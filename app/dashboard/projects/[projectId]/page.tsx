@@ -44,7 +44,7 @@ export default function ProjectDetailsPage() {
 
         unsubscribeProject = onSnapshot(projectRef, (snapshot) => {
           if (snapshot.exists()) {
-            const data = {
+            const data: any = {
               id: snapshot.id,
               ...snapshot.data(),
             };
