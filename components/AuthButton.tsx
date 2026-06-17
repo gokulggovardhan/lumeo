@@ -5,14 +5,19 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
+import { saveUserProfile } from "@/lib/userProfile";
 
 export default function AuthButton() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+
+      if (currentUser) {
+        await saveUserProfile(currentUser);
+      }
     });
 
     return () => unsubscribe();
@@ -20,7 +25,8 @@ export default function AuthButton() {
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      await saveUserProfile(result.user);
       router.push("/dashboard");
     } catch (error: any) {
       alert(error.message);
