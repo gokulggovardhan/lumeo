@@ -1,3 +1,4 @@
+import AuthButton from "@/components/AuthButton";
 const features = [
   {
     title: "Video Editor",
@@ -76,12 +77,7 @@ export default function Home() {
             </a>
           </div>
 
-          <a
-            href="#studio"
-            className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-black transition hover:bg-amber-200"
-          >
-            Explore
-          </a>
+         <AuthButton />
         </nav>
 
         <div className="relative z-10 mx-auto grid max-w-7xl gap-14 pb-20 pt-24 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
