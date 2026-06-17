@@ -204,6 +204,13 @@ export default function DashboardPage() {
                     <p className="text-sm text-purple-300">{project.type}</p>
                     <h3 className="mt-3 text-2xl font-bold">{project.title}</h3>
                     <p className="mt-3 text-white/50">Status: {project.status}</p>
+                    
+                    <Link
+  href={`/dashboard/projects/${project.id}`}
+  className="mt-5 inline-flex rounded-full bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-amber-200"
+>
+  Open Project
+</Link>
                   </div>
                 ))}
               </div>
