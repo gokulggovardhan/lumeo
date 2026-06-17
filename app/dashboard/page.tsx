@@ -4,23 +4,52 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
+import { createProject, listenToUserProjects } from "@/lib/projects";
+import { saveUserProfile } from "@/lib/userProfile";
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null);
   const [checking, setChecking] = useState(true);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [projectTitle, setProjectTitle] = useState("");
+  const [projectType, setProjectType] = useState("Video Project");
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    let unsubscribeProjects: any;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setChecking(false);
+
+      if (unsubscribeProjects) {
+        unsubscribeProjects();
+      }
+
+      if (currentUser) {
+        await saveUserProfile(currentUser);
+
+        unsubscribeProjects = listenToUserProjects(currentUser.uid, (items) => {
+          setProjects(items);
+        });
+      } else {
+        setProjects([]);
+      }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+
+      if (unsubscribeProjects) {
+        unsubscribeProjects();
+      }
+    };
   }, []);
 
   const handleLogin = async () => {
     try {
-      await signInWithPopup(auth, googleProvider);
+      const result = await signInWithPopup(auth, googleProvider);
+      await saveUserProfile(result.user);
     } catch (error: any) {
       alert(error.message);
     }
@@ -31,6 +60,26 @@ export default function DashboardPage() {
       await signOut(auth);
     } catch (error: any) {
       alert(error.message);
+    }
+  };
+
+  const handleCreateProject = async (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!projectTitle.trim()) {
+      alert("Please enter project title");
+      return;
+    }
+
+    try {
+      setSaving(true);
+      await createProject(user, projectTitle.trim(), projectType);
+      setProjectTitle("");
+      setProjectType("Video Project");
+    } catch (error: any) {
+      alert(error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -100,27 +149,65 @@ export default function DashboardPage() {
             You are signed in as {user.email}
           </p>
 
-          <div className="mt-10 grid gap-5 md:grid-cols-3">
-            <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
-              <h2 className="text-2xl font-bold">Projects</h2>
-              <p className="mt-3 text-white/55">
-                Your video and content projects will appear here.
-              </p>
-            </div>
+          <div className="mt-10 rounded-3xl border border-white/10 bg-black/25 p-6">
+            <h2 className="text-2xl font-bold">Create Project</h2>
+            <p className="mt-2 text-white/55">
+              Start a new creative workspace and save it to your account.
+            </p>
 
-            <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
-              <h2 className="text-2xl font-bold">Uploads</h2>
-              <p className="mt-3 text-white/55">
-                Uploads will be added after storage setup.
-              </p>
-            </div>
+            <form
+              onSubmit={handleCreateProject}
+              className="mt-6 grid gap-4 md:grid-cols-[1fr_220px_160px]"
+            >
+              <input
+                value={projectTitle}
+                onChange={(event) => setProjectTitle(event.target.value)}
+                placeholder="Project title"
+                className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/35"
+              />
 
-            <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
-              <h2 className="text-2xl font-bold">Creator Tools</h2>
-              <p className="mt-3 text-white/55">
-                Shorts Creator and editor tools will be added next.
-              </p>
-            </div>
+              <select
+                value={projectType}
+                onChange={(event) => setProjectType(event.target.value)}
+                className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none"
+              >
+                <option className="bg-black">Video Project</option>
+                <option className="bg-black">Shorts Project</option>
+                <option className="bg-black">Podcast Project</option>
+                <option className="bg-black">Learning Project</option>
+                <option className="bg-black">Developer Project</option>
+              </select>
+
+              <button
+                disabled={saving}
+                className="rounded-2xl bg-white px-5 py-4 font-bold text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Create"}
+              </button>
+            </form>
+          </div>
+
+          <div className="mt-10">
+            <h2 className="text-2xl font-bold">Your Projects</h2>
+
+            {projects.length === 0 ? (
+              <div className="mt-5 rounded-3xl border border-white/10 bg-black/25 p-6 text-white/55">
+                No projects yet. Create your first project above.
+              </div>
+            ) : (
+              <div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {projects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="rounded-3xl border border-white/10 bg-black/25 p-6"
+                  >
+                    <p className="text-sm text-purple-300">{project.type}</p>
+                    <h3 className="mt-3 text-2xl font-bold">{project.title}</h3>
+                    <p className="mt-3 text-white/50">Status: {project.status}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>
