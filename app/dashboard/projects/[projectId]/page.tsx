@@ -23,6 +23,7 @@ export default function ProjectDetailsPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.projectId as string;
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [user, setUser] = useState<any>(null);
@@ -31,18 +32,31 @@ export default function ProjectDetailsPage() {
 
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState("Draft");
-  const [script, setScript] = useState("");
-  const [notes, setNotes] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const [localVideoURL, setLocalVideoURL] = useState("");
   const [localVideoName, setLocalVideoName] = useState("");
   const [localVideoSize, setLocalVideoSize] = useState("");
   const [videoDuration, setVideoDuration] = useState(0);
 
+  const [localAudioURL, setLocalAudioURL] = useState("");
+  const [localAudioName, setLocalAudioName] = useState("");
+
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
 
-  const [saving, setSaving] = useState(false);
+  const [overlayText, setOverlayText] = useState("Your title here");
+  const [overlayX, setOverlayX] = useState(50);
+  const [overlayY, setOverlayY] = useState(45);
+  const [overlaySize, setOverlaySize] = useState(34);
+  const [overlayColor, setOverlayColor] = useState("#ffffff");
+
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [grayscale, setGrayscale] = useState(0);
+  const [blur, setBlur] = useState(0);
+
+  const videoFilter = `brightness(${brightness}%) contrast(${contrast}%) grayscale(${grayscale}%) blur(${blur}px)`;
 
   useEffect(() => {
     let unsubscribeProject: any;
@@ -67,14 +81,27 @@ export default function ProjectDetailsPage() {
               ...snapshot.data(),
             };
 
+            const editor = data.editor || {};
+            const timeline = data.timeline || {};
+
             setProject(data);
             setTitle(data.title || "");
             setStatus(data.status || "Draft");
-            setScript(data.script || "");
-            setNotes(data.notes || "");
-            setTrimStart(data.timeline?.trimStart || 0);
-            setTrimEnd(data.timeline?.trimEnd || 0);
-            setVideoDuration(data.timeline?.videoDuration || 0);
+
+            setTrimStart(editor.trimStart ?? timeline.trimStart ?? 0);
+            setTrimEnd(editor.trimEnd ?? timeline.trimEnd ?? 0);
+            setVideoDuration(editor.videoDuration ?? timeline.videoDuration ?? 0);
+
+            setOverlayText(editor.textOverlay?.text || "Your title here");
+            setOverlayX(editor.textOverlay?.x ?? 50);
+            setOverlayY(editor.textOverlay?.y ?? 45);
+            setOverlaySize(editor.textOverlay?.size ?? 34);
+            setOverlayColor(editor.textOverlay?.color || "#ffffff");
+
+            setBrightness(editor.effects?.brightness ?? 100);
+            setContrast(editor.effects?.contrast ?? 100);
+            setGrayscale(editor.effects?.grayscale ?? 0);
+            setBlur(editor.effects?.blur ?? 0);
           } else {
             setProject(null);
           }
@@ -98,6 +125,14 @@ export default function ProjectDetailsPage() {
       }
     };
   }, [localVideoURL]);
+
+  useEffect(() => {
+    return () => {
+      if (localAudioURL) {
+        URL.revokeObjectURL(localAudioURL);
+      }
+    };
+  }, [localAudioURL]);
 
   const handleLogin = async () => {
     try {
@@ -134,6 +169,22 @@ export default function ProjectDetailsPage() {
     setLocalVideoSize(`${(file.size / (1024 * 1024)).toFixed(2)} MB`);
   };
 
+  const handleAudioSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+
+    if (!file) return;
+
+    if (!file.type.startsWith("audio/")) {
+      alert("Please select an audio/music file");
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+
+    setLocalAudioURL(url);
+    setLocalAudioName(file.name);
+  };
+
   const handleLoadedMetadata = () => {
     const duration = videoRef.current?.duration || 0;
     const roundedDuration = Math.floor(duration);
@@ -142,6 +193,14 @@ export default function ProjectDetailsPage() {
 
     if (!trimEnd || trimEnd === 0) {
       setTrimEnd(roundedDuration);
+    }
+  };
+
+  const handleVideoTimeUpdate = () => {
+    if (!videoRef.current) return;
+
+    if (trimEnd > 0 && videoRef.current.currentTime >= Number(trimEnd)) {
+      videoRef.current.pause();
     }
   };
 
@@ -171,19 +230,33 @@ export default function ProjectDetailsPage() {
       await updateDoc(doc(db, "projects", projectId), {
         title: title.trim(),
         status,
-        script,
-        notes,
-        timeline: {
+        editor: {
+          mode: "shorts-editor",
           trimStart: Number(trimStart) || 0,
           trimEnd: Number(trimEnd) || 0,
           videoDuration: Number(videoDuration) || 0,
           localVideoName:
-            localVideoName || project?.timeline?.localVideoName || "",
+            localVideoName || project?.editor?.localVideoName || "",
+          localAudioName:
+            localAudioName || project?.editor?.localAudioName || "",
+          textOverlay: {
+            text: overlayText,
+            x: Number(overlayX) || 50,
+            y: Number(overlayY) || 45,
+            size: Number(overlaySize) || 34,
+            color: overlayColor || "#ffffff",
+          },
+          effects: {
+            brightness: Number(brightness) || 100,
+            contrast: Number(contrast) || 100,
+            grayscale: Number(grayscale) || 0,
+            blur: Number(blur) || 0,
+          },
         },
         updatedAt: serverTimestamp(),
       });
 
-      alert("Project saved successfully");
+      alert("Editor settings saved successfully");
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -219,7 +292,7 @@ export default function ProjectDetailsPage() {
           <h1 className="text-3xl font-black">Sign in required</h1>
 
           <p className="mt-4 text-white/60">
-            Please sign in with Google to open your project.
+            Please sign in with Google to open your editor.
           </p>
 
           <button
@@ -282,7 +355,7 @@ export default function ProjectDetailsPage() {
 
         <div className="mt-6 rounded-[2.5rem] border border-white/10 bg-white/[0.04] p-8 sm:p-12">
           <p className="text-sm font-bold uppercase tracking-[0.3em] text-purple-300">
-            Project Workspace
+            Shorts Editor
           </p>
 
           <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
@@ -290,57 +363,67 @@ export default function ProjectDetailsPage() {
           </h1>
 
           <p className="mt-4 text-lg text-white/60">
-            Type: {project.type} · Status: {project.status}
+            30 sec to 3 min short-format editor · {project.type}
           </p>
 
-          <div className="mt-10 grid gap-5 xl:grid-cols-[1fr_0.8fr]">
+          <div className="mt-10 grid gap-6 xl:grid-cols-[0.85fr_1.15fr_0.75fr]">
             <div className="space-y-5">
               <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
-                <h2 className="text-2xl font-bold">Local Video Preview</h2>
+                <h2 className="text-2xl font-bold">Media</h2>
 
                 <p className="mt-3 text-white/55">
-                  Select a video from your laptop. The video stays in your
-                  browser and is not uploaded.
+                  Select local video and music. Files are not uploaded.
                 </p>
+
+                <label className="mt-6 block text-sm text-white/50">
+                  Select video
+                </label>
 
                 <input
                   type="file"
                   accept="video/*"
                   onChange={handleVideoSelect}
-                  className="mt-6 block w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:font-bold file:text-black"
+                  className="mt-2 block w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:font-bold file:text-black"
                 />
 
-                {localVideoURL ? (
-                  <div className="mt-6">
-                    <video
-                      ref={videoRef}
-                      src={localVideoURL}
-                      controls
-                      onLoadedMetadata={handleLoadedMetadata}
-                      className="w-full rounded-3xl border border-white/10 bg-black"
-                    />
-
-                    <div className="mt-4 grid gap-3 text-sm text-white/60 sm:grid-cols-3">
-                      <p>File: {localVideoName}</p>
-                      <p>Size: {localVideoSize}</p>
-                      <p>Duration: {videoDuration}s</p>
-                    </div>
+                {localVideoName && (
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">
+                    <p>Video: {localVideoName}</p>
+                    <p>Size: {localVideoSize}</p>
+                    <p>Duration: {videoDuration}s</p>
                   </div>
-                ) : (
-                  <div className="mt-6 rounded-3xl border border-dashed border-white/15 bg-white/[0.03] p-8 text-center text-white/45">
-                    No local video selected.
+                )}
+
+                <label className="mt-6 block text-sm text-white/50">
+                  Select music/audio
+                </label>
+
+                <input
+                  type="file"
+                  accept="audio/*"
+                  onChange={handleAudioSelect}
+                  className="mt-2 block w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white file:mr-4 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:font-bold file:text-black"
+                />
+
+                {localAudioURL && (
+                  <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="mb-3 text-sm text-white/60">
+                      Music: {localAudioName}
+                    </p>
+
+                    <audio
+                      src={localAudioURL}
+                      controls
+                      className="w-full"
+                    />
                   </div>
                 )}
               </div>
 
               <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
-                <h2 className="text-2xl font-bold">Timeline Settings</h2>
+                <h2 className="text-2xl font-bold">Trim Controls</h2>
 
-                <p className="mt-3 text-white/55">
-                  Save trim start and end time to Firestore.
-                </p>
-
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div className="mt-6 grid gap-4">
                   <div>
                     <label className="text-sm text-white/50">
                       Trim start seconds
@@ -348,6 +431,7 @@ export default function ProjectDetailsPage() {
 
                     <input
                       type="number"
+                      min={0}
                       value={trimStart}
                       onChange={(event) =>
                         setTrimStart(Number(event.target.value))
@@ -363,6 +447,7 @@ export default function ProjectDetailsPage() {
 
                     <input
                       type="number"
+                      min={0}
                       value={trimEnd}
                       onChange={(event) =>
                         setTrimEnd(Number(event.target.value))
@@ -370,19 +455,229 @@ export default function ProjectDetailsPage() {
                       className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none"
                     />
                   </div>
+
+                  <button
+                    onClick={handlePlayTrimPreview}
+                    disabled={!localVideoURL}
+                    className="rounded-2xl bg-white px-6 py-3 font-bold text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Preview Trim
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold">9:16 Preview</h2>
+                  <p className="mt-2 text-white/55">
+                    Reel / Shorts vertical preview.
+                  </p>
                 </div>
 
-                <button
-                  onClick={handlePlayTrimPreview}
-                  disabled={!localVideoURL}
-                  className="mt-5 rounded-2xl bg-white px-6 py-3 font-bold text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Preview From Trim Start
-                </button>
+                <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white/60">
+                  9:16
+                </span>
+              </div>
+
+              <div className="mx-auto mt-6 flex max-w-[380px] justify-center">
+                <div className="relative aspect-[9/16] w-full overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-2xl">
+                  {localVideoURL ? (
+                    <video
+                      ref={videoRef}
+                      src={localVideoURL}
+                      controls
+                      onLoadedMetadata={handleLoadedMetadata}
+                      onTimeUpdate={handleVideoTimeUpdate}
+                      className="h-full w-full object-cover"
+                      style={{ filter: videoFilter }}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center px-8 text-center text-white/40">
+                      Select a video to start editing.
+                    </div>
+                  )}
+
+                  {overlayText && (
+                    <div
+                      className="pointer-events-none absolute max-w-[85%] text-center font-black leading-tight"
+                      style={{
+                        left: `${overlayX}%`,
+                        top: `${overlayY}%`,
+                        transform: "translate(-50%, -50%)",
+                        fontSize: `${overlaySize}px`,
+                        color: overlayColor,
+                        textShadow:
+                          "0 4px 20px rgba(0,0,0,0.85), 0 1px 2px rgba(0,0,0,0.9)",
+                      }}
+                    >
+                      {overlayText}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/55">
+                <p>
+                  Note: This editor currently previews local media only. The video
+                  is not uploaded, so it will need to be selected again after refresh.
+                </p>
               </div>
             </div>
 
             <div className="space-y-5">
+              <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
+                <h2 className="text-2xl font-bold">Text Overlay</h2>
+
+                <div className="mt-6 space-y-4">
+                  <div>
+                    <label className="text-sm text-white/50">Text</label>
+
+                    <textarea
+                      value={overlayText}
+                      onChange={(event) => setOverlayText(event.target.value)}
+                      placeholder="Enter overlay text"
+                      className="mt-2 min-h-24 w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/35"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-white/50">
+                      Horizontal position: {overlayX}%
+                    </label>
+
+                    <input
+                      type="range"
+                      min={5}
+                      max={95}
+                      value={overlayX}
+                      onChange={(event) =>
+                        setOverlayX(Number(event.target.value))
+                      }
+                      className="mt-2 w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-white/50">
+                      Vertical position: {overlayY}%
+                    </label>
+
+                    <input
+                      type="range"
+                      min={5}
+                      max={95}
+                      value={overlayY}
+                      onChange={(event) =>
+                        setOverlayY(Number(event.target.value))
+                      }
+                      className="mt-2 w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-white/50">
+                      Text size: {overlaySize}px
+                    </label>
+
+                    <input
+                      type="range"
+                      min={18}
+                      max={72}
+                      value={overlaySize}
+                      onChange={(event) =>
+                        setOverlaySize(Number(event.target.value))
+                      }
+                      className="mt-2 w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-white/50">Text color</label>
+
+                    <input
+                      type="color"
+                      value={overlayColor}
+                      onChange={(event) => setOverlayColor(event.target.value)}
+                      className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 p-2"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
+                <h2 className="text-2xl font-bold">Effects</h2>
+
+                <div className="mt-6 space-y-5">
+                  <div>
+                    <label className="text-sm text-white/50">
+                      Brightness: {brightness}%
+                    </label>
+
+                    <input
+                      type="range"
+                      min={50}
+                      max={150}
+                      value={brightness}
+                      onChange={(event) =>
+                        setBrightness(Number(event.target.value))
+                      }
+                      className="mt-2 w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-white/50">
+                      Contrast: {contrast}%
+                    </label>
+
+                    <input
+                      type="range"
+                      min={50}
+                      max={180}
+                      value={contrast}
+                      onChange={(event) =>
+                        setContrast(Number(event.target.value))
+                      }
+                      className="mt-2 w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-white/50">
+                      Grayscale: {grayscale}%
+                    </label>
+
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={grayscale}
+                      onChange={(event) =>
+                        setGrayscale(Number(event.target.value))
+                      }
+                      className="mt-2 w-full"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm text-white/50">
+                      Blur: {blur}px
+                    </label>
+
+                    <input
+                      type="range"
+                      min={0}
+                      max={8}
+                      value={blur}
+                      onChange={(event) => setBlur(Number(event.target.value))}
+                      className="mt-2 w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
                 <h2 className="text-2xl font-bold">Project Settings</h2>
 
@@ -413,46 +708,29 @@ export default function ProjectDetailsPage() {
                       <option className="bg-black">Archived</option>
                     </select>
                   </div>
+
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="w-full rounded-2xl bg-white px-6 py-4 font-bold text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {saving ? "Saving..." : "Save Editor Settings"}
+                  </button>
+
+                  <button
+                    disabled
+                    className="w-full cursor-not-allowed rounded-2xl border border-white/10 bg-white/5 px-6 py-4 font-bold text-white/35"
+                  >
+                    Export MP4 Coming Next
+                  </button>
+
+                  <button
+                    onClick={handleDelete}
+                    className="w-full rounded-2xl border border-red-400/30 bg-red-500/10 px-6 py-4 font-bold text-red-200 transition hover:bg-red-500/20"
+                  >
+                    Delete Project
+                  </button>
                 </div>
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
-                <h2 className="text-2xl font-bold">Script</h2>
-
-                <textarea
-                  value={script}
-                  onChange={(event) => setScript(event.target.value)}
-                  placeholder="Write your video script here..."
-                  className="mt-5 min-h-52 w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/35"
-                />
-              </div>
-
-              <div className="rounded-3xl border border-white/10 bg-black/25 p-6">
-                <h2 className="text-2xl font-bold">Notes</h2>
-
-                <textarea
-                  value={notes}
-                  onChange={(event) => setNotes(event.target.value)}
-                  placeholder="Add project notes, ideas, captions, scenes..."
-                  className="mt-5 min-h-40 w-full rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/35"
-                />
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="rounded-2xl bg-white px-6 py-4 font-bold text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {saving ? "Saving..." : "Save Project"}
-                </button>
-
-                <button
-                  onClick={handleDelete}
-                  className="rounded-2xl border border-red-400/30 bg-red-500/10 px-6 py-4 font-bold text-red-200 transition hover:bg-red-500/20"
-                >
-                  Delete Project
-                </button>
               </div>
             </div>
           </div>
