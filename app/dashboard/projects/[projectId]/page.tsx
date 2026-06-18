@@ -324,26 +324,57 @@ function StatPill({ label, value }: { label: string; value: string }) {
 }
 
 type VideoUploadResponse = {
-  success: true;
   fileId: string;
   fileName: string;
   mimeType: string;
   size: number;
 };
 
-function uploadVideoToBackend(
+type VideoUploadSessionResponse = {
+  success: true;
+  uploadUrl: string;
+  fileName: string;
+};
+
+async function createVideoUploadSession(file: File, projectId: string) {
+  const response = await fetch("/api/google-drive/create-upload-session", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fileName: file.name,
+      mimeType: file.type,
+      size: file.size,
+      projectId,
+    }),
+  });
+
+  const payload = (await response.json()) as
+    | VideoUploadSessionResponse
+    | { success: false; error?: string };
+
+  if (!response.ok || !payload.success) {
+    throw new Error(
+      "error" in payload && payload.error ? payload.error : "Upload failed",
+    );
+  }
+
+  return payload;
+}
+
+async function uploadVideoDirectly(
   file: File,
   projectId: string,
   onProgress: (progress: number) => void
 ) {
-  return new Promise<VideoUploadResponse>((resolve, reject) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("projectId", projectId);
+  const session = await createVideoUploadSession(file, projectId);
 
+  return new Promise<VideoUploadResponse>((resolve, reject) => {
     const request = new XMLHttpRequest();
 
-    request.open("POST", "/api/google-drive/upload");
+    request.open("PUT", session.uploadUrl);
+    request.setRequestHeader("Content-Type", file.type);
 
     request.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;
@@ -353,14 +384,27 @@ function uploadVideoToBackend(
 
     request.onload = () => {
       try {
-        const response = JSON.parse(request.responseText || "{}");
+        const response = JSON.parse(request.responseText || "{}") as {
+          id?: string;
+          name?: string;
+          mimeType?: string;
+          size?: string;
+          error?: {
+            message?: string;
+          };
+        };
 
-        if (request.status >= 200 && request.status < 300 && response.success) {
-          resolve(response as VideoUploadResponse);
+        if (request.status >= 200 && request.status < 300 && response.id) {
+          resolve({
+            fileId: response.id,
+            fileName: response.name || session.fileName,
+            mimeType: response.mimeType || file.type,
+            size: Number(response.size || file.size),
+          });
           return;
         }
 
-        reject(new Error(response.error || "Upload failed"));
+        reject(new Error(response.error?.message || "Upload failed"));
       } catch (error) {
         reject(error);
       }
@@ -368,7 +412,7 @@ function uploadVideoToBackend(
 
     request.onerror = () => reject(new Error("Upload failed"));
     request.onabort = () => reject(new Error("Upload cancelled"));
-    request.send(formData);
+    request.send(file);
   });
 }
 
@@ -953,7 +997,7 @@ export default function ProjectDetailsPage() {
       setVideoUploadStatus("Uploading video...");
 
       const file = await getCurrentVideoFile();
-      const uploaded = await uploadVideoToBackend(file, projectId, (progress) => {
+      const uploaded = await uploadVideoDirectly(file, projectId, (progress) => {
         setVideoUploadProgress(progress);
       });
 

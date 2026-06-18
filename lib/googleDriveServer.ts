@@ -43,6 +43,11 @@ type DriveUploadResult = {
   size: number;
 };
 
+type DriveUploadSession = {
+  uploadUrl: string;
+  fileName: string;
+};
+
 export function getGoogleDriveEnv(): GoogleDriveEnv {
   const env = {
     clientId: process.env.GOOGLE_DRIVE_CLIENT_ID,
@@ -297,5 +302,75 @@ export async function uploadVideoToDriveUploadsFolder({
     fileName: payload.name,
     mimeType: payload.mimeType || file.type,
     size: Number(payload.size || file.size),
+  };
+}
+
+export async function createVideoUploadSession({
+  fileName,
+  mimeType,
+  size,
+}: {
+  fileName: string;
+  mimeType: string;
+  size: number;
+}): Promise<DriveUploadSession> {
+  const env = getGoogleDriveStatusEnv();
+  const accessToken = await getGoogleDriveAccessToken();
+  const metadata = {
+    name: fileName,
+    parents: [env.uploadsFolderId],
+    mimeType,
+  };
+
+  const params = new URLSearchParams({
+    uploadType: "resumable",
+    fields: "id,name,mimeType,size",
+    supportsAllDrives: "true",
+  });
+
+  const response = await fetch(
+    `${GOOGLE_DRIVE_UPLOAD_URL}/files?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+        "X-Upload-Content-Type": mimeType,
+        "X-Upload-Content-Length": String(size),
+      },
+      body: JSON.stringify(metadata),
+    },
+  );
+
+  const uploadUrl = response.headers.get("location");
+
+  if (!response.ok || !uploadUrl) {
+    let payload: { error?: { code?: number; message?: string } } = {};
+
+    try {
+      payload = (await response.json()) as {
+        error?: { code?: number; message?: string };
+      };
+    } catch {
+      // Google may return an empty body when resumable session creation fails.
+    }
+
+    console.error("Google Drive resumable upload session failed", {
+      status: response.status,
+      errorCode: payload.error?.code,
+      errorMessage: payload.error?.message,
+    });
+
+    throw new GoogleDriveServerError(
+      payload.error?.code
+        ? `drive_${payload.error.code}`
+        : "drive_upload_session_failed",
+      payload.error?.message || "Google Drive upload session failed.",
+    );
+  }
+
+  return {
+    uploadUrl,
+    fileName,
   };
 }
