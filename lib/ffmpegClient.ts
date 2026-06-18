@@ -114,7 +114,7 @@ async function createFFmpegClient() {
 
     ffmpeg = new FFmpeg();
 
-    notifyPreloadProgress(35);
+    notifyPreloadProgress(20);
 
     await withTimeout(
       ffmpeg.load({

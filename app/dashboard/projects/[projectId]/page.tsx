@@ -410,11 +410,17 @@ export default function ProjectDetailsPage() {
   const [enginePreparing, setEnginePreparing] = useState(false);
   const [engineProgress, setEngineProgress] = useState(0);
   const [exportError, setExportError] = useState("");
-  const [exportPhase, setExportPhase] = useState("");
+  const [exportPhase, setExportPhase] = useState("idle");
   const [userExportRequested, setUserExportRequested] = useState(false);
   const [lastExportAction, setLastExportAction] = useState<
     "video" | "audio" | null
   >(null);
+
+  const exportRunIdRef = useRef(0);
+  const exportProgressRef = useRef(0);
+  const exportProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
 
   const output = getOutputDimensions(canvasFormat, exportResolution);
 
@@ -629,6 +635,13 @@ export default function ProjectDetailsPage() {
   }, [downloadUrl]);
 
   useEffect(() => {
+    return () => {
+      clearExportProgressTimer();
+      exportRunIdRef.current += 1;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!videoRef.current) return;
 
     videoRef.current.playbackRate = playbackSpeed;
@@ -738,6 +751,7 @@ export default function ProjectDetailsPage() {
     setLocalAudioURL(url);
     setLocalAudioName(file.name);
     setAudioRestored(false);
+    resetExportState();
 
     try {
       await saveMediaToBrowser(audioStorageKey, file);
@@ -876,13 +890,100 @@ export default function ProjectDetailsPage() {
     setDownloadName("");
   };
 
+  const clearExportProgressTimer = () => {
+    if (!exportProgressTimerRef.current) {
+      return;
+    }
+
+    clearInterval(exportProgressTimerRef.current);
+    exportProgressTimerRef.current = null;
+  };
+
+  const updateExportProgress = (
+    runId: number,
+    source: string,
+    value: number,
+    phase: string,
+  ) => {
+    if (runId !== exportRunIdRef.current) {
+      console.log("[Lumeo Export] progress update", {
+        source,
+        value,
+        phase,
+        runId,
+        ignored: true,
+      });
+      return false;
+    }
+
+    const nextValue = Math.min(100, Math.max(0, Math.round(value)));
+
+    console.log("[Lumeo Export] progress update", {
+      source,
+      value: nextValue,
+      phase,
+      runId,
+    });
+
+    exportProgressRef.current = nextValue;
+    setExportProgress(nextValue);
+    return true;
+  };
+
+  const startPreparationProgress = (runId: number, phase: string) => {
+    clearExportProgressTimer();
+    updateExportProgress(runId, "preparation-start", 1, phase);
+
+    let simulatedProgress = 1;
+
+    exportProgressTimerRef.current = setInterval(() => {
+      if (runId !== exportRunIdRef.current) {
+        clearExportProgressTimer();
+        return;
+      }
+
+      simulatedProgress = Math.min(
+        90,
+        simulatedProgress + (simulatedProgress < 20 ? 2 : 1),
+      );
+
+      updateExportProgress(runId, "preparation-timer", simulatedProgress, phase);
+
+      if (simulatedProgress >= 90) {
+        clearExportProgressTimer();
+      }
+    }, 900);
+  };
+
+  const startExportRun = (phase: "Preparing export" | "Preparing audio") => {
+    clearExportProgressTimer();
+    exportRunIdRef.current += 1;
+
+    const runId = exportRunIdRef.current;
+
+    clearDownload();
+    setExporting(true);
+    exportProgressRef.current = 0;
+    setExportProgress(0);
+    setExportStatus(phase);
+    setExportPhase(phase);
+    setExportError("");
+    setUserExportRequested(true);
+    startPreparationProgress(runId, phase);
+
+    return runId;
+  };
+
   const resetExportState = () => {
+    clearExportProgressTimer();
+    exportRunIdRef.current += 1;
     clearDownload();
     setExporting(false);
+    exportProgressRef.current = 0;
     setExportProgress(0);
     setExportStatus("");
     setExportError("");
-    setExportPhase("");
+    setExportPhase("idle");
     setUserExportRequested(false);
     setLastExportAction(null);
   };
@@ -901,14 +1002,17 @@ export default function ProjectDetailsPage() {
     return `${baseName || "lumeo-export"}-${kind}.${format}`;
   };
 
-  const prepareExportEngine = async () => {
+  const prepareExportEngine = async (
+    runId: number,
+    phase: "Preparing export" | "Preparing audio",
+  ) => {
     if (engineReady) {
       setEngineProgress(100);
       return;
     }
 
     setEnginePreparing(true);
-    setExportPhase("Preparing export");
+    setExportPhase(phase);
     setExportError("");
 
     try {
@@ -931,11 +1035,20 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  const createFFmpegOptions = (label: "Optimizing video" | "Preparing audio") => ({
+  const createFFmpegOptions = (
+    runId: number,
+    label: "Optimizing video" | "Extracting audio",
+  ) => ({
     onProgress: ({ progress }: { progress: number }) => {
-      const nextProgress = Math.min(100, Math.max(0, Math.round(progress * 100)));
+      const nextProgress = Math.min(
+        98,
+        Math.max(exportProgressRef.current, Math.round(progress * 100)),
+      );
 
-      setExportProgress(nextProgress);
+      if (!updateExportProgress(runId, "runtime-progress", nextProgress, label)) {
+        return;
+      }
+
       setExportStatus(label);
       setExportPhase(label);
     },
@@ -954,16 +1067,12 @@ export default function ProjectDetailsPage() {
 
     let nextDownloadUrl = "";
     let failurePoint = "starting video export";
+    let runId = exportRunIdRef.current;
 
     try {
       resetExportState();
-      setUserExportRequested(true);
       setLastExportAction("video");
-      setExporting(true);
-      setExportProgress(0);
-      setExportStatus("Preparing export");
-      setExportPhase("Preparing export");
-      setExportError("");
+      runId = startExportRun("Preparing export");
 
       failurePoint = "reading local video";
       const file = await getCurrentVideoFile();
@@ -976,13 +1085,14 @@ export default function ProjectDetailsPage() {
       console.info("[Lumeo export] trimEnd", trimEnd);
       console.info("[Lumeo export] videoDuration", videoDuration);
 
-      const ffmpeg = createFFmpegOptions("Optimizing video");
+      const ffmpeg = createFFmpegOptions(runId, "Optimizing video");
 
       failurePoint = "preparing export runtime";
-      await prepareExportEngine();
+      await prepareExportEngine(runId, "Preparing export");
       failurePoint = "connecting export runtime";
       await getFFmpeg(ffmpeg);
 
+      clearExportProgressTimer();
       setExportStatus("Optimizing video");
       setExportPhase("Optimizing video");
 
@@ -1004,13 +1114,15 @@ export default function ProjectDetailsPage() {
       const result = await exportTrimmedVideoWithFFmpeg(file, exportOptions);
 
       failurePoint = "finalizing download";
+      clearExportProgressTimer();
       setExportStatus("Finalizing download");
       setExportPhase("Finalizing download");
+      updateExportProgress(runId, "finalizing", 99, "Finalizing download");
 
       nextDownloadUrl = URL.createObjectURL(result.blob);
       setDownloadUrl(nextDownloadUrl);
       setDownloadName(result.fileName);
-      setExportProgress(100);
+      updateExportProgress(runId, "complete", 100, "Export complete");
       setExportStatus("Export complete");
       setExportPhase("Export complete");
     } catch (error: any) {
@@ -1023,7 +1135,8 @@ export default function ProjectDetailsPage() {
       resetFFmpeg();
       setEngineReady(false);
       setEngineProgress(0);
-      setExportProgress(0);
+      clearExportProgressTimer();
+      updateExportProgress(runId, "failed", 0, "failed");
       setExportError("Export failed. Please try a smaller video or refresh and try again.");
       setExportStatus("");
       setExportPhase("failed");
@@ -1037,16 +1150,12 @@ export default function ProjectDetailsPage() {
 
     let nextDownloadUrl = "";
     let failurePoint = "starting audio extraction";
+    let runId = exportRunIdRef.current;
 
     try {
       resetExportState();
-      setUserExportRequested(true);
       setLastExportAction("audio");
-      setExporting(true);
-      setExportProgress(0);
-      setExportStatus("Preparing export");
-      setExportPhase("Preparing export");
-      setExportError("");
+      runId = startExportRun("Preparing audio");
 
       failurePoint = "reading local video";
       const file = await getCurrentVideoFile();
@@ -1059,15 +1168,16 @@ export default function ProjectDetailsPage() {
       console.info("[Lumeo export] trimEnd", trimEnd);
       console.info("[Lumeo export] videoDuration", videoDuration);
 
-      const ffmpeg = createFFmpegOptions("Preparing audio");
+      const ffmpeg = createFFmpegOptions(runId, "Extracting audio");
 
       failurePoint = "preparing export runtime";
-      await prepareExportEngine();
+      await prepareExportEngine(runId, "Preparing audio");
       failurePoint = "connecting export runtime";
       await getFFmpeg(ffmpeg);
 
-      setExportStatus("Preparing audio");
-      setExportPhase("Preparing audio");
+      clearExportProgressTimer();
+      setExportStatus("Extracting audio");
+      setExportPhase("Extracting audio");
 
       failurePoint = "running audio extraction";
       const result = await extractAudioWithFFmpeg(file, {
@@ -1077,13 +1187,15 @@ export default function ProjectDetailsPage() {
       });
 
       failurePoint = "finalizing download";
+      clearExportProgressTimer();
       setExportStatus("Finalizing download");
       setExportPhase("Finalizing download");
+      updateExportProgress(runId, "finalizing", 99, "Finalizing download");
 
       nextDownloadUrl = URL.createObjectURL(result.blob);
       setDownloadUrl(nextDownloadUrl);
       setDownloadName(result.fileName);
-      setExportProgress(100);
+      updateExportProgress(runId, "complete", 100, "Export complete");
       setExportStatus("Export complete");
       setExportPhase("Export complete");
     } catch (error: any) {
@@ -1096,7 +1208,8 @@ export default function ProjectDetailsPage() {
       resetFFmpeg();
       setEngineReady(false);
       setEngineProgress(0);
-      setExportProgress(0);
+      clearExportProgressTimer();
+      updateExportProgress(runId, "failed", 0, "failed");
       setExportError("Export failed. Please try a smaller video or refresh and try again.");
       setExportStatus("");
       setExportPhase("failed");
@@ -1716,10 +1829,7 @@ export default function ProjectDetailsPage() {
     }
 
     if (activeTool === "export") {
-      const visibleProgress =
-        exportPhase === "Preparing export" && !engineReady
-          ? engineProgress
-          : exportProgress;
+      const visibleProgress = exportProgress;
       const visiblePhase = exportPhase || exportStatus || "Preparing export";
 
       return (
