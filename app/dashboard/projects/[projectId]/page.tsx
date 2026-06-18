@@ -21,6 +21,7 @@ import { auth, googleProvider, db } from "@/lib/firebase";
 import {
   loadFFmpegClient as getFFmpeg,
   preloadFFmpeg,
+  resetFFmpeg,
 } from "@/lib/ffmpegClient";
 import {
   exportVideo as exportTrimmedVideoWithFFmpeg,
@@ -347,6 +348,7 @@ export default function ProjectDetailsPage() {
   const [localVideoURL, setLocalVideoURL] = useState("");
   const [localVideoName, setLocalVideoName] = useState("");
   const [localVideoSize, setLocalVideoSize] = useState("");
+  const [localVideoBytes, setLocalVideoBytes] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [videoRestored, setVideoRestored] = useState(false);
 
@@ -396,9 +398,9 @@ export default function ProjectDetailsPage() {
   const [exportFormat, setExportFormat] = useState<VideoFormat>("mp4");
   const [audioFormat, setAudioFormat] = useState<AudioFormat>("mp3");
   const [exportResolution, setExportResolution] =
-    useState<ExportResolution>("1080p");
+    useState<ExportResolution>("720p");
   const [exportFps, setExportFps] = useState<ExportFps>(30);
-  const [exportQuality, setExportQuality] = useState<ExportQuality>("high");
+  const [exportQuality, setExportQuality] = useState<ExportQuality>("standard");
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
   const [exportStatus, setExportStatus] = useState("");
@@ -410,6 +412,9 @@ export default function ProjectDetailsPage() {
   const [exportError, setExportError] = useState("");
   const [exportPhase, setExportPhase] = useState("");
   const [userExportRequested, setUserExportRequested] = useState(false);
+  const [lastExportAction, setLastExportAction] = useState<
+    "video" | "audio" | null
+  >(null);
 
   const output = getOutputDimensions(canvasFormat, exportResolution);
 
@@ -528,9 +533,9 @@ export default function ProjectDetailsPage() {
 
             const savedResolution = editor.exportSettings?.resolution;
             setExportResolution(
-              savedResolution === "720p" || savedResolution === "2k"
+              savedResolution === "1080p" || savedResolution === "2k"
                 ? savedResolution
-                : "1080p"
+                : "720p"
             );
 
             const savedFps = editor.exportSettings?.fps;
@@ -538,9 +543,9 @@ export default function ProjectDetailsPage() {
 
             const savedQuality = editor.exportSettings?.quality;
             setExportQuality(
-              savedQuality === "standard" || savedQuality === "max"
+              savedQuality === "high" || savedQuality === "max"
                 ? savedQuality
-                : "high"
+                : "standard"
             );
           } else {
             setProject(null);
@@ -573,6 +578,7 @@ export default function ProjectDetailsPage() {
           setLocalVideoSize(
             `${(savedVideo.size / (1024 * 1024)).toFixed(2)} MB`
           );
+          setLocalVideoBytes(savedVideo.size);
           setVideoRestored(true);
         }
 
@@ -659,6 +665,8 @@ export default function ProjectDetailsPage() {
         console.error("FFmpeg preload failed", error);
 
         if (!active) return;
+        resetFFmpeg();
+        setEngineReady(false);
         setEngineProgress(0);
       })
       .finally(() => {
@@ -704,7 +712,9 @@ export default function ProjectDetailsPage() {
     setLocalVideoURL(url);
     setLocalVideoName(file.name);
     setLocalVideoSize(`${(file.size / (1024 * 1024)).toFixed(2)} MB`);
+    setLocalVideoBytes(file.size);
     setVideoRestored(false);
+    resetExportState();
 
     try {
       await saveMediaToBrowser(videoStorageKey, file);
@@ -750,12 +760,14 @@ export default function ProjectDetailsPage() {
       setLocalVideoURL("");
       setLocalVideoName("");
       setLocalVideoSize("");
+      setLocalVideoBytes(0);
       setVideoDuration(0);
       setVideoRestored(false);
 
       setLocalAudioURL("");
       setLocalAudioName("");
       setAudioRestored(false);
+      resetExportState();
     } catch (error: any) {
       alert(error.message);
     }
@@ -864,13 +876,19 @@ export default function ProjectDetailsPage() {
     setDownloadName("");
   };
 
-  const resetExportResult = () => {
+  const resetExportState = () => {
     clearDownload();
+    setExporting(false);
     setExportProgress(0);
     setExportStatus("");
     setExportError("");
     setExportPhase("");
     setUserExportRequested(false);
+    setLastExportAction(null);
+  };
+
+  const resetExportResult = () => {
+    resetExportState();
   };
 
   const createExportFileName = (kind: "video" | "audio", format: VideoFormat | AudioFormat) => {
@@ -894,15 +912,19 @@ export default function ProjectDetailsPage() {
     setExportError("");
 
     try {
+      console.info("[Lumeo export] FFmpeg/load started");
       await preloadFFmpeg((progress) => {
         setEngineProgress(Math.min(100, Math.max(0, Math.round(progress))));
       });
 
       setEngineReady(true);
       setEngineProgress(100);
+      console.info("[Lumeo export] FFmpeg/load completed");
     } catch (error) {
       console.error("FFmpeg preparation failed", error);
-      setExportError("Export failed. Please refresh and try again.");
+      setEngineReady(false);
+      resetFFmpeg();
+      setExportError("Export failed. Please try a smaller video or refresh and try again.");
       throw error;
     } finally {
       setEnginePreparing(false);
@@ -931,20 +953,34 @@ export default function ProjectDetailsPage() {
     }
 
     let nextDownloadUrl = "";
+    let failurePoint = "starting video export";
 
     try {
+      resetExportState();
       setUserExportRequested(true);
+      setLastExportAction("video");
       setExporting(true);
       setExportProgress(0);
       setExportStatus("Preparing export");
       setExportPhase("Preparing export");
       setExportError("");
-      clearDownload();
 
+      failurePoint = "reading local video";
       const file = await getCurrentVideoFile();
+
+      console.info("[Lumeo export] selected video file name", file.name);
+      console.info("[Lumeo export] selected video file size", file.size);
+      console.info("[Lumeo export] selected export format", exportFormat);
+      console.info("[Lumeo export] selected audio format", audioFormat);
+      console.info("[Lumeo export] trimStart", trimStart);
+      console.info("[Lumeo export] trimEnd", trimEnd);
+      console.info("[Lumeo export] videoDuration", videoDuration);
+
       const ffmpeg = createFFmpegOptions("Optimizing video");
 
+      failurePoint = "preparing export runtime";
       await prepareExportEngine();
+      failurePoint = "connecting export runtime";
       await getFFmpeg(ffmpeg);
 
       setExportStatus("Optimizing video");
@@ -964,8 +1000,10 @@ export default function ProjectDetailsPage() {
         ffmpeg,
       };
 
+      failurePoint = "running video export";
       const result = await exportTrimmedVideoWithFFmpeg(file, exportOptions);
 
+      failurePoint = "finalizing download";
       setExportStatus("Finalizing download");
       setExportPhase("Finalizing download");
 
@@ -976,15 +1014,19 @@ export default function ProjectDetailsPage() {
       setExportStatus("Export complete");
       setExportPhase("Export complete");
     } catch (error: any) {
-      console.error("Video export failed", error);
+      console.error("Video export failed", { failurePoint, error });
 
       if (nextDownloadUrl) {
         URL.revokeObjectURL(nextDownloadUrl);
       }
 
-      setExportError("Export failed. Please refresh and try again.");
+      resetFFmpeg();
+      setEngineReady(false);
+      setEngineProgress(0);
+      setExportProgress(0);
+      setExportError("Export failed. Please try a smaller video or refresh and try again.");
       setExportStatus("");
-      setExportPhase("");
+      setExportPhase("failed");
     } finally {
       setExporting(false);
     }
@@ -994,31 +1036,47 @@ export default function ProjectDetailsPage() {
     if (exporting) return;
 
     let nextDownloadUrl = "";
+    let failurePoint = "starting audio extraction";
 
     try {
+      resetExportState();
       setUserExportRequested(true);
+      setLastExportAction("audio");
       setExporting(true);
       setExportProgress(0);
       setExportStatus("Preparing export");
       setExportPhase("Preparing export");
       setExportError("");
-      clearDownload();
 
+      failurePoint = "reading local video";
       const file = await getCurrentVideoFile();
+
+      console.info("[Lumeo export] selected video file name", file.name);
+      console.info("[Lumeo export] selected video file size", file.size);
+      console.info("[Lumeo export] selected export format", exportFormat);
+      console.info("[Lumeo export] selected audio format", audioFormat);
+      console.info("[Lumeo export] trimStart", trimStart);
+      console.info("[Lumeo export] trimEnd", trimEnd);
+      console.info("[Lumeo export] videoDuration", videoDuration);
+
       const ffmpeg = createFFmpegOptions("Preparing audio");
 
+      failurePoint = "preparing export runtime";
       await prepareExportEngine();
+      failurePoint = "connecting export runtime";
       await getFFmpeg(ffmpeg);
 
       setExportStatus("Preparing audio");
       setExportPhase("Preparing audio");
 
+      failurePoint = "running audio extraction";
       const result = await extractAudioWithFFmpeg(file, {
         format: audioFormat,
         fileName: createExportFileName("audio", audioFormat),
         ffmpeg,
       });
 
+      failurePoint = "finalizing download";
       setExportStatus("Finalizing download");
       setExportPhase("Finalizing download");
 
@@ -1029,17 +1087,32 @@ export default function ProjectDetailsPage() {
       setExportStatus("Export complete");
       setExportPhase("Export complete");
     } catch (error: any) {
-      console.error("Audio extraction failed", error);
+      console.error("Audio extraction failed", { failurePoint, error });
 
       if (nextDownloadUrl) {
         URL.revokeObjectURL(nextDownloadUrl);
       }
 
-      setExportError("Export failed. Please refresh and try again.");
+      resetFFmpeg();
+      setEngineReady(false);
+      setEngineProgress(0);
+      setExportProgress(0);
+      setExportError("Export failed. Please try a smaller video or refresh and try again.");
       setExportStatus("");
-      setExportPhase("");
+      setExportPhase("failed");
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleRetryExport = () => {
+    if (lastExportAction === "video") {
+      void handleExportVideo();
+      return;
+    }
+
+    if (lastExportAction === "audio") {
+      void handleExtractAudio();
     }
   };
 
@@ -1667,6 +1740,13 @@ export default function ProjectDetailsPage() {
               <p className="mt-2 text-sm text-white/50">
                 {canvasFormat} · {exportResolution} · {exportFps} FPS
               </p>
+
+              {localVideoBytes > 100 * 1024 * 1024 && (
+                <p className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/78">
+                  Large browser exports may take longer. For best results, test
+                  with a short 720p clip.
+                </p>
+              )}
             </div>
 
             <div>
@@ -1707,9 +1787,15 @@ export default function ProjectDetailsPage() {
                 )}
               </div>
 
+              {exportResolution === "1080p" && (
+                <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/78">
+                  1080p export may take longer on this device.
+                </p>
+              )}
+
               {exportResolution === "2k" && (
                 <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/78">
-                  2K export may take longer on this device.
+                  2K export may take longer and may fail on some browsers.
                 </p>
               )}
             </div>
@@ -1816,9 +1902,30 @@ export default function ProjectDetailsPage() {
             )}
 
             {exportError && (
-              <p className="rounded-[1.5rem] border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold leading-6 text-rose-100/82">
-                {exportError}
-              </p>
+              <div className="rounded-[1.5rem] border border-rose-300/20 bg-rose-300/10 p-4">
+                <p className="text-sm font-bold leading-6 text-rose-100/82">
+                  {exportError}
+                </p>
+
+                {exportPhase === "failed" && (
+                  <div className="mt-4 grid gap-2">
+                    <button
+                      onClick={handleRetryExport}
+                      disabled={exporting || !lastExportAction}
+                      className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
+                    >
+                      Retry export
+                    </button>
+
+                    <button
+                      onClick={resetExportResult}
+                      className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
+                    >
+                      Reset export
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
 
             {downloadUrl && (

@@ -28,17 +28,26 @@ export function isBrowserFFmpegSupported() {
 }
 
 export async function loadFFmpegClient(options: LoadFFmpegOptions = {}) {
-  const ffmpeg = await preloadFFmpeg();
+  console.info("[Lumeo export] FFmpeg/load requested");
 
-  if (options.onLog) {
-    ffmpeg.on("log", options.onLog);
+  try {
+    const ffmpeg = await preloadFFmpeg();
+
+    if (options.onLog) {
+      ffmpeg.on("log", options.onLog);
+    }
+
+    if (options.onProgress) {
+      ffmpeg.on("progress", options.onProgress);
+    }
+
+    console.info("[Lumeo export] FFmpeg/load completed");
+    return ffmpeg;
+  } catch (error) {
+    console.error("[Lumeo export] FFmpeg/load failed", error);
+    resetFFmpeg();
+    throw error;
   }
-
-  if (options.onProgress) {
-    ffmpeg.on("progress", options.onProgress);
-  }
-
-  return ffmpeg;
 }
 
 export async function preloadFFmpeg(onProgress?: FFmpegPreloadProgressHandler) {
@@ -68,12 +77,22 @@ export async function preloadFFmpeg(onProgress?: FFmpegPreloadProgressHandler) {
 }
 
 export function unloadFFmpegClient() {
-  if (!ffmpegInstance && !loadingPromise) {
-    return;
+  resetFFmpeg();
+}
+
+export function resetFFmpeg() {
+  void loadingPromise
+    ?.then((ffmpeg) => ffmpeg.terminate())
+    .catch((error) => {
+      console.warn("[Lumeo export] FFmpeg/reset ignored pending load failure", error);
+    });
+
+  try {
+    ffmpegInstance?.terminate();
+  } catch (error) {
+    console.warn("[Lumeo export] FFmpeg/reset terminate failed", error);
   }
 
-  void loadingPromise?.then((ffmpeg) => ffmpeg.terminate());
-  ffmpegInstance?.terminate();
   ffmpegInstance = null;
   loadingPromise = null;
   currentPreloadProgress = 0;
@@ -81,31 +100,50 @@ export function unloadFFmpegClient() {
 }
 
 async function createFFmpegClient() {
-  notifyPreloadProgress(12);
+  let ffmpeg: FFmpeg | null = null;
 
-  const { FFmpeg } = await withTimeout(
-    import("@ffmpeg/ffmpeg"),
-    LOAD_TIMEOUT_MS,
-    "Timed out while importing browser export runtime.",
-  );
+  try {
+    console.info("[Lumeo export] FFmpeg/load started");
+    notifyPreloadProgress(12);
 
-  const ffmpeg = new FFmpeg();
+    const { FFmpeg } = await withTimeout(
+      import("@ffmpeg/ffmpeg"),
+      LOAD_TIMEOUT_MS,
+      "Timed out while importing browser export runtime.",
+    );
 
-  notifyPreloadProgress(35);
+    ffmpeg = new FFmpeg();
 
-  await withTimeout(
-    ffmpeg.load({
-      coreURL: `${CORE_BASE_URL}/ffmpeg-core.js`,
-      wasmURL: `${CORE_BASE_URL}/ffmpeg-core.wasm`,
-    }),
-    LOAD_TIMEOUT_MS,
-    "Timed out while preparing browser export runtime.",
-  );
+    notifyPreloadProgress(35);
 
-  ffmpegInstance = ffmpeg;
-  notifyPreloadProgress(100);
+    await withTimeout(
+      ffmpeg.load({
+        coreURL: `${CORE_BASE_URL}/ffmpeg-core.js`,
+        wasmURL: `${CORE_BASE_URL}/ffmpeg-core.wasm`,
+      }),
+      LOAD_TIMEOUT_MS,
+      "Timed out while preparing browser export runtime.",
+    );
 
-  return ffmpeg;
+    ffmpegInstance = ffmpeg;
+    notifyPreloadProgress(100);
+    console.info("[Lumeo export] FFmpeg/load completed");
+
+    return ffmpeg;
+  } catch (error) {
+    console.error("[Lumeo export] FFmpeg/load failure point", error);
+
+    try {
+      ffmpeg?.terminate();
+    } catch (terminateError) {
+      console.warn("[Lumeo export] FFmpeg/load cleanup failed", terminateError);
+    }
+
+    ffmpegInstance = null;
+    loadingPromise = null;
+    currentPreloadProgress = 0;
+    throw error;
+  }
 }
 
 function notifyPreloadProgress(progress: number) {

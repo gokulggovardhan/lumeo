@@ -1,5 +1,10 @@
 import { fetchFile } from "@ffmpeg/util";
-import { loadFFmpegClient, type LoadFFmpegOptions } from "@/lib/ffmpegClient";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
+import {
+  loadFFmpegClient,
+  resetFFmpeg,
+  type LoadFFmpegOptions,
+} from "@/lib/ffmpegClient";
 
 export type ExportFormat = "mp4" | "webm" | "mp3" | "wav";
 export type VideoExportFormat = Extract<ExportFormat, "mp4" | "webm">;
@@ -74,23 +79,60 @@ export async function exportVideo(
   options: VideoExportOptions,
 ): Promise<ExportResult> {
   const config = FORMAT_CONFIG[options.format];
-  const ffmpeg = await loadFFmpegClient(options.ffmpeg);
+  const pathsToCleanup = [INPUT_FILE, config.outputFile];
+  let ffmpeg: FFmpeg | null = null;
+  let failurePoint = "initializing video export";
 
-  await ffmpeg.writeFile(INPUT_FILE, await fetchFile(input));
-  const exitCode = await ffmpeg.exec(buildVideoExportArgs(options));
+  console.info("[Lumeo export] video export selected input", describeInput(input));
+  console.info("[Lumeo export] selected export format", options.format);
+  console.info("[Lumeo export] selected export resolution", options.resolution);
+  console.info("[Lumeo export] selected trimStart", options.trim?.startSeconds);
+  console.info("[Lumeo export] selected trimEnd", options.trim?.endSeconds);
 
-  if (exitCode !== 0) {
-    throw new Error(`FFmpeg video export failed with exit code ${exitCode}.`);
+  try {
+    failurePoint = "loading export runtime";
+    ffmpeg = await loadFFmpegClient(options.ffmpeg);
+
+    failurePoint = "writing input file";
+    console.info("[Lumeo export] writeFile started", INPUT_FILE);
+    await ffmpeg.writeFile(INPUT_FILE, await fetchFile(input));
+    console.info("[Lumeo export] writeFile completed", INPUT_FILE);
+
+    const args = buildVideoExportArgs(options);
+
+    failurePoint = "executing video command";
+    console.info("[Lumeo export] exec started", args);
+    const exitCode = await ffmpeg.exec(args);
+    console.info("[Lumeo export] exec completed", { exitCode });
+
+    if (exitCode !== 0) {
+      throw new Error(`FFmpeg video export failed with exit code ${exitCode}.`);
+    }
+
+    failurePoint = "reading output file";
+    console.info("[Lumeo export] readFile started", config.outputFile);
+    const data = await ffmpeg.readFile(config.outputFile);
+    console.info("[Lumeo export] readFile completed", config.outputFile);
+
+    return {
+      blob: new Blob([toArrayBuffer(data)], { type: config.mimeType }),
+      fileName: options.fileName ?? `lumeo-export.${config.extension}`,
+      mimeType: config.mimeType,
+    };
+  } catch (error) {
+    console.error("[Lumeo export] video export failed", {
+      failurePoint,
+      error,
+      options,
+      input: describeInput(input),
+    });
+    resetFFmpeg();
+    throw error;
+  } finally {
+    if (ffmpeg) {
+      await cleanupFFmpegFiles(ffmpeg, pathsToCleanup);
+    }
   }
-
-  const data = await ffmpeg.readFile(config.outputFile);
-  await cleanupFFmpegFiles([INPUT_FILE, config.outputFile]);
-
-  return {
-    blob: new Blob([toArrayBuffer(data)], { type: config.mimeType }),
-    fileName: options.fileName ?? `lumeo-export.${config.extension}`,
-    mimeType: config.mimeType,
-  };
 }
 
 export async function extractAudio(
@@ -98,23 +140,59 @@ export async function extractAudio(
   options: AudioExportOptions,
 ): Promise<ExportResult> {
   const config = FORMAT_CONFIG[options.format];
-  const ffmpeg = await loadFFmpegClient(options.ffmpeg);
+  const pathsToCleanup = [INPUT_FILE, config.outputFile];
+  let ffmpeg: FFmpeg | null = null;
+  let failurePoint = "initializing audio extraction";
 
-  await ffmpeg.writeFile(INPUT_FILE, await fetchFile(input));
-  const exitCode = await ffmpeg.exec(buildAudioExportArgs(options));
+  console.info("[Lumeo export] audio extraction selected input", describeInput(input));
+  console.info("[Lumeo export] selected audio format", options.format);
+  console.info("[Lumeo export] selected trimStart", options.trim?.startSeconds);
+  console.info("[Lumeo export] selected trimEnd", options.trim?.endSeconds);
 
-  if (exitCode !== 0) {
-    throw new Error(`FFmpeg audio export failed with exit code ${exitCode}.`);
+  try {
+    failurePoint = "loading export runtime";
+    ffmpeg = await loadFFmpegClient(options.ffmpeg);
+
+    failurePoint = "writing input file";
+    console.info("[Lumeo export] writeFile started", INPUT_FILE);
+    await ffmpeg.writeFile(INPUT_FILE, await fetchFile(input));
+    console.info("[Lumeo export] writeFile completed", INPUT_FILE);
+
+    const args = buildAudioExportArgs(options);
+
+    failurePoint = "executing audio command";
+    console.info("[Lumeo export] exec started", args);
+    const exitCode = await ffmpeg.exec(args);
+    console.info("[Lumeo export] exec completed", { exitCode });
+
+    if (exitCode !== 0) {
+      throw new Error(`FFmpeg audio export failed with exit code ${exitCode}.`);
+    }
+
+    failurePoint = "reading output file";
+    console.info("[Lumeo export] readFile started", config.outputFile);
+    const data = await ffmpeg.readFile(config.outputFile);
+    console.info("[Lumeo export] readFile completed", config.outputFile);
+
+    return {
+      blob: new Blob([toArrayBuffer(data)], { type: config.mimeType }),
+      fileName: options.fileName ?? `lumeo-audio.${config.extension}`,
+      mimeType: config.mimeType,
+    };
+  } catch (error) {
+    console.error("[Lumeo export] audio extraction failed", {
+      failurePoint,
+      error,
+      options,
+      input: describeInput(input),
+    });
+    resetFFmpeg();
+    throw error;
+  } finally {
+    if (ffmpeg) {
+      await cleanupFFmpegFiles(ffmpeg, pathsToCleanup);
+    }
   }
-
-  const data = await ffmpeg.readFile(config.outputFile);
-  await cleanupFFmpegFiles([INPUT_FILE, config.outputFile]);
-
-  return {
-    blob: new Blob([toArrayBuffer(data)], { type: config.mimeType }),
-    fileName: options.fileName ?? `lumeo-audio.${config.extension}`,
-    mimeType: config.mimeType,
-  };
 }
 
 export function buildVideoExportArgs(options: VideoExportOptions) {
@@ -187,18 +265,20 @@ function buildTrimArgs(trim?: TrimRange) {
   return args;
 }
 
-async function cleanupFFmpegFiles(paths: string[]) {
-  const ffmpeg = await loadFFmpegClient();
+async function cleanupFFmpegFiles(ffmpeg: FFmpeg, paths: string[]) {
+  console.info("[Lumeo export] cleanup started", paths);
 
   await Promise.all(
     paths.map(async (path) => {
       try {
         await ffmpeg.deleteFile(path);
-      } catch {
-        // The export still succeeded if cleanup misses an already-removed file.
+      } catch (error) {
+        console.warn("[Lumeo export] cleanup skipped file", { path, error });
       }
     }),
   );
+
+  console.info("[Lumeo export] cleanup completed", paths);
 }
 
 function toArrayBuffer(data: string | Uint8Array): ArrayBuffer {
@@ -206,4 +286,19 @@ function toArrayBuffer(data: string | Uint8Array): ArrayBuffer {
   const copy: Uint8Array<ArrayBuffer> = new Uint8Array(bytes.byteLength);
   copy.set(bytes);
   return copy.buffer;
+}
+
+function describeInput(input: Blob | File | string) {
+  if (typeof input === "string") {
+    return {
+      source: input,
+      type: "url-or-path",
+    };
+  }
+
+  return {
+    name: input instanceof File ? input.name : "blob-input",
+    size: input.size,
+    type: input.type,
+  };
 }
