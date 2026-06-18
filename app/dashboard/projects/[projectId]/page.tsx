@@ -366,7 +366,8 @@ async function createVideoUploadSession(file: File, projectId: string) {
 async function uploadVideoDirectly(
   file: File,
   projectId: string,
-  onProgress: (progress: number) => void
+  onProgress: (progress: number) => void,
+  onRequest?: (request: XMLHttpRequest) => boolean | void
 ) {
   const session = await createVideoUploadSession(file, projectId);
 
@@ -412,6 +413,13 @@ async function uploadVideoDirectly(
 
     request.onerror = () => reject(new Error("Upload failed"));
     request.onabort = () => reject(new Error("Upload cancelled"));
+    const shouldUpload = onRequest?.(request);
+
+    if (shouldUpload === false) {
+      reject(new Error("Upload cancelled"));
+      return;
+    }
+
     request.send(file);
   });
 }
@@ -424,6 +432,8 @@ export default function ProjectDetailsPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
+  const videoUploadRequestRef = useRef<XMLHttpRequest | null>(null);
+  const videoUploadCancelledRef = useRef(false);
 
   const videoStorageKey = `project:${projectId}:video`;
   const audioStorageKey = `project:${projectId}:audio`;
@@ -736,6 +746,9 @@ export default function ProjectDetailsPage() {
     return () => {
       clearExportProgressTimer();
       exportRunIdRef.current += 1;
+      videoUploadRequestRef.current?.abort();
+      videoUploadRequestRef.current = null;
+      videoUploadCancelledRef.current = true;
     };
   }, []);
 
@@ -982,24 +995,53 @@ export default function ProjectDetailsPage() {
   };
 
   const resetVideoUploadState = () => {
+    videoUploadRequestRef.current?.abort();
+    videoUploadRequestRef.current = null;
+    videoUploadCancelledRef.current = false;
     setVideoUploading(false);
     setVideoUploadProgress(0);
     setVideoUploadStatus("");
     setVideoStorageMetadata(null);
   };
 
+  const handleCancelVideoUpload = () => {
+    videoUploadCancelledRef.current = true;
+    videoUploadRequestRef.current?.abort();
+    videoUploadRequestRef.current = null;
+    setVideoUploading(false);
+    setVideoUploadProgress(0);
+    setVideoUploadStatus("Upload failed. Please try again.");
+  };
+
   const handleUploadVideo = async () => {
     if (videoUploading) return;
 
     try {
+      videoUploadCancelledRef.current = false;
       setVideoUploading(true);
       setVideoUploadProgress(0);
-      setVideoUploadStatus("Uploading video...");
+      setVideoUploadStatus("Saving media...");
 
       const file = await getCurrentVideoFile();
-      const uploaded = await uploadVideoDirectly(file, projectId, (progress) => {
-        setVideoUploadProgress(progress);
-      });
+      const uploaded = await uploadVideoDirectly(
+        file,
+        projectId,
+        (progress) => {
+          setVideoUploadProgress(progress);
+        },
+        (request) => {
+          if (videoUploadCancelledRef.current) {
+            return false;
+          }
+
+          videoUploadRequestRef.current = request;
+          return true;
+        }
+      );
+
+      if (videoUploadCancelledRef.current) {
+        throw new Error("Upload cancelled");
+      }
 
       const storage = {
         provider: "google_drive",
@@ -1012,7 +1054,7 @@ export default function ProjectDetailsPage() {
 
       setVideoStorageMetadata(storage);
       setVideoUploadProgress(100);
-      setVideoUploadStatus("Video uploaded");
+      setVideoUploadStatus("Media saved");
 
       await updateDoc(doc(db, "projects", projectId), {
         "editor.media.storage": storage,
@@ -1022,6 +1064,8 @@ export default function ProjectDetailsPage() {
       console.error("Video upload failed", error);
       setVideoUploadStatus("Upload failed. Please try again.");
     } finally {
+      videoUploadRequestRef.current = null;
+      videoUploadCancelledRef.current = false;
       setVideoUploading(false);
     }
   };
@@ -1234,8 +1278,11 @@ export default function ProjectDetailsPage() {
 
       failurePoint = "preparing export runtime";
       await prepareExportEngine(runId, "Preparing export");
+      if (runId !== exportRunIdRef.current) return;
+
       failurePoint = "connecting export runtime";
       await getFFmpeg(ffmpeg);
+      if (runId !== exportRunIdRef.current) return;
 
       clearExportProgressTimer();
       setExportStatus("Optimizing video");
@@ -1257,6 +1304,7 @@ export default function ProjectDetailsPage() {
 
       failurePoint = "running video export";
       const result = await exportTrimmedVideoWithFFmpeg(file, exportOptions);
+      if (runId !== exportRunIdRef.current) return;
 
       failurePoint = "finalizing download";
       clearExportProgressTimer();
@@ -1273,6 +1321,10 @@ export default function ProjectDetailsPage() {
     } catch (error: any) {
       console.error("Video export failed", { failurePoint, error });
 
+      if (runId !== exportRunIdRef.current) {
+        return;
+      }
+
       if (nextDownloadUrl) {
         URL.revokeObjectURL(nextDownloadUrl);
       }
@@ -1286,7 +1338,9 @@ export default function ProjectDetailsPage() {
       setExportStatus("");
       setExportPhase("failed");
     } finally {
-      setExporting(false);
+      if (runId === exportRunIdRef.current) {
+        setExporting(false);
+      }
     }
   };
 
@@ -1317,8 +1371,11 @@ export default function ProjectDetailsPage() {
 
       failurePoint = "preparing export runtime";
       await prepareExportEngine(runId, "Preparing audio");
+      if (runId !== exportRunIdRef.current) return;
+
       failurePoint = "connecting export runtime";
       await getFFmpeg(ffmpeg);
+      if (runId !== exportRunIdRef.current) return;
 
       clearExportProgressTimer();
       setExportStatus("Extracting audio");
@@ -1330,6 +1387,7 @@ export default function ProjectDetailsPage() {
         fileName: createExportFileName("audio", audioFormat),
         ffmpeg,
       });
+      if (runId !== exportRunIdRef.current) return;
 
       failurePoint = "finalizing download";
       clearExportProgressTimer();
@@ -1346,6 +1404,10 @@ export default function ProjectDetailsPage() {
     } catch (error: any) {
       console.error("Audio extraction failed", { failurePoint, error });
 
+      if (runId !== exportRunIdRef.current) {
+        return;
+      }
+
       if (nextDownloadUrl) {
         URL.revokeObjectURL(nextDownloadUrl);
       }
@@ -1359,7 +1421,9 @@ export default function ProjectDetailsPage() {
       setExportStatus("");
       setExportPhase("failed");
     } finally {
-      setExporting(false);
+      if (runId === exportRunIdRef.current) {
+        setExporting(false);
+      }
     }
   };
 
@@ -1494,12 +1558,57 @@ export default function ProjectDetailsPage() {
     }
   };
 
+  const handleResetEdit = () => {
+    const confirmed = confirm("Reset edit settings? Saved media will stay in place.");
+
+    if (!confirmed) return;
+
+    setTrimStart(0);
+    setTrimEnd(videoDuration || 0);
+    setCanvasFormat("9:16");
+    setFitMode("contain");
+    setBackgroundStyle("blur");
+    setVideoZoom(100);
+    setVideoX(0);
+    setVideoY(0);
+    setRotate(0);
+    setFlipX(false);
+    setPlaybackSpeed(1);
+    setVideoVolume(100);
+    setMutedOriginal(false);
+    setOverlayText("Your title here");
+    setOverlayX(50);
+    setOverlayY(45);
+    setOverlaySize(34);
+    setOverlayColor("#ffffff");
+    setOverlayOpacity(100);
+    setOverlayBg(false);
+    setOverlayUppercase(false);
+    setOverlayShadow(true);
+    setMusicVolume(80);
+    setBrightness(100);
+    setContrast(100);
+    setSaturation(100);
+    setGrayscale(0);
+    setBlur(0);
+    setTransitionIn("none");
+    setTransitionOut("none");
+    setTransitionDuration(1);
+    setExportFormat("mp4");
+    setAudioFormat("mp3");
+    setExportResolution("720p");
+    setExportFps(30);
+    setExportQuality("standard");
+    resetExportState();
+    setActiveTool("edit");
+  };
+
   const renderInspector = () => {
     if (activeTool === "media") {
       return (
         <Panel
           title="Media Library"
-          subtitle="Import your video and music. Files are stored locally in this browser for now."
+          subtitle="Import your video and music. Preview starts instantly, then save media when you are ready."
         >
           <div className="space-y-5">
             <UploadDropzone
@@ -1529,7 +1638,7 @@ export default function ProjectDetailsPage() {
 
                 {videoRestored && (
                   <p className="mt-3 text-xs font-bold text-emerald-200">
-                    Restored from browser storage.
+                    Restored locally.
                   </p>
                 )}
 
@@ -1541,6 +1650,25 @@ export default function ProjectDetailsPage() {
                   >
                     Upload video
                   </button>
+
+                  {videoUploading && (
+                    <button
+                      onClick={handleCancelVideoUpload}
+                      className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
+                    >
+                      Cancel upload
+                    </button>
+                  )}
+
+                  {!videoUploading &&
+                    videoUploadStatus === "Upload failed. Please try again." && (
+                      <button
+                        onClick={handleUploadVideo}
+                        className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
+                      >
+                        Retry upload
+                      </button>
+                    )}
 
                   {videoUploadStatus && (
                     <div className="rounded-2xl border border-white/10 bg-black/24 p-3">
@@ -1588,7 +1716,7 @@ export default function ProjectDetailsPage() {
 
                 {audioRestored && (
                   <p className="mt-3 text-xs font-bold text-emerald-200">
-                    Audio restored from browser storage.
+                    Audio restored locally.
                   </p>
                 )}
               </div>
@@ -2187,6 +2315,15 @@ export default function ProjectDetailsPage() {
                     style={{ width: `${visibleProgress}%` }}
                   />
                 </div>
+
+                {exporting && (
+                  <button
+                    onClick={resetExportResult}
+                    className="mt-4 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
+                  >
+                    Reset export
+                  </button>
+                )}
               </div>
             )}
 
@@ -2220,9 +2357,14 @@ export default function ProjectDetailsPage() {
             {downloadUrl && (
               <div className="rounded-[1.5rem] border border-emerald-300/20 bg-emerald-300/10 p-4">
                 <div className="mb-4 flex items-center justify-between gap-3">
-                  <p className="text-sm font-black text-emerald-100">
-                    Export complete
-                  </p>
+                  <div>
+                    <p className="text-sm font-black text-emerald-100">
+                      Export complete
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-emerald-100/62">
+                      Click Download video to save it to your computer.
+                    </p>
+                  </div>
 
                   <p className="text-2xl font-black text-emerald-100">100%</p>
                 </div>
@@ -2233,14 +2375,14 @@ export default function ProjectDetailsPage() {
                     download={downloadName}
                     className="flex w-full items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 font-black text-black transition hover:bg-emerald-200"
                   >
-                    Download {downloadName || "export"}
+                    Download video
                   </a>
 
                   <button
                     onClick={resetExportResult}
                     className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
                   >
-                    Clear export
+                    Reset export
                   </button>
                 </div>
               </div>
@@ -2359,7 +2501,7 @@ export default function ProjectDetailsPage() {
             href="/dashboard"
             className="mt-8 inline-flex rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-fuchsia-100"
           >
-            Back to Dashboard
+            Back to dashboard
           </Link>
         </div>
       </main>
@@ -2398,7 +2540,7 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
             <button
               onClick={handleSave}
               disabled={saving}
@@ -2416,10 +2558,24 @@ export default function ProjectDetailsPage() {
 
             <Link
               href="/dashboard"
-              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-5 py-2.5 text-sm font-bold text-white/64 transition hover:bg-white/10 hover:text-white lg:inline-flex"
+              className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm font-bold text-white/72 transition hover:bg-white hover:text-black"
             >
-              Dashboard
+              Back to dashboard
             </Link>
+
+            <button
+              onClick={handleResetEdit}
+              className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm font-bold text-white/72 transition hover:bg-white hover:text-black"
+            >
+              Reset edit
+            </button>
+
+            <button
+              onClick={handleDelete}
+              className="rounded-full border border-rose-300/20 bg-rose-300/10 px-4 py-2.5 text-sm font-bold text-rose-100 transition hover:bg-rose-200 hover:text-black"
+            >
+              Delete project
+            </button>
 
             <button
               onClick={handleLogout}
