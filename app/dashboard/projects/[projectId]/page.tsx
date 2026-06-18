@@ -42,16 +42,17 @@ type AudioFormat = "mp3" | "wav";
 type ExportQuality = "standard" | "high" | "max";
 type ExportFps = 24 | 30 | 60;
 
-const tools: { key: ToolKey; label: string; icon: string }[] = [
-  { key: "media", label: "Media", icon: "◉" },
-  { key: "canvas", label: "Canvas", icon: "▣" },
-  { key: "edit", label: "Edit", icon: "✂" },
-  { key: "text", label: "Text", icon: "T" },
-  { key: "audio", label: "Audio", icon: "♫" },
-  { key: "effects", label: "FX", icon: "✦" },
-  { key: "export", label: "Export", icon: "⇩" },
-  { key: "project", label: "Save", icon: "✓" },
-];
+const tools: { key: ToolKey; label: string; description: string; icon: string }[] =
+  [
+    { key: "media", label: "Media", description: "Video and music", icon: "◉" },
+    { key: "canvas", label: "Canvas", description: "Frame and layout", icon: "▣" },
+    { key: "edit", label: "Edit", description: "Trim and motion", icon: "✂" },
+    { key: "text", label: "Text", description: "Titles and hooks", icon: "T" },
+    { key: "audio", label: "Audio", description: "Sound mix", icon: "♫" },
+    { key: "effects", label: "Effects", description: "Look and color", icon: "✦" },
+    { key: "export", label: "Export", description: "Output settings", icon: "⇩" },
+    { key: "project", label: "Project", description: "Save and manage", icon: "✓" },
+  ];
 
 function getOutputDimensions(
   canvasFormat: CanvasFormat,
@@ -158,7 +159,7 @@ async function deleteMediaFromBrowser(key: string) {
   });
 }
 
-function GlassPanel({
+function Panel({
   title,
   subtitle,
   children,
@@ -168,16 +169,22 @@ function GlassPanel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[1.75rem] border border-white/10 bg-white/[0.055] p-5 shadow-2xl shadow-black/20 backdrop-blur-2xl">
+    <div className="rounded-[2rem] border border-white/10 bg-[#111018]/90 p-5 shadow-2xl shadow-black/25 backdrop-blur-2xl">
       <div>
-        <h2 className="text-lg font-black tracking-tight text-white">{title}</h2>
+        <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
+          Studio Panel
+        </p>
+
+        <h2 className="mt-2 text-xl font-black tracking-tight text-white">
+          {title}
+        </h2>
 
         {subtitle && (
-          <p className="mt-1 text-sm leading-6 text-white/48">{subtitle}</p>
+          <p className="mt-2 text-sm leading-6 text-white/48">{subtitle}</p>
         )}
       </div>
 
-      <div className="mt-5">{children}</div>
+      <div className="mt-6">{children}</div>
     </div>
   );
 }
@@ -202,9 +209,9 @@ function RangeControl({
   return (
     <div>
       <div className="mb-2 flex items-center justify-between gap-3">
-        <label className="text-sm font-semibold text-white/55">{label}</label>
+        <label className="text-sm font-bold text-white/58">{label}</label>
 
-        <span className="rounded-full bg-white/8 px-3 py-1 text-xs font-bold text-white/60">
+        <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-xs font-black text-white/70">
           {value}
           {suffix}
         </span>
@@ -217,37 +224,93 @@ function RangeControl({
         step={step}
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="w-full accent-cyan-300"
+        className="w-full accent-fuchsia-300"
       />
     </div>
   );
 }
 
-function ToolButton({
+function OptionButton({
   active,
-  icon,
-  label,
+  children,
   onClick,
+  small = false,
 }: {
   active: boolean;
-  icon: string;
-  label: string;
+  children: ReactNode;
   onClick: () => void;
+  small?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
-      className={`flex w-full flex-col items-center justify-center gap-2 rounded-2xl border px-3 py-4 text-center transition duration-200 ${
+      className={`rounded-2xl border font-black transition ${
+        small ? "px-3 py-3 text-xs" : "px-4 py-3 text-sm"
+      } ${
         active
-          ? "border-white/20 bg-white text-black shadow-xl shadow-white/10"
-          : "border-white/10 bg-white/[0.045] text-white/58 hover:bg-white/[0.09] hover:text-white"
+          ? "border-white/20 bg-white text-black shadow-lg shadow-white/10"
+          : "border-white/10 bg-white/[0.06] text-white/62 hover:bg-white/[0.12] hover:text-white"
       }`}
     >
-      <span className="text-lg font-black">{icon}</span>
-      <span className="text-[11px] font-black uppercase tracking-wide">
-        {label}
-      </span>
+      {children}
     </button>
+  );
+}
+
+function UploadDropzone({
+  id,
+  title,
+  subtitle,
+  accept,
+  onChange,
+}: {
+  id: string;
+  title: string;
+  subtitle: string;
+  accept: string;
+  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
+}) {
+  return (
+    <div>
+      <input
+        id={id}
+        type="file"
+        accept={accept}
+        onChange={onChange}
+        className="sr-only"
+      />
+
+      <label
+        htmlFor={id}
+        className="group flex cursor-pointer flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-white/14 bg-white/[0.045] px-5 py-8 text-center transition hover:border-fuchsia-300/40 hover:bg-fuchsia-300/[0.08]"
+      >
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl font-black text-black shadow-xl shadow-white/10 transition group-hover:scale-105">
+          +
+        </div>
+
+        <p className="mt-4 text-base font-black text-white">{title}</p>
+
+        <p className="mt-2 max-w-[260px] text-sm leading-6 text-white/45">
+          {subtitle}
+        </p>
+
+        <span className="mt-5 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white/55">
+          Choose from device
+        </span>
+      </label>
+    </div>
+  );
+}
+
+function StatPill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3">
+      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
+        {label}
+      </p>
+
+      <p className="mt-1 text-sm font-black text-white/82">{value}</p>
+    </div>
   );
 }
 
@@ -258,6 +321,7 @@ export default function ProjectDetailsPage() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
 
   const videoStorageKey = `project:${projectId}:video`;
   const audioStorageKey = `project:${projectId}:audio`;
@@ -289,6 +353,7 @@ export default function ProjectDetailsPage() {
   const [fitMode, setFitMode] = useState<FitMode>("contain");
   const [backgroundStyle, setBackgroundStyle] =
     useState<BackgroundStyle>("blur");
+
   const [videoZoom, setVideoZoom] = useState(100);
   const [videoX, setVideoX] = useState(0);
   const [videoY, setVideoY] = useState(0);
@@ -329,14 +394,19 @@ export default function ProjectDetailsPage() {
 
   const output = getOutputDimensions(canvasFormat, exportResolution);
 
+  const selectedRange = Math.max(
+    0,
+    (trimEnd || videoDuration || 0) - trimStart
+  );
+
   const videoFilter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) grayscale(${grayscale}%) blur(${blur}px)`;
 
   const canvasFrameClass =
     canvasFormat === "9:16"
-      ? "aspect-[9/16] h-[64vh] min-h-[420px] max-h-[720px]"
+      ? "aspect-[9/16] h-[66vh] min-h-[440px] max-h-[760px]"
       : canvasFormat === "1:1"
-        ? "aspect-square h-[58vh] min-h-[360px] max-h-[620px]"
-        : "aspect-video w-full max-w-[980px]";
+        ? "aspect-square h-[60vh] min-h-[380px] max-h-[640px]"
+        : "aspect-video w-full max-w-[1080px]";
 
   useEffect(() => {
     let unsubscribeProject: any;
@@ -368,8 +438,13 @@ export default function ProjectDetailsPage() {
             setTitle(data.title || "");
             setStatus(data.status || "Draft");
 
-            setTrimStart(editor.trim?.start ?? editor.trimStart ?? timeline.trimStart ?? 0);
-            setTrimEnd(editor.trim?.end ?? editor.trimEnd ?? timeline.trimEnd ?? 0);
+            setTrimStart(
+              editor.trim?.start ?? editor.trimStart ?? timeline.trimStart ?? 0
+            );
+            setTrimEnd(
+              editor.trim?.end ?? editor.trimEnd ?? timeline.trimEnd ?? 0
+            );
+
             setVideoDuration(
               editor.media?.videoDuration ??
                 editor.videoDuration ??
@@ -476,7 +551,9 @@ export default function ProjectDetailsPage() {
 
           setLocalVideoURL(url);
           setLocalVideoName(savedVideo.name || "Restored local video");
-          setLocalVideoSize(`${(savedVideo.size / (1024 * 1024)).toFixed(2)} MB`);
+          setLocalVideoSize(
+            `${(savedVideo.size / (1024 * 1024)).toFixed(2)} MB`
+          );
           setVideoRestored(true);
         }
 
@@ -732,7 +809,7 @@ export default function ProjectDetailsPage() {
         title: title.trim(),
         status,
         editor: {
-          mode: "shorts-editor-v4",
+          mode: "shorts-editor-v5-premium",
           media: {
             localVideoName:
               localVideoName ||
@@ -831,62 +908,68 @@ export default function ProjectDetailsPage() {
   const renderInspector = () => {
     if (activeTool === "media") {
       return (
-        <GlassPanel
-          title="Media"
-          subtitle="Add video and music. Files restore in this browser."
+        <Panel
+          title="Media Library"
+          subtitle="Import your video and music. Files are stored locally in this browser for now."
         >
           <div className="space-y-5">
-            <div>
-              <label className="text-sm font-bold text-white/55">
-                Video file
-              </label>
-
-              <input
-                type="file"
-                accept="video/*"
-                onChange={handleVideoSelect}
-                className="mt-2 block w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm file:font-black file:text-black"
-              />
-            </div>
+            <UploadDropzone
+              id="video-upload"
+              title="Add video clip"
+              subtitle="MP4, MOV, WebM. Recommended length is 30 seconds to 3 minutes."
+              accept="video/*"
+              onChange={handleVideoSelect}
+            />
 
             {localVideoName && (
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-4 text-sm text-white/60">
-                <p className="font-black text-white">{localVideoName}</p>
-                <p className="mt-1">Size: {localVideoSize}</p>
-                <p>Duration: {videoDuration}s</p>
+              <div className="rounded-[1.5rem] border border-emerald-300/15 bg-emerald-300/[0.06] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-black text-white">
+                      {localVideoName}
+                    </p>
+                    <p className="mt-2 text-xs leading-5 text-white/48">
+                      {localVideoSize} · {videoDuration || 0}s
+                    </p>
+                  </div>
+
+                  <span className="shrink-0 rounded-full bg-emerald-300/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200">
+                    Ready
+                  </span>
+                </div>
 
                 {videoRestored && (
-                  <p className="mt-2 font-bold text-emerald-300">
+                  <p className="mt-3 text-xs font-bold text-emerald-200">
                     Restored from browser storage.
                   </p>
                 )}
               </div>
             )}
 
-            <div>
-              <label className="text-sm font-bold text-white/55">
-                Music / audio
-              </label>
-
-              <input
-                type="file"
-                accept="audio/*"
-                onChange={handleAudioSelect}
-                className="mt-2 block w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm text-white file:mr-3 file:rounded-full file:border-0 file:bg-white file:px-4 file:py-2 file:text-sm file:font-black file:text-black"
-              />
-            </div>
+            <UploadDropzone
+              id="audio-upload"
+              title="Add music or audio"
+              subtitle="Upload music, voiceover, or background audio for the edit."
+              accept="audio/*"
+              onChange={handleAudioSelect}
+            />
 
             {localAudioURL && (
-              <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-                <p className="mb-3 text-sm font-black text-white">
+              <div className="rounded-[1.5rem] border border-white/10 bg-black/30 p-4">
+                <p className="truncate text-sm font-black text-white">
                   {localAudioName}
                 </p>
 
-                <audio ref={audioRef} src={localAudioURL} controls className="w-full" />
+                <audio
+                  ref={audioPreviewRef}
+                  src={localAudioURL}
+                  controls
+                  className="mt-4 w-full"
+                />
 
                 {audioRestored && (
-                  <p className="mt-2 text-sm font-bold text-emerald-300">
-                    Restored from browser storage.
+                  <p className="mt-3 text-xs font-bold text-emerald-200">
+                    Audio restored from browser storage.
                   </p>
                 )}
               </div>
@@ -895,91 +978,76 @@ export default function ProjectDetailsPage() {
             {(localVideoURL || localAudioURL) && (
               <button
                 onClick={handleClearLocalMedia}
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-black text-white/70 transition hover:bg-white/10 hover:text-white"
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/65 transition hover:bg-white hover:text-black"
               >
-                Clear Local Media
+                Clear local media
               </button>
             )}
           </div>
-        </GlassPanel>
+        </Panel>
       );
     }
 
     if (activeTool === "canvas") {
       return (
-        <GlassPanel title="Canvas" subtitle="Choose frame, background, and crop.">
+        <Panel title="Canvas Studio" subtitle="Set the video frame and background style.">
           <div className="space-y-6">
             <div>
-              <label className="text-sm font-bold text-white/55">
+              <label className="text-sm font-bold text-white/58">
                 Canvas format
               </label>
 
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 {(["9:16", "1:1", "16:9"] as CanvasFormat[]).map((item) => (
-                  <button
+                  <OptionButton
                     key={item}
+                    active={canvasFormat === item}
                     onClick={() => setCanvasFormat(item)}
-                    className={`rounded-2xl px-3 py-3 text-sm font-black transition ${
-                      canvasFormat === item
-                        ? "bg-white text-black"
-                        : "bg-white/8 text-white/60 hover:bg-white/12"
-                    }`}
                   >
                     {item}
-                  </button>
+                  </OptionButton>
                 ))}
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-bold text-white/55">
-                Video fit
+              <label className="text-sm font-bold text-white/58">
+                Video framing
               </label>
 
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                <button
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <OptionButton
+                  active={fitMode === "contain"}
                   onClick={() => setFitMode("contain")}
-                  className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
-                    fitMode === "contain"
-                      ? "bg-white text-black"
-                      : "bg-white/8 text-white/60 hover:bg-white/12"
-                  }`}
                 >
                   Fit
-                </button>
+                </OptionButton>
 
-                <button
+                <OptionButton
+                  active={fitMode === "cover"}
                   onClick={() => setFitMode("cover")}
-                  className={`rounded-2xl px-4 py-3 text-sm font-black transition ${
-                    fitMode === "cover"
-                      ? "bg-white text-black"
-                      : "bg-white/8 text-white/60 hover:bg-white/12"
-                  }`}
                 >
                   Fill
-                </button>
+                </OptionButton>
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-bold text-white/55">
+              <label className="text-sm font-bold text-white/58">
                 Background
               </label>
 
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 {(["blur", "black", "gradient"] as BackgroundStyle[]).map(
                   (item) => (
-                    <button
+                    <OptionButton
                       key={item}
+                      active={backgroundStyle === item}
                       onClick={() => setBackgroundStyle(item)}
-                      className={`rounded-2xl px-3 py-3 text-xs font-black capitalize transition ${
-                        backgroundStyle === item
-                          ? "bg-white text-black"
-                          : "bg-white/8 text-white/60 hover:bg-white/12"
-                      }`}
+                      small
                     >
                       {item}
-                    </button>
+                    </OptionButton>
                   )
                 )}
               </div>
@@ -995,7 +1063,7 @@ export default function ProjectDetailsPage() {
             />
 
             <RangeControl
-              label="Video X"
+              label="Position X"
               value={videoX}
               min={-50}
               max={50}
@@ -1004,7 +1072,7 @@ export default function ProjectDetailsPage() {
             />
 
             <RangeControl
-              label="Video Y"
+              label="Position Y"
               value={videoY}
               min={-50}
               max={50}
@@ -1012,20 +1080,20 @@ export default function ProjectDetailsPage() {
               onChange={setVideoY}
             />
           </div>
-        </GlassPanel>
+        </Panel>
       );
     }
 
     if (activeTool === "edit") {
       return (
-        <GlassPanel title="Edit" subtitle="Trim, rotate, speed, and transitions.">
+        <Panel title="Edit Controls" subtitle="Fine-tune trim, speed, rotation, and movement.">
           <div className="space-y-6">
             <button
               onClick={handlePlayTrimPreview}
               disabled={!localVideoURL}
-              className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-45"
+              className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-45"
             >
-              Preview Trim
+              Preview selected range
             </button>
 
             <RangeControl
@@ -1049,24 +1117,24 @@ export default function ProjectDetailsPage() {
 
             <button
               onClick={() => setFlipX(!flipX)}
-              className={`w-full rounded-2xl px-5 py-3 font-black transition ${
+              className={`w-full rounded-2xl border px-5 py-3 font-black transition ${
                 flipX
-                  ? "bg-white text-black"
-                  : "border border-white/10 bg-white/5 text-white/65 hover:bg-white/10"
+                  ? "border-white/20 bg-white text-black"
+                  : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
               }`}
             >
-              {flipX ? "Flip Enabled" : "Flip Horizontal"}
+              {flipX ? "Flip enabled" : "Flip horizontal"}
             </button>
 
             <div>
-              <label className="text-sm font-bold text-white/55">
+              <label className="text-sm font-bold text-white/58">
                 Intro transition
               </label>
 
               <select
                 value={transitionIn}
                 onChange={(event) => setTransitionIn(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none"
+                className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-white outline-none"
               >
                 <option className="bg-black" value="none">
                   None
@@ -1078,14 +1146,14 @@ export default function ProjectDetailsPage() {
             </div>
 
             <div>
-              <label className="text-sm font-bold text-white/55">
+              <label className="text-sm font-bold text-white/58">
                 Outro transition
               </label>
 
               <select
                 value={transitionOut}
                 onChange={(event) => setTransitionOut(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none"
+                className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-white outline-none"
               >
                 <option className="bg-black" value="none">
                   None
@@ -1106,19 +1174,19 @@ export default function ProjectDetailsPage() {
               onChange={setTransitionDuration}
             />
           </div>
-        </GlassPanel>
+        </Panel>
       );
     }
 
     if (activeTool === "text") {
       return (
-        <GlassPanel title="Text" subtitle="Design title and hook text.">
+        <Panel title="Text Layer" subtitle="Create premium title hooks and overlays.">
           <div className="space-y-5">
             <textarea
               value={overlayText}
               onChange={(event) => setOverlayText(event.target.value)}
               placeholder="Enter overlay text"
-              className="min-h-28 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none placeholder:text-white/35 transition focus:border-cyan-300/60"
+              className="min-h-28 w-full rounded-[1.5rem] border border-white/10 bg-white/[0.08] px-4 py-3 text-white outline-none placeholder:text-white/32 transition focus:border-fuchsia-300/60"
             />
 
             <RangeControl
@@ -1140,7 +1208,7 @@ export default function ProjectDetailsPage() {
             />
 
             <RangeControl
-              label="Text size"
+              label="Size"
               value={overlaySize}
               min={18}
               max={82}
@@ -1158,61 +1226,52 @@ export default function ProjectDetailsPage() {
             />
 
             <div>
-              <label className="text-sm font-bold text-white/55">Color</label>
+              <label className="text-sm font-bold text-white/58">Color</label>
 
               <input
                 type="color"
                 value={overlayColor}
                 onChange={(event) => setOverlayColor(event.target.value)}
-                className="mt-2 h-12 w-full rounded-2xl border border-white/10 bg-white/10 p-2"
+                className="mt-3 h-12 w-full rounded-2xl border border-white/10 bg-white/[0.08] p-2"
               />
             </div>
 
             <div className="grid grid-cols-3 gap-2">
-              <button
+              <OptionButton
+                active={overlayBg}
                 onClick={() => setOverlayBg(!overlayBg)}
-                className={`rounded-2xl px-3 py-3 text-xs font-black transition ${
-                  overlayBg
-                    ? "bg-white text-black"
-                    : "bg-white/8 text-white/60 hover:bg-white/12"
-                }`}
+                small
               >
                 BG
-              </button>
+              </OptionButton>
 
-              <button
+              <OptionButton
+                active={overlayUppercase}
                 onClick={() => setOverlayUppercase(!overlayUppercase)}
-                className={`rounded-2xl px-3 py-3 text-xs font-black transition ${
-                  overlayUppercase
-                    ? "bg-white text-black"
-                    : "bg-white/8 text-white/60 hover:bg-white/12"
-                }`}
+                small
               >
                 CAPS
-              </button>
+              </OptionButton>
 
-              <button
+              <OptionButton
+                active={overlayShadow}
                 onClick={() => setOverlayShadow(!overlayShadow)}
-                className={`rounded-2xl px-3 py-3 text-xs font-black transition ${
-                  overlayShadow
-                    ? "bg-white text-black"
-                    : "bg-white/8 text-white/60 hover:bg-white/12"
-                }`}
+                small
               >
                 SHADOW
-              </button>
+              </OptionButton>
             </div>
           </div>
-        </GlassPanel>
+        </Panel>
       );
     }
 
     if (activeTool === "audio") {
       return (
-        <GlassPanel title="Audio" subtitle="Control original and music volume.">
+        <Panel title="Audio Mix" subtitle="Balance original video sound and background music.">
           <div className="space-y-6">
             <RangeControl
-              label="Original video volume"
+              label="Original volume"
               value={videoVolume}
               min={0}
               max={100}
@@ -1222,13 +1281,13 @@ export default function ProjectDetailsPage() {
 
             <button
               onClick={() => setMutedOriginal(!mutedOriginal)}
-              className={`w-full rounded-2xl px-5 py-3 font-black transition ${
+              className={`w-full rounded-2xl border px-5 py-3 font-black transition ${
                 mutedOriginal
-                  ? "bg-white text-black"
-                  : "border border-white/10 bg-white/5 text-white/65 hover:bg-white/10"
+                  ? "border-white/20 bg-white text-black"
+                  : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
               }`}
             >
-              {mutedOriginal ? "Original Muted" : "Mute Original Audio"}
+              {mutedOriginal ? "Original muted" : "Mute original audio"}
             </button>
 
             <RangeControl
@@ -1241,20 +1300,25 @@ export default function ProjectDetailsPage() {
             />
 
             {localAudioURL ? (
-              <audio ref={audioRef} src={localAudioURL} controls className="w-full" />
+              <audio
+                ref={audioRef}
+                src={localAudioURL}
+                controls
+                className="w-full"
+              />
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-white/45">
-                Add music from the Media tab.
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-5 text-sm leading-6 text-white/45">
+                Add music from the Media tab to control background audio.
               </div>
             )}
           </div>
-        </GlassPanel>
+        </Panel>
       );
     }
 
     if (activeTool === "effects") {
       return (
-        <GlassPanel title="Effects" subtitle="Apply presets or tune manually.">
+        <Panel title="Visual Effects" subtitle="Apply presets or tune the look manually.">
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-2">
               {[
@@ -1268,7 +1332,7 @@ export default function ProjectDetailsPage() {
                 <button
                   key={key}
                   onClick={() => applyEffectPreset(key as any)}
-                  className="rounded-2xl border border-white/10 bg-white/8 px-3 py-3 text-sm font-black text-white/68 transition hover:bg-white hover:text-black"
+                  className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-3 text-sm font-black text-white/68 transition hover:bg-white hover:text-black"
                 >
                   {label}
                 </button>
@@ -1320,188 +1384,169 @@ export default function ProjectDetailsPage() {
               onChange={setBlur}
             />
           </div>
-        </GlassPanel>
+        </Panel>
       );
     }
 
     if (activeTool === "export") {
       return (
-        <GlassPanel
-          title="Export"
-          subtitle="Export options are ready. FFmpeg will be connected next."
+        <Panel
+          title="Export Studio"
+          subtitle="Choose output format and quality. Real export will be enabled with FFmpeg next."
         >
           <div className="space-y-6">
-            <div className="rounded-2xl border border-white/10 bg-black/25 p-4">
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-purple-300">
-                Output
+            <div className="rounded-[1.6rem] border border-fuchsia-300/15 bg-gradient-to-br from-fuchsia-300/12 via-white/[0.04] to-cyan-300/10 p-5">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-fuchsia-200">
+                Output target
               </p>
 
-              <p className="mt-3 text-3xl font-black">
+              <p className="mt-3 text-3xl font-black text-white">
                 {output.width} × {output.height}
               </p>
 
-              <p className="mt-1 text-sm text-white/50">
+              <p className="mt-2 text-sm text-white/50">
                 {canvasFormat} · {exportResolution} · {exportFps} FPS
               </p>
             </div>
 
             <div>
-              <label className="text-sm font-bold text-white/55">
+              <label className="text-sm font-bold text-white/58">
                 Video format
               </label>
 
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {(["mp4", "webm"] as VideoFormat[]).map((item) => (
-                  <button
+                  <OptionButton
                     key={item}
+                    active={exportFormat === item}
                     onClick={() => setExportFormat(item)}
-                    className={`rounded-2xl px-4 py-3 text-sm font-black uppercase transition ${
-                      exportFormat === item
-                        ? "bg-white text-black"
-                        : "bg-white/8 text-white/60 hover:bg-white/12"
-                    }`}
                   >
-                    {item}
-                  </button>
+                    {item.toUpperCase()}
+                  </OptionButton>
                 ))}
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-bold text-white/55">
+              <label className="text-sm font-bold text-white/58">
                 Resolution
               </label>
 
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 {(["720p", "1080p", "2k"] as ExportResolution[]).map(
                   (item) => (
-                    <button
+                    <OptionButton
                       key={item}
+                      active={exportResolution === item}
                       onClick={() => setExportResolution(item)}
-                      className={`rounded-2xl px-3 py-3 text-xs font-black uppercase transition ${
-                        exportResolution === item
-                          ? "bg-white text-black"
-                          : "bg-white/8 text-white/60 hover:bg-white/12"
-                      }`}
+                      small
                     >
-                      {item}
-                    </button>
+                      {item.toUpperCase()}
+                    </OptionButton>
                   )
                 )}
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-bold text-white/55">FPS</label>
+              <label className="text-sm font-bold text-white/58">FPS</label>
 
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 {([24, 30, 60] as ExportFps[]).map((item) => (
-                  <button
+                  <OptionButton
                     key={item}
+                    active={exportFps === item}
                     onClick={() => setExportFps(item)}
-                    className={`rounded-2xl px-3 py-3 text-xs font-black transition ${
-                      exportFps === item
-                        ? "bg-white text-black"
-                        : "bg-white/8 text-white/60 hover:bg-white/12"
-                    }`}
+                    small
                   >
                     {item}
-                  </button>
+                  </OptionButton>
                 ))}
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-bold text-white/55">
-                Quality
-              </label>
+              <label className="text-sm font-bold text-white/58">Quality</label>
 
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 {(["standard", "high", "max"] as ExportQuality[]).map(
                   (item) => (
-                    <button
+                    <OptionButton
                       key={item}
+                      active={exportQuality === item}
                       onClick={() => setExportQuality(item)}
-                      className={`rounded-2xl px-3 py-3 text-xs font-black capitalize transition ${
-                        exportQuality === item
-                          ? "bg-white text-black"
-                          : "bg-white/8 text-white/60 hover:bg-white/12"
-                      }`}
+                      small
                     >
                       {item}
-                    </button>
+                    </OptionButton>
                   )
                 )}
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-bold text-white/55">
-                Extract audio format
+              <label className="text-sm font-bold text-white/58">
+                Extract audio
               </label>
 
-              <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {(["mp3", "wav"] as AudioFormat[]).map((item) => (
-                  <button
+                  <OptionButton
                     key={item}
+                    active={audioFormat === item}
                     onClick={() => setAudioFormat(item)}
-                    className={`rounded-2xl px-4 py-3 text-sm font-black uppercase transition ${
-                      audioFormat === item
-                        ? "bg-white text-black"
-                        : "bg-white/8 text-white/60 hover:bg-white/12"
-                    }`}
                   >
-                    {item}
-                  </button>
+                    {item.toUpperCase()}
+                  </OptionButton>
                 ))}
               </div>
             </div>
 
             <button
               onClick={handleExportNotReady}
-              className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-amber-200"
+              className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100"
             >
-              Export Video Next
+              Export video next
             </button>
 
             <button
               onClick={handleExportNotReady}
-              className="w-full rounded-2xl border border-white/10 bg-white/8 px-5 py-3 font-black text-white transition hover:bg-white hover:text-black"
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white transition hover:bg-white hover:text-black"
             >
-              Extract Audio Next
+              Extract audio next
             </button>
 
-            <p className="rounded-2xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-100/80">
-              These export settings are saved now. Actual MP4, WebM, MP3, and
-              WAV generation will be enabled after FFmpeg integration.
+            <p className="rounded-[1.5rem] border border-amber-300/20 bg-amber-300/10 p-4 text-sm leading-6 text-amber-100/78">
+              Export settings are saved now. Actual video/audio generation will
+              be connected through FFmpeg in the next development step.
             </p>
           </div>
-        </GlassPanel>
+        </Panel>
       );
     }
 
     return (
-      <GlassPanel title="Project" subtitle="Save your editor and export settings.">
+      <Panel title="Project Settings" subtitle="Save your editor setup and manage the project.">
         <div className="space-y-4">
           <div>
-            <label className="text-sm font-bold text-white/55">
+            <label className="text-sm font-bold text-white/58">
               Project title
             </label>
 
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none transition focus:border-cyan-300/60"
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-white outline-none transition focus:border-fuchsia-300/60"
             />
           </div>
 
           <div>
-            <label className="text-sm font-bold text-white/55">Status</label>
+            <label className="text-sm font-bold text-white/58">Status</label>
 
             <select
               value={status}
               onChange={(event) => setStatus(event.target.value)}
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none transition focus:border-cyan-300/60"
+              className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-white outline-none transition focus:border-fuchsia-300/60"
             >
               <option className="bg-black">Draft</option>
               <option className="bg-black">In Progress</option>
@@ -1513,33 +1558,43 @@ export default function ProjectDetailsPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {saving ? "Saving..." : "Save Editor"}
+            {saving ? "Saving..." : "Save editor"}
           </button>
 
           <button
             onClick={() => setActiveTool("export")}
-            className="w-full rounded-2xl border border-white/10 bg-white/8 px-5 py-3 font-black text-white transition hover:bg-white hover:text-black"
+            className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white transition hover:bg-white hover:text-black"
           >
-            Open Export Settings
+            Open export settings
           </button>
 
           <button
             onClick={handleDelete}
             className="w-full rounded-2xl border border-red-400/30 bg-red-500/10 px-5 py-3 font-black text-red-200 transition hover:bg-red-500/20"
           >
-            Delete Project
+            Delete project
           </button>
         </div>
-      </GlassPanel>
+      </Panel>
     );
   };
 
   if (checking) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#05030a] text-white">
-        <p className="text-lg text-white/70">Opening editor...</p>
+        <div className="text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-gradient-to-br from-fuchsia-300 via-purple-300 to-cyan-200 font-black text-black shadow-2xl shadow-fuchsia-500/20">
+            L
+          </div>
+
+          <p className="mt-6 text-lg font-black">Opening your Lumeo studio...</p>
+
+          <p className="mt-2 text-sm text-white/42">
+            Preparing your editing workspace.
+          </p>
+        </div>
       </main>
     );
   }
@@ -1548,17 +1603,17 @@ export default function ProjectDetailsPage() {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#05030a] px-6 text-white">
         <div className="max-w-md rounded-[2rem] border border-white/10 bg-white/[0.04] p-8 text-center">
-          <h1 className="text-3xl font-black">Sign in required</h1>
+          <h1 className="text-3xl font-black">Continue to Lumeo</h1>
 
           <p className="mt-4 text-white/60">
-            Please sign in with Google to open your editor.
+            Sign in to open your premium short video editing studio.
           </p>
 
           <button
             onClick={handleLogin}
-            className="mt-8 rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-amber-200"
+            className="mt-8 rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-fuchsia-100"
           >
-            Sign in with Google
+            Continue with Google
           </button>
         </div>
       </main>
@@ -1577,7 +1632,7 @@ export default function ProjectDetailsPage() {
 
           <Link
             href="/dashboard"
-            className="mt-8 inline-flex rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-amber-200"
+            className="mt-8 inline-flex rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-fuchsia-100"
           >
             Back to Dashboard
           </Link>
@@ -1587,43 +1642,63 @@ export default function ProjectDetailsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#251143_0,#05030a_34%,#030207_100%)] text-white">
-      <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#05030a]/78 px-4 py-3 backdrop-blur-2xl sm:px-6">
-        <div className="mx-auto flex max-w-[1800px] items-center justify-between gap-4">
-          <Link href="/dashboard" className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-400 via-fuchsia-400 to-amber-300 font-black text-black shadow-lg shadow-purple-500/20">
+    <main className="min-h-screen overflow-hidden bg-[#07050d] text-white">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(236,72,153,0.18),transparent_34%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_30%),radial-gradient(circle_at_bottom,rgba(168,85,247,0.13),transparent_34%)]" />
+
+      <nav className="relative z-50 border-b border-white/10 bg-[#07050d]/86 px-4 py-3 backdrop-blur-2xl sm:px-6">
+        <div className="mx-auto flex max-w-[1900px] items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <Link
+              href="/dashboard"
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-300 via-purple-300 to-cyan-200 font-black text-black shadow-lg shadow-fuchsia-500/20"
+            >
               L
-            </div>
+            </Link>
 
             <div className="min-w-0">
-              <p className="truncate text-base font-black leading-none">
-                {title || "Lumeo Editor"}
-              </p>
-              <p className="mt-1 hidden text-xs text-white/45 sm:block">
-                Premium short video workspace
+              <div className="flex items-center gap-3">
+                <p className="truncate text-base font-black leading-none sm:text-lg">
+                  {title || "Untitled project"}
+                </p>
+
+                <span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200 md:inline-flex">
+                  Beta Studio
+                </span>
+              </div>
+
+              <p className="mt-1 hidden text-xs text-white/38 sm:block">
+                {canvasFormat} · {exportResolution} ·{" "}
+                {exportFormat.toUpperCase()} · {output.width}×{output.height}
               </p>
             </div>
-          </Link>
+          </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="hidden rounded-full bg-white px-5 py-2 text-sm font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-60 sm:inline-flex"
+              className="rounded-full bg-white px-5 py-2.5 text-sm font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {saving ? "Saving..." : "Save"}
             </button>
 
+            <button
+              onClick={() => setActiveTool("export")}
+              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-5 py-2.5 text-sm font-black text-white/72 transition hover:bg-white hover:text-black md:inline-flex"
+            >
+              Export
+            </button>
+
             <Link
               href="/dashboard"
-              className="hidden rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white/65 transition hover:bg-white/10 hover:text-white md:inline-flex"
+              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-5 py-2.5 text-sm font-bold text-white/64 transition hover:bg-white/10 hover:text-white lg:inline-flex"
             >
               Dashboard
             </Link>
 
             <button
               onClick={handleLogout}
-              className="rounded-full bg-white px-5 py-2 text-sm font-black text-black transition hover:bg-amber-200"
+              className="rounded-full border border-white/10 bg-white/[0.06] px-5 py-2.5 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
             >
               Sign out
             </button>
@@ -1631,58 +1706,68 @@ export default function ProjectDetailsPage() {
         </div>
       </nav>
 
-      <section className="mx-auto max-w-[1800px] px-4 py-4 sm:px-6">
-        <div className="mb-4 flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/20 backdrop-blur-2xl sm:p-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <Link
-              href="/dashboard"
-              className="text-sm font-bold text-white/45 transition hover:text-white"
-            >
-              ← Back to Dashboard
-            </Link>
+      <section className="relative z-10 mx-auto max-w-[1900px] px-4 py-4 sm:px-6">
+        <div className="grid gap-4 lg:h-[calc(100vh-92px)] lg:grid-cols-[280px_minmax(0,1fr)_390px]">
+          <aside className="hidden min-h-0 overflow-hidden rounded-[2rem] border border-white/10 bg-[#111018]/82 shadow-2xl shadow-black/25 backdrop-blur-2xl lg:block">
+            <div className="border-b border-white/10 p-5">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
+                Lumeo tools
+              </p>
 
-            <h1 className="mt-3 truncate text-3xl font-black tracking-tight sm:text-4xl">
-              {project.title}
-            </h1>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <StatPill label="Duration" value={`${videoDuration || 0}s`} />
+                <StatPill label="Range" value={`${selectedRange}s`} />
+              </div>
 
-            <p className="mt-2 text-sm text-white/52">
-              {canvasFormat} · {exportResolution} export ·{" "}
-              {exportFormat.toUpperCase()} · {output.width}×{output.height}
-            </p>
-          </div>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <StatPill label="Canvas" value={canvasFormat} />
+                <StatPill label="Output" value={exportResolution} />
+              </div>
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            <span className="rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-bold text-white/65">
-              {project.type}
-            </span>
+            <div className="space-y-2 p-3">
+              {tools.map((tool) => (
+                <button
+                  key={tool.key}
+                  onClick={() => setActiveTool(tool.key)}
+                  className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-3.5 text-left transition ${
+                    activeTool === tool.key
+                      ? "border-white/18 bg-white text-black shadow-xl shadow-white/10"
+                      : "border-transparent bg-transparent text-white/58 hover:border-white/10 hover:bg-white/[0.06] hover:text-white"
+                  }`}
+                >
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black ${
+                      activeTool === tool.key
+                        ? "bg-black text-white"
+                        : "bg-white/[0.08] text-white/70 group-hover:bg-white/[0.12]"
+                    }`}
+                  >
+                    {tool.icon}
+                  </span>
 
-            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-4 py-2 text-sm font-bold text-emerald-200">
-              {status}
-            </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black">
+                      {tool.label}
+                    </span>
 
-            {localVideoURL && (
-              <span className="rounded-full border border-purple-400/20 bg-purple-400/10 px-4 py-2 text-sm font-bold text-purple-200">
-                {videoRestored ? "Video restored" : "Video selected"}
-              </span>
-            )}
-          </div>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-[86px_minmax(360px,1fr)_390px] lg:h-[calc(100vh-178px)]">
-          <aside className="hidden rounded-[2rem] border border-white/10 bg-white/[0.045] p-3 shadow-2xl shadow-black/20 backdrop-blur-2xl lg:flex lg:flex-col lg:gap-3 lg:overflow-y-auto">
-            {tools.map((tool) => (
-              <ToolButton
-                key={tool.key}
-                icon={tool.icon}
-                label={tool.label}
-                active={activeTool === tool.key}
-                onClick={() => setActiveTool(tool.key)}
-              />
-            ))}
+                    <span
+                      className={`mt-0.5 block truncate text-xs ${
+                        activeTool === tool.key
+                          ? "text-black/55"
+                          : "text-white/34"
+                      }`}
+                    >
+                      {tool.description}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
           </aside>
 
           <div className="flex min-h-0 flex-col gap-4">
-            <div className="flex gap-2 overflow-x-auto rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-2 backdrop-blur-2xl lg:hidden">
+            <div className="flex gap-2 overflow-x-auto rounded-[1.5rem] border border-white/10 bg-[#111018]/82 p-2 backdrop-blur-2xl lg:hidden">
               {tools.map((tool) => (
                 <button
                   key={tool.key}
@@ -1690,7 +1775,7 @@ export default function ProjectDetailsPage() {
                   className={`shrink-0 rounded-2xl px-4 py-3 text-sm font-black transition ${
                     activeTool === tool.key
                       ? "bg-white text-black"
-                      : "bg-white/6 text-white/60"
+                      : "bg-white/[0.06] text-white/60"
                   }`}
                 >
                   {tool.icon} {tool.label}
@@ -1698,237 +1783,270 @@ export default function ProjectDetailsPage() {
               ))}
             </div>
 
-            <div className="relative flex min-h-[620px] flex-1 items-center justify-center overflow-hidden rounded-[2rem] border border-white/10 bg-black/30 p-4 shadow-2xl shadow-black/30 backdrop-blur-2xl lg:min-h-0">
-              {localVideoURL && backgroundStyle === "blur" && (
-                <video
-                  src={localVideoURL}
-                  muted
-                  className="absolute inset-0 h-full w-full scale-110 object-cover opacity-35 blur-2xl"
-                  style={{ filter: videoFilter }}
-                />
-              )}
-
-              {backgroundStyle === "gradient" && (
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-700/30 via-black to-amber-400/20" />
-              )}
-
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0,rgba(0,0,0,0.45)_65%,rgba(0,0,0,0.8)_100%)]" />
-
-              <div className={`relative z-10 max-w-full ${canvasFrameClass}`}>
-                <div className="absolute -inset-4 rounded-[2.75rem] bg-gradient-to-br from-purple-500/25 via-transparent to-amber-300/20 blur-2xl" />
-
-                <div className="relative h-full w-full overflow-hidden rounded-[2.15rem] border border-white/10 bg-black shadow-2xl shadow-black">
-                  {localVideoURL ? (
-                    <video
-                      ref={videoRef}
-                      src={localVideoURL}
-                      controls
-                      playsInline
-                      onLoadedMetadata={handleLoadedMetadata}
-                      onTimeUpdate={handleVideoTimeUpdate}
-                      className="h-full w-full"
-                      style={{
-                        objectFit: fitMode,
-                        filter: videoFilter,
-                        transform: `translate(${videoX}%, ${videoY}%) rotate(${rotate}deg) scale(${videoZoom / 100}) scaleX(${flipX ? -1 : 1})`,
-                        transformOrigin: "center",
-                      }}
-                    />
-                  ) : (
-                    <div className="flex h-full w-full flex-col items-center justify-center px-8 text-center">
-                      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[1.75rem] border border-white/10 bg-white/10 text-3xl shadow-xl">
-                        ▶
-                      </div>
-
-                      <p className="text-2xl font-black">Add your video</p>
-
-                      <p className="mt-3 max-w-xs text-sm leading-6 text-white/45">
-                        Select a local video from the Media tab and start
-                        shaping your short edit.
-                      </p>
-
-                      <button
-                        onClick={() => setActiveTool("media")}
-                        className="mt-6 rounded-full bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-amber-200"
-                      >
-                        Open Media
-                      </button>
-                    </div>
-                  )}
-
-                  {localVideoURL && overlayText && (
-                    <div
-                      className={`pointer-events-none absolute max-w-[86%] text-center font-black leading-tight ${
-                        overlayBg ? "rounded-2xl bg-black/55 px-4 py-2" : ""
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d0b13]/88 shadow-2xl shadow-black/30 backdrop-blur-2xl">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+                <div className="flex flex-wrap gap-2">
+                  {(["9:16", "1:1", "16:9"] as CanvasFormat[]).map((item) => (
+                    <button
+                      key={item}
+                      onClick={() => setCanvasFormat(item)}
+                      className={`rounded-full px-4 py-2 text-xs font-black transition ${
+                        canvasFormat === item
+                          ? "bg-white text-black"
+                          : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
                       }`}
-                      style={{
-                        left: `${overlayX}%`,
-                        top: `${overlayY}%`,
-                        transform: "translate(-50%, -50%)",
-                        fontSize: `${overlaySize}px`,
-                        color: overlayColor,
-                        opacity: overlayOpacity / 100,
-                        textTransform: overlayUppercase
-                          ? "uppercase"
-                          : "none",
-                        textShadow: overlayShadow
-                          ? "0 8px 32px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.9)"
-                          : "none",
-                      }}
                     >
-                      {overlayText}
-                    </div>
-                  )}
+                      {item}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setFitMode("contain")}
+                    className={`rounded-full px-4 py-2 text-xs font-black transition ${
+                      fitMode === "contain"
+                        ? "bg-white text-black"
+                        : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
+                    }`}
+                  >
+                    Fit
+                  </button>
+
+                  <button
+                    onClick={() => setFitMode("cover")}
+                    className={`rounded-full px-4 py-2 text-xs font-black transition ${
+                      fitMode === "cover"
+                        ? "bg-white text-black"
+                        : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
+                    }`}
+                  >
+                    Fill
+                  </button>
                 </div>
               </div>
-            </div>
 
-            <div className="rounded-[2rem] border border-white/10 bg-white/[0.045] p-4 shadow-2xl shadow-black/20 backdrop-blur-2xl">
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div>
-                    <p className="text-sm font-black uppercase tracking-[0.2em] text-white/35">
-                      Timeline
-                    </p>
+              <div className="relative flex min-h-[480px] flex-1 items-center justify-center overflow-hidden p-4 sm:p-6">
+                {localVideoURL && backgroundStyle === "blur" && (
+                  <video
+                    src={localVideoURL}
+                    muted
+                    className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-3xl"
+                    style={{ filter: videoFilter }}
+                  />
+                )}
 
-                    <p className="mt-1 text-sm text-white/55">
-                      Clean trim preview from {trimStart}s to{" "}
-                      {trimEnd || videoDuration}s
-                    </p>
-                  </div>
+                {backgroundStyle === "gradient" && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500/18 via-black to-cyan-400/14" />
+                )}
 
-                  <div className="flex flex-col gap-3 sm:flex-row">
-                    <button
-                      onClick={handlePlayTrimPreview}
-                      disabled={!localVideoURL}
-                      className="rounded-2xl bg-white px-6 py-3 font-black text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-45"
-                    >
-                      Preview
-                    </button>
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0,rgba(0,0,0,0.38)_64%,rgba(0,0,0,0.86)_100%)]" />
 
-                    <button
-                      onClick={handleSave}
-                      disabled={saving}
-                      className="rounded-2xl border border-white/10 bg-white/8 px-6 py-3 font-black text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-55"
-                    >
-                      {saving ? "Saving..." : "Save"}
-                    </button>
+                <div className={`relative z-10 max-w-full ${canvasFrameClass}`}>
+                  <div className="absolute -inset-5 rounded-[3rem] bg-gradient-to-br from-fuchsia-500/22 via-transparent to-cyan-300/18 blur-2xl" />
+
+                  <div className="relative h-full w-full overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-2xl shadow-black">
+                    {localVideoURL ? (
+                      <video
+                        ref={videoRef}
+                        src={localVideoURL}
+                        controls
+                        playsInline
+                        onLoadedMetadata={handleLoadedMetadata}
+                        onTimeUpdate={handleVideoTimeUpdate}
+                        className="h-full w-full"
+                        style={{
+                          objectFit: fitMode,
+                          filter: videoFilter,
+                          transform: `translate(${videoX}%, ${videoY}%) rotate(${rotate}deg) scale(${videoZoom / 100}) scaleX(${flipX ? -1 : 1})`,
+                          transformOrigin: "center",
+                        }}
+                      />
+                    ) : (
+                      <div className="flex h-full w-full flex-col items-center justify-center px-8 text-center">
+                        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-white text-3xl font-black text-black shadow-xl shadow-white/10">
+                          +
+                        </div>
+
+                        <p className="text-2xl font-black">Add your first clip</p>
+
+                        <p className="mt-3 max-w-xs text-sm leading-6 text-white/45">
+                          Import a video from the Media panel to start building
+                          your premium short.
+                        </p>
+
+                        <button
+                          onClick={() => setActiveTool("media")}
+                          className="mt-6 rounded-full bg-white px-6 py-3 text-sm font-black text-black transition hover:bg-fuchsia-100"
+                        >
+                          Open media
+                        </button>
+                      </div>
+                    )}
+
+                    {localVideoURL && overlayText && (
+                      <div
+                        className={`pointer-events-none absolute max-w-[86%] text-center font-black leading-tight ${
+                          overlayBg ? "rounded-2xl bg-black/55 px-4 py-2" : ""
+                        }`}
+                        style={{
+                          left: `${overlayX}%`,
+                          top: `${overlayY}%`,
+                          transform: "translate(-50%, -50%)",
+                          fontSize: `${overlaySize}px`,
+                          color: overlayColor,
+                          opacity: overlayOpacity / 100,
+                          textTransform: overlayUppercase
+                            ? "uppercase"
+                            : "none",
+                          textShadow: overlayShadow
+                            ? "0 8px 32px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.9)"
+                            : "none",
+                        }}
+                      >
+                        {overlayText}
+                      </div>
+                    )}
                   </div>
                 </div>
+              </div>
 
-                <div className="grid gap-4 lg:grid-cols-[120px_1fr_120px] lg:items-center">
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-[0.16em] text-white/35">
-                      Start
-                    </label>
+              <div className="border-t border-white/10 bg-black/22 p-4">
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
+                        Timeline
+                      </p>
 
-                    <input
-                      type="number"
-                      min={0}
-                      value={trimStart}
-                      onChange={(event) =>
-                        setTrimStart(Number(event.target.value))
-                      }
-                      className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none transition focus:border-cyan-300/60"
-                    />
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="mb-2 flex items-center justify-between text-xs font-bold text-white/45">
-                      <span>0s</span>
-                      <span>{videoDuration || 0}s</span>
+                      <p className="mt-1 text-sm text-white/48">
+                        Selected range: {trimStart}s to{" "}
+                        {trimEnd || videoDuration}s · {selectedRange}s
+                      </p>
                     </div>
 
-                    <div className="relative h-4 overflow-hidden rounded-full border border-white/10 bg-black/40">
-                      <div
-                        className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-purple-400 via-cyan-300 to-amber-200"
-                        style={{
-                          width: `${
-                            videoDuration > 0
-                              ? Math.min(
-                                  100,
-                                  Math.max(
-                                    0,
-                                    ((trimEnd || videoDuration) /
-                                      videoDuration) *
-                                      100
-                                  )
-                                )
-                              : 0
-                          }%`,
-                        }}
-                      />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handlePlayTrimPreview}
+                        disabled={!localVideoURL}
+                        className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        Preview
+                      </button>
 
-                      <div
-                        className="absolute top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-white shadow-lg"
-                        style={{
-                          left: `${
-                            videoDuration > 0
-                              ? Math.min(
-                                  100,
-                                  Math.max(
-                                    0,
-                                    (trimStart / videoDuration) * 100
-                                  )
-                                )
-                              : 0
-                          }%`,
-                        }}
-                      />
-
-                      <div
-                        className="absolute top-1/2 h-6 w-1 -translate-y-1/2 rounded-full bg-white shadow-lg"
-                        style={{
-                          left: `${
-                            videoDuration > 0
-                              ? Math.min(
-                                  100,
-                                  Math.max(
-                                    0,
-                                    ((trimEnd || videoDuration) /
-                                      videoDuration) *
-                                      100
-                                  )
-                                )
-                              : 0
-                          }%`,
-                        }}
-                      />
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-between text-xs text-white/35">
-                      <span>Selected range</span>
-                      <span>
-                        {Math.max(
-                          0,
-                          (trimEnd || videoDuration || 0) - trimStart
-                        )}
-                        s
-                      </span>
+                      <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-black text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-55"
+                      >
+                        {saving ? "Saving..." : "Save"}
+                      </button>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="text-xs font-bold uppercase tracking-[0.16em] text-white/35">
-                      End
-                    </label>
+                  <div className="grid gap-4 xl:grid-cols-[110px_1fr_110px] xl:items-center">
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
+                        Start
+                      </label>
 
-                    <input
-                      type="number"
-                      min={0}
-                      value={trimEnd}
-                      onChange={(event) =>
-                        setTrimEnd(Number(event.target.value))
-                      }
-                      className="mt-2 w-full rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-white outline-none transition focus:border-cyan-300/60"
-                    />
+                      <input
+                        type="number"
+                        min={0}
+                        value={trimStart}
+                        onChange={(event) =>
+                          setTrimStart(Number(event.target.value))
+                        }
+                        className="mt-2 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300/60"
+                      />
+                    </div>
+
+                    <div className="min-w-0">
+                      <div className="mb-2 flex items-center justify-between text-xs font-bold text-white/38">
+                        <span>0s</span>
+                        <span>{videoDuration || 0}s</span>
+                      </div>
+
+                      <div className="relative h-4 overflow-hidden rounded-full border border-white/10 bg-black/45">
+                        <div
+                          className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-cyan-200 to-amber-200"
+                          style={{
+                            width: `${
+                              videoDuration > 0
+                                ? Math.min(
+                                    100,
+                                    Math.max(
+                                      0,
+                                      ((trimEnd || videoDuration) /
+                                        videoDuration) *
+                                        100
+                                    )
+                                  )
+                                : 0
+                            }%`,
+                          }}
+                        />
+
+                        <div
+                          className="absolute top-1/2 h-7 w-1.5 -translate-y-1/2 rounded-full bg-white shadow-lg"
+                          style={{
+                            left: `${
+                              videoDuration > 0
+                                ? Math.min(
+                                    100,
+                                    Math.max(
+                                      0,
+                                      (trimStart / videoDuration) * 100
+                                    )
+                                  )
+                                : 0
+                            }%`,
+                          }}
+                        />
+
+                        <div
+                          className="absolute top-1/2 h-7 w-1.5 -translate-y-1/2 rounded-full bg-white shadow-lg"
+                          style={{
+                            left: `${
+                              videoDuration > 0
+                                ? Math.min(
+                                    100,
+                                    Math.max(
+                                      0,
+                                      ((trimEnd || videoDuration) /
+                                        videoDuration) *
+                                        100
+                                    )
+                                  )
+                                : 0
+                            }%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
+                        End
+                      </label>
+
+                      <input
+                        type="number"
+                        min={0}
+                        value={trimEnd}
+                        onChange={(event) =>
+                          setTrimEnd(Number(event.target.value))
+                        }
+                        className="mt-2 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300/60"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <aside className="min-h-0 overflow-y-auto rounded-[2rem] lg:pr-1">
+          <aside className="min-h-0 overflow-y-auto rounded-[2rem]">
             {renderInspector()}
           </aside>
         </div>
