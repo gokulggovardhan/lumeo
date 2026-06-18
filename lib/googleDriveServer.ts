@@ -48,6 +48,13 @@ type DriveUploadSession = {
   fileName: string;
 };
 
+type DriveFileMetadata = {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+};
+
 export function getGoogleDriveEnv(): GoogleDriveEnv {
   const env = {
     clientId: process.env.GOOGLE_DRIVE_CLIENT_ID,
@@ -373,4 +380,132 @@ export async function createVideoUploadSession({
     uploadUrl,
     fileName,
   };
+}
+
+export async function findDriveUploadByName({
+  fileName,
+  mimeType,
+  size,
+}: {
+  fileName: string;
+  mimeType: string;
+  size: number;
+}): Promise<DriveFileMetadata | null> {
+  const env = getGoogleDriveStatusEnv();
+  const accessToken = await getGoogleDriveAccessToken();
+  const escapedFileName = escapeDriveQueryString(fileName);
+  const params = new URLSearchParams({
+    q: `'${env.uploadsFolderId}' in parents and name = '${escapedFileName}' and trashed = false`,
+    fields: "files(id,name,mimeType,size,createdTime)",
+    orderBy: "createdTime desc",
+    pageSize: "1",
+    supportsAllDrives: "true",
+    includeItemsFromAllDrives: "true",
+  });
+
+  const response = await fetch(
+    `${GOOGLE_DRIVE_API_URL}/files?${params.toString()}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  );
+
+  const payload = (await response.json()) as {
+    files?: Array<{
+      id?: string;
+      name?: string;
+      mimeType?: string;
+      size?: string;
+    }>;
+    error?: {
+      code?: number;
+      message?: string;
+    };
+  };
+
+  if (!response.ok) {
+    console.error("Google Drive upload verification failed", {
+      status: response.status,
+      errorCode: payload.error?.code,
+      errorMessage: payload.error?.message,
+    });
+
+    throw new GoogleDriveServerError(
+      payload.error?.code
+        ? `drive_${payload.error.code}`
+        : "drive_upload_verify_failed",
+      payload.error?.message || "Google Drive upload verification failed.",
+    );
+  }
+
+  const file = payload.files?.[0];
+
+  if (!file?.id || !file.name) {
+    return null;
+  }
+
+  if (mimeType && file.mimeType && file.mimeType !== mimeType) {
+    return null;
+  }
+
+  const fileSize = Number(file.size || 0);
+
+  if (Number.isFinite(size) && size > 0 && fileSize > 0 && fileSize !== size) {
+    return null;
+  }
+
+  return {
+    fileId: file.id,
+    fileName: file.name,
+    mimeType: file.mimeType || mimeType,
+    size: fileSize || size,
+  };
+}
+
+export async function deleteDriveFile(fileId: string) {
+  const accessToken = await getGoogleDriveAccessToken();
+  const params = new URLSearchParams({
+    supportsAllDrives: "true",
+  });
+
+  const response = await fetch(
+    `${GOOGLE_DRIVE_API_URL}/files/${encodeURIComponent(fileId)}?${params.toString()}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  );
+
+  if (response.ok || response.status === 404) {
+    return;
+  }
+
+  let payload: { error?: { code?: number; message?: string } } = {};
+
+  try {
+    payload = (await response.json()) as {
+      error?: { code?: number; message?: string };
+    };
+  } catch {
+    // Google may return an empty body for delete errors.
+  }
+
+  console.error("Google Drive file delete failed", {
+    status: response.status,
+    errorCode: payload.error?.code,
+    errorMessage: payload.error?.message,
+  });
+
+  throw new GoogleDriveServerError(
+    payload.error?.code ? `drive_${payload.error.code}` : "drive_delete_failed",
+    payload.error?.message || "Google Drive file delete failed.",
+  );
+}
+
+function escapeDriveQueryString(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }

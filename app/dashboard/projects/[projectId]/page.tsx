@@ -336,6 +336,21 @@ type VideoUploadSessionResponse = {
   fileName: string;
 };
 
+type VideoUploadVerifyResponse =
+  | {
+      success: true;
+      found: boolean;
+      file: VideoUploadResponse | null;
+    }
+  | {
+      success: false;
+      error?: string;
+    };
+
+function createVideoFingerprint(file: File, projectId: string) {
+  return `${projectId}:${file.name}:${file.size}:${file.lastModified}`;
+}
+
 async function createVideoUploadSession(file: File, projectId: string) {
   const response = await fetch("/api/google-drive/create-upload-session", {
     method: "POST",
@@ -360,7 +375,51 @@ async function createVideoUploadSession(file: File, projectId: string) {
     );
   }
 
+  console.info("[Lumeo Upload] upload session created", {
+    fileName: payload.fileName,
+    projectId,
+  });
+
   return payload;
+}
+
+async function verifyUploadedVideo(
+  file: File,
+  fileName: string,
+): Promise<VideoUploadResponse | null> {
+  const response = await fetch("/api/google-drive/verify-upload", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      fileName,
+      mimeType: file.type,
+      size: file.size,
+    }),
+  });
+
+  const payload = (await response.json()) as VideoUploadVerifyResponse;
+
+  if (!response.ok || !payload.success) {
+    return null;
+  }
+
+  return payload.file;
+}
+
+async function deleteUploadedVideo(fileId: string) {
+  if (!fileId) return;
+
+  console.info("[Lumeo Upload] cleanup delete called", { fileId });
+
+  await fetch("/api/google-drive/delete", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ fileId }),
+  });
 }
 
 async function uploadVideoDirectly(
@@ -377,15 +436,33 @@ async function uploadVideoDirectly(
     request.open("PUT", session.uploadUrl);
     request.setRequestHeader("Content-Type", file.type);
 
+    console.info("[Lumeo Upload] direct upload started", {
+      fileName: file.name,
+      size: file.size,
+      mimeType: file.type,
+    });
+
     request.upload.onprogress = (event) => {
       if (!event.lengthComputable) return;
 
-      onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+      const progress = Math.min(
+        99,
+        Math.round((event.loaded / event.total) * 100),
+      );
+
+      console.info("[Lumeo Upload] direct upload progress", { progress });
+      onProgress(progress);
     };
 
-    request.onload = () => {
+    request.onload = async () => {
+      const successStatus = request.status === 200 || request.status === 201;
+
+      console.info("[Lumeo Upload] direct upload status code", {
+        status: request.status,
+      });
+
       try {
-        const response = JSON.parse(request.responseText || "{}") as {
+        let response: {
           id?: string;
           name?: string;
           mimeType?: string;
@@ -393,11 +470,48 @@ async function uploadVideoDirectly(
           error?: {
             message?: string;
           };
-        };
+        } = {};
 
-        if (request.status >= 200 && request.status < 300 && response.id) {
+        try {
+          response = JSON.parse(request.responseText || "{}") as typeof response;
+        } catch (error) {
+          console.warn("[Lumeo Upload] completion JSON parse failed", error);
+        }
+
+        if (successStatus) {
+          if (response.id) {
+            console.info("[Lumeo Upload] upload success detected", {
+              fileId: response.id,
+            });
+
+            resolve({
+              fileId: response.id,
+              fileName: response.name || session.fileName,
+              mimeType: response.mimeType || file.type,
+              size: Number(response.size || file.size),
+            });
+            return;
+          }
+
+          const verifiedFile = await verifyUploadedVideo(file, session.fileName);
+
+          if (verifiedFile) {
+            console.info("[Lumeo Upload] upload success detected", {
+              fileId: verifiedFile.fileId,
+              verified: true,
+            });
+
+            resolve(verifiedFile);
+            return;
+          }
+
+          console.info("[Lumeo Upload] upload success detected", {
+            fallback: true,
+            fileName: session.fileName,
+          });
+
           resolve({
-            fileId: response.id,
+            fileId: "",
             fileName: response.name || session.fileName,
             mimeType: response.mimeType || file.type,
             size: Number(response.size || file.size),
@@ -405,14 +519,25 @@ async function uploadVideoDirectly(
           return;
         }
 
+        console.error("[Lumeo Upload] upload failed", {
+          status: request.status,
+          message: response.error?.message,
+        });
         reject(new Error(response.error?.message || "Upload failed"));
       } catch (error) {
+        console.error("[Lumeo Upload] upload failed", error);
         reject(error);
       }
     };
 
-    request.onerror = () => reject(new Error("Upload failed"));
-    request.onabort = () => reject(new Error("Upload cancelled"));
+    request.onerror = () => {
+      console.error("[Lumeo Upload] upload failed", { status: request.status });
+      reject(new Error("Upload failed"));
+    };
+    request.onabort = () => {
+      console.info("[Lumeo Upload] upload canceled");
+      reject(new Error("Upload cancelled"));
+    };
     const shouldUpload = onRequest?.(request);
 
     if (shouldUpload === false) {
@@ -434,6 +559,8 @@ export default function ProjectDetailsPage() {
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
   const videoUploadRequestRef = useRef<XMLHttpRequest | null>(null);
   const videoUploadCancelledRef = useRef(false);
+  const videoUploadInProgressRef = useRef(false);
+  const videoUploadRunIdRef = useRef(0);
 
   const videoStorageKey = `project:${projectId}:video`;
   const audioStorageKey = `project:${projectId}:audio`;
@@ -746,9 +873,11 @@ export default function ProjectDetailsPage() {
     return () => {
       clearExportProgressTimer();
       exportRunIdRef.current += 1;
+      videoUploadRunIdRef.current += 1;
       videoUploadRequestRef.current?.abort();
       videoUploadRequestRef.current = null;
       videoUploadCancelledRef.current = true;
+      videoUploadInProgressRef.current = false;
     };
   }, []);
 
@@ -995,9 +1124,11 @@ export default function ProjectDetailsPage() {
   };
 
   const resetVideoUploadState = () => {
+    videoUploadRunIdRef.current += 1;
     videoUploadRequestRef.current?.abort();
     videoUploadRequestRef.current = null;
     videoUploadCancelledRef.current = false;
+    videoUploadInProgressRef.current = false;
     setVideoUploading(false);
     setVideoUploadProgress(0);
     setVideoUploadStatus("");
@@ -1005,32 +1136,60 @@ export default function ProjectDetailsPage() {
   };
 
   const handleCancelVideoUpload = () => {
+    videoUploadRunIdRef.current += 1;
     videoUploadCancelledRef.current = true;
     videoUploadRequestRef.current?.abort();
     videoUploadRequestRef.current = null;
+    videoUploadInProgressRef.current = false;
     setVideoUploading(false);
     setVideoUploadProgress(0);
-    setVideoUploadStatus("Upload failed. Please try again.");
+    setVideoUploadStatus("Upload canceled");
   };
 
   const handleUploadVideo = async () => {
-    if (videoUploading) return;
+    if (videoUploading || videoUploadInProgressRef.current) {
+      console.info("[Lumeo Upload] duplicate upload blocked");
+      return;
+    }
+
+    videoUploadRunIdRef.current += 1;
+    const runId = videoUploadRunIdRef.current;
+    let createdFileId = "";
 
     try {
       videoUploadCancelledRef.current = false;
+      videoUploadInProgressRef.current = true;
       setVideoUploading(true);
       setVideoUploadProgress(0);
       setVideoUploadStatus("Saving media...");
 
       const file = await getCurrentVideoFile();
+      const fingerprint = createVideoFingerprint(file, projectId);
+
+      if (
+        videoStorageMetadata &&
+        videoStorageMetadata.fingerprint === fingerprint
+      ) {
+        console.info("[Lumeo Upload] duplicate upload blocked", {
+          fingerprint,
+        });
+        setVideoUploadProgress(100);
+        setVideoUploadStatus("Media already saved");
+        return;
+      }
+
       const uploaded = await uploadVideoDirectly(
         file,
         projectId,
         (progress) => {
+          if (runId !== videoUploadRunIdRef.current) return;
           setVideoUploadProgress(progress);
         },
         (request) => {
-          if (videoUploadCancelledRef.current) {
+          if (
+            videoUploadCancelledRef.current ||
+            runId !== videoUploadRunIdRef.current
+          ) {
             return false;
           }
 
@@ -1039,9 +1198,14 @@ export default function ProjectDetailsPage() {
         }
       );
 
-      if (videoUploadCancelledRef.current) {
+      if (
+        videoUploadCancelledRef.current ||
+        runId !== videoUploadRunIdRef.current
+      ) {
         throw new Error("Upload cancelled");
       }
+
+      createdFileId = uploaded.fileId;
 
       const storage = {
         provider: "google_drive",
@@ -1049,8 +1213,11 @@ export default function ProjectDetailsPage() {
         fileName: uploaded.fileName,
         mimeType: uploaded.mimeType,
         size: uploaded.size,
+        fingerprint,
         uploadedAt: new Date().toISOString(),
       };
+
+      if (runId !== videoUploadRunIdRef.current) return;
 
       setVideoStorageMetadata(storage);
       setVideoUploadProgress(100);
@@ -1062,11 +1229,35 @@ export default function ProjectDetailsPage() {
       });
     } catch (error) {
       console.error("Video upload failed", error);
+
+      if (runId !== videoUploadRunIdRef.current) {
+        return;
+      }
+
+      if (videoUploadCancelledRef.current) {
+        console.info("[Lumeo Upload] upload canceled");
+        setVideoUploadProgress(0);
+        setVideoUploadStatus("Upload canceled");
+        return;
+      }
+
+      if (createdFileId) {
+        try {
+          await deleteUploadedVideo(createdFileId);
+        } catch (cleanupError) {
+          console.error("[Lumeo Upload] cleanup delete failed", cleanupError);
+        }
+      }
+
+      setVideoUploadProgress(0);
       setVideoUploadStatus("Upload failed. Please try again.");
     } finally {
-      videoUploadRequestRef.current = null;
-      videoUploadCancelledRef.current = false;
-      setVideoUploading(false);
+      if (runId === videoUploadRunIdRef.current) {
+        videoUploadRequestRef.current = null;
+        videoUploadCancelledRef.current = false;
+        videoUploadInProgressRef.current = false;
+        setVideoUploading(false);
+      }
     }
   };
 
@@ -1661,7 +1852,8 @@ export default function ProjectDetailsPage() {
                   )}
 
                   {!videoUploading &&
-                    videoUploadStatus === "Upload failed. Please try again." && (
+                    (videoUploadStatus === "Upload failed. Please try again." ||
+                      videoUploadStatus === "Upload canceled") && (
                       <button
                         onClick={handleUploadVideo}
                         className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
@@ -2271,31 +2463,45 @@ export default function ProjectDetailsPage() {
               </div>
             </div>
 
-            <button
-              onClick={handleExportVideo}
-              disabled={exporting}
-              className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
-            >
-              Export video
-            </button>
-
-            <button
-              onClick={handleExtractAudio}
-              disabled={exporting}
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-55"
-            >
-              Extract audio
-            </button>
-
-            {!userExportRequested && !downloadUrl && !exportError && localVideoURL && (
-              <p className="text-center text-xs font-bold text-white/36">
-                {engineReady
-                  ? "Export tools ready"
-                  : enginePreparing
-                    ? "Preparing export tools quietly"
-                    : "Export tools will prepare quietly"}
+            <div className="rounded-[1.5rem] border border-cyan-300/20 bg-cyan-300/10 p-4">
+              <p className="text-sm font-black text-cyan-100">
+                Cloud export is being upgraded.
               </p>
-            )}
+            </div>
+
+            <details className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+              <summary className="cursor-pointer text-sm font-black text-white/72">
+                Experimental export
+              </summary>
+
+              <div className="mt-4 grid gap-3">
+                <button
+                  onClick={handleExportVideo}
+                  disabled={exporting}
+                  className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  Export video
+                </button>
+
+                <button
+                  onClick={handleExtractAudio}
+                  disabled={exporting}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  Extract audio
+                </button>
+
+                {!userExportRequested && !downloadUrl && !exportError && localVideoURL && (
+                  <p className="text-center text-xs font-bold text-white/36">
+                    {engineReady
+                      ? "Export tools ready"
+                      : enginePreparing
+                        ? "Preparing export tools quietly"
+                        : "Export tools will prepare quietly"}
+                  </p>
+                )}
+              </div>
+            </details>
 
             {userExportRequested && !downloadUrl && !exportError && (
               <div className="rounded-[1.5rem] border border-cyan-300/20 bg-gradient-to-br from-cyan-300/12 via-white/[0.045] to-fuchsia-300/10 p-5">

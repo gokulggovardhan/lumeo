@@ -49,6 +49,13 @@ export async function POST(request: NextRequest) {
       size: Number(body.size),
     });
 
+    console.info("Google Drive upload session created", {
+      fileName: session.fileName,
+      mimeType: body.mimeType,
+      size: Number(body.size),
+      projectId: body.projectId,
+    });
+
     return NextResponse.json({
       success: true,
       uploadUrl: session.uploadUrl,
