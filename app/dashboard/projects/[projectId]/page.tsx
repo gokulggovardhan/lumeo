@@ -323,6 +323,55 @@ function StatPill({ label, value }: { label: string; value: string }) {
   );
 }
 
+type VideoUploadResponse = {
+  success: true;
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+};
+
+function uploadVideoToBackend(
+  file: File,
+  projectId: string,
+  onProgress: (progress: number) => void
+) {
+  return new Promise<VideoUploadResponse>((resolve, reject) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("projectId", projectId);
+
+    const request = new XMLHttpRequest();
+
+    request.open("POST", "/api/google-drive/upload");
+
+    request.upload.onprogress = (event) => {
+      if (!event.lengthComputable) return;
+
+      onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)));
+    };
+
+    request.onload = () => {
+      try {
+        const response = JSON.parse(request.responseText || "{}");
+
+        if (request.status >= 200 && request.status < 300 && response.success) {
+          resolve(response as VideoUploadResponse);
+          return;
+        }
+
+        reject(new Error(response.error || "Upload failed"));
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    request.onerror = () => reject(new Error("Upload failed"));
+    request.onabort = () => reject(new Error("Upload cancelled"));
+    request.send(formData);
+  });
+}
+
 export default function ProjectDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -351,6 +400,10 @@ export default function ProjectDetailsPage() {
   const [localVideoBytes, setLocalVideoBytes] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [videoRestored, setVideoRestored] = useState(false);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoUploadProgress, setVideoUploadProgress] = useState(0);
+  const [videoUploadStatus, setVideoUploadStatus] = useState("");
+  const [videoStorageMetadata, setVideoStorageMetadata] = useState<any>(null);
 
   const [localAudioURL, setLocalAudioURL] = useState("");
   const [localAudioName, setLocalAudioName] = useState("");
@@ -481,6 +534,7 @@ export default function ProjectDetailsPage() {
                 timeline.videoDuration ??
                 0
             );
+            setVideoStorageMetadata(editor.media?.storage ?? null);
 
             const savedCanvasFormat = editor.canvas?.format;
             setCanvasFormat(
@@ -727,6 +781,7 @@ export default function ProjectDetailsPage() {
     setLocalVideoSize(`${(file.size / (1024 * 1024)).toFixed(2)} MB`);
     setLocalVideoBytes(file.size);
     setVideoRestored(false);
+    resetVideoUploadState();
     resetExportState();
 
     try {
@@ -777,6 +832,7 @@ export default function ProjectDetailsPage() {
       setLocalVideoBytes(0);
       setVideoDuration(0);
       setVideoRestored(false);
+      resetVideoUploadState();
 
       setLocalAudioURL("");
       setLocalAudioName("");
@@ -879,6 +935,51 @@ export default function ProjectDetailsPage() {
     }
 
     return file;
+  };
+
+  const resetVideoUploadState = () => {
+    setVideoUploading(false);
+    setVideoUploadProgress(0);
+    setVideoUploadStatus("");
+    setVideoStorageMetadata(null);
+  };
+
+  const handleUploadVideo = async () => {
+    if (videoUploading) return;
+
+    try {
+      setVideoUploading(true);
+      setVideoUploadProgress(0);
+      setVideoUploadStatus("Uploading video...");
+
+      const file = await getCurrentVideoFile();
+      const uploaded = await uploadVideoToBackend(file, projectId, (progress) => {
+        setVideoUploadProgress(progress);
+      });
+
+      const storage = {
+        provider: "google_drive",
+        fileId: uploaded.fileId,
+        fileName: uploaded.fileName,
+        mimeType: uploaded.mimeType,
+        size: uploaded.size,
+        uploadedAt: new Date().toISOString(),
+      };
+
+      setVideoStorageMetadata(storage);
+      setVideoUploadProgress(100);
+      setVideoUploadStatus("Video uploaded");
+
+      await updateDoc(doc(db, "projects", projectId), {
+        "editor.media.storage": storage,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Video upload failed", error);
+      setVideoUploadStatus("Upload failed. Please try again.");
+    } finally {
+      setVideoUploading(false);
+    }
   };
 
   const clearDownload = () => {
@@ -1262,6 +1363,10 @@ export default function ProjectDetailsPage() {
               project?.editor?.localAudioName ||
               "",
             videoDuration: Number(videoDuration) || 0,
+            storage:
+              videoStorageMetadata ||
+              project?.editor?.media?.storage ||
+              null,
           },
           trim: {
             start: Number(trimStart) || 0,
@@ -1383,6 +1488,36 @@ export default function ProjectDetailsPage() {
                     Restored from browser storage.
                   </p>
                 )}
+
+                <div className="mt-4 space-y-3">
+                  <button
+                    onClick={handleUploadVideo}
+                    disabled={videoUploading}
+                    className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
+                  >
+                    Upload video
+                  </button>
+
+                  {videoUploadStatus && (
+                    <div className="rounded-2xl border border-white/10 bg-black/24 p-3">
+                      <div className="flex items-center justify-between gap-3 text-xs font-black text-white/70">
+                        <span>{videoUploadStatus}</span>
+                        {(videoUploading || videoUploadProgress > 0) && (
+                          <span>{videoUploadProgress}%</span>
+                        )}
+                      </div>
+
+                      {(videoUploading || videoUploadProgress > 0) && (
+                        <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-cyan-200 to-emerald-200 transition-all"
+                            style={{ width: `${videoUploadProgress}%` }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
