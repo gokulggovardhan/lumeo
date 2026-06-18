@@ -5,10 +5,13 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "copy-ffmpeg-core": "node scripts/copy-ffmpeg-core.mjs",
+    "postinstall": "npm run copy-ffmpeg-core",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@ffmpeg/core": "^0.12.10",
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "cloudinary": "^2.10.0",

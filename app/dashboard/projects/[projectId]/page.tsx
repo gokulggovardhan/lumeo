@@ -18,7 +18,10 @@ import {
   updateDoc,
 } from "firebase/firestore";
 import { auth, googleProvider, db } from "@/lib/firebase";
-import { loadFFmpegClient as getFFmpeg } from "@/lib/ffmpegClient";
+import {
+  loadFFmpegClient as getFFmpeg,
+  preloadFFmpeg,
+} from "@/lib/ffmpegClient";
 import {
   exportVideo as exportTrimmedVideoWithFFmpeg,
   extractAudio as extractAudioWithFFmpeg,
@@ -401,6 +404,11 @@ export default function ProjectDetailsPage() {
   const [exportStatus, setExportStatus] = useState("");
   const [downloadUrl, setDownloadUrl] = useState("");
   const [downloadName, setDownloadName] = useState("");
+  const [engineReady, setEngineReady] = useState(false);
+  const [enginePreparing, setEnginePreparing] = useState(false);
+  const [engineProgress, setEngineProgress] = useState(0);
+  const [exportError, setExportError] = useState("");
+  const [exportPhase, setExportPhase] = useState("");
 
   const output = getOutputDimensions(canvasFormat, exportResolution);
 
@@ -627,6 +635,44 @@ export default function ProjectDetailsPage() {
     audioRef.current.volume = Math.min(Math.max(musicVolume / 100, 0), 1);
   }, [musicVolume, localAudioURL]);
 
+  useEffect(() => {
+    if (activeTool !== "export" || !localVideoURL || engineReady || enginePreparing) {
+      return;
+    }
+
+    let active = true;
+
+    setEnginePreparing(true);
+    setExportPhase("Preparing export");
+    setExportError("");
+
+    preloadFFmpeg((progress) => {
+      if (!active) return;
+      setEngineProgress(Math.min(100, Math.max(0, Math.round(progress))));
+    })
+      .then(() => {
+        if (!active) return;
+        setEngineReady(true);
+        setEngineProgress(100);
+        setExportPhase("");
+      })
+      .catch((error) => {
+        console.error("FFmpeg preload failed", error);
+
+        if (!active) return;
+        setExportError("Export failed. Please refresh and try again.");
+        setExportPhase("");
+      })
+      .finally(() => {
+        if (!active) return;
+        setEnginePreparing(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [activeTool, localVideoURL, engineReady, enginePreparing]);
+
   const handleLogin = async () => {
     try {
       const result = await signInWithPopup(auth, googleProvider);
@@ -820,6 +866,14 @@ export default function ProjectDetailsPage() {
     setDownloadName("");
   };
 
+  const resetExportResult = () => {
+    clearDownload();
+    setExportProgress(0);
+    setExportStatus("");
+    setExportError("");
+    setExportPhase(engineReady ? "" : "Preparing export");
+  };
+
   const createExportFileName = (kind: "video" | "audio", format: VideoFormat | AudioFormat) => {
     const baseName = (title || localVideoName || "lumeo-export")
       .replace(/\.[^/.]+$/, "")
@@ -830,12 +884,38 @@ export default function ProjectDetailsPage() {
     return `${baseName || "lumeo-export"}-${kind}.${format}`;
   };
 
-  const createFFmpegOptions = (label: string) => ({
+  const prepareExportEngine = async () => {
+    if (engineReady) {
+      return;
+    }
+
+    setEnginePreparing(true);
+    setExportPhase("Preparing export");
+    setExportError("");
+
+    try {
+      await preloadFFmpeg((progress) => {
+        setEngineProgress(Math.min(100, Math.max(0, Math.round(progress))));
+      });
+
+      setEngineReady(true);
+      setEngineProgress(100);
+    } catch (error) {
+      console.error("FFmpeg preparation failed", error);
+      setExportError("Export failed. Please refresh and try again.");
+      throw error;
+    } finally {
+      setEnginePreparing(false);
+    }
+  };
+
+  const createFFmpegOptions = (label: "Optimizing video" | "Preparing audio") => ({
     onProgress: ({ progress }: { progress: number }) => {
       const nextProgress = Math.min(100, Math.max(0, Math.round(progress * 100)));
 
       setExportProgress(nextProgress);
-      setExportStatus(`${label} ${nextProgress}%`);
+      setExportStatus(label);
+      setExportPhase(label);
     },
   });
 
@@ -855,16 +935,19 @@ export default function ProjectDetailsPage() {
     try {
       setExporting(true);
       setExportProgress(0);
-      setExportStatus("Loading local video...");
+      setExportStatus("Preparing export");
+      setExportPhase("Preparing export");
+      setExportError("");
       clearDownload();
 
       const file = await getCurrentVideoFile();
-      const ffmpeg = createFFmpegOptions("Exporting video");
+      const ffmpeg = createFFmpegOptions("Optimizing video");
 
-      setExportStatus("Loading FFmpeg...");
+      await prepareExportEngine();
       await getFFmpeg(ffmpeg);
 
-      setExportStatus("Exporting video...");
+      setExportStatus("Optimizing video");
+      setExportPhase("Optimizing video");
 
       const exportOptions = {
         format: exportFormat,
@@ -882,18 +965,25 @@ export default function ProjectDetailsPage() {
 
       const result = await exportTrimmedVideoWithFFmpeg(file, exportOptions);
 
+      setExportStatus("Finalizing download");
+      setExportPhase("Finalizing download");
+
       nextDownloadUrl = URL.createObjectURL(result.blob);
       setDownloadUrl(nextDownloadUrl);
       setDownloadName(result.fileName);
       setExportProgress(100);
-      setExportStatus("Video export ready.");
+      setExportStatus("Export complete");
+      setExportPhase("Export complete");
     } catch (error: any) {
+      console.error("Video export failed", error);
+
       if (nextDownloadUrl) {
         URL.revokeObjectURL(nextDownloadUrl);
       }
 
-      setExportStatus(error.message || "Video export failed.");
-      alert(error.message || "Video export failed.");
+      setExportError("Export failed. Please refresh and try again.");
+      setExportStatus("");
+      setExportPhase("");
     } finally {
       setExporting(false);
     }
@@ -907,16 +997,19 @@ export default function ProjectDetailsPage() {
     try {
       setExporting(true);
       setExportProgress(0);
-      setExportStatus("Loading local video...");
+      setExportStatus("Preparing export");
+      setExportPhase("Preparing export");
+      setExportError("");
       clearDownload();
 
       const file = await getCurrentVideoFile();
-      const ffmpeg = createFFmpegOptions("Extracting audio");
+      const ffmpeg = createFFmpegOptions("Preparing audio");
 
-      setExportStatus("Loading FFmpeg...");
+      await prepareExportEngine();
       await getFFmpeg(ffmpeg);
 
-      setExportStatus("Extracting audio...");
+      setExportStatus("Preparing audio");
+      setExportPhase("Preparing audio");
 
       const result = await extractAudioWithFFmpeg(file, {
         format: audioFormat,
@@ -924,18 +1017,25 @@ export default function ProjectDetailsPage() {
         ffmpeg,
       });
 
+      setExportStatus("Finalizing download");
+      setExportPhase("Finalizing download");
+
       nextDownloadUrl = URL.createObjectURL(result.blob);
       setDownloadUrl(nextDownloadUrl);
       setDownloadName(result.fileName);
       setExportProgress(100);
-      setExportStatus("Audio extraction ready.");
+      setExportStatus("Export complete");
+      setExportPhase("Export complete");
     } catch (error: any) {
+      console.error("Audio extraction failed", error);
+
       if (nextDownloadUrl) {
         URL.revokeObjectURL(nextDownloadUrl);
       }
 
-      setExportStatus(error.message || "Audio extraction failed.");
-      alert(error.message || "Audio extraction failed.");
+      setExportError("Export failed. Please refresh and try again.");
+      setExportStatus("");
+      setExportPhase("");
     } finally {
       setExporting(false);
     }
@@ -1541,10 +1641,13 @@ export default function ProjectDetailsPage() {
     }
 
     if (activeTool === "export") {
+      const visibleProgress = exporting ? exportProgress : engineProgress;
+      const visiblePhase = exportPhase || exportStatus || "Preparing export";
+
       return (
         <Panel
           title="Export Studio"
-          subtitle="Choose output format and quality, then export with browser FFmpeg."
+          subtitle="Choose output format and quality, then create your download."
         >
           <div className="space-y-6">
             <div className="rounded-[1.6rem] border border-fuchsia-300/15 bg-gradient-to-br from-fuchsia-300/12 via-white/[0.04] to-cyan-300/10 p-5">
@@ -1598,6 +1701,12 @@ export default function ProjectDetailsPage() {
                   )
                 )}
               </div>
+
+              {exportResolution === "2k" && (
+                <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/78">
+                  2K export may take longer on this device.
+                </p>
+              )}
             </div>
 
             <div>
@@ -1659,7 +1768,7 @@ export default function ProjectDetailsPage() {
               disabled={exporting}
               className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
             >
-              {exporting ? "Exporting..." : "Export video"}
+              {exporting ? "Preparing..." : "Export video"}
             </button>
 
             <button
@@ -1667,33 +1776,63 @@ export default function ProjectDetailsPage() {
               disabled={exporting}
               className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-55"
             >
-              {exporting ? "Working..." : "Extract audio"}
+              {exporting ? "Preparing..." : "Extract audio"}
             </button>
 
-            {(exportStatus || exporting) && (
-              <div className="rounded-[1.5rem] border border-cyan-300/20 bg-cyan-300/10 p-4">
-                <div className="flex items-center justify-between gap-3 text-sm font-bold text-cyan-100">
-                  <span>{exportStatus || "Preparing export..."}</span>
-                  <span>{exportProgress}%</span>
+            {(enginePreparing || exporting || exportPhase || exportStatus) && !downloadUrl && !exportError && (
+              <div className="rounded-[1.5rem] border border-cyan-300/20 bg-gradient-to-br from-cyan-300/12 via-white/[0.045] to-fuchsia-300/10 p-5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-black text-white">
+                    {visiblePhase}
+                  </span>
+
+                  <span className="text-2xl font-black text-cyan-100">
+                    {visibleProgress}%
+                  </span>
                 </div>
 
                 <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/35">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-cyan-200 to-emerald-200 transition-all"
-                    style={{ width: `${exportProgress}%` }}
+                    style={{ width: `${visibleProgress}%` }}
                   />
                 </div>
               </div>
             )}
 
+            {exportError && (
+              <p className="rounded-[1.5rem] border border-rose-300/20 bg-rose-300/10 p-4 text-sm font-bold leading-6 text-rose-100/82">
+                {exportError}
+              </p>
+            )}
+
             {downloadUrl && (
-              <a
-                href={downloadUrl}
-                download={downloadName}
-                className="flex w-full items-center justify-center rounded-2xl border border-emerald-300/20 bg-emerald-300/12 px-5 py-3 font-black text-emerald-100 transition hover:bg-emerald-300 hover:text-black"
-              >
-                Download {downloadName || "export"}
-              </a>
+              <div className="rounded-[1.5rem] border border-emerald-300/20 bg-emerald-300/10 p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-emerald-100">
+                    Export complete
+                  </p>
+
+                  <p className="text-2xl font-black text-emerald-100">100%</p>
+                </div>
+
+                <div className="grid gap-2">
+                  <a
+                    href={downloadUrl}
+                    download={downloadName}
+                    className="flex w-full items-center justify-center rounded-2xl bg-emerald-300 px-5 py-3 font-black text-black transition hover:bg-emerald-200"
+                  >
+                    Download {downloadName || "export"}
+                  </a>
+
+                  <button
+                    onClick={resetExportResult}
+                    className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
+                  >
+                    Clear export
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </Panel>
