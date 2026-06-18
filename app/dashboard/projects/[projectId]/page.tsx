@@ -409,6 +409,7 @@ export default function ProjectDetailsPage() {
   const [engineProgress, setEngineProgress] = useState(0);
   const [exportError, setExportError] = useState("");
   const [exportPhase, setExportPhase] = useState("");
+  const [userExportRequested, setUserExportRequested] = useState(false);
 
   const output = getOutputDimensions(canvasFormat, exportResolution);
 
@@ -643,8 +644,6 @@ export default function ProjectDetailsPage() {
     let active = true;
 
     setEnginePreparing(true);
-    setExportPhase("Preparing export");
-    setExportError("");
 
     preloadFFmpeg((progress) => {
       if (!active) return;
@@ -660,8 +659,7 @@ export default function ProjectDetailsPage() {
         console.error("FFmpeg preload failed", error);
 
         if (!active) return;
-        setExportError("Export failed. Please refresh and try again.");
-        setExportPhase("");
+        setEngineProgress(0);
       })
       .finally(() => {
         if (!active) return;
@@ -871,7 +869,8 @@ export default function ProjectDetailsPage() {
     setExportProgress(0);
     setExportStatus("");
     setExportError("");
-    setExportPhase(engineReady ? "" : "Preparing export");
+    setExportPhase("");
+    setUserExportRequested(false);
   };
 
   const createExportFileName = (kind: "video" | "audio", format: VideoFormat | AudioFormat) => {
@@ -886,6 +885,7 @@ export default function ProjectDetailsPage() {
 
   const prepareExportEngine = async () => {
     if (engineReady) {
+      setEngineProgress(100);
       return;
     }
 
@@ -933,6 +933,7 @@ export default function ProjectDetailsPage() {
     let nextDownloadUrl = "";
 
     try {
+      setUserExportRequested(true);
       setExporting(true);
       setExportProgress(0);
       setExportStatus("Preparing export");
@@ -995,6 +996,7 @@ export default function ProjectDetailsPage() {
     let nextDownloadUrl = "";
 
     try {
+      setUserExportRequested(true);
       setExporting(true);
       setExportProgress(0);
       setExportStatus("Preparing export");
@@ -1641,7 +1643,10 @@ export default function ProjectDetailsPage() {
     }
 
     if (activeTool === "export") {
-      const visibleProgress = exporting ? exportProgress : engineProgress;
+      const visibleProgress =
+        exportPhase === "Preparing export" && !engineReady
+          ? engineProgress
+          : exportProgress;
       const visiblePhase = exportPhase || exportStatus || "Preparing export";
 
       return (
@@ -1768,7 +1773,7 @@ export default function ProjectDetailsPage() {
               disabled={exporting}
               className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
             >
-              {exporting ? "Preparing..." : "Export video"}
+              Export video
             </button>
 
             <button
@@ -1776,10 +1781,20 @@ export default function ProjectDetailsPage() {
               disabled={exporting}
               className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-55"
             >
-              {exporting ? "Preparing..." : "Extract audio"}
+              Extract audio
             </button>
 
-            {(enginePreparing || exporting || exportPhase || exportStatus) && !downloadUrl && !exportError && (
+            {!userExportRequested && !downloadUrl && !exportError && localVideoURL && (
+              <p className="text-center text-xs font-bold text-white/36">
+                {engineReady
+                  ? "Export tools ready"
+                  : enginePreparing
+                    ? "Preparing export tools quietly"
+                    : "Export tools will prepare quietly"}
+              </p>
+            )}
+
+            {userExportRequested && !downloadUrl && !exportError && (
               <div className="rounded-[1.5rem] border border-cyan-300/20 bg-gradient-to-br from-cyan-300/12 via-white/[0.045] to-fuchsia-300/10 p-5">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-black text-white">
