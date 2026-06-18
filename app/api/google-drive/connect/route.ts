@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
-const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive";
 
 export async function GET() {
   const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
@@ -21,7 +21,7 @@ export async function GET() {
     client_id: clientId,
     redirect_uri: redirectUri,
     response_type: "code",
-    scope: DRIVE_FILE_SCOPE,
+    scope: DRIVE_SCOPE,
     access_type: "offline",
     prompt: "consent",
   });
