@@ -1,5 +1,6 @@
 const GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
 const GOOGLE_DRIVE_API_URL = "https://www.googleapis.com/drive/v3";
+const GOOGLE_DRIVE_UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3";
 
 type GoogleDriveEnv = {
   clientId: string;
@@ -33,6 +34,13 @@ export class GoogleDriveServerError extends Error {
 type DriveFolderMetadata = {
   id: string;
   name: string;
+};
+
+type DriveUploadResult = {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
 };
 
 export function getGoogleDriveEnv(): GoogleDriveEnv {
@@ -210,4 +218,84 @@ export async function getDriveFolderMetadata(folderId: string) {
     id: payload.id,
     name: payload.name,
   } satisfies DriveFolderMetadata;
+}
+
+export async function uploadVideoToDriveUploadsFolder({
+  file,
+  fileName,
+}: {
+  file: File;
+  fileName: string;
+}): Promise<DriveUploadResult> {
+  const env = getGoogleDriveStatusEnv();
+  const accessToken = await getGoogleDriveAccessToken();
+  const metadata = {
+    name: fileName,
+    parents: [env.uploadsFolderId],
+    mimeType: file.type,
+  };
+
+  const delimiter = "lumeo-drive-upload";
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${delimiter}\r\n` +
+        "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+        `${JSON.stringify(metadata)}\r\n` +
+        `--${delimiter}\r\n` +
+        `Content-Type: ${file.type || "application/octet-stream"}\r\n\r\n`,
+    ),
+    bytes,
+    Buffer.from(`\r\n--${delimiter}--`),
+  ]);
+
+  const params = new URLSearchParams({
+    uploadType: "multipart",
+    fields: "id,name,mimeType,size",
+    supportsAllDrives: "true",
+  });
+
+  const response = await fetch(
+    `${GOOGLE_DRIVE_UPLOAD_URL}/files?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": `multipart/related; boundary=${delimiter}`,
+        "Content-Length": String(body.byteLength),
+      },
+      body,
+    },
+  );
+
+  const payload = (await response.json()) as {
+    id?: string;
+    name?: string;
+    mimeType?: string;
+    size?: string;
+    error?: {
+      code?: number;
+      message?: string;
+    };
+  };
+
+  if (!response.ok || !payload.id || !payload.name) {
+    console.error("Google Drive video upload failed", {
+      status: response.status,
+      errorCode: payload.error?.code,
+      errorMessage: payload.error?.message,
+    });
+
+    throw new GoogleDriveServerError(
+      payload.error?.code ? `drive_${payload.error.code}` : "drive_upload_failed",
+      payload.error?.message || "Google Drive video upload failed.",
+    );
+  }
+
+  return {
+    fileId: payload.id,
+    fileName: payload.name,
+    mimeType: payload.mimeType || file.type,
+    size: Number(payload.size || file.size),
+  };
 }
