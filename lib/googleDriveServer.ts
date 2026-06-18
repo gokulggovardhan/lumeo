@@ -12,6 +12,24 @@ type GoogleDriveEnv = {
   tempFolderId: string;
 };
 
+export type GoogleDriveEnvPresence = {
+  clientId: boolean;
+  clientSecret: boolean;
+  redirectUri: boolean;
+  refreshToken: boolean;
+  uploadsFolderId: boolean;
+};
+
+export class GoogleDriveServerError extends Error {
+  code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "GoogleDriveServerError";
+    this.code = code;
+  }
+}
+
 type DriveFolderMetadata = {
   id: string;
   name: string;
@@ -40,8 +58,66 @@ export function getGoogleDriveEnv(): GoogleDriveEnv {
   return env as GoogleDriveEnv;
 }
 
+export function getGoogleDriveEnvPresence(): GoogleDriveEnvPresence {
+  return {
+    clientId: Boolean(process.env.GOOGLE_DRIVE_CLIENT_ID),
+    clientSecret: Boolean(process.env.GOOGLE_DRIVE_CLIENT_SECRET),
+    redirectUri: Boolean(process.env.GOOGLE_DRIVE_REDIRECT_URI),
+    refreshToken: Boolean(process.env.GOOGLE_DRIVE_REFRESH_TOKEN),
+    uploadsFolderId: Boolean(process.env.LUMEO_DRIVE_UPLOADS_FOLDER_ID),
+  };
+}
+
+export function getGoogleDriveStatusEnv() {
+  const clientId = process.env.GOOGLE_DRIVE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
+  const redirectUri = process.env.GOOGLE_DRIVE_REDIRECT_URI;
+  const refreshToken = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
+  const uploadsFolderId = process.env.LUMEO_DRIVE_UPLOADS_FOLDER_ID;
+
+  if (!clientId) {
+    throw new GoogleDriveServerError("missing_client_id", "Missing Google Drive client ID.");
+  }
+
+  if (!clientSecret) {
+    throw new GoogleDriveServerError(
+      "missing_client_secret",
+      "Missing Google Drive client secret.",
+    );
+  }
+
+  if (!redirectUri) {
+    throw new GoogleDriveServerError(
+      "missing_redirect_uri",
+      "Missing Google Drive redirect URI.",
+    );
+  }
+
+  if (!refreshToken) {
+    throw new GoogleDriveServerError(
+      "missing_refresh_token",
+      "Missing Google Drive refresh token.",
+    );
+  }
+
+  if (!uploadsFolderId) {
+    throw new GoogleDriveServerError(
+      "missing_uploads_folder_id",
+      "Missing Google Drive uploads folder ID.",
+    );
+  }
+
+  return {
+    clientId,
+    clientSecret,
+    redirectUri,
+    refreshToken,
+    uploadsFolderId,
+  };
+}
+
 export async function getGoogleDriveAccessToken() {
-  const env = getGoogleDriveEnv();
+  const env = getGoogleDriveStatusEnv();
 
   const response = await fetch(GOOGLE_TOKEN_URL, {
     method: "POST",
@@ -69,7 +145,10 @@ export async function getGoogleDriveAccessToken() {
       errorDescription: payload.error_description,
     });
 
-    throw new Error("Google Drive token refresh failed");
+    throw new GoogleDriveServerError(
+      payload.error || "token_refresh_failed",
+      payload.error_description || "Google Drive token refresh failed.",
+    );
   }
 
   return payload.access_token;
@@ -109,7 +188,10 @@ export async function getDriveFolderMetadata(folderId: string) {
       errorMessage: payload.error?.message,
     });
 
-    throw new Error("Google Drive folder metadata lookup failed");
+    throw new GoogleDriveServerError(
+      payload.error?.code ? `drive_${payload.error.code}` : "folder_lookup_failed",
+      payload.error?.message || "Google Drive folder metadata lookup failed.",
+    );
   }
 
   if (payload.mimeType !== "application/vnd.google-apps.folder") {
@@ -118,7 +200,10 @@ export async function getDriveFolderMetadata(folderId: string) {
       mimeType: payload.mimeType,
     });
 
-    throw new Error("Google Drive uploads target is not a folder");
+    throw new GoogleDriveServerError(
+      "uploads_target_not_folder",
+      "Google Drive uploads target is not a folder.",
+    );
   }
 
   return {
