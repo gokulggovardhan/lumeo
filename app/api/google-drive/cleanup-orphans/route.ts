@@ -23,6 +23,21 @@ type CleanupStages = {
   orphanCandidateCount: number;
 };
 
+type ProjectReferenceDiagnostics = {
+  fileIds: Set<string>;
+  projectDocCount: number;
+  projectDocsWithEditorMediaCount: number;
+  projectDocsWithStorageCount: number;
+  sampleStoragePathsFound: string[];
+};
+
+type SafeProjectReferenceDiagnostics = Omit<
+  ProjectReferenceDiagnostics,
+  "fileIds"
+> & {
+  referencedFileIdCount: number;
+};
+
 class CleanupStageError extends Error {
   stage: keyof CleanupStages | string;
 
@@ -115,12 +130,12 @@ export async function GET(request: NextRequest) {
       throw toStageError("driveListFilesOk", "Could not list uploaded media.", error);
     }
 
-    let referencedFileIds: Set<string>;
+    let projectReferences: ProjectReferenceDiagnostics;
 
     try {
-      referencedFileIds = await getReferencedProjectFileIds();
+      projectReferences = await getProjectReferenceDiagnostics();
       stages.firestoreProjectsQueryOk = true;
-      stages.referencedFileIdCount = referencedFileIds.size;
+      stages.referencedFileIdCount = projectReferences.fileIds.size;
     } catch (error) {
       if (error instanceof FirebaseAdminConfigError) {
         throw toStageError(
@@ -140,7 +155,7 @@ export async function GET(request: NextRequest) {
     const now = Date.now();
     const minAgeMs = minAgeMinutes * 60 * 1000;
     const orphanCandidates = files.filter((file) => {
-      if (referencedFileIds.has(file.fileId)) return false;
+      if (projectReferences.fileIds.has(file.fileId)) return false;
       if (!file.createdTime) return false;
 
       const createdAt = Date.parse(file.createdTime);
@@ -148,7 +163,29 @@ export async function GET(request: NextRequest) {
       return Number.isFinite(createdAt) && now - createdAt >= minAgeMs;
     });
     stages.orphanCandidateCount = orphanCandidates.length;
+    const diagnostics = toSafeProjectReferenceDiagnostics(projectReferences);
     const deletedFileIds: string[] = [];
+
+    if (confirm && files.length > 0 && projectReferences.fileIds.size === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Cleanup refused.",
+          details:
+            "No referenced project media files were found. Verify project media metadata before deleting.",
+          dryRun: false,
+          minAgeMinutes,
+          scannedCount: files.length,
+          referencedCount: projectReferences.fileIds.size,
+          candidateCount: orphanCandidates.length,
+          deletedCount: 0,
+          stages,
+          ...diagnostics,
+          candidates: toSafeCandidateList(orphanCandidates),
+        },
+        { status: 409 },
+      );
+    }
 
     if (confirm) {
       for (const file of orphanCandidates) {
@@ -162,20 +199,12 @@ export async function GET(request: NextRequest) {
       dryRun: !confirm,
       minAgeMinutes,
       scannedCount: files.length,
-      referencedCount: referencedFileIds.size,
+      referencedCount: projectReferences.fileIds.size,
       candidateCount: orphanCandidates.length,
       deletedCount: deletedFileIds.length,
       stages,
-      candidates: orphanCandidates.map((file) => ({
-        fileId: file.fileId,
-        fileName: file.fileName,
-        mimeType: file.mimeType,
-        size: file.size,
-        createdTime: file.createdTime || null,
-        app: file.appProperties?.app || null,
-        purpose: file.appProperties?.purpose || null,
-        projectId: file.appProperties?.projectId || null,
-      })),
+      ...diagnostics,
+      candidates: toSafeCandidateList(orphanCandidates),
     });
   } catch (error) {
     console.error("Media cleanup failed", error);
@@ -197,45 +226,136 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getReferencedProjectFileIds() {
+async function getProjectReferenceDiagnostics(): Promise<ProjectReferenceDiagnostics> {
   const db = getFirebaseAdminDb();
   const snapshot = await db.collection("projects").get();
-  const referencedFileIds = new Set<string>();
+  const diagnostics: ProjectReferenceDiagnostics = {
+    fileIds: new Set<string>(),
+    projectDocCount: snapshot.size,
+    projectDocsWithEditorMediaCount: 0,
+    projectDocsWithStorageCount: 0,
+    sampleStoragePathsFound: [],
+  };
 
   snapshot.forEach((document) => {
     const data = document.data();
 
-    collectProjectFileIds(data, referencedFileIds);
+    collectProjectFileIds(data, diagnostics);
   });
 
 
-  return referencedFileIds;
+  return diagnostics;
 }
 
-function collectProjectFileIds(project: Record<string, unknown>, fileIds: Set<string>) {
-  collectFileIdsFromValue(project.editor, fileIds);
-  collectFileIdsFromValue(project.export, fileIds);
-  collectFileIdsFromValue(project.exports, fileIds);
+function collectProjectFileIds(
+  project: Record<string, unknown>,
+  diagnostics: ProjectReferenceDiagnostics,
+) {
+  const editor = getRecord(project.editor);
+  const media = getRecord(editor?.media);
+  const storage = getRecord(media?.storage);
+  const storageFileId = storage?.fileId;
+
+  if (media) {
+    diagnostics.projectDocsWithEditorMediaCount += 1;
+  }
+
+  if (storage) {
+    diagnostics.projectDocsWithStorageCount += 1;
+    addSampleStoragePath(diagnostics, "editor.media.storage");
+  }
+
+  if (typeof storageFileId === "string" && storageFileId.trim()) {
+    diagnostics.fileIds.add(storageFileId.trim());
+    addSampleStoragePath(diagnostics, "editor.media.storage.fileId");
+  }
+
+  collectFileIdsFromValue(project.export, diagnostics, "export");
+  collectFileIdsFromValue(project.exports, diagnostics, "exports");
+  collectFileIdsFromValue(editor?.export, diagnostics, "editor.export");
+  collectFileIdsFromValue(editor?.exports, diagnostics, "editor.exports");
 }
 
-function collectFileIdsFromValue(value: unknown, fileIds: Set<string>) {
+function collectFileIdsFromValue(
+  value: unknown,
+  diagnostics: ProjectReferenceDiagnostics,
+  path: string,
+) {
   if (!value || typeof value !== "object") return;
 
   if (Array.isArray(value)) {
-    for (const item of value) {
-      collectFileIdsFromValue(item, fileIds);
-    }
+    value.forEach((item, index) => {
+      collectFileIdsFromValue(item, diagnostics, `${path}.${index}`);
+    });
 
     return;
   }
 
-  if ("fileId" in value && typeof value.fileId === "string" && value.fileId) {
-    fileIds.add(value.fileId);
+  const record = getRecord(value);
+
+  if (!record) return;
+
+  if (
+    typeof record.fileId === "string" &&
+    record.fileId.trim()
+  ) {
+    diagnostics.fileIds.add(record.fileId.trim());
+    addSampleStoragePath(diagnostics, `${path}.fileId`);
   }
 
-  for (const child of Object.values(value)) {
-    collectFileIdsFromValue(child, fileIds);
+  for (const [key, child] of Object.entries(record)) {
+    if (key === "fileId") {
+      continue;
+    }
+
+    collectFileIdsFromValue(child, diagnostics, `${path}.${key}`);
   }
+}
+
+function getRecord(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+
+  return value as Record<string, unknown>;
+}
+
+function addSampleStoragePath(
+  diagnostics: ProjectReferenceDiagnostics,
+  path: string,
+) {
+  if (
+    diagnostics.sampleStoragePathsFound.length < 8 &&
+    !diagnostics.sampleStoragePathsFound.includes(path)
+  ) {
+    diagnostics.sampleStoragePathsFound.push(path);
+  }
+}
+
+function toSafeProjectReferenceDiagnostics(
+  diagnostics: ProjectReferenceDiagnostics,
+): SafeProjectReferenceDiagnostics {
+  return {
+    projectDocCount: diagnostics.projectDocCount,
+    projectDocsWithEditorMediaCount:
+      diagnostics.projectDocsWithEditorMediaCount,
+    projectDocsWithStorageCount: diagnostics.projectDocsWithStorageCount,
+    referencedFileIdCount: diagnostics.fileIds.size,
+    sampleStoragePathsFound: diagnostics.sampleStoragePathsFound,
+  };
+}
+
+function toSafeCandidateList(
+  files: Awaited<ReturnType<typeof listDriveUploadsFolderFiles>>,
+) {
+  return files.map((file) => ({
+    fileId: file.fileId,
+    fileName: file.fileName,
+    mimeType: file.mimeType,
+    size: file.size,
+    createdTime: file.createdTime || null,
+    app: file.appProperties?.app || null,
+    purpose: file.appProperties?.purpose || null,
+    projectId: file.appProperties?.projectId || null,
+  }));
 }
 
 function toStageError(
