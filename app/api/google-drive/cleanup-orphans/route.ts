@@ -4,6 +4,10 @@ import {
   getGoogleDriveAccessToken,
   listDriveUploadsFolderFiles,
 } from "@/lib/googleDriveServer";
+import {
+  FirebaseAdminConfigError,
+  getFirebaseAdminDb,
+} from "@/lib/firebaseAdmin";
 
 const DEFAULT_MIN_AGE_MINUTES = 30;
 
@@ -28,33 +32,6 @@ class CleanupStageError extends Error {
     this.stage = stage;
   }
 }
-
-type FirestoreValue = {
-  stringValue?: string;
-  integerValue?: string;
-  doubleValue?: number;
-  booleanValue?: boolean;
-  timestampValue?: string;
-  nullValue?: null;
-  mapValue?: {
-    fields?: Record<string, FirestoreValue>;
-  };
-  arrayValue?: {
-    values?: FirestoreValue[];
-  };
-};
-
-type FirestoreListResponse = {
-  documents?: Array<{
-    name?: string;
-    fields?: Record<string, FirestoreValue>;
-  }>;
-  nextPageToken?: string;
-  error?: {
-    code?: number;
-    message?: string;
-  };
-};
 
 export const dynamic = "force-dynamic";
 
@@ -145,6 +122,14 @@ export async function GET(request: NextRequest) {
       stages.firestoreProjectsQueryOk = true;
       stages.referencedFileIdCount = referencedFileIds.size;
     } catch (error) {
+      if (error instanceof FirebaseAdminConfigError) {
+        throw toStageError(
+          "firebaseAdminConfig",
+          "Firebase Admin environment variables are missing.",
+          error,
+        );
+      }
+
       throw toStageError(
         "firestoreProjectsQueryOk",
         "Could not read project media references.",
@@ -213,77 +198,43 @@ export async function GET(request: NextRequest) {
 }
 
 async function getReferencedProjectFileIds() {
-  const projectId =
-    process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ||
-    process.env.FIREBASE_PROJECT_ID ||
-    process.env.GOOGLE_CLOUD_PROJECT ||
-    "project-lumeo";
-  const apiKey =
-    process.env.NEXT_PUBLIC_FIREBASE_API_KEY || process.env.FIREBASE_API_KEY;
+  const db = getFirebaseAdminDb();
+  const snapshot = await db.collection("projects").get();
   const referencedFileIds = new Set<string>();
-  let pageToken = "";
 
-  do {
-    const params = new URLSearchParams({
-      pageSize: "100",
-    });
+  snapshot.forEach((document) => {
+    const data = document.data();
 
-    if (pageToken) {
-      params.set("pageToken", pageToken);
-    }
+    collectProjectFileIds(data, referencedFileIds);
+  });
 
-    if (apiKey) {
-      params.set("key", apiKey);
-    }
-
-    const response = await fetch(
-      `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(projectId)}/databases/(default)/documents/projects?${params.toString()}`,
-      {
-        cache: "no-store",
-      },
-    );
-    const payload = (await response.json()) as FirestoreListResponse;
-
-    if (!response.ok) {
-      console.error("Project reference lookup failed", {
-        status: response.status,
-        errorCode: payload.error?.code,
-        errorMessage: payload.error?.message,
-      });
-
-      throw new Error("Project reference lookup failed.");
-    }
-
-    for (const document of payload.documents || []) {
-      collectFileIds(document.fields, referencedFileIds);
-    }
-
-    pageToken = payload.nextPageToken || "";
-  } while (pageToken);
 
   return referencedFileIds;
 }
 
-function collectFileIds(
-  fields: Record<string, FirestoreValue> | undefined,
-  fileIds: Set<string>,
-) {
-  if (!fields) return;
+function collectProjectFileIds(project: Record<string, unknown>, fileIds: Set<string>) {
+  collectFileIdsFromValue(project.editor, fileIds);
+  collectFileIdsFromValue(project.export, fileIds);
+  collectFileIdsFromValue(project.exports, fileIds);
+}
 
-  for (const [key, value] of Object.entries(fields)) {
-    if (key === "fileId" && value.stringValue) {
-      fileIds.add(value.stringValue);
+function collectFileIdsFromValue(value: unknown, fileIds: Set<string>) {
+  if (!value || typeof value !== "object") return;
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectFileIdsFromValue(item, fileIds);
     }
 
-    if (value.mapValue?.fields) {
-      collectFileIds(value.mapValue.fields, fileIds);
-    }
+    return;
+  }
 
-    for (const item of value.arrayValue?.values || []) {
-      if (item.mapValue?.fields) {
-        collectFileIds(item.mapValue.fields, fileIds);
-      }
-    }
+  if ("fileId" in value && typeof value.fileId === "string" && value.fileId) {
+    fileIds.add(value.fileId);
+  }
+
+  for (const child of Object.values(value)) {
+    collectFileIdsFromValue(child, fileIds);
   }
 }
 
@@ -299,6 +250,10 @@ function toStageError(
 
 function getSafeErrorMessage(error: unknown) {
   if (error instanceof CleanupStageError) {
+    return error.message;
+  }
+
+  if (error instanceof FirebaseAdminConfigError) {
     return error.message;
   }
 
