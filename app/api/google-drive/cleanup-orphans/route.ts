@@ -1,10 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   deleteDriveFile,
+  getGoogleDriveAccessToken,
   listDriveUploadsFolderFiles,
 } from "@/lib/googleDriveServer";
 
 const DEFAULT_MIN_AGE_MINUTES = 30;
+
+type CleanupStages = {
+  tokenEnvPresent: boolean;
+  tokenMatched: boolean;
+  uploadsFolderIdPresent: boolean;
+  driveAuthOk: boolean;
+  driveListFilesOk: boolean;
+  driveFileCount: number;
+  firestoreProjectsQueryOk: boolean;
+  referencedFileIdCount: number;
+  orphanCandidateCount: number;
+};
+
+class CleanupStageError extends Error {
+  stage: keyof CleanupStages | string;
+
+  constructor(stage: keyof CleanupStages | string, message: string) {
+    super(message);
+    this.name = "CleanupStageError";
+    this.stage = stage;
+  }
+}
 
 type FirestoreValue = {
   stringValue?: string;
@@ -36,20 +59,45 @@ type FirestoreListResponse = {
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const stages: CleanupStages = {
+    tokenEnvPresent: false,
+    tokenMatched: false,
+    uploadsFolderIdPresent: false,
+    driveAuthOk: false,
+    driveListFilesOk: false,
+    driveFileCount: 0,
+    firestoreProjectsQueryOk: false,
+    referencedFileIdCount: 0,
+    orphanCandidateCount: 0,
+  };
   const expectedToken = process.env.LUMEO_ADMIN_CLEANUP_TOKEN;
+  stages.tokenEnvPresent = Boolean(expectedToken);
 
   if (!expectedToken) {
     return NextResponse.json(
-      { success: false, error: "Cleanup is not configured." },
+      {
+        success: false,
+        error: "Cleanup failed.",
+        failedStage: "tokenEnvPresent",
+        details: "Cleanup token is not configured.",
+        stages,
+      },
       { status: 500 },
     );
   }
 
   const token = request.nextUrl.searchParams.get("token");
+  stages.tokenMatched = token === expectedToken;
 
-  if (token !== expectedToken) {
+  if (!stages.tokenMatched) {
     return NextResponse.json(
-      { success: false, error: "Unauthorized." },
+      {
+        success: false,
+        error: "Cleanup failed.",
+        failedStage: "tokenMatched",
+        details: "Cleanup token did not match.",
+        stages,
+      },
       { status: 401 },
     );
   }
@@ -62,10 +110,48 @@ export async function GET(request: NextRequest) {
   );
 
   try {
-    const [files, referencedFileIds] = await Promise.all([
-      listDriveUploadsFolderFiles(),
-      getReferencedProjectFileIds(),
-    ]);
+    stages.uploadsFolderIdPresent = Boolean(
+      process.env.LUMEO_DRIVE_UPLOADS_FOLDER_ID,
+    );
+
+    if (!stages.uploadsFolderIdPresent) {
+      throw new CleanupStageError(
+        "uploadsFolderIdPresent",
+        "Uploads folder is not configured.",
+      );
+    }
+
+    try {
+      await getGoogleDriveAccessToken();
+      stages.driveAuthOk = true;
+    } catch (error) {
+      throw toStageError("driveAuthOk", "Permanent media authorization failed.", error);
+    }
+
+    let files: Awaited<ReturnType<typeof listDriveUploadsFolderFiles>>;
+
+    try {
+      files = await listDriveUploadsFolderFiles();
+      stages.driveListFilesOk = true;
+      stages.driveFileCount = files.length;
+    } catch (error) {
+      throw toStageError("driveListFilesOk", "Could not list uploaded media.", error);
+    }
+
+    let referencedFileIds: Set<string>;
+
+    try {
+      referencedFileIds = await getReferencedProjectFileIds();
+      stages.firestoreProjectsQueryOk = true;
+      stages.referencedFileIdCount = referencedFileIds.size;
+    } catch (error) {
+      throw toStageError(
+        "firestoreProjectsQueryOk",
+        "Could not read project media references.",
+        error,
+      );
+    }
+
     const now = Date.now();
     const minAgeMs = minAgeMinutes * 60 * 1000;
     const orphanCandidates = files.filter((file) => {
@@ -76,6 +162,7 @@ export async function GET(request: NextRequest) {
 
       return Number.isFinite(createdAt) && now - createdAt >= minAgeMs;
     });
+    stages.orphanCandidateCount = orphanCandidates.length;
     const deletedFileIds: string[] = [];
 
     if (confirm) {
@@ -93,6 +180,7 @@ export async function GET(request: NextRequest) {
       referencedCount: referencedFileIds.size,
       candidateCount: orphanCandidates.length,
       deletedCount: deletedFileIds.length,
+      stages,
       candidates: orphanCandidates.map((file) => ({
         fileId: file.fileId,
         fileName: file.fileName,
@@ -106,9 +194,19 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Media cleanup failed", error);
+    const stageError =
+      error instanceof CleanupStageError
+        ? error
+        : new CleanupStageError("unknown", "Unexpected cleanup failure.");
 
     return NextResponse.json(
-      { success: false, error: "Cleanup failed." },
+      {
+        success: false,
+        error: "Cleanup failed.",
+        failedStage: stageError.stage,
+        details: getSafeErrorMessage(stageError),
+        stages,
+      },
       { status: 500 },
     );
   }
@@ -187,4 +285,26 @@ function collectFileIds(
       }
     }
   }
+}
+
+function toStageError(
+  stage: keyof CleanupStages | string,
+  safeMessage: string,
+  error: unknown,
+) {
+  console.error("Cleanup stage failed", { stage, error });
+
+  return new CleanupStageError(stage, safeMessage);
+}
+
+function getSafeErrorMessage(error: unknown) {
+  if (error instanceof CleanupStageError) {
+    return error.message;
+  }
+
+  if (error instanceof Error && error.message) {
+    return error.message.slice(0, 180);
+  }
+
+  return "Unexpected cleanup failure.";
 }
