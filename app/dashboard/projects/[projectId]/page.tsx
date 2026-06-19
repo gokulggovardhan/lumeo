@@ -947,6 +947,7 @@ export default function ProjectDetailsPage() {
 
   const handleVideoSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    event.currentTarget.value = "";
 
     if (!file) return;
 
@@ -963,6 +964,8 @@ export default function ProjectDetailsPage() {
     setLocalVideoBytes(file.size);
     setVideoRestored(false);
     resetVideoUploadState();
+    setVideoUploadStatus("Saving media...");
+    setVideoUploadProgress(0);
     resetExportState();
 
     try {
@@ -970,6 +973,8 @@ export default function ProjectDetailsPage() {
     } catch {
       alert("Video preview works, but browser could not save it locally.");
     }
+
+    void handleUploadVideo(file);
   };
 
   const handleAudioSelect = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -1143,18 +1148,18 @@ export default function ProjectDetailsPage() {
     videoUploadInProgressRef.current = false;
     setVideoUploading(false);
     setVideoUploadProgress(0);
-    setVideoUploadStatus("Upload canceled");
+    setVideoUploadStatus("");
   };
 
-  const handleUploadVideo = async () => {
-    if (videoUploading || videoUploadInProgressRef.current) {
+  const handleUploadVideo = async (selectedFile?: File) => {
+    if (videoUploadInProgressRef.current) {
       console.info("[Lumeo Upload] duplicate upload blocked");
       return;
     }
 
     videoUploadRunIdRef.current += 1;
     const runId = videoUploadRunIdRef.current;
-    let temporaryUpload = pendingCloudinaryUpload;
+    let temporaryUpload = selectedFile ? null : pendingCloudinaryUpload;
 
     try {
       videoUploadCancelledRef.current = false;
@@ -1163,7 +1168,7 @@ export default function ProjectDetailsPage() {
       setVideoUploadProgress(0);
       setVideoUploadStatus("Saving media...");
 
-      const file = await getCurrentVideoFile();
+      const file = selectedFile || (await getCurrentVideoFile());
       const fingerprint = createVideoFingerprint(file, projectId);
 
       if (
@@ -1257,7 +1262,7 @@ export default function ProjectDetailsPage() {
       if (videoUploadCancelledRef.current) {
         console.info("[Lumeo Upload] upload canceled");
         setVideoUploadProgress(0);
-        setVideoUploadStatus("Upload canceled");
+        setVideoUploadStatus("");
         return;
       }
 
@@ -1274,6 +1279,35 @@ export default function ProjectDetailsPage() {
         videoUploadInProgressRef.current = false;
         setVideoUploading(false);
       }
+    }
+  };
+
+  const handleRemoveVideo = async () => {
+    resetVideoUploadState();
+    resetExportState();
+
+    try {
+      await deleteMediaFromBrowser(videoStorageKey);
+    } catch (error) {
+      console.error("Video remove failed", error);
+    }
+
+    setLocalVideoURL("");
+    setLocalVideoName("");
+    setLocalVideoSize("");
+    setLocalVideoBytes(0);
+    setVideoDuration(0);
+    setVideoRestored(false);
+
+    try {
+      await updateDoc(doc(db, "projects", projectId), {
+        "editor.media.localVideoName": "",
+        "editor.media.videoDuration": 0,
+        "editor.media.storage": null,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      console.error("Video remove metadata update failed", error);
     }
   };
 
@@ -1818,13 +1852,28 @@ export default function ProjectDetailsPage() {
           subtitle="Import your video and music. Preview starts instantly, then save media when you are ready."
         >
           <div className="space-y-5">
-            <UploadDropzone
+            <input
               id="video-upload"
-              title="Add video clip"
-              subtitle="MP4, MOV, WebM. Recommended length is 30 seconds to 3 minutes."
+              type="file"
               accept="video/*"
               onChange={handleVideoSelect}
+              className="sr-only"
             />
+
+            {!localVideoName && (
+              <label
+                htmlFor="video-upload"
+                className="group flex cursor-pointer flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-white/14 bg-white/[0.045] px-5 py-8 text-center transition hover:border-fuchsia-300/40 hover:bg-fuchsia-300/[0.08]"
+              >
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl font-black text-black shadow-xl shadow-white/10 transition group-hover:scale-105">
+                  +
+                </div>
+
+                <p className="mt-4 text-base font-black text-white">
+                  Choose from device
+                </p>
+              </label>
+            )}
 
             {localVideoName && (
               <div className="rounded-[1.5rem] border border-emerald-300/15 bg-emerald-300/[0.06] p-4">
@@ -1850,33 +1899,33 @@ export default function ProjectDetailsPage() {
                 )}
 
                 <div className="mt-4 space-y-3">
-                  <button
-                    onClick={handleUploadVideo}
-                    disabled={videoUploading}
-                    className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
-                  >
-                    Upload video
-                  </button>
-
-                  {videoUploading && (
-                    <button
-                      onClick={handleCancelVideoUpload}
-                      className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
-                    >
-                      Cancel upload
-                    </button>
-                  )}
-
                   {!videoUploading &&
-                    (videoUploadStatus === "Upload failed. Please try again." ||
-                      videoUploadStatus === "Upload canceled") && (
+                    videoUploadStatus === "Upload failed. Please try again." && (
                       <button
-                        onClick={handleUploadVideo}
+                        onClick={() => handleUploadVideo()}
                         className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
                       >
                         Retry upload
                       </button>
                     )}
+
+                  {!videoUploading && (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <label
+                        htmlFor="video-upload"
+                        className="flex cursor-pointer items-center justify-center rounded-2xl bg-white px-4 py-3 text-sm font-black text-black transition hover:bg-fuchsia-100"
+                      >
+                        Replace video
+                      </label>
+
+                      <button
+                        onClick={handleRemoveVideo}
+                        className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
+                      >
+                        Remove video
+                      </button>
+                    </div>
+                  )}
 
                   {videoUploadStatus && (
                     <div className="rounded-2xl border border-white/10 bg-black/24 p-3">
