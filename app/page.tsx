@@ -53,10 +53,11 @@ export default function Home() {
         </div>
       </nav>
 
-      <section className="relative overflow-hidden px-5 pb-20 pt-16 sm:px-8 sm:pt-20 lg:px-12 lg:pt-24">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_32%_0%,rgba(167,139,250,0.14),transparent_58%),radial-gradient(circle_at_74%_8%,rgba(244,114,182,0.10),transparent_42%)]" />
+      <section className="relative overflow-hidden px-5 pb-14 pt-14 sm:px-8 sm:pt-18 lg:px-12 lg:pb-16 lg:pt-20">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_6%,rgba(243,231,200,0.12),transparent_32%),radial-gradient(circle_at_74%_9%,rgba(167,139,250,0.14),transparent_38%),linear-gradient(rgba(243,231,200,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(243,231,200,0.02)_1px,transparent_1px)] bg-[size:auto,auto,44px_44px,44px_44px]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-[#07070A] via-transparent to-transparent" />
 
-        <div className="relative z-10 mx-auto grid max-w-7xl gap-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
+        <div className="relative z-10 mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.98fr_1.02fr] lg:items-center">
           <div>
             <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#F3E7C8]/10 bg-white/[0.03] px-3.5 py-1.5 text-xs font-bold text-[#F7F0DE]/50">
               <span className="h-1.5 w-1.5 rounded-full bg-[#F3E7C8]" />
@@ -87,36 +88,99 @@ export default function Home() {
                 Explore Tools
               </a>
             </div>
+
+            <div className="mt-8 flex flex-wrap gap-2.5">
+              {["Trim clips", "Frame for socials", "Export clean MP4"].map(
+                (item) => (
+                  <span
+                    key={item}
+                    className="rounded-full border border-[#F3E7C8]/10 bg-white/[0.035] px-4 py-2 text-xs font-bold text-[#F7F0DE]/54 backdrop-blur"
+                  >
+                    {item}
+                  </span>
+                ),
+              )}
+            </div>
           </div>
 
-          <div id="studio" className="relative mx-auto w-full max-w-[360px]">
-            <div className="relative overflow-hidden rounded-2xl border border-[#F3E7C8]/10 bg-[#101115] shadow-2xl shadow-black/40">
-              <div className="flex items-center justify-between border-b border-[#F3E7C8]/10 px-4 py-2.5">
-                <div className="flex items-center gap-1.5">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#F3E7C8]" />
-                  <span className="text-[10px] font-bold tracking-wide text-[#F7F0DE]/48">
-                    9:16
+          <div id="studio" className="relative mx-auto w-full max-w-[560px]">
+            <div className="pointer-events-none absolute -inset-8 rounded-[3rem] bg-[radial-gradient(circle_at_50%_20%,rgba(243,231,200,0.13),transparent_48%),radial-gradient(circle_at_78%_70%,rgba(167,139,250,0.14),transparent_42%)] blur-xl" />
+
+            <div className="relative rounded-[2rem] border border-[#F3E7C8]/10 bg-[#101115]/88 p-4 shadow-2xl shadow-black/45 backdrop-blur-2xl sm:p-5">
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-[#F3E7C8]" />
+                  <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[#F7F0DE]/42">
+                    Studio
                   </span>
                 </div>
-                <span className="text-[10px] font-semibold tabular-nums text-[#F7F0DE]/28">
-                  00:18 / 00:24
+                <span className="rounded-full border border-[#F3E7C8]/10 bg-[#F3E7C8]/8 px-3 py-1 text-[10px] font-black text-[#F3E7C8]/78">
+                  Ready to export
                 </span>
               </div>
 
-              <div className="relative aspect-[9/16] w-full overflow-hidden bg-gradient-to-br from-[#1B1C22] via-[#111219] to-[#07070A]">
-                <div className="absolute inset-8 rounded-[1.5rem] border border-[#F3E7C8]/8 bg-black/18" />
-                <div className="absolute bottom-8 left-8 right-8 h-2 rounded-full bg-[#F3E7C8]/12">
-                  <div className="h-full w-2/3 rounded-full bg-[#F3E7C8]/60" />
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_132px]">
+                <div className="relative mx-auto aspect-[9/16] w-full max-w-[290px] overflow-hidden rounded-[1.5rem] border border-[#F3E7C8]/10 bg-[#07070A] shadow-2xl shadow-black/35">
+                  <div className="flex items-center justify-between border-b border-[#F3E7C8]/10 px-3 py-2">
+                    <span className="rounded-full bg-[#F3E7C8]/10 px-2.5 py-1 text-[10px] font-black text-[#F3E7C8]/78">
+                      9:16
+                    </span>
+                    <span className="rounded-full bg-white/[0.055] px-2.5 py-1 text-[10px] font-black text-[#F7F0DE]/48">
+                      720p
+                    </span>
+                  </div>
+
+                  <div className="relative h-[calc(100%-2.3rem)] overflow-hidden bg-[radial-gradient(circle_at_42%_28%,rgba(243,231,200,0.24),transparent_18%),radial-gradient(circle_at_58%_58%,rgba(167,139,250,0.22),transparent_24%),linear-gradient(145deg,#242633,#11131c_46%,#07070A)]">
+                    <div className="absolute inset-5 rounded-[1.25rem] border border-white/8 bg-black/16" />
+                    <div className="absolute left-5 top-5 h-16 w-16 rounded-full bg-[#F3E7C8]/8 blur-xl" />
+                    <div className="absolute bottom-5 left-5 right-5">
+                      <div className="mb-2 flex items-center gap-1.5">
+                        <span className="h-1.5 w-8 rounded-full bg-[#F3E7C8]/40" />
+                        <span className="h-1.5 w-4 rounded-full bg-white/18" />
+                      </div>
+                      <div className="h-1.5 rounded-full bg-black/35">
+                        <div className="h-full w-[62%] rounded-full bg-[#F3E7C8]/70" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-3">
+                  {["Trim", "Frame", "Export"].map((item, index) => (
+                    <div
+                      key={item}
+                      className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.045] p-3"
+                    >
+                      <div className="mb-3 flex items-center justify-between">
+                        <span className="text-xs font-black text-[#F7F0DE]/72">
+                          {item}
+                        </span>
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#F3E7C8]/70" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <div
+                          className="h-1.5 rounded-full bg-[#F3E7C8]/18"
+                          style={{ width: `${74 - index * 12}%` }}
+                        />
+                        <div
+                          className="h-1.5 rounded-full bg-white/10"
+                          style={{ width: `${44 + index * 10}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              <div className="border-t border-[#F3E7C8]/10 bg-[#07070A] px-4 py-3.5">
-                <div className="relative h-7 overflow-hidden rounded-md border border-[#F3E7C8]/10 bg-[#161620]">
-                  <div className="absolute inset-y-0 left-[18%] right-[22%] bg-gradient-to-r from-[#F3E7C8]/32 to-[#F3E7C8]/12" />
-                  <div className="absolute inset-y-0 left-0 w-[18%] bg-[#07070A]/75" />
-                  <div className="absolute inset-y-0 right-0 w-[22%] bg-[#07070A]/75" />
-                  <div className="absolute left-[18%] top-0 h-full w-[3px] -translate-x-1/2 rounded-full bg-[#F3E7C8]" />
-                  <div className="absolute left-[78%] top-0 h-full w-[3px] -translate-x-1/2 rounded-full bg-[#F3E7C8]" />
+              <div className="mt-4 rounded-2xl border border-[#F3E7C8]/10 bg-[#07070A]/88 p-3">
+                <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.18em] text-[#F7F0DE]/32">
+                  <span>Timeline</span>
+                  <span>00:24</span>
+                </div>
+                <div className="grid grid-cols-[0.55fr_1fr_0.7fr] gap-1.5">
+                  <div className="h-8 rounded-md bg-[#F3E7C8]/12" />
+                  <div className="h-8 rounded-md bg-[#F3E7C8]/28" />
+                  <div className="h-8 rounded-md bg-white/10" />
                 </div>
               </div>
             </div>
@@ -124,7 +188,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="tools" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
+      <section id="tools" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12">
         <div className="mb-12 max-w-xl">
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#D8C48E]">
             Tools
