@@ -363,8 +363,16 @@ type CopyFromCloudinaryResponse =
       error?: string;
     };
 
+const LEGACY_DEFAULT_OVERLAY_TEXT = "Your title here";
+
 function createVideoFingerprint(file: File, projectId: string) {
   return `${projectId}:${file.name}:${file.size}:${file.lastModified}`;
+}
+
+function normalizeOverlayText(value: unknown) {
+  if (typeof value !== "string") return "";
+
+  return value.trim() === LEGACY_DEFAULT_OVERLAY_TEXT ? "" : value;
 }
 
 async function createCloudinaryUploadSignature() {
@@ -600,7 +608,7 @@ export default function ProjectDetailsPage() {
   const [videoVolume, setVideoVolume] = useState(100);
   const [mutedOriginal, setMutedOriginal] = useState(false);
 
-  const [overlayText, setOverlayText] = useState("Your title here");
+  const [overlayText, setOverlayText] = useState("");
   const [overlayX, setOverlayX] = useState(50);
   const [overlayY, setOverlayY] = useState(45);
   const [overlaySize, setOverlaySize] = useState(34);
@@ -657,6 +665,8 @@ export default function ProjectDetailsPage() {
   );
 
   const videoFilter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) grayscale(${grayscale}%) blur(${blur}px)`;
+  const visibleOverlayText = overlayText.trim();
+  const hasVisibleOverlayText = visibleOverlayText.length > 0;
 
   const canvasFrameClass =
     canvasFormat === "9:16"
@@ -737,7 +747,7 @@ export default function ProjectDetailsPage() {
             setVideoVolume(editor.playback?.videoVolume ?? 100);
             setMutedOriginal(editor.playback?.mutedOriginal ?? false);
 
-            setOverlayText(editor.textOverlay?.text || "Your title here");
+            setOverlayText(normalizeOverlayText(editor.textOverlay?.text));
             setOverlayX(editor.textOverlay?.x ?? 50);
             setOverlayY(editor.textOverlay?.y ?? 45);
             setOverlaySize(editor.textOverlay?.size ?? 34);
@@ -1740,7 +1750,7 @@ export default function ProjectDetailsPage() {
             musicVolume: Number(musicVolume) || 80,
           },
           textOverlay: {
-            text: overlayText,
+            text: visibleOverlayText,
             x: Number(overlayX) || 50,
             y: Number(overlayY) || 45,
             size: Number(overlaySize) || 34,
@@ -1817,7 +1827,7 @@ export default function ProjectDetailsPage() {
     setPlaybackSpeed(1);
     setVideoVolume(100);
     setMutedOriginal(false);
-    setOverlayText("Your title here");
+    setOverlayText("");
     setOverlayX(50);
     setOverlayY(45);
     setOverlaySize(34);
@@ -2189,7 +2199,7 @@ export default function ProjectDetailsPage() {
             <textarea
               value={overlayText}
               onChange={(event) => setOverlayText(event.target.value)}
-              placeholder="Enter overlay text"
+              placeholder="Type your title..."
               className="min-h-28 w-full rounded-[1.5rem] border border-white/10 bg-white/[0.08] px-4 py-3 text-white outline-none placeholder:text-white/32 transition focus:border-fuchsia-300/60"
             />
 
@@ -3036,7 +3046,7 @@ export default function ProjectDetailsPage() {
                       </div>
                     )}
 
-                    {localVideoURL && overlayText && (
+                    {localVideoURL && hasVisibleOverlayText && (
                       <div
                         className={`pointer-events-none absolute max-w-[86%] text-center font-black leading-tight ${
                           overlayBg ? "rounded-2xl bg-black/55 px-4 py-2" : ""
@@ -3056,7 +3066,7 @@ export default function ProjectDetailsPage() {
                             : "none",
                         }}
                       >
-                        {overlayText}
+                        {visibleOverlayText}
                       </div>
                     )}
                   </div>
