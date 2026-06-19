@@ -363,6 +363,18 @@ type CopyFromCloudinaryResponse =
       error?: string;
     };
 
+type CloudExportResponse =
+  | {
+      success: true;
+      downloadUrl?: string;
+      fileName: string;
+      createdAt: string;
+    }
+  | {
+      success: false;
+      error?: string;
+    };
+
 const LEGACY_DEFAULT_OVERLAY_TEXT = "Your title here";
 
 function createVideoFingerprint(file: File, projectId: string) {
@@ -716,6 +728,9 @@ export default function ProjectDetailsPage() {
   );
 
   const output = getOutputDimensions(canvasFormat, exportResolution);
+  const phaseOneExportResolution =
+    exportResolution === "1080p" ? "1080p" : "720p";
+  const hasSavedSourceMedia = Boolean(videoStorageMetadata?.fileId);
 
   const selectedRange = Math.max(
     0,
@@ -725,6 +740,22 @@ export default function ProjectDetailsPage() {
   const videoFilter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) grayscale(${grayscale}%) blur(${blur}px)`;
   const visibleOverlayText = overlayText.trim();
   const hasVisibleOverlayText = visibleOverlayText.length > 0;
+  const hasPreviewOnlyExportEdits =
+    hasVisibleOverlayText ||
+    brightness !== 100 ||
+    contrast !== 100 ||
+    saturation !== 100 ||
+    grayscale !== 0 ||
+    blur !== 0 ||
+    playbackSpeed !== 1 ||
+    rotate !== 0 ||
+    flipX ||
+    videoZoom !== 100 ||
+    videoX !== 0 ||
+    videoY !== 0 ||
+    videoVolume !== 100 ||
+    mutedOriginal ||
+    Boolean(localAudioURL);
 
   const canvasFrameClass =
     canvasFormat === "9:16"
@@ -827,8 +858,7 @@ export default function ProjectDetailsPage() {
             setTransitionOut(editor.transitions?.out ?? "none");
             setTransitionDuration(editor.transitions?.duration ?? 1);
 
-            const savedVideoFormat = editor.exportSettings?.videoFormat;
-            setExportFormat(savedVideoFormat === "webm" ? "webm" : "mp4");
+            setExportFormat("mp4");
 
             const savedAudioFormat = editor.exportSettings?.audioFormat;
             setAudioFormat(savedAudioFormat === "wav" ? "wav" : "mp3");
@@ -924,7 +954,7 @@ export default function ProjectDetailsPage() {
 
   useEffect(() => {
     return () => {
-      if (downloadUrl) {
+      if (downloadUrl.startsWith("blob:")) {
         URL.revokeObjectURL(downloadUrl);
       }
     };
@@ -1404,7 +1434,7 @@ export default function ProjectDetailsPage() {
   };
 
   const clearDownload = () => {
-    if (downloadUrl) {
+    if (downloadUrl.startsWith("blob:")) {
       URL.revokeObjectURL(downloadUrl);
     }
 
@@ -1477,7 +1507,7 @@ export default function ProjectDetailsPage() {
     }, 900);
   };
 
-  const startExportRun = (phase: "Preparing export" | "Preparing audio") => {
+  const startExportRun = (phase: string) => {
     clearExportProgressTimer();
     exportRunIdRef.current += 1;
 
@@ -1550,7 +1580,7 @@ export default function ProjectDetailsPage() {
       console.error("FFmpeg preparation failed", error);
       setEngineReady(false);
       resetFFmpeg();
-      setExportError("Export failed. Please try a smaller video or refresh and try again.");
+      setExportError("Export failed. Please try again.");
       throw error;
     } finally {
       setEnginePreparing(false);
@@ -1577,6 +1607,86 @@ export default function ProjectDetailsPage() {
   });
 
   const handleExportVideo = async () => {
+    if (exporting) return;
+
+    const exportEnd = Number(trimEnd || videoDuration || 0);
+    const exportStart = Number(trimStart) || 0;
+    let runId = exportRunIdRef.current;
+
+    if (exportEnd > 0 && exportStart >= exportEnd) {
+      alert("Trim start should be less than trim end");
+      return;
+    }
+
+    try {
+      resetExportState();
+      setLastExportAction("video");
+      runId = startExportRun("Preparing export...");
+
+      if (!hasSavedSourceMedia) {
+        throw new Error("Saved media is required before export.");
+      }
+
+      console.info("[Lumeo Export] cloud export requested", {
+        projectId,
+        trimStart: exportStart,
+        trimEnd: exportEnd,
+        canvasFormat,
+        resolution: phaseOneExportResolution,
+      });
+
+      const response = await fetch("/api/export/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          projectId,
+          settings: {
+            trimStart: exportStart,
+            trimEnd: exportEnd || undefined,
+            canvasFormat,
+            resolution: phaseOneExportResolution,
+          },
+        }),
+      });
+
+      const payload = (await response.json()) as CloudExportResponse;
+
+      if (!response.ok || !payload.success || !payload.downloadUrl) {
+        throw new Error(
+          !payload.success && payload.error ? payload.error : "Export failed",
+        );
+      }
+
+      if (runId !== exportRunIdRef.current) return;
+
+      clearExportProgressTimer();
+      setDownloadUrl(payload.downloadUrl);
+      setDownloadName(payload.fileName);
+      updateExportProgress(runId, "complete", 100, "Export complete");
+      setExportStatus("Export complete");
+      setExportPhase("Export complete");
+    } catch (error) {
+      console.error("[Lumeo Export] cloud export failed", error);
+
+      if (runId !== exportRunIdRef.current) {
+        return;
+      }
+
+      clearExportProgressTimer();
+      updateExportProgress(runId, "failed", 0, "failed");
+      setExportError("Export failed. Please try again.");
+      setExportStatus("");
+      setExportPhase("failed");
+    } finally {
+      if (runId === exportRunIdRef.current) {
+        setExporting(false);
+      }
+    }
+  };
+
+  const handleExperimentalExportVideo = async () => {
     if (exporting) return;
 
     const exportEnd = Number(trimEnd || videoDuration || 0);
@@ -1667,7 +1777,7 @@ export default function ProjectDetailsPage() {
       setEngineProgress(0);
       clearExportProgressTimer();
       updateExportProgress(runId, "failed", 0, "failed");
-      setExportError("Export failed. Please try a smaller video or refresh and try again.");
+      setExportError("Export failed. Please try again.");
       setExportStatus("");
       setExportPhase("failed");
     } finally {
@@ -1750,7 +1860,7 @@ export default function ProjectDetailsPage() {
       setEngineProgress(0);
       clearExportProgressTimer();
       updateExportProgress(runId, "failed", 0, "failed");
-      setExportError("Export failed. Please try a smaller video or refresh and try again.");
+      setExportError("Export failed. Please try again.");
       setExportStatus("");
       setExportPhase("failed");
     } finally {
@@ -1864,6 +1974,7 @@ export default function ProjectDetailsPage() {
             outputWidth: output.width,
             outputHeight: output.height,
           },
+          export: project?.editor?.export || null,
         },
         updatedAt: serverTimestamp(),
       });
@@ -2496,7 +2607,7 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "export") {
       const visibleProgress = exportProgress;
-      const visiblePhase = exportPhase || exportStatus || "Preparing export";
+      const visiblePhase = exportPhase || exportStatus || "Preparing export...";
 
       return (
         <Panel
@@ -2514,13 +2625,13 @@ export default function ProjectDetailsPage() {
               </p>
 
               <p className="mt-2 text-sm text-white/50">
-                {canvasFormat} · {exportResolution} · {exportFps} FPS
+                {canvasFormat} · {phaseOneExportResolution}
               </p>
 
               {localVideoBytes > 100 * 1024 * 1024 && (
                 <p className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/78">
-                  Large browser exports may take longer. For best results, test
-                  with a short 720p clip.
+                  Large exports may take longer. For best results, test with a
+                  short 720p clip.
                 </p>
               )}
             </div>
@@ -2530,8 +2641,8 @@ export default function ProjectDetailsPage() {
                 Video format
               </label>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {(["mp4", "webm"] as VideoFormat[]).map((item) => (
+              <div className="mt-3 grid grid-cols-1 gap-2">
+                {(["mp4"] as VideoFormat[]).map((item) => (
                   <OptionButton
                     key={item}
                     active={exportFormat === item}
@@ -2548,8 +2659,8 @@ export default function ProjectDetailsPage() {
                 Resolution
               </label>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {(["720p", "1080p", "2k"] as ExportResolution[]).map(
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {(["720p", "1080p"] as ExportResolution[]).map(
                   (item) => (
                     <OptionButton
                       key={item}
@@ -2562,79 +2673,23 @@ export default function ProjectDetailsPage() {
                   )
                 )}
               </div>
+            </div>
 
-              {exportResolution === "1080p" && (
-                <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/78">
-                  1080p export may take longer on this device.
+            {hasPreviewOnlyExportEdits && (
+              <div className="rounded-[1.5rem] border border-amber-300/20 bg-amber-300/10 p-4">
+                <p className="text-sm font-bold leading-6 text-amber-100/82">
+                  Some advanced edits are preview-only in this export version.
                 </p>
-              )}
-
-              {exportResolution === "2k" && (
-                <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/78">
-                  2K export may take longer and may fail on some browsers.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <label className="text-sm font-bold text-white/58">FPS</label>
-
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {([24, 30, 60] as ExportFps[]).map((item) => (
-                  <OptionButton
-                    key={item}
-                    active={exportFps === item}
-                    onClick={() => setExportFps(item)}
-                    small
-                  >
-                    {item}
-                  </OptionButton>
-                ))}
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="text-sm font-bold text-white/58">Quality</label>
-
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {(["standard", "high", "max"] as ExportQuality[]).map(
-                  (item) => (
-                    <OptionButton
-                      key={item}
-                      active={exportQuality === item}
-                      onClick={() => setExportQuality(item)}
-                      small
-                    >
-                      {item}
-                    </OptionButton>
-                  )
-                )}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-bold text-white/58">
-                Extract audio
-              </label>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {(["mp3", "wav"] as AudioFormat[]).map((item) => (
-                  <OptionButton
-                    key={item}
-                    active={audioFormat === item}
-                    onClick={() => setAudioFormat(item)}
-                  >
-                    {item.toUpperCase()}
-                  </OptionButton>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-cyan-300/20 bg-cyan-300/10 p-4">
-              <p className="text-sm font-black text-cyan-100">
-                Cloud export is being upgraded.
-              </p>
-            </div>
+            <button
+              onClick={handleExportVideo}
+              disabled={exporting || !hasSavedSourceMedia}
+              className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
+            >
+              {exporting ? "Preparing export..." : "Export video"}
+            </button>
 
             <details className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
               <summary className="cursor-pointer text-sm font-black text-white/72">
@@ -2643,7 +2698,7 @@ export default function ProjectDetailsPage() {
 
               <div className="mt-4 grid gap-3">
                 <button
-                  onClick={handleExportVideo}
+                  onClick={handleExperimentalExportVideo}
                   disabled={exporting}
                   className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
                 >

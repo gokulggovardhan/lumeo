@@ -1,11 +1,25 @@
 import { v2 as cloudinary } from "cloudinary";
 
 const TEMP_UPLOAD_FOLDER = "lumeo/temp";
+const TEMP_EXPORT_FOLDER = "lumeo/export-temp";
 
 type CloudinaryEnv = {
   cloudName: string;
   apiKey: string;
   apiSecret: string;
+};
+
+type TemporaryCloudinaryVideo = {
+  publicId: string;
+  secureUrl: string;
+  bytes: number;
+};
+
+type PhaseOneTransformOptions = {
+  trimStart?: number;
+  trimEnd?: number;
+  width: number;
+  height: number;
 };
 
 function getCloudinaryEnv(): CloudinaryEnv {
@@ -68,4 +82,99 @@ export async function deleteTemporaryCloudinaryVideo(publicId: string) {
     resource_type: "video",
     invalidate: true,
   });
+}
+
+export async function uploadTemporaryCloudinaryVideoBuffer({
+  bytes,
+  fileName,
+}: {
+  bytes: Buffer;
+  fileName: string;
+}): Promise<TemporaryCloudinaryVideo> {
+  configureCloudinary();
+
+  const publicId = createTemporaryPublicId(fileName);
+
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: TEMP_EXPORT_FOLDER,
+        public_id: publicId,
+        resource_type: "video",
+        overwrite: true,
+      },
+      (error, result) => {
+        if (error || !result?.public_id || !result.secure_url) {
+          reject(error || new Error("Temporary video upload failed."));
+          return;
+        }
+
+        resolve({
+          publicId: result.public_id,
+          secureUrl: result.secure_url,
+          bytes: Number(result.bytes || bytes.byteLength),
+        });
+      },
+    );
+
+    stream.end(bytes);
+  });
+}
+
+export function createPhaseOneCloudinaryExportUrl(
+  publicId: string,
+  options: PhaseOneTransformOptions,
+) {
+  configureCloudinary();
+
+  const transformation: Record<string, string | number>[] = [];
+  const trim: Record<string, number> = {};
+
+  if (Number.isFinite(options.trimStart) && Number(options.trimStart) > 0) {
+    trim.start_offset = Number(options.trimStart);
+  }
+
+  if (
+    Number.isFinite(options.trimEnd) &&
+    Number(options.trimEnd) > 0 &&
+    Number(options.trimEnd) > Number(options.trimStart || 0)
+  ) {
+    trim.end_offset = Number(options.trimEnd);
+  }
+
+  if (Object.keys(trim).length > 0) {
+    transformation.push(trim);
+  }
+
+  transformation.push({
+    width: options.width,
+    height: options.height,
+    crop: "pad",
+    background: "black",
+  });
+
+  transformation.push({
+    video_codec: "h264",
+    audio_codec: "aac",
+    quality: "auto:good",
+  });
+
+  return cloudinary.url(publicId, {
+    resource_type: "video",
+    secure: true,
+    format: "mp4",
+    transformation,
+  });
+}
+
+function createTemporaryPublicId(fileName: string) {
+  const safeName =
+    fileName
+      .replace(/\.[^/.]+$/, "")
+      .replace(/[^a-z0-9-_]+/gi, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase()
+      .slice(0, 80) || "source";
+
+  return `${safeName}-${Date.now()}`;
 }

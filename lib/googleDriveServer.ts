@@ -43,6 +43,10 @@ type DriveUploadResult = {
   size: number;
 };
 
+type DriveDownloadResult = DriveUploadResult & {
+  bytes: Buffer;
+};
+
 type DriveUploadSession = {
   uploadUrl: string;
   fileName: string;
@@ -405,6 +409,225 @@ export async function uploadVideoBufferToDriveUploadsFolder({
     mimeType: payload.mimeType || mimeType,
     size: Number(payload.size || size),
   };
+}
+
+export async function uploadVideoBufferToDriveExportsFolder({
+  bytes,
+  fileName,
+  mimeType,
+  size,
+  appProperties,
+}: {
+  bytes: Buffer;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  appProperties?: DriveFileAppProperties;
+}): Promise<DriveUploadResult> {
+  const env = getGoogleDriveEnv();
+  const accessToken = await getGoogleDriveAccessToken();
+  const metadata = {
+    name: fileName,
+    parents: [env.exportsFolderId],
+    mimeType,
+    ...(appProperties ? { appProperties } : {}),
+  };
+
+  const delimiter = "lumeo-drive-export";
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${delimiter}\r\n` +
+        "Content-Type: application/json; charset=UTF-8\r\n\r\n" +
+        `${JSON.stringify(metadata)}\r\n` +
+        `--${delimiter}\r\n` +
+        `Content-Type: ${mimeType || "application/octet-stream"}\r\n\r\n`,
+    ),
+    bytes,
+    Buffer.from(`\r\n--${delimiter}--`),
+  ]);
+
+  const params = new URLSearchParams({
+    uploadType: "multipart",
+    fields: "id,name,mimeType,size",
+    supportsAllDrives: "true",
+  });
+
+  const response = await fetch(
+    `${GOOGLE_DRIVE_UPLOAD_URL}/files?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": `multipart/related; boundary=${delimiter}`,
+        "Content-Length": String(body.byteLength),
+      },
+      body,
+    },
+  );
+
+  const payload = (await response.json()) as {
+    id?: string;
+    name?: string;
+    mimeType?: string;
+    size?: string;
+    error?: {
+      code?: number;
+      message?: string;
+    };
+  };
+
+  if (!response.ok || !payload.id || !payload.name) {
+    console.error("Google Drive export upload failed", {
+      status: response.status,
+      errorCode: payload.error?.code,
+      errorMessage: payload.error?.message,
+    });
+
+    throw new GoogleDriveServerError(
+      payload.error?.code ? `drive_${payload.error.code}` : "drive_export_failed",
+      payload.error?.message || "Google Drive export upload failed.",
+    );
+  }
+
+  return {
+    fileId: payload.id,
+    fileName: payload.name,
+    mimeType: payload.mimeType || mimeType,
+    size: Number(payload.size || size),
+  };
+}
+
+export async function downloadDriveFileBuffer(
+  fileId: string,
+): Promise<DriveDownloadResult> {
+  const accessToken = await getGoogleDriveAccessToken();
+  const metadataParams = new URLSearchParams({
+    fields: "id,name,mimeType,size",
+    supportsAllDrives: "true",
+  });
+
+  const metadataResponse = await fetch(
+    `${GOOGLE_DRIVE_API_URL}/files/${encodeURIComponent(fileId)}?${metadataParams.toString()}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    },
+  );
+
+  const metadata = (await metadataResponse.json()) as {
+    id?: string;
+    name?: string;
+    mimeType?: string;
+    size?: string;
+    error?: {
+      code?: number;
+      message?: string;
+    };
+  };
+
+  if (!metadataResponse.ok || !metadata.id || !metadata.name) {
+    console.error("Google Drive media metadata lookup failed", {
+      status: metadataResponse.status,
+      errorCode: metadata.error?.code,
+      errorMessage: metadata.error?.message,
+    });
+
+    throw new GoogleDriveServerError(
+      metadata.error?.code ? `drive_${metadata.error.code}` : "drive_metadata_failed",
+      metadata.error?.message || "Google Drive media metadata lookup failed.",
+    );
+  }
+
+  const mediaParams = new URLSearchParams({
+    alt: "media",
+    supportsAllDrives: "true",
+  });
+  const mediaResponse = await fetch(
+    `${GOOGLE_DRIVE_API_URL}/files/${encodeURIComponent(fileId)}?${mediaParams.toString()}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    },
+  );
+
+  if (!mediaResponse.ok) {
+    console.error("Google Drive media download failed", {
+      status: mediaResponse.status,
+      fileId,
+    });
+
+    throw new GoogleDriveServerError(
+      `drive_${mediaResponse.status}`,
+      "Google Drive media download failed.",
+    );
+  }
+
+  const bytes = Buffer.from(await mediaResponse.arrayBuffer());
+
+  return {
+    bytes,
+    fileId: metadata.id,
+    fileName: metadata.name,
+    mimeType:
+      metadata.mimeType ||
+      mediaResponse.headers.get("content-type") ||
+      "application/octet-stream",
+    size: Number(metadata.size || bytes.byteLength),
+  };
+}
+
+export async function createDriveDownloadUrl(fileId: string) {
+  const accessToken = await getGoogleDriveAccessToken();
+  const params = new URLSearchParams({
+    supportsAllDrives: "true",
+    fields: "id",
+  });
+
+  const response = await fetch(
+    `${GOOGLE_DRIVE_API_URL}/files/${encodeURIComponent(fileId)}/permissions?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8",
+      },
+      body: JSON.stringify({
+        role: "reader",
+        type: "anyone",
+      }),
+    },
+  );
+
+  if (!response.ok) {
+    let payload: { error?: { code?: number; message?: string } } = {};
+
+    try {
+      payload = (await response.json()) as {
+        error?: { code?: number; message?: string };
+      };
+    } catch {
+      // Google may return an empty body for permission errors.
+    }
+
+    console.error("Google Drive download permission failed", {
+      status: response.status,
+      errorCode: payload.error?.code,
+      errorMessage: payload.error?.message,
+    });
+
+    throw new GoogleDriveServerError(
+      payload.error?.code
+        ? `drive_${payload.error.code}`
+        : "drive_download_permission_failed",
+      payload.error?.message || "Google Drive download permission failed.",
+    );
+  }
+
+  return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(fileId)}`;
 }
 
 export async function createVideoUploadSession({
