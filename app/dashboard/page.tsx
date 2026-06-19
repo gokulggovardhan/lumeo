@@ -140,7 +140,7 @@ export default function DashboardPage() {
           </p>
 
           <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
-            Welcome to Lumeo
+            Welcome to Lumeo Studio
           </h1>
 
           <p className="mt-4 text-lg text-[#F7F0DE]/60">

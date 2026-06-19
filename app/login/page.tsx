@@ -49,15 +49,11 @@ export default function LoginPage() {
           <span className="text-lg font-black tracking-tight">Lumeo</span>
         </Link>
 
-        <p className="mt-8 text-xs font-black uppercase tracking-[0.28em] text-[#D8C48E]/70">
-          Midnight Studio
-        </p>
         <h1 className="mt-4 text-4xl font-black tracking-tight">
           Welcome to Lumeo Studio
         </h1>
         <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-[#F7F0DE]/58">
-          A private creative workspace for shaping short-form video with a
-          polished, focused editing flow.
+          Sign in to continue.
         </p>
 
         <button
@@ -68,16 +64,11 @@ export default function LoginPage() {
           {loading ? "Opening Studio..." : "Continue with Google"}
         </button>
 
-        <p className="mt-4 text-xs font-medium leading-5 text-[#F7F0DE]/38">
-          Your workspace is protected by your Google account. We only use sign-in
-          to open your Studio.
-        </p>
-
         <Link
           href="/"
           className="mt-8 inline-flex text-xs font-bold text-[#F3E7C8]/58 transition hover:text-[#F3E7C8]"
         >
-          Return to homepage
+          Return home
         </Link>
       </section>
 
