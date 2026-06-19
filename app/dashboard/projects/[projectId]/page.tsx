@@ -9,7 +9,7 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   deleteDoc,
   doc,
@@ -17,7 +17,7 @@ import {
   serverTimestamp,
   updateDoc,
 } from "firebase/firestore";
-import { auth, googleProvider, db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 import {
   loadFFmpegClient as getFFmpeg,
   preloadFFmpeg,
@@ -54,10 +54,10 @@ type ExportFps = 24 | 30 | 60;
 const tools: { key: ToolKey; label: string; description: string; icon: string }[] =
   [
     { key: "media", label: "Media", description: "Video and music", icon: "◉" },
-    { key: "canvas", label: "Canvas", description: "Frame and layout", icon: "▣" },
-    { key: "edit", label: "Edit", description: "Trim and motion", icon: "✂" },
-    { key: "text", label: "Text", description: "Titles and hooks", icon: "T" },
-    { key: "audio", label: "Audio", description: "Sound mix", icon: "♫" },
+    { key: "canvas", label: "Frame", description: "Layout and view", icon: "▣" },
+    { key: "edit", label: "Cut", description: "Trim and motion", icon: "✂" },
+    { key: "text", label: "Titles", description: "Hooks and overlays", icon: "T" },
+    { key: "audio", label: "Sound", description: "Audio mix", icon: "♫" },
     { key: "effects", label: "Effects", description: "Look and color", icon: "✦" },
     { key: "export", label: "Export", description: "Output settings", icon: "⇩" },
     { key: "project", label: "Project", description: "Save and manage", icon: "✓" },
@@ -1023,15 +1023,6 @@ export default function ProjectDetailsPage() {
     };
   }, [activeTool, localVideoURL, engineReady, enginePreparing]);
 
-  const handleLogin = async () => {
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
-      await saveUserProfile(result.user);
-    } catch (error: any) {
-      alert(error.message);
-    }
-  };
-
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -1110,7 +1101,7 @@ export default function ProjectDetailsPage() {
     try {
       await saveMediaToBrowser(audioStorageKey, file);
     } catch {
-      alert("Audio preview works, but browser could not save it locally.");
+      alert("Sound preview works, but browser could not save it locally.");
     }
   };
 
@@ -2185,7 +2176,7 @@ export default function ProjectDetailsPage() {
 
                 {audioRestored && (
                   <p className="mt-3 text-xs font-bold text-emerald-200">
-                    Audio restored locally.
+                    Sound restored locally.
                   </p>
                 )}
               </div>
@@ -2206,11 +2197,11 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "canvas") {
       return (
-        <Panel title="Canvas Studio" subtitle="Set the video frame and background style.">
+        <Panel title="Frame Studio" subtitle="Set the video frame and background style.">
           <div className="space-y-6">
             <div>
               <label className="text-sm font-bold text-white/58">
-                Canvas format
+                Frame format
               </label>
 
               <div className="mt-3 grid grid-cols-3 gap-2">
@@ -2307,7 +2298,7 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "edit") {
       return (
-        <Panel title="Edit Controls" subtitle="Fine-tune trim, speed, rotation, and movement.">
+        <Panel title="Cut Controls" subtitle="Fine-tune trim, speed, rotation, and movement.">
           <div className="space-y-6">
             <button
               onClick={handlePlayTrimPreview}
@@ -2401,7 +2392,7 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "text") {
       return (
-        <Panel title="Text Layer" subtitle="Create premium title hooks and overlays.">
+        <Panel title="Titles" subtitle="Create premium title hooks and overlays.">
           <div className="space-y-5">
             <textarea
               value={overlayText}
@@ -2489,7 +2480,7 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "audio") {
       return (
-        <Panel title="Audio Mix" subtitle="Balance original video sound and background music.">
+        <Panel title="Sound Mix" subtitle="Balance original video sound and background music.">
           <div className="space-y-6">
             <RangeControl
               label="Original volume"
@@ -2685,7 +2676,7 @@ export default function ProjectDetailsPage() {
               disabled={exporting || !hasSavedSourceMedia}
               className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
             >
-              {exporting ? "Preparing export..." : "Export video"}
+              {exporting ? "Preparing export..." : "Export Video"}
             </button>
 
             {userExportRequested && !downloadUrl && !exportError && (
@@ -2867,12 +2858,12 @@ export default function ProjectDetailsPage() {
             Sign in to open your premium short video editing studio.
           </p>
 
-          <button
-            onClick={handleLogin}
-            className="mt-8 rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-fuchsia-100"
+          <Link
+            href="/login"
+            className="mt-8 inline-flex rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-fuchsia-100"
           >
-            Continue with Google
-          </button>
+            Continue to Sign In
+          </Link>
         </div>
       </main>
     );
@@ -2892,7 +2883,7 @@ export default function ProjectDetailsPage() {
             href="/dashboard"
             className="mt-8 inline-flex rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-fuchsia-100"
           >
-            Back to dashboard
+            Back to Studio
           </Link>
         </div>
       </main>
@@ -2951,7 +2942,7 @@ export default function ProjectDetailsPage() {
               href="/dashboard"
               className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm font-bold text-white/72 transition hover:bg-white hover:text-black"
             >
-              Back to dashboard
+              Back to Studio
             </Link>
 
             <button
@@ -2983,7 +2974,7 @@ export default function ProjectDetailsPage() {
           <aside className="hidden min-h-0 overflow-hidden rounded-[2rem] border border-white/10 bg-[#111018]/82 shadow-2xl shadow-black/25 backdrop-blur-2xl lg:block">
             <div className="border-b border-white/10 p-5">
               <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
-                Lumeo tools
+                Studio Tools
               </p>
 
               <div className="mt-4 grid grid-cols-2 gap-2">
@@ -2992,7 +2983,7 @@ export default function ProjectDetailsPage() {
               </div>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <StatPill label="Canvas" value={canvasFormat} />
+                <StatPill label="Frame" value={canvasFormat} />
                 <StatPill label="Output" value={exportResolution} />
               </div>
             </div>

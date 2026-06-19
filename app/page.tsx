@@ -17,7 +17,7 @@ const controls = [
   {
     title: "Frame",
     description:
-      "Switch between 9:16, 1:1, and 16:9 instantly. Fit or fill the frame without ever leaving the canvas.",
+      "Switch between 9:16, 1:1, and 16:9 instantly. Choose Full Frame or Original View without leaving the canvas.",
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
         <rect x="5" y="2.5" width="14" height="19" rx="2" />
@@ -98,20 +98,20 @@ const useCases = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#0B0C0F] text-white">
+    <main className="min-h-screen bg-[#07070A] text-[#F7F0DE]">
       {/* ---------------------------------------------------------------- */}
       {/* NAV                                                               */}
       {/* ---------------------------------------------------------------- */}
-      <nav className="relative z-50 border-b border-white/10 bg-[#0B0C0F]/90 px-5 py-3.5 backdrop-blur-xl sm:px-8 lg:px-12">
+      <nav className="relative z-50 border-b border-[#F3E7C8]/10 bg-[#07070A]/90 px-5 py-3.5 backdrop-blur-xl sm:px-8 lg:px-12">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FF5A36] text-sm font-bold text-white">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E7C8] text-sm font-bold text-[#111018]">
               L
             </div>
             <span className="text-base font-bold tracking-tight">Lumeo</span>
           </Link>
 
-          <div className="hidden items-center gap-8 text-sm font-semibold text-white/55 md:flex">
+          <div className="hidden items-center gap-8 text-sm font-semibold text-[#F7F0DE]/55 md:flex">
             <a href="#controls" className="transition hover:text-white">
               Controls
             </a>
@@ -131,19 +131,19 @@ export default function Home() {
       {/* HERO — countdown leader settles into the real product frame      */}
       {/* ---------------------------------------------------------------- */}
       <section className="relative overflow-hidden px-5 pb-20 pt-16 sm:px-8 sm:pt-20 lg:px-12 lg:pt-24">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[480px] bg-[radial-gradient(circle_at_50%_0%,rgba(255,90,54,0.08),transparent_60%)]" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(circle_at_35%_0%,rgba(167,139,250,0.15),transparent_58%),radial-gradient(circle_at_75%_10%,rgba(244,114,182,0.11),transparent_42%)]" />
 
         <div className="relative z-10 mx-auto grid max-w-7xl gap-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div>
             <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs font-bold text-white/50">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#FF5A36]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-[#F3E7C8]" />
               Built for vertical, square, and widescreen
             </div>
 
             <h1 className="max-w-xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-[4.25rem]">
               Cut your next short
               <br />
-              <span className="text-[#FF8A6B]">right in the browser.</span>
+              <span className="text-[#F3E7C8]">right in the browser.</span>
             </h1>
 
             <p className="mt-6 max-w-lg text-lg leading-7 text-white/55">
@@ -155,9 +155,9 @@ export default function Home() {
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/dashboard"
-                className="rounded-full bg-[#FF5A36] px-7 py-3.5 text-center text-sm font-bold text-white transition hover:bg-[#E6491F]"
+                className="rounded-full bg-[#F3E7C8] px-7 py-3.5 text-center text-sm font-bold text-[#111018] transition hover:bg-white"
               >
-                Open the editor
+                Open Studio
               </Link>
               <a
                 href="#controls"
@@ -207,7 +207,7 @@ export default function Home() {
                 </span>
               </div>
 
-              <div className="relative aspect-[9/16] w-full overflow-hidden bg-gradient-to-br from-[#1C1D22] via-[#15161B] to-[#0B0C0F]">
+              <div className="relative aspect-[9/16] w-full overflow-hidden bg-gradient-to-br from-[#1C1D22] via-[#15161B] to-[#07070A]">
                 <div className="absolute inset-0 flex items-center justify-center">
                   <span className="font-[Space_Grotesk,sans-serif] text-7xl font-bold text-white/[0.06]">
                     8
@@ -235,11 +235,11 @@ export default function Home() {
                     backgroundRepeat: "repeat-x",
                   }}
                 >
-                  <div className="absolute inset-y-0 left-[18%] right-[22%] bg-gradient-to-r from-[#FF5A36]/35 to-[#FF5A36]/15" />
+                  <div className="absolute inset-y-0 left-[18%] right-[22%] bg-gradient-to-r from-[#F3E7C8]/35 to-[#F3E7C8]/15" />
                   <div className="absolute inset-y-0 left-0 w-[18%] bg-[#0B0C0F]/75" />
                   <div className="absolute inset-y-0 right-0 w-[22%] bg-[#0B0C0F]/75" />
-                  <div className="absolute left-[18%] top-0 h-full w-[3px] -translate-x-1/2 rounded-full bg-[#FF5A36] shadow-[0_0_0_3px_rgba(255,90,54,0.25)]" />
-                  <div className="absolute left-[78%] top-0 h-full w-[3px] -translate-x-1/2 rounded-full bg-[#FF5A36] shadow-[0_0_0_3px_rgba(255,90,54,0.25)]" />
+                  <div className="absolute left-[18%] top-0 h-full w-[3px] -translate-x-1/2 rounded-full bg-[#F3E7C8] shadow-[0_0_0_3px_rgba(243,231,200,0.22)]" />
+                  <div className="absolute left-[78%] top-0 h-full w-[3px] -translate-x-1/2 rounded-full bg-[#F3E7C8] shadow-[0_0_0_3px_rgba(243,231,200,0.22)]" />
                 </div>
               </div>
             </div>
@@ -256,7 +256,7 @@ export default function Home() {
       {/* ---------------------------------------------------------------- */}
       <section id="controls" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
         <div className="mb-12 max-w-xl">
-          <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#FF8A6B]">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#D8C48E]">
             Controls
           </p>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -293,7 +293,7 @@ export default function Home() {
       {/* ---------------------------------------------------------------- */}
       <section id="workflow" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
         <div className="rounded-2xl border border-white/10 bg-[#101115] p-8 sm:p-12 lg:p-14">
-          <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#FF8A6B]">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#D8C48E]">
             Workflow
           </p>
           <h2 className="max-w-xl text-3xl font-bold tracking-tight sm:text-4xl">
@@ -303,7 +303,7 @@ export default function Home() {
           <div className="mt-10 grid gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 md:grid-cols-3">
             {workflow.map((item, index) => (
               <div key={item.title} className="bg-[#0B0C0F] p-7">
-                <span className="font-[Space_Grotesk,sans-serif] text-sm font-bold tabular-nums text-[#FF5A36]">
+                <span className="font-[Space_Grotesk,sans-serif] text-sm font-bold tabular-nums text-[#D8C48E]">
                   {String(index + 1).padStart(2, "0")}
                 </span>
                 <h3 className="mt-4 text-xl font-bold">{item.title}</h3>
@@ -321,7 +321,7 @@ export default function Home() {
       {/* ---------------------------------------------------------------- */}
       <section id="use-cases" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
         <div className="mb-10 max-w-xl">
-          <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#FF8A6B]">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#D8C48E]">
             Use cases
           </p>
           <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
@@ -346,26 +346,27 @@ export default function Home() {
       {/* ---------------------------------------------------------------- */}
       <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
         <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#101115] p-10 text-center sm:p-16">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FF5A36]/50 to-transparent" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#F3E7C8]/50 to-transparent" />
 
           <h2 className="text-3xl font-bold tracking-tight sm:text-5xl">
             Your next clip is one upload away.
           </h2>
           <p className="mx-auto mt-5 max-w-md text-base leading-7 text-white/50">
-            Open the editor, drop in a video, and start cutting. No setup
+            Open Studio, drop in a video, and start cutting. No setup
             screens between you and the timeline.
           </p>
           <Link
             href="/dashboard"
-            className="mt-8 inline-flex rounded-full bg-[#FF5A36] px-8 py-3.5 text-sm font-bold text-white transition hover:bg-[#E6491F]"
+            className="mt-8 inline-flex rounded-full bg-[#F3E7C8] px-8 py-3.5 text-sm font-bold text-[#111018] transition hover:bg-white"
           >
-            Open the editor
+            Open Studio
           </Link>
         </div>
       </section>
 
-      <footer className="border-t border-white/10 px-6 py-8 text-center text-xs font-medium text-white/30">
-        © 2026 Lumeo. All rights reserved.
+      <footer className="border-t border-[#F3E7C8]/10 px-6 py-8 text-center font-serif text-[11px] italic leading-5 text-[#F7F0DE]/34 sm:text-right">
+        <p>© 2026 Lumeo. All rights reserved.</p>
+        <p>Developed by Govardhan Gudapakam</p>
       </footer>
     </main>
   );
