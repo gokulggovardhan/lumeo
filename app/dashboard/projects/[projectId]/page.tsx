@@ -728,8 +728,7 @@ export default function ProjectDetailsPage() {
   );
 
   const output = getOutputDimensions(canvasFormat, exportResolution);
-  const phaseOneExportResolution =
-    exportResolution === "1080p" ? "1080p" : "720p";
+  const phaseOneExportResolution: ExportResolution = "720p";
   const hasSavedSourceMedia = Boolean(videoStorageMetadata?.fileId);
 
   const selectedRange = Math.max(
@@ -863,12 +862,7 @@ export default function ProjectDetailsPage() {
             const savedAudioFormat = editor.exportSettings?.audioFormat;
             setAudioFormat(savedAudioFormat === "wav" ? "wav" : "mp3");
 
-            const savedResolution = editor.exportSettings?.resolution;
-            setExportResolution(
-              savedResolution === "1080p" || savedResolution === "2k"
-                ? savedResolution
-                : "720p"
-            );
+            setExportResolution("720p");
 
             const savedFps = editor.exportSettings?.fps;
             setExportFps(savedFps === 24 || savedFps === 60 ? savedFps : 30);
@@ -2659,20 +2653,13 @@ export default function ProjectDetailsPage() {
                 Resolution
               </label>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {(["720p", "1080p"] as ExportResolution[]).map(
-                  (item) => (
-                    <OptionButton
-                      key={item}
-                      active={exportResolution === item}
-                      onClick={() => setExportResolution(item)}
-                      small
-                    >
-                      {item.toUpperCase()}
-                    </OptionButton>
-                  )
-                )}
+              <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/82">
+                720P
               </div>
+
+              <p className="mt-3 text-xs font-bold text-white/38">
+                Higher resolutions are coming soon.
+              </p>
             </div>
 
             {hasPreviewOnlyExportEdits && (
@@ -2690,40 +2677,6 @@ export default function ProjectDetailsPage() {
             >
               {exporting ? "Preparing export..." : "Export video"}
             </button>
-
-            <details className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-              <summary className="cursor-pointer text-sm font-black text-white/72">
-                Experimental export
-              </summary>
-
-              <div className="mt-4 grid gap-3">
-                <button
-                  onClick={handleExperimentalExportVideo}
-                  disabled={exporting}
-                  className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
-                >
-                  Export video
-                </button>
-
-                <button
-                  onClick={handleExtractAudio}
-                  disabled={exporting}
-                  className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-55"
-                >
-                  Extract audio
-                </button>
-
-                {!userExportRequested && !downloadUrl && !exportError && localVideoURL && (
-                  <p className="text-center text-xs font-bold text-white/36">
-                    {engineReady
-                      ? "Export tools ready"
-                      : enginePreparing
-                        ? "Preparing export tools quietly"
-                        : "Export tools will prepare quietly"}
-                  </p>
-                )}
-              </div>
-            </details>
 
             {userExportRequested && !downloadUrl && !exportError && (
               <div className="rounded-[1.5rem] border border-cyan-300/20 bg-gradient-to-br from-cyan-300/12 via-white/[0.045] to-fuchsia-300/10 p-5">

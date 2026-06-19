@@ -12,7 +12,6 @@ export default function DashboardPage() {
   const [checking, setChecking] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
   const [projectTitle, setProjectTitle] = useState("");
-  const [projectType, setProjectType] = useState("Video Project");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -73,9 +72,8 @@ export default function DashboardPage() {
 
     try {
       setSaving(true);
-      await createProject(user, projectTitle.trim(), projectType);
+      await createProject(user, projectTitle.trim(), "Video Project");
       setProjectTitle("");
-      setProjectType("Video Project");
     } catch (error: any) {
       alert(error.message);
     } finally {
@@ -157,7 +155,7 @@ export default function DashboardPage() {
 
             <form
               onSubmit={handleCreateProject}
-              className="mt-6 grid gap-4 md:grid-cols-[1fr_220px_160px]"
+              className="mt-6 grid gap-4 md:grid-cols-[1fr_160px]"
             >
               <input
                 value={projectTitle}
@@ -165,18 +163,6 @@ export default function DashboardPage() {
                 placeholder="Project title"
                 className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none placeholder:text-white/35"
               />
-
-              <select
-                value={projectType}
-                onChange={(event) => setProjectType(event.target.value)}
-                className="rounded-2xl border border-white/10 bg-white/10 px-5 py-4 text-white outline-none"
-              >
-                <option className="bg-black">Video Project</option>
-                <option className="bg-black">Shorts Project</option>
-                <option className="bg-black">Podcast Project</option>
-                <option className="bg-black">Learning Project</option>
-                <option className="bg-black">Developer Project</option>
-              </select>
 
               <button
                 disabled={saving}
@@ -201,8 +187,7 @@ export default function DashboardPage() {
                     key={project.id}
                     className="rounded-3xl border border-white/10 bg-black/25 p-6"
                   >
-                    <p className="text-sm text-purple-300">{project.type}</p>
-                    <h3 className="mt-3 text-2xl font-bold">{project.title}</h3>
+                    <h3 className="text-2xl font-bold">{project.title}</h3>
                     <p className="mt-3 text-white/50">Status: {project.status}</p>
                     
                     <Link

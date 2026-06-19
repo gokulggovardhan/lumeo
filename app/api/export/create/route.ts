@@ -293,7 +293,7 @@ function normalizeCanvasFormat(value: unknown): CanvasFormat {
 }
 
 function normalizeResolution(value: unknown): ExportResolution {
-  return value === "1080p" ? "1080p" : "720p";
+  return "720p";
 }
 
 function toSafeNumber(value: unknown, fallback: number) {
