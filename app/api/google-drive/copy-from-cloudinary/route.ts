@@ -73,6 +73,12 @@ export async function POST(request: NextRequest) {
       fileName: createDriveFileName(body.projectId, body.fileName),
       mimeType: body.mimeType,
       size: Number(body.size),
+      appProperties: {
+        projectId: body.projectId,
+        purpose: "source",
+        app: "lumeo",
+        uploadedAt: new Date().toISOString(),
+      },
     });
 
     console.info("[Lumeo Upload] copy to permanent storage completed", {

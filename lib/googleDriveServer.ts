@@ -53,6 +53,15 @@ type DriveFileMetadata = {
   fileName: string;
   mimeType: string;
   size: number;
+  createdTime?: string;
+  appProperties?: Record<string, string>;
+};
+
+type DriveFileAppProperties = {
+  projectId?: string;
+  purpose?: string;
+  app?: string;
+  uploadedAt?: string;
 };
 
 export function getGoogleDriveEnv(): GoogleDriveEnv {
@@ -317,11 +326,13 @@ export async function uploadVideoBufferToDriveUploadsFolder({
   fileName,
   mimeType,
   size,
+  appProperties,
 }: {
   bytes: Buffer;
   fileName: string;
   mimeType: string;
   size: number;
+  appProperties?: DriveFileAppProperties;
 }): Promise<DriveUploadResult> {
   const env = getGoogleDriveStatusEnv();
   const accessToken = await getGoogleDriveAccessToken();
@@ -329,6 +340,7 @@ export async function uploadVideoBufferToDriveUploadsFolder({
     name: fileName,
     parents: [env.uploadsFolderId],
     mimeType,
+    ...(appProperties ? { appProperties } : {}),
   };
 
   const delimiter = "lumeo-drive-upload";
@@ -545,6 +557,83 @@ export async function findDriveUploadByName({
     mimeType: file.mimeType || mimeType,
     size: fileSize || size,
   };
+}
+
+export async function listDriveUploadsFolderFiles() {
+  const env = getGoogleDriveStatusEnv();
+  const accessToken = await getGoogleDriveAccessToken();
+  const files: DriveFileMetadata[] = [];
+  let pageToken = "";
+
+  do {
+    const params = new URLSearchParams({
+      q: `'${env.uploadsFolderId}' in parents and trashed = false`,
+      fields:
+        "nextPageToken,files(id,name,mimeType,size,createdTime,appProperties)",
+      pageSize: "100",
+      supportsAllDrives: "true",
+      includeItemsFromAllDrives: "true",
+    });
+
+    if (pageToken) {
+      params.set("pageToken", pageToken);
+    }
+
+    const response = await fetch(
+      `${GOOGLE_DRIVE_API_URL}/files?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+
+    const payload = (await response.json()) as {
+      nextPageToken?: string;
+      files?: Array<{
+        id?: string;
+        name?: string;
+        mimeType?: string;
+        size?: string;
+        createdTime?: string;
+        appProperties?: Record<string, string>;
+      }>;
+      error?: {
+        code?: number;
+        message?: string;
+      };
+    };
+
+    if (!response.ok) {
+      console.error("Google Drive uploads list failed", {
+        status: response.status,
+        errorCode: payload.error?.code,
+        errorMessage: payload.error?.message,
+      });
+
+      throw new GoogleDriveServerError(
+        payload.error?.code ? `drive_${payload.error.code}` : "drive_list_failed",
+        payload.error?.message || "Google Drive uploads list failed.",
+      );
+    }
+
+    for (const file of payload.files || []) {
+      if (!file.id || !file.name) continue;
+
+      files.push({
+        fileId: file.id,
+        fileName: file.name,
+        mimeType: file.mimeType || "",
+        size: Number(file.size || 0),
+        createdTime: file.createdTime,
+        appProperties: file.appProperties,
+      });
+    }
+
+    pageToken = payload.nextPageToken || "";
+  } while (pageToken);
+
+  return files;
 }
 
 export async function deleteDriveFile(fileId: string) {

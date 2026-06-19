@@ -547,6 +547,64 @@ async function copyCloudinaryVideoToPermanentStorage(
   return payload;
 }
 
+async function deletePermanentMediaFile(fileId: string) {
+  if (!fileId) return;
+
+  const response = await fetch("/api/google-drive/delete", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ fileId }),
+  });
+
+  if (!response.ok) {
+    throw new Error("Permanent media delete failed.");
+  }
+}
+
+async function deletePermanentMediaFiles(fileIds: string[]) {
+  const uniqueFileIds = Array.from(new Set(fileIds.filter(Boolean)));
+
+  for (const fileId of uniqueFileIds) {
+    try {
+      await deletePermanentMediaFile(fileId);
+    } catch (error) {
+      console.error("Permanent media cleanup failed", error);
+    }
+  }
+}
+
+function collectFileIdsFromValue(value: unknown, fileIds: Set<string>) {
+  if (!value || typeof value !== "object") return;
+
+  if ("fileId" in value && typeof value.fileId === "string") {
+    fileIds.add(value.fileId);
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectFileIdsFromValue(item, fileIds);
+    }
+
+    return;
+  }
+
+  for (const item of Object.values(value)) {
+    collectFileIdsFromValue(item, fileIds);
+  }
+}
+
+function collectPermanentMediaFileIds(...values: unknown[]) {
+  const fileIds = new Set<string>();
+
+  for (const value of values) {
+    collectFileIdsFromValue(value, fileIds);
+  }
+
+  return Array.from(fileIds);
+}
+
 export default function ProjectDetailsPage() {
   const params = useParams();
   const router = useRouter();
@@ -966,6 +1024,10 @@ export default function ProjectDetailsPage() {
       return;
     }
 
+    const oldMediaFileIds = collectPermanentMediaFileIds(
+      videoStorageMetadata,
+      project?.editor?.media?.storage,
+    );
     const url = URL.createObjectURL(file);
 
     setLocalVideoURL(url);
@@ -982,6 +1044,19 @@ export default function ProjectDetailsPage() {
       await saveMediaToBrowser(videoStorageKey, file);
     } catch {
       alert("Video preview works, but browser could not save it locally.");
+    }
+
+    if (oldMediaFileIds.length > 0) {
+      await deletePermanentMediaFiles(oldMediaFileIds);
+
+      try {
+        await updateDoc(doc(db, "projects", projectId), {
+          "editor.media.storage": null,
+          updatedAt: serverTimestamp(),
+        });
+      } catch (error) {
+        console.error("Video replace metadata cleanup failed", error);
+      }
     }
 
     void handleUploadVideo(file);
@@ -1293,6 +1368,11 @@ export default function ProjectDetailsPage() {
   };
 
   const handleRemoveVideo = async () => {
+    const oldMediaFileIds = collectPermanentMediaFileIds(
+      videoStorageMetadata,
+      project?.editor?.media?.storage,
+    );
+
     resetVideoUploadState();
     resetExportState();
 
@@ -1301,6 +1381,8 @@ export default function ProjectDetailsPage() {
     } catch (error) {
       console.error("Video remove failed", error);
     }
+
+    await deletePermanentMediaFiles(oldMediaFileIds);
 
     setLocalVideoURL("");
     setLocalVideoName("");
@@ -1799,13 +1881,23 @@ export default function ProjectDetailsPage() {
 
     if (!confirmed) return;
 
+    const linkedMediaFileIds = collectPermanentMediaFileIds(
+      project?.editor?.media?.storage,
+      project?.editor?.export,
+      project?.editor?.exports,
+      project?.export,
+      project?.exports,
+    );
+
     try {
       await deleteDoc(doc(db, "projects", projectId));
       await deleteMediaFromBrowser(videoStorageKey);
       await deleteMediaFromBrowser(audioStorageKey);
+      await deletePermanentMediaFiles(linkedMediaFileIds);
       router.push("/dashboard");
-    } catch (error: any) {
-      alert(error.message);
+    } catch (error) {
+      console.error("Project delete failed", error);
+      alert("Something went wrong. Please try again.");
     }
   };
 
