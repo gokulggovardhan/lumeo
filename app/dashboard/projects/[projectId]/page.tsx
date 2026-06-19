@@ -330,18 +330,34 @@ type VideoUploadResponse = {
   size: number;
 };
 
-type VideoUploadSessionResponse = {
-  success: true;
-  uploadUrl: string;
-  fileName: string;
-};
-
-type VideoUploadVerifyResponse =
+type CloudinarySignUploadResponse =
   | {
       success: true;
-      found: boolean;
-      file: VideoUploadResponse | null;
+      cloudName: string;
+      apiKey: string;
+      folder: string;
+      timestamp: number;
+      signature: string;
     }
+  | {
+      success: false;
+      error?: string;
+    };
+
+type TemporaryCloudinaryUpload = {
+  publicId: string;
+  secureUrl: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  fingerprint: string;
+};
+
+type CopyFromCloudinaryResponse =
+  | ({
+      success: true;
+      cleanupComplete: boolean;
+    } & VideoUploadResponse)
   | {
       success: false;
       error?: string;
@@ -351,23 +367,11 @@ function createVideoFingerprint(file: File, projectId: string) {
   return `${projectId}:${file.name}:${file.size}:${file.lastModified}`;
 }
 
-async function createVideoUploadSession(file: File, projectId: string) {
-  const response = await fetch("/api/google-drive/create-upload-session", {
+async function createCloudinaryUploadSignature() {
+  const response = await fetch("/api/cloudinary/sign-upload", {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      fileName: file.name,
-      mimeType: file.type,
-      size: file.size,
-      projectId,
-    }),
   });
-
-  const payload = (await response.json()) as
-    | VideoUploadSessionResponse
-    | { success: false; error?: string };
+  const payload = (await response.json()) as CloudinarySignUploadResponse;
 
   if (!response.ok || !payload.success) {
     throw new Error(
@@ -375,71 +379,38 @@ async function createVideoUploadSession(file: File, projectId: string) {
     );
   }
 
-  console.info("[Lumeo Upload] upload session created", {
-    fileName: payload.fileName,
-    projectId,
-  });
-
   return payload;
 }
 
-async function verifyUploadedVideo(
-  file: File,
-  fileName: string,
-): Promise<VideoUploadResponse | null> {
-  const response = await fetch("/api/google-drive/verify-upload", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      fileName,
-      mimeType: file.type,
-      size: file.size,
-    }),
-  });
-
-  const payload = (await response.json()) as VideoUploadVerifyResponse;
-
-  if (!response.ok || !payload.success) {
-    return null;
-  }
-
-  return payload.file;
-}
-
-async function deleteUploadedVideo(fileId: string) {
-  if (!fileId) return;
-
-  console.info("[Lumeo Upload] cleanup delete called", { fileId });
-
-  await fetch("/api/google-drive/delete", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ fileId }),
-  });
-}
-
-async function uploadVideoDirectly(
+async function uploadVideoToTemporaryCloudinary(
   file: File,
   projectId: string,
+  fingerprint: string,
   onProgress: (progress: number) => void,
   onRequest?: (request: XMLHttpRequest) => boolean | void
 ) {
-  const session = await createVideoUploadSession(file, projectId);
+  const signature = await createCloudinaryUploadSignature();
 
-  return new Promise<VideoUploadResponse>((resolve, reject) => {
+  return new Promise<TemporaryCloudinaryUpload>((resolve, reject) => {
     const request = new XMLHttpRequest();
+    const formData = new FormData();
 
-    request.open("PUT", session.uploadUrl);
-    request.setRequestHeader("Content-Type", file.type);
+    formData.append("file", file);
+    formData.append("api_key", signature.apiKey);
+    formData.append("timestamp", String(signature.timestamp));
+    formData.append("signature", signature.signature);
+    formData.append("folder", signature.folder);
 
-    console.info("[Lumeo Upload] direct upload started", {
+    request.open(
+      "POST",
+      `https://api.cloudinary.com/v1_1/${signature.cloudName}/video/upload`,
+    );
+
+    console.info("[Lumeo Upload] Cloudinary upload started", {
       fileName: file.name,
       size: file.size,
       mimeType: file.type,
+      projectId,
     });
 
     request.upload.onprogress = (event) => {
@@ -450,92 +421,67 @@ async function uploadVideoDirectly(
         Math.round((event.loaded / event.total) * 100),
       );
 
-      console.info("[Lumeo Upload] direct upload progress", { progress });
+      console.info("[Lumeo Upload] Cloudinary upload progress", { progress });
       onProgress(progress);
     };
 
-    request.onload = async () => {
-      const successStatus = request.status === 200 || request.status === 201;
-
-      console.info("[Lumeo Upload] direct upload status code", {
+    request.onload = () => {
+      console.info("[Lumeo Upload] Cloudinary upload status code", {
         status: request.status,
       });
 
       try {
-        let response: {
-          id?: string;
-          name?: string;
+        const response = JSON.parse(request.responseText || "{}") as {
+          public_id?: string;
+          secure_url?: string;
+          bytes?: number;
           mimeType?: string;
-          size?: string;
+          resource_type?: string;
           error?: {
             message?: string;
           };
-        } = {};
+        };
 
-        try {
-          response = JSON.parse(request.responseText || "{}") as typeof response;
-        } catch (error) {
-          console.warn("[Lumeo Upload] completion JSON parse failed", error);
-        }
-
-        if (successStatus) {
-          if (response.id) {
-            console.info("[Lumeo Upload] upload success detected", {
-              fileId: response.id,
-            });
-
-            resolve({
-              fileId: response.id,
-              fileName: response.name || session.fileName,
-              mimeType: response.mimeType || file.type,
-              size: Number(response.size || file.size),
-            });
-            return;
-          }
-
-          const verifiedFile = await verifyUploadedVideo(file, session.fileName);
-
-          if (verifiedFile) {
-            console.info("[Lumeo Upload] upload success detected", {
-              fileId: verifiedFile.fileId,
-              verified: true,
-            });
-
-            resolve(verifiedFile);
-            return;
-          }
-
-          console.info("[Lumeo Upload] upload success detected", {
-            fallback: true,
-            fileName: session.fileName,
+        if (
+          request.status >= 200 &&
+          request.status < 300 &&
+          response.public_id &&
+          response.secure_url
+        ) {
+          console.info("[Lumeo Upload] Cloudinary upload completed", {
+            publicId: response.public_id,
           });
 
           resolve({
-            fileId: "",
-            fileName: response.name || session.fileName,
-            mimeType: response.mimeType || file.type,
-            size: Number(response.size || file.size),
+            publicId: response.public_id,
+            secureUrl: response.secure_url,
+            fileName: file.name,
+            mimeType: file.type,
+            size: Number(response.bytes || file.size),
+            fingerprint,
           });
           return;
         }
 
-        console.error("[Lumeo Upload] upload failed", {
+        console.error("[Lumeo Upload] Cloudinary upload failed", {
           status: request.status,
           message: response.error?.message,
         });
         reject(new Error(response.error?.message || "Upload failed"));
       } catch (error) {
-        console.error("[Lumeo Upload] upload failed", error);
+        console.error("[Lumeo Upload] Cloudinary upload failed", error);
         reject(error);
       }
     };
 
     request.onerror = () => {
-      console.error("[Lumeo Upload] upload failed", { status: request.status });
+      console.error("[Lumeo Upload] Cloudinary upload failed", {
+        status: request.status,
+      });
       reject(new Error("Upload failed"));
     };
     request.onabort = () => {
-      console.info("[Lumeo Upload] upload canceled");
+      console.info("[Lumeo Upload] Cloudinary upload canceled");
       reject(new Error("Upload cancelled"));
     };
     const shouldUpload = onRequest?.(request);
@@ -545,8 +491,52 @@ async function uploadVideoDirectly(
       return;
     }
 
-    request.send(file);
+    request.send(formData);
   });
+}
+
+async function copyCloudinaryVideoToPermanentStorage(
+  temporaryUpload: TemporaryCloudinaryUpload,
+  projectId: string,
+  signal?: AbortSignal,
+) {
+  console.info("[Lumeo Upload] copy to permanent storage started", {
+    publicId: temporaryUpload.publicId,
+    fileName: temporaryUpload.fileName,
+    size: temporaryUpload.size,
+  });
+
+  const response = await fetch("/api/google-drive/copy-from-cloudinary", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    signal,
+    body: JSON.stringify({
+      publicId: temporaryUpload.publicId,
+      secureUrl: temporaryUpload.secureUrl,
+      fileName: temporaryUpload.fileName,
+      mimeType: temporaryUpload.mimeType,
+      size: temporaryUpload.size,
+      projectId,
+    }),
+  });
+
+  const payload = (await response.json()) as CopyFromCloudinaryResponse;
+
+  if (!response.ok || !payload.success) {
+    throw new Error(
+      "error" in payload && payload.error ? payload.error : "Upload failed",
+    );
+  }
+
+  console.info("[Lumeo Upload] copy to permanent storage completed", {
+    fileName: payload.fileName,
+    size: payload.size,
+    cleanupComplete: payload.cleanupComplete,
+  });
+
+  return payload;
 }
 
 export default function ProjectDetailsPage() {
@@ -558,6 +548,7 @@ export default function ProjectDetailsPage() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
   const videoUploadRequestRef = useRef<XMLHttpRequest | null>(null);
+  const videoUploadCopyAbortRef = useRef<AbortController | null>(null);
   const videoUploadCancelledRef = useRef(false);
   const videoUploadInProgressRef = useRef(false);
   const videoUploadRunIdRef = useRef(0);
@@ -585,6 +576,8 @@ export default function ProjectDetailsPage() {
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [videoUploadStatus, setVideoUploadStatus] = useState("");
   const [videoStorageMetadata, setVideoStorageMetadata] = useState<any>(null);
+  const [pendingCloudinaryUpload, setPendingCloudinaryUpload] =
+    useState<TemporaryCloudinaryUpload | null>(null);
 
   const [localAudioURL, setLocalAudioURL] = useState("");
   const [localAudioName, setLocalAudioName] = useState("");
@@ -876,6 +869,8 @@ export default function ProjectDetailsPage() {
       videoUploadRunIdRef.current += 1;
       videoUploadRequestRef.current?.abort();
       videoUploadRequestRef.current = null;
+      videoUploadCopyAbortRef.current?.abort();
+      videoUploadCopyAbortRef.current = null;
       videoUploadCancelledRef.current = true;
       videoUploadInProgressRef.current = false;
     };
@@ -1127,12 +1122,15 @@ export default function ProjectDetailsPage() {
     videoUploadRunIdRef.current += 1;
     videoUploadRequestRef.current?.abort();
     videoUploadRequestRef.current = null;
+    videoUploadCopyAbortRef.current?.abort();
+    videoUploadCopyAbortRef.current = null;
     videoUploadCancelledRef.current = false;
     videoUploadInProgressRef.current = false;
     setVideoUploading(false);
     setVideoUploadProgress(0);
     setVideoUploadStatus("");
     setVideoStorageMetadata(null);
+    setPendingCloudinaryUpload(null);
   };
 
   const handleCancelVideoUpload = () => {
@@ -1140,6 +1138,8 @@ export default function ProjectDetailsPage() {
     videoUploadCancelledRef.current = true;
     videoUploadRequestRef.current?.abort();
     videoUploadRequestRef.current = null;
+    videoUploadCopyAbortRef.current?.abort();
+    videoUploadCopyAbortRef.current = null;
     videoUploadInProgressRef.current = false;
     setVideoUploading(false);
     setVideoUploadProgress(0);
@@ -1154,7 +1154,7 @@ export default function ProjectDetailsPage() {
 
     videoUploadRunIdRef.current += 1;
     const runId = videoUploadRunIdRef.current;
-    let createdFileId = "";
+    let temporaryUpload = pendingCloudinaryUpload;
 
     try {
       videoUploadCancelledRef.current = false;
@@ -1178,25 +1178,35 @@ export default function ProjectDetailsPage() {
         return;
       }
 
-      const uploaded = await uploadVideoDirectly(
-        file,
-        projectId,
-        (progress) => {
-          if (runId !== videoUploadRunIdRef.current) return;
-          setVideoUploadProgress(progress);
-        },
-        (request) => {
-          if (
-            videoUploadCancelledRef.current ||
-            runId !== videoUploadRunIdRef.current
-          ) {
-            return false;
-          }
+      if (!temporaryUpload || temporaryUpload.fingerprint !== fingerprint) {
+        temporaryUpload = await uploadVideoToTemporaryCloudinary(
+          file,
+          projectId,
+          fingerprint,
+          (progress) => {
+            if (runId !== videoUploadRunIdRef.current) return;
+            setVideoUploadProgress(progress);
+          },
+          (request) => {
+            if (
+              videoUploadCancelledRef.current ||
+              runId !== videoUploadRunIdRef.current
+            ) {
+              return false;
+            }
 
-          videoUploadRequestRef.current = request;
-          return true;
-        }
-      );
+            videoUploadRequestRef.current = request;
+            return true;
+          }
+        );
+
+        setPendingCloudinaryUpload(temporaryUpload);
+      } else {
+        console.info("[Lumeo Upload] retrying permanent copy from temporary media", {
+          publicId: temporaryUpload.publicId,
+        });
+        setVideoUploadProgress((progress) => Math.max(progress, 90));
+      }
 
       if (
         videoUploadCancelledRef.current ||
@@ -1205,7 +1215,15 @@ export default function ProjectDetailsPage() {
         throw new Error("Upload cancelled");
       }
 
-      createdFileId = uploaded.fileId;
+      const copyAbortController = new AbortController();
+      videoUploadCopyAbortRef.current = copyAbortController;
+      setVideoUploadProgress((progress) => Math.max(progress, 95));
+
+      const uploaded = await copyCloudinaryVideoToPermanentStorage(
+        temporaryUpload,
+        projectId,
+        copyAbortController.signal,
+      );
 
       const storage = {
         provider: "google_drive",
@@ -1220,8 +1238,10 @@ export default function ProjectDetailsPage() {
       if (runId !== videoUploadRunIdRef.current) return;
 
       setVideoStorageMetadata(storage);
+      setPendingCloudinaryUpload(null);
       setVideoUploadProgress(100);
       setVideoUploadStatus("Media saved");
+      console.info("[Lumeo Upload] final UI state", { status: "Media saved" });
 
       await updateDoc(doc(db, "projects", projectId), {
         "editor.media.storage": storage,
@@ -1241,19 +1261,15 @@ export default function ProjectDetailsPage() {
         return;
       }
 
-      if (createdFileId) {
-        try {
-          await deleteUploadedVideo(createdFileId);
-        } catch (cleanupError) {
-          console.error("[Lumeo Upload] cleanup delete failed", cleanupError);
-        }
-      }
-
       setVideoUploadProgress(0);
       setVideoUploadStatus("Upload failed. Please try again.");
+      console.info("[Lumeo Upload] final UI state", {
+        status: "Upload failed. Please try again.",
+      });
     } finally {
       if (runId === videoUploadRunIdRef.current) {
         videoUploadRequestRef.current = null;
+        videoUploadCopyAbortRef.current = null;
         videoUploadCancelledRef.current = false;
         videoUploadInProgressRef.current = false;
         setVideoUploading(false);
