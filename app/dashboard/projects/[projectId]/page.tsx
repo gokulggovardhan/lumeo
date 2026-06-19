@@ -665,7 +665,7 @@ export default function ProjectDetailsPage() {
   const [trimEnd, setTrimEnd] = useState(0);
 
   const [canvasFormat, setCanvasFormat] = useState<CanvasFormat>("9:16");
-  const [fitMode, setFitMode] = useState<FitMode>("contain");
+  const [fitMode, setFitMode] = useState<FitMode>("cover");
   const [backgroundStyle, setBackgroundStyle] =
     useState<BackgroundStyle>("blur");
 
@@ -816,7 +816,11 @@ export default function ProjectDetailsPage() {
             );
 
             const savedFitMode = editor.canvas?.fitMode;
-            setFitMode(savedFitMode === "cover" ? "cover" : "contain");
+            setFitMode(
+              savedFitMode === "contain"
+                ? "contain"
+                : "cover"
+            );
 
             const savedBackground = editor.canvas?.backgroundStyle;
             setBackgroundStyle(
@@ -1640,6 +1644,7 @@ export default function ProjectDetailsPage() {
             trimStart: exportStart,
             trimEnd: exportEnd || undefined,
             canvasFormat,
+            fitMode,
             resolution: phaseOneExportResolution,
           },
         }),
@@ -2014,7 +2019,7 @@ export default function ProjectDetailsPage() {
     setTrimStart(0);
     setTrimEnd(videoDuration || 0);
     setCanvasFormat("9:16");
-    setFitMode("contain");
+    setFitMode("cover");
     setBackgroundStyle("blur");
     setVideoZoom(100);
     setVideoX(0);
@@ -2228,18 +2233,23 @@ export default function ProjectDetailsPage() {
 
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <OptionButton
-                  active={fitMode === "contain"}
-                  onClick={() => setFitMode("contain")}
-                >
-                  Fit
-                </OptionButton>
-
-                <OptionButton
                   active={fitMode === "cover"}
                   onClick={() => setFitMode("cover")}
                 >
-                  Fill
+                  Full Frame
                 </OptionButton>
+
+                <OptionButton
+                  active={fitMode === "contain"}
+                  onClick={() => setFitMode("contain")}
+                >
+                  Original View
+                </OptionButton>
+              </div>
+
+              <div className="mt-3 grid gap-2 text-xs font-bold leading-5 text-white/42">
+                <p>Full Frame: Best for social posts. Fills the canvas.</p>
+                <p>Original View: Keeps the full clip visible.</p>
               </div>
             </div>
 
@@ -3065,17 +3075,6 @@ export default function ProjectDetailsPage() {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => setFitMode("contain")}
-                    className={`rounded-full px-4 py-2 text-xs font-black transition ${
-                      fitMode === "contain"
-                        ? "bg-white text-black"
-                        : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
-                    }`}
-                  >
-                    Fit
-                  </button>
-
-                  <button
                     onClick={() => setFitMode("cover")}
                     className={`rounded-full px-4 py-2 text-xs font-black transition ${
                       fitMode === "cover"
@@ -3083,7 +3082,18 @@ export default function ProjectDetailsPage() {
                         : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
                     }`}
                   >
-                    Fill
+                    Full Frame
+                  </button>
+
+                  <button
+                    onClick={() => setFitMode("contain")}
+                    className={`rounded-full px-4 py-2 text-xs font-black transition ${
+                      fitMode === "contain"
+                        ? "bg-white text-black"
+                        : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
+                    }`}
+                  >
+                    Original View
                   </button>
                 </div>
               </div>

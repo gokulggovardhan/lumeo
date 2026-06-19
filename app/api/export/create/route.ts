@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  createPhaseOneCloudinaryExportUrl,
   deleteTemporaryCloudinaryVideo,
   uploadTemporaryCloudinaryVideoBuffer,
 } from "@/lib/cloudinaryServer";
@@ -17,6 +16,7 @@ export const maxDuration = 300;
 
 type CanvasFormat = "9:16" | "1:1" | "16:9";
 type ExportResolution = "720p" | "1080p";
+type FitMode = "contain" | "cover";
 
 type ExportRequestBody = {
   projectId?: string;
@@ -24,6 +24,7 @@ type ExportRequestBody = {
     trimStart?: number;
     trimEnd?: number;
     canvasFormat?: CanvasFormat;
+    fitMode?: FitMode;
     resolution?: ExportResolution | "2k";
   };
 };
@@ -46,6 +47,7 @@ type ProjectData = {
     };
     canvas?: {
       format?: CanvasFormat;
+      fitMode?: FitMode;
     };
     exportSettings?: {
       resolution?: ExportResolution | "2k";
@@ -114,11 +116,12 @@ export async function POST(request: NextRequest) {
       bytes: temporarySource.bytes,
     });
 
-    const transformedUrl = createPhaseOneCloudinaryExportUrl(temporaryPublicId, {
+    const transformedUrl = createPhaseOneExportUrl(temporaryPublicId, {
       trimStart: settings.trimStart,
       trimEnd: settings.trimEnd,
       width: dimensions.width,
       height: dimensions.height,
+      fitMode: settings.fitMode,
     });
 
     console.info("[Lumeo Export] transformed MP4 fetch started", { projectId });
@@ -185,6 +188,7 @@ export async function POST(request: NextRequest) {
           trimStart: settings.trimStart,
           trimEnd: settings.trimEnd,
           canvasFormat: settings.canvasFormat,
+          fitMode: settings.fitMode,
           resolution: settings.resolution,
           outputWidth: dimensions.width,
           outputHeight: dimensions.height,
@@ -252,6 +256,9 @@ function resolveExportSettings(
   const canvasFormat = normalizeCanvasFormat(
     bodySettings?.canvasFormat || project.editor?.canvas?.format,
   );
+  const fitMode = normalizeFitMode(
+    bodySettings?.fitMode || project.editor?.canvas?.fitMode,
+  );
   const resolution = normalizeResolution(
     bodySettings?.resolution || project.editor?.exportSettings?.resolution,
   );
@@ -263,6 +270,7 @@ function resolveExportSettings(
         ? trimEnd
         : project.editor?.media?.videoDuration || undefined,
     canvasFormat,
+    fitMode,
     resolution,
   };
 }
@@ -292,8 +300,59 @@ function normalizeCanvasFormat(value: unknown): CanvasFormat {
   return value === "1:1" || value === "16:9" ? value : "9:16";
 }
 
+function normalizeFitMode(value: unknown): FitMode {
+  return value === "contain" ? "contain" : "cover";
+}
+
 function normalizeResolution(value: unknown): ExportResolution {
   return "720p";
+}
+
+function createPhaseOneExportUrl(
+  publicId: string,
+  options: {
+    trimStart?: number;
+    trimEnd?: number;
+    width: number;
+    height: number;
+    fitMode: FitMode;
+  },
+) {
+  const cloudName =
+    process.env.CLOUDINARY_CLOUD_NAME ||
+    process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
+
+  if (!cloudName) {
+    throw new Error("Missing export media environment.");
+  }
+
+  const transformations: string[] = [];
+
+  if (Number.isFinite(options.trimStart) && Number(options.trimStart) > 0) {
+    transformations.push(`so_${Number(options.trimStart)}`);
+  }
+
+  if (
+    Number.isFinite(options.trimEnd) &&
+    Number(options.trimEnd) > 0 &&
+    Number(options.trimEnd) > Number(options.trimStart || 0)
+  ) {
+    transformations.push(`eo_${Number(options.trimEnd)}`);
+  }
+
+  transformations.push(
+    [
+      options.fitMode === "cover" ? "c_fill" : "c_pad",
+      "b_black",
+      `w_${options.width}`,
+      `h_${options.height}`,
+    ].join(","),
+  );
+  transformations.push("vc_h264,ac_aac,q_auto:good");
+
+  return `https://res.cloudinary.com/${encodeURIComponent(
+    cloudName,
+  )}/video/upload/${transformations.join("/")}/${publicId}.mp4`;
 }
 
 function toSafeNumber(value: unknown, fallback: number) {
