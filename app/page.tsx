@@ -1,54 +1,89 @@
 import Link from "next/link";
 import AuthButton from "@/components/AuthButton";
 
-const features = [
+const controls = [
   {
-    title: "Short Video Editor",
+    title: "Trim",
     description:
-      "Create polished short videos for Reels, Shorts, social posts, product clips, and creator content.",
+      "Set precise in and out points on a real timeline, with a frame-accurate preview of exactly what you'll export.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <circle cx="6" cy="6" r="2.4" />
+        <circle cx="6" cy="18" r="2.4" />
+        <path d="M8.4 7.2L19 17M19 7L8.4 16.8" />
+      </svg>
+    ),
   },
   {
-    title: "9:16 Preview",
+    title: "Frame",
     description:
-      "Work with a vertical preview designed for mobile-first videos and short-form platforms.",
+      "Switch between 9:16, 1:1, and 16:9 instantly. Fit or fill the frame without ever leaving the canvas.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <rect x="5" y="2.5" width="14" height="19" rx="2" />
+        <path d="M9 2.5v19M15 2.5v19" />
+      </svg>
+    ),
   },
   {
-    title: "Trim Controls",
+    title: "Title",
     description:
-      "Set clean start and end points for short videos, highlights, and cinematic clips.",
+      "Drop in hooks, captions, and labels with full control over position, size, color, and weight.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M5 5h14M12 5v14" strokeLinecap="round" />
+      </svg>
+    ),
   },
   {
-    title: "Text Overlay",
+    title: "Mix",
     description:
-      "Add bold titles, hooks, captions, labels, and visual text elements directly on your video.",
+      "Balance your original audio against a music bed with two independent volume controls.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M4 14V9.5l11-3v9" />
+        <circle cx="4.5" cy="15.5" r="2.2" />
+        <circle cx="14.5" cy="15.5" r="2.2" />
+      </svg>
+    ),
   },
   {
-    title: "Music Workspace",
+    title: "Grade",
     description:
-      "Attach local music or audio to shape the mood and rhythm of your short video edits.",
+      "Brightness, contrast, saturation, and grain — six presets to start, full manual control to finish.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M12 3l2.2 5.4L20 10l-4.6 3.6L17 19l-5-3.2L7 19l1.6-5.4L4 10l5.8-1.6L12 3z" strokeLinejoin="round" />
+      </svg>
+    ),
   },
   {
-    title: "Visual Effects",
+    title: "Move",
     description:
-      "Adjust brightness, contrast, grayscale, blur, and visual tone for a cleaner edit.",
+      "Speed ramp from quarter speed to double time, rotate, flip, and reposition the frame.",
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+        <path d="M5 12h11M12 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    ),
   },
 ];
 
 const workflow = [
   {
-    title: "Import your clip",
+    title: "Drop in a clip",
     description:
-      "Start with a local video from your device and open it inside the Lumeo editor.",
+      "Pull a video straight from your device. No account setup, no project wizard — the canvas is ready the moment the file lands.",
   },
   {
-    title: "Shape the edit",
+    title: "Cut it down",
     description:
-      "Trim the video, add text, tune the look, and prepare the short-form composition.",
+      "Trim on the timeline, frame the shot, add a title, and balance the audio — all in the same view, all reflected live.",
   },
   {
-    title: "Prepare for posting",
+    title: "Send it out",
     description:
-      "Build clean short videos for mobile platforms with a focused editing workspace.",
+      "Lock the format and resolution you need, and walk away with a file built for the platform it's going to.",
   },
 ];
 
@@ -63,31 +98,22 @@ const useCases = [
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#05030a] text-white">
-      <section className="relative px-5 py-6 sm:px-8 lg:px-12">
-        <div className="absolute left-1/2 top-[-140px] h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-purple-700/30 blur-[140px]" />
-        <div className="absolute right-[-160px] top-72 h-[420px] w-[420px] rounded-full bg-amber-400/20 blur-[130px]" />
-        <div className="absolute bottom-0 left-[-180px] h-[420px] w-[420px] rounded-full bg-fuchsia-600/20 blur-[140px]" />
-
-        <nav className="relative z-10 mx-auto flex max-w-7xl items-center justify-between rounded-[1.75rem] border border-white/10 bg-white/[0.06] px-4 py-4 shadow-2xl shadow-black/20 backdrop-blur-2xl sm:px-5">
+    <main className="min-h-screen bg-[#0B0C0F] text-white">
+      {/* ---------------------------------------------------------------- */}
+      {/* NAV                                                               */}
+      {/* ---------------------------------------------------------------- */}
+      <nav className="relative z-50 border-b border-white/10 bg-[#0B0C0F]/90 px-5 py-3.5 backdrop-blur-xl sm:px-8 lg:px-12">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-400 via-fuchsia-400 to-amber-300 font-black text-black shadow-lg shadow-purple-500/20">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#FF5A36] text-sm font-bold text-white">
               L
             </div>
-
-            <div>
-              <p className="text-lg font-black leading-none tracking-tight">
-                Lumeo
-              </p>
-              <p className="mt-1 hidden text-xs text-white/45 sm:block">
-                Short video studio
-              </p>
-            </div>
+            <span className="text-base font-bold tracking-tight">Lumeo</span>
           </Link>
 
-          <div className="hidden items-center gap-7 text-sm font-semibold text-white/60 md:flex">
-            <a href="#features" className="transition hover:text-white">
-              Features
+          <div className="hidden items-center gap-8 text-sm font-semibold text-white/55 md:flex">
+            <a href="#controls" className="transition hover:text-white">
+              Controls
             </a>
             <a href="#workflow" className="transition hover:text-white">
               Workflow
@@ -95,223 +121,193 @@ export default function Home() {
             <a href="#use-cases" className="transition hover:text-white">
               Use cases
             </a>
-            <a href="#studio" className="transition hover:text-white">
-              Studio
-            </a>
           </div>
 
           <AuthButton />
-        </nav>
+        </div>
+      </nav>
 
-        <div className="relative z-10 mx-auto grid max-w-7xl gap-14 pb-20 pt-20 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:pt-24">
+      {/* ---------------------------------------------------------------- */}
+      {/* HERO — countdown leader settles into the real product frame      */}
+      {/* ---------------------------------------------------------------- */}
+      <section className="relative overflow-hidden px-5 pb-20 pt-16 sm:px-8 sm:pt-20 lg:px-12 lg:pt-24">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[480px] bg-[radial-gradient(circle_at_50%_0%,rgba(255,90,54,0.08),transparent_60%)]" />
+
+        <div className="relative z-10 mx-auto grid max-w-7xl gap-16 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
           <div>
-            <div className="mb-6 inline-flex rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-sm font-semibold text-white/75 backdrop-blur-xl">
-              Premium short video editing workspace
+            <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3.5 py-1.5 text-xs font-bold text-white/50">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#FF5A36]" />
+              Built for vertical, square, and widescreen
             </div>
 
-            <h1 className="max-w-5xl text-5xl font-black leading-[1.02] tracking-tight sm:text-6xl lg:text-7xl">
-              Create short videos that{" "}
-              <span className="bg-gradient-to-r from-purple-300 via-white to-amber-200 bg-clip-text text-transparent">
-                feel premium.
-              </span>
+            <h1 className="max-w-xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-[4.25rem]">
+              Cut your next short
+              <br />
+              <span className="text-[#FF8A6B]">right in the browser.</span>
             </h1>
 
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-white/62">
-              Lumeo is a browser-based editing studio for short-form videos,
-              vertical edits, creator clips, social content, and cinematic
-              videos up to 3 minutes.
+            <p className="mt-6 max-w-lg text-lg leading-7 text-white/55">
+              Lumeo is a focused editor for short-form video — trim, frame,
+              title, and grade a clip without installing anything or learning
+              a timeline built for feature films.
             </p>
 
-            <div className="mt-9 flex flex-col gap-4 sm:flex-row">
+            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
                 href="/dashboard"
-                className="rounded-full bg-gradient-to-r from-purple-400 via-fuchsia-300 to-amber-300 px-7 py-4 text-center font-black text-black shadow-xl shadow-purple-500/20 transition hover:scale-[1.02]"
+                className="rounded-full bg-[#FF5A36] px-7 py-3.5 text-center text-sm font-bold text-white transition hover:bg-[#E6491F]"
               >
-                Open Studio
+                Open the editor
               </Link>
-
               <a
-                href="#features"
-                className="rounded-full border border-white/15 bg-white/[0.06] px-7 py-4 text-center font-black text-white transition hover:bg-white/10"
+                href="#controls"
+                className="rounded-full border border-white/12 px-7 py-3.5 text-center text-sm font-bold text-white/70 transition hover:border-white/25 hover:text-white"
               >
-                Explore Features
+                See what it can do
               </a>
             </div>
 
-            <div className="mt-12 grid max-w-2xl grid-cols-1 gap-4 sm:grid-cols-3">
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.055] p-5 backdrop-blur-xl">
-                <p className="text-3xl font-black">9:16</p>
-                <p className="mt-1 text-sm leading-6 text-white/50">
-                  Vertical preview
+            <div className="mt-12 flex items-center gap-8 border-t border-white/10 pt-7">
+              <div>
+                <p className="text-2xl font-bold tabular-nums">3 min</p>
+                <p className="mt-0.5 text-xs font-semibold text-white/40">
+                  Max clip length
                 </p>
               </div>
-
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.055] p-5 backdrop-blur-xl">
-                <p className="text-3xl font-black">3 min</p>
-                <p className="mt-1 text-sm leading-6 text-white/50">
-                  Short edit focus
+              <div className="h-8 w-px bg-white/10" />
+              <div>
+                <p className="text-2xl font-bold tabular-nums">0</p>
+                <p className="mt-0.5 text-xs font-semibold text-white/40">
+                  Installs required
                 </p>
               </div>
-
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.055] p-5 backdrop-blur-xl">
-                <p className="text-3xl font-black">Web</p>
-                <p className="mt-1 text-sm leading-6 text-white/50">
-                  Browser first
+              <div className="h-8 w-px bg-white/10" />
+              <div>
+                <p className="text-2xl font-bold tabular-nums">3</p>
+                <p className="mt-0.5 text-xs font-semibold text-white/40">
+                  Frame ratios
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="relative">
-            <div className="absolute -inset-6 rounded-[3rem] bg-gradient-to-br from-purple-500/25 via-transparent to-amber-300/20 blur-2xl" />
+          {/* signature: a real 9:16 frame with sprocket trim bar + tally light,
+              matching the editor's actual canvas instead of a fake mockup */}
+          <div className="relative mx-auto w-full max-w-[340px]">
+            <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#101115] shadow-2xl shadow-black/40">
+              <div className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#FF5A36]" />
+                  <span className="text-[10px] font-bold tracking-wide text-white/50">
+                    9:16
+                  </span>
+                </div>
+                <span className="text-[10px] font-semibold tabular-nums text-white/30">
+                  00:18 / 00:24
+                </span>
+              </div>
 
-            <div className="relative rounded-[2.25rem] border border-white/10 bg-white/[0.065] p-4 shadow-2xl shadow-black/30 backdrop-blur-2xl">
-              <div className="rounded-[1.75rem] border border-white/10 bg-[#0d0a16] p-5">
-                <div className="mb-5 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-white/45">Lumeo Editor</p>
-                    <h2 className="text-xl font-black">Shorts Workspace</h2>
-                  </div>
-
-                  <div className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-sm font-semibold text-emerald-300">
-                    Ready
-                  </div>
+              <div className="relative aspect-[9/16] w-full overflow-hidden bg-gradient-to-br from-[#1C1D22] via-[#15161B] to-[#0B0C0F]">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="font-[Space_Grotesk,sans-serif] text-7xl font-bold text-white/[0.06]">
+                    8
+                  </span>
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-[0.65fr_1fr]">
-                  <div className="space-y-3">
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-                      <div className="mb-3 h-3 w-24 rounded-full bg-white/20" />
-                      <div className="h-10 rounded-xl bg-white/10" />
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-                      <div className="mb-3 h-3 w-20 rounded-full bg-white/20" />
-                      <div className="h-2 rounded-full bg-cyan-300/70" />
-                      <div className="mt-4 h-2 w-3/4 rounded-full bg-purple-300/60" />
-                    </div>
-
-                    <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-4">
-                      <div className="mb-3 h-3 w-28 rounded-full bg-white/20" />
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="h-12 rounded-xl bg-purple-300/20" />
-                        <div className="h-12 rounded-xl bg-amber-300/20" />
-                        <div className="h-12 rounded-xl bg-white/10" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex justify-center">
-                    <div className="relative aspect-[9/16] w-full max-w-[250px] overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-2xl">
-                      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/25 via-black to-amber-300/20" />
-
-                      <div className="absolute left-1/2 top-[42%] w-[78%] -translate-x-1/2 text-center">
-                        <p className="text-2xl font-black leading-tight">
-                          Your short video
-                        </p>
-                        <p className="mt-3 text-xs leading-5 text-white/50">
-                          9:16 preview, text overlays, music, trim, and clean
-                          effects.
-                        </p>
-                      </div>
-
-                      <div className="absolute bottom-5 left-5 right-5 rounded-2xl border border-white/10 bg-white/10 p-3 backdrop-blur-xl">
-                        <div className="h-2 rounded-full bg-white/20">
-                          <div className="h-2 w-2/3 rounded-full bg-gradient-to-r from-purple-300 to-amber-200" />
-                        </div>
-                        <div className="mt-3 grid grid-cols-4 gap-2">
-                          <div className="h-8 rounded-lg bg-white/10" />
-                          <div className="h-8 rounded-lg bg-white/10" />
-                          <div className="h-8 rounded-lg bg-white/10" />
-                          <div className="h-8 rounded-lg bg-white/10" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                <div className="absolute left-1/2 top-[58%] w-[80%] -translate-x-1/2 -translate-y-1/2 text-center">
+                  <p className="text-lg font-bold leading-snug text-white/90">
+                    your title, exactly
+                    <br />
+                    where you put it
+                  </p>
                 </div>
+              </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-3">
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-center text-sm text-white/60">
-                    Trim
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-center text-sm text-white/60">
-                    Text
-                  </div>
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.06] p-3 text-center text-sm text-white/60">
-                    Effects
-                  </div>
+              {/* sprocket-edge trim bar — same component language as the editor */}
+              <div className="border-t border-white/10 bg-[#0B0C0F] px-4 py-3.5">
+                <div
+                  className="relative h-7 overflow-hidden rounded-md border border-white/10 bg-[#161620]"
+                  style={{
+                    backgroundImage:
+                      "radial-gradient(circle, rgba(255,255,255,0.18) 1.2px, transparent 1.4px)",
+                    backgroundSize: "12px 100%",
+                    backgroundPosition: "0 2.5px, 0 calc(100% - 2.5px)",
+                    backgroundRepeat: "repeat-x",
+                  }}
+                >
+                  <div className="absolute inset-y-0 left-[18%] right-[22%] bg-gradient-to-r from-[#FF5A36]/35 to-[#FF5A36]/15" />
+                  <div className="absolute inset-y-0 left-0 w-[18%] bg-[#0B0C0F]/75" />
+                  <div className="absolute inset-y-0 right-0 w-[22%] bg-[#0B0C0F]/75" />
+                  <div className="absolute left-[18%] top-0 h-full w-[3px] -translate-x-1/2 rounded-full bg-[#FF5A36] shadow-[0_0_0_3px_rgba(255,90,54,0.25)]" />
+                  <div className="absolute left-[78%] top-0 h-full w-[3px] -translate-x-1/2 rounded-full bg-[#FF5A36] shadow-[0_0_0_3px_rgba(255,90,54,0.25)]" />
                 </div>
               </div>
             </div>
+
+            <p className="mt-4 text-center text-xs font-medium text-white/30">
+              This is the actual editor canvas — not a mockup.
+            </p>
           </div>
         </div>
       </section>
 
-      <section
-        id="features"
-        className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12"
-      >
-        <div className="mb-12 max-w-3xl">
-          <p className="mb-3 text-sm font-black uppercase tracking-[0.35em] text-purple-300">
-            Features
+      {/* ---------------------------------------------------------------- */}
+      {/* CONTROLS — what the editor actually does, six real tools          */}
+      {/* ---------------------------------------------------------------- */}
+      <section id="controls" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
+        <div className="mb-12 max-w-xl">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#FF8A6B]">
+            Controls
           </p>
-
-          <h2 className="text-4xl font-black tracking-tight sm:text-5xl">
-            Built for short-form creators.
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Six tools. Nothing you'll have to look up.
           </h2>
-
-          <p className="mt-5 text-lg leading-8 text-white/55">
-            A focused editor for mobile-first videos, quick creative edits, and
-            polished social content.
+          <p className="mt-4 text-base leading-7 text-white/50">
+            Every control sits in plain view on the same screen as your
+            clip — there's no panel to discover and no setting buried three
+            menus deep.
           </p>
         </div>
 
-        <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-          {features.map((feature) => (
+        <div className="grid gap-px overflow-hidden rounded-2xl border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-3">
+          {controls.map((control) => (
             <div
-              key={feature.title}
-              className="group rounded-[2rem] border border-white/10 bg-white/[0.045] p-7 shadow-xl shadow-black/10 transition hover:-translate-y-1 hover:bg-white/[0.075]"
+              key={control.title}
+              className="group bg-[#0B0C0F] p-7 transition hover:bg-[#15161B]"
             >
-              <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-400/30 to-amber-300/20 ring-1 ring-white/10">
-                <div className="h-3 w-3 rounded-full bg-white transition group-hover:scale-125" />
-              </div>
+              <span className="flex h-9 w-9 items-center justify-center text-[#FF8A6B]">
+                <span className="block h-[20px] w-[20px]">{control.icon}</span>
+              </span>
 
-              <h3 className="text-2xl font-black">{feature.title}</h3>
-
-              <p className="mt-4 leading-7 text-white/58">
-                {feature.description}
+              <h3 className="mt-5 text-lg font-bold">{control.title}</h3>
+              <p className="mt-2.5 text-sm leading-6 text-white/50">
+                {control.description}
               </p>
             </div>
           ))}
         </div>
       </section>
 
-      <section
-        id="workflow"
-        className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12"
-      >
-        <div className="rounded-[2.5rem] border border-white/10 bg-white/[0.045] p-7 shadow-2xl shadow-black/20 sm:p-10 lg:p-12">
-          <p className="mb-3 text-sm font-black uppercase tracking-[0.35em] text-amber-200">
+      {/* ---------------------------------------------------------------- */}
+      {/* WORKFLOW — a real three-step sequence, numbering earns its keep   */}
+      {/* ---------------------------------------------------------------- */}
+      <section id="workflow" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
+        <div className="rounded-2xl border border-white/10 bg-[#101115] p-8 sm:p-12 lg:p-14">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#FF8A6B]">
             Workflow
           </p>
-
-          <h2 className="max-w-3xl text-4xl font-black tracking-tight sm:text-5xl">
-            From raw clip to clean short video.
+          <h2 className="max-w-xl text-3xl font-bold tracking-tight sm:text-4xl">
+            Three steps. In this order, every time.
           </h2>
 
-          <div className="mt-10 grid gap-5 md:grid-cols-3">
+          <div className="mt-10 grid gap-px overflow-hidden rounded-xl border border-white/10 bg-white/10 md:grid-cols-3">
             {workflow.map((item, index) => (
-              <div
-                key={item.title}
-                className="rounded-[2rem] border border-white/10 bg-black/25 p-7"
-              >
-                <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-2xl bg-white text-xl font-black text-black">
-                  {index + 1}
-                </div>
-
-                <h3 className="text-2xl font-black">{item.title}</h3>
-
-                <p className="mt-4 leading-7 text-white/55">
+              <div key={item.title} className="bg-[#0B0C0F] p-7">
+                <span className="font-[Space_Grotesk,sans-serif] text-sm font-bold tabular-nums text-[#FF5A36]">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <h3 className="mt-4 text-xl font-bold">{item.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-white/50">
                   {item.description}
                 </p>
               </div>
@@ -320,60 +316,55 @@ export default function Home() {
         </div>
       </section>
 
-      <section
-        id="use-cases"
-        className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12"
-      >
-        <div className="mb-12 max-w-3xl">
-          <p className="mb-3 text-sm font-black uppercase tracking-[0.35em] text-purple-300">
+      {/* ---------------------------------------------------------------- */}
+      {/* USE CASES                                                         */}
+      {/* ---------------------------------------------------------------- */}
+      <section id="use-cases" className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
+        <div className="mb-10 max-w-xl">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#FF8A6B]">
             Use cases
           </p>
-
-          <h2 className="text-4xl font-black tracking-tight sm:text-5xl">
-            Made for short videos that need to look clean.
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Made for clips that need to look clean, fast.
           </h2>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex flex-wrap gap-2.5">
           {useCases.map((useCase) => (
-            <div
+            <span
               key={useCase}
-              className="rounded-[1.75rem] border border-white/10 bg-white/[0.045] px-6 py-6 text-xl font-black transition hover:bg-white/[0.075]"
+              className="rounded-full border border-white/10 bg-[#101115] px-5 py-2.5 text-sm font-semibold text-white/65 transition hover:border-white/20 hover:text-white"
             >
               {useCase}
-            </div>
+            </span>
           ))}
         </div>
       </section>
 
-      <section
-        id="studio"
-        className="mx-auto max-w-7xl px-5 py-24 sm:px-8 lg:px-12"
-      >
-        <div className="relative overflow-hidden rounded-[3rem] border border-white/10 bg-gradient-to-br from-purple-500/20 via-white/[0.04] to-amber-300/20 p-8 text-center shadow-2xl shadow-black/25 sm:p-14 lg:p-16">
-          <div className="absolute left-1/2 top-0 h-64 w-64 -translate-x-1/2 rounded-full bg-white/10 blur-3xl" />
+      {/* ---------------------------------------------------------------- */}
+      {/* FINAL CTA — quiet, one accent, no second gradient treatment       */}
+      {/* ---------------------------------------------------------------- */}
+      <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[#101115] p-10 text-center sm:p-16">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FF5A36]/50 to-transparent" />
 
-          <div className="relative z-10">
-            <h2 className="text-4xl font-black tracking-tight sm:text-6xl">
-              Start your next short video inside Lumeo.
-            </h2>
-
-            <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-white/65">
-              Open the studio, create a project, select your video, and begin
-              shaping a clean short-form edit.
-            </p>
-
-            <Link
-              href="/dashboard"
-              className="mt-9 inline-flex rounded-full bg-white px-8 py-4 font-black text-black transition hover:bg-amber-200"
-            >
-              Open Studio
-            </Link>
-          </div>
+          <h2 className="text-3xl font-bold tracking-tight sm:text-5xl">
+            Your next clip is one upload away.
+          </h2>
+          <p className="mx-auto mt-5 max-w-md text-base leading-7 text-white/50">
+            Open the editor, drop in a video, and start cutting. No setup
+            screens between you and the timeline.
+          </p>
+          <Link
+            href="/dashboard"
+            className="mt-8 inline-flex rounded-full bg-[#FF5A36] px-8 py-3.5 text-sm font-bold text-white transition hover:bg-[#E6491F]"
+          >
+            Open the editor
+          </Link>
         </div>
       </section>
 
-      <footer className="border-t border-white/10 px-6 py-10 text-center text-sm text-white/45">
+      <footer className="border-t border-white/10 px-6 py-8 text-center text-xs font-medium text-white/30">
         © 2026 Lumeo. All rights reserved.
       </footer>
     </main>
