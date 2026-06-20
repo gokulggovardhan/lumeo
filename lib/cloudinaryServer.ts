@@ -20,6 +20,7 @@ type PhaseOneTransformOptions = {
   trimEnd?: number;
   width: number;
   height: number;
+  fitMode?: string;
 };
 
 function getCloudinaryEnv(): CloudinaryEnv {
@@ -129,6 +130,7 @@ export function createPhaseOneCloudinaryExportUrl(
 
   const transformation: Record<string, string | number>[] = [];
   const trim: Record<string, number> = {};
+  const cropMode = normalizePhaseOneFitMode(options.fitMode);
 
   if (Number.isFinite(options.trimStart) && Number(options.trimStart) > 0) {
     trim.start_offset = Number(options.trimStart);
@@ -149,7 +151,7 @@ export function createPhaseOneCloudinaryExportUrl(
   transformation.push({
     width: options.width,
     height: options.height,
-    crop: "pad",
+    crop: cropMode === "cover" ? "fill" : "pad",
     background: "black",
   });
 
@@ -165,6 +167,19 @@ export function createPhaseOneCloudinaryExportUrl(
     format: "mp4",
     transformation,
   });
+}
+
+function normalizePhaseOneFitMode(value: unknown): "contain" | "cover" {
+  if (
+    value === "contain" ||
+    value === "fit" ||
+    value === "Original View" ||
+    value === "originalView"
+  ) {
+    return "contain";
+  }
+
+  return "cover";
 }
 
 function createTemporaryPublicId(fileName: string) {

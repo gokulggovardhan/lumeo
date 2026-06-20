@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
+  createPhaseOneCloudinaryExportUrl,
   deleteTemporaryCloudinaryVideo,
   uploadTemporaryCloudinaryVideoBuffer,
 } from "@/lib/cloudinaryServer";
@@ -17,6 +18,18 @@ export const maxDuration = 300;
 type CanvasFormat = "9:16" | "1:1" | "16:9";
 type ExportResolution = "720p" | "1080p";
 type FitMode = "contain" | "cover";
+type ExportFailureStage =
+  | "projectRead"
+  | "mediaFileIdCheck"
+  | "settingsResolve"
+  | "sourceDownload"
+  | "tempRenderUpload"
+  | "transformationBuild"
+  | "transformedFetch"
+  | "permanentExportUpload"
+  | "downloadUrlCreate"
+  | "metadataSave"
+  | "tempCleanup";
 
 type ExportRequestBody = {
   projectId?: string;
@@ -57,6 +70,7 @@ type ProjectData = {
 
 export async function POST(request: NextRequest) {
   let temporaryPublicId = "";
+  let failedStage: ExportFailureStage = "projectRead";
 
   try {
     const body = (await request.json()) as ExportRequestBody;
@@ -64,37 +78,56 @@ export async function POST(request: NextRequest) {
 
     if (!projectId) {
       return NextResponse.json(
-        { success: false, error: "Missing project." },
+        {
+          success: false,
+          error: "Export failed. Please try again.",
+          failedStage: "projectRead",
+          details: getSafeFailureDetails("projectRead"),
+        },
         { status: 400 },
       );
     }
 
     console.info("[Lumeo Export] phase one export started", { projectId });
 
+    failedStage = "projectRead";
     const db = getFirebaseAdminDb();
     const projectRef = db.collection("projects").doc(projectId);
     const snapshot = await projectRef.get();
 
     if (!snapshot.exists) {
       return NextResponse.json(
-        { success: false, error: "Project was not found." },
+        {
+          success: false,
+          error: "Export failed. Please try again.",
+          failedStage: "projectRead",
+          details: getSafeFailureDetails("projectRead"),
+        },
         { status: 404 },
       );
     }
 
     const project = snapshot.data() as ProjectData;
+    failedStage = "mediaFileIdCheck";
     const sourceFileId = project.editor?.media?.storage?.fileId;
 
     if (!sourceFileId) {
       return NextResponse.json(
-        { success: false, error: "Saved media was not found." },
+        {
+          success: false,
+          error: "Export failed. Please try again.",
+          failedStage: "mediaFileIdCheck",
+          details: getSafeFailureDetails("mediaFileIdCheck"),
+        },
         { status: 400 },
       );
     }
 
+    failedStage = "settingsResolve";
     const settings = resolveExportSettings(project, body.settings);
     const dimensions = getOutputDimensions(settings.canvasFormat, settings.resolution);
 
+    failedStage = "sourceDownload";
     console.info("[Lumeo Export] source download started", { projectId });
     const source = await downloadDriveFileBuffer(sourceFileId);
     console.info("[Lumeo Export] source download completed", {
@@ -103,6 +136,7 @@ export async function POST(request: NextRequest) {
       mimeType: source.mimeType,
     });
 
+    failedStage = "tempRenderUpload";
     console.info("[Lumeo Export] temporary transform source upload started", {
       projectId,
     });
@@ -116,7 +150,8 @@ export async function POST(request: NextRequest) {
       bytes: temporarySource.bytes,
     });
 
-    const transformedUrl = createPhaseOneExportUrl(temporaryPublicId, {
+    failedStage = "transformationBuild";
+    const transformedUrl = createPhaseOneCloudinaryExportUrl(temporaryPublicId, {
       trimStart: settings.trimStart,
       trimEnd: settings.trimEnd,
       width: dimensions.width,
@@ -124,20 +159,8 @@ export async function POST(request: NextRequest) {
       fitMode: settings.fitMode,
     });
 
-    console.info("[Lumeo Export] transformed MP4 fetch started", { projectId });
-    const transformedResponse = await fetch(transformedUrl, {
-      cache: "no-store",
-    });
-
-    if (!transformedResponse.ok) {
-      console.error("[Lumeo Export] transformed MP4 fetch failed", {
-        status: transformedResponse.status,
-      });
-
-      throw new Error("Transformed MP4 fetch failed.");
-    }
-
-    const exportBytes = Buffer.from(await transformedResponse.arrayBuffer());
+    failedStage = "transformedFetch";
+    const exportBytes = await fetchTransformedExportWithRetry(transformedUrl);
     console.info("[Lumeo Export] transformed MP4 fetch completed", {
       size: exportBytes.byteLength,
     });
@@ -145,6 +168,7 @@ export async function POST(request: NextRequest) {
     const createdAt = new Date().toISOString();
     const fileName = createExportFileName(project.title, projectId);
 
+    failedStage = "permanentExportUpload";
     console.info("[Lumeo Export] permanent export upload started", {
       projectId,
       fileName,
@@ -167,14 +191,10 @@ export async function POST(request: NextRequest) {
       size: uploadedExport.size,
     });
 
-    let downloadUrl = "";
+    failedStage = "downloadUrlCreate";
+    const downloadUrl = await createDriveDownloadUrl(uploadedExport.fileId);
 
-    try {
-      downloadUrl = await createDriveDownloadUrl(uploadedExport.fileId);
-    } catch (downloadError) {
-      console.error("[Lumeo Export] download URL setup failed", downloadError);
-    }
-
+    failedStage = "metadataSave";
     await projectRef.update({
       "editor.export": {
         status: "complete",
@@ -206,6 +226,7 @@ export async function POST(request: NextRequest) {
 
     console.info("[Lumeo Export] project export metadata saved", { projectId });
 
+    failedStage = "tempCleanup";
     try {
       console.info("[Lumeo Export] temporary cleanup started", {
         publicId: temporaryPublicId,
@@ -225,7 +246,10 @@ export async function POST(request: NextRequest) {
       createdAt,
     });
   } catch (error) {
-    console.error("[Lumeo Export] phase one export failed", error);
+    console.error("[Lumeo Export] phase one export failed", {
+      failedStage,
+      error,
+    });
 
     if (temporaryPublicId) {
       try {
@@ -236,7 +260,12 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: "Export failed. Please try again." },
+      {
+        success: false,
+        error: "Export failed. Please try again.",
+        failedStage,
+        details: getSafeFailureDetails(failedStage),
+      },
       { status: 500 },
     );
   }
@@ -280,20 +309,14 @@ function getOutputDimensions(
   resolution: ExportResolution,
 ) {
   if (canvasFormat === "9:16") {
-    return resolution === "1080p"
-      ? { width: 1080, height: 1920 }
-      : { width: 720, height: 1280 };
+    return { width: 720, height: 1280 };
   }
 
   if (canvasFormat === "1:1") {
-    return resolution === "1080p"
-      ? { width: 1080, height: 1080 }
-      : { width: 720, height: 720 };
+    return { width: 720, height: 720 };
   }
 
-  return resolution === "1080p"
-    ? { width: 1920, height: 1080 }
-    : { width: 1280, height: 720 };
+  return { width: 1280, height: 720 };
 }
 
 function normalizeCanvasFormat(value: unknown): CanvasFormat {
@@ -301,64 +324,97 @@ function normalizeCanvasFormat(value: unknown): CanvasFormat {
 }
 
 function normalizeFitMode(value: unknown): FitMode {
-  return value === "contain" ? "contain" : "cover";
+  if (
+    value === "contain" ||
+    value === "fit" ||
+    value === "Original View" ||
+    value === "originalView"
+  ) {
+    return "contain";
+  }
+
+  return "cover";
 }
 
 function normalizeResolution(value: unknown): ExportResolution {
   return "720p";
 }
 
-function createPhaseOneExportUrl(
-  publicId: string,
-  options: {
-    trimStart?: number;
-    trimEnd?: number;
-    width: number;
-    height: number;
-    fitMode: FitMode;
-  },
-) {
-  const cloudName =
-    process.env.CLOUDINARY_CLOUD_NAME ||
-    process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-
-  if (!cloudName) {
-    throw new Error("Missing export media environment.");
-  }
-
-  const transformations: string[] = [];
-
-  if (Number.isFinite(options.trimStart) && Number(options.trimStart) > 0) {
-    transformations.push(`so_${Number(options.trimStart)}`);
-  }
-
-  if (
-    Number.isFinite(options.trimEnd) &&
-    Number(options.trimEnd) > 0 &&
-    Number(options.trimEnd) > Number(options.trimStart || 0)
-  ) {
-    transformations.push(`eo_${Number(options.trimEnd)}`);
-  }
-
-  transformations.push(
-    [
-      options.fitMode === "cover" ? "c_fill" : "c_pad",
-      "b_black",
-      `w_${options.width}`,
-      `h_${options.height}`,
-    ].join(","),
-  );
-  transformations.push("vc_h264,ac_aac,q_auto:good");
-
-  return `https://res.cloudinary.com/${encodeURIComponent(
-    cloudName,
-  )}/video/upload/${transformations.join("/")}/${publicId}.mp4`;
-}
-
 function toSafeNumber(value: unknown, fallback: number) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+async function fetchTransformedExportWithRetry(url: string) {
+  const retryStatuses = new Set([420, 423, 404, 429, 500, 502, 503, 504]);
+  const delays = [1000, 2000, 4000, 8000, 12000];
+  let lastStatus = 0;
+
+  for (let attempt = 0; attempt <= delays.length; attempt += 1) {
+    console.info("[Lumeo Export] transformed MP4 fetch attempt started", {
+      attempt: attempt + 1,
+    });
+
+    const response = await fetch(url, {
+      cache: "no-store",
+    });
+
+    lastStatus = response.status;
+
+    if (response.ok) {
+      return Buffer.from(await response.arrayBuffer());
+    }
+
+    console.warn("[Lumeo Export] transformed MP4 fetch attempt failed", {
+      attempt: attempt + 1,
+      status: response.status,
+      retryable: retryStatuses.has(response.status),
+    });
+
+    if (!retryStatuses.has(response.status) || attempt === delays.length) {
+      throw new Error(`Transformed export fetch failed with status ${lastStatus}.`);
+    }
+
+    await delay(delays[attempt]);
+  }
+
+  throw new Error(`Transformed export fetch failed with status ${lastStatus}.`);
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+function getSafeFailureDetails(stage: ExportFailureStage) {
+  switch (stage) {
+    case "projectRead":
+      return "Project could not be read.";
+    case "mediaFileIdCheck":
+      return "Saved media is missing.";
+    case "settingsResolve":
+      return "Export settings could not be prepared.";
+    case "sourceDownload":
+      return "Source media could not be prepared.";
+    case "tempRenderUpload":
+      return "Export preparation failed.";
+    case "transformationBuild":
+      return "Export settings could not be applied.";
+    case "transformedFetch":
+      return "Rendered video was not ready.";
+    case "permanentExportUpload":
+      return "Export could not be saved.";
+    case "downloadUrlCreate":
+      return "Download could not be prepared.";
+    case "metadataSave":
+      return "Export metadata could not be saved.";
+    case "tempCleanup":
+      return "Temporary export cleanup failed.";
+    default:
+      return "Export failed.";
+  }
 }
 
 function createExportFileName(title: unknown, projectId: string) {

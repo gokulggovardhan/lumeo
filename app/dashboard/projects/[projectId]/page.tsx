@@ -373,6 +373,8 @@ type CloudExportResponse =
   | {
       success: false;
       error?: string;
+      failedStage?: string;
+      details?: string;
     };
 
 const LEGACY_DEFAULT_OVERLAY_TEXT = "Your title here";
@@ -1644,6 +1646,13 @@ export default function ProjectDetailsPage() {
       const payload = (await response.json()) as CloudExportResponse;
 
       if (!response.ok || !payload.success || !payload.downloadUrl) {
+        if (!payload.success) {
+          console.error("[Lumeo Export] cloud export server diagnostics", {
+            failedStage: payload.failedStage,
+            details: payload.details,
+          });
+        }
+
         throw new Error(
           !payload.success && payload.error ? payload.error : "Export failed",
         );
