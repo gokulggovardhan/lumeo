@@ -940,10 +940,9 @@ export default function ProjectDetailsPage() {
             const savedAudioFormat = editor.exportSettings?.audioFormat;
             setAudioFormat(savedAudioFormat === "wav" ? "wav" : "mp3");
 
-            setExportResolution("720p");
-
-            const savedFps = editor.exportSettings?.fps;
-            setExportFps(savedFps === 24 || savedFps === 60 ? savedFps : 30);
+            const savedResolution = editor.exportSettings?.resolution;
+            setExportResolution(savedResolution === "1080p" ? "1080p" : "720p");
+            setExportFps(30);
 
             const savedQuality = editor.exportSettings?.quality;
             setExportQuality(
@@ -3095,7 +3094,7 @@ export default function ProjectDetailsPage() {
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(236,72,153,0.18),transparent_34%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_30%),radial-gradient(circle_at_bottom,rgba(168,85,247,0.13),transparent_34%)]" />
 
       <div className="relative z-10 flex min-h-0 w-full flex-col">
-      <nav className="shrink-0 border-b border-white/10 bg-[#07050d]/86 px-3 py-2.5 backdrop-blur-2xl sm:px-4">
+        <nav className="shrink-0 border-b border-white/10 bg-[#07050d]/86 px-3 py-2.5 backdrop-blur-2xl sm:px-4">
         <div className="mx-auto flex max-w-[1900px] items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <Link
@@ -3112,7 +3111,7 @@ export default function ProjectDetailsPage() {
                 </p>
 
                 <span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200 md:inline-flex">
-                  Beta Studio
+                  Lumeo Studio
                 </span>
               </div>
 
@@ -3163,9 +3162,9 @@ export default function ProjectDetailsPage() {
             </button>
           </div>
         </div>
-      </nav>
+        </nav>
 
-      <section className="mx-auto flex min-h-0 w-full max-w-[1900px] flex-1 overflow-hidden px-3 py-3 sm:px-4">
+        <section className="mx-auto flex min-h-0 w-full max-w-[1900px] flex-1 overflow-hidden px-3 py-3 sm:px-4">
         <div className="grid min-h-0 w-full grid-rows-[minmax(0,1fr)_minmax(0,42vh)] gap-3 lg:grid-cols-[270px_minmax(0,1fr)_380px] lg:grid-rows-none">
           <aside className="hidden min-h-0 overflow-hidden rounded-[2rem] border border-white/10 bg-[#111018]/82 shadow-2xl shadow-black/25 backdrop-blur-2xl lg:block">
             <div className="border-b border-white/10 p-4">
@@ -3529,7 +3528,7 @@ export default function ProjectDetailsPage() {
             {renderInspector()}
           </aside>
         </div>
-      </section>
+        </section>
       </div>
     </main>
   );
