@@ -17,7 +17,7 @@ export const maxDuration = 300;
 
 type CanvasFormat = "9:16" | "1:1" | "4:5" | "16:9";
 type ExportResolution = "720p" | "1080p";
-type FitMode = "contain" | "cover";
+type FrameMode = "fullFrame" | "originalView" | "blurredBackground";
 type ExportFps = 30;
 type ExportFailureStage =
   | "unknown"
@@ -40,13 +40,23 @@ type ExportRequestBody = {
     trimEnd?: number;
     canvasFormat?: CanvasFormat;
     fitMode?:
-      | FitMode
+      | "contain"
+      | "cover"
       | "fit"
       | "fill"
       | "fullFrame"
       | "originalView"
+      | "blurredBackground"
       | "Full Frame"
-      | "Original View";
+      | "Original View"
+      | "Blurred Background";
+    frameMode?:
+      | "fullFrame"
+      | "originalView"
+      | "blurredBackground"
+      | "Full Frame"
+      | "Original View"
+      | "Blurred Background";
     resolution?: ExportResolution | "2k";
     fps?: number;
   };
@@ -71,13 +81,17 @@ type ProjectData = {
     canvas?: {
       format?: CanvasFormat;
       fitMode?:
-        | FitMode
+        | "contain"
+        | "cover"
         | "fit"
         | "fill"
         | "fullFrame"
         | "originalView"
+        | "blurredBackground"
         | "Full Frame"
-        | "Original View";
+        | "Original View"
+        | "Blurred Background";
+      frameMode?: "fullFrame" | "originalView" | "blurredBackground";
     };
     exportSettings?: {
       resolution?: ExportResolution | "2k";
@@ -148,7 +162,7 @@ export async function POST(request: NextRequest) {
       resolution: settings.resolution,
       fps: settings.fps,
       canvasFormat: settings.canvasFormat,
-      frameMode: settings.fitMode,
+      frameMode: settings.frameMode,
       outputWidth: dimensions.width,
       outputHeight: dimensions.height,
     });
@@ -182,7 +196,7 @@ export async function POST(request: NextRequest) {
       trimEnd: settings.trimEnd,
       width: dimensions.width,
       height: dimensions.height,
-      fitMode: settings.fitMode,
+      frameMode: settings.frameMode,
       fps: settings.fps,
     });
 
@@ -266,6 +280,15 @@ export async function POST(request: NextRequest) {
       fileName: uploadedExport.fileName,
       createdAt,
       metadataSaved,
+      exportInfo: {
+        quality: `${settings.resolution}${settings.fps}`,
+        resolution: settings.resolution,
+        fps: settings.fps,
+        outputWidth: dimensions.width,
+        outputHeight: dimensions.height,
+        frameMode: settings.frameMode,
+        format: "mp4",
+      },
     });
   } catch (error) {
     console.error("[Lumeo Export] phase one export failed", {
@@ -307,8 +330,11 @@ function resolveExportSettings(
   const canvasFormat = normalizeCanvasFormat(
     bodySettings?.canvasFormat || project.editor?.canvas?.format,
   );
-  const fitMode = normalizeFitMode(
-    bodySettings?.fitMode || project.editor?.canvas?.fitMode,
+  const frameMode = normalizeFrameMode(
+    bodySettings?.frameMode ||
+      bodySettings?.fitMode ||
+      project.editor?.canvas?.frameMode ||
+      project.editor?.canvas?.fitMode,
   );
   const resolution = normalizeResolution(
     bodySettings?.resolution || project.editor?.exportSettings?.resolution,
@@ -325,7 +351,7 @@ function resolveExportSettings(
         ? trimEnd
         : project.editor?.media?.videoDuration || undefined,
     canvasFormat,
-    fitMode,
+    frameMode,
     resolution,
     fps,
   };
@@ -364,17 +390,24 @@ function normalizeCanvasFormat(value: unknown): CanvasFormat {
     : "9:16";
 }
 
-function normalizeFitMode(value: unknown): FitMode {
+function normalizeFrameMode(value: unknown): FrameMode {
   if (
     value === "contain" ||
     value === "fit" ||
     value === "Original View" ||
     value === "originalView"
   ) {
-    return "contain";
+    return "originalView";
   }
 
-  return "cover";
+  if (
+    value === "blurredBackground" ||
+    value === "Blurred Background"
+  ) {
+    return "blurredBackground";
+  }
+
+  return "fullFrame";
 }
 
 function normalizeResolution(value: unknown): ExportResolution {
@@ -415,7 +448,7 @@ function createExportMetadata({
       trimStart: toNullableNumber(settings.trimStart),
       trimEnd: toNullableNumber(settings.trimEnd),
       canvasFormat: settings.canvasFormat,
-      fitMode: settings.fitMode,
+      frameMode: settings.frameMode,
       quality: `${settings.resolution}${settings.fps}`,
       resolution: settings.resolution,
       fps: settings.fps,
@@ -427,6 +460,7 @@ function createExportMetadata({
         "aspectRatio",
         "resolution",
         "originalAudio",
+        "frameMode",
       ],
     },
   };
@@ -534,5 +568,17 @@ function createExportFileName(
       .toLowerCase()
       .slice(0, 120) || "lumeo-export";
 
-  return `${safeName}-${settings.resolution}-${settings.fps}fps-${Date.now()}.mp4`;
+  return `${safeName}-${formatCanvasSlug(settings.canvasFormat)}-${formatFrameModeSlug(
+    settings.frameMode,
+  )}-${settings.resolution}-${settings.fps}fps-${Date.now()}.mp4`;
+}
+
+function formatCanvasSlug(canvasFormat: CanvasFormat) {
+  return canvasFormat.replace(":", "x");
+}
+
+function formatFrameModeSlug(frameMode: FrameMode) {
+  if (frameMode === "blurredBackground") return "blurred-background";
+  if (frameMode === "originalView") return "original-view";
+  return "full-frame";
 }

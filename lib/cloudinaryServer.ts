@@ -31,6 +31,14 @@ type PhaseOneTransformOptions = {
     | "Full Frame"
     | "Original View"
     | string;
+  frameMode?:
+    | "fullFrame"
+    | "originalView"
+    | "blurredBackground"
+    | "Full Frame"
+    | "Original View"
+    | "Blurred Background"
+    | string;
 };
 
 function getCloudinaryEnv(): CloudinaryEnv {
@@ -138,9 +146,11 @@ export function createPhaseOneCloudinaryExportUrl(
 ) {
   configureCloudinary();
 
-  const transformation: Record<string, string | number>[] = [];
+  const transformation: Record<string, unknown>[] = [];
   const trim: Record<string, number> = {};
-  const cropMode = normalizePhaseOneFitMode(options.fitMode);
+  const frameMode = normalizePhaseOneFrameMode(
+    options.frameMode || options.fitMode,
+  );
 
   if (Number.isFinite(options.trimStart) && Number(options.trimStart) > 0) {
     trim.start_offset = Number(options.trimStart);
@@ -158,12 +168,37 @@ export function createPhaseOneCloudinaryExportUrl(
     transformation.push(trim);
   }
 
-  transformation.push({
-    width: options.width,
-    height: options.height,
-    crop: cropMode === "cover" ? "fill" : "pad",
-    background: "black",
-  });
+  if (frameMode === "blurredBackground") {
+    transformation.push({
+      width: options.width,
+      height: options.height,
+      crop: "fill",
+      effect: "blur:600",
+    });
+
+    transformation.push({
+      overlay: {
+        resource_type: "video",
+        public_id: publicId,
+      },
+      ...trim,
+      width: options.width,
+      height: options.height,
+      crop: "fit",
+    });
+
+    transformation.push({
+      flags: "layer_apply",
+      gravity: "center",
+    });
+  } else {
+    transformation.push({
+      width: options.width,
+      height: options.height,
+      crop: frameMode === "fullFrame" ? "fill" : "pad",
+      background: "black",
+    });
+  }
 
   transformation.push({
     video_codec: "h264",
@@ -182,17 +217,26 @@ export function createPhaseOneCloudinaryExportUrl(
   });
 }
 
-function normalizePhaseOneFitMode(value: unknown): "contain" | "cover" {
+function normalizePhaseOneFrameMode(
+  value: unknown,
+): "originalView" | "fullFrame" | "blurredBackground" {
   if (
     value === "contain" ||
     value === "fit" ||
     value === "Original View" ||
     value === "originalView"
   ) {
-    return "contain";
+    return "originalView";
   }
 
-  return "cover";
+  if (
+    value === "blurredBackground" ||
+    value === "Blurred Background"
+  ) {
+    return "blurredBackground";
+  }
+
+  return "fullFrame";
 }
 
 function createTemporaryPublicId(fileName: string) {

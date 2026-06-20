@@ -45,7 +45,7 @@ type ToolKey =
   | "export";
 
 type CanvasFormat = "9:16" | "1:1" | "4:5" | "16:9";
-type FitMode = "contain" | "cover";
+type FitMode = "contain" | "cover" | "blurredBackground";
 type BackgroundStyle = "blur" | "black" | "gradient";
 type ExportResolution = "720p" | "1080p" | "2k";
 type VideoFormat = "mp4" | "webm";
@@ -788,7 +788,11 @@ export default function ProjectDetailsPage() {
   const productionExportFps = 30;
   const productionExportQualityLabel = `${productionExportResolution} · ${productionExportFps}fps`;
   const productionFrameModeLabel =
-    fitMode === "cover" ? "Full Frame" : "Original View";
+    fitMode === "blurredBackground"
+      ? "Blurred Background"
+      : fitMode === "cover"
+        ? "Full Frame"
+        : "Original View";
   const productionExportSummary = `${canvasFormat} · ${productionFrameModeLabel} · ${productionExportQualityLabel} · MP4`;
   const hasSavedSourceMedia = Boolean(videoStorageMetadata?.fileId);
 
@@ -887,9 +891,11 @@ export default function ProjectDetailsPage() {
                 : "9:16"
             );
 
-            const savedFitMode = editor.canvas?.fitMode;
+            const savedFitMode = editor.canvas?.frameMode || editor.canvas?.fitMode;
             setFitMode(
-              savedFitMode === "contain"
+              savedFitMode === "blurredBackground"
+                ? "blurredBackground"
+                : savedFitMode === "contain"
                 ? "contain"
                 : "cover"
             );
@@ -1693,6 +1699,7 @@ export default function ProjectDetailsPage() {
         trimStart: exportStart,
         trimEnd: exportEnd,
         canvasFormat,
+        frameMode: fitMode,
         resolution: productionExportResolution,
         fps: productionExportFps,
       });
@@ -1709,6 +1716,7 @@ export default function ProjectDetailsPage() {
             trimEnd: exportEnd || undefined,
             canvasFormat,
             fitMode,
+            frameMode: fitMode,
             resolution: productionExportResolution,
             fps: productionExportFps,
           },
@@ -1983,6 +1991,7 @@ export default function ProjectDetailsPage() {
       "editor.canvas": {
         format: canvasFormat,
         fitMode,
+        frameMode: fitMode,
         backgroundStyle,
         videoZoom: Number(videoZoom) || 100,
         videoX: Number(videoX) || 0,
@@ -2378,7 +2387,7 @@ export default function ProjectDetailsPage() {
                 Video framing
               </label>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 <OptionButton
                   active={fitMode === "cover"}
                   onClick={() => setFitMode("cover")}
@@ -2392,27 +2401,19 @@ export default function ProjectDetailsPage() {
                 >
                   Original View
                 </OptionButton>
+
+                <OptionButton
+                  active={fitMode === "blurredBackground"}
+                  onClick={() => setFitMode("blurredBackground")}
+                >
+                  Blurred Background
+                </OptionButton>
               </div>
 
               <div className="mt-3 grid gap-2 text-xs font-bold leading-5 text-white/42">
                 <p>Full Frame: Best for social posts. Fills the canvas.</p>
                 <p>Original View: Keeps the full clip visible.</p>
-              </div>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-black text-white">
-                    Blurred Background
-                  </p>
-                  <p className="mt-1 text-xs font-bold text-white/42">
-                    Coming soon
-                  </p>
-                </div>
-                <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
-                  Coming soon
-                </span>
+                <p>Blurred Background: Fills the canvas behind the full clip.</p>
               </div>
             </div>
           </div>
@@ -3304,6 +3305,17 @@ export default function ProjectDetailsPage() {
                   >
                     Original View
                   </button>
+
+                  <button
+                    onClick={() => setFitMode("blurredBackground")}
+                    className={`rounded-full px-4 py-2 text-xs font-black transition ${
+                      fitMode === "blurredBackground"
+                        ? "bg-white text-black"
+                        : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
+                    }`}
+                  >
+                    Blurred Background
+                  </button>
                 </div>
               </div>
 
@@ -3328,21 +3340,37 @@ export default function ProjectDetailsPage() {
 
                   <div className="relative h-full w-full overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-2xl shadow-black">
                     {localVideoURL ? (
-                      <video
-                        ref={videoRef}
-                        src={localVideoURL}
-                        controls
-                        playsInline
-                        onLoadedMetadata={handleLoadedMetadata}
-                        onTimeUpdate={handleVideoTimeUpdate}
-                        className="h-full w-full"
-                        style={{
-                          objectFit: fitMode,
-                          filter: videoFilter,
-                          transform: `translate(${videoX}%, ${videoY}%) rotate(${rotate}deg) scale(${videoZoom / 100}) scaleX(${flipX ? -1 : 1})`,
-                          transformOrigin: "center",
-                        }}
-                      />
+                      <>
+                        {fitMode === "blurredBackground" && (
+                          <video
+                            src={localVideoURL}
+                            muted
+                            playsInline
+                            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-2xl"
+                            style={{ filter: videoFilter }}
+                          />
+                        )}
+
+                        <video
+                          ref={videoRef}
+                          src={localVideoURL}
+                          controls
+                          playsInline
+                          onLoadedMetadata={handleLoadedMetadata}
+                          onTimeUpdate={handleVideoTimeUpdate}
+                          className="relative z-10 h-full w-full"
+                          style={{
+                            objectFit:
+                              fitMode === "blurredBackground" ? "contain" : fitMode,
+                            filter: videoFilter,
+                            transform:
+                              fitMode === "blurredBackground"
+                                ? "none"
+                                : `translate(${videoX}%, ${videoY}%) rotate(${rotate}deg) scale(${videoZoom / 100}) scaleX(${flipX ? -1 : 1})`,
+                            transformOrigin: "center",
+                          }}
+                        />
+                      </>
                     ) : (
                       <div className="flex h-full w-full flex-col items-center justify-center px-8 text-center">
                         <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-white text-3xl font-black text-black shadow-xl shadow-white/10">
