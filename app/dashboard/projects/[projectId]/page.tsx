@@ -2369,7 +2369,7 @@ export default function ProjectDetailsPage() {
                 Frame format
               </label>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {frameOptions.map((item) => (
                   <OptionButton
                     key={item.value}
@@ -2387,7 +2387,7 @@ export default function ProjectDetailsPage() {
                 Video framing
               </label>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <OptionButton
                   active={fitMode === "cover"}
                   onClick={() => setFitMode("cover")}
@@ -2424,7 +2424,7 @@ export default function ProjectDetailsPage() {
     if (activeTool === "cut") {
       return (
         <Panel title="Cut" subtitle="Set clean start and end points.">
-          <div className="space-y-6">
+          <div className="space-y-5">
             <div className="grid grid-cols-2 gap-3">
               <StatPill label="Duration" value={`${videoDuration || 0}s`} />
               <StatPill label="Output" value={`${selectedRange}s`} />
@@ -2659,8 +2659,8 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "audio") {
       return (
-        <Panel title="Sound Mix" subtitle="Balance original video sound and background music.">
-          <div className="space-y-6">
+        <Panel title="Sound" subtitle="Balance original sound and music.">
+          <div className="space-y-4">
             <RangeControl
               label="Original volume"
               value={videoVolume}
@@ -2698,8 +2698,16 @@ export default function ProjectDetailsPage() {
                 className="w-full"
               />
             ) : (
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-5 text-sm leading-6 text-white/45">
-                Add music from the Media tab to control background audio.
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-black text-white/68">Add music</p>
+                  <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
+                    Coming soon
+                  </span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-white/42">
+                  Music controls stay ready here when audio is added.
+                </p>
               </div>
             )}
           </div>
@@ -2788,13 +2796,13 @@ export default function ProjectDetailsPage() {
           title="Export Studio"
           subtitle="Choose output format and quality, then create your download."
         >
-          <div className="space-y-6">
-            <div className="rounded-[1.6rem] border border-fuchsia-300/15 bg-gradient-to-br from-fuchsia-300/12 via-white/[0.04] to-cyan-300/10 p-5">
+          <div className="space-y-5">
+            <div className="rounded-[1.6rem] border border-fuchsia-300/15 bg-gradient-to-br from-fuchsia-300/12 via-white/[0.04] to-cyan-300/10 p-4">
               <p className="text-xs font-black uppercase tracking-[0.22em] text-fuchsia-200">
                 Output target
               </p>
 
-              <p className="mt-3 text-3xl font-black text-white">
+              <p className="mt-2 text-2xl font-black text-white">
                 {output.width} × {output.height}
               </p>
 
@@ -2806,7 +2814,7 @@ export default function ProjectDetailsPage() {
               </p>
 
               {localVideoBytes > 100 * 1024 * 1024 && (
-                <p className="mt-4 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/78">
+                <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/78">
                   Large exports may take longer. For best results, test with a
                   short 720p clip.
                 </p>
@@ -3158,7 +3166,7 @@ export default function ProjectDetailsPage() {
       </nav>
 
       <section className="mx-auto flex min-h-0 w-full max-w-[1900px] flex-1 overflow-hidden px-3 py-3 sm:px-4">
-        <div className="grid min-h-0 w-full gap-3 lg:grid-cols-[270px_minmax(0,1fr)_380px]">
+        <div className="grid min-h-0 w-full grid-rows-[minmax(0,1fr)_minmax(0,42vh)] gap-3 lg:grid-cols-[270px_minmax(0,1fr)_380px] lg:grid-rows-none">
           <aside className="hidden min-h-0 overflow-hidden rounded-[2rem] border border-white/10 bg-[#111018]/82 shadow-2xl shadow-black/25 backdrop-blur-2xl lg:block">
             <div className="border-b border-white/10 p-4">
               <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
