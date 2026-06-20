@@ -19,6 +19,21 @@ type CanvasFormat = "9:16" | "1:1" | "4:5" | "16:9";
 type ExportResolution = "720p" | "1080p";
 type FrameMode = "fullFrame" | "originalView" | "blurredBackground";
 type ExportFps = 30;
+type TitleStyle =
+  | "cleanWhite"
+  | "creatorYellow"
+  | "neonGreen"
+  | "boldCaption"
+  | "lowerThird";
+type TitlePosition = "top" | "center" | "bottom" | "lowerThird";
+type TitleSize = "small" | "medium" | "large" | "xl";
+type TitleOverlaySettings = {
+  enabled: boolean;
+  text: string;
+  style: TitleStyle;
+  position: TitlePosition;
+  size: TitleSize;
+};
 type ExportFailureStage =
   | "unknown"
   | "projectRead"
@@ -59,6 +74,7 @@ type ExportRequestBody = {
       | "Blurred Background";
     resolution?: ExportResolution | "2k";
     fps?: number;
+    titleOverlay?: Partial<TitleOverlaySettings>;
   };
 };
 
@@ -96,6 +112,10 @@ type ProjectData = {
     exportSettings?: {
       resolution?: ExportResolution | "2k";
       fps?: number;
+    };
+    titleOverlay?: Partial<TitleOverlaySettings>;
+    textOverlay?: {
+      text?: string;
     };
   };
 };
@@ -198,6 +218,12 @@ export async function POST(request: NextRequest) {
       height: dimensions.height,
       frameMode: settings.frameMode,
       fps: settings.fps,
+      titleOverlay: {
+        enabled: settings.titleOverlay.enabled,
+        style: settings.titleOverlay.style,
+        position: settings.titleOverlay.position,
+        size: settings.titleOverlay.size,
+      },
     });
 
     failedStage = "transformedFetch";
@@ -288,6 +314,7 @@ export async function POST(request: NextRequest) {
         outputHeight: dimensions.height,
         frameMode: settings.frameMode,
         format: "mp4",
+        titleIncluded: settings.titleOverlay.enabled,
       },
     });
   } catch (error) {
@@ -343,6 +370,11 @@ function resolveExportSettings(
     resolution,
     bodySettings?.fps || project.editor?.exportSettings?.fps,
   );
+  const titleOverlay = normalizeTitleOverlay(
+    bodySettings?.titleOverlay,
+    project.editor?.titleOverlay,
+    project.editor?.textOverlay,
+  );
 
   return {
     trimStart,
@@ -354,6 +386,7 @@ function resolveExportSettings(
     frameMode,
     resolution,
     fps,
+    titleOverlay,
   };
 }
 
@@ -454,6 +487,7 @@ function createExportMetadata({
       fps: settings.fps,
       outputWidth: dimensions.width,
       outputHeight: dimensions.height,
+      titleOverlay: settings.titleOverlay,
       supportedFeatures: [
         "mp4",
         "trim",
@@ -461,9 +495,66 @@ function createExportMetadata({
         "resolution",
         "originalAudio",
         "frameMode",
+        "titleOverlay",
       ],
     },
   };
+}
+
+function normalizeTitleOverlay(
+  bodyValue: unknown,
+  savedValue: unknown,
+  legacyValue: unknown,
+): TitleOverlaySettings {
+  const source =
+    bodyValue && typeof bodyValue === "object"
+      ? (bodyValue as Record<string, unknown>)
+      : savedValue && typeof savedValue === "object"
+        ? (savedValue as Record<string, unknown>)
+        : {};
+  const legacy =
+    legacyValue && typeof legacyValue === "object"
+      ? (legacyValue as Record<string, unknown>)
+      : {};
+  const text = sanitizeTitleText(source.text || legacy.text);
+  const enabled = Boolean(source.enabled) && text.length > 0;
+
+  return {
+    enabled,
+    text: enabled ? text : "",
+    style: normalizeTitleStyle(source.style),
+    position: normalizeTitlePosition(source.position),
+    size: normalizeTitleSize(source.size),
+  };
+}
+
+function sanitizeTitleText(value: unknown) {
+  if (typeof value !== "string") return "";
+
+  return value.replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function normalizeTitleStyle(value: unknown): TitleStyle {
+  return value === "creatorYellow" ||
+    value === "neonGreen" ||
+    value === "boldCaption" ||
+    value === "lowerThird"
+    ? value
+    : "cleanWhite";
+}
+
+function normalizeTitlePosition(value: unknown): TitlePosition {
+  return value === "top" ||
+    value === "center" ||
+    value === "lowerThird"
+    ? value
+    : "bottom";
+}
+
+function normalizeTitleSize(value: unknown): TitleSize {
+  return value === "small" || value === "medium" || value === "xl"
+    ? value
+    : "large";
 }
 
 function toSafeNumber(value: unknown, fallback: number) {

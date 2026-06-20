@@ -52,6 +52,14 @@ type VideoFormat = "mp4" | "webm";
 type AudioFormat = "mp3" | "wav";
 type ExportQuality = "standard" | "high" | "max";
 type ExportFps = 24 | 30 | 60;
+type TitleStyle =
+  | "cleanWhite"
+  | "creatorYellow"
+  | "neonGreen"
+  | "boldCaption"
+  | "lowerThird";
+type TitlePosition = "top" | "center" | "bottom" | "lowerThird";
+type TitleSize = "small" | "medium" | "large" | "xl";
 
 const tools: { key: ToolKey; label: string; description: string; icon: string }[] =
   [
@@ -103,6 +111,28 @@ const frameOptions: { value: CanvasFormat; label: string }[] = [
   { value: "1:1", label: "1:1 Square" },
   { value: "4:5", label: "4:5 Portrait" },
   { value: "16:9", label: "16:9 Landscape" },
+];
+
+const titleStyles: { value: TitleStyle; label: string }[] = [
+  { value: "cleanWhite", label: "Clean White" },
+  { value: "creatorYellow", label: "Creator Yellow" },
+  { value: "neonGreen", label: "Neon Green" },
+  { value: "boldCaption", label: "Bold Caption" },
+  { value: "lowerThird", label: "Lower Third" },
+];
+
+const titlePositions: { value: TitlePosition; label: string }[] = [
+  { value: "top", label: "Top" },
+  { value: "center", label: "Center" },
+  { value: "bottom", label: "Bottom" },
+  { value: "lowerThird", label: "Lower Third" },
+];
+
+const titleSizes: { value: TitleSize; label: string }[] = [
+  { value: "small", label: "Small" },
+  { value: "medium", label: "Medium" },
+  { value: "large", label: "Large" },
+  { value: "xl", label: "XL" },
 ];
 
 function getOutputDimensions(
@@ -437,6 +467,29 @@ function normalizeOverlayText(value: unknown) {
   return value.trim() === LEGACY_DEFAULT_OVERLAY_TEXT ? "" : value;
 }
 
+function normalizeTitleStyle(value: unknown): TitleStyle {
+  return value === "creatorYellow" ||
+    value === "neonGreen" ||
+    value === "boldCaption" ||
+    value === "lowerThird"
+    ? value
+    : "cleanWhite";
+}
+
+function normalizeTitlePosition(value: unknown): TitlePosition {
+  return value === "top" ||
+    value === "center" ||
+    value === "lowerThird"
+    ? value
+    : "bottom";
+}
+
+function normalizeTitleSize(value: unknown): TitleSize {
+  return value === "small" || value === "medium" || value === "xl"
+    ? value
+    : "large";
+}
+
 async function createCloudinaryUploadSignature() {
   const response = await fetch("/api/cloudinary/sign-upload", {
     method: "POST",
@@ -729,6 +782,10 @@ export default function ProjectDetailsPage() {
   const [videoVolume, setVideoVolume] = useState(100);
   const [mutedOriginal, setMutedOriginal] = useState(false);
 
+  const [titleEnabled, setTitleEnabled] = useState(false);
+  const [titleStyle, setTitleStyle] = useState<TitleStyle>("cleanWhite");
+  const [titlePosition, setTitlePosition] = useState<TitlePosition>("bottom");
+  const [titleSize, setTitleSize] = useState<TitleSize>("large");
   const [overlayText, setOverlayText] = useState("");
   const [overlayX, setOverlayX] = useState(50);
   const [overlayY, setOverlayY] = useState(45);
@@ -802,10 +859,42 @@ export default function ProjectDetailsPage() {
   );
 
   const videoFilter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) grayscale(${grayscale}%) blur(${blur}px)`;
-  const visibleOverlayText = overlayText.trim();
-  const hasVisibleOverlayText = visibleOverlayText.length > 0;
+  const visibleOverlayText = overlayText.trim().slice(0, 80);
+  const hasActiveTitleOverlay = titleEnabled && visibleOverlayText.length > 0;
+  const titleOverlayForExport = {
+    enabled: hasActiveTitleOverlay,
+    text: hasActiveTitleOverlay ? visibleOverlayText : "",
+    style: titleStyle,
+    position: titlePosition,
+    size: titleSize,
+  };
+  const titlePreviewClass =
+    titleStyle === "creatorYellow"
+      ? "text-[#FFD84D] [text-shadow:0_4px_0_rgba(0,0,0,0.9),0_12px_32px_rgba(0,0,0,0.85)]"
+      : titleStyle === "neonGreen"
+        ? "text-[#65FF8A] [text-shadow:0_4px_0_rgba(0,0,0,0.9),0_12px_32px_rgba(0,0,0,0.85)]"
+        : titleStyle === "boldCaption"
+          ? "rounded-2xl bg-black/70 px-5 py-3 text-white shadow-2xl shadow-black/50"
+          : titleStyle === "lowerThird"
+            ? "rounded-2xl bg-black/58 px-5 py-3 text-white shadow-2xl shadow-black/45 backdrop-blur-md"
+            : "text-white [text-shadow:0_8px_32px_rgba(0,0,0,0.95),0_2px_8px_rgba(0,0,0,0.9)]";
+  const titlePreviewPositionClass =
+    titlePosition === "top"
+      ? "top-[14%]"
+      : titlePosition === "center"
+        ? "top-1/2"
+        : titlePosition === "lowerThird"
+          ? "top-[76%]"
+          : "top-[82%]";
+  const titlePreviewSizeClass =
+    titleSize === "small"
+      ? "text-xl sm:text-2xl"
+      : titleSize === "medium"
+        ? "text-2xl sm:text-3xl"
+        : titleSize === "xl"
+          ? "text-4xl sm:text-6xl"
+          : "text-3xl sm:text-5xl";
   const hasPreviewOnlyExportEdits =
-    hasVisibleOverlayText ||
     brightness !== 100 ||
     contrast !== 100 ||
     saturation !== 100 ||
@@ -913,7 +1002,15 @@ export default function ProjectDetailsPage() {
             setVideoVolume(editor.playback?.videoVolume ?? 100);
             setMutedOriginal(editor.playback?.mutedOriginal ?? false);
 
-            setOverlayText(normalizeOverlayText(editor.textOverlay?.text));
+            const savedTitleOverlay = editor.titleOverlay || {};
+            const savedTitleText = normalizeOverlayText(
+              savedTitleOverlay.text || editor.textOverlay?.text,
+            );
+            setTitleEnabled(Boolean(savedTitleOverlay.enabled && savedTitleText));
+            setTitleStyle(normalizeTitleStyle(savedTitleOverlay.style));
+            setTitlePosition(normalizeTitlePosition(savedTitleOverlay.position));
+            setTitleSize(normalizeTitleSize(savedTitleOverlay.size));
+            setOverlayText(savedTitleText);
             setOverlayX(editor.textOverlay?.x ?? 50);
             setOverlayY(editor.textOverlay?.y ?? 45);
             setOverlaySize(editor.textOverlay?.size ?? 34);
@@ -1718,6 +1815,7 @@ export default function ProjectDetailsPage() {
             frameMode: fitMode,
             resolution: productionExportResolution,
             fps: productionExportFps,
+            titleOverlay: titleOverlayForExport,
           },
         }),
       });
@@ -2017,6 +2115,13 @@ export default function ProjectDetailsPage() {
         uppercase: overlayUppercase,
         shadow: overlayShadow,
       },
+      "editor.titleOverlay": {
+        enabled: titleOverlayForExport.enabled,
+        text: titleOverlayForExport.text,
+        style: titleOverlayForExport.style,
+        position: titleOverlayForExport.position,
+        size: titleOverlayForExport.size,
+      },
       "editor.effects": {
         brightness: Number(brightness) || 100,
         contrast: Number(contrast) || 100,
@@ -2113,6 +2218,10 @@ export default function ProjectDetailsPage() {
     playbackSpeed,
     videoVolume,
     mutedOriginal,
+    titleEnabled,
+    titleStyle,
+    titlePosition,
+    titleSize,
     overlayText,
     overlayX,
     overlayY,
@@ -2184,6 +2293,10 @@ export default function ProjectDetailsPage() {
     setPlaybackSpeed(1);
     setVideoVolume(100);
     setMutedOriginal(false);
+    setTitleEnabled(false);
+    setTitleStyle("cleanWhite");
+    setTitlePosition("bottom");
+    setTitleSize("large");
     setOverlayText("");
     setOverlayX(50);
     setOverlayY(45);
@@ -2570,86 +2683,125 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "text") {
       return (
-        <Panel title="Titles" subtitle="Create premium title hooks and overlays.">
+        <Panel title="Titles" subtitle="Add a clean title that exports with your video.">
           <div className="space-y-5">
-            <textarea
-              value={overlayText}
-              onChange={(event) => setOverlayText(event.target.value)}
-              placeholder="Type your title..."
-              className="min-h-28 w-full rounded-[1.5rem] border border-white/10 bg-white/[0.08] px-4 py-3 text-white outline-none placeholder:text-white/32 transition focus:border-fuchsia-300/60"
-            />
-
-            <RangeControl
-              label="Horizontal"
-              value={overlayX}
-              min={5}
-              max={95}
-              suffix="%"
-              onChange={setOverlayX}
-            />
-
-            <RangeControl
-              label="Vertical"
-              value={overlayY}
-              min={5}
-              max={95}
-              suffix="%"
-              onChange={setOverlayY}
-            />
-
-            <RangeControl
-              label="Size"
-              value={overlaySize}
-              min={18}
-              max={82}
-              suffix="px"
-              onChange={setOverlaySize}
-            />
-
-            <RangeControl
-              label="Opacity"
-              value={overlayOpacity}
-              min={10}
-              max={100}
-              suffix="%"
-              onChange={setOverlayOpacity}
-            />
-
             <div>
-              <label className="text-sm font-bold text-white/58">Color</label>
+              <label className="text-sm font-bold text-white/58">
+                Enable title
+              </label>
 
-              <input
-                type="color"
-                value={overlayColor}
-                onChange={(event) => setOverlayColor(event.target.value)}
-                className="mt-3 h-12 w-full rounded-2xl border border-white/10 bg-white/[0.08] p-2"
-              />
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <OptionButton
+                  active={!titleEnabled}
+                  onClick={() => setTitleEnabled(false)}
+                >
+                  Title off
+                </OptionButton>
+
+                <OptionButton
+                  active={titleEnabled}
+                  onClick={() => setTitleEnabled(true)}
+                >
+                  Title on
+                </OptionButton>
+              </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
-              <OptionButton
-                active={overlayBg}
-                onClick={() => setOverlayBg(!overlayBg)}
-                small
-              >
-                BG
-              </OptionButton>
+            <div>
+              <label className="text-sm font-bold text-white/58">
+                Title text
+              </label>
 
-              <OptionButton
-                active={overlayUppercase}
-                onClick={() => setOverlayUppercase(!overlayUppercase)}
-                small
-              >
-                CAPS
-              </OptionButton>
+              <textarea
+                value={overlayText}
+                onChange={(event) =>
+                  setOverlayText(event.target.value.slice(0, 80))
+                }
+                placeholder="Add your title"
+                maxLength={80}
+                className="mt-3 min-h-24 w-full rounded-[1.5rem] border border-white/10 bg-white/[0.08] px-4 py-3 text-white outline-none placeholder:text-white/32 transition focus:border-fuchsia-300/60"
+              />
 
-              <OptionButton
-                active={overlayShadow}
-                onClick={() => setOverlayShadow(!overlayShadow)}
-                small
-              >
-                SHADOW
-              </OptionButton>
+              <p className="mt-2 text-right text-xs font-bold text-white/34">
+                {visibleOverlayText.length}/80
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-white/58">
+                Style templates
+              </label>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {titleStyles.map((item) => (
+                  <OptionButton
+                    key={item.value}
+                    active={titleStyle === item.value}
+                    onClick={() => setTitleStyle(item.value)}
+                    small
+                  >
+                    {item.label}
+                  </OptionButton>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-white/58">
+                Position
+              </label>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {titlePositions.map((item) => (
+                  <OptionButton
+                    key={item.value}
+                    active={titlePosition === item.value}
+                    onClick={() => setTitlePosition(item.value)}
+                    small
+                  >
+                    {item.label}
+                  </OptionButton>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-white/58">Size</label>
+
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {titleSizes.map((item) => (
+                  <OptionButton
+                    key={item.value}
+                    active={titleSize === item.value}
+                    onClick={() => setTitleSize(item.value)}
+                    small
+                  >
+                    {item.label}
+                  </OptionButton>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-black text-white/68">Coming soon</p>
+                <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
+                  Coming soon
+                </span>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {["Animated captions", "Auto captions", "Word-by-word captions"].map(
+                  (item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-bold text-white/45"
+                    >
+                      {item}
+                    </span>
+                  ),
+                )}
+              </div>
             </div>
           </div>
         </Panel>
@@ -2947,7 +3099,9 @@ export default function ProjectDetailsPage() {
                       Click Download video to save it to your computer.
                     </p>
                     <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-emerald-100/50">
-                      {productionExportSummary}
+                      {hasActiveTitleOverlay
+                        ? `Title included · ${productionExportQualityLabel} · MP4`
+                        : `${productionExportQualityLabel} · MP4`}
                     </p>
                   </div>
 
@@ -3366,25 +3520,9 @@ export default function ProjectDetailsPage() {
                       </div>
                     )}
 
-                    {localVideoURL && hasVisibleOverlayText && (
+                    {localVideoURL && hasActiveTitleOverlay && (
                       <div
-                        className={`pointer-events-none absolute max-w-[86%] text-center font-black leading-tight ${
-                          overlayBg ? "rounded-2xl bg-black/55 px-4 py-2" : ""
-                        }`}
-                        style={{
-                          left: `${overlayX}%`,
-                          top: `${overlayY}%`,
-                          transform: "translate(-50%, -50%)",
-                          fontSize: `${overlaySize}px`,
-                          color: overlayColor,
-                          opacity: overlayOpacity / 100,
-                          textTransform: overlayUppercase
-                            ? "uppercase"
-                            : "none",
-                          textShadow: overlayShadow
-                            ? "0 8px 32px rgba(0,0,0,0.95), 0 2px 8px rgba(0,0,0,0.9)"
-                            : "none",
-                        }}
+                        className={`pointer-events-none absolute left-1/2 z-20 max-w-[86%] -translate-x-1/2 -translate-y-1/2 text-center font-black leading-tight ${titlePreviewPositionClass} ${titlePreviewSizeClass} ${titlePreviewClass}`}
                       >
                         {visibleOverlayText}
                       </div>

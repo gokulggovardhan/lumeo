@@ -39,6 +39,21 @@ type PhaseOneTransformOptions = {
     | "Original View"
     | "Blurred Background"
     | string;
+  titleOverlay?: Partial<PhaseOneTitleOverlay>;
+};
+
+type PhaseOneTitleOverlay = {
+  enabled: boolean;
+  text: string;
+  style:
+    | "cleanWhite"
+    | "creatorYellow"
+    | "neonGreen"
+    | "boldCaption"
+    | "lowerThird"
+    | string;
+  position: "top" | "center" | "bottom" | "lowerThird" | string;
+  size: "small" | "medium" | "large" | "xl" | string;
 };
 
 function getCloudinaryEnv(): CloudinaryEnv {
@@ -200,6 +215,15 @@ export function createPhaseOneCloudinaryExportUrl(
     });
   }
 
+  const titleOverlay = normalizeTitleOverlay(options.titleOverlay);
+
+  if (titleOverlay.enabled) {
+    transformation.push(...createTitleOverlayTransformation(titleOverlay, {
+      width: options.width,
+      height: options.height,
+    }));
+  }
+
   transformation.push({
     video_codec: "h264",
     audio_codec: "aac",
@@ -215,6 +239,130 @@ export function createPhaseOneCloudinaryExportUrl(
     format: "mp4",
     transformation,
   });
+}
+
+function normalizeTitleOverlay(
+  value: Partial<PhaseOneTitleOverlay> | undefined,
+): PhaseOneTitleOverlay {
+  const text = sanitizeTitleText(value?.text);
+  const enabled = Boolean(value?.enabled) && text.length > 0;
+
+  return {
+    enabled,
+    text: enabled ? text : "",
+    style: normalizeTitleStyle(value?.style),
+    position: normalizeTitlePosition(value?.position),
+    size: normalizeTitleSize(value?.size),
+  };
+}
+
+function createTitleOverlayTransformation(
+  title: PhaseOneTitleOverlay,
+  dimensions: { width: number; height: number },
+) {
+  const style = getTitleStyle(title.style);
+  const position = getTitlePosition(title.position);
+  const fontSize = getTitleFontSize(title.size, dimensions.width);
+  const textLayer: Record<string, unknown> = {
+    overlay: {
+      font_family: "Arial",
+      font_size: fontSize,
+      font_weight: "bold",
+      text: title.text,
+    },
+    color: style.color,
+    effect: style.effect,
+    width: Math.round(dimensions.width * 0.86),
+    crop: "fit",
+  };
+
+  if (style.background) {
+    textLayer.background = style.background;
+    textLayer.radius = Math.round(fontSize * 0.35);
+  }
+
+  return [
+    textLayer,
+    {
+      flags: "layer_apply",
+      gravity: position.gravity,
+      y: position.y,
+    },
+  ];
+}
+
+function sanitizeTitleText(value: unknown) {
+  if (typeof value !== "string") return "";
+
+  return value.replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function normalizeTitleStyle(value: unknown) {
+  return value === "creatorYellow" ||
+    value === "neonGreen" ||
+    value === "boldCaption" ||
+    value === "lowerThird"
+    ? value
+    : "cleanWhite";
+}
+
+function normalizeTitlePosition(value: unknown) {
+  return value === "top" ||
+    value === "center" ||
+    value === "lowerThird"
+    ? value
+    : "bottom";
+}
+
+function normalizeTitleSize(value: unknown) {
+  return value === "small" || value === "medium" || value === "xl"
+    ? value
+    : "large";
+}
+
+function getTitleStyle(style: string) {
+  if (style === "creatorYellow") {
+    return { color: "#FFD84D", effect: "shadow:50" };
+  }
+
+  if (style === "neonGreen") {
+    return { color: "#65FF8A", effect: "shadow:50" };
+  }
+
+  if (style === "boldCaption") {
+    return { color: "#FFFFFF", effect: "shadow:35", background: "#000000" };
+  }
+
+  if (style === "lowerThird") {
+    return { color: "#FFFFFF", effect: "shadow:35", background: "#000000" };
+  }
+
+  return { color: "#FFFFFF", effect: "shadow:45" };
+}
+
+function getTitlePosition(position: string) {
+  if (position === "top") {
+    return { gravity: "north", y: 120 };
+  }
+
+  if (position === "center") {
+    return { gravity: "center", y: 0 };
+  }
+
+  if (position === "lowerThird") {
+    return { gravity: "south", y: 220 };
+  }
+
+  return { gravity: "south", y: 120 };
+}
+
+function getTitleFontSize(size: string, width: number) {
+  const base = Math.max(28, Math.round(width * 0.075));
+
+  if (size === "small") return Math.round(base * 0.72);
+  if (size === "medium") return Math.round(base * 0.9);
+  if (size === "xl") return Math.round(base * 1.32);
+  return base;
 }
 
 function normalizePhaseOneFrameMode(

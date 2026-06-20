@@ -19,6 +19,8 @@
   - Full Frame
   - Original View
   - Blurred Background
+- Manual exportable title overlays
+- Title style templates
 - Basic trim/cut controls
 - Output target summary
 - Clean export status and download
