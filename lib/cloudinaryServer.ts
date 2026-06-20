@@ -20,6 +20,7 @@ type PhaseOneTransformOptions = {
   trimEnd?: number;
   width: number;
   height: number;
+  fps?: number | null;
   fitMode?:
     | "contain"
     | "cover"
@@ -168,6 +169,9 @@ export function createPhaseOneCloudinaryExportUrl(
     video_codec: "h264",
     audio_codec: "aac",
     quality: "auto:good",
+    ...(Number.isFinite(options.fps) && Number(options.fps) > 0
+      ? { fps: Number(options.fps) }
+      : {}),
   });
 
   return cloudinary.url(publicId, {

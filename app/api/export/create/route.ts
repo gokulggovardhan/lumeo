@@ -18,6 +18,7 @@ export const maxDuration = 300;
 type CanvasFormat = "9:16" | "1:1" | "16:9";
 type ExportResolution = "720p" | "1080p";
 type FitMode = "contain" | "cover";
+type ExportFps = 24;
 type ExportFailureStage =
   | "unknown"
   | "projectRead"
@@ -47,6 +48,7 @@ type ExportRequestBody = {
       | "Full Frame"
       | "Original View";
     resolution?: ExportResolution | "2k";
+    fps?: number;
   };
 };
 
@@ -79,6 +81,7 @@ type ProjectData = {
     };
     exportSettings?: {
       resolution?: ExportResolution | "2k";
+      fps?: number;
     };
   };
 };
@@ -141,6 +144,14 @@ export async function POST(request: NextRequest) {
     failedStage = "settingsResolve";
     const settings = resolveExportSettings(project, body.settings);
     const dimensions = getOutputDimensions(settings.canvasFormat, settings.resolution);
+    console.info("[Lumeo Export] resolved export settings", {
+      resolution: settings.resolution,
+      fps: settings.fps,
+      canvasFormat: settings.canvasFormat,
+      frameMode: settings.fitMode,
+      outputWidth: dimensions.width,
+      outputHeight: dimensions.height,
+    });
 
     failedStage = "sourceDownload";
     console.info("[Lumeo Export] source download started", { projectId });
@@ -172,6 +183,7 @@ export async function POST(request: NextRequest) {
       width: dimensions.width,
       height: dimensions.height,
       fitMode: settings.fitMode,
+      fps: settings.fps,
     });
 
     failedStage = "transformedFetch";
@@ -301,6 +313,10 @@ function resolveExportSettings(
   const resolution = normalizeResolution(
     bodySettings?.resolution || project.editor?.exportSettings?.resolution,
   );
+  const fps = normalizeFps(
+    resolution,
+    bodySettings?.fps || project.editor?.exportSettings?.fps,
+  );
 
   return {
     trimStart,
@@ -311,6 +327,7 @@ function resolveExportSettings(
     canvasFormat,
     fitMode,
     resolution,
+    fps,
   };
 }
 
@@ -319,14 +336,20 @@ function getOutputDimensions(
   resolution: ExportResolution,
 ) {
   if (canvasFormat === "9:16") {
-    return { width: 720, height: 1280 };
+    return resolution === "1080p"
+      ? { width: 1080, height: 1920 }
+      : { width: 720, height: 1280 };
   }
 
   if (canvasFormat === "1:1") {
-    return { width: 720, height: 720 };
+    return resolution === "1080p"
+      ? { width: 1080, height: 1080 }
+      : { width: 720, height: 720 };
   }
 
-  return { width: 1280, height: 720 };
+  return resolution === "1080p"
+    ? { width: 1920, height: 1080 }
+    : { width: 1280, height: 720 };
 }
 
 function normalizeCanvasFormat(value: unknown): CanvasFormat {
@@ -347,7 +370,18 @@ function normalizeFitMode(value: unknown): FitMode {
 }
 
 function normalizeResolution(value: unknown): ExportResolution {
-  return "720p";
+  return value === "1080p" ? "1080p" : "720p";
+}
+
+function normalizeFps(
+  resolution: ExportResolution,
+  value: unknown,
+): ExportFps | null {
+  if (resolution === "1080p") {
+    return 24;
+  }
+
+  return Number(value) === 24 ? 24 : null;
 }
 
 function createExportMetadata({
@@ -378,7 +412,8 @@ function createExportMetadata({
       trimEnd: toNullableNumber(settings.trimEnd),
       canvasFormat: settings.canvasFormat,
       fitMode: settings.fitMode,
-      resolution: "720p",
+      resolution: settings.resolution,
+      fps: settings.fps,
       outputWidth: dimensions.width,
       outputHeight: dimensions.height,
       supportedFeatures: [

@@ -729,8 +729,11 @@ export default function ProjectDetailsPage() {
     null
   );
 
-  const output = getOutputDimensions(canvasFormat, exportResolution);
-  const phaseOneExportResolution: ExportResolution = "720p";
+  const productionExportResolution =
+    exportResolution === "1080p" ? "1080p" : "720p";
+  const output = getOutputDimensions(canvasFormat, productionExportResolution);
+  const phaseOneExportFps =
+    productionExportResolution === "1080p" ? 24 : undefined;
   const hasSavedSourceMedia = Boolean(videoStorageMetadata?.fileId);
 
   const selectedRange = Math.max(
@@ -1623,7 +1626,8 @@ export default function ProjectDetailsPage() {
         trimStart: exportStart,
         trimEnd: exportEnd,
         canvasFormat,
-        resolution: phaseOneExportResolution,
+        resolution: productionExportResolution,
+        fps: phaseOneExportFps,
       });
 
       const response = await fetch("/api/export/create", {
@@ -1638,7 +1642,8 @@ export default function ProjectDetailsPage() {
             trimEnd: exportEnd || undefined,
             canvasFormat,
             fitMode,
-            resolution: phaseOneExportResolution,
+            resolution: productionExportResolution,
+            fps: phaseOneExportFps,
           },
         }),
       });
@@ -2629,7 +2634,10 @@ export default function ProjectDetailsPage() {
               </p>
 
               <p className="mt-2 text-sm text-white/50">
-                {canvasFormat} · {phaseOneExportResolution}
+                {canvasFormat} ·{" "}
+                {productionExportResolution === "1080p"
+                  ? "1080p · 24fps"
+                  : "720p"}
               </p>
 
               {localVideoBytes > 100 * 1024 * 1024 && (
@@ -2663,12 +2671,23 @@ export default function ProjectDetailsPage() {
                 Resolution
               </label>
 
-              <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/82">
-                720P
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <OptionButton
+                  active={productionExportResolution === "720p"}
+                  onClick={() => setExportResolution("720p")}
+                >
+                  720p
+                </OptionButton>
+                <OptionButton
+                  active={productionExportResolution === "1080p"}
+                  onClick={() => setExportResolution("1080p")}
+                >
+                  1080p · 24fps
+                </OptionButton>
               </div>
 
               <p className="mt-3 text-xs font-bold text-white/38">
-                Higher resolutions are coming soon.
+                Higher frame rates are coming soon.
               </p>
             </div>
 
