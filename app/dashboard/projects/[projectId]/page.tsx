@@ -226,22 +226,22 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <div className="rounded-[2rem] border border-white/10 bg-[#111018]/90 p-5 shadow-2xl shadow-black/25 backdrop-blur-2xl">
-      <div>
+    <div className="flex h-full min-h-0 flex-col rounded-[1.6rem] border border-white/10 bg-[#111018]/90 shadow-2xl shadow-black/25 backdrop-blur-2xl">
+      <div className="shrink-0 border-b border-white/10 px-5 py-4">
         <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
           Studio Panel
         </p>
 
-        <h2 className="mt-2 text-xl font-black tracking-tight text-white">
+        <h2 className="mt-1.5 text-lg font-black tracking-tight text-white">
           {title}
         </h2>
 
         {subtitle && (
-          <p className="mt-2 text-sm leading-6 text-white/48">{subtitle}</p>
+          <p className="mt-1.5 text-xs leading-5 text-white/48">{subtitle}</p>
         )}
       </div>
 
-      <div className="mt-6">{children}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
     </div>
   );
 }
@@ -823,12 +823,12 @@ export default function ProjectDetailsPage() {
 
   const canvasFrameClass =
     canvasFormat === "9:16"
-      ? "aspect-[9/16] h-[66vh] min-h-[440px] max-h-[760px]"
+      ? "aspect-[9/16] h-full max-h-[640px]"
       : canvasFormat === "1:1"
-        ? "aspect-square h-[60vh] min-h-[380px] max-h-[640px]"
+        ? "aspect-square h-full max-h-[560px]"
         : canvasFormat === "4:5"
-          ? "aspect-[4/5] h-[64vh] min-h-[420px] max-h-[720px]"
-          : "aspect-video w-full max-w-[1080px]";
+          ? "aspect-[4/5] h-full max-h-[600px]"
+          : "aspect-video w-full max-w-[980px]";
 
   useEffect(() => {
     projectLoadedRef.current = false;
@@ -3083,15 +3083,16 @@ export default function ProjectDetailsPage() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#07050d] text-white">
+    <main className="flex h-dvh overflow-hidden bg-[#07050d] text-white">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(236,72,153,0.18),transparent_34%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_30%),radial-gradient(circle_at_bottom,rgba(168,85,247,0.13),transparent_34%)]" />
 
-      <nav className="relative z-50 border-b border-white/10 bg-[#07050d]/86 px-4 py-3 backdrop-blur-2xl sm:px-6">
-        <div className="mx-auto flex max-w-[1900px] items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
+      <div className="relative z-10 flex min-h-0 w-full flex-col">
+      <nav className="shrink-0 border-b border-white/10 bg-[#07050d]/86 px-3 py-2.5 backdrop-blur-2xl sm:px-4">
+        <div className="mx-auto flex max-w-[1900px] items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <Link
               href="/dashboard"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-300 via-purple-300 to-cyan-200 font-black text-black shadow-lg shadow-fuchsia-500/20"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-300 via-purple-300 to-cyan-200 font-black text-black shadow-lg shadow-fuchsia-500/20"
             >
               L
             </Link>
@@ -3114,41 +3115,41 @@ export default function ProjectDetailsPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-            <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-emerald-100">
+            <span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100 sm:inline-flex">
               {autoSaveStatus}
             </span>
 
             <button
               onClick={() => setActiveTool("export")}
-              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-5 py-2.5 text-sm font-black text-white/72 transition hover:bg-white hover:text-black md:inline-flex"
+              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-white/72 transition hover:bg-white hover:text-black md:inline-flex"
             >
               Export
             </button>
 
             <Link
               href="/dashboard"
-              className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm font-bold text-white/72 transition hover:bg-white hover:text-black"
+              className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black"
             >
               Back to Studio
             </Link>
 
             <button
               onClick={handleResetEdit}
-              className="rounded-full border border-white/10 bg-white/[0.06] px-4 py-2.5 text-sm font-bold text-white/72 transition hover:bg-white hover:text-black"
+              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black sm:inline-flex"
             >
               Reset edit
             </button>
 
             <button
               onClick={handleDelete}
-              className="rounded-full border border-rose-300/20 bg-rose-300/10 px-4 py-2.5 text-sm font-bold text-rose-100 transition hover:bg-rose-200 hover:text-black"
+              className="hidden rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-2 text-xs font-bold text-rose-100 transition hover:bg-rose-200 hover:text-black md:inline-flex"
             >
               Delete project
             </button>
 
             <button
               onClick={handleLogout}
-              className="rounded-full border border-white/10 bg-white/[0.06] px-5 py-2.5 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
+              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-white/72 transition hover:bg-white hover:text-black lg:inline-flex"
             >
               Sign out
             </button>
@@ -3156,10 +3157,10 @@ export default function ProjectDetailsPage() {
         </div>
       </nav>
 
-      <section className="relative z-10 mx-auto max-w-[1900px] px-4 py-4 sm:px-6">
-        <div className="grid gap-4 lg:h-[calc(100vh-92px)] lg:grid-cols-[280px_minmax(0,1fr)_390px]">
+      <section className="mx-auto flex min-h-0 w-full max-w-[1900px] flex-1 overflow-hidden px-3 py-3 sm:px-4">
+        <div className="grid min-h-0 w-full gap-3 lg:grid-cols-[270px_minmax(0,1fr)_380px]">
           <aside className="hidden min-h-0 overflow-hidden rounded-[2rem] border border-white/10 bg-[#111018]/82 shadow-2xl shadow-black/25 backdrop-blur-2xl lg:block">
-            <div className="border-b border-white/10 p-5">
+            <div className="border-b border-white/10 p-4">
               <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
                 Studio Tools
               </p>
@@ -3175,7 +3176,7 @@ export default function ProjectDetailsPage() {
               </div>
             </div>
 
-            <div className="space-y-2 p-3">
+            <div className="max-h-[calc(100dvh-205px)] space-y-2 overflow-y-auto p-3">
               {studioTools.map((tool) => (
                 <button
                   key={tool.key}
@@ -3265,61 +3266,26 @@ export default function ProjectDetailsPage() {
               ))}
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d0b13]/88 shadow-2xl shadow-black/30 backdrop-blur-2xl">
-              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
-                <div className="flex flex-wrap gap-2">
-                  {frameOptions.map((item) => (
-                    <button
-                      key={item.value}
-                      onClick={() => setCanvasFormat(item.value)}
-                      className={`rounded-full px-4 py-2 text-xs font-black transition ${
-                        canvasFormat === item.value
-                          ? "bg-white text-black"
-                          : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
-                      }`}
-                    >
-                      {item.value}
-                    </button>
-                  ))}
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.6rem] border border-white/10 bg-[#0d0b13]/88 shadow-2xl shadow-black/30 backdrop-blur-2xl">
+              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/32">
+                    Live Preview
+                  </p>
+                  <p className="mt-1 truncate text-sm font-black text-white/68">
+                    {productionExportSummary}
+                  </p>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setFitMode("cover")}
-                    className={`rounded-full px-4 py-2 text-xs font-black transition ${
-                      fitMode === "cover"
-                        ? "bg-white text-black"
-                        : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
-                    }`}
-                  >
-                    Full Frame
-                  </button>
-
-                  <button
-                    onClick={() => setFitMode("contain")}
-                    className={`rounded-full px-4 py-2 text-xs font-black transition ${
-                      fitMode === "contain"
-                        ? "bg-white text-black"
-                        : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
-                    }`}
-                  >
-                    Original View
-                  </button>
-
-                  <button
-                    onClick={() => setFitMode("blurredBackground")}
-                    className={`rounded-full px-4 py-2 text-xs font-black transition ${
-                      fitMode === "blurredBackground"
-                        ? "bg-white text-black"
-                        : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
-                    }`}
-                  >
-                    Blurred Background
-                  </button>
-                </div>
+                <button
+                  onClick={() => setActiveTool("frame")}
+                  className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-white/60 transition hover:bg-white hover:text-black"
+                >
+                  Frame settings
+                </button>
               </div>
 
-              <div className="relative flex min-h-[480px] flex-1 items-center justify-center overflow-hidden p-4 sm:p-6">
+              <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 sm:p-4">
                 {localVideoURL && backgroundStyle === "blur" && (
                   <video
                     src={localVideoURL}
@@ -3420,15 +3386,15 @@ export default function ProjectDetailsPage() {
                 </div>
               </div>
 
-              <div className="border-t border-white/10 bg-black/22 p-4">
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="shrink-0 border-t border-white/10 bg-black/22 p-3">
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
                         Timeline
                       </p>
 
-                      <p className="mt-1 text-sm text-white/48">
+                      <p className="mt-0.5 text-xs text-white/48">
                         Selected range: {trimStart}s to{" "}
                         {trimEnd || videoDuration}s · {selectedRange}s
                       </p>
@@ -3438,18 +3404,18 @@ export default function ProjectDetailsPage() {
                       <button
                         onClick={handlePlayTrimPreview}
                         disabled={!localVideoURL}
-                        className="rounded-2xl bg-white px-5 py-3 text-sm font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="rounded-2xl bg-white px-4 py-2.5 text-xs font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         Preview
                       </button>
 
-                      <span className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-5 py-3 text-sm font-black text-emerald-100">
+                      <span className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-xs font-black text-emerald-100">
                         {autoSaveStatus}
                       </span>
                     </div>
                   </div>
 
-                  <div className="grid gap-4 xl:grid-cols-[110px_1fr_110px] xl:items-center">
+                  <div className="grid gap-3 xl:grid-cols-[96px_1fr_96px] xl:items-center">
                     <div>
                       <label className="text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
                         Start
@@ -3462,7 +3428,7 @@ export default function ProjectDetailsPage() {
                         onChange={(event) =>
                           setTrimStart(Number(event.target.value))
                         }
-                        className="mt-2 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300/60"
+                        className="mt-1.5 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300/60"
                       />
                     </div>
 
@@ -3542,7 +3508,7 @@ export default function ProjectDetailsPage() {
                         onChange={(event) =>
                           setTrimEnd(Number(event.target.value))
                         }
-                        className="mt-2 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-4 py-3 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300/60"
+                        className="mt-1.5 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300/60"
                       />
                     </div>
                   </div>
@@ -3551,11 +3517,12 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
 
-          <aside className="min-h-0 overflow-y-auto rounded-[2rem]">
+          <aside className="min-h-0 overflow-hidden rounded-[1.6rem]">
             {renderInspector()}
           </aside>
         </div>
       </section>
+      </div>
     </main>
   );
 }
