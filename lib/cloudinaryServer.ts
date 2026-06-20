@@ -49,16 +49,18 @@ type PhaseOneBackgroundSettings = {
 };
 
 type PhaseOneTitleOverlay = {
-  enabled: boolean;
   text: string;
   style:
-    | "cleanWhite"
-    | "creatorYellow"
-    | "neonGreen"
-    | "boldCaption"
+    | "minimal"
+    | "creator"
+    | "luxury"
+    | "neon"
+    | "caption"
     | "lowerThird"
     | string;
-  position: "top" | "center" | "bottom" | "lowerThird" | string;
+  x: number;
+  y: number;
+  align: "left" | "center" | "right" | string;
   size: "small" | "medium" | "large" | "xl" | string;
 };
 
@@ -235,7 +237,7 @@ export function createPhaseOneCloudinaryExportUrl(
 
   const titleOverlay = normalizeTitleOverlay(options.titleOverlay);
 
-  if (titleOverlay.enabled) {
+  if (titleOverlay.text.length > 0) {
     transformation.push(...createTitleOverlayTransformation(titleOverlay, {
       width: options.width,
       height: options.height,
@@ -263,13 +265,13 @@ function normalizeTitleOverlay(
   value: Partial<PhaseOneTitleOverlay> | undefined,
 ): PhaseOneTitleOverlay {
   const text = sanitizeTitleText(value?.text);
-  const enabled = Boolean(value?.enabled) && text.length > 0;
 
   return {
-    enabled,
-    text: enabled ? text : "",
+    text,
     style: normalizeTitleStyle(value?.style),
-    position: normalizeTitlePosition(value?.position),
+    x: clampNumber(value?.x, 0, 100, 50),
+    y: clampNumber(value?.y, 8, 88, 78),
+    align: normalizeTitleAlign(value?.align),
     size: normalizeTitleSize(value?.size),
   };
 }
@@ -301,18 +303,26 @@ function createTitleOverlayTransformation(
   dimensions: { width: number; height: number },
 ) {
   const style = getTitleStyle(title.style);
-  const position = getTitlePosition(title.position);
   const fontSize = getTitleFontSize(title.size, dimensions.width);
+  const maxWidth = Math.round(dimensions.width * 0.76);
+  const safeX = Math.round((title.x / 100) * dimensions.width);
+  const safeY = Math.round((title.y / 100) * dimensions.height);
+  const layerX = getTitleLayerX(title.align, safeX, maxWidth, dimensions.width);
+  const layerY = Math.max(
+    24,
+    Math.min(dimensions.height - Math.round(fontSize * 1.4), safeY - fontSize),
+  );
   const textLayer: Record<string, unknown> = {
     overlay: {
       font_family: "Arial",
       font_size: fontSize,
       font_weight: "bold",
       text: title.text,
+      text_align: title.align,
     },
     color: style.color,
     effect: style.effect,
-    width: Math.round(dimensions.width * 0.86),
+    width: maxWidth,
     crop: "fit",
   };
 
@@ -325,10 +335,23 @@ function createTitleOverlayTransformation(
     textLayer,
     {
       flags: "layer_apply",
-      gravity: position.gravity,
-      y: position.y,
+      gravity: "north_west",
+      x: layerX,
+      y: layerY,
     },
   ];
+}
+
+function getTitleLayerX(
+  align: string,
+  x: number,
+  width: number,
+  canvasWidth: number,
+) {
+  const targetX =
+    align === "left" ? x : align === "right" ? x - width : x - width / 2;
+
+  return Math.round(Math.max(24, Math.min(canvasWidth - width - 24, targetX)));
 }
 
 function sanitizeTitleText(value: unknown) {
@@ -338,20 +361,19 @@ function sanitizeTitleText(value: unknown) {
 }
 
 function normalizeTitleStyle(value: unknown) {
-  return value === "creatorYellow" ||
-    value === "neonGreen" ||
-    value === "boldCaption" ||
+  return value === "creator" ||
+    value === "luxury" ||
+    value === "neon" ||
+    value === "caption" ||
     value === "lowerThird"
     ? value
-    : "cleanWhite";
+    : "minimal";
 }
 
-function normalizeTitlePosition(value: unknown) {
-  return value === "top" ||
-    value === "center" ||
-    value === "lowerThird"
+function normalizeTitleAlign(value: unknown) {
+  return value === "left" || value === "right"
     ? value
-    : "bottom";
+    : "center";
 }
 
 function normalizeTitleSize(value: unknown) {
@@ -360,16 +382,28 @@ function normalizeTitleSize(value: unknown) {
     : "large";
 }
 
+function clampNumber(value: unknown, min: number, max: number, fallback: number) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return fallback;
+
+  return Math.min(max, Math.max(min, parsed));
+}
+
 function getTitleStyle(style: string) {
-  if (style === "creatorYellow") {
+  if (style === "creator") {
     return { color: "#FFD84D", effect: "shadow:50" };
   }
 
-  if (style === "neonGreen") {
-    return { color: "#65FF8A", effect: "shadow:50" };
+  if (style === "luxury") {
+    return { color: "#F5E6BC", effect: "shadow:45" };
   }
 
-  if (style === "boldCaption") {
+  if (style === "neon") {
+    return { color: "#6DFFE5", effect: "shadow:60" };
+  }
+
+  if (style === "caption") {
     return { color: "#FFFFFF", effect: "shadow:35", background: "#000000" };
   }
 
@@ -378,22 +412,6 @@ function getTitleStyle(style: string) {
   }
 
   return { color: "#FFFFFF", effect: "shadow:45" };
-}
-
-function getTitlePosition(position: string) {
-  if (position === "top") {
-    return { gravity: "north", y: 120 };
-  }
-
-  if (position === "center") {
-    return { gravity: "center", y: 0 };
-  }
-
-  if (position === "lowerThird") {
-    return { gravity: "south", y: 220 };
-  }
-
-  return { gravity: "south", y: 120 };
 }
 
 function getTitleFontSize(size: string, width: number) {

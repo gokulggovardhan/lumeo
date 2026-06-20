@@ -26,18 +26,20 @@ type BackgroundSettings = {
   dimStyle: BackgroundDimStyle;
 };
 type TitleStyle =
-  | "cleanWhite"
-  | "creatorYellow"
-  | "neonGreen"
-  | "boldCaption"
+  | "minimal"
+  | "creator"
+  | "luxury"
+  | "neon"
+  | "caption"
   | "lowerThird";
-type TitlePosition = "top" | "center" | "bottom" | "lowerThird";
+type TitleAlign = "left" | "center" | "right";
 type TitleSize = "small" | "medium" | "large" | "xl";
 type TitleOverlaySettings = {
-  enabled: boolean;
   text: string;
   style: TitleStyle;
-  position: TitlePosition;
+  x: number;
+  y: number;
+  align: TitleAlign;
   size: TitleSize;
 };
 type ExportFailureStage =
@@ -319,7 +321,7 @@ export async function POST(request: NextRequest) {
         outputHeight: dimensions.height,
         frameMode: settings.frameMode,
         format: "mp4",
-        titleIncluded: settings.titleOverlay.enabled,
+        titleIncluded: settings.titleOverlay.text.length > 0,
       },
     });
   } catch (error) {
@@ -559,13 +561,13 @@ function normalizeTitleOverlay(
       ? (legacyValue as Record<string, unknown>)
       : {};
   const text = sanitizeTitleText(source.text || legacy.text);
-  const enabled = Boolean(source.enabled) && text.length > 0;
 
   return {
-    enabled,
-    text: enabled ? text : "",
+    text,
     style: normalizeTitleStyle(source.style),
-    position: normalizeTitlePosition(source.position),
+    x: clampNumber(source.x ?? legacy.x, 0, 100, 50),
+    y: clampNumber(source.y ?? legacy.y, 8, 88, 78),
+    align: normalizeTitleAlign(source.align),
     size: normalizeTitleSize(source.size),
   };
 }
@@ -577,26 +579,33 @@ function sanitizeTitleText(value: unknown) {
 }
 
 function normalizeTitleStyle(value: unknown): TitleStyle {
-  return value === "creatorYellow" ||
-    value === "neonGreen" ||
-    value === "boldCaption" ||
+  return value === "creator" ||
+    value === "luxury" ||
+    value === "neon" ||
+    value === "caption" ||
     value === "lowerThird"
     ? value
-    : "cleanWhite";
+    : "minimal";
 }
 
-function normalizeTitlePosition(value: unknown): TitlePosition {
-  return value === "top" ||
-    value === "center" ||
-    value === "lowerThird"
+function normalizeTitleAlign(value: unknown): TitleAlign {
+  return value === "left" || value === "right"
     ? value
-    : "bottom";
+    : "center";
 }
 
 function normalizeTitleSize(value: unknown): TitleSize {
   return value === "small" || value === "medium" || value === "xl"
     ? value
     : "large";
+}
+
+function clampNumber(value: unknown, min: number, max: number, fallback: number) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return fallback;
+
+  return Math.min(max, Math.max(min, parsed));
 }
 
 function toSafeNumber(value: unknown, fallback: number) {
@@ -613,7 +622,7 @@ function toNullableNumber(value: unknown) {
 
 async function fetchTransformedExportWithRetry(url: string) {
   const retryStatuses = new Set([420, 423, 404, 429, 500, 502, 503, 504]);
-  const delays = [1000, 2000, 4000, 8000, 12000];
+  const delays = [2000, 4000, 8000, 12000, 18000, 24000, 30000, 30000];
   let lastStatus = 0;
 
   for (let attempt = 0; attempt <= delays.length; attempt += 1) {
@@ -641,10 +650,51 @@ async function fetchTransformedExportWithRetry(url: string) {
       throw new Error(`Transformed export fetch failed with status ${lastStatus}.`);
     }
 
-    await delay(delays[attempt]);
+    const retryAfterMs = getRetryAfterMs(response.headers.get("retry-after"));
+    const delayMs = retryAfterMs ?? delays[attempt];
+
+    try {
+      const snippet = (await response.text()).slice(0, 240);
+      if (snippet) {
+        console.warn("[Lumeo Export] transformed MP4 response snippet", {
+          attempt: attempt + 1,
+          snippet,
+        });
+      }
+    } catch (snippetError) {
+      console.warn("[Lumeo Export] transformed MP4 snippet unavailable", {
+        attempt: attempt + 1,
+        error: snippetError,
+      });
+    }
+
+    console.info("[Lumeo Export] transformed MP4 retry scheduled", {
+      attempt: attempt + 1,
+      delayMs,
+    });
+
+    await delay(delayMs);
   }
 
   throw new Error(`Transformed export fetch failed with status ${lastStatus}.`);
+}
+
+function getRetryAfterMs(value: string | null) {
+  if (!value) return null;
+
+  const seconds = Number(value);
+
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(30000, Math.round(seconds * 1000));
+  }
+
+  const dateMs = Date.parse(value);
+
+  if (Number.isFinite(dateMs)) {
+    return Math.min(30000, Math.max(0, dateMs - Date.now()));
+  }
+
+  return null;
 }
 
 function delay(ms: number) {
@@ -670,7 +720,7 @@ function getSafeFailureDetails(stage: ExportFailureStage) {
     case "transformationBuild":
       return "Export settings could not be applied.";
     case "transformedFetch":
-      return "Rendered video was not ready.";
+      return "Rendered video was not ready in time.";
     case "permanentExportUpload":
       return "Export could not be saved.";
     case "downloadUrlCreate":

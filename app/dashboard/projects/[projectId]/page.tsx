@@ -55,12 +55,13 @@ type AudioFormat = "mp3" | "wav";
 type ExportQuality = "standard" | "high" | "max";
 type ExportFps = 24 | 30 | 60;
 type TitleStyle =
-  | "cleanWhite"
-  | "creatorYellow"
-  | "neonGreen"
-  | "boldCaption"
+  | "minimal"
+  | "creator"
+  | "luxury"
+  | "neon"
+  | "caption"
   | "lowerThird";
-type TitlePosition = "top" | "center" | "bottom" | "lowerThird";
+type TitleAlign = "left" | "center" | "right";
 type TitleSize = "small" | "medium" | "large" | "xl";
 
 const tools: { key: ToolKey; label: string; description: string; icon: string }[] =
@@ -85,29 +86,6 @@ const studioTools: { key: ToolKey; label: string; description: string; icon: str
     { key: "export", label: "Export", description: "Output settings", icon: "E" },
   ];
 
-const comingSoonTools = [
-  "Multi-track timeline",
-  "Split-screen templates",
-  "Keyframes",
-  "Speed ramp",
-  "Progress bar overlay",
-  "Transitions",
-  "Stickers",
-  "Audio ducking",
-  "SFX",
-  "Brand kit",
-  "Batch export",
-  "60fps",
-];
-
-const aiLaterTools = [
-  "AI captions",
-  "AI shorts clipper",
-  "AI face tracking",
-  "AI denoise",
-  "AI dubbing",
-];
-
 const frameOptions: { value: CanvasFormat; label: string }[] = [
   { value: "9:16", label: "9:16 Vertical" },
   { value: "1:1", label: "1:1 Square" },
@@ -127,17 +105,11 @@ const backgroundDimOptions: { value: BackgroundDimStyle; label: string }[] = [
 ];
 
 const titleStyles: { value: TitleStyle; label: string }[] = [
-  { value: "cleanWhite", label: "Clean White" },
-  { value: "creatorYellow", label: "Creator Yellow" },
-  { value: "neonGreen", label: "Neon Green" },
-  { value: "boldCaption", label: "Bold Caption" },
-  { value: "lowerThird", label: "Lower Third" },
-];
-
-const titlePositions: { value: TitlePosition; label: string }[] = [
-  { value: "top", label: "Top" },
-  { value: "center", label: "Center" },
-  { value: "bottom", label: "Bottom" },
+  { value: "minimal", label: "Minimal" },
+  { value: "creator", label: "Creator" },
+  { value: "luxury", label: "Luxury" },
+  { value: "neon", label: "Neon" },
+  { value: "caption", label: "Caption" },
   { value: "lowerThird", label: "Lower Third" },
 ];
 
@@ -146,6 +118,23 @@ const titleSizes: { value: TitleSize; label: string }[] = [
   { value: "medium", label: "Medium" },
   { value: "large", label: "Large" },
   { value: "xl", label: "XL" },
+];
+
+const titleAlignments: { value: TitleAlign; label: string }[] = [
+  { value: "left", label: "Left" },
+  { value: "center", label: "Center" },
+  { value: "right", label: "Right" },
+];
+
+const titleQuickPositions = [
+  { label: "Top Left", x: 18, y: 14, align: "left" as TitleAlign },
+  { label: "Top Center", x: 50, y: 14, align: "center" as TitleAlign },
+  { label: "Top Right", x: 82, y: 14, align: "right" as TitleAlign },
+  { label: "Center", x: 50, y: 50, align: "center" as TitleAlign },
+  { label: "Bottom Left", x: 18, y: 82, align: "left" as TitleAlign },
+  { label: "Bottom Center", x: 50, y: 82, align: "center" as TitleAlign },
+  { label: "Bottom Right", x: 82, y: 82, align: "right" as TitleAlign },
+  { label: "Lower Third", x: 50, y: 76, align: "center" as TitleAlign },
 ];
 
 function getOutputDimensions(
@@ -481,26 +470,33 @@ function normalizeOverlayText(value: unknown) {
 }
 
 function normalizeTitleStyle(value: unknown): TitleStyle {
-  return value === "creatorYellow" ||
-    value === "neonGreen" ||
-    value === "boldCaption" ||
+  return value === "creator" ||
+    value === "luxury" ||
+    value === "neon" ||
+    value === "caption" ||
     value === "lowerThird"
     ? value
-    : "cleanWhite";
+    : "minimal";
 }
 
-function normalizeTitlePosition(value: unknown): TitlePosition {
-  return value === "top" ||
-    value === "center" ||
-    value === "lowerThird"
+function normalizeTitleAlign(value: unknown): TitleAlign {
+  return value === "left" || value === "right"
     ? value
-    : "bottom";
+    : "center";
 }
 
 function normalizeTitleSize(value: unknown): TitleSize {
   return value === "small" || value === "medium" || value === "xl"
     ? value
     : "large";
+}
+
+function clampTitleCoordinate(value: unknown, min: number, max: number, fallback: number) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return fallback;
+
+  return Math.min(max, Math.max(min, parsed));
 }
 
 function normalizeBackgroundBlurStyle(value: unknown): BackgroundBlurStyle {
@@ -807,13 +803,12 @@ export default function ProjectDetailsPage() {
   const [videoVolume, setVideoVolume] = useState(100);
   const [mutedOriginal, setMutedOriginal] = useState(false);
 
-  const [titleEnabled, setTitleEnabled] = useState(false);
-  const [titleStyle, setTitleStyle] = useState<TitleStyle>("cleanWhite");
-  const [titlePosition, setTitlePosition] = useState<TitlePosition>("bottom");
+  const [titleStyle, setTitleStyle] = useState<TitleStyle>("minimal");
+  const [titleAlign, setTitleAlign] = useState<TitleAlign>("center");
   const [titleSize, setTitleSize] = useState<TitleSize>("large");
   const [overlayText, setOverlayText] = useState("");
   const [overlayX, setOverlayX] = useState(50);
-  const [overlayY, setOverlayY] = useState(45);
+  const [overlayY, setOverlayY] = useState(78);
   const [overlaySize, setOverlaySize] = useState(34);
   const [overlayColor, setOverlayColor] = useState("#ffffff");
   const [overlayOpacity, setOverlayOpacity] = useState(100);
@@ -895,32 +890,39 @@ export default function ProjectDetailsPage() {
   const blurredBackgroundOverlayClass =
     backgroundDimStyle === "dark" ? "bg-black/40" : "bg-black/30";
   const visibleOverlayText = overlayText.trim().slice(0, 80);
-  const hasActiveTitleOverlay = titleEnabled && visibleOverlayText.length > 0;
+  const hasActiveTitleOverlay = visibleOverlayText.length > 0;
   const titleOverlayForExport = {
-    enabled: hasActiveTitleOverlay,
     text: hasActiveTitleOverlay ? visibleOverlayText : "",
     style: titleStyle,
-    position: titlePosition,
+    x: clampTitleCoordinate(overlayX, 0, 100, 50),
+    y: clampTitleCoordinate(overlayY, 8, 88, 78),
+    align: titleAlign,
     size: titleSize,
   };
   const titlePreviewClass =
-    titleStyle === "creatorYellow"
+    titleStyle === "creator"
       ? "text-[#FFD84D] [text-shadow:0_4px_0_rgba(0,0,0,0.9),0_12px_32px_rgba(0,0,0,0.85)]"
-      : titleStyle === "neonGreen"
-        ? "text-[#65FF8A] [text-shadow:0_4px_0_rgba(0,0,0,0.9),0_12px_32px_rgba(0,0,0,0.85)]"
-        : titleStyle === "boldCaption"
+      : titleStyle === "luxury"
+        ? "text-[#F5E6BC] [text-shadow:0_10px_32px_rgba(0,0,0,0.85),0_0_24px_rgba(245,215,150,0.22)]"
+        : titleStyle === "neon"
+          ? "text-[#6DFFE5] [text-shadow:0_0_18px_rgba(109,255,229,0.5),0_5px_24px_rgba(0,0,0,0.9)]"
+        : titleStyle === "caption"
           ? "rounded-2xl bg-black/70 px-5 py-3 text-white shadow-2xl shadow-black/50"
           : titleStyle === "lowerThird"
             ? "rounded-2xl bg-black/58 px-5 py-3 text-white shadow-2xl shadow-black/45 backdrop-blur-md"
             : "text-white [text-shadow:0_8px_32px_rgba(0,0,0,0.95),0_2px_8px_rgba(0,0,0,0.9)]";
-  const titlePreviewPositionClass =
-    titlePosition === "top"
-      ? "top-[14%]"
-      : titlePosition === "center"
-        ? "top-1/2"
-        : titlePosition === "lowerThird"
-          ? "top-[76%]"
-          : "top-[82%]";
+  const titlePreviewAlignClass =
+    titleAlign === "left"
+      ? "text-left"
+      : titleAlign === "right"
+        ? "text-right"
+        : "text-center";
+  const titlePreviewTransform =
+    titleAlign === "left"
+      ? "translate(0, -50%)"
+      : titleAlign === "right"
+        ? "translate(-100%, -50%)"
+        : "translate(-50%, -50%)";
   const titlePreviewSizeClass =
     titleSize === "small"
       ? "text-xl sm:text-2xl"
@@ -929,22 +931,6 @@ export default function ProjectDetailsPage() {
         : titleSize === "xl"
           ? "text-4xl sm:text-6xl"
           : "text-3xl sm:text-5xl";
-  const hasPreviewOnlyExportEdits =
-    brightness !== 100 ||
-    contrast !== 100 ||
-    saturation !== 100 ||
-    grayscale !== 0 ||
-    blur !== 0 ||
-    playbackSpeed !== 1 ||
-    rotate !== 0 ||
-    flipX ||
-    videoZoom !== 100 ||
-    videoX !== 0 ||
-    videoY !== 0 ||
-    videoVolume !== 100 ||
-    mutedOriginal ||
-    Boolean(localAudioURL);
-
   const canvasFrameClass =
     canvasFormat === "9:16"
       ? "aspect-[9/16] h-full max-h-[640px]"
@@ -1047,13 +1033,16 @@ export default function ProjectDetailsPage() {
             const savedTitleText = normalizeOverlayText(
               savedTitleOverlay.text || editor.textOverlay?.text,
             );
-            setTitleEnabled(Boolean(savedTitleOverlay.enabled && savedTitleText));
             setTitleStyle(normalizeTitleStyle(savedTitleOverlay.style));
-            setTitlePosition(normalizeTitlePosition(savedTitleOverlay.position));
+            setTitleAlign(normalizeTitleAlign(savedTitleOverlay.align));
             setTitleSize(normalizeTitleSize(savedTitleOverlay.size));
             setOverlayText(savedTitleText);
-            setOverlayX(editor.textOverlay?.x ?? 50);
-            setOverlayY(editor.textOverlay?.y ?? 45);
+            setOverlayX(
+              clampTitleCoordinate(savedTitleOverlay.x ?? editor.textOverlay?.x, 0, 100, 50),
+            );
+            setOverlayY(
+              clampTitleCoordinate(savedTitleOverlay.y ?? editor.textOverlay?.y, 8, 88, 78),
+            );
             setOverlaySize(editor.textOverlay?.size ?? 34);
             setOverlayColor(editor.textOverlay?.color || "#ffffff");
             setOverlayOpacity(editor.textOverlay?.opacity ?? 100);
@@ -2154,7 +2143,7 @@ export default function ProjectDetailsPage() {
       "editor.textOverlay": {
         text: visibleOverlayText,
         x: Number(overlayX) || 50,
-        y: Number(overlayY) || 45,
+        y: Number(overlayY) || 78,
         size: Number(overlaySize) || 34,
         color: overlayColor || "#ffffff",
         opacity: Number(overlayOpacity) || 100,
@@ -2163,10 +2152,11 @@ export default function ProjectDetailsPage() {
         shadow: overlayShadow,
       },
       "editor.titleOverlay": {
-        enabled: titleOverlayForExport.enabled,
         text: titleOverlayForExport.text,
         style: titleOverlayForExport.style,
-        position: titleOverlayForExport.position,
+        x: titleOverlayForExport.x,
+        y: titleOverlayForExport.y,
+        align: titleOverlayForExport.align,
         size: titleOverlayForExport.size,
       },
       "editor.effects": {
@@ -2267,9 +2257,8 @@ export default function ProjectDetailsPage() {
     playbackSpeed,
     videoVolume,
     mutedOriginal,
-    titleEnabled,
     titleStyle,
-    titlePosition,
+    titleAlign,
     titleSize,
     overlayText,
     overlayX,
@@ -2344,13 +2333,12 @@ export default function ProjectDetailsPage() {
     setPlaybackSpeed(1);
     setVideoVolume(100);
     setMutedOriginal(false);
-    setTitleEnabled(false);
-    setTitleStyle("cleanWhite");
-    setTitlePosition("bottom");
+    setTitleStyle("minimal");
+    setTitleAlign("center");
     setTitleSize("large");
     setOverlayText("");
     setOverlayX(50);
-    setOverlayY(45);
+    setOverlayY(78);
     setOverlaySize(34);
     setOverlayColor("#ffffff");
     setOverlayOpacity(100);
@@ -2481,36 +2469,7 @@ export default function ProjectDetailsPage() {
               </div>
             )}
 
-            <UploadDropzone
-              id="audio-upload"
-              title="Add music or audio"
-              subtitle="Upload music, voiceover, or background audio for the edit."
-              accept="audio/*"
-              onChange={handleAudioSelect}
-            />
-
-            {localAudioURL && (
-              <div className="rounded-[1.5rem] border border-white/10 bg-black/30 p-4">
-                <p className="truncate text-sm font-black text-white">
-                  {localAudioName}
-                </p>
-
-                <audio
-                  ref={audioPreviewRef}
-                  src={localAudioURL}
-                  controls
-                  className="mt-4 w-full"
-                />
-
-                {audioRestored && (
-                  <p className="mt-3 text-xs font-bold text-emerald-200">
-                    Sound restored locally.
-                  </p>
-                )}
-              </div>
-            )}
-
-            {(localVideoURL || localAudioURL) && (
+            {localVideoURL && (
               <button
                 onClick={handleClearLocalMedia}
                 className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/65 transition hover:bg-white hover:text-black"
@@ -2665,10 +2624,6 @@ export default function ProjectDetailsPage() {
               Clear trim
             </button>
 
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4 text-sm font-bold text-white/52">
-              Speed ramp, transitions, keyframes, and manual repositioning are
-              in Coming soon.
-            </div>
           </div>
         </Panel>
       );
@@ -2770,31 +2725,9 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "text") {
       return (
-        <Panel title="Titles" subtitle="Add a clean title that exports with your video.">
+        <Panel title="Titles" subtitle="Design a polished title for this export.">
           <div className="space-y-5">
-            <div>
-              <label className="text-sm font-bold text-white/58">
-                Enable title
-              </label>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <OptionButton
-                  active={!titleEnabled}
-                  onClick={() => setTitleEnabled(false)}
-                >
-                  Title off
-                </OptionButton>
-
-                <OptionButton
-                  active={titleEnabled}
-                  onClick={() => setTitleEnabled(true)}
-                >
-                  Title on
-                </OptionButton>
-              </div>
-            </div>
-
-            <div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
               <label className="text-sm font-bold text-white/58">
                 Title text
               </label>
@@ -2806,7 +2739,7 @@ export default function ProjectDetailsPage() {
                 }
                 placeholder="Add your title"
                 maxLength={80}
-                className="mt-3 min-h-24 w-full rounded-[1.5rem] border border-white/10 bg-white/[0.08] px-4 py-3 text-white outline-none placeholder:text-white/32 transition focus:border-fuchsia-300/60"
+                className="mt-3 min-h-24 w-full rounded-[1.25rem] border border-white/10 bg-black/25 px-4 py-3 text-white outline-none placeholder:text-white/32 transition focus:border-fuchsia-200/60 focus:bg-black/35"
               />
 
               <p className="mt-2 text-right text-xs font-bold text-white/34">
@@ -2816,19 +2749,41 @@ export default function ProjectDetailsPage() {
 
             <div>
               <label className="text-sm font-bold text-white/58">
-                Style templates
+                Style
               </label>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
                 {titleStyles.map((item) => (
-                  <OptionButton
+                  <button
                     key={item.value}
-                    active={titleStyle === item.value}
                     onClick={() => setTitleStyle(item.value)}
-                    small
+                    className={`rounded-2xl border p-3 text-left transition ${
+                      titleStyle === item.value
+                        ? "border-fuchsia-200/50 bg-white/[0.12] shadow-lg shadow-fuchsia-500/10"
+                        : "border-white/10 bg-white/[0.045] hover:border-white/18 hover:bg-white/[0.08]"
+                    }`}
                   >
-                    {item.label}
-                  </OptionButton>
+                    <span className="block text-xs font-black text-white/58">
+                      {item.label}
+                    </span>
+                    <span
+                      className={`mt-2 block truncate rounded-xl px-3 py-2 text-sm font-black ${
+                        item.value === "creator"
+                          ? "bg-black/35 text-[#FFD84D]"
+                          : item.value === "luxury"
+                            ? "bg-gradient-to-r from-[#2c2415] to-black/30 text-[#F5E6BC]"
+                            : item.value === "neon"
+                              ? "bg-black/35 text-[#6DFFE5] shadow-[0_0_18px_rgba(109,255,229,0.18)]"
+                              : item.value === "caption"
+                                ? "bg-black/70 text-white"
+                                : item.value === "lowerThird"
+                                  ? "bg-black/55 text-white"
+                                  : "bg-white/[0.06] text-white"
+                      }`}
+                    >
+                      Aa
+                    </span>
+                  </button>
                 ))}
               </div>
             </div>
@@ -2838,12 +2793,64 @@ export default function ProjectDetailsPage() {
                 Position
               </label>
 
+              <div className="mt-3 space-y-4 rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
+                <RangeControl
+                  label="Horizontal"
+                  value={overlayX}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  onChange={setOverlayX}
+                />
+                <div className="-mt-2 flex justify-between text-[10px] font-black uppercase tracking-[0.14em] text-white/34">
+                  <span>Left</span>
+                  <span>Center</span>
+                  <span>Right</span>
+                </div>
+
+                <RangeControl
+                  label="Vertical"
+                  value={overlayY}
+                  min={8}
+                  max={88}
+                  suffix="%"
+                  onChange={setOverlayY}
+                />
+                <div className="-mt-2 flex justify-between text-[10px] font-black uppercase tracking-[0.14em] text-white/34">
+                  <span>Top</span>
+                  <span>Middle</span>
+                  <span>Bottom</span>
+                </div>
+              </div>
+
               <div className="mt-3 grid grid-cols-2 gap-2">
-                {titlePositions.map((item) => (
+                {titleQuickPositions.map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => {
+                      setOverlayX(item.x);
+                      setOverlayY(item.y);
+                      setTitleAlign(item.align);
+                    }}
+                    className="rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-2.5 text-xs font-black text-white/58 transition hover:border-white/18 hover:bg-white/[0.08] hover:text-white"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-white/58">
+                Alignment
+              </label>
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {titleAlignments.map((item) => (
                   <OptionButton
                     key={item.value}
-                    active={titlePosition === item.value}
-                    onClick={() => setTitlePosition(item.value)}
+                    active={titleAlign === item.value}
+                    onClick={() => setTitleAlign(item.value)}
                     small
                   >
                     {item.label}
@@ -2866,28 +2873,6 @@ export default function ProjectDetailsPage() {
                     {item.label}
                   </OptionButton>
                 ))}
-              </div>
-            </div>
-
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-black text-white/68">Coming soon</p>
-                <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
-                  Coming soon
-                </span>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {["Animated captions", "Auto captions", "Word-by-word captions"].map(
-                  (item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-bold text-white/45"
-                    >
-                      {item}
-                    </span>
-                  ),
-                )}
               </div>
             </div>
           </div>
@@ -2919,35 +2904,25 @@ export default function ProjectDetailsPage() {
               {mutedOriginal ? "Original muted" : "Mute original audio"}
             </button>
 
-            <RangeControl
-              label="Music volume"
-              value={musicVolume}
-              min={0}
-              max={100}
-              suffix="%"
-              onChange={setMusicVolume}
-            />
-
             {localAudioURL ? (
-              <audio
-                ref={audioRef}
-                src={localAudioURL}
-                controls
-                className="w-full"
-              />
-            ) : (
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-sm font-black text-white/68">Add music</p>
-                  <span className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
-                    Coming soon
-                  </span>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-white/42">
-                  Music controls stay ready here when audio is added.
-                </p>
-              </div>
-            )}
+              <>
+                <RangeControl
+                  label="Music volume"
+                  value={musicVolume}
+                  min={0}
+                  max={100}
+                  suffix="%"
+                  onChange={setMusicVolume}
+                />
+
+                <audio
+                  ref={audioRef}
+                  src={localAudioURL}
+                  controls
+                  className="w-full"
+                />
+              </>
+            ) : null}
           </div>
         </Panel>
       );
@@ -3097,18 +3072,7 @@ export default function ProjectDetailsPage() {
                 </OptionButton>
               </div>
 
-              <p className="mt-3 text-xs font-bold text-white/38">
-                60fps coming later.
-              </p>
             </div>
-
-            {hasPreviewOnlyExportEdits && (
-              <div className="rounded-[1.5rem] border border-amber-300/20 bg-amber-300/10 p-4">
-                <p className="text-sm font-bold leading-6 text-amber-100/82">
-                  Some tools are Coming soon.
-                </p>
-              </div>
-            )}
 
             <button
               onClick={handleExportVideo}
@@ -3463,37 +3427,6 @@ export default function ProjectDetailsPage() {
                 </button>
               ))}
 
-              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/36">
-                  Coming soon
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {comingSoonTools.slice(0, 8).map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-bold text-white/45"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/36">
-                  AI later
-                </p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {aiLaterTools.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-bold text-white/45"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-              </div>
             </div>
           </aside>
 
@@ -3598,29 +3531,22 @@ export default function ProjectDetailsPage() {
                       </>
                     ) : (
                       <div className="flex h-full w-full flex-col items-center justify-center px-8 text-center">
-                        <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-white text-3xl font-black text-black shadow-xl shadow-white/10">
-                          +
-                        </div>
-
                         <p className="text-2xl font-black">Add your first clip</p>
 
                         <p className="mt-3 max-w-xs text-sm leading-6 text-white/45">
-                          Import a video from the Media panel to start building
-                          your premium short.
+                          Choose a video from the Media Library to begin.
                         </p>
-
-                        <button
-                          onClick={() => setActiveTool("media")}
-                          className="mt-6 rounded-full bg-white px-6 py-3 text-sm font-black text-black transition hover:bg-fuchsia-100"
-                        >
-                          Open media
-                        </button>
                       </div>
                     )}
 
                     {localVideoURL && hasActiveTitleOverlay && (
                       <div
-                        className={`pointer-events-none absolute left-1/2 z-20 max-w-[86%] -translate-x-1/2 -translate-y-1/2 text-center font-black leading-tight ${titlePreviewPositionClass} ${titlePreviewSizeClass} ${titlePreviewClass}`}
+                        className={`pointer-events-none absolute z-20 max-w-[86%] font-black leading-tight ${titlePreviewAlignClass} ${titlePreviewSizeClass} ${titlePreviewClass}`}
+                        style={{
+                          left: `clamp(24px, ${titleOverlayForExport.x}%, calc(100% - 24px))`,
+                          top: `clamp(24px, ${titleOverlayForExport.y}%, calc(100% - 24px))`,
+                          transform: titlePreviewTransform,
+                        }}
                       >
                         {visibleOverlayText}
                       </div>
