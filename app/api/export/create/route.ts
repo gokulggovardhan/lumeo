@@ -38,7 +38,14 @@ type ExportRequestBody = {
     trimStart?: number;
     trimEnd?: number;
     canvasFormat?: CanvasFormat;
-    fitMode?: FitMode | "fit" | "fill" | "fullFrame" | "originalView" | "Full Frame" | "Original View";
+    fitMode?:
+      | FitMode
+      | "fit"
+      | "fill"
+      | "fullFrame"
+      | "originalView"
+      | "Full Frame"
+      | "Original View";
     resolution?: ExportResolution | "2k";
   };
 };
@@ -61,7 +68,14 @@ type ProjectData = {
     };
     canvas?: {
       format?: CanvasFormat;
-      fitMode?: FitMode | "fit" | "fill" | "fullFrame" | "originalView" | "Full Frame" | "Original View";
+      fitMode?:
+        | FitMode
+        | "fit"
+        | "fill"
+        | "fullFrame"
+        | "originalView"
+        | "Full Frame"
+        | "Original View";
     };
     exportSettings?: {
       resolution?: ExportResolution | "2k";
@@ -196,36 +210,30 @@ export async function POST(request: NextRequest) {
     const downloadUrl = await createDriveDownloadUrl(uploadedExport.fileId);
 
     failedStage = "metadataSave";
-    await projectRef.update({
-      "editor.export": {
-        status: "complete",
-        fileId: uploadedExport.fileId,
-        fileName: uploadedExport.fileName,
-        mimeType: "video/mp4",
-        size: uploadedExport.size,
-        createdAt,
-        settings: {
-          format: "mp4",
-          trimStart: settings.trimStart,
-          trimEnd: settings.trimEnd,
-          canvasFormat: settings.canvasFormat,
-          fitMode: settings.fitMode,
-          resolution: settings.resolution,
-          outputWidth: dimensions.width,
-          outputHeight: dimensions.height,
-          supportedFeatures: [
-            "mp4",
-            "trim",
-            "aspectRatio",
-            "resolution",
-            "originalAudio",
-          ],
-        },
-      },
-      updatedAt: new Date(),
+    let metadataSaved = true;
+    const exportMetadata = createExportMetadata({
+      fileId: uploadedExport.fileId,
+      fileName: uploadedExport.fileName,
+      size: uploadedExport.size,
+      createdAt,
+      settings,
+      dimensions,
     });
 
-    console.info("[Lumeo Export] project export metadata saved", { projectId });
+    try {
+      await projectRef.update({
+        "editor.export": exportMetadata,
+        updatedAt: createdAt,
+      });
+
+      console.info("[Lumeo Export] project export metadata saved", { projectId });
+    } catch (metadataError) {
+      metadataSaved = false;
+      console.error("[Lumeo Export] project export metadata save failed", {
+        projectId,
+        error: metadataError,
+      });
+    }
 
     failedStage = "tempCleanup";
     try {
@@ -245,6 +253,7 @@ export async function POST(request: NextRequest) {
       downloadUrl,
       fileName: uploadedExport.fileName,
       createdAt,
+      metadataSaved,
     });
   } catch (error) {
     console.error("[Lumeo Export] phase one export failed", {
@@ -341,10 +350,58 @@ function normalizeResolution(value: unknown): ExportResolution {
   return "720p";
 }
 
+function createExportMetadata({
+  fileId,
+  fileName,
+  size,
+  createdAt,
+  settings,
+  dimensions,
+}: {
+  fileId: string;
+  fileName: string;
+  size: number;
+  createdAt: string;
+  settings: ReturnType<typeof resolveExportSettings>;
+  dimensions: ReturnType<typeof getOutputDimensions>;
+}) {
+  return {
+    status: "complete",
+    fileId,
+    fileName,
+    mimeType: "video/mp4",
+    size: Number.isFinite(Number(size)) ? Number(size) : 0,
+    createdAt,
+    settings: {
+      format: "mp4",
+      trimStart: toNullableNumber(settings.trimStart),
+      trimEnd: toNullableNumber(settings.trimEnd),
+      canvasFormat: settings.canvasFormat,
+      fitMode: settings.fitMode,
+      resolution: "720p",
+      outputWidth: dimensions.width,
+      outputHeight: dimensions.height,
+      supportedFeatures: [
+        "mp4",
+        "trim",
+        "aspectRatio",
+        "resolution",
+        "originalAudio",
+      ],
+    },
+  };
+}
+
 function toSafeNumber(value: unknown, fallback: number) {
   const parsed = Number(value);
 
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+function toNullableNumber(value: unknown) {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
 async function fetchTransformedExportWithRetry(url: string) {
