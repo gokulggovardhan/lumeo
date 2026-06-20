@@ -20,7 +20,16 @@ type PhaseOneTransformOptions = {
   trimEnd?: number;
   width: number;
   height: number;
-  fitMode?: string;
+  fitMode?:
+    | "contain"
+    | "cover"
+    | "fit"
+    | "fill"
+    | "fullFrame"
+    | "originalView"
+    | "Full Frame"
+    | "Original View"
+    | string;
 };
 
 function getCloudinaryEnv(): CloudinaryEnv {

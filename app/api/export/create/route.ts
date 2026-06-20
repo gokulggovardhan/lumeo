@@ -19,6 +19,7 @@ type CanvasFormat = "9:16" | "1:1" | "16:9";
 type ExportResolution = "720p" | "1080p";
 type FitMode = "contain" | "cover";
 type ExportFailureStage =
+  | "unknown"
   | "projectRead"
   | "mediaFileIdCheck"
   | "settingsResolve"
@@ -37,7 +38,7 @@ type ExportRequestBody = {
     trimStart?: number;
     trimEnd?: number;
     canvasFormat?: CanvasFormat;
-    fitMode?: FitMode;
+    fitMode?: FitMode | "fit" | "fill" | "fullFrame" | "originalView" | "Full Frame" | "Original View";
     resolution?: ExportResolution | "2k";
   };
 };
@@ -60,7 +61,7 @@ type ProjectData = {
     };
     canvas?: {
       format?: CanvasFormat;
-      fitMode?: FitMode;
+      fitMode?: FitMode | "fit" | "fill" | "fullFrame" | "originalView" | "Full Frame" | "Original View";
     };
     exportSettings?: {
       resolution?: ExportResolution | "2k";
@@ -70,7 +71,7 @@ type ProjectData = {
 
 export async function POST(request: NextRequest) {
   let temporaryPublicId = "";
-  let failedStage: ExportFailureStage = "projectRead";
+  let failedStage: ExportFailureStage = "unknown";
 
   try {
     const body = (await request.json()) as ExportRequestBody;
@@ -390,6 +391,8 @@ function delay(ms: number) {
 
 function getSafeFailureDetails(stage: ExportFailureStage) {
   switch (stage) {
+    case "unknown":
+      return "Export could not be started.";
     case "projectRead":
       return "Project could not be read.";
     case "mediaFileIdCheck":
