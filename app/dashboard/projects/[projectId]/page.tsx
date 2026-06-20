@@ -114,27 +114,10 @@ const titleStyles: { value: TitleStyle; label: string }[] = [
 ];
 
 const titleSizes: { value: TitleSize; label: string }[] = [
-  { value: "small", label: "Small" },
-  { value: "medium", label: "Medium" },
-  { value: "large", label: "Large" },
-  { value: "xl", label: "XL" },
-];
-
-const titleAlignments: { value: TitleAlign; label: string }[] = [
-  { value: "left", label: "Left" },
-  { value: "center", label: "Center" },
-  { value: "right", label: "Right" },
-];
-
-const titleQuickPositions = [
-  { label: "Top Left", x: 18, y: 14, align: "left" as TitleAlign },
-  { label: "Top Center", x: 50, y: 14, align: "center" as TitleAlign },
-  { label: "Top Right", x: 82, y: 14, align: "right" as TitleAlign },
-  { label: "Center", x: 50, y: 50, align: "center" as TitleAlign },
-  { label: "Bottom Left", x: 18, y: 82, align: "left" as TitleAlign },
-  { label: "Bottom Center", x: 50, y: 82, align: "center" as TitleAlign },
-  { label: "Bottom Right", x: 82, y: 82, align: "right" as TitleAlign },
-  { label: "Lower Third", x: 50, y: 76, align: "center" as TitleAlign },
+  { value: "small", label: "S" },
+  { value: "medium", label: "M" },
+  { value: "large", label: "L" },
+  { value: "xl", label: "Hero" },
 ];
 
 function getOutputDimensions(
@@ -479,12 +462,6 @@ function normalizeTitleStyle(value: unknown): TitleStyle {
     : "minimal";
 }
 
-function normalizeTitleAlign(value: unknown): TitleAlign {
-  return value === "left" || value === "right"
-    ? value
-    : "center";
-}
-
 function normalizeTitleSize(value: unknown): TitleSize {
   return value === "small" || value === "medium" || value === "xl"
     ? value
@@ -804,7 +781,6 @@ export default function ProjectDetailsPage() {
   const [mutedOriginal, setMutedOriginal] = useState(false);
 
   const [titleStyle, setTitleStyle] = useState<TitleStyle>("minimal");
-  const [titleAlign, setTitleAlign] = useState<TitleAlign>("center");
   const [titleSize, setTitleSize] = useState<TitleSize>("large");
   const [overlayText, setOverlayText] = useState("");
   const [overlayX, setOverlayX] = useState(50);
@@ -896,7 +872,7 @@ export default function ProjectDetailsPage() {
     style: titleStyle,
     x: clampTitleCoordinate(overlayX, 0, 100, 50),
     y: clampTitleCoordinate(overlayY, 8, 88, 78),
-    align: titleAlign,
+    align: "center" as TitleAlign,
     size: titleSize,
   };
   const titlePreviewClass =
@@ -911,18 +887,8 @@ export default function ProjectDetailsPage() {
           : titleStyle === "lowerThird"
             ? "rounded-2xl bg-black/58 px-5 py-3 text-white shadow-2xl shadow-black/45 backdrop-blur-md"
             : "text-white [text-shadow:0_8px_32px_rgba(0,0,0,0.95),0_2px_8px_rgba(0,0,0,0.9)]";
-  const titlePreviewAlignClass =
-    titleAlign === "left"
-      ? "text-left"
-      : titleAlign === "right"
-        ? "text-right"
-        : "text-center";
-  const titlePreviewTransform =
-    titleAlign === "left"
-      ? "translate(0, -50%)"
-      : titleAlign === "right"
-        ? "translate(-100%, -50%)"
-        : "translate(-50%, -50%)";
+  const titlePreviewAlignClass = "text-center";
+  const titlePreviewTransform = "translate(-50%, -50%)";
   const titlePreviewSizeClass =
     titleSize === "small"
       ? "text-xl sm:text-2xl"
@@ -1034,7 +1000,6 @@ export default function ProjectDetailsPage() {
               savedTitleOverlay.text || editor.textOverlay?.text,
             );
             setTitleStyle(normalizeTitleStyle(savedTitleOverlay.style));
-            setTitleAlign(normalizeTitleAlign(savedTitleOverlay.align));
             setTitleSize(normalizeTitleSize(savedTitleOverlay.size));
             setOverlayText(savedTitleText);
             setOverlayX(
@@ -2258,7 +2223,6 @@ export default function ProjectDetailsPage() {
     videoVolume,
     mutedOriginal,
     titleStyle,
-    titleAlign,
     titleSize,
     overlayText,
     overlayX,
@@ -2334,7 +2298,6 @@ export default function ProjectDetailsPage() {
     setVideoVolume(100);
     setMutedOriginal(false);
     setTitleStyle("minimal");
-    setTitleAlign("center");
     setTitleSize("large");
     setOverlayText("");
     setOverlayX(50);
@@ -2737,7 +2700,7 @@ export default function ProjectDetailsPage() {
                 onChange={(event) =>
                   setOverlayText(event.target.value.slice(0, 80))
                 }
-                placeholder="Add your title"
+                placeholder="Add a title"
                 maxLength={80}
                 className="mt-3 min-h-24 w-full rounded-[1.25rem] border border-white/10 bg-black/25 px-4 py-3 text-white outline-none placeholder:text-white/32 transition focus:border-fuchsia-200/60 focus:bg-black/35"
               />
@@ -2823,40 +2786,6 @@ export default function ProjectDetailsPage() {
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {titleQuickPositions.map((item) => (
-                  <button
-                    key={item.label}
-                    onClick={() => {
-                      setOverlayX(item.x);
-                      setOverlayY(item.y);
-                      setTitleAlign(item.align);
-                    }}
-                    className="rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-2.5 text-xs font-black text-white/58 transition hover:border-white/18 hover:bg-white/[0.08] hover:text-white"
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-bold text-white/58">
-                Alignment
-              </label>
-
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {titleAlignments.map((item) => (
-                  <OptionButton
-                    key={item.value}
-                    active={titleAlign === item.value}
-                    onClick={() => setTitleAlign(item.value)}
-                    small
-                  >
-                    {item.label}
-                  </OptionButton>
-                ))}
-              </div>
             </div>
 
             <div>
