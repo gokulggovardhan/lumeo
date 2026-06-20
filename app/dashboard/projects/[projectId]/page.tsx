@@ -34,15 +34,17 @@ const MEDIA_STORE_NAME = "project-media";
 
 type ToolKey =
   | "media"
+  | "cut"
+  | "frame"
   | "canvas"
   | "edit"
   | "text"
   | "audio"
   | "effects"
-  | "export"
-  | "project";
+  | "project"
+  | "export";
 
-type CanvasFormat = "9:16" | "1:1" | "16:9";
+type CanvasFormat = "9:16" | "1:1" | "4:5" | "16:9";
 type FitMode = "contain" | "cover";
 type BackgroundStyle = "blur" | "black" | "gradient";
 type ExportResolution = "720p" | "1080p" | "2k";
@@ -63,6 +65,46 @@ const tools: { key: ToolKey; label: string; description: string; icon: string }[
     { key: "project", label: "Project", description: "Save and manage", icon: "✓" },
   ];
 
+const studioTools: { key: ToolKey; label: string; description: string; icon: string }[] =
+  [
+    { key: "media", label: "Media", description: "Video status", icon: "M" },
+    { key: "cut", label: "Cut", description: "Trim controls", icon: "C" },
+    { key: "frame", label: "Frame", description: "Canvas format", icon: "F" },
+    { key: "text", label: "Titles", description: "Hooks and overlays", icon: "T" },
+    { key: "audio", label: "Sound", description: "Audio levels", icon: "S" },
+    { key: "export", label: "Export", description: "Output settings", icon: "E" },
+  ];
+
+const comingSoonTools = [
+  "Multi-track timeline",
+  "Split-screen templates",
+  "Keyframes",
+  "Speed ramp",
+  "Progress bar overlay",
+  "Transitions",
+  "Stickers",
+  "Audio ducking",
+  "SFX",
+  "Brand kit",
+  "Batch export",
+  "60fps",
+];
+
+const aiLaterTools = [
+  "AI captions",
+  "AI shorts clipper",
+  "AI face tracking",
+  "AI denoise",
+  "AI dubbing",
+];
+
+const frameOptions: { value: CanvasFormat; label: string }[] = [
+  { value: "9:16", label: "9:16 Vertical" },
+  { value: "1:1", label: "1:1 Square" },
+  { value: "4:5", label: "4:5 Portrait" },
+  { value: "16:9", label: "16:9 Landscape" },
+];
+
 function getOutputDimensions(
   canvasFormat: CanvasFormat,
   resolution: ExportResolution
@@ -77,6 +119,12 @@ function getOutputDimensions(
     if (resolution === "720p") return { width: 720, height: 720 };
     if (resolution === "1080p") return { width: 1080, height: 1080 };
     return { width: 1440, height: 1440 };
+  }
+
+  if (canvasFormat === "4:5") {
+    if (resolution === "720p") return { width: 720, height: 900 };
+    if (resolution === "1080p") return { width: 1080, height: 1350 };
+    return { width: 1440, height: 1800 };
   }
 
   if (resolution === "720p") return { width: 1280, height: 720 };
@@ -645,6 +693,7 @@ export default function ProjectDetailsPage() {
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState("Draft");
   const [saving, setSaving] = useState(false);
+  const [autoSaveStatus, setAutoSaveStatus] = useState("Saved");
 
   const [localVideoURL, setLocalVideoURL] = useState("");
   const [localVideoName, setLocalVideoName] = useState("");
@@ -669,7 +718,7 @@ export default function ProjectDetailsPage() {
   const [canvasFormat, setCanvasFormat] = useState<CanvasFormat>("9:16");
   const [fitMode, setFitMode] = useState<FitMode>("cover");
   const [backgroundStyle, setBackgroundStyle] =
-    useState<BackgroundStyle>("blur");
+    useState<BackgroundStyle>("black");
 
   const [videoZoom, setVideoZoom] = useState(100);
   const [videoX, setVideoX] = useState(0);
@@ -728,12 +777,19 @@ export default function ProjectDetailsPage() {
   const exportProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const projectLoadedRef = useRef(false);
+  const initialAutoSaveSkippedRef = useRef(false);
+  const projectDataRef = useRef<any>(null);
 
   const productionExportResolution =
     exportResolution === "1080p" ? "1080p" : "720p";
   const output = getOutputDimensions(canvasFormat, productionExportResolution);
   const productionExportFps = 30;
   const productionExportQualityLabel = `${productionExportResolution} · ${productionExportFps}fps`;
+  const productionFrameModeLabel =
+    fitMode === "cover" ? "Full Frame" : "Original View";
+  const productionExportSummary = `${canvasFormat} · ${productionFrameModeLabel} · ${productionExportQualityLabel} · MP4`;
   const hasSavedSourceMedia = Boolean(videoStorageMetadata?.fileId);
 
   const selectedRange = Math.max(
@@ -766,7 +822,15 @@ export default function ProjectDetailsPage() {
       ? "aspect-[9/16] h-[66vh] min-h-[440px] max-h-[760px]"
       : canvasFormat === "1:1"
         ? "aspect-square h-[60vh] min-h-[380px] max-h-[640px]"
-        : "aspect-video w-full max-w-[1080px]";
+        : canvasFormat === "4:5"
+          ? "aspect-[4/5] h-[64vh] min-h-[420px] max-h-[720px]"
+          : "aspect-video w-full max-w-[1080px]";
+
+  useEffect(() => {
+    projectLoadedRef.current = false;
+    initialAutoSaveSkippedRef.current = false;
+    setAutoSaveStatus("Saved");
+  }, [projectId]);
 
   useEffect(() => {
     let unsubscribeProject: any;
@@ -795,6 +859,7 @@ export default function ProjectDetailsPage() {
             const timeline = data.timeline || {};
 
             setProject(data);
+            projectDataRef.current = data;
             setTitle(data.title || "");
             setStatus(data.status || "Draft");
 
@@ -815,7 +880,9 @@ export default function ProjectDetailsPage() {
 
             const savedCanvasFormat = editor.canvas?.format;
             setCanvasFormat(
-              savedCanvasFormat === "1:1" || savedCanvasFormat === "16:9"
+              savedCanvasFormat === "1:1" ||
+                savedCanvasFormat === "4:5" ||
+                savedCanvasFormat === "16:9"
                 ? savedCanvasFormat
                 : "9:16"
             );
@@ -828,11 +895,7 @@ export default function ProjectDetailsPage() {
             );
 
             const savedBackground = editor.canvas?.backgroundStyle;
-            setBackgroundStyle(
-              savedBackground === "black" || savedBackground === "gradient"
-                ? savedBackground
-                : "blur"
-            );
+            setBackgroundStyle(savedBackground === "gradient" ? "gradient" : "black");
 
             setVideoZoom(editor.canvas?.videoZoom ?? 100);
             setVideoX(editor.canvas?.videoX ?? 0);
@@ -882,7 +945,11 @@ export default function ProjectDetailsPage() {
                 ? savedQuality
                 : "standard"
             );
+            projectLoadedRef.current = true;
+            setAutoSaveStatus("Saved");
           } else {
+            projectDataRef.current = null;
+            projectLoadedRef.current = false;
             setProject(null);
           }
         });
@@ -1885,111 +1952,186 @@ export default function ProjectDetailsPage() {
     }
   };
 
-  const handleSave = async () => {
+  const buildEditorUpdatePayload = () => {
+    const currentProject = projectDataRef.current;
+    const currentEditor = currentProject?.editor || {};
+    const exportQualityPreset = `${productionExportResolution}${productionExportFps}`;
+
+    return {
+      "editor.mode": "studio-foundation-v2",
+      "editor.media": {
+        localVideoName:
+          localVideoName ||
+          currentEditor.media?.localVideoName ||
+          currentEditor.localVideoName ||
+          "",
+        localAudioName:
+          localAudioName ||
+          currentEditor.media?.localAudioName ||
+          currentEditor.localAudioName ||
+          "",
+        videoDuration: Number(videoDuration) || 0,
+        storage:
+          videoStorageMetadata ||
+          currentEditor.media?.storage ||
+          null,
+      },
+      "editor.trim": {
+        start: Number(trimStart) || 0,
+        end: Number(trimEnd) || 0,
+      },
+      "editor.canvas": {
+        format: canvasFormat,
+        fitMode,
+        backgroundStyle,
+        videoZoom: Number(videoZoom) || 100,
+        videoX: Number(videoX) || 0,
+        videoY: Number(videoY) || 0,
+        rotate: Number(rotate) || 0,
+        flipX,
+      },
+      "editor.playback": {
+        speed: Number(playbackSpeed) || 1,
+        videoVolume: Number(videoVolume) || 100,
+        mutedOriginal,
+      },
+      "editor.audio": {
+        musicVolume: Number(musicVolume) || 80,
+      },
+      "editor.textOverlay": {
+        text: visibleOverlayText,
+        x: Number(overlayX) || 50,
+        y: Number(overlayY) || 45,
+        size: Number(overlaySize) || 34,
+        color: overlayColor || "#ffffff",
+        opacity: Number(overlayOpacity) || 100,
+        background: overlayBg,
+        uppercase: overlayUppercase,
+        shadow: overlayShadow,
+      },
+      "editor.effects": {
+        brightness: Number(brightness) || 100,
+        contrast: Number(contrast) || 100,
+        saturation: Number(saturation) || 100,
+        grayscale: Number(grayscale) || 0,
+        blur: Number(blur) || 0,
+      },
+      "editor.transitions": {
+        in: transitionIn,
+        out: transitionOut,
+        duration: Number(transitionDuration) || 1,
+      },
+      "editor.exportSettings": {
+        videoFormat: "mp4",
+        audioFormat,
+        resolution: productionExportResolution,
+        fps: productionExportFps,
+        quality: exportQualityPreset,
+        maxResolution: "1080p",
+        outputWidth: output.width,
+        outputHeight: output.height,
+      },
+      updatedAt: serverTimestamp(),
+    };
+  };
+
+  const saveEditorSettings = async (silent = false) => {
     if (!projectId) return;
 
-    if (!title.trim()) {
-      alert("Project title cannot be empty");
-      return;
-    }
-
     if (Number(trimEnd) > 0 && Number(trimStart) >= Number(trimEnd)) {
-      alert("Trim start should be less than trim end");
+      if (!silent) {
+        alert("Trim start should be less than trim end");
+      }
       return;
     }
 
     try {
       setSaving(true);
+      setAutoSaveStatus("Saving...");
 
-      await updateDoc(doc(db, "projects", projectId), {
-        title: title.trim(),
-        status,
-        editor: {
-          mode: "shorts-editor-v5-premium",
-          media: {
-            localVideoName:
-              localVideoName ||
-              project?.editor?.media?.localVideoName ||
-              project?.editor?.localVideoName ||
-              "",
-            localAudioName:
-              localAudioName ||
-              project?.editor?.media?.localAudioName ||
-              project?.editor?.localAudioName ||
-              "",
-            videoDuration: Number(videoDuration) || 0,
-            storage:
-              videoStorageMetadata ||
-              project?.editor?.media?.storage ||
-              null,
-          },
-          trim: {
-            start: Number(trimStart) || 0,
-            end: Number(trimEnd) || 0,
-          },
-          canvas: {
-            format: canvasFormat,
-            fitMode,
-            backgroundStyle,
-            videoZoom,
-            videoX,
-            videoY,
-            rotate,
-            flipX,
-          },
-          playback: {
-            speed: Number(playbackSpeed) || 1,
-            videoVolume: Number(videoVolume) || 100,
-            mutedOriginal,
-          },
-          audio: {
-            musicVolume: Number(musicVolume) || 80,
-          },
-          textOverlay: {
-            text: visibleOverlayText,
-            x: Number(overlayX) || 50,
-            y: Number(overlayY) || 45,
-            size: Number(overlaySize) || 34,
-            color: overlayColor || "#ffffff",
-            opacity: Number(overlayOpacity) || 100,
-            background: overlayBg,
-            uppercase: overlayUppercase,
-            shadow: overlayShadow,
-          },
-          effects: {
-            brightness: Number(brightness) || 100,
-            contrast: Number(contrast) || 100,
-            saturation: Number(saturation) || 100,
-            grayscale: Number(grayscale) || 0,
-            blur: Number(blur) || 0,
-          },
-          transitions: {
-            in: transitionIn,
-            out: transitionOut,
-            duration: Number(transitionDuration) || 1,
-          },
-          exportSettings: {
-            videoFormat: exportFormat,
-            audioFormat,
-            resolution: exportResolution,
-            fps: exportFps,
-            quality: exportQuality,
-            maxResolution: "2k",
-            outputWidth: output.width,
-            outputHeight: output.height,
-          },
-          export: project?.editor?.export || null,
-        },
-        updatedAt: serverTimestamp(),
-      });
+      await updateDoc(doc(db, "projects", projectId), buildEditorUpdatePayload());
 
-      alert("Editor settings saved successfully");
+      setAutoSaveStatus("Saved");
     } catch (error: any) {
-      alert(error.message);
+      console.error("Editor settings save failed", error);
+      if (!silent) {
+        alert(error.message);
+      }
     } finally {
       setSaving(false);
     }
   };
+
+  const handleSave = async () => {
+    await saveEditorSettings(false);
+  };
+
+  useEffect(() => {
+    if (!user || !projectId || !projectLoadedRef.current) return;
+
+    if (!initialAutoSaveSkippedRef.current) {
+      initialAutoSaveSkippedRef.current = true;
+      return;
+    }
+
+    if (autoSaveTimerRef.current) {
+      clearTimeout(autoSaveTimerRef.current);
+    }
+
+    setAutoSaveStatus("Saving...");
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      void saveEditorSettings(true);
+    }, 900);
+
+    return () => {
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+      }
+    };
+  }, [
+    projectId,
+    user,
+    trimStart,
+    trimEnd,
+    canvasFormat,
+    fitMode,
+    backgroundStyle,
+    videoZoom,
+    videoX,
+    videoY,
+    rotate,
+    flipX,
+    playbackSpeed,
+    videoVolume,
+    mutedOriginal,
+    overlayText,
+    overlayX,
+    overlayY,
+    overlaySize,
+    overlayColor,
+    overlayOpacity,
+    overlayBg,
+    overlayUppercase,
+    overlayShadow,
+    musicVolume,
+    brightness,
+    contrast,
+    saturation,
+    grayscale,
+    blur,
+    transitionIn,
+    transitionOut,
+    transitionDuration,
+    audioFormat,
+    productionExportResolution,
+    productionExportFps,
+    output.width,
+    output.height,
+    videoDuration,
+    localVideoName,
+    localAudioName,
+  ]);
 
   const handleDelete = async () => {
     const confirmed = confirm("Are you sure you want to delete this project?");
@@ -2025,7 +2167,7 @@ export default function ProjectDetailsPage() {
     setTrimEnd(videoDuration || 0);
     setCanvasFormat("9:16");
     setFitMode("cover");
-    setBackgroundStyle("blur");
+    setBackgroundStyle("black");
     setVideoZoom(100);
     setVideoX(0);
     setVideoY(0);
@@ -2058,7 +2200,7 @@ export default function ProjectDetailsPage() {
     setExportFps(30);
     setExportQuality("standard");
     resetExportState();
-    setActiveTool("edit");
+    setActiveTool("cut");
   };
 
   const renderInspector = () => {
@@ -2066,7 +2208,7 @@ export default function ProjectDetailsPage() {
       return (
         <Panel
           title="Media Library"
-          subtitle="Import your video and music. Preview starts instantly, then save media when you are ready."
+              subtitle="Add, replace, or remove your source media."
         >
           <div className="space-y-5">
             <input
@@ -2209,7 +2351,7 @@ export default function ProjectDetailsPage() {
       );
     }
 
-    if (activeTool === "canvas") {
+    if (activeTool === "frame") {
       return (
         <Panel title="Frame Studio" subtitle="Set the video frame and background style.">
           <div className="space-y-6">
@@ -2219,13 +2361,13 @@ export default function ProjectDetailsPage() {
               </label>
 
               <div className="mt-3 grid grid-cols-3 gap-2">
-                {(["9:16", "1:1", "16:9"] as CanvasFormat[]).map((item) => (
+                {frameOptions.map((item) => (
                   <OptionButton
-                    key={item}
-                    active={canvasFormat === item}
-                    onClick={() => setCanvasFormat(item)}
+                    key={item.value}
+                    active={canvasFormat === item.value}
+                    onClick={() => setCanvasFormat(item.value)}
                   >
-                    {item}
+                    {item.label}
                   </OptionButton>
                 ))}
               </div>
@@ -2258,53 +2400,75 @@ export default function ProjectDetailsPage() {
               </div>
             </div>
 
-            <div>
-              <label className="text-sm font-bold text-white/58">
-                Background
-              </label>
-
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {(["blur", "black", "gradient"] as BackgroundStyle[]).map(
-                  (item) => (
-                    <OptionButton
-                      key={item}
-                      active={backgroundStyle === item}
-                      onClick={() => setBackgroundStyle(item)}
-                      small
-                    >
-                      {item}
-                    </OptionButton>
-                  )
-                )}
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-white">
+                    Blurred Background
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-white/42">
+                    Coming soon
+                  </p>
+                </div>
+                <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/45">
+                  Coming soon
+                </span>
               </div>
             </div>
+          </div>
+        </Panel>
+      );
+    }
+
+    if (activeTool === "cut") {
+      return (
+        <Panel title="Cut" subtitle="Set clean start and end points.">
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 gap-3">
+              <StatPill label="Duration" value={`${videoDuration || 0}s`} />
+              <StatPill label="Output" value={`${selectedRange}s`} />
+            </div>
+
+            <button
+              onClick={handlePlayTrimPreview}
+              disabled={!localVideoURL}
+              className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              Preview selected range
+            </button>
 
             <RangeControl
-              label="Video zoom"
-              value={videoZoom}
-              min={50}
-              max={200}
-              suffix="%"
-              onChange={setVideoZoom}
+              label="Trim start"
+              value={trimStart}
+              min={0}
+              max={Math.max(videoDuration, 1)}
+              suffix="s"
+              onChange={setTrimStart}
             />
 
             <RangeControl
-              label="Position X"
-              value={videoX}
-              min={-50}
-              max={50}
-              suffix="%"
-              onChange={setVideoX}
+              label="Trim end"
+              value={trimEnd || videoDuration || 0}
+              min={0}
+              max={Math.max(videoDuration, 1)}
+              suffix="s"
+              onChange={setTrimEnd}
             />
 
-            <RangeControl
-              label="Position Y"
-              value={videoY}
-              min={-50}
-              max={50}
-              suffix="%"
-              onChange={setVideoY}
-            />
+            <button
+              onClick={() => {
+                setTrimStart(0);
+                setTrimEnd(videoDuration || 0);
+              }}
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white/72 transition hover:bg-white hover:text-black"
+            >
+              Clear trim
+            </button>
+
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4 text-sm font-bold text-white/52">
+              Speed ramp, transitions, keyframes, and manual repositioning are
+              in Coming soon.
+            </div>
           </div>
         </Panel>
       );
@@ -2694,7 +2858,7 @@ export default function ProjectDetailsPage() {
             {hasPreviewOnlyExportEdits && (
               <div className="rounded-[1.5rem] border border-amber-300/20 bg-amber-300/10 p-4">
                 <p className="text-sm font-bold leading-6 text-amber-100/82">
-                  Some advanced edits are preview-only in this export version.
+                  Some tools are Coming soon.
                 </p>
               </div>
             )}
@@ -2775,7 +2939,7 @@ export default function ProjectDetailsPage() {
                       Click Download video to save it to your computer.
                     </p>
                     <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-emerald-100/50">
-                      {productionExportQualityLabel} · MP4
+                      {productionExportSummary}
                     </p>
                   </div>
 
@@ -2835,13 +2999,9 @@ export default function ProjectDetailsPage() {
             </select>
           </div>
 
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {saving ? "Saving..." : "Save editor"}
-          </button>
+          <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-5 py-3 text-center text-sm font-black text-emerald-100">
+            {autoSaveStatus}
+          </div>
 
           <button
             onClick={() => setActiveTool("export")}
@@ -2947,20 +3107,15 @@ export default function ProjectDetailsPage() {
               </div>
 
               <p className="mt-1 hidden text-xs text-white/38 sm:block">
-                {canvasFormat} · {exportResolution} ·{" "}
-                {exportFormat.toUpperCase()} · {output.width}×{output.height}
+                {productionExportSummary} · {output.width}×{output.height}
               </p>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="rounded-full bg-white px-5 py-2.5 text-sm font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
+            <span className="rounded-full border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-emerald-100">
+              {autoSaveStatus}
+            </span>
 
             <button
               onClick={() => setActiveTool("export")}
@@ -3015,12 +3170,12 @@ export default function ProjectDetailsPage() {
 
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <StatPill label="Frame" value={canvasFormat} />
-                <StatPill label="Output" value={exportResolution} />
+                <StatPill label="Output" value={productionExportQualityLabel} />
               </div>
             </div>
 
             <div className="space-y-2 p-3">
-              {tools.map((tool) => (
+              {studioTools.map((tool) => (
                 <button
                   key={tool.key}
                   onClick={() => setActiveTool(tool.key)}
@@ -3057,12 +3212,44 @@ export default function ProjectDetailsPage() {
                   </span>
                 </button>
               ))}
+
+              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/36">
+                  Coming soon
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {comingSoonTools.slice(0, 8).map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-bold text-white/45"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/36">
+                  AI later
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {aiLaterTools.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-white/10 bg-black/25 px-2.5 py-1 text-[10px] font-bold text-white/45"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </div>
           </aside>
 
           <div className="flex min-h-0 flex-col gap-4">
             <div className="flex gap-2 overflow-x-auto rounded-[1.5rem] border border-white/10 bg-[#111018]/82 p-2 backdrop-blur-2xl lg:hidden">
-              {tools.map((tool) => (
+              {studioTools.map((tool) => (
                 <button
                   key={tool.key}
                   onClick={() => setActiveTool(tool.key)}
@@ -3080,17 +3267,17 @@ export default function ProjectDetailsPage() {
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] border border-white/10 bg-[#0d0b13]/88 shadow-2xl shadow-black/30 backdrop-blur-2xl">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
                 <div className="flex flex-wrap gap-2">
-                  {(["9:16", "1:1", "16:9"] as CanvasFormat[]).map((item) => (
+                  {frameOptions.map((item) => (
                     <button
-                      key={item}
-                      onClick={() => setCanvasFormat(item)}
+                      key={item.value}
+                      onClick={() => setCanvasFormat(item.value)}
                       className={`rounded-full px-4 py-2 text-xs font-black transition ${
-                        canvasFormat === item
+                        canvasFormat === item.value
                           ? "bg-white text-black"
                           : "bg-white/[0.06] text-white/55 hover:bg-white/[0.12] hover:text-white"
                       }`}
                     >
-                      {item}
+                      {item.value}
                     </button>
                   ))}
                 </div>
@@ -3228,13 +3415,9 @@ export default function ProjectDetailsPage() {
                         Preview
                       </button>
 
-                      <button
-                        onClick={handleSave}
-                        disabled={saving}
-                        className="rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-black text-white transition hover:bg-white hover:text-black disabled:cursor-not-allowed disabled:opacity-55"
-                      >
-                        {saving ? "Saving..." : "Save"}
-                      </button>
+                      <span className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-5 py-3 text-sm font-black text-emerald-100">
+                        {autoSaveStatus}
+                      </span>
                     </div>
                   </div>
 

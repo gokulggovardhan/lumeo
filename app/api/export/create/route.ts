@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-type CanvasFormat = "9:16" | "1:1" | "16:9";
+type CanvasFormat = "9:16" | "1:1" | "4:5" | "16:9";
 type ExportResolution = "720p" | "1080p";
 type FitMode = "contain" | "cover";
 type ExportFps = 30;
@@ -347,13 +347,21 @@ function getOutputDimensions(
       : { width: 720, height: 720 };
   }
 
+  if (canvasFormat === "4:5") {
+    return resolution === "1080p"
+      ? { width: 1080, height: 1350 }
+      : { width: 720, height: 900 };
+  }
+
   return resolution === "1080p"
     ? { width: 1920, height: 1080 }
     : { width: 1280, height: 720 };
 }
 
 function normalizeCanvasFormat(value: unknown): CanvasFormat {
-  return value === "1:1" || value === "16:9" ? value : "9:16";
+  return value === "1:1" || value === "4:5" || value === "16:9"
+    ? value
+    : "9:16";
 }
 
 function normalizeFitMode(value: unknown): FitMode {
