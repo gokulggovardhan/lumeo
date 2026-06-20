@@ -19,6 +19,12 @@ type CanvasFormat = "9:16" | "1:1" | "4:5" | "16:9";
 type ExportResolution = "720p" | "1080p";
 type FrameMode = "fullFrame" | "originalView" | "blurredBackground";
 type ExportFps = 30;
+type BackgroundBlurStyle = "soft" | "premium" | "strong";
+type BackgroundDimStyle = "balanced" | "dark";
+type BackgroundSettings = {
+  blurStyle: BackgroundBlurStyle;
+  dimStyle: BackgroundDimStyle;
+};
 type TitleStyle =
   | "cleanWhite"
   | "creatorYellow"
@@ -74,6 +80,7 @@ type ExportRequestBody = {
       | "Blurred Background";
     resolution?: ExportResolution | "2k";
     fps?: number;
+    background?: Partial<BackgroundSettings>;
     titleOverlay?: Partial<TitleOverlaySettings>;
   };
 };
@@ -108,6 +115,8 @@ type ProjectData = {
         | "Original View"
         | "Blurred Background";
       frameMode?: "fullFrame" | "originalView" | "blurredBackground";
+      backgroundBlurStyle?: BackgroundBlurStyle;
+      backgroundDimStyle?: BackgroundDimStyle;
     };
     exportSettings?: {
       resolution?: ExportResolution | "2k";
@@ -218,12 +227,8 @@ export async function POST(request: NextRequest) {
       height: dimensions.height,
       frameMode: settings.frameMode,
       fps: settings.fps,
-      titleOverlay: {
-        enabled: settings.titleOverlay.enabled,
-        style: settings.titleOverlay.style,
-        position: settings.titleOverlay.position,
-        size: settings.titleOverlay.size,
-      },
+      background: settings.background,
+      titleOverlay: settings.titleOverlay,
     });
 
     failedStage = "transformedFetch";
@@ -370,6 +375,10 @@ function resolveExportSettings(
     resolution,
     bodySettings?.fps || project.editor?.exportSettings?.fps,
   );
+  const background = normalizeBackgroundSettings(
+    bodySettings?.background,
+    project.editor?.canvas,
+  );
   const titleOverlay = normalizeTitleOverlay(
     bodySettings?.titleOverlay,
     project.editor?.titleOverlay,
@@ -386,6 +395,7 @@ function resolveExportSettings(
     frameMode,
     resolution,
     fps,
+    background,
     titleOverlay,
   };
 }
@@ -454,6 +464,37 @@ function normalizeFps(
   return 30;
 }
 
+function normalizeBackgroundSettings(
+  bodyValue: unknown,
+  canvasValue: unknown,
+): BackgroundSettings {
+  const body =
+    bodyValue && typeof bodyValue === "object"
+      ? (bodyValue as Record<string, unknown>)
+      : {};
+  const canvas =
+    canvasValue && typeof canvasValue === "object"
+      ? (canvasValue as Record<string, unknown>)
+      : {};
+
+  return {
+    blurStyle: normalizeBackgroundBlurStyle(
+      body.blurStyle || canvas.backgroundBlurStyle,
+    ),
+    dimStyle: normalizeBackgroundDimStyle(
+      body.dimStyle || canvas.backgroundDimStyle,
+    ),
+  };
+}
+
+function normalizeBackgroundBlurStyle(value: unknown): BackgroundBlurStyle {
+  return value === "soft" || value === "strong" ? value : "premium";
+}
+
+function normalizeBackgroundDimStyle(value: unknown): BackgroundDimStyle {
+  return value === "dark" ? value : "balanced";
+}
+
 function createExportMetadata({
   fileId,
   fileName,
@@ -487,6 +528,7 @@ function createExportMetadata({
       fps: settings.fps,
       outputWidth: dimensions.width,
       outputHeight: dimensions.height,
+      background: settings.background,
       titleOverlay: settings.titleOverlay,
       supportedFeatures: [
         "mp4",

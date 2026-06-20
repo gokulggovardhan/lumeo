@@ -39,7 +39,13 @@ type PhaseOneTransformOptions = {
     | "Original View"
     | "Blurred Background"
     | string;
+  background?: Partial<PhaseOneBackgroundSettings>;
   titleOverlay?: Partial<PhaseOneTitleOverlay>;
+};
+
+type PhaseOneBackgroundSettings = {
+  blurStyle: "soft" | "premium" | "strong" | string;
+  dimStyle: "balanced" | "dark" | string;
 };
 
 type PhaseOneTitleOverlay = {
@@ -166,6 +172,7 @@ export function createPhaseOneCloudinaryExportUrl(
   const frameMode = normalizePhaseOneFrameMode(
     options.frameMode || options.fitMode,
   );
+  const background = normalizeBackgroundSettings(options.background);
 
   if (Number.isFinite(options.trimStart) && Number(options.trimStart) > 0) {
     trim.start_offset = Number(options.trimStart);
@@ -188,7 +195,18 @@ export function createPhaseOneCloudinaryExportUrl(
       width: options.width,
       height: options.height,
       crop: "fill",
-      effect: "blur:600",
+    });
+
+    transformation.push({
+      effect: `blur:${getBackgroundBlurStrength(background.blurStyle)}`,
+    });
+
+    transformation.push({
+      effect: `brightness:${getBackgroundBrightness(background.dimStyle)}`,
+    });
+
+    transformation.push({
+      effect: "saturation:15",
     });
 
     transformation.push({
@@ -254,6 +272,28 @@ function normalizeTitleOverlay(
     position: normalizeTitlePosition(value?.position),
     size: normalizeTitleSize(value?.size),
   };
+}
+
+function normalizeBackgroundSettings(
+  value: Partial<PhaseOneBackgroundSettings> | undefined,
+): PhaseOneBackgroundSettings {
+  return {
+    blurStyle:
+      value?.blurStyle === "soft" || value?.blurStyle === "strong"
+        ? value.blurStyle
+        : "premium",
+    dimStyle: value?.dimStyle === "dark" ? "dark" : "balanced",
+  };
+}
+
+function getBackgroundBlurStrength(style: string) {
+  if (style === "soft") return 1200;
+  if (style === "strong") return 1800;
+  return 1500;
+}
+
+function getBackgroundBrightness(style: string) {
+  return style === "dark" ? -48 : -35;
 }
 
 function createTitleOverlayTransformation(

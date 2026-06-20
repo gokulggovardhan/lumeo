@@ -47,6 +47,8 @@ type ToolKey =
 type CanvasFormat = "9:16" | "1:1" | "4:5" | "16:9";
 type FitMode = "contain" | "cover" | "blurredBackground";
 type BackgroundStyle = "blur" | "black" | "gradient";
+type BackgroundBlurStyle = "soft" | "premium" | "strong";
+type BackgroundDimStyle = "balanced" | "dark";
 type ExportResolution = "720p" | "1080p" | "2k";
 type VideoFormat = "mp4" | "webm";
 type AudioFormat = "mp3" | "wav";
@@ -111,6 +113,17 @@ const frameOptions: { value: CanvasFormat; label: string }[] = [
   { value: "1:1", label: "1:1 Square" },
   { value: "4:5", label: "4:5 Portrait" },
   { value: "16:9", label: "16:9 Landscape" },
+];
+
+const backgroundBlurOptions: { value: BackgroundBlurStyle; label: string }[] = [
+  { value: "soft", label: "Soft" },
+  { value: "premium", label: "Premium" },
+  { value: "strong", label: "Strong" },
+];
+
+const backgroundDimOptions: { value: BackgroundDimStyle; label: string }[] = [
+  { value: "balanced", label: "Balanced" },
+  { value: "dark", label: "Dark" },
 ];
 
 const titleStyles: { value: TitleStyle; label: string }[] = [
@@ -490,6 +503,14 @@ function normalizeTitleSize(value: unknown): TitleSize {
     : "large";
 }
 
+function normalizeBackgroundBlurStyle(value: unknown): BackgroundBlurStyle {
+  return value === "soft" || value === "strong" ? value : "premium";
+}
+
+function normalizeBackgroundDimStyle(value: unknown): BackgroundDimStyle {
+  return value === "dark" ? value : "balanced";
+}
+
 async function createCloudinaryUploadSignature() {
   const response = await fetch("/api/cloudinary/sign-upload", {
     method: "POST",
@@ -772,6 +793,10 @@ export default function ProjectDetailsPage() {
   const [fitMode, setFitMode] = useState<FitMode>("cover");
   const [backgroundStyle, setBackgroundStyle] =
     useState<BackgroundStyle>("black");
+  const [backgroundBlurStyle, setBackgroundBlurStyle] =
+    useState<BackgroundBlurStyle>("premium");
+  const [backgroundDimStyle, setBackgroundDimStyle] =
+    useState<BackgroundDimStyle>("balanced");
 
   const [videoZoom, setVideoZoom] = useState(100);
   const [videoX, setVideoX] = useState(0);
@@ -859,6 +884,16 @@ export default function ProjectDetailsPage() {
   );
 
   const videoFilter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) grayscale(${grayscale}%) blur(${blur}px)`;
+  const backgroundBlurPixels =
+    backgroundBlurStyle === "soft"
+      ? 28
+      : backgroundBlurStyle === "strong"
+        ? 48
+        : 36;
+  const backgroundBrightness = backgroundDimStyle === "dark" ? 0.42 : 0.55;
+  const blurredBackgroundPreviewFilter = `blur(${backgroundBlurPixels}px) brightness(${backgroundBrightness}) saturate(1.15)`;
+  const blurredBackgroundOverlayClass =
+    backgroundDimStyle === "dark" ? "bg-black/40" : "bg-black/30";
   const visibleOverlayText = overlayText.trim().slice(0, 80);
   const hasActiveTitleOverlay = titleEnabled && visibleOverlayText.length > 0;
   const titleOverlayForExport = {
@@ -991,6 +1026,12 @@ export default function ProjectDetailsPage() {
 
             const savedBackground = editor.canvas?.backgroundStyle;
             setBackgroundStyle(savedBackground === "gradient" ? "gradient" : "black");
+            setBackgroundBlurStyle(
+              normalizeBackgroundBlurStyle(editor.canvas?.backgroundBlurStyle),
+            );
+            setBackgroundDimStyle(
+              normalizeBackgroundDimStyle(editor.canvas?.backgroundDimStyle),
+            );
 
             setVideoZoom(editor.canvas?.videoZoom ?? 100);
             setVideoX(editor.canvas?.videoX ?? 0);
@@ -1815,6 +1856,10 @@ export default function ProjectDetailsPage() {
             frameMode: fitMode,
             resolution: productionExportResolution,
             fps: productionExportFps,
+            background: {
+              blurStyle: backgroundBlurStyle,
+              dimStyle: backgroundDimStyle,
+            },
             titleOverlay: titleOverlayForExport,
           },
         }),
@@ -2090,6 +2135,8 @@ export default function ProjectDetailsPage() {
         fitMode,
         frameMode: fitMode,
         backgroundStyle,
+        backgroundBlurStyle,
+        backgroundDimStyle,
         videoZoom: Number(videoZoom) || 100,
         videoX: Number(videoX) || 0,
         videoY: Number(videoY) || 0,
@@ -2210,6 +2257,8 @@ export default function ProjectDetailsPage() {
     canvasFormat,
     fitMode,
     backgroundStyle,
+    backgroundBlurStyle,
+    backgroundDimStyle,
     videoZoom,
     videoX,
     videoY,
@@ -2285,6 +2334,8 @@ export default function ProjectDetailsPage() {
     setCanvasFormat("9:16");
     setFitMode("cover");
     setBackgroundStyle("black");
+    setBackgroundBlurStyle("premium");
+    setBackgroundDimStyle("balanced");
     setVideoZoom(100);
     setVideoX(0);
     setVideoY(0);
@@ -2528,6 +2579,42 @@ export default function ProjectDetailsPage() {
                 <p>Blurred Background: Fills the canvas behind the full clip.</p>
               </div>
             </div>
+
+            {fitMode === "blurredBackground" && (
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
+                <p className="text-sm font-bold text-white/58">
+                  Background look
+                </p>
+
+                <div className="mt-3 grid grid-cols-3 gap-2">
+                  {backgroundBlurOptions.map((item) => (
+                    <OptionButton
+                      key={item.value}
+                      active={backgroundBlurStyle === item.value}
+                      onClick={() => setBackgroundBlurStyle(item.value)}
+                      small
+                    >
+                      {item.label}
+                    </OptionButton>
+                  ))}
+                </div>
+
+                <p className="mt-4 text-sm font-bold text-white/58">Dim</p>
+
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {backgroundDimOptions.map((item) => (
+                    <OptionButton
+                      key={item.value}
+                      active={backgroundDimStyle === item.value}
+                      onClick={() => setBackgroundDimStyle(item.value)}
+                      small
+                    >
+                      {item.label}
+                    </OptionButton>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </Panel>
       );
@@ -3451,8 +3538,11 @@ export default function ProjectDetailsPage() {
                   <video
                     src={localVideoURL}
                     muted
-                    className="absolute inset-0 h-full w-full scale-110 object-cover opacity-30 blur-3xl"
-                    style={{ filter: videoFilter }}
+                    className="absolute inset-0 h-full w-full object-cover opacity-30"
+                    style={{
+                      filter: blurredBackgroundPreviewFilter,
+                      transform: "scale(1.18)",
+                    }}
                   />
                 )}
 
@@ -3469,13 +3559,21 @@ export default function ProjectDetailsPage() {
                     {localVideoURL ? (
                       <>
                         {fitMode === "blurredBackground" && (
-                          <video
-                            src={localVideoURL}
-                            muted
-                            playsInline
-                            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-70 blur-2xl"
-                            style={{ filter: videoFilter }}
-                          />
+                          <>
+                            <video
+                              src={localVideoURL}
+                              muted
+                              playsInline
+                              className="absolute inset-0 h-full w-full object-cover opacity-85"
+                              style={{
+                                filter: blurredBackgroundPreviewFilter,
+                                transform: "scale(1.2)",
+                              }}
+                            />
+                            <div
+                              className={`absolute inset-0 ${blurredBackgroundOverlayClass}`}
+                            />
+                          </>
                         )}
 
                         <video
