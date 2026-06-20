@@ -18,7 +18,7 @@ export const maxDuration = 300;
 type CanvasFormat = "9:16" | "1:1" | "16:9";
 type ExportResolution = "720p" | "1080p";
 type FitMode = "contain" | "cover";
-type ExportFps = 24;
+type ExportFps = 30;
 type ExportFailureStage =
   | "unknown"
   | "projectRead"
@@ -193,7 +193,7 @@ export async function POST(request: NextRequest) {
     });
 
     const createdAt = new Date().toISOString();
-    const fileName = createExportFileName(project.title, projectId);
+    const fileName = createExportFileName(project.title, projectId, settings);
 
     failedStage = "permanentExportUpload";
     console.info("[Lumeo Export] permanent export upload started", {
@@ -376,12 +376,8 @@ function normalizeResolution(value: unknown): ExportResolution {
 function normalizeFps(
   resolution: ExportResolution,
   value: unknown,
-): ExportFps | null {
-  if (resolution === "1080p") {
-    return 24;
-  }
-
-  return Number(value) === 24 ? 24 : null;
+): ExportFps {
+  return 30;
 }
 
 function createExportMetadata({
@@ -412,6 +408,7 @@ function createExportMetadata({
       trimEnd: toNullableNumber(settings.trimEnd),
       canvasFormat: settings.canvasFormat,
       fitMode: settings.fitMode,
+      quality: `${settings.resolution}${settings.fps}`,
       resolution: settings.resolution,
       fps: settings.fps,
       outputWidth: dimensions.width,
@@ -512,7 +509,11 @@ function getSafeFailureDetails(stage: ExportFailureStage) {
   }
 }
 
-function createExportFileName(title: unknown, projectId: string) {
+function createExportFileName(
+  title: unknown,
+  projectId: string,
+  settings: ReturnType<typeof resolveExportSettings>,
+) {
   const baseName =
     typeof title === "string" && title.trim()
       ? title.trim()
@@ -525,5 +526,5 @@ function createExportFileName(title: unknown, projectId: string) {
       .toLowerCase()
       .slice(0, 120) || "lumeo-export";
 
-  return `${safeName}-${Date.now()}.mp4`;
+  return `${safeName}-${settings.resolution}-${settings.fps}fps-${Date.now()}.mp4`;
 }

@@ -732,8 +732,8 @@ export default function ProjectDetailsPage() {
   const productionExportResolution =
     exportResolution === "1080p" ? "1080p" : "720p";
   const output = getOutputDimensions(canvasFormat, productionExportResolution);
-  const phaseOneExportFps =
-    productionExportResolution === "1080p" ? 24 : undefined;
+  const productionExportFps = 30;
+  const productionExportQualityLabel = `${productionExportResolution} · ${productionExportFps}fps`;
   const hasSavedSourceMedia = Boolean(videoStorageMetadata?.fileId);
 
   const selectedRange = Math.max(
@@ -1627,7 +1627,7 @@ export default function ProjectDetailsPage() {
         trimEnd: exportEnd,
         canvasFormat,
         resolution: productionExportResolution,
-        fps: phaseOneExportFps,
+        fps: productionExportFps,
       });
 
       const response = await fetch("/api/export/create", {
@@ -1643,7 +1643,7 @@ export default function ProjectDetailsPage() {
             canvasFormat,
             fitMode,
             resolution: productionExportResolution,
-            fps: phaseOneExportFps,
+            fps: productionExportFps,
           },
         }),
       });
@@ -2636,8 +2636,8 @@ export default function ProjectDetailsPage() {
               <p className="mt-2 text-sm text-white/50">
                 {canvasFormat} ·{" "}
                 {productionExportResolution === "1080p"
-                  ? "1080p · 24fps"
-                  : "720p"}
+                  ? "1080p · 30fps"
+                  : "720p · 30fps"}
               </p>
 
               {localVideoBytes > 100 * 1024 * 1024 && (
@@ -2676,18 +2676,18 @@ export default function ProjectDetailsPage() {
                   active={productionExportResolution === "720p"}
                   onClick={() => setExportResolution("720p")}
                 >
-                  720p
+                  720p · 30fps
                 </OptionButton>
                 <OptionButton
                   active={productionExportResolution === "1080p"}
                   onClick={() => setExportResolution("1080p")}
                 >
-                  1080p · 24fps
+                  1080p · 30fps
                 </OptionButton>
               </div>
 
               <p className="mt-3 text-xs font-bold text-white/38">
-                Higher frame rates are coming soon.
+                60fps coming later.
               </p>
             </div>
 
@@ -2773,6 +2773,9 @@ export default function ProjectDetailsPage() {
                     </p>
                     <p className="mt-1 text-xs font-bold text-emerald-100/62">
                       Click Download video to save it to your computer.
+                    </p>
+                    <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-emerald-100/50">
+                      {productionExportQualityLabel} · MP4
                     </p>
                   </div>
 
