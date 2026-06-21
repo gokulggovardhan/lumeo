@@ -1,19 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  deleteDriveFiles,
-  listDriveExportsFolderFiles,
-  listDriveTempFolderFiles,
-  listDriveUploadsFolderFiles,
-  type DriveFileMetadata,
-} from "@/lib/googleDriveServer";
-import {
-  FirebaseAdminConfigError,
-  getFirebaseAdminDb,
-} from "@/lib/firebaseAdmin";
 
 const DEFAULT_MIN_AGE_MINUTES = 30;
 
-type ScannedFile = DriveFileMetadata & {
+type ScannedFile = {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  size: number;
+  createdTime?: string;
+  appProperties?: Record<string, string>;
   folder: "uploads" | "exports" | "temp";
 };
 
@@ -47,92 +42,126 @@ type CleanupStage =
   | "unknown";
 
 type CleanupEnvDiagnostics = {
+  cleanupTokenConfigured: boolean;
   uploadsFolderId: boolean;
   exportsFolderId: boolean;
   tempFolderId: boolean;
+  firebaseProjectId: boolean;
+  firebaseClientEmail: boolean;
+  firebasePrivateKey: boolean;
+};
+
+type CleanupImportsDiagnostics = {
   firebaseAdmin: boolean;
+  googleDriveServer: boolean;
 };
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 export async function GET(request: NextRequest) {
   let failedStage: CleanupStage = "unknown";
-  let dryRun = true;
 
   try {
+    if (request.nextUrl.searchParams.get("ping") === "true") {
+      return NextResponse.json({
+        success: true,
+        routeLoaded: true,
+        dryRun: true,
+        message: "Cleanup route loaded.",
+      });
+    }
+
+    const env = getSafeEnvDiagnostics();
+
+    if (request.nextUrl.searchParams.get("diagnose") === "true") {
+      const imports = await getSafeImportDiagnostics();
+
+      return NextResponse.json({
+        success: imports.firebaseAdmin && imports.googleDriveServer,
+        dryRun: true,
+        diagnose: true,
+        routeLoaded: true,
+        env,
+        imports,
+        ...(imports.firebaseAdmin && imports.googleDriveServer
+          ? {}
+          : {
+              failedStage: imports.firebaseAdmin
+                ? "envCheck"
+                : "firebaseAdmin",
+              details: "One or more server modules could not be loaded.",
+            }),
+      });
+    }
+
     failedStage = "auth";
-    const expectedToken = process.env.LUMEO_ADMIN_CLEANUP_TOKEN;
     const token = request.nextUrl.searchParams.get("token");
 
-    if (!expectedToken || token !== expectedToken) {
+    if (!env.cleanupTokenConfigured || token !== process.env.LUMEO_ADMIN_CLEANUP_TOKEN) {
       return NextResponse.json(
         {
           success: false,
           dryRun: true,
-          error: "Cleanup authorization required.",
           failedStage: "auth",
           details: "Admin cleanup token is missing or invalid.",
           deleted: 0,
-          env: getSafeEnvDiagnostics(),
         },
         { status: 401 },
       );
     }
 
     failedStage = "envCheck";
-    const env = getSafeEnvDiagnostics();
-    const diagnose = request.nextUrl.searchParams.get("diagnose") === "true";
-    const confirm = request.nextUrl.searchParams.get("confirm") === "true";
-    dryRun = !confirm || diagnose;
-    const force = request.nextUrl.searchParams.get("force") === "true";
-    const minAgeMinutes = Math.max(
-      DEFAULT_MIN_AGE_MINUTES,
-      Number(request.nextUrl.searchParams.get("minAgeMinutes")) ||
-        DEFAULT_MIN_AGE_MINUTES,
-    );
-
-    if (diagnose) {
-      return NextResponse.json({
-        success: true,
-        dryRun: true,
-        diagnose: true,
-        env,
-        deleted: 0,
-        reason: "Diagnose only. Nothing deleted.",
-      });
-    }
-
     if (!env.uploadsFolderId) {
       return failureJson({
-        failedStage: "envCheck",
+        failedStage,
         details: "Uploads folder is not configured.",
         env,
       });
     }
 
     failedStage = "firebaseAdmin";
-    if (!env.firebaseAdmin) {
+    if (
+      !env.firebaseProjectId ||
+      !env.firebaseClientEmail ||
+      !env.firebasePrivateKey
+    ) {
       return failureJson({
-        failedStage: "firebaseAdmin",
+        failedStage,
         details: "Project database admin configuration is missing.",
         env,
       });
     }
 
+    const confirm = request.nextUrl.searchParams.get("confirm") === "true";
+    const force = request.nextUrl.searchParams.get("force") === "true";
+    const minAgeMinutes = Math.max(
+      DEFAULT_MIN_AGE_MINUTES,
+      Number(request.nextUrl.searchParams.get("minAgeMinutes")) ||
+        DEFAULT_MIN_AGE_MINUTES,
+    );
+    const [{ getFirebaseAdminDb }, googleDrive] = await Promise.all([
+      import("@/lib/firebaseAdmin"),
+      import("@/lib/googleDriveServer"),
+    ]);
+
     failedStage = "projectScan";
-    const projectReferences = await getProjectReferenceDiagnostics();
+    const projectReferences = await getProjectReferenceDiagnostics(
+      getFirebaseAdminDb,
+    );
 
     failedStage = "uploadFolderScan";
-    const uploads = await listDriveUploadsFolderFiles();
+    const uploads = await googleDrive.listDriveUploadsFolderFiles();
 
     failedStage = "exportFolderScan";
     const exports = env.exportsFolderId
-      ? await listDriveExportsFolderFiles()
+      ? await googleDrive.listDriveExportsFolderFiles()
       : [];
 
     failedStage = "tempFolderScan";
-    const temp = env.tempFolderId ? await listDriveTempFolderFiles() : [];
-
+    const temp = env.tempFolderId
+      ? await googleDrive.listDriveTempFolderFiles()
+      : [];
     const scannedFiles: ScannedFile[] = [
       ...uploads.map((file) => ({ ...file, folder: "uploads" as const })),
       ...exports.map((file) => ({ ...file, folder: "exports" as const })),
@@ -163,7 +192,6 @@ export async function GET(request: NextRequest) {
         {
           success: false,
           dryRun: true,
-          error: "Cleanup refused.",
           failedStage: "deleteConfirm",
           details:
             "No referenced project media files were found. Verify project media metadata before deleting.",
@@ -180,10 +208,11 @@ export async function GET(request: NextRequest) {
 
     let deleted = 0;
     let failedDeletes = 0;
+    const dryRun = !confirm;
 
     if (confirm) {
       failedStage = "deleteExecute";
-      const result = await deleteDriveFiles(
+      const result = await googleDrive.deleteDriveFiles(
         candidates.map((candidate) => candidate.fileId),
       );
       deleted = result.deleted;
@@ -217,7 +246,41 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getProjectReferenceDiagnostics(): Promise<ProjectReferenceDiagnostics> {
+async function getSafeImportDiagnostics(): Promise<CleanupImportsDiagnostics> {
+  const imports = {
+    firebaseAdmin: false,
+    googleDriveServer: false,
+  };
+
+  try {
+    await import("@/lib/firebaseAdmin");
+    imports.firebaseAdmin = true;
+  } catch (error) {
+    console.error("[Lumeo Cleanup] firebase admin import failed", error);
+  }
+
+  try {
+    await import("@/lib/googleDriveServer");
+    imports.googleDriveServer = true;
+  } catch (error) {
+    console.error("[Lumeo Cleanup] storage helper import failed", error);
+  }
+
+  return imports;
+}
+
+async function getProjectReferenceDiagnostics(
+  getFirebaseAdminDb: () => {
+    collection: (name: string) => {
+      get: () => Promise<{
+        size: number;
+        forEach: (callback: {
+          (document: { id: string; data: () => Record<string, unknown> }): void;
+        }) => void;
+      }>;
+    };
+  },
+): Promise<ProjectReferenceDiagnostics> {
   const db = getFirebaseAdminDb();
   const snapshot = await db.collection("projects").get();
   const diagnostics: ProjectReferenceDiagnostics = {
@@ -382,20 +445,19 @@ function addSampleStoragePath(
 
 function toScannedSummary(files: ScannedFile[]) {
   return {
-    total: files.length,
     uploads: files.filter((file) => file.folder === "uploads").length,
     exports: files.filter((file) => file.folder === "exports").length,
     temp: files.filter((file) => file.folder === "temp").length,
-    lumeoOwned: files.filter(isLumeoOwnedFile).length,
+    total: files.length,
   };
 }
 
 function toCandidateSummary(files: CleanupCandidate[]) {
   return {
-    total: files.length,
     uploads: files.filter((file) => file.folder === "uploads").length,
     exports: files.filter((file) => file.folder === "exports").length,
     temp: files.filter((file) => file.folder === "temp").length,
+    total: files.length,
   };
 }
 
@@ -415,29 +477,24 @@ function toSafeProjectReferenceDiagnostics(
   };
 }
 
-function getSafeErrorMessage(error: unknown) {
-  if (error instanceof FirebaseAdminConfigError) {
-    return "Project references could not be loaded.";
-  }
+function getSafeEnvDiagnostics(): CleanupEnvDiagnostics {
+  return {
+    cleanupTokenConfigured: Boolean(process.env.LUMEO_ADMIN_CLEANUP_TOKEN),
+    uploadsFolderId: Boolean(process.env.LUMEO_DRIVE_UPLOADS_FOLDER_ID),
+    exportsFolderId: Boolean(process.env.LUMEO_DRIVE_EXPORTS_FOLDER_ID),
+    tempFolderId: Boolean(process.env.LUMEO_DRIVE_TEMP_FOLDER_ID),
+    firebaseProjectId: Boolean(process.env.FIREBASE_PROJECT_ID),
+    firebaseClientEmail: Boolean(process.env.FIREBASE_CLIENT_EMAIL),
+    firebasePrivateKey: Boolean(process.env.FIREBASE_PRIVATE_KEY),
+  };
+}
 
+function getSafeErrorMessage(error: unknown) {
   if (error instanceof Error && error.message) {
     return error.message.slice(0, 180);
   }
 
   return "Unexpected cleanup failure.";
-}
-
-function getSafeEnvDiagnostics(): CleanupEnvDiagnostics {
-  return {
-    uploadsFolderId: Boolean(process.env.LUMEO_DRIVE_UPLOADS_FOLDER_ID),
-    exportsFolderId: Boolean(process.env.LUMEO_DRIVE_EXPORTS_FOLDER_ID),
-    tempFolderId: Boolean(process.env.LUMEO_DRIVE_TEMP_FOLDER_ID),
-    firebaseAdmin: Boolean(
-      process.env.FIREBASE_PROJECT_ID &&
-        process.env.FIREBASE_CLIENT_EMAIL &&
-        process.env.FIREBASE_PRIVATE_KEY,
-    ),
-  };
 }
 
 function failureJson({
@@ -455,7 +512,6 @@ function failureJson({
     {
       success: false,
       dryRun: true,
-      error: "Cleanup check failed.",
       failedStage,
       details,
       deleted: 0,
