@@ -52,8 +52,13 @@ type CleanupEnvDiagnostics = {
 };
 
 type CleanupImportsDiagnostics = {
-  firebaseAdmin: boolean;
+  firebaseAdminDbOnly: boolean;
   googleDriveServer: boolean;
+};
+
+type CleanupImportErrors = {
+  firebaseAdminDbOnly: string | null;
+  googleDriveServer: string | null;
 };
 
 export const dynamic = "force-dynamic";
@@ -75,19 +80,20 @@ export async function GET(request: NextRequest) {
     const env = getSafeEnvDiagnostics();
 
     if (request.nextUrl.searchParams.get("diagnose") === "true") {
-      const imports = await getSafeImportDiagnostics();
+      const { imports, importErrors } = await getSafeImportDiagnostics();
 
       return NextResponse.json({
-        success: imports.firebaseAdmin && imports.googleDriveServer,
+        success: imports.firebaseAdminDbOnly && imports.googleDriveServer,
         dryRun: true,
         diagnose: true,
         routeLoaded: true,
         env,
         imports,
-        ...(imports.firebaseAdmin && imports.googleDriveServer
+        importErrors,
+        ...(imports.firebaseAdminDbOnly && imports.googleDriveServer
           ? {}
           : {
-              failedStage: imports.firebaseAdmin
+              failedStage: imports.firebaseAdminDbOnly
                 ? "envCheck"
                 : "firebaseAdmin",
               details: "One or more server modules could not be loaded.",
@@ -140,14 +146,14 @@ export async function GET(request: NextRequest) {
       Number(request.nextUrl.searchParams.get("minAgeMinutes")) ||
         DEFAULT_MIN_AGE_MINUTES,
     );
-    const [{ getFirebaseAdminDb }, googleDrive] = await Promise.all([
-      import("@/lib/firebaseAdmin"),
+    const [{ getFirebaseAdminDbOnly }, googleDrive] = await Promise.all([
+      import("@/lib/firebaseAdminDbOnly"),
       import("@/lib/googleDriveServer"),
     ]);
 
     failedStage = "projectScan";
     const projectReferences = await getProjectReferenceDiagnostics(
-      getFirebaseAdminDb,
+      getFirebaseAdminDbOnly,
     );
 
     failedStage = "uploadFolderScan";
@@ -246,27 +252,36 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function getSafeImportDiagnostics(): Promise<CleanupImportsDiagnostics> {
+async function getSafeImportDiagnostics(): Promise<{
+  imports: CleanupImportsDiagnostics;
+  importErrors: CleanupImportErrors;
+}> {
   const imports = {
-    firebaseAdmin: false,
+    firebaseAdminDbOnly: false,
     googleDriveServer: false,
+  };
+  const importErrors: CleanupImportErrors = {
+    firebaseAdminDbOnly: null,
+    googleDriveServer: null,
   };
 
   try {
-    await import("@/lib/firebaseAdmin");
-    imports.firebaseAdmin = true;
+    await import("@/lib/firebaseAdminDbOnly");
+    imports.firebaseAdminDbOnly = true;
   } catch (error) {
-    console.error("[Lumeo Cleanup] firebase admin import failed", error);
+    importErrors.firebaseAdminDbOnly = getSafeImportError(error);
+    console.error("[Lumeo Cleanup] firestore admin import failed", error);
   }
 
   try {
     await import("@/lib/googleDriveServer");
     imports.googleDriveServer = true;
   } catch (error) {
+    importErrors.googleDriveServer = getSafeImportError(error);
     console.error("[Lumeo Cleanup] storage helper import failed", error);
   }
 
-  return imports;
+  return { imports, importErrors };
 }
 
 async function getProjectReferenceDiagnostics(
@@ -495,6 +510,17 @@ function getSafeErrorMessage(error: unknown) {
   }
 
   return "Unexpected cleanup failure.";
+}
+
+function getSafeImportError(error: unknown) {
+  if (error instanceof Error) {
+    const name = error.name || "Error";
+    const message = error.message || "Module import failed.";
+
+    return `${name}: ${message}`.slice(0, 180);
+  }
+
+  return "Module import failed.";
 }
 
 function failureJson({
