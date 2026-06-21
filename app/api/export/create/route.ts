@@ -48,6 +48,11 @@ type ExportFailureStage =
   | "downloadUrlCreate"
   | "metadataSave"
   | "tempCleanup";
+type TransformVariant =
+  | "requested"
+  | "requestedWithoutTitle"
+  | "stableFrame"
+  | "simpleFrame";
 
 type ExportRequestBody = {
   projectId?: string;
@@ -294,23 +299,17 @@ export async function POST(request: NextRequest) {
       bytes: temporarySource.bytes,
     });
 
-    failedStage = "transformationBuild";
-    const transformedUrl =
-      cloudinaryServer.createPhaseOneCloudinaryExportUrl(temporaryPublicId, {
-        trimStart: settings.trimStart,
-        trimEnd: settings.trimEnd,
-        width: dimensions.width,
-        height: dimensions.height,
-        frameMode: settings.frameMode,
-        fps: settings.fps,
-        background: settings.background,
-        titleOverlay: settings.titleOverlay,
-      });
-
     failedStage = "transformedFetch";
-    const exportBytes = await fetchTransformedExportWithRetry(transformedUrl);
+    const transformedExport = await fetchTransformedExportWithFallbacks({
+      cloudinaryServer,
+      publicId: temporaryPublicId,
+      settings,
+      dimensions,
+    });
+    const exportBytes = transformedExport.bytes;
     console.info("[Lumeo Export] transformed MP4 fetch completed", {
       size: exportBytes.byteLength,
+      variant: transformedExport.variant,
     });
 
     const createdAt = new Date().toISOString();
@@ -353,6 +352,7 @@ export async function POST(request: NextRequest) {
       createdAt,
       settings,
       dimensions,
+      transformVariant: transformedExport.variant,
     });
 
     try {
@@ -407,6 +407,8 @@ export async function POST(request: NextRequest) {
         frameMode: settings.frameMode,
         format: "mp4",
         titleIncluded: settings.titleOverlay.text.length > 0,
+        transformVariant: transformedExport.variant,
+        transformFallbackUsed: transformedExport.variant !== "requested",
       },
     });
   } catch (error) {
@@ -590,6 +592,7 @@ function createExportMetadata({
   createdAt,
   settings,
   dimensions,
+  transformVariant,
 }: {
   fileId: string;
   fileName: string;
@@ -597,6 +600,7 @@ function createExportMetadata({
   createdAt: string;
   settings: ReturnType<typeof resolveExportSettings>;
   dimensions: ReturnType<typeof getOutputDimensions>;
+  transformVariant: TransformVariant;
 }) {
   return {
     status: "complete",
@@ -618,6 +622,8 @@ function createExportMetadata({
       outputHeight: dimensions.height,
       background: settings.background,
       titleOverlay: settings.titleOverlay,
+      transformVariant,
+      transformFallbackUsed: transformVariant !== "requested",
       supportedFeatures: [
         "mp4",
         "trim",
@@ -706,14 +712,121 @@ function toNullableNumber(value: unknown) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
-async function fetchTransformedExportWithRetry(url: string) {
+async function fetchTransformedExportWithFallbacks({
+  cloudinaryServer,
+  publicId,
+  settings,
+  dimensions,
+}: {
+  cloudinaryServer: CloudinaryServerModule;
+  publicId: string;
+  settings: ReturnType<typeof resolveExportSettings>;
+  dimensions: ReturnType<typeof getOutputDimensions>;
+}) {
+  const variants = createTransformVariants(settings);
+  let lastError: unknown = null;
+
+  for (const variant of variants) {
+    const transformedUrl = cloudinaryServer.createPhaseOneCloudinaryExportUrl(
+      publicId,
+      {
+        trimStart: settings.trimStart,
+        trimEnd: settings.trimEnd,
+        width: dimensions.width,
+        height: dimensions.height,
+        frameMode: variant.frameMode,
+        fps: settings.fps,
+        background: settings.background,
+        titleOverlay: variant.titleOverlay,
+      },
+    );
+
+    try {
+      return {
+        bytes: await fetchTransformedExportWithRetry(
+          transformedUrl,
+          variant.label,
+        ),
+        variant: variant.label,
+      };
+    } catch (error) {
+      lastError = error;
+
+      if (
+        error instanceof CloudTransformFetchError &&
+        error.canTryFallback
+      ) {
+        console.warn("[Lumeo Export] transform variant failed, trying fallback", {
+          variant: error.variant,
+          status: error.status,
+          cloudError: error.cloudError,
+        });
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw lastError || new Error("Transformed export failed.");
+}
+
+function createTransformVariants(settings: ReturnType<typeof resolveExportSettings>) {
+  const emptyTitle = { ...settings.titleOverlay, text: "" };
+  const variants: Array<{
+    label: TransformVariant;
+    frameMode: FrameMode;
+    titleOverlay: TitleOverlaySettings;
+  }> = [
+    {
+      label: "requested",
+      frameMode: settings.frameMode,
+      titleOverlay: settings.titleOverlay,
+    },
+    {
+      label: "requestedWithoutTitle",
+      frameMode: settings.frameMode,
+      titleOverlay: emptyTitle,
+    },
+    {
+      label: "stableFrame",
+      frameMode:
+        settings.frameMode === "blurredBackground"
+          ? "originalView"
+          : settings.frameMode,
+      titleOverlay: emptyTitle,
+    },
+    {
+      label: "simpleFrame",
+      frameMode: "originalView",
+      titleOverlay: emptyTitle,
+    },
+  ];
+  const seen = new Set<string>();
+
+  return variants.filter((variant) => {
+    const key = `${variant.label}:${variant.frameMode}:${variant.titleOverlay.text}`;
+
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+async function fetchTransformedExportWithRetry(
+  url: string,
+  variant: TransformVariant,
+) {
   const retryStatuses = new Set([420, 423, 404, 429, 500, 502, 503, 504]);
   const delays = [2000, 4000, 8000, 12000, 18000, 24000, 30000, 30000];
   let lastStatus = 0;
+  let lastCloudError = "";
+  let lastSnippet = "";
 
   for (let attempt = 0; attempt <= delays.length; attempt += 1) {
     console.info("[Lumeo Export] transformed MP4 fetch attempt started", {
       attempt: attempt + 1,
+      variant,
     });
 
     const response = await fetch(url, {
@@ -721,6 +834,7 @@ async function fetchTransformedExportWithRetry(url: string) {
     });
 
     lastStatus = response.status;
+    lastCloudError = sanitizeDiagnosticText(response.headers.get("x-cld-error"));
 
     if (response.ok) {
       return Buffer.from(await response.arrayBuffer());
@@ -730,21 +844,37 @@ async function fetchTransformedExportWithRetry(url: string) {
       attempt: attempt + 1,
       status: response.status,
       retryable: retryStatuses.has(response.status),
+      variant,
+      cloudError: lastCloudError,
     });
 
     if (!retryStatuses.has(response.status) || attempt === delays.length) {
-      throw new Error(`Transformed export fetch failed with status ${lastStatus}.`);
+      try {
+        lastSnippet = sanitizeDiagnosticText(await response.text());
+      } catch {
+        lastSnippet = "";
+      }
+
+      throw new CloudTransformFetchError({
+        status: lastStatus,
+        cloudError: lastCloudError,
+        responseSnippet: lastSnippet,
+        variant,
+        canTryFallback: !retryStatuses.has(response.status),
+      });
     }
 
     const retryAfterMs = getRetryAfterMs(response.headers.get("retry-after"));
     const delayMs = retryAfterMs ?? delays[attempt];
 
     try {
-      const snippet = (await response.text()).slice(0, 240);
+      const snippet = sanitizeDiagnosticText(await response.text());
+      lastSnippet = snippet;
       if (snippet) {
         console.warn("[Lumeo Export] transformed MP4 response snippet", {
           attempt: attempt + 1,
           snippet,
+          variant,
         });
       }
     } catch (snippetError) {
@@ -757,12 +887,49 @@ async function fetchTransformedExportWithRetry(url: string) {
     console.info("[Lumeo Export] transformed MP4 retry scheduled", {
       attempt: attempt + 1,
       delayMs,
+      variant,
     });
 
     await delay(delayMs);
   }
 
-  throw new Error(`Transformed export fetch failed with status ${lastStatus}.`);
+  throw new CloudTransformFetchError({
+    status: lastStatus,
+    cloudError: lastCloudError,
+    responseSnippet: lastSnippet,
+    variant,
+    canTryFallback: false,
+  });
+}
+
+class CloudTransformFetchError extends Error {
+  status: number;
+  cloudError: string;
+  responseSnippet: string;
+  variant: TransformVariant;
+  canTryFallback: boolean;
+
+  constructor({
+    status,
+    cloudError,
+    responseSnippet,
+    variant,
+    canTryFallback,
+  }: {
+    status: number;
+    cloudError: string;
+    responseSnippet: string;
+    variant: TransformVariant;
+    canTryFallback: boolean;
+  }) {
+    super(`Transformed export fetch failed with status ${status}.`);
+    this.name = "CloudTransformFetchError";
+    this.status = status;
+    this.cloudError = cloudError;
+    this.responseSnippet = responseSnippet;
+    this.variant = variant;
+    this.canTryFallback = canTryFallback;
+  }
 }
 
 function getRetryAfterMs(value: string | null) {
@@ -947,6 +1114,17 @@ function getSafeDiagnosticError(error: unknown) {
 }
 
 function getSafeExportDiagnostic(error: unknown) {
+  if (error instanceof CloudTransformFetchError) {
+    return {
+      errorName: error.name,
+      errorMessage: error.message.slice(0, 180),
+      status: error.status,
+      cloudError: error.cloudError,
+      responseSnippet: error.responseSnippet,
+      variant: error.variant,
+    };
+  }
+
   if (error instanceof Error) {
     return {
       errorName: (error.name || "Error").slice(0, 80),
@@ -958,6 +1136,17 @@ function getSafeExportDiagnostic(error: unknown) {
     errorName: "Unknown",
     errorMessage: "Unknown error.",
   };
+}
+
+function sanitizeDiagnosticText(value: unknown) {
+  if (typeof value !== "string") return "";
+
+  return value
+    .replace(/https:\/\/res\.cloudinary\.com\/[^\s"'<>]+/g, "[redacted-url]")
+    .replace(/lumeo\/export-temp\/[a-zA-Z0-9/_-]+/g, "[redacted-public-id]")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240);
 }
 
 function formatCanvasSlug(canvasFormat: CanvasFormat) {

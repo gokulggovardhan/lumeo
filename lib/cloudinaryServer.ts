@@ -289,13 +289,13 @@ function normalizeBackgroundSettings(
 }
 
 function getBackgroundBlurStrength(style: string) {
-  if (style === "soft") return 1200;
-  if (style === "strong") return 1800;
-  return 1500;
+  if (style === "soft") return 400;
+  if (style === "strong") return 900;
+  return 700;
 }
 
 function getBackgroundBrightness(style: string) {
-  return style === "dark" ? -48 : -35;
+  return style === "dark" ? -40 : -25;
 }
 
 function createTitleOverlayTransformation(
@@ -318,17 +318,14 @@ function createTitleOverlayTransformation(
       font_size: fontSize,
       font_weight: "bold",
       text: title.text,
-      text_align: title.align,
     },
     color: style.color,
-    effect: style.effect,
     width: maxWidth,
     crop: "fit",
   };
 
   if (style.background) {
     textLayer.background = style.background;
-    textLayer.radius = Math.round(fontSize * 0.35);
   }
 
   return [
@@ -392,26 +389,26 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
 
 function getTitleStyle(style: string) {
   if (style === "creator") {
-    return { color: "#FFD84D", effect: "shadow:50" };
+    return { color: "#FFD84D" };
   }
 
   if (style === "luxury") {
-    return { color: "#F5E6BC", effect: "shadow:45" };
+    return { color: "#F5E6BC" };
   }
 
   if (style === "neon") {
-    return { color: "#6DFFE5", effect: "shadow:60" };
+    return { color: "#6DFFE5" };
   }
 
   if (style === "caption") {
-    return { color: "#FFFFFF", effect: "shadow:35", background: "#000000" };
+    return { color: "#FFFFFF", background: "#000000" };
   }
 
   if (style === "lowerThird") {
-    return { color: "#FFFFFF", effect: "shadow:35", background: "#000000" };
+    return { color: "#FFFFFF", background: "#000000" };
   }
 
-  return { color: "#FFFFFF", effect: "shadow:45" };
+  return { color: "#FFFFFF" };
 }
 
 function getTitleFontSize(size: string, width: number) {
