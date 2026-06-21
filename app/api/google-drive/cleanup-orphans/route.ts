@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  deleteDriveFile,
+  deleteDriveFiles,
   getGoogleDriveAccessToken,
+  listDriveExportsFolderFiles,
+  listDriveTempFolderFiles,
   listDriveUploadsFolderFiles,
+  type DriveFileMetadata,
 } from "@/lib/googleDriveServer";
 import {
   FirebaseAdminConfigError,
@@ -11,90 +14,58 @@ import {
 
 const DEFAULT_MIN_AGE_MINUTES = 30;
 
-type CleanupStages = {
-  tokenEnvPresent: boolean;
-  tokenMatched: boolean;
-  uploadsFolderIdPresent: boolean;
-  driveAuthOk: boolean;
-  driveListFilesOk: boolean;
-  driveFileCount: number;
-  firestoreProjectsQueryOk: boolean;
-  referencedFileIdCount: number;
-  orphanCandidateCount: number;
+type ScannedFile = DriveFileMetadata & {
+  folder: "uploads" | "exports" | "temp";
+};
+
+type CleanupCandidate = ScannedFile & {
+  reason: string;
 };
 
 type ProjectReferenceDiagnostics = {
-  fileIds: Set<string>;
+  projectIds: Set<string>;
+  allReferencedFileIds: Set<string>;
+  activeSourceFileIds: Set<string>;
+  latestExportFileIds: Set<string>;
   projectDocCount: number;
   projectDocsWithEditorMediaCount: number;
   projectDocsWithStorageCount: number;
+  projectDocsWithExportCount: number;
   sampleStoragePathsFound: string[];
 };
-
-type SafeProjectReferenceDiagnostics = Omit<
-  ProjectReferenceDiagnostics,
-  "fileIds"
-> & {
-  referencedFileIdCount: number;
-};
-
-class CleanupStageError extends Error {
-  stage: keyof CleanupStages | string;
-
-  constructor(stage: keyof CleanupStages | string, message: string) {
-    super(message);
-    this.name = "CleanupStageError";
-    this.stage = stage;
-  }
-}
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  const stages: CleanupStages = {
-    tokenEnvPresent: false,
-    tokenMatched: false,
-    uploadsFolderIdPresent: false,
-    driveAuthOk: false,
-    driveListFilesOk: false,
-    driveFileCount: 0,
-    firestoreProjectsQueryOk: false,
-    referencedFileIdCount: 0,
-    orphanCandidateCount: 0,
-  };
   const expectedToken = process.env.LUMEO_ADMIN_CLEANUP_TOKEN;
-  stages.tokenEnvPresent = Boolean(expectedToken);
 
   if (!expectedToken) {
     return NextResponse.json(
       {
         success: false,
         error: "Cleanup failed.",
-        failedStage: "tokenEnvPresent",
-        details: "Cleanup token is not configured.",
-        stages,
+        reason: "Cleanup token is not configured.",
       },
       { status: 500 },
     );
   }
 
   const token = request.nextUrl.searchParams.get("token");
-  stages.tokenMatched = token === expectedToken;
 
-  if (!stages.tokenMatched) {
+  if (token !== expectedToken) {
     return NextResponse.json(
       {
         success: false,
         error: "Cleanup failed.",
-        failedStage: "tokenMatched",
-        details: "Cleanup token did not match.",
-        stages,
+        reason: "Cleanup token did not match.",
       },
       { status: 401 },
     );
   }
 
   const confirm = request.nextUrl.searchParams.get("confirm") === "true";
+  const force = request.nextUrl.searchParams.get("force") === "true";
+  const dryRun = !confirm;
   const minAgeMinutes = Math.max(
     DEFAULT_MIN_AGE_MINUTES,
     Number(request.nextUrl.searchParams.get("minAgeMinutes")) ||
@@ -102,124 +73,96 @@ export async function GET(request: NextRequest) {
   );
 
   try {
-    stages.uploadsFolderIdPresent = Boolean(
-      process.env.LUMEO_DRIVE_UPLOADS_FOLDER_ID,
-    );
+    await getGoogleDriveAccessToken();
 
-    if (!stages.uploadsFolderIdPresent) {
-      throw new CleanupStageError(
-        "uploadsFolderIdPresent",
-        "Uploads folder is not configured.",
-      );
-    }
-
-    try {
-      await getGoogleDriveAccessToken();
-      stages.driveAuthOk = true;
-    } catch (error) {
-      throw toStageError("driveAuthOk", "Permanent media authorization failed.", error);
-    }
-
-    let files: Awaited<ReturnType<typeof listDriveUploadsFolderFiles>>;
-
-    try {
-      files = await listDriveUploadsFolderFiles();
-      stages.driveListFilesOk = true;
-      stages.driveFileCount = files.length;
-    } catch (error) {
-      throw toStageError("driveListFilesOk", "Could not list uploaded media.", error);
-    }
-
-    let projectReferences: ProjectReferenceDiagnostics;
-
-    try {
-      projectReferences = await getProjectReferenceDiagnostics();
-      stages.firestoreProjectsQueryOk = true;
-      stages.referencedFileIdCount = projectReferences.fileIds.size;
-    } catch (error) {
-      if (error instanceof FirebaseAdminConfigError) {
-        throw toStageError(
-          "firebaseAdminConfig",
-          "Firebase Admin environment variables are missing.",
-          error,
-        );
-      }
-
-      throw toStageError(
-        "firestoreProjectsQueryOk",
-        "Could not read project media references.",
-        error,
-      );
-    }
-
-    const now = Date.now();
+    const [uploads, exports, temp] = await Promise.all([
+      listDriveUploadsFolderFiles(),
+      listDriveExportsFolderFiles().catch((error) => {
+        console.error("[Lumeo Cleanup] exports folder scan failed", error);
+        return [] as DriveFileMetadata[];
+      }),
+      listDriveTempFolderFiles().catch((error) => {
+        console.error("[Lumeo Cleanup] temp folder scan failed", error);
+        return [] as DriveFileMetadata[];
+      }),
+    ]);
+    const scannedFiles: ScannedFile[] = [
+      ...uploads.map((file) => ({ ...file, folder: "uploads" as const })),
+      ...exports.map((file) => ({ ...file, folder: "exports" as const })),
+      ...temp.map((file) => ({ ...file, folder: "temp" as const })),
+    ];
+    const projectReferences = await getProjectReferenceDiagnostics();
     const minAgeMs = minAgeMinutes * 60 * 1000;
-    const orphanCandidates = files.filter((file) => {
-      if (projectReferences.fileIds.has(file.fileId)) return false;
-      if (!file.createdTime) return false;
+    const now = Date.now();
+    const candidates = scannedFiles.filter((file) => {
+      if (!isOldEnough(file, now, minAgeMs)) return false;
+      if (!isLumeoOwnedFile(file)) return false;
 
-      const createdAt = Date.parse(file.createdTime);
+      return getCleanupReason(file, projectReferences) !== "";
+    }) as CleanupCandidate[];
 
-      return Number.isFinite(createdAt) && now - createdAt >= minAgeMs;
-    });
-    stages.orphanCandidateCount = orphanCandidates.length;
-    const diagnostics = toSafeProjectReferenceDiagnostics(projectReferences);
-    const deletedFileIds: string[] = [];
+    for (const candidate of candidates) {
+      candidate.reason = getCleanupReason(candidate, projectReferences);
+    }
 
-    if (confirm && files.length > 0 && projectReferences.fileIds.size === 0) {
+    if (
+      confirm &&
+      scannedFiles.length > 0 &&
+      projectReferences.allReferencedFileIds.size === 0 &&
+      !force
+    ) {
       return NextResponse.json(
         {
           success: false,
-          error: "Cleanup refused.",
-          details:
-            "No referenced project media files were found. Verify project media metadata before deleting.",
           dryRun: false,
-          minAgeMinutes,
-          scannedCount: files.length,
-          referencedCount: projectReferences.fileIds.size,
-          candidateCount: orphanCandidates.length,
-          deletedCount: 0,
-          stages,
-          ...diagnostics,
-          candidates: toSafeCandidateList(orphanCandidates),
+          error: "Cleanup refused.",
+          reason:
+            "No referenced project media files were found. Verify project media metadata before deleting.",
+          scanned: toScannedSummary(scannedFiles),
+          candidates: toSafeCandidateList(candidates),
+          deleted: 0,
+          skipped: candidates.length,
+          ...toSafeProjectReferenceDiagnostics(projectReferences),
         },
         { status: 409 },
       );
     }
 
+    let deleted = 0;
+    let failedDeletes = 0;
+
     if (confirm) {
-      for (const file of orphanCandidates) {
-        await deleteDriveFile(file.fileId);
-        deletedFileIds.push(file.fileId);
-      }
+      const result = await deleteDriveFiles(
+        candidates.map((candidate) => candidate.fileId),
+      );
+      deleted = result.deleted;
+      failedDeletes = result.failed;
     }
 
     return NextResponse.json({
-      success: true,
-      dryRun: !confirm,
+      success: failedDeletes === 0,
+      dryRun,
       minAgeMinutes,
-      scannedCount: files.length,
-      referencedCount: projectReferences.fileIds.size,
-      candidateCount: orphanCandidates.length,
-      deletedCount: deletedFileIds.length,
-      stages,
-      ...diagnostics,
-      candidates: toSafeCandidateList(orphanCandidates),
+      scanned: toScannedSummary(scannedFiles),
+      candidates: toSafeCandidateList(candidates),
+      deleted,
+      skipped: dryRun ? candidates.length : failedDeletes,
+      reason: dryRun
+        ? "Dry run only. Add confirm=true to delete candidates after review."
+        : failedDeletes > 0
+          ? "Cleanup completed with some files skipped."
+          : "Cleanup complete.",
+      ...toSafeProjectReferenceDiagnostics(projectReferences),
     });
   } catch (error) {
-    console.error("Media cleanup failed", error);
-    const stageError =
-      error instanceof CleanupStageError
-        ? error
-        : new CleanupStageError("unknown", "Unexpected cleanup failure.");
+    console.error("[Lumeo Cleanup] cleanup failed", error);
 
     return NextResponse.json(
       {
         success: false,
+        dryRun,
         error: "Cleanup failed.",
-        failedStage: stageError.stage,
-        details: getSafeErrorMessage(stageError),
-        stages,
+        reason: getSafeErrorMessage(error),
       },
       { status: 500 },
     );
@@ -230,19 +173,21 @@ async function getProjectReferenceDiagnostics(): Promise<ProjectReferenceDiagnos
   const db = getFirebaseAdminDb();
   const snapshot = await db.collection("projects").get();
   const diagnostics: ProjectReferenceDiagnostics = {
-    fileIds: new Set<string>(),
+    projectIds: new Set<string>(),
+    allReferencedFileIds: new Set<string>(),
+    activeSourceFileIds: new Set<string>(),
+    latestExportFileIds: new Set<string>(),
     projectDocCount: snapshot.size,
     projectDocsWithEditorMediaCount: 0,
     projectDocsWithStorageCount: 0,
+    projectDocsWithExportCount: 0,
     sampleStoragePathsFound: [],
   };
 
   snapshot.forEach((document) => {
-    const data = document.data();
-
-    collectProjectFileIds(data, diagnostics);
+    diagnostics.projectIds.add(document.id);
+    collectProjectFileIds(document.data(), diagnostics);
   });
-
 
   return diagnostics;
 }
@@ -254,7 +199,9 @@ function collectProjectFileIds(
   const editor = getRecord(project.editor);
   const media = getRecord(editor?.media);
   const storage = getRecord(media?.storage);
-  const storageFileId = storage?.fileId;
+  const exportMetadata = getRecord(editor?.export);
+  const storageFileId = getFileId(storage);
+  const exportFileId = getFileId(exportMetadata);
 
   if (media) {
     diagnostics.projectDocsWithEditorMediaCount += 1;
@@ -265,15 +212,26 @@ function collectProjectFileIds(
     addSampleStoragePath(diagnostics, "editor.media.storage");
   }
 
-  if (typeof storageFileId === "string" && storageFileId.trim()) {
-    diagnostics.fileIds.add(storageFileId.trim());
+  if (storageFileId) {
+    diagnostics.activeSourceFileIds.add(storageFileId);
+    diagnostics.allReferencedFileIds.add(storageFileId);
     addSampleStoragePath(diagnostics, "editor.media.storage.fileId");
   }
 
+  if (exportMetadata) {
+    diagnostics.projectDocsWithExportCount += 1;
+    addSampleStoragePath(diagnostics, "editor.export");
+  }
+
+  if (exportFileId) {
+    diagnostics.latestExportFileIds.add(exportFileId);
+    diagnostics.allReferencedFileIds.add(exportFileId);
+    addSampleStoragePath(diagnostics, "editor.export.fileId");
+  }
+
+  collectFileIdsFromValue(editor?.exports, diagnostics, "editor.exports");
   collectFileIdsFromValue(project.export, diagnostics, "export");
   collectFileIdsFromValue(project.exports, diagnostics, "exports");
-  collectFileIdsFromValue(editor?.export, diagnostics, "editor.export");
-  collectFileIdsFromValue(editor?.exports, diagnostics, "editor.exports");
 }
 
 function collectFileIdsFromValue(
@@ -295,27 +253,71 @@ function collectFileIdsFromValue(
 
   if (!record) return;
 
-  if (
-    typeof record.fileId === "string" &&
-    record.fileId.trim()
-  ) {
-    diagnostics.fileIds.add(record.fileId.trim());
+  const fileId = getFileId(record);
+
+  if (fileId) {
+    diagnostics.allReferencedFileIds.add(fileId);
     addSampleStoragePath(diagnostics, `${path}.fileId`);
   }
 
   for (const [key, child] of Object.entries(record)) {
-    if (key === "fileId") {
-      continue;
+    if (key !== "fileId") {
+      collectFileIdsFromValue(child, diagnostics, `${path}.${key}`);
     }
-
-    collectFileIdsFromValue(child, diagnostics, `${path}.${key}`);
   }
+}
+
+function getCleanupReason(
+  file: ScannedFile,
+  diagnostics: ProjectReferenceDiagnostics,
+) {
+  const projectId = file.appProperties?.projectId || "";
+  const purpose = file.appProperties?.purpose || "";
+
+  if (!projectId) return "missingProjectTag";
+  if (!diagnostics.projectIds.has(projectId)) return "projectDeleted";
+  if (purpose === "source" || purpose === "upload") {
+    return diagnostics.activeSourceFileIds.has(file.fileId)
+      ? ""
+      : "inactiveSource";
+  }
+  if (purpose === "export") {
+    return diagnostics.latestExportFileIds.has(file.fileId) ? "" : "oldExport";
+  }
+  if (purpose === "temp") return "oldTemp";
+
+  return diagnostics.allReferencedFileIds.has(file.fileId)
+    ? ""
+    : "unreferencedLumeoFile";
+}
+
+function isOldEnough(file: ScannedFile, now: number, minAgeMs: number) {
+  if (!file.createdTime) return false;
+
+  const createdAt = Date.parse(file.createdTime);
+
+  return Number.isFinite(createdAt) && now - createdAt >= minAgeMs;
+}
+
+function isLumeoOwnedFile(file: ScannedFile) {
+  return (
+    file.appProperties?.app === "lumeo" ||
+    file.fileName.toLowerCase().startsWith("lumeo-")
+  );
 }
 
 function getRecord(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
 
   return value as Record<string, unknown>;
+}
+
+function getFileId(value: unknown) {
+  const record = getRecord(value);
+
+  if (!record || typeof record.fileId !== "string") return "";
+
+  return record.fileId.trim();
 }
 
 function addSampleStoragePath(
@@ -330,51 +332,48 @@ function addSampleStoragePath(
   }
 }
 
+function toScannedSummary(files: ScannedFile[]) {
+  return {
+    total: files.length,
+    uploads: files.filter((file) => file.folder === "uploads").length,
+    exports: files.filter((file) => file.folder === "exports").length,
+    temp: files.filter((file) => file.folder === "temp").length,
+    lumeoOwned: files.filter(isLumeoOwnedFile).length,
+  };
+}
+
+function toSafeCandidateList(files: CleanupCandidate[]) {
+  return files.map((file) => ({
+    fileName: file.fileName,
+    folder: file.folder,
+    mimeType: file.mimeType,
+    size: file.size,
+    createdTime: file.createdTime || null,
+    purpose: file.appProperties?.purpose || null,
+    projectTagged: Boolean(file.appProperties?.projectId),
+    reason: file.reason,
+  }));
+}
+
 function toSafeProjectReferenceDiagnostics(
   diagnostics: ProjectReferenceDiagnostics,
-): SafeProjectReferenceDiagnostics {
+) {
   return {
     projectDocCount: diagnostics.projectDocCount,
     projectDocsWithEditorMediaCount:
       diagnostics.projectDocsWithEditorMediaCount,
     projectDocsWithStorageCount: diagnostics.projectDocsWithStorageCount,
-    referencedFileIdCount: diagnostics.fileIds.size,
+    projectDocsWithExportCount: diagnostics.projectDocsWithExportCount,
+    referencedFileIdCount: diagnostics.allReferencedFileIds.size,
+    activeSourceFileIdCount: diagnostics.activeSourceFileIds.size,
+    latestExportFileIdCount: diagnostics.latestExportFileIds.size,
     sampleStoragePathsFound: diagnostics.sampleStoragePathsFound,
   };
 }
 
-function toSafeCandidateList(
-  files: Awaited<ReturnType<typeof listDriveUploadsFolderFiles>>,
-) {
-  return files.map((file) => ({
-    fileId: file.fileId,
-    fileName: file.fileName,
-    mimeType: file.mimeType,
-    size: file.size,
-    createdTime: file.createdTime || null,
-    app: file.appProperties?.app || null,
-    purpose: file.appProperties?.purpose || null,
-    projectId: file.appProperties?.projectId || null,
-  }));
-}
-
-function toStageError(
-  stage: keyof CleanupStages | string,
-  safeMessage: string,
-  error: unknown,
-) {
-  console.error("Cleanup stage failed", { stage, error });
-
-  return new CleanupStageError(stage, safeMessage);
-}
-
 function getSafeErrorMessage(error: unknown) {
-  if (error instanceof CleanupStageError) {
-    return error.message;
-  }
-
   if (error instanceof FirebaseAdminConfigError) {
-    return error.message;
+    return "Project references could not be loaded.";
   }
 
   if (error instanceof Error && error.message) {

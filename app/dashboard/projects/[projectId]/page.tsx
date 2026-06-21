@@ -11,7 +11,6 @@ import {
 } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
-  deleteDoc,
   doc,
   onSnapshot,
   serverTimestamp,
@@ -727,6 +726,7 @@ export default function ProjectDetailsPage() {
   const videoUploadCancelledRef = useRef(false);
   const videoUploadInProgressRef = useRef(false);
   const videoUploadRunIdRef = useRef(0);
+  const replacedMediaCleanupIdsRef = useRef<string[]>([]);
 
   const videoStorageKey = `project:${projectId}:video`;
   const audioStorageKey = `project:${projectId}:audio`;
@@ -741,6 +741,7 @@ export default function ProjectDetailsPage() {
   const [status, setStatus] = useState("Draft");
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("Saved");
+  const [projectDeleting, setProjectDeleting] = useState(false);
 
   const [localVideoURL, setLocalVideoURL] = useState("");
   const [localVideoName, setLocalVideoName] = useState("");
@@ -1224,6 +1225,7 @@ export default function ProjectDetailsPage() {
     setLocalVideoBytes(file.size);
     setVideoRestored(false);
     resetVideoUploadState();
+    replacedMediaCleanupIdsRef.current = oldMediaFileIds;
     setVideoUploadStatus("Saving media...");
     setVideoUploadProgress(0);
     resetExportState();
@@ -1232,19 +1234,6 @@ export default function ProjectDetailsPage() {
       await saveMediaToBrowser(videoStorageKey, file);
     } catch {
       alert("Video preview works, but browser could not save it locally.");
-    }
-
-    if (oldMediaFileIds.length > 0) {
-      await deletePermanentMediaFiles(oldMediaFileIds);
-
-      try {
-        await updateDoc(doc(db, "projects", projectId), {
-          "editor.media.storage": null,
-          updatedAt: serverTimestamp(),
-        });
-      } catch (error) {
-        console.error("Video replace metadata cleanup failed", error);
-      }
     }
 
     void handleUploadVideo(file);
@@ -1515,16 +1504,23 @@ export default function ProjectDetailsPage() {
 
       if (runId !== videoUploadRunIdRef.current) return;
 
+      await updateDoc(doc(db, "projects", projectId), {
+        "editor.media.storage": storage,
+        updatedAt: serverTimestamp(),
+      });
+
+      const cleanupFileIds = replacedMediaCleanupIdsRef.current.filter(
+        (fileId) => fileId !== uploaded.fileId,
+      );
+      replacedMediaCleanupIdsRef.current = [];
+
+      await deletePermanentMediaFiles(cleanupFileIds);
+
       setVideoStorageMetadata(storage);
       setPendingCloudinaryUpload(null);
       setVideoUploadProgress(100);
       setVideoUploadStatus("Media saved");
       console.info("[Lumeo Upload] final UI state", { status: "Media saved" });
-
-      await updateDoc(doc(db, "projects", projectId), {
-        "editor.media.storage": storage,
-        updatedAt: serverTimestamp(),
-      });
     } catch (error) {
       console.error("Video upload failed", error);
 
@@ -1571,6 +1567,7 @@ export default function ProjectDetailsPage() {
     }
 
     await deletePermanentMediaFiles(oldMediaFileIds);
+    replacedMediaCleanupIdsRef.current = [];
 
     setLocalVideoURL("");
     setLocalVideoName("");
@@ -2257,23 +2254,37 @@ export default function ProjectDetailsPage() {
 
     if (!confirmed) return;
 
-    const linkedMediaFileIds = collectPermanentMediaFileIds(
-      project?.editor?.media?.storage,
-      project?.editor?.export,
-      project?.editor?.exports,
-      project?.export,
-      project?.exports,
-    );
-
     try {
-      await deleteDoc(doc(db, "projects", projectId));
+      setProjectDeleting(true);
+      if (!user) {
+        throw new Error("Delete failed. Please try again.");
+      }
+
+      const idToken = await user?.getIdToken();
+      const response = await fetch("/api/projects/delete", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ projectId }),
+      });
+      const payload = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !payload.success) {
+        throw new Error(payload.error || "Delete failed. Please try again.");
+      }
+
       await deleteMediaFromBrowser(videoStorageKey);
       await deleteMediaFromBrowser(audioStorageKey);
-      await deletePermanentMediaFiles(linkedMediaFileIds);
       router.push("/dashboard");
     } catch (error) {
       console.error("Project delete failed", error);
-      alert("Something went wrong. Please try again.");
+      alert("Delete failed. Please try again.");
+      setProjectDeleting(false);
     }
   };
 
@@ -3154,9 +3165,10 @@ export default function ProjectDetailsPage() {
 
           <button
             onClick={handleDelete}
-            className="w-full rounded-2xl border border-red-400/30 bg-red-500/10 px-5 py-3 font-black text-red-200 transition hover:bg-red-500/20"
+            disabled={projectDeleting}
+            className="w-full rounded-2xl border border-red-400/30 bg-red-500/10 px-5 py-3 font-black text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-55"
           >
-            Delete project
+            {projectDeleting ? "Deleting project..." : "Delete project"}
           </button>
         </div>
       </Panel>
@@ -3283,9 +3295,10 @@ export default function ProjectDetailsPage() {
 
             <button
               onClick={handleDelete}
-              className="hidden rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-2 text-xs font-bold text-rose-100 transition hover:bg-rose-200 hover:text-black md:inline-flex"
+              disabled={projectDeleting}
+              className="hidden rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-2 text-xs font-bold text-rose-100 transition hover:bg-rose-200 hover:text-black disabled:cursor-not-allowed disabled:opacity-55 md:inline-flex"
             >
-              Delete project
+              {projectDeleting ? "Deleting project..." : "Delete project"}
             </button>
 
             <button

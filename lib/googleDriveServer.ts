@@ -52,7 +52,7 @@ type DriveUploadSession = {
   fileName: string;
 };
 
-type DriveFileMetadata = {
+export type DriveFileMetadata = {
   fileId: string;
   fileName: string;
   mimeType: string;
@@ -784,13 +784,114 @@ export async function findDriveUploadByName({
 
 export async function listDriveUploadsFolderFiles() {
   const env = getGoogleDriveStatusEnv();
+
+  return listDriveFolderFiles(env.uploadsFolderId);
+}
+
+export async function listDriveExportsFolderFiles() {
+  const exportsFolderId = process.env.LUMEO_DRIVE_EXPORTS_FOLDER_ID;
+
+  if (!exportsFolderId) {
+    throw new GoogleDriveServerError(
+      "missing_exports_folder_id",
+      "Missing Google Drive exports folder ID.",
+    );
+  }
+
+  return listDriveFolderFiles(exportsFolderId);
+}
+
+export async function listDriveTempFolderFiles() {
+  const tempFolderId = process.env.LUMEO_DRIVE_TEMP_FOLDER_ID;
+
+  if (!tempFolderId) {
+    return [];
+  }
+
+  return listDriveFolderFiles(tempFolderId);
+}
+
+export async function listLumeoFilesByProjectId(projectId: string) {
+  const safeProjectId = projectId.trim();
+
+  if (!safeProjectId) return [];
+
+  const folderFileLists = await Promise.all([
+    listDriveUploadsFolderFiles(),
+    listDriveExportsFolderFiles().catch((error) => {
+      console.error("Google Drive exports folder list failed", error);
+      return [] as DriveFileMetadata[];
+    }),
+    listDriveTempFolderFiles().catch((error) => {
+      console.error("Google Drive temp folder list failed", error);
+      return [] as DriveFileMetadata[];
+    }),
+  ]);
+
+  const filesById = new Map<string, DriveFileMetadata>();
+
+  for (const file of folderFileLists.flat()) {
+    if (
+      file.appProperties?.app === "lumeo" &&
+      file.appProperties?.projectId === safeProjectId
+    ) {
+      filesById.set(file.fileId, file);
+    }
+  }
+
+  return Array.from(filesById.values());
+}
+
+export async function deleteDriveFiles(fileIds: string[]) {
+  const uniqueFileIds = Array.from(
+    new Set(fileIds.map((fileId) => fileId.trim()).filter(Boolean)),
+  );
+  let deleted = 0;
+  let failed = 0;
+
+  for (const fileId of uniqueFileIds) {
+    try {
+      await deleteDriveFile(fileId);
+      deleted += 1;
+    } catch (error) {
+      failed += 1;
+      console.error("Google Drive batch delete failed", { fileId, error });
+    }
+  }
+
+  return { deleted, failed };
+}
+
+export async function deleteLumeoFilesByProjectId(
+  projectId: string,
+  options?: {
+    purposes?: string[];
+    keepFileIds?: string[];
+  },
+) {
+  const files = await listLumeoFilesByProjectId(projectId);
+  const keepFileIds = new Set(options?.keepFileIds || []);
+  const purposes = new Set(options?.purposes || []);
+  const deleteFileIds = files
+    .filter((file) => !keepFileIds.has(file.fileId))
+    .filter((file) => {
+      if (purposes.size === 0) return true;
+
+      return purposes.has(file.appProperties?.purpose || "");
+    })
+    .map((file) => file.fileId);
+
+  return deleteDriveFiles(deleteFileIds);
+}
+
+async function listDriveFolderFiles(folderId: string) {
   const accessToken = await getGoogleDriveAccessToken();
   const files: DriveFileMetadata[] = [];
   let pageToken = "";
 
   do {
     const params = new URLSearchParams({
-      q: `'${env.uploadsFolderId}' in parents and trashed = false`,
+      q: `'${escapeDriveQueryString(folderId)}' in parents and trashed = false`,
       fields:
         "nextPageToken,files(id,name,mimeType,size,createdTime,appProperties)",
       pageSize: "100",
@@ -836,7 +937,7 @@ export async function listDriveUploadsFolderFiles() {
 
       throw new GoogleDriveServerError(
         payload.error?.code ? `drive_${payload.error.code}` : "drive_list_failed",
-        payload.error?.message || "Google Drive uploads list failed.",
+        payload.error?.message || "Google Drive folder list failed.",
       );
     }
 

@@ -7,6 +7,8 @@ import {
 import { getFirebaseAdminDb } from "@/lib/firebaseAdmin";
 import {
   createDriveDownloadUrl,
+  deleteDriveFiles,
+  deleteLumeoFilesByProjectId,
   downloadDriveFileBuffer,
   uploadVideoBufferToDriveExportsFolder,
 } from "@/lib/googleDriveServer";
@@ -124,6 +126,9 @@ type ProjectData = {
       resolution?: ExportResolution | "2k";
       fps?: number;
     };
+    export?: {
+      fileId?: string;
+    } | null;
     titleOverlay?: Partial<TitleOverlaySettings>;
     textOverlay?: {
       text?: string;
@@ -173,6 +178,7 @@ export async function POST(request: NextRequest) {
     const project = snapshot.data() as ProjectData;
     failedStage = "mediaFileIdCheck";
     const sourceFileId = project.editor?.media?.storage?.fileId;
+    const previousExportFileId = getSafeFileId(project.editor?.export);
 
     if (!sourceFileId) {
       return NextResponse.json(
@@ -291,6 +297,14 @@ export async function POST(request: NextRequest) {
       console.error("[Lumeo Export] project export metadata save failed", {
         projectId,
         error: metadataError,
+      });
+    }
+
+    if (metadataSaved) {
+      await cleanupPreviousProjectExports({
+        projectId,
+        previousExportFileId,
+        currentExportFileId: uploadedExport.fileId,
       });
     }
 
@@ -701,6 +715,43 @@ function delay(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function getSafeFileId(value: unknown) {
+  if (!value || typeof value !== "object") return "";
+
+  const record = value as Record<string, unknown>;
+
+  return typeof record.fileId === "string" ? record.fileId.trim() : "";
+}
+
+async function cleanupPreviousProjectExports({
+  projectId,
+  previousExportFileId,
+  currentExportFileId,
+}: {
+  projectId: string;
+  previousExportFileId: string;
+  currentExportFileId: string;
+}) {
+  try {
+    if (
+      previousExportFileId &&
+      previousExportFileId !== currentExportFileId
+    ) {
+      await deleteDriveFiles([previousExportFileId]);
+    }
+
+    await deleteLumeoFilesByProjectId(projectId, {
+      purposes: ["export"],
+      keepFileIds: [currentExportFileId],
+    });
+  } catch (error) {
+    console.error("[Lumeo Export] previous export cleanup failed", {
+      projectId,
+      error,
+    });
+  }
 }
 
 function getSafeFailureDetails(stage: ExportFailureStage) {
