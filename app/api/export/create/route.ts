@@ -1,21 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import {
-  createPhaseOneCloudinaryExportUrl,
-  deleteTemporaryCloudinaryVideo,
-  uploadTemporaryCloudinaryVideoBuffer,
-} from "@/lib/cloudinaryServer";
-import { getFirebaseAdminDb } from "@/lib/firebaseAdmin";
-import {
-  createDriveDownloadUrl,
-  deleteDriveFiles,
-  deleteLumeoFilesByProjectId,
-  downloadDriveFileBuffer,
-  uploadVideoBufferToDriveExportsFolder,
-} from "@/lib/googleDriveServer";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300;
+
+type CloudinaryServerModule = typeof import("@/lib/cloudinaryServer");
+type GoogleDriveServerModule = typeof import("@/lib/googleDriveServer");
 
 type CanvasFormat = "9:16" | "1:1" | "4:5" | "16:9";
 type ExportResolution = "720p" | "1080p";
@@ -46,6 +36,7 @@ type TitleOverlaySettings = {
 };
 type ExportFailureStage =
   | "unknown"
+  | "serverModules"
   | "projectRead"
   | "mediaFileIdCheck"
   | "settingsResolve"
@@ -136,9 +127,72 @@ type ProjectData = {
   };
 };
 
+export async function GET(request: NextRequest) {
+  try {
+    if (request.nextUrl.searchParams.get("ping") === "true") {
+      return NextResponse.json({
+        success: true,
+        routeLoaded: true,
+        route: "export-create",
+      });
+    }
+
+    if (request.nextUrl.searchParams.get("diagnose") !== "true") {
+      return NextResponse.json(
+        { success: false, error: "Not found." },
+        { status: 404 },
+      );
+    }
+
+    const token = request.nextUrl.searchParams.get("token");
+
+    if (
+      !process.env.LUMEO_ADMIN_CLEANUP_TOKEN ||
+      token !== process.env.LUMEO_ADMIN_CLEANUP_TOKEN
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          diagnose: true,
+          routeLoaded: true,
+          failedStage: "auth",
+          details: "Admin diagnostic token is missing or invalid.",
+        },
+        { status: 401 },
+      );
+    }
+
+    const { imports, importErrors } = await getSafeImportDiagnostics();
+
+    return NextResponse.json({
+      success:
+        imports.firebaseAdminDbOnly &&
+        imports.cloudinaryServer &&
+        imports.googleDriveServer,
+      diagnose: true,
+      routeLoaded: true,
+      env: getSafeExportEnvDiagnostics(),
+      imports,
+      importErrors,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      {
+        success: false,
+        diagnose: true,
+        routeLoaded: true,
+        failedStage: "unknown",
+        details: getSafeDiagnosticError(error),
+      },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   let temporaryPublicId = "";
   let failedStage: ExportFailureStage = "unknown";
+  let cloudinaryServer: CloudinaryServerModule | null = null;
 
   try {
     const body = (await request.json()) as ExportRequestBody;
@@ -158,8 +212,20 @@ export async function POST(request: NextRequest) {
 
     console.info("[Lumeo Export] phase one export started", { projectId });
 
+    failedStage = "serverModules";
+    const [
+      { getFirebaseAdminDbOnly },
+      loadedCloudinaryServer,
+      googleDriveServer,
+    ] = await Promise.all([
+      import("@/lib/firebaseAdminDbOnly"),
+      import("@/lib/cloudinaryServer"),
+      import("@/lib/googleDriveServer"),
+    ]);
+    cloudinaryServer = loadedCloudinaryServer;
+
     failedStage = "projectRead";
-    const db = getFirebaseAdminDb();
+    const db = getFirebaseAdminDbOnly();
     const projectRef = db.collection("projects").doc(projectId);
     const snapshot = await projectRef.get();
 
@@ -206,7 +272,7 @@ export async function POST(request: NextRequest) {
 
     failedStage = "sourceDownload";
     console.info("[Lumeo Export] source download started", { projectId });
-    const source = await downloadDriveFileBuffer(sourceFileId);
+    const source = await googleDriveServer.downloadDriveFileBuffer(sourceFileId);
     console.info("[Lumeo Export] source download completed", {
       fileName: source.fileName,
       size: source.size,
@@ -217,7 +283,8 @@ export async function POST(request: NextRequest) {
     console.info("[Lumeo Export] temporary transform source upload started", {
       projectId,
     });
-    const temporarySource = await uploadTemporaryCloudinaryVideoBuffer({
+    const temporarySource =
+      await cloudinaryServer.uploadTemporaryCloudinaryVideoBuffer({
       bytes: source.bytes,
       fileName: source.fileName,
     });
@@ -228,16 +295,17 @@ export async function POST(request: NextRequest) {
     });
 
     failedStage = "transformationBuild";
-    const transformedUrl = createPhaseOneCloudinaryExportUrl(temporaryPublicId, {
-      trimStart: settings.trimStart,
-      trimEnd: settings.trimEnd,
-      width: dimensions.width,
-      height: dimensions.height,
-      frameMode: settings.frameMode,
-      fps: settings.fps,
-      background: settings.background,
-      titleOverlay: settings.titleOverlay,
-    });
+    const transformedUrl =
+      cloudinaryServer.createPhaseOneCloudinaryExportUrl(temporaryPublicId, {
+        trimStart: settings.trimStart,
+        trimEnd: settings.trimEnd,
+        width: dimensions.width,
+        height: dimensions.height,
+        frameMode: settings.frameMode,
+        fps: settings.fps,
+        background: settings.background,
+        titleOverlay: settings.titleOverlay,
+      });
 
     failedStage = "transformedFetch";
     const exportBytes = await fetchTransformedExportWithRetry(transformedUrl);
@@ -254,7 +322,7 @@ export async function POST(request: NextRequest) {
       fileName,
       size: exportBytes.byteLength,
     });
-    const uploadedExport = await uploadVideoBufferToDriveExportsFolder({
+    const uploadedExport = await googleDriveServer.uploadVideoBufferToDriveExportsFolder({
       bytes: exportBytes,
       fileName,
       mimeType: "video/mp4",
@@ -272,7 +340,9 @@ export async function POST(request: NextRequest) {
     });
 
     failedStage = "downloadUrlCreate";
-    const downloadUrl = await createDriveDownloadUrl(uploadedExport.fileId);
+    const downloadUrl = await googleDriveServer.createDriveDownloadUrl(
+      uploadedExport.fileId,
+    );
 
     failedStage = "metadataSave";
     let metadataSaved = true;
@@ -305,6 +375,7 @@ export async function POST(request: NextRequest) {
         projectId,
         previousExportFileId,
         currentExportFileId: uploadedExport.fileId,
+        googleDriveServer,
       });
     }
 
@@ -313,7 +384,7 @@ export async function POST(request: NextRequest) {
       console.info("[Lumeo Export] temporary cleanup started", {
         publicId: temporaryPublicId,
       });
-      await deleteTemporaryCloudinaryVideo(temporaryPublicId);
+      await cloudinaryServer.deleteTemporaryCloudinaryVideo(temporaryPublicId);
       console.info("[Lumeo Export] temporary cleanup completed", {
         publicId: temporaryPublicId,
       });
@@ -346,7 +417,7 @@ export async function POST(request: NextRequest) {
 
     if (temporaryPublicId) {
       try {
-        await deleteTemporaryCloudinaryVideo(temporaryPublicId);
+        await cloudinaryServer?.deleteTemporaryCloudinaryVideo(temporaryPublicId);
       } catch (cleanupError) {
         console.error("[Lumeo Export] failed export cleanup failed", cleanupError);
       }
@@ -358,6 +429,7 @@ export async function POST(request: NextRequest) {
         error: "Export failed. Please try again.",
         failedStage,
         details: getSafeFailureDetails(failedStage),
+        diagnostic: getSafeExportDiagnostic(error),
       },
       { status: 500 },
     );
@@ -729,20 +801,22 @@ async function cleanupPreviousProjectExports({
   projectId,
   previousExportFileId,
   currentExportFileId,
+  googleDriveServer,
 }: {
   projectId: string;
   previousExportFileId: string;
   currentExportFileId: string;
+  googleDriveServer: GoogleDriveServerModule;
 }) {
   try {
     if (
       previousExportFileId &&
       previousExportFileId !== currentExportFileId
     ) {
-      await deleteDriveFiles([previousExportFileId]);
+      await googleDriveServer.deleteDriveFiles([previousExportFileId]);
     }
 
-    await deleteLumeoFilesByProjectId(projectId, {
+    await googleDriveServer.deleteLumeoFilesByProjectId(projectId, {
       purposes: ["export"],
       keepFileIds: [currentExportFileId],
     });
@@ -758,6 +832,8 @@ function getSafeFailureDetails(stage: ExportFailureStage) {
   switch (stage) {
     case "unknown":
       return "Export could not be started.";
+    case "serverModules":
+      return "Export server modules could not be loaded.";
     case "projectRead":
       return "Project could not be read.";
     case "mediaFileIdCheck":
@@ -805,6 +881,83 @@ function createExportFileName(
   return `${safeName}-${formatCanvasSlug(settings.canvasFormat)}-${formatFrameModeSlug(
     settings.frameMode,
   )}-${settings.resolution}-${settings.fps}fps-${Date.now()}.mp4`;
+}
+
+async function getSafeImportDiagnostics() {
+  const imports = {
+    firebaseAdminDbOnly: false,
+    cloudinaryServer: false,
+    googleDriveServer: false,
+  };
+  const importErrors = {
+    firebaseAdminDbOnly: null as string | null,
+    cloudinaryServer: null as string | null,
+    googleDriveServer: null as string | null,
+  };
+
+  try {
+    await import("@/lib/firebaseAdminDbOnly");
+    imports.firebaseAdminDbOnly = true;
+  } catch (error) {
+    importErrors.firebaseAdminDbOnly = getSafeDiagnosticError(error);
+  }
+
+  try {
+    await import("@/lib/cloudinaryServer");
+    imports.cloudinaryServer = true;
+  } catch (error) {
+    importErrors.cloudinaryServer = getSafeDiagnosticError(error);
+  }
+
+  try {
+    await import("@/lib/googleDriveServer");
+    imports.googleDriveServer = true;
+  } catch (error) {
+    importErrors.googleDriveServer = getSafeDiagnosticError(error);
+  }
+
+  return { imports, importErrors };
+}
+
+function getSafeExportEnvDiagnostics() {
+  return {
+    firebaseProjectId: Boolean(process.env.FIREBASE_PROJECT_ID),
+    firebaseClientEmail: Boolean(process.env.FIREBASE_CLIENT_EMAIL),
+    firebasePrivateKey: Boolean(process.env.FIREBASE_PRIVATE_KEY),
+    googleDriveClientId: Boolean(process.env.GOOGLE_DRIVE_CLIENT_ID),
+    googleDriveClientSecret: Boolean(process.env.GOOGLE_DRIVE_CLIENT_SECRET),
+    googleDriveRefreshToken: Boolean(process.env.GOOGLE_DRIVE_REFRESH_TOKEN),
+    uploadsFolderId: Boolean(process.env.LUMEO_DRIVE_UPLOADS_FOLDER_ID),
+    exportsFolderId: Boolean(process.env.LUMEO_DRIVE_EXPORTS_FOLDER_ID),
+    cloudinaryCloudName: Boolean(process.env.CLOUDINARY_CLOUD_NAME),
+    cloudinaryApiKey: Boolean(process.env.CLOUDINARY_API_KEY),
+    cloudinaryApiSecret: Boolean(process.env.CLOUDINARY_API_SECRET),
+  };
+}
+
+function getSafeDiagnosticError(error: unknown) {
+  if (error instanceof Error) {
+    return `${error.name || "Error"}: ${error.message || "Unknown error."}`.slice(
+      0,
+      180,
+    );
+  }
+
+  return "Unknown error.";
+}
+
+function getSafeExportDiagnostic(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      errorName: (error.name || "Error").slice(0, 80),
+      errorMessage: (error.message || "Unknown error.").slice(0, 180),
+    };
+  }
+
+  return {
+    errorName: "Unknown",
+    errorMessage: "Unknown error.",
+  };
 }
 
 function formatCanvasSlug(canvasFormat: CanvasFormat) {
