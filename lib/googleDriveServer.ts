@@ -895,6 +895,7 @@ async function listDriveFolderFiles(folderId: string) {
       fields:
         "nextPageToken,files(id,name,mimeType,size,createdTime,appProperties)",
       pageSize: "100",
+      spaces: "drive",
       supportsAllDrives: "true",
       includeItemsFromAllDrives: "true",
     });
@@ -929,7 +930,7 @@ async function listDriveFolderFiles(folderId: string) {
     };
 
     if (!response.ok) {
-      console.error("Google Drive uploads list failed", {
+      console.error("Google Drive folder list failed", {
         status: response.status,
         errorCode: payload.error?.code,
         errorMessage: payload.error?.message,

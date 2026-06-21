@@ -41,6 +41,14 @@ type CleanupStage =
   | "deleteExecute"
   | "unknown";
 
+type CleanupReason =
+  | "legacyUploadMissingProjectTag"
+  | "projectDeleted"
+  | "inactiveSource"
+  | "oldExport"
+  | "oldTemp"
+  | "unreferencedLumeoFile";
+
 type CleanupEnvDiagnostics = {
   cleanupTokenConfigured: boolean;
   uploadsFolderId: boolean;
@@ -203,6 +211,8 @@ export async function GET(request: NextRequest) {
             "No referenced project media files were found. Verify project media metadata before deleting.",
           scanned: toScannedSummary(scannedFiles),
           candidates: toCandidateSummary(candidates),
+          legacyLumeoFiles: toLegacyLumeoSummary(scannedFiles),
+          candidateReasons: toCandidateReasonSummary(candidates),
           deleted: 0,
           skipped: candidates.length,
           env,
@@ -231,6 +241,8 @@ export async function GET(request: NextRequest) {
       minAgeMinutes,
       scanned: toScannedSummary(scannedFiles),
       candidates: toCandidateSummary(candidates),
+      legacyLumeoFiles: toLegacyLumeoSummary(scannedFiles),
+      candidateReasons: toCandidateReasonSummary(candidates),
       deleted,
       skipped: dryRun ? candidates.length : failedDeletes,
       reason: dryRun
@@ -396,11 +408,23 @@ function collectFileIdsFromValue(
 function getCleanupReason(
   file: ScannedFile,
   diagnostics: ProjectReferenceDiagnostics,
-) {
+): CleanupReason | "" {
   const projectId = file.appProperties?.projectId || "";
   const purpose = file.appProperties?.purpose || "";
 
-  if (!projectId) return "missingProjectTag";
+  if (diagnostics.allReferencedFileIds.has(file.fileId)) return "";
+
+  if (!projectId) {
+    if (file.folder === "uploads" && isLegacyLumeoFile(file)) {
+      return "legacyUploadMissingProjectTag";
+    }
+
+    if (file.folder === "exports") return "oldExport";
+    if (file.folder === "temp") return "oldTemp";
+
+    return "unreferencedLumeoFile";
+  }
+
   if (!diagnostics.projectIds.has(projectId)) return "projectDeleted";
   if (purpose === "source" || purpose === "upload") {
     return diagnostics.activeSourceFileIds.has(file.fileId)
@@ -428,7 +452,17 @@ function isOldEnough(file: ScannedFile, now: number, minAgeMs: number) {
 function isLumeoOwnedFile(file: ScannedFile) {
   return (
     file.appProperties?.app === "lumeo" ||
-    file.fileName.toLowerCase().startsWith("lumeo-")
+    isLegacyLumeoFile(file)
+  );
+}
+
+function isLegacyLumeoFile(file: ScannedFile) {
+  const fileName = file.fileName.toLowerCase();
+
+  return (
+    fileName.startsWith("lumeo-") ||
+    fileName.includes("-lumeo-") ||
+    fileName.includes("lumeo-export")
   );
 }
 
@@ -474,6 +508,36 @@ function toCandidateSummary(files: CleanupCandidate[]) {
     temp: files.filter((file) => file.folder === "temp").length,
     total: files.length,
   };
+}
+
+function toLegacyLumeoSummary(files: ScannedFile[]) {
+  const legacyFiles = files.filter(
+    (file) => isLegacyLumeoFile(file) && !file.appProperties?.projectId,
+  );
+
+  return {
+    uploads: legacyFiles.filter((file) => file.folder === "uploads").length,
+    exports: legacyFiles.filter((file) => file.folder === "exports").length,
+    temp: legacyFiles.filter((file) => file.folder === "temp").length,
+    total: legacyFiles.length,
+  };
+}
+
+function toCandidateReasonSummary(files: CleanupCandidate[]) {
+  const counts: Record<CleanupReason, number> = {
+    legacyUploadMissingProjectTag: 0,
+    projectDeleted: 0,
+    inactiveSource: 0,
+    oldExport: 0,
+    oldTemp: 0,
+    unreferencedLumeoFile: 0,
+  };
+
+  for (const file of files) {
+    counts[file.reason as CleanupReason] += 1;
+  }
+
+  return counts;
 }
 
 function toSafeProjectReferenceDiagnostics(
