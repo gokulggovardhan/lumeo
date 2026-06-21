@@ -961,6 +961,217 @@ async function listDriveFolderFiles(folderId: string) {
   return files;
 }
 
+export async function getDriveFolderDebugMetadata(folderId: string) {
+  const folderIdMasked = maskDriveId(folderId);
+
+  if (!folderId.trim()) {
+    return {
+      folderIdMasked,
+      error: "Folder ID is not configured.",
+    };
+  }
+
+  try {
+    const accessToken = await getGoogleDriveAccessToken();
+    const params = new URLSearchParams({
+      fields: "id,name,mimeType,driveId,parents,webViewLink",
+      supportsAllDrives: "true",
+    });
+    const response = await fetch(
+      `${GOOGLE_DRIVE_API_URL}/files/${encodeURIComponent(folderId)}?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+    const payload = (await response.json()) as {
+      id?: string;
+      name?: string;
+      mimeType?: string;
+      driveId?: string;
+      parents?: string[];
+      webViewLink?: string;
+      error?: {
+        code?: number;
+        message?: string;
+      };
+    };
+
+    if (!response.ok) {
+      return {
+        folderIdMasked,
+        error: getSafeDriveDebugError(response.status, payload.error?.message),
+      };
+    }
+
+    return {
+      folderIdMasked,
+      name: payload.name || null,
+      mimeType: payload.mimeType || null,
+      driveId: payload.driveId ? maskDriveId(payload.driveId) : null,
+      parents: (payload.parents || []).map(maskDriveId),
+      webViewLink: payload.webViewLink || null,
+    };
+  } catch (error) {
+    return {
+      folderIdMasked,
+      error: getSafeUnknownDebugError(error),
+    };
+  }
+}
+
+export async function listDriveFolderFilesDebug(folderId: string) {
+  if (!folderId.trim()) {
+    return {
+      count: 0,
+      sampleNames: [] as string[],
+      sampleMimeTypes: [] as string[],
+      sampleFileIdsMasked: [] as string[],
+      error: "Folder ID is not configured.",
+    };
+  }
+
+  try {
+    const accessToken = await getGoogleDriveAccessToken();
+    const files: Array<{
+      id?: string;
+      name?: string;
+      mimeType?: string;
+    }> = [];
+    let pageToken = "";
+
+    do {
+      const params = new URLSearchParams({
+        q: `'${escapeDriveQueryString(folderId)}' in parents and trashed = false`,
+        fields: "nextPageToken,files(id,name,mimeType)",
+        pageSize: "100",
+        spaces: "drive",
+        supportsAllDrives: "true",
+        includeItemsFromAllDrives: "true",
+      });
+
+      if (pageToken) {
+        params.set("pageToken", pageToken);
+      }
+
+      const response = await fetch(
+        `${GOOGLE_DRIVE_API_URL}/files?${params.toString()}`,
+        {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        },
+      );
+      const payload = (await response.json()) as {
+        nextPageToken?: string;
+        files?: Array<{
+          id?: string;
+          name?: string;
+          mimeType?: string;
+        }>;
+        error?: {
+          message?: string;
+        };
+      };
+
+      if (!response.ok) {
+        return {
+          count: files.length,
+          sampleNames: files.slice(0, 15).map((file) => file.name || ""),
+          sampleMimeTypes: files.slice(0, 15).map((file) => file.mimeType || ""),
+          sampleFileIdsMasked: files
+            .slice(0, 15)
+            .map((file) => maskDriveId(file.id || "")),
+          rawApiStatus: response.status,
+          error: getSafeDriveDebugError(response.status, payload.error?.message),
+        };
+      }
+
+      files.push(...(payload.files || []));
+      pageToken = payload.nextPageToken || "";
+    } while (pageToken);
+
+    return {
+      count: files.length,
+      sampleNames: files.slice(0, 15).map((file) => file.name || ""),
+      sampleMimeTypes: files.slice(0, 15).map((file) => file.mimeType || ""),
+      sampleFileIdsMasked: files
+        .slice(0, 15)
+        .map((file) => maskDriveId(file.id || "")),
+    };
+  } catch (error) {
+    return {
+      count: 0,
+      sampleNames: [] as string[],
+      sampleMimeTypes: [] as string[],
+      sampleFileIdsMasked: [] as string[],
+      error: getSafeUnknownDebugError(error),
+    };
+  }
+}
+
+export async function searchLumeoNamedFilesDebug() {
+  try {
+    const accessToken = await getGoogleDriveAccessToken();
+    const params = new URLSearchParams({
+      q: "name contains 'lumeo-' and trashed = false",
+      fields: "files(id,name,mimeType,parents)",
+      pageSize: "30",
+      spaces: "drive",
+      supportsAllDrives: "true",
+      includeItemsFromAllDrives: "true",
+    });
+    const response = await fetch(
+      `${GOOGLE_DRIVE_API_URL}/files?${params.toString()}`,
+      {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      },
+    );
+    const payload = (await response.json()) as {
+      files?: Array<{
+        id?: string;
+        name?: string;
+        mimeType?: string;
+        parents?: string[];
+      }>;
+      error?: {
+        message?: string;
+      };
+    };
+
+    if (!response.ok) {
+      return {
+        count: 0,
+        sampleNames: [] as string[],
+        parentIdsMasked: [] as string[][],
+        sampleFileIdsMasked: [] as string[],
+        rawApiStatus: response.status,
+        error: getSafeDriveDebugError(response.status, payload.error?.message),
+      };
+    }
+
+    const files = payload.files || [];
+
+    return {
+      count: files.length,
+      sampleNames: files.map((file) => file.name || ""),
+      parentIdsMasked: files.map((file) => (file.parents || []).map(maskDriveId)),
+      sampleFileIdsMasked: files.map((file) => maskDriveId(file.id || "")),
+    };
+  } catch (error) {
+    return {
+      count: 0,
+      sampleNames: [] as string[],
+      parentIdsMasked: [] as string[][],
+      sampleFileIdsMasked: [] as string[],
+      error: getSafeUnknownDebugError(error),
+    };
+  }
+}
+
 export async function deleteDriveFile(fileId: string) {
   const accessToken = await getGoogleDriveAccessToken();
   const params = new URLSearchParams({
@@ -1005,4 +1216,25 @@ export async function deleteDriveFile(fileId: string) {
 
 function escapeDriveQueryString(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
+
+function maskDriveId(value: string) {
+  const trimmed = value.trim();
+
+  if (!trimmed) return "";
+  if (trimmed.length <= 12) return `${trimmed.slice(0, 2)}...${trimmed.slice(-2)}`;
+
+  return `${trimmed.slice(0, 6)}...${trimmed.slice(-6)}`;
+}
+
+function getSafeDriveDebugError(status: number, message?: string) {
+  return `Drive API ${status}: ${message || "Request failed."}`.slice(0, 180);
+}
+
+function getSafeUnknownDebugError(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return `${error.name || "Error"}: ${error.message}`.slice(0, 180);
+  }
+
+  return "Request failed.";
 }

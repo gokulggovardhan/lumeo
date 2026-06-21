@@ -125,6 +125,41 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    if (request.nextUrl.searchParams.get("debugFolders") === "true") {
+      try {
+        const googleDrive = await import("@/lib/googleDriveServer");
+
+        return NextResponse.json({
+          success: true,
+          dryRun: true,
+          debugFolders: true,
+          configuredFolders: {
+            uploads: await getFolderDebug(
+              process.env.LUMEO_DRIVE_UPLOADS_FOLDER_ID || "",
+              googleDrive,
+            ),
+            exports: await getFolderDebug(
+              process.env.LUMEO_DRIVE_EXPORTS_FOLDER_ID || "",
+              googleDrive,
+            ),
+            temp: await getFolderDebug(
+              process.env.LUMEO_DRIVE_TEMP_FOLDER_ID || "",
+              googleDrive,
+            ),
+          },
+          lumeoNamedSearch: await googleDrive.searchLumeoNamedFilesDebug(),
+        });
+      } catch (error) {
+        console.error("[Lumeo Cleanup] folder debug failed", error);
+
+        return failureJson({
+          failedStage: "envCheck",
+          details: getSafeImportError(error),
+          env,
+        });
+      }
+    }
+
     failedStage = "envCheck";
     if (!env.uploadsFolderId) {
       return failureJson({
@@ -294,6 +329,28 @@ async function getSafeImportDiagnostics(): Promise<{
   }
 
   return { imports, importErrors };
+}
+
+async function getFolderDebug(
+  folderId: string,
+  googleDrive: {
+    getDriveFolderDebugMetadata: (folderId: string) => Promise<{
+      folderIdMasked?: string;
+      [key: string]: unknown;
+    }>;
+    listDriveFolderFilesDebug: (folderId: string) => Promise<unknown>;
+  },
+) {
+  const [metadata, fileList] = await Promise.all([
+    googleDrive.getDriveFolderDebugMetadata(folderId),
+    googleDrive.listDriveFolderFilesDebug(folderId),
+  ]);
+
+  return {
+    folderIdMasked: metadata.folderIdMasked || "",
+    metadata,
+    fileList,
+  };
 }
 
 async function getProjectReferenceDiagnostics(
