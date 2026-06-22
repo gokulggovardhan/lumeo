@@ -71,7 +71,8 @@ export default function Home() {
             </h1>
 
             <p className="mt-6 max-w-md text-lg leading-7 text-[#F7F0DE]/58">
-              Trim, frame, and export with Lumeo.
+              Lumeo is an online creative studio for video creators to edit,
+              reframe, title, and export polished clips.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
