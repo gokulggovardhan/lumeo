@@ -217,6 +217,52 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12">
+        <div className="grid gap-10 lg:grid-cols-[0.86fr_1.14fr] lg:items-start">
+          <div>
+            <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#D8C48E]">
+              Creator Workflow
+            </p>
+            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+              Built for focused creators.
+            </h2>
+            <p className="mt-5 max-w-xl text-base leading-7 text-[#F7F0DE]/52">
+              Lumeo keeps the editing experience clean, focused, and
+              export-ready so creators can move from raw clip to polished short
+              without unnecessary clutter.
+            </p>
+          </div>
+
+          <div className="grid gap-px overflow-hidden rounded-2xl border border-[#F3E7C8]/10 bg-[#F3E7C8]/10 md:grid-cols-3">
+            {[
+              {
+                title: "Short-form first",
+                description:
+                  "Compose clips for vertical, square, and widescreen outputs.",
+              },
+              {
+                title: "Studio calm",
+                description:
+                  "A clean workspace for trimming, framing, titles, sound, and export.",
+              },
+              {
+                title: "Export ready",
+                description:
+                  "Prepare polished MP4 clips for social posts and creator workflows.",
+              },
+            ].map((item) => (
+              <div key={item.title} className="bg-[#0B0C0F] p-7">
+                <span className="mb-6 block h-1 w-10 rounded-full bg-[#F3E7C8]/70" />
+                <h3 className="text-lg font-bold">{item.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-[#F7F0DE]/50">
+                  {item.description}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
         <div className="relative overflow-hidden rounded-2xl border border-[#F3E7C8]/10 bg-[#101115] p-10 text-center sm:p-16">
           <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#F3E7C8]/50 to-transparent" />

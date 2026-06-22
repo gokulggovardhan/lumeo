@@ -33,6 +33,12 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+    apple: "/lumeo-mark.svg",
+  },
+  manifest: "/manifest.webmanifest",
   openGraph: {
     type: "website",
     url: "https://lumeo.in",
@@ -40,12 +46,21 @@ export const metadata: Metadata = {
     title: "Lumeo - Premium Online Video Editor for Creators",
     description:
       "Create, edit, reframe, title, and export polished videos for reels, shorts, podcasts, education, social media, and creator workflows with Lumeo.",
+    images: [
+      {
+        url: "/og-image.svg",
+        width: 1200,
+        height: 630,
+        alt: "Lumeo Studio - Create clean short videos.",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Lumeo - Premium Online Video Editor for Creators",
     description:
       "Create, edit, reframe, title, and export polished videos for reels, shorts, podcasts, education, social media, and creator workflows with Lumeo.",
+    images: ["/og-image.svg"],
   },
 };
 

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Lumeo mark</title>
+  <desc id="desc">A premium dark rounded square with a luminous Lumeo play mark.</desc>
+  <defs>
+    <linearGradient id="edge" x1="76" y1="58" x2="438" y2="456" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F3E7C8"/>
+      <stop offset="0.48" stop-color="#C9B7FF"/>
+      <stop offset="1" stop-color="#8DF8E8"/>
+    </linearGradient>
+    <linearGradient id="mark" x1="154" y1="124" x2="358" y2="388" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF6D8"/>
+      <stop offset="0.58" stop-color="#F3E7C8"/>
+      <stop offset="1" stop-color="#BDFBF1"/>
+    </linearGradient>
+    <radialGradient id="glowA" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(158 130) rotate(45) scale(260)">
+      <stop stop-color="#F3E7C8" stop-opacity="0.42"/>
+      <stop offset="1" stop-color="#F3E7C8" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowB" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(368 372) rotate(45) scale(220)">
+      <stop stop-color="#8DF8E8" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#8DF8E8" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="40" y="40" width="432" height="432" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="26" stdDeviation="26" flood-color="#000000" flood-opacity="0.42"/>
+      <feDropShadow dx="0" dy="0" stdDeviation="18" flood-color="#8DF8E8" flood-opacity="0.16"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="#07070A"/>
+  <rect x="28" y="28" width="456" height="456" rx="98" fill="#0D0B13"/>
+  <rect x="29.5" y="29.5" width="453" height="453" rx="96.5" fill="none" stroke="url(#edge)" stroke-opacity="0.56" stroke-width="3"/>
+  <path d="M70 90h372v332H70z" fill="url(#glowA)"/>
+  <path d="M70 90h372v332H70z" fill="url(#glowB)"/>
+  <g filter="url(#softShadow)">
+    <path d="M160 128c15.5 0 28 12.5 28 28v180h118c15.5 0 28 12.5 28 28s-12.5 28-28 28H160c-15.5 0-28-12.5-28-28V156c0-15.5 12.5-28 28-28Z" fill="url(#mark)"/>
+    <path d="M276 202.5c0-16.2 17.7-26.1 31.5-17.6l83.2 51.5c13.1 8.1 13.1 27.1 0 35.2l-83.2 51.5c-13.8 8.5-31.5-1.4-31.5-17.6v-103Z" fill="url(#mark)"/>
+  </g>
+  <path d="M95 380c62 38 135 54 222 48" fill="none" stroke="#F3E7C8" stroke-opacity="0.12" stroke-width="2"/>
+</svg>
