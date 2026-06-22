@@ -54,14 +54,14 @@ type AudioFormat = "mp3" | "wav";
 type ExportQuality = "standard" | "high" | "max";
 type ExportFps = 24 | 30 | 60;
 type TitleStyle =
-  | "minimal"
-  | "creator"
-  | "luxury"
-  | "neon"
-  | "caption"
-  | "lowerThird";
+  | "cleanLower"
+  | "creatorBold"
+  | "minimalTag"
+  | "cinematic"
+  | "softCaption";
 type TitleAlign = "left" | "center" | "right";
 type TitleSize = "small" | "medium" | "large" | "xl";
+type TitlePosition = "top" | "center" | "lower" | "bottom";
 type ReframeState = {
   scale: number;
   x: number;
@@ -109,20 +109,39 @@ const backgroundDimOptions: { value: BackgroundDimStyle; label: string }[] = [
   { value: "dark", label: "Dark" },
 ];
 
-const titleStyles: { value: TitleStyle; label: string }[] = [
-  { value: "minimal", label: "Minimal" },
-  { value: "creator", label: "Creator" },
-  { value: "luxury", label: "Luxury" },
-  { value: "neon", label: "Neon" },
-  { value: "caption", label: "Caption" },
-  { value: "lowerThird", label: "Lower Third" },
+const titleStyles: { value: TitleStyle; label: string; description: string }[] = [
+  {
+    value: "cleanLower",
+    label: "Clean Lower",
+    description: "Premium lower-third style",
+  },
+  {
+    value: "creatorBold",
+    label: "Creator Bold",
+    description: "Bold centered creator title",
+  },
+  {
+    value: "minimalTag",
+    label: "Minimal Tag",
+    description: "Small compact label",
+  },
+  {
+    value: "cinematic",
+    label: "Cinematic",
+    description: "Elegant wide title",
+  },
+  {
+    value: "softCaption",
+    label: "Soft Caption",
+    description: "Readable caption-style title",
+  },
 ];
 
-const titleSizes: { value: TitleSize; label: string }[] = [
-  { value: "small", label: "S" },
-  { value: "medium", label: "M" },
-  { value: "large", label: "L" },
-  { value: "xl", label: "Hero" },
+const titlePositions: { value: TitlePosition; label: string; x: number; y: number }[] = [
+  { value: "top", label: "Top", x: 50, y: 16 },
+  { value: "center", label: "Center", x: 50, y: 50 },
+  { value: "lower", label: "Lower", x: 50, y: 76 },
+  { value: "bottom", label: "Bottom", x: 50, y: 86 },
 ];
 
 const reframeDefaults: ReframeState = {
@@ -662,19 +681,46 @@ function normalizeOverlayText(value: unknown) {
 }
 
 function normalizeTitleStyle(value: unknown): TitleStyle {
-  return value === "creator" ||
-    value === "luxury" ||
-    value === "neon" ||
-    value === "caption" ||
-    value === "lowerThird"
-    ? value
-    : "minimal";
+  if (value === "creatorBold" || value === "creator") return "creatorBold";
+  if (value === "minimalTag" || value === "minimal") return "minimalTag";
+  if (value === "cinematic" || value === "luxury" || value === "neon") {
+    return "cinematic";
+  }
+  if (value === "softCaption" || value === "caption") return "softCaption";
+  return "cleanLower";
 }
 
 function normalizeTitleSize(value: unknown): TitleSize {
   return value === "small" || value === "medium" || value === "xl"
     ? value
     : "large";
+}
+
+function normalizeTitlePosition(value: unknown): TitlePosition {
+  return value === "top" ||
+    value === "center" ||
+    value === "bottom"
+    ? value
+    : "lower";
+}
+
+function getTitlePositionCoordinates(position: TitlePosition) {
+  return titlePositions.find((item) => item.value === position) || titlePositions[2];
+}
+
+function normalizeTitleScale(value: unknown) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return 1;
+
+  return Math.min(1.6, Math.max(0.8, parsed));
+}
+
+function getTitleScaleFromLegacySize(value: unknown) {
+  if (value === "small") return 0.85;
+  if (value === "medium") return 0.95;
+  if (value === "xl") return 1.35;
+  return 1;
 }
 
 function clampTitleCoordinate(value: unknown, min: number, max: number, fallback: number) {
@@ -992,8 +1038,12 @@ export default function ProjectDetailsPage() {
   const [videoVolume, setVideoVolume] = useState(100);
   const [mutedOriginal, setMutedOriginal] = useState(false);
 
-  const [titleStyle, setTitleStyle] = useState<TitleStyle>("minimal");
-  const [titleSize, setTitleSize] = useState<TitleSize>("large");
+  const [titleStyle, setTitleStyle] = useState<TitleStyle>("cleanLower");
+  const [titlePosition, setTitlePosition] = useState<TitlePosition>("lower");
+  const [titleScale, setTitleScale] = useState(1);
+  const [titleBackground, setTitleBackground] = useState(true);
+  const [titleShadow, setTitleShadow] = useState(true);
+  const [titleEnabled, setTitleEnabled] = useState(false);
   const [overlayText, setOverlayText] = useState("");
   const [overlayX, setOverlayX] = useState(50);
   const [overlayY, setOverlayY] = useState(78);
@@ -1085,36 +1135,36 @@ export default function ProjectDetailsPage() {
     backgroundDimStyle === "dark" ? "bg-black/40" : "bg-black/30";
   const visibleOverlayText = overlayText.trim().slice(0, 80);
   const hasActiveTitleOverlay = visibleOverlayText.length > 0;
+  const titlePositionCoordinates = getTitlePositionCoordinates(titlePosition);
   const titleOverlayForExport = {
+    enabled: titleEnabled && hasActiveTitleOverlay,
     text: hasActiveTitleOverlay ? visibleOverlayText : "",
     style: titleStyle,
-    x: clampTitleCoordinate(overlayX, 0, 100, 50),
-    y: clampTitleCoordinate(overlayY, 8, 88, 78),
+    preset: titleStyle,
+    position: titlePosition,
+    x: titlePositionCoordinates.x,
+    y: titlePositionCoordinates.y,
     align: "center" as TitleAlign,
-    size: titleSize,
+    size: "large" as TitleSize,
+    scale: normalizeTitleScale(titleScale),
+    background: titleBackground,
+    shadow: titleShadow,
   };
   const titlePreviewClass =
-    titleStyle === "creator"
-      ? "text-[#FFD84D] [text-shadow:0_4px_0_rgba(0,0,0,0.9),0_12px_32px_rgba(0,0,0,0.85)]"
-      : titleStyle === "luxury"
-        ? "text-[#F5E6BC] [text-shadow:0_10px_32px_rgba(0,0,0,0.85),0_0_24px_rgba(245,215,150,0.22)]"
-        : titleStyle === "neon"
-          ? "text-[#6DFFE5] [text-shadow:0_0_18px_rgba(109,255,229,0.5),0_5px_24px_rgba(0,0,0,0.9)]"
-        : titleStyle === "caption"
-          ? "rounded-2xl bg-black/70 px-5 py-3 text-white shadow-2xl shadow-black/50"
-          : titleStyle === "lowerThird"
-            ? "rounded-2xl bg-black/58 px-5 py-3 text-white shadow-2xl shadow-black/45 backdrop-blur-md"
-            : "text-white [text-shadow:0_8px_32px_rgba(0,0,0,0.95),0_2px_8px_rgba(0,0,0,0.9)]";
+    titleStyle === "creatorBold"
+      ? `${titleBackground ? "rounded-3xl bg-black/30 px-6 py-3 backdrop-blur-sm" : ""} text-[#FFF6D8] font-black tracking-tight ${titleShadow ? "[text-shadow:0_8px_30px_rgba(0,0,0,0.95),0_2px_8px_rgba(0,0,0,0.9)]" : ""}`
+      : titleStyle === "minimalTag"
+        ? `${titleBackground ? "rounded-full bg-black/62 px-4 py-2 backdrop-blur-md" : ""} text-[#F3E7C8] text-sm font-black uppercase tracking-[0.18em] ${titleShadow ? "shadow-2xl shadow-black/45" : ""}`
+        : titleStyle === "cinematic"
+          ? `${titleBackground ? "rounded-2xl bg-black/24 px-6 py-3 backdrop-blur-sm" : ""} font-serif text-[#F5E6BC] font-semibold uppercase tracking-[0.18em] ${titleShadow ? "[text-shadow:0_10px_34px_rgba(0,0,0,0.88)]" : ""}`
+          : titleStyle === "softCaption"
+            ? `${titleBackground ? "rounded-2xl bg-black/72 px-5 py-3 backdrop-blur-md" : ""} text-white font-black ${titleShadow ? "shadow-2xl shadow-black/55" : ""}`
+            : `${titleBackground ? "rounded-2xl bg-black/58 px-5 py-3 backdrop-blur-md" : ""} text-[#F3E7C8] font-bold ${titleShadow ? "shadow-2xl shadow-black/45 [text-shadow:0_6px_24px_rgba(0,0,0,0.82)]" : ""}`;
   const titlePreviewAlignClass = "text-center";
   const titlePreviewTransform = "translate(-50%, -50%)";
-  const titlePreviewSizeClass =
-    titleSize === "small"
-      ? "text-xl sm:text-2xl"
-      : titleSize === "medium"
-        ? "text-2xl sm:text-3xl"
-        : titleSize === "xl"
-          ? "text-4xl sm:text-6xl"
-          : "text-3xl sm:text-5xl";
+  const titlePreviewSizeStyle = {
+    fontSize: `clamp(1.35rem, ${3.05 * titleOverlayForExport.scale}vw, ${4.6 * titleOverlayForExport.scale}rem)`,
+  };
   const canvasFrameClass =
     canvasFormat === "9:16"
       ? "aspect-[9/16] h-full max-h-[640px]"
@@ -1218,12 +1268,35 @@ export default function ProjectDetailsPage() {
             setVideoVolume(editor.playback?.videoVolume ?? 100);
             setMutedOriginal(editor.playback?.mutedOriginal ?? false);
 
+            const savedTitles = editor.titles || {};
             const savedTitleOverlay = editor.titleOverlay || {};
             const savedTitleText = normalizeOverlayText(
-              savedTitleOverlay.text || editor.textOverlay?.text,
+              savedTitles.text || savedTitleOverlay.text || editor.textOverlay?.text,
             );
-            setTitleStyle(normalizeTitleStyle(savedTitleOverlay.style));
-            setTitleSize(normalizeTitleSize(savedTitleOverlay.size));
+            setTitleEnabled(Boolean(savedTitles.enabled) || savedTitleText.length > 0);
+            setTitleStyle(normalizeTitleStyle(savedTitles.preset || savedTitleOverlay.preset || savedTitleOverlay.style));
+            setTitlePosition(normalizeTitlePosition(savedTitles.position || savedTitleOverlay.position));
+            setTitleScale(
+              normalizeTitleScale(
+                savedTitles.size ??
+                  savedTitleOverlay.scale ??
+                  getTitleScaleFromLegacySize(savedTitleOverlay.size),
+              ),
+            );
+            setTitleBackground(
+              typeof savedTitles.background === "boolean"
+                ? savedTitles.background
+                : typeof savedTitleOverlay.background === "boolean"
+                  ? savedTitleOverlay.background
+                  : true,
+            );
+            setTitleShadow(
+              typeof savedTitles.shadow === "boolean"
+                ? savedTitles.shadow
+                : typeof savedTitleOverlay.shadow === "boolean"
+                  ? savedTitleOverlay.shadow
+                  : true,
+            );
             setOverlayText(savedTitleText);
             setOverlayX(
               clampTitleCoordinate(savedTitleOverlay.x ?? editor.textOverlay?.x, 0, 100, 50),
@@ -2343,13 +2416,28 @@ export default function ProjectDetailsPage() {
         uppercase: overlayUppercase,
         shadow: overlayShadow,
       },
+      "editor.titles": {
+        enabled: titleOverlayForExport.enabled,
+        text: titleOverlayForExport.text,
+        preset: titleOverlayForExport.preset,
+        position: titleOverlayForExport.position,
+        size: titleOverlayForExport.scale,
+        background: titleOverlayForExport.background,
+        shadow: titleOverlayForExport.shadow,
+      },
       "editor.titleOverlay": {
+        enabled: titleOverlayForExport.enabled,
         text: titleOverlayForExport.text,
         style: titleOverlayForExport.style,
+        preset: titleOverlayForExport.preset,
+        position: titleOverlayForExport.position,
         x: titleOverlayForExport.x,
         y: titleOverlayForExport.y,
         align: titleOverlayForExport.align,
         size: titleOverlayForExport.size,
+        scale: titleOverlayForExport.scale,
+        background: titleOverlayForExport.background,
+        shadow: titleOverlayForExport.shadow,
       },
       "editor.effects": {
         brightness: Number(brightness) || 100,
@@ -2451,7 +2539,11 @@ export default function ProjectDetailsPage() {
     videoVolume,
     mutedOriginal,
     titleStyle,
-    titleSize,
+    titlePosition,
+    titleScale,
+    titleBackground,
+    titleShadow,
+    titleEnabled,
     overlayText,
     overlayX,
     overlayY,
@@ -2540,8 +2632,12 @@ export default function ProjectDetailsPage() {
     setPlaybackSpeed(1);
     setVideoVolume(100);
     setMutedOriginal(false);
-    setTitleStyle("minimal");
-    setTitleSize("large");
+    setTitleStyle("cleanLower");
+    setTitlePosition("lower");
+    setTitleScale(1);
+    setTitleBackground(true);
+    setTitleShadow(true);
+    setTitleEnabled(false);
     setOverlayText("");
     setOverlayX(50);
     setOverlayY(78);
@@ -3056,7 +3152,7 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "text") {
       return (
-        <Panel title="Titles" subtitle="Design a polished title for this export.">
+        <Panel title="Titles Studio" subtitle="Add clean, creator-ready text to your video.">
           <div className="space-y-5">
             <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
               <label className="text-sm font-bold text-white/58">
@@ -3066,9 +3162,13 @@ export default function ProjectDetailsPage() {
               <textarea
                 value={overlayText}
                 onChange={(event) =>
-                  setOverlayText(event.target.value.slice(0, 80))
+                  {
+                    const nextText = event.target.value.slice(0, 80);
+                    setOverlayText(nextText);
+                    setTitleEnabled(nextText.trim().length > 0);
+                  }
                 }
-                placeholder="Add a title"
+                placeholder="Add a title for your clip"
                 maxLength={80}
                 className="mt-3 min-h-24 w-full rounded-[1.25rem] border border-white/10 bg-black/25 px-4 py-3 text-white outline-none placeholder:text-white/32 transition focus:border-fuchsia-200/60 focus:bg-black/35"
               />
@@ -3078,9 +3178,9 @@ export default function ProjectDetailsPage() {
               </p>
             </div>
 
-            <div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
               <label className="text-sm font-bold text-white/58">
-                Style
+                Style presets
               </label>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -3097,19 +3197,20 @@ export default function ProjectDetailsPage() {
                     <span className="block text-xs font-black text-white/58">
                       {item.label}
                     </span>
+                    <span className="mt-1 block text-[11px] leading-4 text-white/34">
+                      {item.description}
+                    </span>
                     <span
                       className={`mt-2 block truncate rounded-xl px-3 py-2 text-sm font-black ${
-                        item.value === "creator"
-                          ? "bg-black/35 text-[#FFD84D]"
-                          : item.value === "luxury"
-                            ? "bg-gradient-to-r from-[#2c2415] to-black/30 text-[#F5E6BC]"
-                            : item.value === "neon"
-                              ? "bg-black/35 text-[#6DFFE5] shadow-[0_0_18px_rgba(109,255,229,0.18)]"
-                              : item.value === "caption"
+                        item.value === "creatorBold"
+                          ? "bg-black/35 text-[#FFF6D8]"
+                          : item.value === "minimalTag"
+                            ? "bg-black/55 text-[#F3E7C8] uppercase tracking-[0.18em]"
+                            : item.value === "cinematic"
+                              ? "bg-gradient-to-r from-[#2c2415] to-black/30 font-serif text-[#F5E6BC] tracking-[0.12em]"
+                              : item.value === "softCaption"
                                 ? "bg-black/70 text-white"
-                                : item.value === "lowerThird"
-                                  ? "bg-black/55 text-white"
-                                  : "bg-white/[0.06] text-white"
+                                : "bg-black/55 text-[#F3E7C8]"
                       }`}
                     >
                       Aa
@@ -3119,52 +3220,17 @@ export default function ProjectDetailsPage() {
               </div>
             </div>
 
-            <div>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
               <label className="text-sm font-bold text-white/58">
                 Position
               </label>
 
-              <div className="mt-3 space-y-4 rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
-                <RangeControl
-                  label="Horizontal"
-                  value={overlayX}
-                  min={0}
-                  max={100}
-                  suffix="%"
-                  onChange={setOverlayX}
-                />
-                <div className="-mt-2 flex justify-between text-[10px] font-black uppercase tracking-[0.14em] text-white/34">
-                  <span>Left</span>
-                  <span>Center</span>
-                  <span>Right</span>
-                </div>
-
-                <RangeControl
-                  label="Vertical"
-                  value={overlayY}
-                  min={8}
-                  max={88}
-                  suffix="%"
-                  onChange={setOverlayY}
-                />
-                <div className="-mt-2 flex justify-between text-[10px] font-black uppercase tracking-[0.14em] text-white/34">
-                  <span>Top</span>
-                  <span>Middle</span>
-                  <span>Bottom</span>
-                </div>
-              </div>
-
-            </div>
-
-            <div>
-              <label className="text-sm font-bold text-white/58">Size</label>
-
               <div className="mt-3 grid grid-cols-4 gap-2">
-                {titleSizes.map((item) => (
+                {titlePositions.map((item) => (
                   <OptionButton
                     key={item.value}
-                    active={titleSize === item.value}
-                    onClick={() => setTitleSize(item.value)}
+                    active={titlePosition === item.value}
+                    onClick={() => setTitlePosition(item.value)}
                     small
                   >
                     {item.label}
@@ -3172,6 +3238,61 @@ export default function ProjectDetailsPage() {
                 ))}
               </div>
             </div>
+
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
+              <RangeControl
+                label="Text size"
+                value={Number(titleScale.toFixed(2))}
+                min={0.8}
+                max={1.6}
+                step={0.05}
+                suffix="x"
+                onChange={(value) => setTitleScale(normalizeTitleScale(value))}
+              />
+            </div>
+
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
+              <p className="text-sm font-bold text-white/58">Finishing</p>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                <button
+                  onClick={() => setTitleBackground(!titleBackground)}
+                  className={`rounded-2xl border px-4 py-3 text-sm font-black transition ${
+                    titleBackground
+                      ? "border-white/20 bg-white text-black"
+                      : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
+                  }`}
+                >
+                  Background plate
+                </button>
+
+                <button
+                  onClick={() => setTitleShadow(!titleShadow)}
+                  className={`rounded-2xl border px-4 py-3 text-sm font-black transition ${
+                    titleShadow
+                      ? "border-white/20 bg-white text-black"
+                      : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
+                  }`}
+                >
+                  Soft shadow
+                </button>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                setTitleEnabled(false);
+                setOverlayText("");
+                setTitleStyle("cleanLower");
+                setTitlePosition("lower");
+                setTitleScale(1);
+                setTitleBackground(true);
+                setTitleShadow(true);
+              }}
+              className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"
+            >
+              Reset title
+            </button>
           </div>
         </Panel>
       );
@@ -3851,11 +3972,12 @@ export default function ProjectDetailsPage() {
 
                     {localVideoURL && hasActiveTitleOverlay && (
                       <div
-                        className={`pointer-events-none absolute z-30 max-w-[86%] font-black leading-tight ${titlePreviewAlignClass} ${titlePreviewSizeClass} ${titlePreviewClass}`}
+                        className={`pointer-events-none absolute z-30 max-w-[86%] leading-tight ${titlePreviewAlignClass} ${titlePreviewClass}`}
                         style={{
                           left: `clamp(24px, ${titleOverlayForExport.x}%, calc(100% - 24px))`,
                           top: `clamp(24px, ${titleOverlayForExport.y}%, calc(100% - 24px))`,
                           transform: titlePreviewTransform,
+                          ...titlePreviewSizeStyle,
                         }}
                       >
                         {visibleOverlayText}

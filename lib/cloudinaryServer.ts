@@ -56,19 +56,24 @@ type PhaseOneReframeSettings = {
 };
 
 type PhaseOneTitleOverlay = {
+  enabled?: boolean;
   text: string;
   style:
-    | "minimal"
-    | "creator"
-    | "luxury"
-    | "neon"
-    | "caption"
-    | "lowerThird"
+    | "cleanLower"
+    | "creatorBold"
+    | "minimalTag"
+    | "cinematic"
+    | "softCaption"
     | string;
+  preset?: string;
+  position?: "top" | "center" | "lower" | "bottom" | string;
   x: number;
   y: number;
   align: "left" | "center" | "right" | string;
   size: "small" | "medium" | "large" | "xl" | string;
+  scale?: number;
+  background?: boolean;
+  shadow?: boolean;
 };
 
 function getCloudinaryEnv(): CloudinaryEnv {
@@ -291,14 +296,24 @@ function normalizeTitleOverlay(
   value: Partial<PhaseOneTitleOverlay> | undefined,
 ): PhaseOneTitleOverlay {
   const text = sanitizeTitleText(value?.text);
+  const style = normalizeTitleStyle(value?.preset || value?.style);
+  const position = normalizeTitlePosition(value?.position);
+  const coordinates = getTitlePositionCoordinates(position);
+  const enabled = value?.enabled === false ? false : text.length > 0;
 
   return {
-    text,
-    style: normalizeTitleStyle(value?.style),
-    x: clampNumber(value?.x, 0, 100, 50),
-    y: clampNumber(value?.y, 8, 88, 78),
+    enabled,
+    text: enabled ? text : "",
+    style,
+    preset: style,
+    position,
+    x: clampNumber(value?.x, 0, 100, coordinates.x),
+    y: clampNumber(value?.y, 8, 88, coordinates.y),
     align: normalizeTitleAlign(value?.align),
     size: normalizeTitleSize(value?.size),
+    scale: normalizeTitleScale(value?.scale ?? value?.size),
+    background: value?.background !== false,
+    shadow: value?.shadow !== false,
   };
 }
 
@@ -351,7 +366,7 @@ function createTitleOverlayTransformation(
   dimensions: { width: number; height: number },
 ) {
   const style = getTitleStyle(title.style);
-  const fontSize = getTitleFontSize(title.size, dimensions.width);
+  const fontSize = getTitleFontSize(title, dimensions.width);
   const maxWidth = Math.round(dimensions.width * 0.76);
   const safeX = Math.round((title.x / 100) * dimensions.width);
   const safeY = Math.round((title.y / 100) * dimensions.height);
@@ -364,7 +379,7 @@ function createTitleOverlayTransformation(
     overlay: {
       font_family: "Arial",
       font_size: fontSize,
-      font_weight: "bold",
+      font_weight: style.fontWeight,
       text: title.text,
     },
     color: style.color,
@@ -372,7 +387,7 @@ function createTitleOverlayTransformation(
     crop: "fit",
   };
 
-  if (style.background) {
+  if (title.background && style.background) {
     textLayer.background = style.background;
   }
 
@@ -406,13 +421,13 @@ function sanitizeTitleText(value: unknown) {
 }
 
 function normalizeTitleStyle(value: unknown) {
-  return value === "creator" ||
-    value === "luxury" ||
-    value === "neon" ||
-    value === "caption" ||
-    value === "lowerThird"
-    ? value
-    : "minimal";
+  if (value === "creatorBold" || value === "creator") return "creatorBold";
+  if (value === "minimalTag" || value === "minimal") return "minimalTag";
+  if (value === "cinematic" || value === "luxury" || value === "neon") {
+    return "cinematic";
+  }
+  if (value === "softCaption" || value === "caption") return "softCaption";
+  return "cleanLower";
 }
 
 function normalizeTitleAlign(value: unknown) {
@@ -427,6 +442,27 @@ function normalizeTitleSize(value: unknown) {
     : "large";
 }
 
+function normalizeTitlePosition(value: unknown) {
+  return value === "top" || value === "center" || value === "bottom"
+    ? value
+    : "lower";
+}
+
+function getTitlePositionCoordinates(position: string) {
+  if (position === "top") return { x: 50, y: 16 };
+  if (position === "center") return { x: 50, y: 50 };
+  if (position === "bottom") return { x: 50, y: 86 };
+  return { x: 50, y: 76 };
+}
+
+function normalizeTitleScale(value: unknown) {
+  if (value === "small") return 0.85;
+  if (value === "medium") return 0.95;
+  if (value === "xl") return 1.35;
+
+  return clampNumber(value, 0.8, 1.6, 1);
+}
+
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
   const parsed = Number(value);
 
@@ -436,36 +472,34 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
 }
 
 function getTitleStyle(style: string) {
-  if (style === "creator") {
-    return { color: "#FFD84D" };
+  if (style === "creatorBold") {
+    return { color: "#FFF6D8", background: "#00000055", fontWeight: "bold" };
   }
 
-  if (style === "luxury") {
-    return { color: "#F5E6BC" };
+  if (style === "minimalTag") {
+    return { color: "#F3E7C8", background: "#000000AA", fontWeight: "bold" };
   }
 
-  if (style === "neon") {
-    return { color: "#6DFFE5" };
+  if (style === "cinematic") {
+    return { color: "#F5E6BC", background: "#00000033", fontWeight: "normal" };
   }
 
-  if (style === "caption") {
-    return { color: "#FFFFFF", background: "#000000" };
+  if (style === "softCaption") {
+    return { color: "#FFFFFF", background: "#000000BB", fontWeight: "bold" };
   }
 
-  if (style === "lowerThird") {
-    return { color: "#FFFFFF", background: "#000000" };
-  }
-
-  return { color: "#FFFFFF" };
+  return { color: "#F3E7C8", background: "#00000099", fontWeight: "bold" };
 }
 
-function getTitleFontSize(size: string, width: number) {
+function getTitleFontSize(title: PhaseOneTitleOverlay, width: number) {
   const base = Math.max(28, Math.round(width * 0.075));
+  const scaledBase = Math.round(base * normalizeTitleScale(title.scale));
 
-  if (size === "small") return Math.round(base * 0.72);
-  if (size === "medium") return Math.round(base * 0.9);
-  if (size === "xl") return Math.round(base * 1.32);
-  return base;
+  if (title.style === "minimalTag") return Math.round(scaledBase * 0.72);
+  if (title.style === "softCaption") return Math.round(scaledBase * 0.86);
+  if (title.style === "cinematic") return Math.round(scaledBase * 0.92);
+  if (title.style === "creatorBold") return Math.round(scaledBase * 1.12);
+  return scaledBase;
 }
 
 function normalizePhaseOneFrameMode(

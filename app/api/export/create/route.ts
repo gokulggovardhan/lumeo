@@ -23,21 +23,27 @@ type ReframeSettings = {
   y: number;
 };
 type TitleStyle =
-  | "minimal"
-  | "creator"
-  | "luxury"
-  | "neon"
-  | "caption"
-  | "lowerThird";
+  | "cleanLower"
+  | "creatorBold"
+  | "minimalTag"
+  | "cinematic"
+  | "softCaption";
 type TitleAlign = "left" | "center" | "right";
 type TitleSize = "small" | "medium" | "large" | "xl";
+type TitlePosition = "top" | "center" | "lower" | "bottom";
 type TitleOverlaySettings = {
+  enabled: boolean;
   text: string;
   style: TitleStyle;
+  preset: TitleStyle;
+  position: TitlePosition;
   x: number;
   y: number;
   align: TitleAlign;
   size: TitleSize;
+  scale: number;
+  background: boolean;
+  shadow: boolean;
 };
 type ExportFailureStage =
   | "unknown"
@@ -87,6 +93,7 @@ type ExportRequestBody = {
     fps?: number;
     reframe?: Partial<ReframeSettings>;
     background?: Partial<BackgroundSettings>;
+    titles?: Partial<TitleOverlaySettings>;
     titleOverlay?: Partial<TitleOverlaySettings>;
   };
 };
@@ -134,6 +141,7 @@ type ProjectData = {
     export?: {
       fileId?: string;
     } | null;
+    titles?: Partial<TitleOverlaySettings>;
     titleOverlay?: Partial<TitleOverlaySettings>;
     textOverlay?: {
       text?: string;
@@ -486,8 +494,8 @@ function resolveExportSettings(
     project.editor?.canvas?.reframe,
   );
   const titleOverlay = normalizeTitleOverlay(
-    bodySettings?.titleOverlay,
-    project.editor?.titleOverlay,
+    bodySettings?.titles || bodySettings?.titleOverlay,
+    project.editor?.titles || project.editor?.titleOverlay,
     project.editor?.textOverlay,
   );
 
@@ -700,14 +708,24 @@ function normalizeTitleOverlay(
       ? (legacyValue as Record<string, unknown>)
       : {};
   const text = sanitizeTitleText(source.text || legacy.text);
+  const preset = normalizeTitleStyle(source.preset || source.style);
+  const position = normalizeTitlePosition(source.position);
+  const positionCoordinates = getTitlePositionCoordinates(position);
+  const enabled = source.enabled === false ? false : text.length > 0;
 
   return {
-    text,
-    style: normalizeTitleStyle(source.style),
-    x: clampNumber(source.x ?? legacy.x, 0, 100, 50),
-    y: clampNumber(source.y ?? legacy.y, 8, 88, 78),
+    enabled,
+    text: enabled ? text : "",
+    style: preset,
+    preset,
+    position,
+    x: clampNumber(source.x ?? legacy.x, 0, 100, positionCoordinates.x),
+    y: clampNumber(source.y ?? legacy.y, 8, 88, positionCoordinates.y),
     align: normalizeTitleAlign(source.align),
     size: normalizeTitleSize(source.size),
+    scale: normalizeTitleScale(source.scale ?? source.size),
+    background: source.background !== false,
+    shadow: source.shadow !== false,
   };
 }
 
@@ -718,13 +736,13 @@ function sanitizeTitleText(value: unknown) {
 }
 
 function normalizeTitleStyle(value: unknown): TitleStyle {
-  return value === "creator" ||
-    value === "luxury" ||
-    value === "neon" ||
-    value === "caption" ||
-    value === "lowerThird"
-    ? value
-    : "minimal";
+  if (value === "creatorBold" || value === "creator") return "creatorBold";
+  if (value === "minimalTag" || value === "minimal") return "minimalTag";
+  if (value === "cinematic" || value === "luxury" || value === "neon") {
+    return "cinematic";
+  }
+  if (value === "softCaption" || value === "caption") return "softCaption";
+  return "cleanLower";
 }
 
 function normalizeTitleAlign(value: unknown): TitleAlign {
@@ -737,6 +755,29 @@ function normalizeTitleSize(value: unknown): TitleSize {
   return value === "small" || value === "medium" || value === "xl"
     ? value
     : "large";
+}
+
+function normalizeTitlePosition(value: unknown): TitlePosition {
+  return value === "top" ||
+    value === "center" ||
+    value === "bottom"
+    ? value
+    : "lower";
+}
+
+function getTitlePositionCoordinates(position: TitlePosition) {
+  if (position === "top") return { x: 50, y: 16 };
+  if (position === "center") return { x: 50, y: 50 };
+  if (position === "bottom") return { x: 50, y: 86 };
+  return { x: 50, y: 76 };
+}
+
+function normalizeTitleScale(value: unknown) {
+  if (value === "small") return 0.85;
+  if (value === "medium") return 0.95;
+  if (value === "xl") return 1.35;
+
+  return clampNumber(value, 0.8, 1.6, 1);
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
