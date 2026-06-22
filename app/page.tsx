@@ -1,5 +1,6 @@
 import Link from "next/link";
 import AuthButton from "@/components/AuthButton";
+import SeoStructuredData from "@/components/SeoStructuredData";
 
 const tools = [
   {
@@ -31,6 +32,8 @@ const tools = [
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#07070A] text-[#F7F0DE]">
+      <SeoStructuredData />
+
       <nav className="relative z-50 border-b border-[#F3E7C8]/10 bg-[#07070A]/90 px-5 py-3.5 backdrop-blur-xl sm:px-8 lg:px-12">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
