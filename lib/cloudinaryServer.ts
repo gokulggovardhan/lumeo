@@ -40,12 +40,19 @@ type PhaseOneTransformOptions = {
     | "Blurred Background"
     | string;
   background?: Partial<PhaseOneBackgroundSettings>;
+  reframe?: Partial<PhaseOneReframeSettings>;
   titleOverlay?: Partial<PhaseOneTitleOverlay>;
 };
 
 type PhaseOneBackgroundSettings = {
   blurStyle: "soft" | "premium" | "strong" | string;
   dimStyle: "balanced" | "dark" | string;
+};
+
+type PhaseOneReframeSettings = {
+  scale: number;
+  x: number;
+  y: number;
 };
 
 type PhaseOneTitleOverlay = {
@@ -175,6 +182,8 @@ export function createPhaseOneCloudinaryExportUrl(
     options.frameMode || options.fitMode,
   );
   const background = normalizeBackgroundSettings(options.background);
+  const reframe = normalizeReframeSettings(options.reframe);
+  const reframeActive = isReframeActive(reframe);
 
   if (Number.isFinite(options.trimStart) && Number(options.trimStart) > 0) {
     trim.start_offset = Number(options.trimStart);
@@ -217,22 +226,39 @@ export function createPhaseOneCloudinaryExportUrl(
         public_id: publicId,
       },
       ...trim,
-      width: options.width,
-      height: options.height,
+      width: Math.round(options.width * reframe.scale),
+      height: Math.round(options.height * reframe.scale),
       crop: "fit",
     });
 
     transformation.push({
       flags: "layer_apply",
       gravity: "center",
+      ...(reframeActive
+        ? {
+            x: getLayerOffset(options.width, reframe.x),
+            y: getLayerOffset(options.height, reframe.y),
+          }
+        : {}),
     });
   } else {
     transformation.push({
-      width: options.width,
-      height: options.height,
+      width: Math.round(options.width * reframe.scale),
+      height: Math.round(options.height * reframe.scale),
       crop: frameMode === "fullFrame" ? "fill" : "pad",
       background: "black",
     });
+
+    if (reframeActive) {
+      transformation.push({
+        width: options.width,
+        height: options.height,
+        crop: "crop",
+        gravity: "center",
+        x: getLayerOffset(options.width, reframe.x),
+        y: getLayerOffset(options.height, reframe.y),
+      });
+    }
   }
 
   const titleOverlay = normalizeTitleOverlay(options.titleOverlay);
@@ -286,6 +312,28 @@ function normalizeBackgroundSettings(
         : "premium",
     dimStyle: value?.dimStyle === "dark" ? "dark" : "balanced",
   };
+}
+
+function normalizeReframeSettings(
+  value: Partial<PhaseOneReframeSettings> | undefined,
+): PhaseOneReframeSettings {
+  return {
+    scale: clampNumber(value?.scale, 0.85, 1.6, 1),
+    x: clampNumber(value?.x, -40, 40, 0),
+    y: clampNumber(value?.y, -40, 40, 0),
+  };
+}
+
+function isReframeActive(reframe: PhaseOneReframeSettings) {
+  return (
+    Math.abs(reframe.scale - 1) > 0.005 ||
+    Math.abs(reframe.x) > 0.005 ||
+    Math.abs(reframe.y) > 0.005
+  );
+}
+
+function getLayerOffset(size: number, percent: number) {
+  return Math.round((size * percent) / 100);
 }
 
 function getBackgroundBlurStrength(style: string) {

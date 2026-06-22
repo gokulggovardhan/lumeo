@@ -62,6 +62,12 @@ type TitleStyle =
   | "lowerThird";
 type TitleAlign = "left" | "center" | "right";
 type TitleSize = "small" | "medium" | "large" | "xl";
+type ReframeState = {
+  scale: number;
+  x: number;
+  y: number;
+  safeZones: boolean;
+};
 
 const tools: { key: ToolKey; label: string; description: string; icon: string }[] =
   [
@@ -86,10 +92,10 @@ const studioTools: { key: ToolKey; label: string; description: string; icon: str
   ];
 
 const frameOptions: { value: CanvasFormat; label: string }[] = [
-  { value: "9:16", label: "9:16 Vertical" },
-  { value: "1:1", label: "1:1 Square" },
-  { value: "4:5", label: "4:5 Portrait" },
-  { value: "16:9", label: "16:9 Landscape" },
+  { value: "9:16", label: "9:16" },
+  { value: "1:1", label: "1:1" },
+  { value: "4:5", label: "4:5" },
+  { value: "16:9", label: "16:9" },
 ];
 
 const backgroundBlurOptions: { value: BackgroundBlurStyle; label: string }[] = [
@@ -119,6 +125,28 @@ const titleSizes: { value: TitleSize; label: string }[] = [
   { value: "xl", label: "Hero" },
 ];
 
+const reframeDefaults: ReframeState = {
+  scale: 1,
+  x: 0,
+  y: 0,
+  safeZones: false,
+};
+
+const subjectSizePresets: { label: string; scale: number }[] = [
+  { label: "Wide", scale: 0.9 },
+  { label: "Natural", scale: 1 },
+  { label: "Close", scale: 1.18 },
+  { label: "Hero", scale: 1.35 },
+];
+
+const focusPresets: { label: string; x: number; y: number }[] = [
+  { label: "Center", x: 0, y: 0 },
+  { label: "Face left", x: 16, y: 0 },
+  { label: "Face right", x: -16, y: 0 },
+  { label: "Higher", x: 0, y: 14 },
+  { label: "Lower", x: 0, y: -14 },
+];
+
 function getOutputDimensions(
   canvasFormat: CanvasFormat,
   resolution: ExportResolution
@@ -144,6 +172,41 @@ function getOutputDimensions(
   if (resolution === "720p") return { width: 1280, height: 720 };
   if (resolution === "1080p") return { width: 1920, height: 1080 };
   return { width: 2560, height: 1440 };
+}
+
+function clampReframeScale(value: unknown) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return reframeDefaults.scale;
+
+  return Math.min(1.6, Math.max(0.85, parsed));
+}
+
+function clampReframeOffset(value: unknown) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) return 0;
+
+  return Math.min(40, Math.max(-40, parsed));
+}
+
+function normalizeReframeState(
+  savedReframe: unknown,
+  legacyCanvas: Record<string, unknown> = {},
+): ReframeState {
+  const source =
+    savedReframe && typeof savedReframe === "object"
+      ? (savedReframe as Record<string, unknown>)
+      : {};
+
+  return {
+    scale: clampReframeScale(
+      source.scale ?? Number(legacyCanvas.videoZoom || 100) / 100,
+    ),
+    x: clampReframeOffset(source.x ?? legacyCanvas.videoX),
+    y: clampReframeOffset(source.y ?? legacyCanvas.videoY),
+    safeZones: source.safeZones === true,
+  };
 }
 
 function openMediaDB(): Promise<IDBDatabase> {
@@ -771,10 +834,11 @@ export default function ProjectDetailsPage() {
     useState<BackgroundBlurStyle>("premium");
   const [backgroundDimStyle, setBackgroundDimStyle] =
     useState<BackgroundDimStyle>("balanced");
+  const [reframeScale, setReframeScale] = useState(reframeDefaults.scale);
+  const [reframeX, setReframeX] = useState(reframeDefaults.x);
+  const [reframeY, setReframeY] = useState(reframeDefaults.y);
+  const [safeZones, setSafeZones] = useState(reframeDefaults.safeZones);
 
-  const [videoZoom, setVideoZoom] = useState(100);
-  const [videoX, setVideoX] = useState(0);
-  const [videoY, setVideoY] = useState(0);
   const [rotate, setRotate] = useState(0);
   const [flipX, setFlipX] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -845,10 +909,16 @@ export default function ProjectDetailsPage() {
     fitMode === "blurredBackground"
       ? "Blurred Background"
       : fitMode === "cover"
-        ? "Full Frame"
+        ? "Cinematic Fill"
         : "Original View";
   const productionExportSummary = `${canvasFormat} · ${productionFrameModeLabel} · ${productionExportQualityLabel} · MP4`;
   const hasSavedSourceMedia = Boolean(videoStorageMetadata?.fileId);
+  const currentReframe = {
+    scale: clampReframeScale(reframeScale),
+    x: clampReframeOffset(reframeX),
+    y: clampReframeOffset(reframeY),
+  };
+  const reframePreviewTransform = `translate(${currentReframe.x}%, ${currentReframe.y}%) rotate(${rotate}deg) scale(${currentReframe.scale}) scaleX(${flipX ? -1 : 1})`;
 
   const selectedRange = Math.max(
     0,
@@ -986,9 +1056,14 @@ export default function ProjectDetailsPage() {
               normalizeBackgroundDimStyle(editor.canvas?.backgroundDimStyle),
             );
 
-            setVideoZoom(editor.canvas?.videoZoom ?? 100);
-            setVideoX(editor.canvas?.videoX ?? 0);
-            setVideoY(editor.canvas?.videoY ?? 0);
+            const savedReframe = normalizeReframeState(
+              editor.canvas?.reframe,
+              editor.canvas || {},
+            );
+            setReframeScale(savedReframe.scale);
+            setReframeX(savedReframe.x);
+            setReframeY(savedReframe.y);
+            setSafeZones(savedReframe.safeZones);
             setRotate(editor.canvas?.rotate ?? 0);
             setFlipX(editor.canvas?.flipX ?? false);
 
@@ -1790,6 +1865,7 @@ export default function ProjectDetailsPage() {
         frameMode: fitMode,
         resolution: productionExportResolution,
         fps: productionExportFps,
+        reframe: currentReframe,
       });
 
       const response = await fetch("/api/export/create", {
@@ -1807,6 +1883,7 @@ export default function ProjectDetailsPage() {
             frameMode: fitMode,
             resolution: productionExportResolution,
             fps: productionExportFps,
+            reframe: currentReframe,
             background: {
               blurStyle: backgroundBlurStyle,
               dimStyle: backgroundDimStyle,
@@ -2088,9 +2165,15 @@ export default function ProjectDetailsPage() {
         backgroundStyle,
         backgroundBlurStyle,
         backgroundDimStyle,
-        videoZoom: Number(videoZoom) || 100,
-        videoX: Number(videoX) || 0,
-        videoY: Number(videoY) || 0,
+        reframe: {
+          scale: currentReframe.scale,
+          x: currentReframe.x,
+          y: currentReframe.y,
+          safeZones,
+        },
+        videoZoom: Math.round(currentReframe.scale * 100),
+        videoX: currentReframe.x,
+        videoY: currentReframe.y,
         rotate: Number(rotate) || 0,
         flipX,
       },
@@ -2211,9 +2294,10 @@ export default function ProjectDetailsPage() {
     backgroundStyle,
     backgroundBlurStyle,
     backgroundDimStyle,
-    videoZoom,
-    videoX,
-    videoY,
+    reframeScale,
+    reframeX,
+    reframeY,
+    safeZones,
     rotate,
     flipX,
     playbackSpeed,
@@ -2300,9 +2384,10 @@ export default function ProjectDetailsPage() {
     setBackgroundStyle("black");
     setBackgroundBlurStyle("premium");
     setBackgroundDimStyle("balanced");
-    setVideoZoom(100);
-    setVideoX(0);
-    setVideoY(0);
+    setReframeScale(reframeDefaults.scale);
+    setReframeX(reframeDefaults.x);
+    setReframeY(reframeDefaults.y);
+    setSafeZones(reframeDefaults.safeZones);
     setRotate(0);
     setFlipX(false);
     setPlaybackSpeed(1);
@@ -2458,19 +2543,21 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "frame") {
       return (
-        <Panel title="Frame Studio" subtitle="Set the video frame and background style.">
-          <div className="space-y-6">
-            <div>
-              <label className="text-sm font-bold text-white/58">
-                Frame format
-              </label>
+        <Panel
+          title="Reframe Studio"
+          subtitle="Compose your video for shorts, reels, posts, and widescreen exports."
+        >
+          <div className="space-y-5">
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-sm font-black text-white/70">Canvas</p>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-4 gap-2">
                 {frameOptions.map((item) => (
                   <OptionButton
                     key={item.value}
                     active={canvasFormat === item.value}
                     onClick={() => setCanvasFormat(item.value)}
+                    small
                   >
                     {item.label}
                   </OptionButton>
@@ -2478,17 +2565,15 @@ export default function ProjectDetailsPage() {
               </div>
             </div>
 
-            <div>
-              <label className="text-sm font-bold text-white/58">
-                Video framing
-              </label>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-sm font-black text-white/70">Composition</p>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid gap-2">
                 <OptionButton
                   active={fitMode === "cover"}
                   onClick={() => setFitMode("cover")}
                 >
-                  Full Frame
+                  Cinematic Fill
                 </OptionButton>
 
                 <OptionButton
@@ -2505,17 +2590,94 @@ export default function ProjectDetailsPage() {
                   Blurred Background
                 </OptionButton>
               </div>
+            </div>
 
-              <div className="mt-3 grid gap-2 text-xs font-bold leading-5 text-white/42">
-                <p>Full Frame: Best for social posts. Fills the canvas.</p>
-                <p>Original View: Keeps the full clip visible.</p>
-                <p>Blurred Background: Fills the canvas behind the full clip.</p>
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-sm font-black text-white/70">Subject Size</p>
+
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {subjectSizePresets.map((item) => (
+                  <OptionButton
+                    key={item.label}
+                    active={Math.abs(currentReframe.scale - item.scale) < 0.015}
+                    onClick={() => setReframeScale(item.scale)}
+                    small
+                  >
+                    {item.label}
+                  </OptionButton>
+                ))}
+              </div>
+
+              <div className="mt-4">
+                <RangeControl
+                  label="Fine scale"
+                  value={Number(currentReframe.scale.toFixed(2))}
+                  min={0.85}
+                  max={1.6}
+                  step={0.01}
+                  suffix="x"
+                  onChange={(value) => setReframeScale(clampReframeScale(value))}
+                />
+              </div>
+            </div>
+
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+              <p className="text-sm font-black text-white/70">Focus Point</p>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {focusPresets.map((item) => (
+                  <OptionButton
+                    key={item.label}
+                    active={
+                      currentReframe.x === item.x && currentReframe.y === item.y
+                    }
+                    onClick={() => {
+                      setReframeX(item.x);
+                      setReframeY(item.y);
+                    }}
+                    small
+                  >
+                    {item.label}
+                  </OptionButton>
+                ))}
+              </div>
+
+              <div className="mt-4 space-y-4">
+                <div>
+                  <RangeControl
+                    label="Horizontal focus"
+                    value={currentReframe.x}
+                    min={-40}
+                    max={40}
+                    onChange={(value) => setReframeX(clampReframeOffset(value))}
+                  />
+                  <div className="mt-1 flex justify-between text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
+                    <span>Left</span>
+                    <span>Center</span>
+                    <span>Right</span>
+                  </div>
+                </div>
+
+                <div>
+                  <RangeControl
+                    label="Vertical focus"
+                    value={currentReframe.y}
+                    min={-40}
+                    max={40}
+                    onChange={(value) => setReframeY(clampReframeOffset(value))}
+                  />
+                  <div className="mt-1 flex justify-between text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
+                    <span>Top</span>
+                    <span>Middle</span>
+                    <span>Bottom</span>
+                  </div>
+                </div>
               </div>
             </div>
 
             {fitMode === "blurredBackground" && (
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
-                <p className="text-sm font-bold text-white/58">
+              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+                <p className="text-sm font-black text-white/70">
                   Background look
                 </p>
 
@@ -2532,7 +2694,7 @@ export default function ProjectDetailsPage() {
                   ))}
                 </div>
 
-                <p className="mt-4 text-sm font-bold text-white/58">Dim</p>
+                <p className="mt-4 text-sm font-black text-white/70">Dim</p>
 
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {backgroundDimOptions.map((item) => (
@@ -2548,6 +2710,31 @@ export default function ProjectDetailsPage() {
                 </div>
               </div>
             )}
+
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+              <button
+                onClick={() => setSafeZones(!safeZones)}
+                className={`w-full rounded-2xl border px-4 py-3 text-sm font-black transition ${
+                  safeZones
+                    ? "border-white/20 bg-white text-black"
+                    : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
+                }`}
+              >
+                Show safe zones
+              </button>
+
+              <button
+                onClick={() => {
+                  setReframeScale(reframeDefaults.scale);
+                  setReframeX(reframeDefaults.x);
+                  setReframeY(reframeDefaults.y);
+                  setSafeZones(reframeDefaults.safeZones);
+                }}
+                className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/65 transition hover:bg-white hover:text-black"
+              >
+                Reset composition
+              </button>
+            </div>
           </div>
         </Panel>
       );
@@ -3463,11 +3650,9 @@ export default function ProjectDetailsPage() {
                             objectFit:
                               fitMode === "blurredBackground" ? "contain" : fitMode,
                             filter: videoFilter,
-                            transform:
-                              fitMode === "blurredBackground"
-                                ? "none"
-                                : `translate(${videoX}%, ${videoY}%) rotate(${rotate}deg) scale(${videoZoom / 100}) scaleX(${flipX ? -1 : 1})`,
+                            transform: reframePreviewTransform,
                             transformOrigin: "center",
+                            transition: "transform 180ms ease",
                           }}
                         />
                       </>
@@ -3481,9 +3666,18 @@ export default function ProjectDetailsPage() {
                       </div>
                     )}
 
+                    {localVideoURL && safeZones && (
+                      <div className="pointer-events-none absolute inset-[6%] z-20 rounded-[1.5rem] border border-white/35">
+                        <span className="absolute left-3 top-3 rounded-full border border-white/20 bg-black/50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-white/70 backdrop-blur">
+                          Safe zone
+                        </span>
+                        <div className="absolute inset-x-0 bottom-0 h-[22%] border-t border-white/24 bg-white/[0.045]" />
+                      </div>
+                    )}
+
                     {localVideoURL && hasActiveTitleOverlay && (
                       <div
-                        className={`pointer-events-none absolute z-20 max-w-[86%] font-black leading-tight ${titlePreviewAlignClass} ${titlePreviewSizeClass} ${titlePreviewClass}`}
+                        className={`pointer-events-none absolute z-30 max-w-[86%] font-black leading-tight ${titlePreviewAlignClass} ${titlePreviewSizeClass} ${titlePreviewClass}`}
                         style={{
                           left: `clamp(24px, ${titleOverlayForExport.x}%, calc(100% - 24px))`,
                           top: `clamp(24px, ${titleOverlayForExport.y}%, calc(100% - 24px))`,

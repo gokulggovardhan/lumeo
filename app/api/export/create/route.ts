@@ -17,6 +17,11 @@ type BackgroundSettings = {
   blurStyle: BackgroundBlurStyle;
   dimStyle: BackgroundDimStyle;
 };
+type ReframeSettings = {
+  scale: number;
+  x: number;
+  y: number;
+};
 type TitleStyle =
   | "minimal"
   | "creator"
@@ -80,6 +85,7 @@ type ExportRequestBody = {
       | "Blurred Background";
     resolution?: ExportResolution | "2k";
     fps?: number;
+    reframe?: Partial<ReframeSettings>;
     background?: Partial<BackgroundSettings>;
     titleOverlay?: Partial<TitleOverlaySettings>;
   };
@@ -117,6 +123,9 @@ type ProjectData = {
       frameMode?: "fullFrame" | "originalView" | "blurredBackground";
       backgroundBlurStyle?: BackgroundBlurStyle;
       backgroundDimStyle?: BackgroundDimStyle;
+      reframe?: Partial<ReframeSettings> & {
+        safeZones?: boolean;
+      };
     };
     exportSettings?: {
       resolution?: ExportResolution | "2k";
@@ -273,6 +282,7 @@ export async function POST(request: NextRequest) {
       frameMode: settings.frameMode,
       outputWidth: dimensions.width,
       outputHeight: dimensions.height,
+      reframe: settings.reframe,
     });
 
     failedStage = "sourceDownload";
@@ -409,6 +419,8 @@ export async function POST(request: NextRequest) {
         titleIncluded: settings.titleOverlay.text.length > 0,
         transformVariant: transformedExport.variant,
         transformFallbackUsed: transformedExport.variant !== "requested",
+        reframeApplied: transformedExport.reframeApplied,
+        reframe: settings.reframe,
       },
     });
   } catch (error) {
@@ -469,6 +481,10 @@ function resolveExportSettings(
     bodySettings?.background,
     project.editor?.canvas,
   );
+  const reframe = normalizeReframeSettings(
+    bodySettings?.reframe,
+    project.editor?.canvas?.reframe,
+  );
   const titleOverlay = normalizeTitleOverlay(
     bodySettings?.titleOverlay,
     project.editor?.titleOverlay,
@@ -486,6 +502,7 @@ function resolveExportSettings(
     resolution,
     fps,
     background,
+    reframe,
     titleOverlay,
   };
 }
@@ -585,6 +602,34 @@ function normalizeBackgroundDimStyle(value: unknown): BackgroundDimStyle {
   return value === "dark" ? value : "balanced";
 }
 
+function normalizeReframeSettings(
+  bodyValue: unknown,
+  savedValue: unknown,
+): ReframeSettings {
+  const body =
+    bodyValue && typeof bodyValue === "object"
+      ? (bodyValue as Record<string, unknown>)
+      : {};
+  const saved =
+    savedValue && typeof savedValue === "object"
+      ? (savedValue as Record<string, unknown>)
+      : {};
+
+  return {
+    scale: clampNumber(body.scale ?? saved.scale, 0.85, 1.6, 1),
+    x: clampNumber(body.x ?? saved.x, -40, 40, 0),
+    y: clampNumber(body.y ?? saved.y, -40, 40, 0),
+  };
+}
+
+function isReframeActive(reframe: ReframeSettings) {
+  return (
+    Math.abs(reframe.scale - 1) > 0.005 ||
+    Math.abs(reframe.x) > 0.005 ||
+    Math.abs(reframe.y) > 0.005
+  );
+}
+
 function createExportMetadata({
   fileId,
   fileName,
@@ -621,6 +666,7 @@ function createExportMetadata({
       outputWidth: dimensions.width,
       outputHeight: dimensions.height,
       background: settings.background,
+      reframe: settings.reframe,
       titleOverlay: settings.titleOverlay,
       transformVariant,
       transformFallbackUsed: transformVariant !== "requested",
@@ -631,6 +677,7 @@ function createExportMetadata({
         "resolution",
         "originalAudio",
         "frameMode",
+        "reframe",
         "titleOverlay",
       ],
     },
@@ -737,6 +784,7 @@ async function fetchTransformedExportWithFallbacks({
         frameMode: variant.frameMode,
         fps: settings.fps,
         background: settings.background,
+        reframe: variant.reframe,
         titleOverlay: variant.titleOverlay,
       },
     );
@@ -748,6 +796,7 @@ async function fetchTransformedExportWithFallbacks({
           variant.label,
         ),
         variant: variant.label,
+        reframeApplied: variant.reframeApplied,
       };
     } catch (error) {
       lastError = error;
@@ -777,16 +826,22 @@ function createTransformVariants(settings: ReturnType<typeof resolveExportSettin
     label: TransformVariant;
     frameMode: FrameMode;
     titleOverlay: TitleOverlaySettings;
+    reframe: ReframeSettings;
+    reframeApplied: boolean;
   }> = [
     {
       label: "requested",
       frameMode: settings.frameMode,
       titleOverlay: settings.titleOverlay,
+      reframe: settings.reframe,
+      reframeApplied: isReframeActive(settings.reframe),
     },
     {
       label: "requestedWithoutTitle",
       frameMode: settings.frameMode,
       titleOverlay: emptyTitle,
+      reframe: settings.reframe,
+      reframeApplied: isReframeActive(settings.reframe),
     },
     {
       label: "stableFrame",
@@ -795,17 +850,21 @@ function createTransformVariants(settings: ReturnType<typeof resolveExportSettin
           ? "originalView"
           : settings.frameMode,
       titleOverlay: emptyTitle,
+      reframe: { scale: 1, x: 0, y: 0 },
+      reframeApplied: false,
     },
     {
       label: "simpleFrame",
       frameMode: "originalView",
       titleOverlay: emptyTitle,
+      reframe: { scale: 1, x: 0, y: 0 },
+      reframeApplied: false,
     },
   ];
   const seen = new Set<string>();
 
   return variants.filter((variant) => {
-    const key = `${variant.label}:${variant.frameMode}:${variant.titleOverlay.text}`;
+    const key = `${variant.label}:${variant.frameMode}:${variant.titleOverlay.text}:${variant.reframe.scale}:${variant.reframe.x}:${variant.reframe.y}`;
 
     if (seen.has(key)) return false;
     seen.add(key);
