@@ -81,14 +81,14 @@ const tools: { key: ToolKey; label: string; description: string; icon: string }[
     { key: "project", label: "Project", description: "Save and manage", icon: "✓" },
   ];
 
-const studioTools: { key: ToolKey; label: string; description: string; icon: string }[] =
+const studioTools: { key: ToolKey; label: string; description: string }[] =
   [
-    { key: "media", label: "Media", description: "Video status", icon: "M" },
-    { key: "cut", label: "Cut", description: "Trim controls", icon: "C" },
-    { key: "frame", label: "Frame", description: "Canvas format", icon: "F" },
-    { key: "text", label: "Titles", description: "Hooks and overlays", icon: "T" },
-    { key: "audio", label: "Sound", description: "Audio levels", icon: "S" },
-    { key: "export", label: "Export", description: "Output settings", icon: "E" },
+    { key: "media", label: "Media", description: "Video status" },
+    { key: "cut", label: "Cut", description: "Trim controls" },
+    { key: "frame", label: "Frame", description: "Canvas format" },
+    { key: "text", label: "Titles", description: "Hooks and overlays" },
+    { key: "audio", label: "Sound", description: "Audio levels" },
+    { key: "export", label: "Export", description: "Output settings" },
   ];
 
 const frameOptions: { value: CanvasFormat; label: string }[] = [
@@ -391,6 +391,134 @@ function OptionButton({
   );
 }
 
+function LumeoStudioMark({ small = false }: { small?: boolean }) {
+  return (
+    <span
+      className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-white/12 bg-[#090812] shadow-lg shadow-fuchsia-500/12 ${
+        small ? "h-9 w-9" : "h-10 w-10"
+      }`}
+    >
+      <span
+        className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(245,230,188,0.38),transparent_34%),linear-gradient(135deg,rgba(217,70,239,0.34),rgba(34,211,238,0.18))]"
+        style={{ animation: "lumeoPulse 3.8s ease-in-out infinite" }}
+      />
+      <svg
+        viewBox="0 0 24 24"
+        className="relative z-10 h-5 w-5 text-[#f8eed0]"
+        fill="none"
+        aria-hidden="true"
+      >
+        <path
+          d="M7 5.5v13h9.5"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <path d="M13 9.2l4.7 2.8-4.7 2.8V9.2z" fill="currentColor" />
+      </svg>
+    </span>
+  );
+}
+
+function StudioToolIcon({
+  tool,
+  active,
+}: {
+  tool: ToolKey;
+  active: boolean;
+}) {
+  const iconClass = "h-[21px] w-[21px]";
+  const strokeProps = {
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+
+  return (
+    <span
+      className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition ${
+        active
+          ? "border-cyan-200/24 bg-gradient-to-br from-fuchsia-300/22 via-violet-300/16 to-cyan-200/22 text-cyan-50 shadow-lg shadow-cyan-300/10"
+          : "border-white/8 bg-white/[0.055] text-white/58 group-hover:border-white/14 group-hover:bg-white/[0.09] group-hover:text-white/82"
+      }`}
+      style={active ? { animation: "subtleShimmer 3.2s ease-in-out infinite" } : undefined}
+    >
+      {tool === "media" && (
+        <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
+          <rect x="4" y="6" width="16" height="12" rx="2.2" {...strokeProps} />
+          <path d="M11 9.5l4 2.5-4 2.5v-5z" fill="currentColor" />
+        </svg>
+      )}
+
+      {tool === "cut" && (
+        <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
+          <circle cx="6.5" cy="7" r="2.2" {...strokeProps} />
+          <circle cx="6.5" cy="17" r="2.2" {...strokeProps} />
+          <path d="M8.4 8.4L18.5 18M18.5 6L8.4 15.6" {...strokeProps} />
+        </svg>
+      )}
+
+      {tool === "frame" && (
+        <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
+          <path d="M7 4H4v3M17 4h3v3M7 20H4v-3M20 17v3h-3" {...strokeProps} />
+          <rect x="7" y="7" width="10" height="10" rx="1.8" {...strokeProps} />
+        </svg>
+      )}
+
+      {tool === "text" && (
+        <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
+          <path d="M5 6h14M12 6v12M8.5 18h7" {...strokeProps} />
+          <path d="M7 6l1-2h8l1 2" {...strokeProps} />
+        </svg>
+      )}
+
+      {tool === "audio" && (
+        <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
+          <path d="M4 14v-4M8 17V7M12 19V5M16 16V8M20 13v-2" {...strokeProps} />
+        </svg>
+      )}
+
+      {tool === "export" && (
+        <svg viewBox="0 0 24 24" className={iconClass} aria-hidden="true">
+          <path d="M12 15V4M8 8l4-4 4 4" {...strokeProps} />
+          <path d="M5 14v3.5A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5V14" {...strokeProps} />
+        </svg>
+      )}
+    </span>
+  );
+}
+
+function StudioEmptyState() {
+  return (
+    <div className="relative flex h-full w-full flex-col items-center justify-center px-8 text-center">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(217,70,239,0.16),transparent_34%),radial-gradient(circle_at_52%_55%,rgba(34,211,238,0.12),transparent_28%)]" />
+      <div
+        className="relative flex h-24 w-24 items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.045] shadow-2xl shadow-fuchsia-500/10"
+        style={{ animation: "lumeoFloat 4.5s ease-in-out infinite" }}
+      >
+        <span className="absolute inset-[-14px] rounded-[2.4rem] border border-fuchsia-200/10" />
+        <span className="absolute inset-[-28px] rounded-[2.8rem] border border-cyan-200/8" />
+        <LumeoStudioMark />
+      </div>
+
+      <p className="relative mt-7 text-2xl font-black tracking-tight">
+        Start with your first clip
+      </p>
+
+      <p className="relative mt-3 max-w-xs text-sm leading-6 text-white/48">
+        Upload a video to begin editing in Lumeo Studio.
+      </p>
+
+      <span className="relative mt-5 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/52">
+        Media Library
+      </span>
+    </div>
+  );
+}
+
 function UploadDropzone({
   id,
   title,
@@ -416,19 +544,38 @@ function UploadDropzone({
 
       <label
         htmlFor={id}
-        className="group flex cursor-pointer flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-white/14 bg-white/[0.045] px-5 py-8 text-center transition hover:border-fuchsia-300/40 hover:bg-fuchsia-300/[0.08]"
+        className="group relative flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border border-dashed border-white/14 bg-gradient-to-br from-white/[0.075] via-white/[0.035] to-cyan-200/[0.045] px-5 py-8 text-center shadow-xl shadow-black/10 transition hover:border-cyan-200/28 hover:bg-white/[0.08] hover:shadow-cyan-300/10"
       >
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl font-black text-black shadow-xl shadow-white/10 transition group-hover:scale-105">
-          +
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(245,230,188,0.14),transparent_42%)] opacity-80" />
+
+        <div
+          className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/12 bg-[#090812] text-[#f8eed0] shadow-xl shadow-fuchsia-500/10 transition group-hover:scale-105"
+          style={{ animation: "lumeoFloat 4.8s ease-in-out infinite" }}
+        >
+          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
+            <path
+              d="M12 15V5M8 9l4-4 4 4"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M5 15.5V17a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1.5"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+            />
+          </svg>
         </div>
 
-        <p className="mt-4 text-base font-black text-white">{title}</p>
+        <p className="relative mt-4 text-base font-black text-white">{title}</p>
 
-        <p className="mt-2 max-w-[260px] text-sm leading-6 text-white/45">
+        <p className="relative mt-2 max-w-[260px] text-sm leading-6 text-white/45">
           {subtitle}
         </p>
 
-        <span className="mt-5 rounded-full border border-white/10 bg-black/30 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white/55">
+        <span className="relative mt-5 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white/62">
           Choose from device
         </span>
       </label>
@@ -2441,14 +2588,37 @@ export default function ProjectDetailsPage() {
             {!localVideoName && (
               <label
                 htmlFor="video-upload"
-                className="group flex cursor-pointer flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-white/14 bg-white/[0.045] px-5 py-8 text-center transition hover:border-fuchsia-300/40 hover:bg-fuchsia-300/[0.08]"
+                className="group relative flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border border-dashed border-white/14 bg-gradient-to-br from-white/[0.075] via-white/[0.035] to-cyan-200/[0.045] px-5 py-8 text-center shadow-xl shadow-black/10 transition hover:border-cyan-200/28 hover:bg-white/[0.08] hover:shadow-cyan-300/10"
               >
-                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl font-black text-black shadow-xl shadow-white/10 transition group-hover:scale-105">
-                  +
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(245,230,188,0.14),transparent_42%)] opacity-80" />
+
+                <div
+                  className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/12 bg-[#090812] text-[#f8eed0] shadow-xl shadow-fuchsia-500/10 transition group-hover:scale-105"
+                  style={{ animation: "lumeoFloat 4.8s ease-in-out infinite" }}
+                >
+                  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
+                    <path
+                      d="M12 15V5M8 9l4-4 4 4"
+                      stroke="currentColor"
+                      strokeWidth="1.9"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M5 15.5V17a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1.5"
+                      stroke="currentColor"
+                      strokeWidth="1.9"
+                      strokeLinecap="round"
+                    />
+                  </svg>
                 </div>
 
-                <p className="mt-4 text-base font-black text-white">
+                <p className="relative mt-4 text-base font-black text-white">
                   Choose from device
+                </p>
+
+                <p className="relative mt-2 text-sm text-white/45">
+                  Upload your source video
                 </p>
               </label>
             )}
@@ -3424,6 +3594,22 @@ export default function ProjectDetailsPage() {
 
   return (
     <main className="flex h-dvh overflow-hidden bg-[#07050d] text-white">
+      <style>{`
+        @keyframes lumeoPulse {
+          0%, 100% { opacity: 0.78; transform: scale(1); }
+          50% { opacity: 1; transform: scale(1.06); }
+        }
+
+        @keyframes lumeoFloat {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+
+        @keyframes subtleShimmer {
+          0%, 100% { box-shadow: 0 0 0 rgba(103, 232, 249, 0); }
+          50% { box-shadow: 0 0 24px rgba(103, 232, 249, 0.16); }
+        }
+      `}</style>
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(236,72,153,0.18),transparent_34%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_30%),radial-gradient(circle_at_bottom,rgba(168,85,247,0.13),transparent_34%)]" />
 
       <div className="relative z-10 flex min-h-0 w-full flex-col">
@@ -3432,9 +3618,9 @@ export default function ProjectDetailsPage() {
           <div className="flex min-w-0 items-center gap-3">
             <Link
               href="/dashboard"
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-fuchsia-300 via-purple-300 to-cyan-200 font-black text-black shadow-lg shadow-fuchsia-500/20"
+              className="shrink-0"
             >
-              L
+              <LumeoStudioMark />
             </Link>
 
             <div className="min-w-0">
@@ -3500,8 +3686,8 @@ export default function ProjectDetailsPage() {
 
         <section className="mx-auto flex min-h-0 w-full max-w-[1900px] flex-1 overflow-hidden px-3 py-3 sm:px-4">
         <div className="grid min-h-0 w-full grid-rows-[minmax(0,1fr)_minmax(0,42vh)] gap-3 lg:grid-cols-[270px_minmax(0,1fr)_380px] lg:grid-rows-none">
-          <aside className="hidden min-h-0 overflow-hidden rounded-[2rem] border border-white/10 bg-[#111018]/82 shadow-2xl shadow-black/25 backdrop-blur-2xl lg:block">
-            <div className="border-b border-white/10 p-4">
+          <aside className="hidden min-h-0 overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-b from-[#12101a]/92 via-[#0c0a12]/88 to-[#080711]/92 shadow-2xl shadow-black/30 backdrop-blur-2xl lg:block">
+            <div className="border-b border-white/10 bg-white/[0.025] p-4">
               <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
                 Studio Tools
               </p>
@@ -3524,19 +3710,11 @@ export default function ProjectDetailsPage() {
                   onClick={() => setActiveTool(tool.key)}
                   className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-3.5 text-left transition ${
                     activeTool === tool.key
-                      ? "border-white/18 bg-white text-black shadow-xl shadow-white/10"
-                      : "border-transparent bg-transparent text-white/58 hover:border-white/10 hover:bg-white/[0.06] hover:text-white"
+                      ? "border-cyan-200/18 bg-gradient-to-br from-white/[0.105] via-fuchsia-300/[0.075] to-cyan-200/[0.07] text-white shadow-xl shadow-cyan-300/10"
+                      : "border-transparent bg-transparent text-white/58 hover:border-white/10 hover:bg-white/[0.055] hover:text-white"
                   }`}
                 >
-                  <span
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg font-black ${
-                      activeTool === tool.key
-                        ? "bg-black text-white"
-                        : "bg-white/[0.08] text-white/70 group-hover:bg-white/[0.12]"
-                    }`}
-                  >
-                    {tool.icon}
-                  </span>
+                  <StudioToolIcon tool={tool.key} active={activeTool === tool.key} />
 
                   <span className="min-w-0">
                     <span className="block text-sm font-black">
@@ -3546,7 +3724,7 @@ export default function ProjectDetailsPage() {
                     <span
                       className={`mt-0.5 block truncate text-xs ${
                         activeTool === tool.key
-                          ? "text-black/55"
+                          ? "text-white/52"
                           : "text-white/34"
                       }`}
                     >
@@ -3560,24 +3738,25 @@ export default function ProjectDetailsPage() {
           </aside>
 
           <div className="flex min-h-0 flex-col gap-4">
-            <div className="flex gap-2 overflow-x-auto rounded-[1.5rem] border border-white/10 bg-[#111018]/82 p-2 backdrop-blur-2xl lg:hidden">
+            <div className="flex gap-2 overflow-x-auto rounded-[1.5rem] border border-white/10 bg-[#111018]/86 p-2 shadow-xl shadow-black/20 backdrop-blur-2xl lg:hidden">
               {studioTools.map((tool) => (
                 <button
                   key={tool.key}
                   onClick={() => setActiveTool(tool.key)}
-                  className={`shrink-0 rounded-2xl px-4 py-3 text-sm font-black transition ${
+                  className={`flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm font-black transition ${
                     activeTool === tool.key
-                      ? "bg-white text-black"
-                      : "bg-white/[0.06] text-white/60"
+                      ? "border-cyan-200/18 bg-white/[0.105] text-white shadow-lg shadow-cyan-300/10"
+                      : "border-transparent bg-white/[0.045] text-white/60"
                   }`}
                 >
-                  {tool.icon} {tool.label}
+                  <StudioToolIcon tool={tool.key} active={activeTool === tool.key} />
+                  {tool.label}
                 </button>
               ))}
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.6rem] border border-white/10 bg-[#0d0b13]/88 shadow-2xl shadow-black/30 backdrop-blur-2xl">
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-5">
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.6rem] border border-white/10 bg-gradient-to-br from-[#100e18]/92 via-[#0b0912]/90 to-[#080711]/92 shadow-2xl shadow-black/35 backdrop-blur-2xl">
+              <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.025] px-4 py-3 sm:px-5">
                 <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/32">
                     Live Preview
@@ -3595,7 +3774,8 @@ export default function ProjectDetailsPage() {
                 </button>
               </div>
 
-              <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 sm:p-4">
+              <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-4">
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(245,230,188,0.08),transparent_32%),radial-gradient(circle_at_20%_80%,rgba(217,70,239,0.1),transparent_32%),radial-gradient(circle_at_80%_75%,rgba(34,211,238,0.08),transparent_28%)]" />
                 {localVideoURL && backgroundStyle === "blur" && (
                   <video
                     src={localVideoURL}
@@ -3612,12 +3792,12 @@ export default function ProjectDetailsPage() {
                   <div className="absolute inset-0 bg-gradient-to-br from-fuchsia-500/18 via-black to-cyan-400/14" />
                 )}
 
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0,rgba(0,0,0,0.38)_64%,rgba(0,0,0,0.86)_100%)]" />
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0,rgba(0,0,0,0.34)_64%,rgba(0,0,0,0.84)_100%)]" />
 
                 <div className={`relative z-10 max-w-full ${canvasFrameClass}`}>
-                  <div className="absolute -inset-5 rounded-[3rem] bg-gradient-to-br from-fuchsia-500/22 via-transparent to-cyan-300/18 blur-2xl" />
+                  <div className="absolute -inset-5 rounded-[3rem] bg-gradient-to-br from-fuchsia-500/20 via-transparent to-cyan-300/18 blur-2xl" />
 
-                  <div className="relative h-full w-full overflow-hidden rounded-[2rem] border border-white/10 bg-black shadow-2xl shadow-black">
+                  <div className="relative h-full w-full overflow-hidden rounded-[2rem] border border-white/12 bg-black shadow-2xl shadow-black ring-1 ring-white/[0.035]">
                     {localVideoURL ? (
                       <>
                         {fitMode === "blurredBackground" && (
@@ -3657,13 +3837,7 @@ export default function ProjectDetailsPage() {
                         />
                       </>
                     ) : (
-                      <div className="flex h-full w-full flex-col items-center justify-center px-8 text-center">
-                        <p className="text-2xl font-black">Add your first clip</p>
-
-                        <p className="mt-3 max-w-xs text-sm leading-6 text-white/45">
-                          Choose a video from the Media Library to begin.
-                        </p>
-                      </div>
+                      <StudioEmptyState />
                     )}
 
                     {localVideoURL && safeZones && (
