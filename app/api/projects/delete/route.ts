@@ -14,10 +14,6 @@ type DeleteFailureStage =
   | "projectDelete"
   | "unknown";
 
-type FirebaseDecodedToken = {
-  uid: string;
-};
-
 export async function GET(request: NextRequest) {
   try {
     if (request.nextUrl.searchParams.get("ping") === "true") {
@@ -57,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success:
-        imports.firebaseAdminAuthOnly &&
+        imports.firebaseAuthRest &&
         imports.firebaseAdminDbOnly &&
         imports.googleDriveServer,
       diagnose: true,
@@ -111,19 +107,17 @@ export async function POST(request: NextRequest) {
 
     failedStage = "serverModules";
     const [
-      { getFirebaseAdminAuthOnly },
+      { verifyFirebaseIdTokenWithRest },
       { getFirebaseAdminDbOnly },
       googleDriveServer,
     ] = await Promise.all([
-      import("@/lib/firebaseAdminAuthOnly"),
+      import("@/lib/firebaseAuthRest"),
       import("@/lib/firebaseAdminDbOnly"),
       import("@/lib/googleDriveServer"),
     ]);
 
     failedStage = "tokenVerify";
-    const decodedToken = (await getFirebaseAdminAuthOnly().verifyIdToken(
-      idToken,
-    )) as FirebaseDecodedToken;
+    const verifiedUser = await verifyFirebaseIdTokenWithRest(idToken);
 
     failedStage = "projectRead";
     const db = getFirebaseAdminDbOnly();
@@ -141,7 +135,7 @@ export async function POST(request: NextRequest) {
     const project = snapshot.data() as Record<string, unknown>;
 
     failedStage = "ownershipCheck";
-    if (project.ownerId !== decodedToken.uid) {
+    if (project.ownerId !== verifiedUser.uid) {
       return deleteFailureJson({
         failedStage,
         details: "Project ownership could not be verified.",
@@ -238,21 +232,21 @@ function collectFileIdsFromValue(value: unknown, fileIds: Set<string>) {
 
 async function getSafeImportDiagnostics() {
   const imports = {
-    firebaseAdminAuthOnly: false,
+    firebaseAuthRest: false,
     firebaseAdminDbOnly: false,
     googleDriveServer: false,
   };
   const importErrors = {
-    firebaseAdminAuthOnly: null as string | null,
+    firebaseAuthRest: null as string | null,
     firebaseAdminDbOnly: null as string | null,
     googleDriveServer: null as string | null,
   };
 
   try {
-    await import("@/lib/firebaseAdminAuthOnly");
-    imports.firebaseAdminAuthOnly = true;
+    await import("@/lib/firebaseAuthRest");
+    imports.firebaseAuthRest = true;
   } catch (error) {
-    importErrors.firebaseAdminAuthOnly = getSafeDiagnosticMessage(error);
+    importErrors.firebaseAuthRest = getSafeDiagnosticMessage(error);
   }
 
   try {
@@ -277,6 +271,9 @@ function getSafeDeleteEnvDiagnostics() {
     firebaseProjectId: Boolean(process.env.FIREBASE_PROJECT_ID),
     firebaseClientEmail: Boolean(process.env.FIREBASE_CLIENT_EMAIL),
     firebasePrivateKey: Boolean(process.env.FIREBASE_PRIVATE_KEY),
+    firebaseApiKey: Boolean(
+      process.env.FIREBASE_API_KEY || process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+    ),
     googleDriveClientId: Boolean(process.env.GOOGLE_DRIVE_CLIENT_ID),
     googleDriveClientSecret: Boolean(process.env.GOOGLE_DRIVE_CLIENT_SECRET),
     googleDriveRefreshToken: Boolean(process.env.GOOGLE_DRIVE_REFRESH_TOKEN),
@@ -322,7 +319,7 @@ function getSafeStageDetails(stage: DeleteFailureStage) {
     case "serverModules":
       return "Delete server modules could not be loaded.";
     case "tokenVerify":
-      return "Signed-in session could not be verified.";
+      return "Sign-in verification failed.";
     case "projectRead":
       return "Project could not be read.";
     case "ownershipCheck":
