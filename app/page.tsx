@@ -282,10 +282,21 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-[#F3E7C8]/10 px-6 py-8 text-center font-serif text-[11px] italic leading-5 text-[#F7F0DE]/34 sm:text-right">
-        <p>© 2026 Lumeo. All rights reserved.</p>
-        <p>Developed by Govardhan Gudapakam</p>
-      </footer>
+      <footer className="border-t border-[#F3E7C8]/10 px-6 py-8 text-center text-xs text-[#F7F0DE]/35">
+  <div className="mb-4 flex items-center justify-center gap-6">
+    <Link href="/about" className="transition hover:text-white">
+      About
+    </Link>
+    <Link href="/privacy" className="transition hover:text-white">
+      Privacy
+    </Link>
+    <Link href="/terms" className="transition hover:text-white">
+      Terms
+    </Link>
+  </div>
+  <p>© 2026 Lumeo. All rights reserved.</p>
+  <p className="mt-1">Developed by Govardhan Gudapakam</p>
+</footer>
     </main>
   );
 }
