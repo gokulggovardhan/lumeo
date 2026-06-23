@@ -6,27 +6,34 @@ import PublicFooter from "@/components/PublicFooter";
 const tools = [
   {
     title: "Trim",
-    description: "Set clean start and end points.",
+    description: "Set clean start and end points for a focused short video.",
+    href: "/features",
   },
   {
     title: "Frame",
-    description: "Choose vertical, square, or widescreen.",
+    description: "Reframe clips for vertical, square, or widescreen output.",
+    href: "/video-reframe-tool",
   },
   {
     title: "Titles",
-    description: "Add simple text when you need it.",
+    description:
+      "Add polished creator-ready titles with clean presets and readable overlays.",
+    href: "/add-titles-to-video",
   },
   {
     title: "Sound",
-    description: "Balance your clip and music.",
+    description: "Prepare clean audio levels for your final clip.",
+    href: "/features",
   },
   {
     title: "Export",
-    description: "Create a polished MP4 download.",
+    description: "Create a polished MP4 download for publishing and sharing.",
+    href: "/features",
   },
   {
     title: "Auto-save",
-    description: "Keep your media saved as you work.",
+    description: "Keep your media and project settings saved as you work.",
+    href: "/features",
   },
 ];
 
@@ -208,15 +215,19 @@ export default function Home() {
 
         <div className="grid gap-px overflow-hidden rounded-2xl border border-[#F3E7C8]/10 bg-[#F3E7C8]/10 sm:grid-cols-2 lg:grid-cols-3">
           {tools.map((tool) => (
-            <div
+            <Link
               key={tool.title}
-              className="bg-[#0B0C0F] p-7 transition hover:bg-[#15161B]"
+              href={tool.href}
+              className="group bg-[#0B0C0F] p-7 transition hover:bg-[#15161B]"
             >
               <h3 className="text-lg font-bold">{tool.title}</h3>
               <p className="mt-2.5 text-sm leading-6 text-[#F7F0DE]/50">
                 {tool.description}
               </p>
-            </div>
+              <span className="mt-5 inline-flex text-xs font-bold text-[#D8C48E]/70 transition group-hover:text-[#F3E7C8]">
+                Explore →
+              </span>
+            </Link>
           ))}
         </div>
       </section>
