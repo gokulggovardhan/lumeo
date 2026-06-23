@@ -74,7 +74,7 @@ export default function LoginPage() {
 
       <footer className="absolute inset-x-0 bottom-6 px-6 text-center font-serif text-[11px] italic leading-5 text-[#F7F0DE]/34">
         <p>© 2026 Lumeo. All rights reserved.</p>
-        <p>Developed by Govardhan Gudapakam</p>
+        <p>Built by Govardhan Gudapakam</p>
       </footer>
     </main>
   );

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PublicFooter from "@/components/PublicFooter";
 
 export const metadata: Metadata = {
   title: "About Lumeo – Premium Online Creative Studio",
@@ -51,16 +52,16 @@ export default function AboutPage() {
         <div className="mt-10 space-y-7 text-base leading-8 text-[#F7F0DE]/60">
           <p>
             Lumeo is being built as a premium online creative studio for
-            creators who want to turn raw clips into clean, polished
-            short-form videos. The goal is to keep the editing experience
-            focused, calm, and export-ready.
+            creators who want to turn raw clips into clean, polished short-form
+            videos. The goal is to keep the editing experience focused, calm,
+            and export-ready.
           </p>
 
           <p>
             Instead of copying large editing suites, Lumeo focuses on the
-            creator workflow that matters most: upload a clip, trim it,
-            reframe it, add titles, adjust sound, and export a clean video
-            for social platforms and creator projects.
+            creator workflow that matters most: upload a clip, trim it, reframe
+            it, add titles, adjust sound, and export a clean video for social
+            platforms and creator projects.
           </p>
 
           <p>
@@ -101,21 +102,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      <footer className="border-t border-[#F3E7C8]/10 px-6 py-8 text-center text-xs text-[#F7F0DE]/35">
-        <div className="mb-4 flex items-center justify-center gap-6">
-          <Link href="/about" className="transition hover:text-white">
-            About
-          </Link>
-          <Link href="/privacy" className="transition hover:text-white">
-            Privacy
-          </Link>
-          <Link href="/terms" className="transition hover:text-white">
-            Terms
-          </Link>
-        </div>
-        <p>© 2026 Lumeo. All rights reserved.</p>
-        <p className="mt-1">Developed by Govardhan Gudapakam</p>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }

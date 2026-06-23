@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PublicFooter from "@/components/PublicFooter";
 
 export const metadata: Metadata = {
   title: "Short Video Editor – Lumeo",
   description:
-    "Create short videos online with Lumeo. Trim clips, reframe for social formats, add titles, and export polished MP4 videos.",
+    "Create short videos online with Lumeo. Trim clips, reframe videos, add titles, prepare sound, and export polished MP4 clips for creator workflows.",
   alternates: {
     canonical: "https://lumeo.in/short-video-editor",
   },
   openGraph: {
     title: "Short Video Editor – Lumeo",
     description:
-      "Create short videos online with Lumeo's focused creator editing workflow.",
+      "Use Lumeo to create polished short videos for creator and social workflows.",
     url: "https://lumeo.in/short-video-editor",
     siteName: "Lumeo",
     type: "website",
@@ -22,32 +23,32 @@ const useCases = [
   {
     title: "Reels and Shorts",
     description:
-      "Prepare vertical clips for short-form social platforms with clean framing and export-ready output.",
+      "Prepare clean short-form clips for vertical-first social platforms.",
   },
   {
     title: "Creator clips",
     description:
-      "Turn raw footage into focused short videos for creator workflows, updates, lessons, or highlights.",
+      "Turn raw creator footage into focused clips with clean framing and titles.",
   },
   {
     title: "Podcast moments",
     description:
-      "Shape short clips from longer recordings into cleaner, easier-to-share video moments.",
+      "Shape highlight clips from longer conversations and creator sessions.",
   },
   {
     title: "Educational clips",
     description:
-      "Create short video explainers, lesson highlights, or simple learning clips with titles.",
+      "Prepare short learning moments, explainers, and lesson highlights.",
   },
   {
     title: "Business content",
     description:
-      "Prepare short videos for product updates, announcements, demos, and social posts.",
+      "Create polished short videos for product updates and brand communication.",
   },
   {
     title: "Developer updates",
     description:
-      "Create clean progress clips, feature previews, and project updates for technical audiences.",
+      "Prepare walkthroughs, screen-recording highlights, and product demos.",
   },
 ];
 
@@ -82,8 +83,8 @@ export default function ShortVideoEditorPage() {
         </h1>
 
         <p className="mt-6 max-w-2xl text-lg leading-8 text-[#F7F0DE]/55">
-          Lumeo helps creators prepare short videos online with tools for
-          trimming, reframing, titles, sound, and polished MP4 export.
+          Lumeo gives creators a focused workflow for turning raw clips into
+          polished short videos without unnecessary editing clutter.
         </p>
 
         <div className="mt-10 flex flex-wrap gap-3">
@@ -118,40 +119,17 @@ export default function ShortVideoEditorPage() {
 
         <div className="mt-16 rounded-2xl border border-[#F3E7C8]/10 bg-[#101115] p-8">
           <h2 className="text-2xl font-bold">
-            Designed around the short-video workflow.
+            Built for focused short-form creation.
           </h2>
           <p className="mt-4 max-w-3xl text-base leading-7 text-[#F7F0DE]/55">
-            Short videos need speed, clarity, and clean composition. Lumeo
-            keeps the editing workspace focused so creators can move from raw
-            clip to finished short without unnecessary complexity.
+            Short video work should feel fast, clean, and intentional. Lumeo
+            keeps the workflow focused on the core steps creators need to
+            finish polished clips.
           </p>
         </div>
       </section>
 
-      <footer className="border-t border-[#F3E7C8]/10 px-6 py-8 text-center text-xs text-[#F7F0DE]/35">
-        <div className="mb-4 flex flex-wrap items-center justify-center gap-6">
-          <Link href="/features" className="transition hover:text-white">
-            Features
-          </Link>
-          <Link href="/online-video-editor" className="transition hover:text-white">
-            Online Video Editor
-          </Link>
-          <Link href="/short-video-editor" className="transition hover:text-white">
-            Short Video Editor
-          </Link>
-          <Link href="/about" className="transition hover:text-white">
-            About
-          </Link>
-          <Link href="/privacy" className="transition hover:text-white">
-            Privacy
-          </Link>
-          <Link href="/terms" className="transition hover:text-white">
-            Terms
-          </Link>
-        </div>
-        <p>© 2026 Lumeo. All rights reserved.</p>
-        <p className="mt-1">Developed by Govardhan Gudapakam</p>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PublicFooter from "@/components/PublicFooter";
 
 export const metadata: Metadata = {
   title: "Lumeo Privacy Policy",
@@ -58,11 +59,11 @@ export default function PrivacyPage() {
               Information we collect
             </h2>
             <p>
-              When you use Lumeo, we may collect basic account information
-              such as your name and email address for sign-in and project
-              access. We may also store project settings, editor preferences,
-              uploaded media details, and export-related information needed to
-              provide the editing experience.
+              When you use Lumeo, we may collect basic account information such
+              as your name and email address for sign-in and project access. We
+              may also store project settings, editor preferences, uploaded
+              media details, and export-related information needed to provide
+              the editing experience.
             </p>
           </section>
 
@@ -71,9 +72,9 @@ export default function PrivacyPage() {
               How we use information
             </h2>
             <p>
-              We use information to provide core Lumeo features such as
-              account access, project saving, media editing, preview, export,
-              and project management. We do not sell your personal information.
+              We use information to provide core Lumeo features such as account
+              access, project saving, media editing, preview, export, and
+              project management. We do not sell your personal information.
             </p>
           </section>
 
@@ -137,21 +138,7 @@ export default function PrivacyPage() {
         </div>
       </section>
 
-      <footer className="border-t border-[#F3E7C8]/10 px-6 py-8 text-center text-xs text-[#F7F0DE]/35">
-        <div className="mb-4 flex items-center justify-center gap-6">
-          <Link href="/about" className="transition hover:text-white">
-            About
-          </Link>
-          <Link href="/privacy" className="transition hover:text-white">
-            Privacy
-          </Link>
-          <Link href="/terms" className="transition hover:text-white">
-            Terms
-          </Link>
-        </div>
-        <p>© 2026 Lumeo. All rights reserved.</p>
-        <p className="mt-1">Developed by Govardhan Gudapakam</p>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }

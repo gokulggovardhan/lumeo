@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PublicFooter from "@/components/PublicFooter";
 
 export const metadata: Metadata = {
   title: "Lumeo Features – Online Creative Studio for Short Videos",
@@ -110,24 +111,7 @@ export default function FeaturesPage() {
         </div>
       </section>
 
-      <footer className="border-t border-[#F3E7C8]/10 px-6 py-8 text-center text-xs text-[#F7F0DE]/35">
-        <div className="mb-4 flex flex-wrap items-center justify-center gap-6">
-          <Link href="/features" className="transition hover:text-white">
-            Features
-          </Link>
-          <Link href="/about" className="transition hover:text-white">
-            About
-          </Link>
-          <Link href="/privacy" className="transition hover:text-white">
-            Privacy
-          </Link>
-          <Link href="/terms" className="transition hover:text-white">
-            Terms
-          </Link>
-        </div>
-        <p>© 2026 Lumeo. All rights reserved.</p>
-        <p className="mt-1">Developed by Govardhan Gudapakam</p>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PublicFooter from "@/components/PublicFooter";
 
 export const metadata: Metadata = {
   title: "Lumeo Terms of Use",
@@ -93,10 +94,9 @@ export default function TermsPage() {
             </h2>
             <p>
               You may not use Lumeo to upload, create, edit, or distribute
-              unlawful, harmful, abusive, infringing, or misleading content.
-              You may not attempt to interfere with the platform, misuse
-              storage or export systems, or access data that does not belong to
-              you.
+              unlawful, harmful, abusive, infringing, or misleading content. You
+              may not attempt to interfere with the platform, misuse storage or
+              export systems, or access data that does not belong to you.
             </p>
           </section>
 
@@ -106,9 +106,9 @@ export default function TermsPage() {
             </h2>
             <p>
               Lumeo is provided as an online service and may change as the
-              platform develops. We aim to provide a reliable experience, but
-              we do not guarantee uninterrupted access, error-free operation,
-              or permanent availability of any specific feature.
+              platform develops. We aim to provide a reliable experience, but we
+              do not guarantee uninterrupted access, error-free operation, or
+              permanent availability of any specific feature.
             </p>
           </section>
 
@@ -137,21 +137,7 @@ export default function TermsPage() {
         </div>
       </section>
 
-      <footer className="border-t border-[#F3E7C8]/10 px-6 py-8 text-center text-xs text-[#F7F0DE]/35">
-        <div className="mb-4 flex items-center justify-center gap-6">
-          <Link href="/about" className="transition hover:text-white">
-            About
-          </Link>
-          <Link href="/privacy" className="transition hover:text-white">
-            Privacy
-          </Link>
-          <Link href="/terms" className="transition hover:text-white">
-            Terms
-          </Link>
-        </div>
-        <p>© 2026 Lumeo. All rights reserved.</p>
-        <p className="mt-1">Developed by Govardhan Gudapakam</p>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }

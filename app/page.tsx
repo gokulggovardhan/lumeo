@@ -1,6 +1,7 @@
 import Link from "next/link";
 import AuthButton from "@/components/AuthButton";
 import SeoStructuredData from "@/components/SeoStructuredData";
+import PublicFooter from "@/components/PublicFooter";
 
 const tools = [
   {
@@ -192,7 +193,10 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="tools" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12">
+      <section
+        id="tools"
+        className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12"
+      >
         <div className="mb-12 max-w-xl">
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#D8C48E]">
             Tools
@@ -282,21 +286,7 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="border-t border-[#F3E7C8]/10 px-6 py-8 text-center text-xs text-[#F7F0DE]/35">
-  <div className="mb-4 flex items-center justify-center gap-6">
-    <Link href="/about" className="transition hover:text-white">
-      About
-    </Link>
-    <Link href="/privacy" className="transition hover:text-white">
-      Privacy
-    </Link>
-    <Link href="/terms" className="transition hover:text-white">
-      Terms
-    </Link>
-  </div>
-  <p>© 2026 Lumeo. All rights reserved.</p>
-  <p className="mt-1">Developed by Govardhan Gudapakam</p>
-</footer>
+      <PublicFooter />
     </main>
   );
 }

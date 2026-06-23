@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PublicFooter from "@/components/PublicFooter";
 
 export const metadata: Metadata = {
   title: "Online Video Editor – Lumeo",
   description:
-    "Use Lumeo as an online video editor to upload, trim, reframe, add titles, adjust sound, and export polished short videos.",
+    "Edit videos online with Lumeo. Upload clips, trim videos, reframe for social formats, add titles, adjust sound, and export clean MP4 files.",
   alternates: {
     canonical: "https://lumeo.in/online-video-editor",
   },
   openGraph: {
     title: "Online Video Editor – Lumeo",
     description:
-      "Create polished short videos online with Lumeo's focused video editing workflow.",
+      "Use Lumeo as a focused online video editor for clean short-form clips.",
     url: "https://lumeo.in/online-video-editor",
     siteName: "Lumeo",
     type: "website",
@@ -22,32 +23,32 @@ const steps = [
   {
     title: "Upload your clip",
     description:
-      "Start by adding a source video to your Lumeo project and prepare it for editing.",
+      "Bring your video into a focused browser-based editing workspace.",
   },
   {
     title: "Trim the video",
     description:
-      "Set clean start and end points so the final clip stays focused and watchable.",
+      "Set clean start and end points to remove extra time from your clip.",
   },
   {
     title: "Reframe for output",
     description:
-      "Use composition tools to prepare vertical, square, or widescreen versions.",
+      "Compose your video for vertical, square, portrait, or widescreen formats.",
   },
   {
     title: "Add titles",
     description:
-      "Place clean text overlays using creator-ready title styles and positions.",
+      "Place polished title overlays using clean, readable creator presets.",
   },
   {
     title: "Prepare sound",
     description:
-      "Keep audio controls close to the editing workflow for a cleaner final result.",
+      "Adjust audio as part of the final video preparation workflow.",
   },
   {
     title: "Export MP4",
     description:
-      "Create a polished MP4 download ready for social or creator workflows.",
+      "Create a clean MP4 download for publishing and sharing.",
   },
 ];
 
@@ -82,9 +83,8 @@ export default function OnlineVideoEditorPage() {
         </h1>
 
         <p className="mt-6 max-w-2xl text-lg leading-8 text-[#F7F0DE]/55">
-          Lumeo helps creators edit videos online with a clean workflow for
-          uploading, trimming, reframing, adding titles, adjusting sound, and
-          exporting polished MP4 clips.
+          Lumeo helps creators move from raw video to polished MP4 output with
+          a clean online editing workflow built for speed and focus.
         </p>
 
         <div className="mt-10 flex flex-wrap gap-3">
@@ -119,37 +119,18 @@ export default function OnlineVideoEditorPage() {
 
         <div className="mt-16 rounded-2xl border border-[#F3E7C8]/10 bg-[#101115] p-8">
           <h2 className="text-2xl font-bold">
-            Built for creators who want less clutter.
+            Editing without unnecessary clutter.
           </h2>
           <p className="mt-4 max-w-3xl text-base leading-7 text-[#F7F0DE]/55">
-            Many video tools try to include everything at once. Lumeo focuses
-            on the editing steps that matter for short videos: clean framing,
-            simple titles, clear workflow, and export-ready output.
+            Lumeo is designed around the essential steps creators use most:
+            trim, reframe, title, prepare sound, and export. The goal is a
+            calm, premium editing experience that stays focused on finishing
+            the clip.
           </p>
         </div>
       </section>
 
-      <footer className="border-t border-[#F3E7C8]/10 px-6 py-8 text-center text-xs text-[#F7F0DE]/35">
-        <div className="mb-4 flex flex-wrap items-center justify-center gap-6">
-          <Link href="/features" className="transition hover:text-white">
-            Features
-          </Link>
-          <Link href="/online-video-editor" className="transition hover:text-white">
-            Online Video Editor
-          </Link>
-          <Link href="/about" className="transition hover:text-white">
-            About
-          </Link>
-          <Link href="/privacy" className="transition hover:text-white">
-            Privacy
-          </Link>
-          <Link href="/terms" className="transition hover:text-white">
-            Terms
-          </Link>
-        </div>
-        <p>© 2026 Lumeo. All rights reserved.</p>
-        <p className="mt-1">Developed by Govardhan Gudapakam</p>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }
