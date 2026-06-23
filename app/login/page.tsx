@@ -33,7 +33,7 @@ export default function LoginPage() {
   }, [router]);
 
   const handleLogin = async () => {
-  let resetTimer: ReturnType<typeof window.setTimeout> | undefined;
+  let resetTimer: number | undefined;
 
   try {
     setAuthError("");
@@ -59,7 +59,7 @@ export default function LoginPage() {
     console.error(error);
     setAuthError("Sign-in failed. Please try again.");
   } finally {
-    if (resetTimer) {
+    if (resetTimer !== undefined) {
       window.clearTimeout(resetTimer);
     }
 

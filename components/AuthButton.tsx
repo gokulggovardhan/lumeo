@@ -46,7 +46,7 @@ export default function AuthButton() {
   };
 
   const handleLogin = async () => {
-  let resetTimer: ReturnType<typeof window.setTimeout> | undefined;
+  let resetTimer: number | undefined;
 
   try {
     setErrorMessage("");
@@ -72,7 +72,7 @@ export default function AuthButton() {
     console.error(error);
     showTemporaryError("Sign-in failed. Please try again.");
   } finally {
-    if (resetTimer) {
+    if (resetTimer !== undefined) {
       window.clearTimeout(resetTimer);
     }
 
