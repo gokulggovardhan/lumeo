@@ -37,10 +37,71 @@ const tools = [
   },
 ];
 
+const studioPreviewSteps = [
+  {
+    title: "Trim clips",
+    description: "Clean start and end",
+    primaryWidth: "78%",
+    secondaryWidth: "46%",
+  },
+  {
+    title: "Frame for socials",
+    description: "Vertical-ready layout",
+    primaryWidth: "66%",
+    secondaryWidth: "58%",
+  },
+  {
+    title: "Export clean MP4",
+    description: "Ready to publish",
+    primaryWidth: "86%",
+    secondaryWidth: "38%",
+  },
+];
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-[#07070A] text-[#F7F0DE]">
       <SeoStructuredData />
+
+      <style>{`
+        @keyframes lumeoPreviewFloat {
+          0%, 100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-7px);
+          }
+        }
+
+        @keyframes lumeoPreviewGlow {
+          0%, 100% {
+            opacity: 0.72;
+            box-shadow: 0 0 0 rgba(243, 231, 200, 0);
+          }
+          50% {
+            opacity: 1;
+            box-shadow: 0 0 28px rgba(243, 231, 200, 0.16);
+          }
+        }
+
+        @keyframes lumeoBarMove {
+          0%, 100% {
+            transform: translateX(-8%);
+          }
+          50% {
+            transform: translateX(8%);
+          }
+        }
+
+        @keyframes lumeoTimelinePulse {
+          0%, 100% {
+            opacity: 0.72;
+          }
+          50% {
+            opacity: 1;
+          }
+        }
+      `}</style>
 
       <nav className="relative z-50 border-b border-[#F3E7C8]/10 bg-[#07070A]/90 px-5 py-3.5 backdrop-blur-xl sm:px-8 lg:px-12">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
@@ -126,12 +187,15 @@ export default function Home() {
                     Studio
                   </span>
                 </div>
-                <span className="rounded-full border border-[#F3E7C8]/10 bg-[#F3E7C8]/8 px-3 py-1 text-[10px] font-black text-[#F3E7C8]/78">
+                <span
+                  className="rounded-full border border-[#F3E7C8]/10 bg-[#F3E7C8]/8 px-3 py-1 text-[10px] font-black text-[#F3E7C8]/78"
+                  style={{ animation: "lumeoPreviewGlow 3.2s ease-in-out infinite" }}
+                >
                   Ready to export
                 </span>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_132px]">
+              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_150px]">
                 <div className="relative mx-auto aspect-[9/16] w-full max-w-[290px] overflow-hidden rounded-[1.5rem] border border-[#F3E7C8]/10 bg-[#07070A] shadow-2xl shadow-black/35">
                   <div className="flex items-center justify-between border-b border-[#F3E7C8]/10 px-3 py-2">
                     <span className="rounded-full bg-[#F3E7C8]/10 px-2.5 py-1 text-[10px] font-black text-[#F3E7C8]/78">
@@ -150,33 +214,45 @@ export default function Home() {
                         <span className="h-1.5 w-8 rounded-full bg-[#F3E7C8]/40" />
                         <span className="h-1.5 w-4 rounded-full bg-white/18" />
                       </div>
-                      <div className="h-1.5 rounded-full bg-black/35">
-                        <div className="h-full w-[62%] rounded-full bg-[#F3E7C8]/70" />
+                      <div className="h-1.5 overflow-hidden rounded-full bg-black/35">
+                        <div
+                          className="h-full w-[62%] rounded-full bg-[#F3E7C8]/70"
+                          style={{ animation: "lumeoBarMove 5.4s ease-in-out infinite" }}
+                        />
                       </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="grid gap-3">
-                  {["Trim", "Frame", "Export"].map((item, index) => (
+                  {studioPreviewSteps.map((item, index) => (
                     <div
-                      key={item}
-                      className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.045] p-3"
+                      key={item.title}
+                      className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.045] p-3 transition hover:border-[#F3E7C8]/24 hover:bg-white/[0.07]"
+                      style={{
+                        animation: "lumeoPreviewFloat 5.4s ease-in-out infinite",
+                        animationDelay: `${index * 0.45}s`,
+                      }}
                     >
-                      <div className="mb-3 flex items-center justify-between">
-                        <span className="text-xs font-black text-[#F7F0DE]/72">
-                          {item}
-                        </span>
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#F3E7C8]/70" />
+                      <div className="mb-3 flex items-start justify-between gap-2">
+                        <div>
+                          <span className="block text-xs font-black text-[#F7F0DE]/78">
+                            {item.title}
+                          </span>
+                          <span className="mt-1 block text-[10px] font-bold text-[#F7F0DE]/34">
+                            {item.description}
+                          </span>
+                        </div>
+                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#F3E7C8]/70" />
                       </div>
                       <div className="space-y-1.5">
                         <div
                           className="h-1.5 rounded-full bg-[#F3E7C8]/18"
-                          style={{ width: `${74 - index * 12}%` }}
+                          style={{ width: item.primaryWidth }}
                         />
                         <div
                           className="h-1.5 rounded-full bg-white/10"
-                          style={{ width: `${44 + index * 10}%` }}
+                          style={{ width: item.secondaryWidth }}
                         />
                       </div>
                     </div>
@@ -184,7 +260,10 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="mt-4 rounded-2xl border border-[#F3E7C8]/10 bg-[#07070A]/88 p-3">
+              <div
+                className="mt-4 rounded-2xl border border-[#F3E7C8]/10 bg-[#07070A]/88 p-3"
+                style={{ animation: "lumeoTimelinePulse 4.8s ease-in-out infinite" }}
+              >
                 <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.18em] text-[#F7F0DE]/32">
                   <span>Timeline</span>
                   <span>00:24</span>

@@ -7,6 +7,15 @@ import { onAuthStateChanged, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { saveUserProfile } from "@/lib/userProfile";
 
+function PremiumSpinner() {
+  return (
+    <span
+      className="h-4 w-4 animate-spin rounded-full border-2 border-[#111018]/25 border-t-[#111018]"
+      aria-hidden="true"
+    />
+  );
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -30,9 +39,9 @@ export default function LoginPage() {
       const result = await signInWithPopup(auth, googleProvider);
       await saveUserProfile(result.user);
       router.push("/dashboard");
-    } catch (error: any) {
+    } catch (error) {
       console.error(error);
-      setAuthError(error.message || "Sign-in failed. Please try again.");
+      setAuthError("Sign-in failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -68,8 +77,9 @@ export default function LoginPage() {
         <button
           onClick={handleLogin}
           disabled={loading}
-          className="mt-8 w-full rounded-full bg-[#F3E7C8] px-6 py-3.5 text-sm font-black text-[#111018] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+          className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#F3E7C8] px-6 py-3.5 text-sm font-black text-[#111018] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
         >
+          {loading && <PremiumSpinner />}
           {loading ? "Opening Google..." : "Continue with Google"}
         </button>
 
