@@ -46,39 +46,53 @@ export default function AuthButton() {
   };
 
   const handleLogin = async () => {
-  let resetTimer: number | undefined;
+    let resetTimer: number | undefined;
 
-  try {
-    setErrorMessage("");
-    setLoading(true);
+    try {
+      setErrorMessage("");
+      setLoading(true);
 
-    resetTimer = window.setTimeout(() => {
+      resetTimer = window.setTimeout(() => {
+        setLoading(false);
+      }, 15000);
+
+      const result = await signInWithPopup(auth, googleProvider);
+      await saveUserProfile(result.user);
+      router.push("/dashboard");
+    } catch (error: any) {
+      const code = error?.code || "";
+
+      if (
+        code === "auth/popup-closed-by-user" ||
+        code === "auth/cancelled-popup-request"
+      ) {
+        return;
+      }
+
+      console.error(error);
+      showTemporaryError("Sign-in failed. Please try again.");
+    } finally {
+      if (resetTimer !== undefined) {
+        window.clearTimeout(resetTimer);
+      }
+
       setLoading(false);
-    }, 15000);
-
-    const result = await signInWithPopup(auth, googleProvider);
-    await saveUserProfile(result.user);
-    router.push("/dashboard");
-  } catch (error: any) {
-    const code = error?.code || "";
-
-    if (
-      code === "auth/popup-closed-by-user" ||
-      code === "auth/cancelled-popup-request"
-    ) {
-      return;
     }
+  };
 
-    console.error(error);
-    showTemporaryError("Sign-in failed. Please try again.");
-  } finally {
-    if (resetTimer !== undefined) {
-      window.clearTimeout(resetTimer);
+  const handleLogout = async () => {
+    try {
+      setErrorMessage("");
+      setLoading(true);
+      await signOut(auth);
+      router.push("/");
+    } catch (error) {
+      console.error(error);
+      showTemporaryError("Sign-out failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
-  }
-};
+  };
 
   if (user) {
     return (
