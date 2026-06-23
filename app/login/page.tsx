@@ -33,19 +33,39 @@ export default function LoginPage() {
   }, [router]);
 
   const handleLogin = async () => {
-    try {
-      setAuthError("");
-      setLoading(true);
-      const result = await signInWithPopup(auth, googleProvider);
-      await saveUserProfile(result.user);
-      router.push("/dashboard");
-    } catch (error) {
-      console.error(error);
-      setAuthError("Sign-in failed. Please try again.");
-    } finally {
+  let resetTimer: ReturnType<typeof window.setTimeout> | undefined;
+
+  try {
+    setAuthError("");
+    setLoading(true);
+
+    resetTimer = window.setTimeout(() => {
       setLoading(false);
+    }, 15000);
+
+    const result = await signInWithPopup(auth, googleProvider);
+    await saveUserProfile(result.user);
+    router.push("/dashboard");
+  } catch (error: any) {
+    const code = error?.code || "";
+
+    if (
+      code === "auth/popup-closed-by-user" ||
+      code === "auth/cancelled-popup-request"
+    ) {
+      return;
     }
-  };
+
+    console.error(error);
+    setAuthError("Sign-in failed. Please try again.");
+  } finally {
+    if (resetTimer) {
+      window.clearTimeout(resetTimer);
+    }
+
+    setLoading(false);
+  }
+};
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#07070A] px-6 py-12 text-[#F7F0DE]">
