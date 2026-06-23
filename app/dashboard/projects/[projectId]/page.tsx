@@ -3702,12 +3702,21 @@ export default function ProjectDetailsPage() {
             This project may not exist or you may not have access.
           </p>
 
-          <Link
-            href="/dashboard"
-            className="mt-8 inline-flex rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-fuchsia-100"
-          >
-            Back to Studio
-          </Link>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link
+              href="/"
+              className="inline-flex rounded-full border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white/72 transition hover:bg-white hover:text-black"
+            >
+              Home
+            </Link>
+
+            <Link
+              href="/dashboard"
+              className="inline-flex rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-fuchsia-100"
+            >
+              Back to Studio
+            </Link>
+          </div>
         </div>
       </main>
     );
@@ -3772,6 +3781,13 @@ export default function ProjectDetailsPage() {
             >
               Export
             </button>
+
+            <Link
+              href="/"
+              className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black"
+            >
+              Home
+            </Link>
 
             <Link
               href="/dashboard"

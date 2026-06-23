@@ -3,19 +3,20 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithPopup } from "firebase/auth";
+import { onAuthStateChanged, signInWithRedirect } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { saveUserProfile } from "@/lib/userProfile";
 
 export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [authError, setAuthError] = useState("");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         await saveUserProfile(currentUser);
-        router.push("/dashboard");
+        router.replace("/dashboard");
       }
     });
 
@@ -24,14 +25,12 @@ export default function LoginPage() {
 
   const handleLogin = async () => {
     try {
+      setAuthError("");
       setLoading(true);
-      const result = await signInWithPopup(auth, googleProvider);
-      await saveUserProfile(result.user);
-      router.push("/dashboard");
-    } catch (error: any) {
-      alert(error.message);
-      console.log(error);
-    } finally {
+      await signInWithRedirect(auth, googleProvider);
+    } catch (error) {
+      console.error(error);
+      setAuthError("Sign-in could not be started. Please try again.");
       setLoading(false);
     }
   };
@@ -52,24 +51,36 @@ export default function LoginPage() {
         <h1 className="mt-4 text-4xl font-black tracking-tight">
           Welcome to Lumeo Studio
         </h1>
+
         <p className="mx-auto mt-4 max-w-sm text-sm leading-6 text-[#F7F0DE]/58">
-          Sign in to continue.
+          Sign in securely to open your private creative workspace.
         </p>
+
+        {authError && (
+          <div className="mt-6 rounded-2xl border border-red-300/20 bg-red-400/10 px-4 py-3 text-sm font-bold text-red-100">
+            {authError}
+          </div>
+        )}
 
         <button
           onClick={handleLogin}
           disabled={loading}
           className="mt-8 w-full rounded-full bg-[#F3E7C8] px-6 py-3.5 text-sm font-black text-[#111018] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? "Opening Studio..." : "Continue with Google"}
+          {loading ? "Opening secure sign-in..." : "Continue with Google"}
         </button>
 
         <Link
           href="/"
-          className="mt-8 inline-flex text-xs font-bold text-[#F3E7C8]/58 transition hover:text-[#F3E7C8]"
+          className="mt-4 inline-flex w-full items-center justify-center rounded-full border border-[#F3E7C8]/12 bg-white/[0.035] px-6 py-3 text-sm font-bold text-[#F7F0DE]/65 transition hover:border-[#F3E7C8]/30 hover:text-white"
         >
-          Return home
+          Go to homepage
         </Link>
+
+        <p className="mx-auto mt-5 max-w-xs text-xs leading-5 text-[#F7F0DE]/35">
+          You will be redirected to Google for authentication and returned to
+          Lumeo Studio after sign-in.
+        </p>
       </section>
 
       <footer className="absolute inset-x-0 bottom-6 px-6 text-center font-serif text-[11px] italic leading-5 text-[#F7F0DE]/34">

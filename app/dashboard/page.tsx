@@ -99,8 +99,11 @@ export default function DashboardPage() {
           </Link>
 
           <div className="mt-6">
-            <Link href="/" className="text-sm text-[#F7F0DE]/50 hover:text-[#F7F0DE]">
-              Back to home
+            <Link
+              href="/"
+              className="inline-flex rounded-full border border-[#F3E7C8]/12 bg-white/[0.035] px-5 py-2.5 text-sm font-bold text-[#F7F0DE]/60 transition hover:border-[#F3E7C8]/30 hover:text-white"
+            >
+              Home
             </Link>
           </div>
         </div>
@@ -125,12 +128,21 @@ export default function DashboardPage() {
           <span className="text-xl font-bold tracking-tight">Lumeo</span>
         </Link>
 
-        <button
-          onClick={handleLogout}
-          className="rounded-full bg-[#F3E7C8] px-5 py-2 text-sm font-semibold text-[#111018] transition hover:bg-white"
-        >
-          Sign out
-        </button>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/"
+            className="rounded-full border border-[#F3E7C8]/12 bg-white/[0.035] px-5 py-2 text-sm font-semibold text-[#F7F0DE]/65 transition hover:border-[#F3E7C8]/30 hover:text-white"
+          >
+            Home
+          </Link>
+
+          <button
+            onClick={handleLogout}
+            className="rounded-full bg-[#F3E7C8] px-5 py-2 text-sm font-semibold text-[#111018] transition hover:bg-white"
+          >
+            Sign out
+          </button>
+        </div>
       </nav>
 
       <section className="relative z-10 mx-auto max-w-7xl py-16">
@@ -188,14 +200,16 @@ export default function DashboardPage() {
                     className="rounded-3xl border border-[#F3E7C8]/10 bg-black/25 p-6 shadow-xl shadow-black/20"
                   >
                     <h3 className="text-2xl font-bold">{project.title}</h3>
-                    <p className="mt-3 text-[#F7F0DE]/50">Status: {project.status}</p>
-                    
+                    <p className="mt-3 text-[#F7F0DE]/50">
+                      Status: {project.status}
+                    </p>
+
                     <Link
-  href={`/dashboard/projects/${project.id}`}
-  className="mt-5 inline-flex rounded-full bg-[#F3E7C8] px-5 py-2 text-sm font-bold text-[#111018] transition hover:bg-white"
->
-  Open Project
-</Link>
+                      href={`/dashboard/projects/${project.id}`}
+                      className="mt-5 inline-flex rounded-full bg-[#F3E7C8] px-5 py-2 text-sm font-bold text-[#111018] transition hover:bg-white"
+                    >
+                      Open Project
+                    </Link>
                   </div>
                 ))}
               </div>
