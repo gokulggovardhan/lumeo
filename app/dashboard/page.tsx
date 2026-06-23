@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -8,6 +9,7 @@ import { createProject, listenToUserProjects } from "@/lib/projects";
 import { saveUserProfile } from "@/lib/userProfile";
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [checking, setChecking] = useState(true);
   const [projects, setProjects] = useState<any[]>([]);
@@ -48,6 +50,7 @@ export default function DashboardPage() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      router.push("/");
     } catch (error: any) {
       alert(error.message);
     }
