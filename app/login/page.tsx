@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithRedirect } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup } from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { saveUserProfile } from "@/lib/userProfile";
 
@@ -16,7 +16,7 @@ export default function LoginPage() {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       if (currentUser) {
         await saveUserProfile(currentUser);
-        router.replace("/dashboard");
+        router.push("/dashboard");
       }
     });
 
@@ -27,10 +27,13 @@ export default function LoginPage() {
     try {
       setAuthError("");
       setLoading(true);
-      await signInWithRedirect(auth, googleProvider);
-    } catch (error) {
+      const result = await signInWithPopup(auth, googleProvider);
+      await saveUserProfile(result.user);
+      router.push("/dashboard");
+    } catch (error: any) {
       console.error(error);
-      setAuthError("Sign-in could not be started. Please try again.");
+      setAuthError(error.message || "Sign-in failed. Please try again.");
+    } finally {
       setLoading(false);
     }
   };
@@ -67,7 +70,7 @@ export default function LoginPage() {
           disabled={loading}
           className="mt-8 w-full rounded-full bg-[#F3E7C8] px-6 py-3.5 text-sm font-black text-[#111018] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {loading ? "Opening secure sign-in..." : "Continue with Google"}
+          {loading ? "Opening Google..." : "Continue with Google"}
         </button>
 
         <Link
@@ -78,8 +81,7 @@ export default function LoginPage() {
         </Link>
 
         <p className="mx-auto mt-5 max-w-xs text-xs leading-5 text-[#F7F0DE]/35">
-          You will be redirected to Google for authentication and returned to
-          Lumeo Studio after sign-in.
+          A Google sign-in window will open to continue securely.
         </p>
       </section>
 

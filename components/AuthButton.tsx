@@ -1,15 +1,15 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import { auth, googleProvider } from "@/lib/firebase";
 import { saveUserProfile } from "@/lib/userProfile";
 
 export default function AuthButton() {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -22,6 +22,20 @@ export default function AuthButton() {
 
     return () => unsubscribe();
   }, []);
+
+  const handleLogin = async () => {
+    try {
+      setLoading(true);
+      const result = await signInWithPopup(auth, googleProvider);
+      await saveUserProfile(result.user);
+      router.push("/dashboard");
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Sign-in failed. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -36,12 +50,12 @@ export default function AuthButton() {
   if (user) {
     return (
       <div className="flex items-center gap-3">
-        <Link
-          href="/dashboard"
+        <button
+          onClick={() => router.push("/dashboard")}
           className="rounded-full bg-[#F3E7C8] px-5 py-2 text-sm font-semibold text-[#111018] transition hover:bg-white"
         >
           Studio
-        </Link>
+        </button>
 
         <button
           onClick={handleLogout}
@@ -54,11 +68,12 @@ export default function AuthButton() {
   }
 
   return (
-    <Link
-      href="/login"
-      className="rounded-full bg-[#F3E7C8] px-5 py-2 text-sm font-semibold text-[#111018] transition hover:bg-white"
+    <button
+      onClick={handleLogin}
+      disabled={loading}
+      className="rounded-full bg-[#F3E7C8] px-5 py-2 text-sm font-semibold text-[#111018] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
     >
-      Sign in
-    </Link>
+      {loading ? "Opening..." : "Sign in"}
+    </button>
   );
 }
