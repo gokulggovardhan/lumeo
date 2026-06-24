@@ -322,7 +322,7 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <div className="flex h-full min-h-0 flex-col rounded-[1.6rem] border border-white/10 bg-[#111018]/90 shadow-2xl shadow-black/25 backdrop-blur-2xl">
+    <div className="flex min-h-0 flex-col rounded-[1.6rem] border border-white/10 bg-[#111018]/90 shadow-2xl shadow-black/25 backdrop-blur-2xl lg:h-full">
       <div className="shrink-0 border-b border-white/10 px-5 py-4">
         <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
           Studio Panel
@@ -337,7 +337,7 @@ function Panel({
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
+      <div className="min-h-0 flex-1 overflow-visible px-5 py-4 lg:overflow-y-auto">{children}</div>
     </div>
   );
 }
@@ -3702,28 +3702,26 @@ export default function ProjectDetailsPage() {
             This project may not exist or you may not have access.
           </p>
 
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Link
-              href="/"
-              className="inline-flex rounded-full border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white/72 transition hover:bg-white hover:text-black"
-            >
-              Home
-            </Link>
+          <Link
+  href="/"
+  className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black"
+>
+  Home
+</Link>
 
-            <Link
-              href="/dashboard"
-              className="inline-flex rounded-full bg-white px-6 py-3 font-black text-black transition hover:bg-fuchsia-100"
-            >
-              Back to Studio
-            </Link>
-          </div>
+<Link
+  href="/dashboard"
+  className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black"
+>
+  Back to Studio
+</Link>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="flex h-dvh overflow-hidden bg-[#07050d] text-white">
+    <main className="min-h-dvh overflow-x-hidden bg-[#07050d] pb-28 text-white lg:h-dvh lg:overflow-hidden lg:pb-0">
       <style>{`
         @keyframes lumeoPulse {
           0%, 100% { opacity: 0.78; transform: scale(1); }
@@ -3742,9 +3740,9 @@ export default function ProjectDetailsPage() {
       `}</style>
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(236,72,153,0.18),transparent_34%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_30%),radial-gradient(circle_at_bottom,rgba(168,85,247,0.13),transparent_34%)]" />
 
-      <div className="relative z-10 flex min-h-0 w-full flex-col">
-        <nav className="shrink-0 border-b border-white/10 bg-[#07050d]/86 px-3 py-2.5 backdrop-blur-2xl sm:px-4">
-        <div className="mx-auto flex max-w-[1900px] items-center justify-between gap-3">
+      <div className="relative z-10 flex min-h-dvh w-full min-w-0 flex-col lg:min-h-0">
+        <nav className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-[#07050d]/92 px-3 py-2.5 backdrop-blur-2xl sm:px-4 lg:static">
+        <div className="mx-auto flex w-full max-w-[1900px] flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <Link
               href="/dashboard"
@@ -3783,13 +3781,6 @@ export default function ProjectDetailsPage() {
             </button>
 
             <Link
-              href="/"
-              className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black"
-            >
-              Home
-            </Link>
-
-            <Link
               href="/dashboard"
               className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black"
             >
@@ -3821,8 +3812,8 @@ export default function ProjectDetailsPage() {
         </div>
         </nav>
 
-        <section className="mx-auto flex min-h-0 w-full max-w-[1900px] flex-1 overflow-hidden px-3 py-3 sm:px-4">
-        <div className="grid min-h-0 w-full grid-rows-[minmax(0,1fr)_minmax(0,42vh)] gap-3 lg:grid-cols-[270px_minmax(0,1fr)_380px] lg:grid-rows-none">
+        <section className="mx-auto flex w-full max-w-[1900px] px-3 py-3 sm:px-4 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
+        <div className="grid w-full min-w-0 gap-3 lg:h-full lg:min-h-0 lg:grid-cols-[270px_minmax(0,1fr)_380px]">
           <aside className="hidden min-h-0 overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-b from-[#12101a]/92 via-[#0c0a12]/88 to-[#080711]/92 shadow-2xl shadow-black/30 backdrop-blur-2xl lg:block">
             <div className="border-b border-white/10 bg-white/[0.025] p-4">
               <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
@@ -3874,7 +3865,7 @@ export default function ProjectDetailsPage() {
             </div>
           </aside>
 
-          <div className="flex min-h-0 flex-col gap-4">
+          <div className="flex min-w-0 flex-col gap-3 lg:min-h-0">
             <div className="flex gap-2 overflow-x-auto rounded-[1.5rem] border border-white/10 bg-[#111018]/86 p-2 shadow-xl shadow-black/20 backdrop-blur-2xl lg:hidden">
               {studioTools.map((tool) => (
                 <button
@@ -3892,7 +3883,7 @@ export default function ProjectDetailsPage() {
               ))}
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-[1.6rem] border border-white/10 bg-gradient-to-br from-[#100e18]/92 via-[#0b0912]/90 to-[#080711]/92 shadow-2xl shadow-black/35 backdrop-blur-2xl">
+            <div className="flex min-h-[430px] min-w-0 flex-col overflow-hidden rounded-[1.6rem] border border-white/10 bg-gradient-to-br from-[#100e18]/92 via-[#0b0912]/90 to-[#080711]/92 shadow-2xl shadow-black/35 backdrop-blur-2xl lg:min-h-0 lg:flex-1">
               <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.025] px-4 py-3 sm:px-5">
                 <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/32">
@@ -3911,7 +3902,7 @@ export default function ProjectDetailsPage() {
                 </button>
               </div>
 
-              <div className="relative flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-4">
+              <div className="relative flex min-h-[260px] flex-1 items-center justify-center overflow-hidden p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-4 lg:min-h-0">
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(245,230,188,0.08),transparent_32%),radial-gradient(circle_at_20%_80%,rgba(217,70,239,0.1),transparent_32%),radial-gradient(circle_at_80%_75%,rgba(34,211,238,0.08),transparent_28%)]" />
                 {localVideoURL && backgroundStyle === "blur" && (
                   <video
@@ -4134,7 +4125,7 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
 
-          <aside className="min-h-0 overflow-hidden rounded-[1.6rem]">
+          <aside className="min-w-0 overflow-visible rounded-[1.6rem] lg:min-h-0 lg:overflow-hidden">
             {renderInspector()}
           </aside>
         </div>
