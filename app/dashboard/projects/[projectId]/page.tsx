@@ -652,6 +652,8 @@ type CopyFromCloudinaryResponse =
   | {
       success: false;
       error?: string;
+      failedStage?: string;
+      details?: string;
     };
 
 type CloudExportResponse =
@@ -672,6 +674,41 @@ const LEGACY_DEFAULT_OVERLAY_TEXT = "Your title here";
 
 function createVideoFingerprint(file: File, projectId: string) {
   return `${projectId}:${file.name}:${file.size}:${file.lastModified}`;
+}
+
+type MediaUploadStage =
+  | "signature"
+  | "temporaryUpload"
+  | "permanentSave"
+  | "metadataSave"
+  | "unknown";
+
+class MediaUploadError extends Error {
+  stage: MediaUploadStage;
+  status?: number;
+  userMessage: string;
+
+  constructor({
+    stage,
+    message,
+    userMessage,
+    status,
+  }: {
+    stage: MediaUploadStage;
+    message: string;
+    userMessage: string;
+    status?: number;
+  }) {
+    super(message);
+    this.name = "MediaUploadError";
+    this.stage = stage;
+    this.status = status;
+    this.userMessage = userMessage;
+  }
+}
+
+function getSafeUploadErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message.slice(0, 180) : "Unknown error.";
 }
 
 function normalizeOverlayText(value: unknown) {
@@ -743,12 +780,26 @@ async function createCloudinaryUploadSignature() {
   const response = await fetch("/api/cloudinary/sign-upload", {
     method: "POST",
   });
-  const payload = (await response.json()) as CloudinarySignUploadResponse;
+  const payload = (await response.json().catch(() => ({
+    success: false,
+  }))) as CloudinarySignUploadResponse;
 
   if (!response.ok || !payload.success) {
-    throw new Error(
-      "error" in payload && payload.error ? payload.error : "Upload failed",
-    );
+    console.error("[Lumeo Upload] stage failed", {
+      stage: "signature",
+      status: response.status,
+      message: "error" in payload ? payload.error : undefined,
+    });
+
+    throw new MediaUploadError({
+      stage: "signature",
+      status: response.status,
+      message:
+        "error" in payload && payload.error
+          ? payload.error
+          : "Upload signing failed.",
+      userMessage: "Upload could not start. Please retry.",
+    });
   }
 
   return payload;
@@ -759,9 +810,11 @@ async function uploadVideoToTemporaryCloudinary(
   projectId: string,
   fingerprint: string,
   onProgress: (progress: number) => void,
+  onStage?: (status: string) => void,
   onRequest?: (request: XMLHttpRequest) => boolean | void
 ) {
   const signature = await createCloudinaryUploadSignature();
+  onStage?.("Uploading original video...");
 
   return new Promise<TemporaryCloudinaryUpload>((resolve, reject) => {
     const request = new XMLHttpRequest();
@@ -779,6 +832,7 @@ async function uploadVideoToTemporaryCloudinary(
     );
 
     console.info("[Lumeo Upload] Cloudinary upload started", {
+      stage: "temporaryUpload",
       fileName: file.name,
       size: file.size,
       mimeType: file.type,
@@ -821,7 +875,9 @@ async function uploadVideoToTemporaryCloudinary(
           response.secure_url
         ) {
           console.info("[Lumeo Upload] Cloudinary upload completed", {
-            publicId: response.public_id,
+            stage: "temporaryUpload",
+            fileName: file.name,
+            size: Number(response.bytes || file.size),
           });
 
           resolve({
@@ -836,21 +892,54 @@ async function uploadVideoToTemporaryCloudinary(
         }
 
         console.error("[Lumeo Upload] Cloudinary upload failed", {
+          stage: "temporaryUpload",
           status: request.status,
+          fileName: file.name,
+          size: file.size,
           message: response.error?.message,
         });
-        reject(new Error(response.error?.message || "Upload failed"));
+        reject(
+          new MediaUploadError({
+            stage: "temporaryUpload",
+            status: request.status,
+            message: response.error?.message || "Temporary upload failed.",
+            userMessage: "Upload failed. Please retry.",
+          }),
+        );
       } catch (error) {
-        console.error("[Lumeo Upload] Cloudinary upload failed", error);
-        reject(error);
+        console.error("[Lumeo Upload] Cloudinary upload failed", {
+          stage: "temporaryUpload",
+          fileName: file.name,
+          size: file.size,
+          message: getSafeUploadErrorMessage(error),
+        });
+        reject(
+          error instanceof MediaUploadError
+            ? error
+            : new MediaUploadError({
+                stage: "temporaryUpload",
+                message: getSafeUploadErrorMessage(error),
+                userMessage: "Upload failed. Please retry.",
+              }),
+        );
       }
     };
 
     request.onerror = () => {
       console.error("[Lumeo Upload] Cloudinary upload failed", {
+        stage: "temporaryUpload",
         status: request.status,
+        fileName: file.name,
+        size: file.size,
       });
-      reject(new Error("Upload failed"));
+      reject(
+        new MediaUploadError({
+          stage: "temporaryUpload",
+          status: request.status,
+          message: "Temporary upload network error.",
+          userMessage: "Upload failed. Please retry.",
+        }),
+      );
     };
     request.onabort = () => {
       console.info("[Lumeo Upload] Cloudinary upload canceled");
@@ -873,7 +962,7 @@ async function copyCloudinaryVideoToPermanentStorage(
   signal?: AbortSignal,
 ) {
   console.info("[Lumeo Upload] copy to permanent storage started", {
-    publicId: temporaryUpload.publicId,
+    stage: "permanentSave",
     fileName: temporaryUpload.fileName,
     size: temporaryUpload.size,
   });
@@ -894,15 +983,43 @@ async function copyCloudinaryVideoToPermanentStorage(
     }),
   });
 
-  const payload = (await response.json()) as CopyFromCloudinaryResponse;
+  const payload = (await response.json().catch(() => ({
+    success: false,
+  }))) as CopyFromCloudinaryResponse;
 
   if (!response.ok || !payload.success) {
-    throw new Error(
-      "error" in payload && payload.error ? payload.error : "Upload failed",
-    );
+    const serverMessage =
+      "error" in payload && payload.error ? payload.error : "Backup save failed.";
+    const failedStage =
+      "failedStage" in payload && payload.failedStage
+        ? payload.failedStage
+        : "permanentSave";
+    const unavailable =
+      failedStage === "cloudBackupUnavailable" ||
+      serverMessage === "Cloud backup is temporarily unavailable.";
+
+    console.error("[Lumeo Upload] stage failed", {
+      stage: failedStage,
+      status: response.status,
+      fileName: temporaryUpload.fileName,
+      size: temporaryUpload.size,
+      message:
+        "details" in payload && payload.details ? payload.details : serverMessage,
+    });
+
+    throw new MediaUploadError({
+      stage: "permanentSave",
+      status: response.status,
+      message:
+        "details" in payload && payload.details ? payload.details : serverMessage,
+      userMessage: unavailable
+        ? "Cloud backup is temporarily unavailable."
+        : "Cloud backup failed while saving. Please retry.",
+    });
   }
 
   console.info("[Lumeo Upload] copy to permanent storage completed", {
+    stage: "permanentSave",
     fileName: payload.fileName,
     size: payload.size,
     cleanupComplete: payload.cleanupComplete,
@@ -1119,6 +1236,13 @@ export default function ProjectDetailsPage() {
         : "Original View";
   const productionExportSummary = `${canvasFormat} · ${productionFrameModeLabel} · ${productionExportQualityLabel} · MP4`;
   const hasSavedSourceMedia = Boolean(videoStorageMetadata?.fileId);
+  const canRetryCloudBackup =
+    !videoUploading &&
+    Boolean(localVideoURL) &&
+    (videoUploadStatus === "Upload failed. Please retry." ||
+      videoUploadStatus === "Cloud backup failed while saving. Please retry." ||
+      videoUploadStatus === "Upload could not start. Please retry." ||
+      videoUploadStatus === "Cloud backup is temporarily unavailable.");
   const currentReframe = {
     scale: clampReframeScale(reframeScale),
     x: clampReframeOffset(reframeX),
@@ -1633,7 +1757,7 @@ export default function ProjectDetailsPage() {
     setCloudSyncError("");
     resetVideoUploadState();
     replacedMediaCleanupIdsRef.current = oldMediaFileIds;
-    setVideoUploadStatus("Saving media...");
+    setVideoUploadStatus("Preparing secure upload...");
     setVideoUploadProgress(0);
     resetExportState();
 
@@ -1839,20 +1963,29 @@ export default function ProjectDetailsPage() {
       videoUploadInProgressRef.current = true;
       setVideoUploading(true);
       setVideoUploadProgress(0);
-      setVideoUploadStatus("Saving media...");
+      setVideoUploadStatus("Preparing secure upload...");
 
       const file = selectedFile || (await getCurrentVideoFile());
       const fingerprint = createVideoFingerprint(file, projectId);
+
+      console.info("[Lumeo Upload] flow started", {
+        stage: "prepare",
+        fileName: file.name,
+        size: file.size,
+        mimeType: file.type,
+      });
 
       if (
         videoStorageMetadata &&
         videoStorageMetadata.fingerprint === fingerprint
       ) {
         console.info("[Lumeo Upload] duplicate upload blocked", {
-          fingerprint,
+          stage: "prepare",
+          fileName: file.name,
+          size: file.size,
         });
         setVideoUploadProgress(100);
-        setVideoUploadStatus("Media already saved");
+        setVideoUploadStatus("Cloud backup active");
         return;
       }
 
@@ -1864,6 +1997,10 @@ export default function ProjectDetailsPage() {
           (progress) => {
             if (runId !== videoUploadRunIdRef.current) return;
             setVideoUploadProgress(progress);
+          },
+          (status) => {
+            if (runId !== videoUploadRunIdRef.current) return;
+            setVideoUploadStatus(status);
           },
           (request) => {
             if (
@@ -1881,7 +2018,9 @@ export default function ProjectDetailsPage() {
         setPendingCloudinaryUpload(temporaryUpload);
       } else {
         console.info("[Lumeo Upload] retrying permanent copy from temporary media", {
-          publicId: temporaryUpload.publicId,
+          stage: "permanentSave",
+          fileName: temporaryUpload.fileName,
+          size: temporaryUpload.size,
         });
         setVideoUploadProgress((progress) => Math.max(progress, 90));
       }
@@ -1896,6 +2035,7 @@ export default function ProjectDetailsPage() {
       const copyAbortController = new AbortController();
       videoUploadCopyAbortRef.current = copyAbortController;
       setVideoUploadProgress((progress) => Math.max(progress, 95));
+      setVideoUploadStatus("Saving cloud backup...");
 
       const uploaded = await copyCloudinaryVideoToPermanentStorage(
         temporaryUpload,
@@ -1930,10 +2070,19 @@ export default function ProjectDetailsPage() {
       setVideoStorageMetadata(storage);
       setPendingCloudinaryUpload(null);
       setVideoUploadProgress(100);
-      setVideoUploadStatus("Media saved");
-      console.info("[Lumeo Upload] final UI state", { status: "Media saved" });
+      setVideoUploadStatus("Cloud backup active");
+      console.info("[Lumeo Upload] final UI state", {
+        stage: "complete",
+        status: "Cloud backup active",
+        fileName: file.name,
+        size: file.size,
+      });
     } catch (error) {
-      console.error("Video upload failed", error);
+      console.error("Video upload failed", {
+        stage: error instanceof MediaUploadError ? error.stage : "unknown",
+        status: error instanceof MediaUploadError ? error.status : undefined,
+        message: getSafeUploadErrorMessage(error),
+      });
 
       if (runId !== videoUploadRunIdRef.current) {
         return;
@@ -1947,9 +2096,17 @@ export default function ProjectDetailsPage() {
       }
 
       setVideoUploadProgress(0);
-      setVideoUploadStatus("Upload failed. Please try again.");
+      setVideoUploadStatus(
+        error instanceof MediaUploadError
+          ? error.userMessage
+          : "Upload failed. Please retry.",
+      );
       console.info("[Lumeo Upload] final UI state", {
-        status: "Upload failed. Please try again.",
+        stage: error instanceof MediaUploadError ? error.stage : "unknown",
+        status:
+          error instanceof MediaUploadError
+            ? error.userMessage
+            : "Upload failed. Please retry.",
       });
     } finally {
       if (runId === videoUploadRunIdRef.current) {
@@ -2991,8 +3148,7 @@ export default function ProjectDetailsPage() {
                 </div>
 
                 <div className="mt-4 space-y-3">
-                  {!videoUploading &&
-                    videoUploadStatus === "Upload failed. Please try again." && (
+                  {canRetryCloudBackup && (
                       <button
                         onClick={() => handleUploadVideo()}
                         className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/72 transition hover:bg-white hover:text-black"

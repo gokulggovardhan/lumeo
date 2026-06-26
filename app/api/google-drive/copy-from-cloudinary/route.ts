@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteTemporaryCloudinaryVideo } from "@/lib/cloudinaryServer";
-import { uploadVideoBufferToDriveUploadsFolder } from "@/lib/googleDriveServer";
+import {
+  GoogleDriveServerError,
+  uploadVideoBufferToDriveUploadsFolder,
+} from "@/lib/googleDriveServer";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
+  let failedStage = "requestRead";
+  let safeFileName = "";
+  let safeSize = 0;
+
   try {
     const body = (await request.json()) as {
       publicId?: string;
@@ -14,6 +21,8 @@ export async function POST(request: NextRequest) {
       size?: number;
       projectId?: string;
     };
+    safeFileName = body.fileName || "";
+    safeSize = Number(body.size || 0);
 
     if (
       !body.publicId ||
@@ -24,29 +33,45 @@ export async function POST(request: NextRequest) {
       !Number.isFinite(body.size)
     ) {
       return NextResponse.json(
-        { success: false, error: "Missing media metadata." },
+        {
+          success: false,
+          error: "Cloud backup failed while saving. Please retry.",
+          failedStage: "requestRead",
+          details: "Missing media metadata.",
+        },
         { status: 400 },
       );
     }
 
     if (!body.mimeType.startsWith("video/")) {
       return NextResponse.json(
-        { success: false, error: "Only video files are allowed." },
+        {
+          success: false,
+          error: "Cloud backup failed while saving. Please retry.",
+          failedStage: "requestRead",
+          details: "Only video files are allowed.",
+        },
         { status: 400 },
       );
     }
 
+    failedStage = "temporaryDownload";
     const secureUrl = new URL(body.secureUrl);
 
     if (secureUrl.protocol !== "https:") {
       return NextResponse.json(
-        { success: false, error: "Invalid media URL." },
+        {
+          success: false,
+          error: "Cloud backup failed while saving. Please retry.",
+          failedStage,
+          details: "Invalid temporary media URL.",
+        },
         { status: 400 },
       );
     }
 
     console.info("[Lumeo Upload] copy to permanent storage started", {
-      publicId: body.publicId,
+      stage: "temporaryDownload",
       fileName: body.fileName,
       size: body.size,
       projectId: body.projectId,
@@ -58,16 +83,25 @@ export async function POST(request: NextRequest) {
 
     if (!mediaResponse.ok) {
       console.error("[Lumeo Upload] temporary media download failed", {
+        stage: "temporaryDownload",
         status: mediaResponse.status,
+        fileName: body.fileName,
+        size: body.size,
       });
 
       return NextResponse.json(
-        { success: false, error: "Media copy failed." },
+        {
+          success: false,
+          error: "Cloud backup failed while saving. Please retry.",
+          failedStage,
+          details: `Temporary media download failed with status ${mediaResponse.status}.`,
+        },
         { status: 502 },
       );
     }
 
     const bytes = Buffer.from(await mediaResponse.arrayBuffer());
+    failedStage = "permanentSave";
     const uploadedFile = await uploadVideoBufferToDriveUploadsFolder({
       bytes,
       fileName: createDriveFileName(body.projectId, body.fileName),
@@ -82,6 +116,7 @@ export async function POST(request: NextRequest) {
     });
 
     console.info("[Lumeo Upload] copy to permanent storage completed", {
+      stage: "permanentSave",
       fileName: uploadedFile.fileName,
       size: uploadedFile.size,
     });
@@ -90,17 +125,26 @@ export async function POST(request: NextRequest) {
 
     try {
       console.info("[Lumeo Upload] temporary cleanup started", {
-        publicId: body.publicId,
+        stage: "temporaryCleanup",
+        fileName: body.fileName,
+        size: body.size,
       });
 
       await deleteTemporaryCloudinaryVideo(body.publicId);
       cleanupComplete = true;
 
       console.info("[Lumeo Upload] temporary cleanup completed", {
-        publicId: body.publicId,
+        stage: "temporaryCleanup",
+        fileName: body.fileName,
+        size: body.size,
       });
     } catch (cleanupError) {
-      console.error("[Lumeo Upload] temporary cleanup failed", cleanupError);
+      console.error("[Lumeo Upload] temporary cleanup failed", {
+        stage: "temporaryCleanup",
+        fileName: body.fileName,
+        size: body.size,
+        error: cleanupError,
+      });
     }
 
     return NextResponse.json({
@@ -112,13 +156,45 @@ export async function POST(request: NextRequest) {
       size: uploadedFile.size,
     });
   } catch (error) {
-    console.error("Copy from Cloudinary route failed", error);
+    const unavailable = isCloudBackupUnavailable(error);
+    const errorMessage = getSafeErrorMessage(error);
+
+    console.error("Copy from Cloudinary route failed", {
+      stage: failedStage,
+      fileName: safeFileName,
+      size: safeSize,
+      error,
+    });
 
     return NextResponse.json(
-      { success: false, error: "Media copy failed." },
-      { status: 500 },
+      {
+        success: false,
+        error: unavailable
+          ? "Cloud backup is temporarily unavailable."
+          : "Cloud backup failed while saving. Please retry.",
+        failedStage: unavailable ? "cloudBackupUnavailable" : failedStage,
+        details: errorMessage,
+      },
+      { status: unavailable ? 503 : 500 },
     );
   }
+}
+
+function isCloudBackupUnavailable(error: unknown) {
+  if (!(error instanceof GoogleDriveServerError)) return false;
+
+  return (
+    error.code.startsWith("missing_") ||
+    error.code === "token_refresh_failed" ||
+    error.code === "uploads_target_not_folder" ||
+    error.code === "drive_401" ||
+    error.code === "drive_403" ||
+    error.code === "drive_404"
+  );
+}
+
+function getSafeErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message.slice(0, 180) : "Unknown error.";
 }
 
 function createDriveFileName(projectId: string, originalFileName: string) {
