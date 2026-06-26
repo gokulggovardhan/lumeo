@@ -338,8 +338,70 @@ export async function uploadVideoBufferToDriveUploadsFolder({
   size: number;
   appProperties?: DriveFileAppProperties;
 }): Promise<DriveUploadResult> {
-  const env = getGoogleDriveStatusEnv();
-  const accessToken = await getGoogleDriveAccessToken();
+  const projectId = appProperties?.projectId;
+
+  console.info("[Lumeo Upload] permanent media env check started", {
+    stage: "driveEnvCheck",
+    fileName,
+    fileSize: size,
+    mimeType,
+    projectId,
+  });
+
+  let env: ReturnType<typeof getGoogleDriveStatusEnv>;
+
+  try {
+    env = getGoogleDriveStatusEnv();
+    console.info("[Lumeo Upload] permanent media env check completed", {
+      stage: "driveEnvCheck",
+      fileName,
+      fileSize: size,
+      mimeType,
+      projectId,
+    });
+  } catch (error) {
+    console.error("[Lumeo Upload] permanent media env check failed", {
+      stage: "driveEnvCheck",
+      fileName,
+      fileSize: size,
+      mimeType,
+      projectId,
+      error,
+    });
+    throw error;
+  }
+
+  console.info("[Lumeo Upload] permanent media token refresh started", {
+    stage: "driveTokenRefresh",
+    fileName,
+    fileSize: size,
+    mimeType,
+    projectId,
+  });
+
+  let accessToken: string;
+
+  try {
+    accessToken = await getGoogleDriveAccessToken();
+    console.info("[Lumeo Upload] permanent media token refresh completed", {
+      stage: "driveTokenRefresh",
+      fileName,
+      fileSize: size,
+      mimeType,
+      projectId,
+    });
+  } catch (error) {
+    console.error("[Lumeo Upload] permanent media token refresh failed", {
+      stage: "driveTokenRefresh",
+      fileName,
+      fileSize: size,
+      mimeType,
+      projectId,
+      error,
+    });
+    throw error;
+  }
+
   const metadata = {
     name: fileName,
     parents: [env.uploadsFolderId],
@@ -364,6 +426,14 @@ export async function uploadVideoBufferToDriveUploadsFolder({
     uploadType: "multipart",
     fields: "id,name,mimeType,size",
     supportsAllDrives: "true",
+  });
+
+  console.info("[Lumeo Upload] permanent media upload started", {
+    stage: "driveUpload",
+    fileName,
+    fileSize: size,
+    mimeType,
+    projectId,
   });
 
   const response = await fetch(
@@ -392,7 +462,12 @@ export async function uploadVideoBufferToDriveUploadsFolder({
 
   if (!response.ok || !payload.id || !payload.name) {
     console.error("Google Drive video upload failed", {
+      stage: "driveUpload",
       status: response.status,
+      fileName,
+      fileSize: size,
+      mimeType,
+      projectId,
       errorCode: payload.error?.code,
       errorMessage: payload.error?.message,
     });
@@ -402,6 +477,14 @@ export async function uploadVideoBufferToDriveUploadsFolder({
       payload.error?.message || "Google Drive video upload failed.",
     );
   }
+
+  console.info("[Lumeo Upload] permanent media upload completed", {
+    stage: "driveUpload",
+    fileName: payload.name,
+    fileSize: Number(payload.size || size),
+    mimeType: payload.mimeType || mimeType,
+    projectId,
+  });
 
   return {
     fileId: payload.id,

@@ -653,6 +653,7 @@ type CopyFromCloudinaryResponse =
       success: false;
       error?: string;
       failedStage?: string;
+      diagnostic?: string;
       details?: string;
     };
 
@@ -680,6 +681,11 @@ type MediaUploadStage =
   | "signature"
   | "temporaryUpload"
   | "permanentSave"
+  | "payloadValidation"
+  | "tempMediaDownload"
+  | "driveEnvCheck"
+  | "driveTokenRefresh"
+  | "driveUpload"
   | "metadataSave"
   | "unknown";
 
@@ -709,6 +715,26 @@ class MediaUploadError extends Error {
 
 function getSafeUploadErrorMessage(error: unknown) {
   return error instanceof Error ? error.message.slice(0, 180) : "Unknown error.";
+}
+
+function getPermanentBackupUserMessage(failedStage: string) {
+  if (
+    failedStage === "driveEnvCheck" ||
+    failedStage === "driveTokenRefresh" ||
+    failedStage === "driveUpload"
+  ) {
+    return "Cloud backup is temporarily unavailable.";
+  }
+
+  if (failedStage === "tempMediaDownload") {
+    return "Cloud backup failed while preparing the video. Please retry.";
+  }
+
+  if (failedStage === "payloadValidation") {
+    return "Cloud backup could not start. Please retry.";
+  }
+
+  return "Cloud backup failed while saving. Please retry.";
 }
 
 function normalizeOverlayText(value: unknown) {
@@ -994,27 +1020,27 @@ async function copyCloudinaryVideoToPermanentStorage(
       "failedStage" in payload && payload.failedStage
         ? payload.failedStage
         : "permanentSave";
-    const unavailable =
-      failedStage === "cloudBackupUnavailable" ||
-      serverMessage === "Cloud backup is temporarily unavailable.";
+    const diagnostic =
+      "diagnostic" in payload && payload.diagnostic
+        ? payload.diagnostic
+        : "details" in payload && payload.details
+          ? payload.details
+          : serverMessage;
+    const userMessage = getPermanentBackupUserMessage(failedStage);
 
     console.error("[Lumeo Upload] stage failed", {
       stage: failedStage,
       status: response.status,
       fileName: temporaryUpload.fileName,
       size: temporaryUpload.size,
-      message:
-        "details" in payload && payload.details ? payload.details : serverMessage,
+      message: diagnostic,
     });
 
     throw new MediaUploadError({
-      stage: "permanentSave",
+      stage: failedStage as MediaUploadStage,
       status: response.status,
-      message:
-        "details" in payload && payload.details ? payload.details : serverMessage,
-      userMessage: unavailable
-        ? "Cloud backup is temporarily unavailable."
-        : "Cloud backup failed while saving. Please retry.",
+      message: diagnostic,
+      userMessage,
     });
   }
 
@@ -1241,6 +1267,8 @@ export default function ProjectDetailsPage() {
     Boolean(localVideoURL) &&
     (videoUploadStatus === "Upload failed. Please retry." ||
       videoUploadStatus === "Cloud backup failed while saving. Please retry." ||
+      videoUploadStatus === "Cloud backup failed while preparing the video. Please retry." ||
+      videoUploadStatus === "Cloud backup could not start. Please retry." ||
       videoUploadStatus === "Upload could not start. Please retry." ||
       videoUploadStatus === "Cloud backup is temporarily unavailable.");
   const currentReframe = {
