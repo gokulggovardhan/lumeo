@@ -173,6 +173,7 @@ export async function POST(request: NextRequest) {
       success: true,
       deletedFiles: deleteResult.deleted,
       cleanupFailed: deleteResult.failed + (cleanupListFailed ? 1 : 0),
+      cleanupPartialFailed: deleteResult.failed > 0 || cleanupListFailed,
       projectDeleted: true,
     });
   } catch (error) {

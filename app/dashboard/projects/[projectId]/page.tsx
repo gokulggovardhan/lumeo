@@ -998,6 +998,8 @@ export default function ProjectDetailsPage() {
   const [saving, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("Saved");
   const [projectDeleting, setProjectDeleting] = useState(false);
+  const [projectDeleteStatus, setProjectDeleteStatus] = useState("");
+  const [projectDeleteError, setProjectDeleteError] = useState("");
 
   const [localVideoURL, setLocalVideoURL] = useState("");
   const [localVideoName, setLocalVideoName] = useState("");
@@ -1005,12 +1007,17 @@ export default function ProjectDetailsPage() {
   const [localVideoBytes, setLocalVideoBytes] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
   const [videoRestored, setVideoRestored] = useState(false);
+  const [localMediaRestoreChecked, setLocalMediaRestoreChecked] =
+    useState(false);
   const [videoUploading, setVideoUploading] = useState(false);
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [videoUploadStatus, setVideoUploadStatus] = useState("");
   const [videoStorageMetadata, setVideoStorageMetadata] = useState<any>(null);
   const [pendingCloudinaryUpload, setPendingCloudinaryUpload] =
     useState<TemporaryCloudinaryUpload | null>(null);
+  const [cloudSyncing, setCloudSyncing] = useState(false);
+  const [cloudSyncStatus, setCloudSyncStatus] = useState("");
+  const [cloudSyncError, setCloudSyncError] = useState("");
 
   const [localAudioURL, setLocalAudioURL] = useState("");
   const [localAudioName, setLocalAudioName] = useState("");
@@ -1092,7 +1099,9 @@ export default function ProjectDetailsPage() {
   const exportProgressTimerRef = useRef<ReturnType<typeof setInterval> | null>(
     null
   );
+  const cloudSyncAttemptedRef = useRef("");
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inspectorRef = useRef<HTMLDivElement | null>(null);
   const projectLoadedRef = useRef(false);
   const initialAutoSaveSkippedRef = useRef(false);
   const projectDataRef = useRef<any>(null);
@@ -1177,6 +1186,13 @@ export default function ProjectDetailsPage() {
   useEffect(() => {
     projectLoadedRef.current = false;
     initialAutoSaveSkippedRef.current = false;
+    cloudSyncAttemptedRef.current = "";
+    setCloudSyncing(false);
+    setCloudSyncStatus("");
+    setCloudSyncError("");
+    setLocalMediaRestoreChecked(false);
+    setProjectDeleteStatus("");
+    setProjectDeleteError("");
     setAutoSaveStatus("Saved");
   }, [projectId]);
 
@@ -1360,6 +1376,7 @@ export default function ProjectDetailsPage() {
 
   useEffect(() => {
     let active = true;
+    setLocalMediaRestoreChecked(false);
 
     async function restoreLocalMedia() {
       try {
@@ -1389,6 +1406,10 @@ export default function ProjectDetailsPage() {
       } catch {
         setVideoRestored(false);
         setAudioRestored(false);
+      } finally {
+        if (active) {
+          setLocalMediaRestoreChecked(true);
+        }
       }
     }
 
@@ -1398,6 +1419,80 @@ export default function ProjectDetailsPage() {
       active = false;
     };
   }, [videoStorageKey, audioStorageKey]);
+
+  const syncOriginalVideoFromCloud = async (force = false) => {
+    const fileId =
+      typeof videoStorageMetadata?.fileId === "string"
+        ? videoStorageMetadata.fileId
+        : "";
+
+    if (!fileId || !projectId) return;
+    if (!force && cloudSyncAttemptedRef.current === fileId) return;
+
+    cloudSyncAttemptedRef.current = fileId;
+    setCloudSyncing(true);
+    setCloudSyncStatus("Syncing original source...");
+    setCloudSyncError("");
+
+    try {
+      const response = await fetch("/api/google-drive/download", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ fileId }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Original source could not be synced.");
+      }
+
+      const blob = await response.blob();
+      const encodedName = response.headers.get("X-Lumeo-File-Name") || "";
+      const fileName =
+        (encodedName ? decodeURIComponent(encodedName) : "") ||
+        videoStorageMetadata?.fileName ||
+        "lumeo-source-video";
+      const file = new File([blob], fileName, {
+        type: blob.type || videoStorageMetadata?.mimeType || "video/mp4",
+      });
+      const url = URL.createObjectURL(file);
+
+      await saveMediaToBrowser(videoStorageKey, file);
+
+      setLocalVideoURL(url);
+      setLocalVideoName(file.name || "Synced source video");
+      setLocalVideoSize(`${(file.size / (1024 * 1024)).toFixed(2)} MB`);
+      setLocalVideoBytes(file.size);
+      setVideoRestored(true);
+      setCloudSyncStatus("Original video ready on this device.");
+      setCloudSyncError("");
+    } catch (error) {
+      console.error("[Lumeo Media Sync] original source sync failed", error);
+      setCloudSyncError("Original source could not be synced.");
+      setCloudSyncStatus("");
+    } finally {
+      setCloudSyncing(false);
+    }
+  };
+
+  useEffect(() => {
+    const fileId =
+      typeof videoStorageMetadata?.fileId === "string"
+        ? videoStorageMetadata.fileId
+        : "";
+
+    if (!localMediaRestoreChecked || !fileId || localVideoURL || cloudSyncing) {
+      return;
+    }
+
+    void syncOriginalVideoFromCloud();
+  }, [
+    videoStorageMetadata?.fileId,
+    localMediaRestoreChecked,
+    localVideoURL,
+    cloudSyncing,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -1497,6 +1592,19 @@ export default function ProjectDetailsPage() {
     }
   };
 
+  const handleStudioToolSelect = (tool: ToolKey, scrollToInspector = false) => {
+    setActiveTool(tool);
+
+    if (!scrollToInspector || typeof window === "undefined") return;
+
+    window.setTimeout(() => {
+      inspectorRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    }, 90);
+  };
+
   const handleVideoSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.currentTarget.value = "";
@@ -1519,6 +1627,10 @@ export default function ProjectDetailsPage() {
     setLocalVideoSize(`${(file.size / (1024 * 1024)).toFixed(2)} MB`);
     setLocalVideoBytes(file.size);
     setVideoRestored(false);
+    cloudSyncAttemptedRef.current = "";
+    setCloudSyncing(false);
+    setCloudSyncStatus("");
+    setCloudSyncError("");
     resetVideoUploadState();
     replacedMediaCleanupIdsRef.current = oldMediaFileIds;
     setVideoUploadStatus("Saving media...");
@@ -1575,6 +1687,10 @@ export default function ProjectDetailsPage() {
       setLocalVideoBytes(0);
       setVideoDuration(0);
       setVideoRestored(false);
+      cloudSyncAttemptedRef.current = "";
+      setCloudSyncing(false);
+      setCloudSyncStatus("");
+      setCloudSyncError("");
       resetVideoUploadState();
 
       setLocalAudioURL("");
@@ -1870,6 +1986,10 @@ export default function ProjectDetailsPage() {
     setLocalVideoBytes(0);
     setVideoDuration(0);
     setVideoRestored(false);
+    cloudSyncAttemptedRef.current = "";
+    setCloudSyncing(false);
+    setCloudSyncStatus("");
+    setCloudSyncError("");
 
     try {
       await updateDoc(doc(db, "projects", projectId), {
@@ -2579,11 +2699,14 @@ export default function ProjectDetailsPage() {
 
     try {
       setProjectDeleting(true);
+      setProjectDeleteStatus("Deleting project");
+      setProjectDeleteError("");
       if (!user) {
         throw new Error("Delete failed. Please try again.");
       }
 
       const idToken = await user?.getIdToken();
+      setProjectDeleteStatus("Cleaning cloud media");
       const response = await fetch("/api/projects/delete", {
         method: "POST",
         headers: {
@@ -2595,18 +2718,54 @@ export default function ProjectDetailsPage() {
       const payload = (await response.json()) as {
         success?: boolean;
         error?: string;
+        deletedFiles?: number;
+        cleanupFailed?: number;
+        cleanupPartialFailed?: boolean;
+        projectDeleted?: boolean;
       };
 
       if (!response.ok || !payload.success) {
         throw new Error(payload.error || "Delete failed. Please try again.");
       }
 
-      await deleteMediaFromBrowser(videoStorageKey);
-      await deleteMediaFromBrowser(audioStorageKey);
-      router.push("/dashboard");
+      const cacheResults = await Promise.allSettled([
+        deleteMediaFromBrowser(videoStorageKey),
+        deleteMediaFromBrowser(audioStorageKey),
+      ]);
+
+      for (const result of cacheResults) {
+        if (result.status === "rejected") {
+          console.error("Local project media cleanup failed", result.reason);
+        }
+      }
+
+      setLocalVideoURL("");
+      setLocalVideoName("");
+      setLocalVideoSize("");
+      setLocalVideoBytes(0);
+      setVideoDuration(0);
+      setVideoRestored(false);
+      setLocalAudioURL("");
+      setLocalAudioName("");
+      setAudioRestored(false);
+      cloudSyncAttemptedRef.current = "";
+      setProjectDeleteStatus("Project deleted");
+
+      if (payload.cleanupPartialFailed || (payload.cleanupFailed || 0) > 0) {
+        setProjectDeleteError("Project deleted, but some media cleanup could not be completed.");
+        console.error("Project media cleanup partially failed", {
+          deletedFiles: payload.deletedFiles,
+          cleanupFailed: payload.cleanupFailed,
+        });
+      }
+
+      window.setTimeout(() => {
+        router.push("/dashboard");
+      }, payload.cleanupPartialFailed || (payload.cleanupFailed || 0) > 0 ? 1300 : 450);
     } catch (error) {
       console.error("Project delete failed", error);
-      alert("Delete failed. Please try again.");
+      setProjectDeleteError("Delete failed. Please try again.");
+      setProjectDeleteStatus("");
       setProjectDeleting(false);
     }
   };
@@ -2681,7 +2840,84 @@ export default function ProjectDetailsPage() {
               className="sr-only"
             />
 
-            {!localVideoName && (
+            {(cloudSyncing || cloudSyncError) && (
+              <div
+                className={`rounded-[1.5rem] border p-4 ${
+                  cloudSyncError
+                    ? "border-rose-300/18 bg-rose-300/[0.07]"
+                    : "border-cyan-200/16 bg-cyan-200/[0.065]"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border ${
+                      cloudSyncError
+                        ? "border-rose-200/18 bg-rose-200/10 text-rose-100"
+                        : "border-cyan-100/16 bg-cyan-100/10 text-cyan-100"
+                    }`}
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" aria-hidden="true">
+                      {cloudSyncError ? (
+                        <path
+                          d="M12 8v5M12 17h.01M5.5 19h13L12 5 5.5 19z"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      ) : (
+                        <path
+                          d="M7 17.5h9.5a3.5 3.5 0 0 0 .7-6.93A5.2 5.2 0 0 0 7.04 9.2 4.15 4.15 0 0 0 7 17.5zM12 8v6M9.5 11.5 12 14l2.5-2.5"
+                          stroke="currentColor"
+                          strokeWidth="1.75"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      )}
+                    </svg>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-white">
+                      {cloudSyncing
+                        ? "Syncing original source..."
+                        : "Original source could not be synced."}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-white/46">
+                      {cloudSyncing
+                        ? "Preparing the saved source video for this device."
+                        : "You can retry without replacing your video."}
+                    </p>
+
+                    {cloudSyncing && (
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full w-1/2 rounded-full bg-gradient-to-r from-cyan-200 via-fuchsia-200 to-amber-100"
+                          style={{
+                            animation:
+                              "subtleShimmer 1.8s ease-in-out infinite",
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {cloudSyncError && (
+                      <button
+                        onClick={() => {
+                          cloudSyncAttemptedRef.current = "";
+                          void syncOriginalVideoFromCloud(true);
+                        }}
+                        className="mt-3 rounded-2xl bg-white px-4 py-2.5 text-xs font-black text-black transition hover:bg-fuchsia-100"
+                      >
+                        Retry sync
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!localVideoName && !cloudSyncing && (
               <label
                 htmlFor="video-upload"
                 className="group relative flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border border-dashed border-white/14 bg-gradient-to-br from-white/[0.075] via-white/[0.035] to-cyan-200/[0.045] px-5 py-8 text-center shadow-xl shadow-black/10 transition hover:border-cyan-200/28 hover:bg-white/[0.08] hover:shadow-cyan-300/10"
@@ -2738,7 +2974,7 @@ export default function ProjectDetailsPage() {
 
                 {videoRestored && (
                   <p className="mt-3 text-xs font-bold text-emerald-200">
-                    Restored locally.
+                    Original video ready on this device.
                   </p>
                 )}
 
@@ -2988,6 +3224,10 @@ export default function ProjectDetailsPage() {
               >
                 Show safe zones
               </button>
+
+              <p className="mt-2 text-xs leading-5 text-white/42">
+                Preview guide only. Safe zones are never included in exports.
+              </p>
 
               <button
                 onClick={() => {
@@ -3635,7 +3875,7 @@ export default function ProjectDetailsPage() {
           </div>
 
           <button
-            onClick={() => setActiveTool("export")}
+            onClick={() => handleStudioToolSelect("export")}
             className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-5 py-3 font-black text-white transition hover:bg-white hover:text-black"
           >
             Open export settings
@@ -3646,8 +3886,29 @@ export default function ProjectDetailsPage() {
             disabled={projectDeleting}
             className="w-full rounded-2xl border border-red-400/30 bg-red-500/10 px-5 py-3 font-black text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-55"
           >
-            {projectDeleting ? "Deleting project..." : "Delete project"}
+            {projectDeleting
+              ? projectDeleteStatus || "Deleting project"
+              : "Delete project"}
           </button>
+
+          {(projectDeleteStatus || projectDeleteError) && (
+            <div
+              className={`rounded-2xl border px-4 py-3 text-sm font-bold ${
+                projectDeleteError
+                  ? "border-rose-300/18 bg-rose-300/10 text-rose-100"
+                  : "border-cyan-200/16 bg-cyan-200/10 text-cyan-100"
+              }`}
+            >
+              {projectDeleteStatus && (
+                <p className="font-black">{projectDeleteStatus}</p>
+              )}
+              {projectDeleteError && (
+                <p className="mt-1 text-xs leading-5 text-white/58">
+                  {projectDeleteError}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </Panel>
     );
@@ -3774,7 +4035,7 @@ export default function ProjectDetailsPage() {
             </span>
 
             <button
-              onClick={() => setActiveTool("export")}
+              onClick={() => handleStudioToolSelect("export")}
               className="hidden rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-white/72 transition hover:bg-white hover:text-black md:inline-flex"
             >
               Export
@@ -3799,7 +4060,9 @@ export default function ProjectDetailsPage() {
               disabled={projectDeleting}
               className="hidden rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-2 text-xs font-bold text-rose-100 transition hover:bg-rose-200 hover:text-black disabled:cursor-not-allowed disabled:opacity-55 md:inline-flex"
             >
-              {projectDeleting ? "Deleting project..." : "Delete project"}
+              {projectDeleting
+                ? projectDeleteStatus || "Deleting project"
+                : "Delete project"}
             </button>
 
             <button
@@ -3835,7 +4098,7 @@ export default function ProjectDetailsPage() {
               {studioTools.map((tool) => (
                 <button
                   key={tool.key}
-                  onClick={() => setActiveTool(tool.key)}
+                  onClick={() => handleStudioToolSelect(tool.key)}
                   className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-3.5 text-left transition ${
                     activeTool === tool.key
                       ? "border-cyan-200/18 bg-gradient-to-br from-white/[0.105] via-fuchsia-300/[0.075] to-cyan-200/[0.07] text-white shadow-xl shadow-cyan-300/10"
@@ -3870,7 +4133,7 @@ export default function ProjectDetailsPage() {
               {studioTools.map((tool) => (
                 <button
                   key={tool.key}
-                  onClick={() => setActiveTool(tool.key)}
+                  onClick={() => handleStudioToolSelect(tool.key, true)}
                   className={`flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm font-black transition ${
                     activeTool === tool.key
                       ? "border-cyan-200/18 bg-white/[0.105] text-white shadow-lg shadow-cyan-300/10"
@@ -3895,7 +4158,7 @@ export default function ProjectDetailsPage() {
                 </div>
 
                 <button
-                  onClick={() => setActiveTool("frame")}
+                  onClick={() => handleStudioToolSelect("frame", true)}
                   className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-white/60 transition hover:bg-white hover:text-black"
                 >
                   Frame settings
@@ -4125,7 +4388,10 @@ export default function ProjectDetailsPage() {
             </div>
           </div>
 
-          <aside className="min-w-0 overflow-visible rounded-[1.6rem] lg:min-h-0 lg:overflow-hidden">
+          <aside
+            ref={inspectorRef}
+            className="min-w-0 scroll-mt-24 overflow-visible rounded-[1.6rem] lg:min-h-0 lg:scroll-mt-0 lg:overflow-hidden"
+          >
             {renderInspector()}
           </aside>
         </div>
