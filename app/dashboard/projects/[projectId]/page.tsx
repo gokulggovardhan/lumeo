@@ -1386,7 +1386,7 @@ export default function ProjectDetailsPage() {
           const url = URL.createObjectURL(savedVideo);
 
           setLocalVideoURL(url);
-          setLocalVideoName(savedVideo.name || "Restored local video");
+          setLocalVideoName(savedVideo.name || "Source video");
           setLocalVideoSize(
             `${(savedVideo.size / (1024 * 1024)).toFixed(2)} MB`
           );
@@ -1400,7 +1400,7 @@ export default function ProjectDetailsPage() {
           const url = URL.createObjectURL(savedAudio);
 
           setLocalAudioURL(url);
-          setLocalAudioName(savedAudio.name || "Restored local audio");
+          setLocalAudioName(savedAudio.name || "Source audio");
           setAudioRestored(true);
         }
       } catch {
@@ -1465,7 +1465,7 @@ export default function ProjectDetailsPage() {
       setLocalVideoSize(`${(file.size / (1024 * 1024)).toFixed(2)} MB`);
       setLocalVideoBytes(file.size);
       setVideoRestored(true);
-      setCloudSyncStatus("Original video ready on this device.");
+      setCloudSyncStatus("Original video ready");
       setCloudSyncError("");
     } catch (error) {
       console.error("[Lumeo Media Sync] original source sync failed", error);
@@ -1790,7 +1790,7 @@ export default function ProjectDetailsPage() {
     const file = await getMediaFromBrowser(videoStorageKey);
 
     if (!file) {
-      throw new Error("Add or restore a local video before exporting.");
+      throw new Error("Add a video before exporting.");
     }
 
     return file;
@@ -2881,11 +2881,11 @@ export default function ProjectDetailsPage() {
                     <p className="text-sm font-black text-white">
                       {cloudSyncing
                         ? "Syncing original source..."
-                        : "Original source could not be synced."}
+                        : "We could not prepare the original video on this device."}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-white/46">
                       {cloudSyncing
-                        ? "Preparing the saved source video for this device."
+                        ? "Your saved source is being made available here."
                         : "You can retry without replacing your video."}
                     </p>
 
@@ -2968,15 +2968,27 @@ export default function ProjectDetailsPage() {
                   </div>
 
                   <span className="shrink-0 rounded-full bg-emerald-300/12 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200">
-                    Ready
+                    Original video ready
                   </span>
                 </div>
 
-                {videoRestored && (
-                  <p className="mt-3 text-xs font-bold text-emerald-200">
-                    Original video ready on this device.
-                  </p>
-                )}
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span
+                    className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+                      hasSavedSourceMedia
+                        ? "border-cyan-200/18 bg-cyan-200/10 text-cyan-100"
+                        : "border-amber-200/20 bg-amber-200/10 text-amber-100"
+                    }`}
+                  >
+                    {hasSavedSourceMedia ? "Cloud backup active" : "Local only"}
+                  </span>
+
+                  {localVideoURL && (
+                    <span className="rounded-full border border-emerald-200/18 bg-emerald-200/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100">
+                      Available on this device
+                    </span>
+                  )}
+                </div>
 
                 <div className="mt-4 space-y-3">
                   {!videoUploading &&
