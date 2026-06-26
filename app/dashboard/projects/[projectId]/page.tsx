@@ -322,22 +322,22 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <div className="flex min-h-0 flex-col rounded-[1.6rem] border border-white/10 bg-[#111018]/90 shadow-2xl shadow-black/25 backdrop-blur-2xl lg:h-full">
-      <div className="shrink-0 border-b border-white/10 px-5 py-4">
-        <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
+    <div className="flex min-h-0 flex-col rounded-[1.35rem] border border-white/10 bg-[#111018]/90 shadow-2xl shadow-black/25 backdrop-blur-2xl lg:h-full">
+      <div className="shrink-0 border-b border-white/10 px-4 py-3">
+        <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/32">
           Studio Panel
         </p>
 
-        <h2 className="mt-1.5 text-lg font-black tracking-tight text-white">
+        <h2 className="mt-1 text-base font-black tracking-tight text-white">
           {title}
         </h2>
 
         {subtitle && (
-          <p className="mt-1.5 text-xs leading-5 text-white/48">{subtitle}</p>
+          <p className="mt-1 text-xs leading-4 text-white/48">{subtitle}</p>
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-visible px-5 py-4 lg:overflow-y-auto">{children}</div>
+      <div className="min-h-0 flex-1 overflow-visible px-4 py-3 lg:overflow-y-auto">{children}</div>
     </div>
   );
 }
@@ -458,7 +458,7 @@ function StudioToolIcon({
 
   return (
     <span
-      className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition ${
+      className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition ${
         active
           ? "border-cyan-200/24 bg-gradient-to-br from-fuchsia-300/22 via-violet-300/16 to-cyan-200/22 text-cyan-50 shadow-lg shadow-cyan-300/10"
           : "border-white/8 bg-white/[0.055] text-white/58 group-hover:border-white/14 group-hover:bg-white/[0.09] group-hover:text-white/82"
@@ -512,26 +512,26 @@ function StudioToolIcon({
 
 function StudioEmptyState() {
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center px-8 text-center">
+    <div className="relative flex h-full w-full flex-col items-center justify-center px-6 text-center">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(217,70,239,0.16),transparent_34%),radial-gradient(circle_at_52%_55%,rgba(34,211,238,0.12),transparent_28%)]" />
       <div
-        className="relative flex h-24 w-24 items-center justify-center rounded-[2rem] border border-white/10 bg-white/[0.045] shadow-2xl shadow-fuchsia-500/10"
+        className="relative flex h-20 w-20 items-center justify-center rounded-[1.6rem] border border-white/10 bg-white/[0.045] shadow-2xl shadow-fuchsia-500/10"
         style={{ animation: "lumeoFloat 4.5s ease-in-out infinite" }}
       >
-        <span className="absolute inset-[-14px] rounded-[2.4rem] border border-fuchsia-200/10" />
-        <span className="absolute inset-[-28px] rounded-[2.8rem] border border-cyan-200/8" />
+        <span className="absolute inset-[-10px] rounded-[2rem] border border-fuchsia-200/10" />
+        <span className="absolute inset-[-22px] rounded-[2.5rem] border border-cyan-200/8" />
         <LumeoStudioMark />
       </div>
 
-      <p className="relative mt-7 text-2xl font-black tracking-tight">
+      <p className="relative mt-5 text-xl font-black tracking-tight">
         Start with your first clip
       </p>
 
-      <p className="relative mt-3 max-w-xs text-sm leading-6 text-white/48">
+      <p className="relative mt-2 max-w-xs text-sm leading-5 text-white/48">
         Upload a video to begin editing in Lumeo Studio.
       </p>
 
-      <span className="relative mt-5 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/52">
+      <span className="relative mt-4 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-[10px] font-black uppercase tracking-[0.18em] text-white/52">
         Media Library
       </span>
     </div>
@@ -604,12 +604,12 @@ function UploadDropzone({
 
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-3">
-      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
+    <div className="rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-2">
+      <p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/32">
         {label}
       </p>
 
-      <p className="mt-1 text-sm font-black text-white/82">{value}</p>
+      <p className="mt-0.5 truncate text-xs font-black text-white/82">{value}</p>
     </div>
   );
 }
@@ -1176,12 +1176,12 @@ export default function ProjectDetailsPage() {
   };
   const canvasFrameClass =
     canvasFormat === "9:16"
-      ? "aspect-[9/16] h-full max-h-[640px]"
+      ? "aspect-[9/16] h-full max-h-[min(58dvh,560px)]"
       : canvasFormat === "1:1"
-        ? "aspect-square h-full max-h-[560px]"
+        ? "aspect-square h-full max-h-[min(54dvh,500px)]"
         : canvasFormat === "4:5"
-          ? "aspect-[4/5] h-full max-h-[600px]"
-          : "aspect-video w-full max-w-[980px]";
+          ? "aspect-[4/5] h-full max-h-[min(56dvh,520px)]"
+          : "aspect-video w-full max-w-[min(76vw,900px)]";
 
   useEffect(() => {
     projectLoadedRef.current = false;
@@ -4013,10 +4013,10 @@ export default function ProjectDetailsPage() {
       `}</style>
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(236,72,153,0.18),transparent_34%),radial-gradient(circle_at_top_right,rgba(34,211,238,0.12),transparent_30%),radial-gradient(circle_at_bottom,rgba(168,85,247,0.13),transparent_34%)]" />
 
-      <div className="relative z-10 flex min-h-dvh w-full min-w-0 flex-col lg:min-h-0">
-        <nav className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-[#07050d]/92 px-3 py-2.5 backdrop-blur-2xl sm:px-4 lg:static">
-        <div className="mx-auto flex w-full max-w-[1900px] flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
+      <div className="relative z-10 flex min-h-dvh w-full min-w-0 flex-col lg:h-dvh lg:min-h-0">
+        <nav className="sticky top-0 z-40 shrink-0 border-b border-white/10 bg-[#07050d]/92 px-3 py-2 backdrop-blur-2xl sm:px-4 lg:static">
+        <div className="mx-auto flex w-full max-w-[1800px] flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2.5">
             <Link
               href="/dashboard"
               className="shrink-0"
@@ -4025,44 +4025,44 @@ export default function ProjectDetailsPage() {
             </Link>
 
             <div className="min-w-0">
-              <div className="flex items-center gap-3">
-                <p className="truncate text-base font-black leading-none sm:text-lg">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-sm font-black leading-none sm:text-base">
                   {title || "Untitled project"}
                 </p>
 
-                <span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-200 md:inline-flex">
+                <span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.16em] text-emerald-200 md:inline-flex">
                   Lumeo Studio
                 </span>
               </div>
 
-              <p className="mt-1 hidden text-xs text-white/38 sm:block">
+              <p className="mt-1 hidden max-w-[48vw] truncate text-[11px] text-white/38 sm:block">
                 {productionExportSummary} · {output.width}×{output.height}
               </p>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-2 sm:gap-3">
-            <span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-100 sm:inline-flex">
+          <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+            <span className="hidden rounded-full border border-emerald-300/20 bg-emerald-300/10 px-2.5 py-1.5 text-[9px] font-black uppercase tracking-[0.16em] text-emerald-100 sm:inline-flex">
               {autoSaveStatus}
             </span>
 
             <button
               onClick={() => handleStudioToolSelect("export")}
-              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-white/72 transition hover:bg-white hover:text-black md:inline-flex"
+              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-black text-white/72 transition hover:bg-white hover:text-black md:inline-flex"
             >
               Export
             </button>
 
             <Link
               href="/dashboard"
-              className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black"
+              className="rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black"
             >
               Back to Studio
             </Link>
 
             <button
               onClick={handleResetEdit}
-              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-3 py-2 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black sm:inline-flex"
+              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-bold text-white/72 transition hover:bg-white hover:text-black sm:inline-flex"
             >
               Reset edit
             </button>
@@ -4070,7 +4070,7 @@ export default function ProjectDetailsPage() {
             <button
               onClick={handleDelete}
               disabled={projectDeleting}
-              className="hidden rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-2 text-xs font-bold text-rose-100 transition hover:bg-rose-200 hover:text-black disabled:cursor-not-allowed disabled:opacity-55 md:inline-flex"
+              className="hidden rounded-full border border-rose-300/20 bg-rose-300/10 px-3 py-1.5 text-xs font-bold text-rose-100 transition hover:bg-rose-200 hover:text-black disabled:cursor-not-allowed disabled:opacity-55 md:inline-flex"
             >
               {projectDeleting
                 ? projectDeleteStatus || "Deleting project"
@@ -4079,7 +4079,7 @@ export default function ProjectDetailsPage() {
 
             <button
               onClick={handleLogout}
-              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-white/72 transition hover:bg-white hover:text-black lg:inline-flex"
+              className="hidden rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-black text-white/72 transition hover:bg-white hover:text-black lg:inline-flex"
             >
               Sign out
             </button>
@@ -4087,31 +4087,31 @@ export default function ProjectDetailsPage() {
         </div>
         </nav>
 
-        <section className="mx-auto flex w-full max-w-[1900px] px-3 py-3 sm:px-4 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
-        <div className="grid w-full min-w-0 gap-3 lg:h-full lg:min-h-0 lg:grid-cols-[270px_minmax(0,1fr)_380px]">
-          <aside className="hidden min-h-0 overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-b from-[#12101a]/92 via-[#0c0a12]/88 to-[#080711]/92 shadow-2xl shadow-black/30 backdrop-blur-2xl lg:block">
-            <div className="border-b border-white/10 bg-white/[0.025] p-4">
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
+        <section className="mx-auto flex w-full max-w-[1800px] px-2.5 py-2 sm:px-3 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
+        <div className="grid w-full min-w-0 gap-2.5 lg:h-full lg:min-h-0 lg:grid-cols-[230px_minmax(0,1fr)_340px] xl:grid-cols-[240px_minmax(0,1fr)_360px]">
+          <aside className="hidden min-h-0 overflow-hidden rounded-[1.45rem] border border-white/10 bg-gradient-to-b from-[#12101a]/92 via-[#0c0a12]/88 to-[#080711]/92 shadow-2xl shadow-black/30 backdrop-blur-2xl lg:block">
+            <div className="border-b border-white/10 bg-white/[0.025] p-3">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/32">
                 Studio Tools
               </p>
 
-              <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-1.5">
                 <StatPill label="Duration" value={`${videoDuration || 0}s`} />
                 <StatPill label="Range" value={`${selectedRange}s`} />
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
                 <StatPill label="Frame" value={canvasFormat} />
                 <StatPill label="Output" value={productionExportQualityLabel} />
               </div>
             </div>
 
-            <div className="max-h-[calc(100dvh-205px)] space-y-2 overflow-y-auto p-3">
+            <div className="max-h-[calc(100dvh-170px)] space-y-1.5 overflow-y-auto p-2.5">
               {studioTools.map((tool) => (
                 <button
                   key={tool.key}
                   onClick={() => handleStudioToolSelect(tool.key)}
-                  className={`group flex w-full items-center gap-3 rounded-2xl border px-3 py-3.5 text-left transition ${
+                  className={`group flex w-full items-center gap-2.5 rounded-2xl border px-2.5 py-2.5 text-left transition ${
                     activeTool === tool.key
                       ? "border-cyan-200/18 bg-gradient-to-br from-white/[0.105] via-fuchsia-300/[0.075] to-cyan-200/[0.07] text-white shadow-xl shadow-cyan-300/10"
                       : "border-transparent bg-transparent text-white/58 hover:border-white/10 hover:bg-white/[0.055] hover:text-white"
@@ -4120,12 +4120,12 @@ export default function ProjectDetailsPage() {
                   <StudioToolIcon tool={tool.key} active={activeTool === tool.key} />
 
                   <span className="min-w-0">
-                    <span className="block text-sm font-black">
+                    <span className="block text-[13px] font-black">
                       {tool.label}
                     </span>
 
                     <span
-                      className={`mt-0.5 block truncate text-xs ${
+                      className={`mt-0.5 block truncate text-[11px] ${
                         activeTool === tool.key
                           ? "text-white/52"
                           : "text-white/34"
@@ -4140,13 +4140,13 @@ export default function ProjectDetailsPage() {
             </div>
           </aside>
 
-          <div className="flex min-w-0 flex-col gap-3 lg:min-h-0">
-            <div className="flex gap-2 overflow-x-auto rounded-[1.5rem] border border-white/10 bg-[#111018]/86 p-2 shadow-xl shadow-black/20 backdrop-blur-2xl lg:hidden">
+          <div className="flex min-w-0 flex-col gap-2.5 lg:min-h-0">
+            <div className="flex gap-2 overflow-x-auto rounded-[1.25rem] border border-white/10 bg-[#111018]/86 p-2 shadow-xl shadow-black/20 backdrop-blur-2xl lg:hidden">
               {studioTools.map((tool) => (
                 <button
                   key={tool.key}
                   onClick={() => handleStudioToolSelect(tool.key, true)}
-                  className={`flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2.5 text-sm font-black transition ${
+                  className={`flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 text-sm font-black transition ${
                     activeTool === tool.key
                       ? "border-cyan-200/18 bg-white/[0.105] text-white shadow-lg shadow-cyan-300/10"
                       : "border-transparent bg-white/[0.045] text-white/60"
@@ -4158,26 +4158,26 @@ export default function ProjectDetailsPage() {
               ))}
             </div>
 
-            <div className="flex min-h-[430px] min-w-0 flex-col overflow-hidden rounded-[1.6rem] border border-white/10 bg-gradient-to-br from-[#100e18]/92 via-[#0b0912]/90 to-[#080711]/92 shadow-2xl shadow-black/35 backdrop-blur-2xl lg:min-h-0 lg:flex-1">
-              <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.025] px-4 py-3 sm:px-5">
+            <div className="flex min-h-[430px] min-w-0 flex-col overflow-hidden rounded-[1.35rem] border border-white/10 bg-gradient-to-br from-[#100e18]/92 via-[#0b0912]/90 to-[#080711]/92 shadow-2xl shadow-black/35 backdrop-blur-2xl lg:min-h-0 lg:flex-1">
+              <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/[0.025] px-3.5 py-2.5 sm:px-4">
                 <div className="min-w-0">
                   <p className="text-[10px] font-black uppercase tracking-[0.24em] text-white/32">
                     Live Preview
                   </p>
-                  <p className="mt-1 truncate text-sm font-black text-white/68">
+                  <p className="mt-0.5 truncate text-xs font-black text-white/68">
                     {productionExportSummary}
                   </p>
                 </div>
 
                 <button
                   onClick={() => handleStudioToolSelect("frame", true)}
-                  className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-4 py-2 text-xs font-black text-white/60 transition hover:bg-white hover:text-black"
+                  className="shrink-0 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 text-xs font-black text-white/60 transition hover:bg-white hover:text-black"
                 >
                   Frame settings
                 </button>
               </div>
 
-              <div className="relative flex min-h-[260px] flex-1 items-center justify-center overflow-hidden p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-4 lg:min-h-0">
+              <div className="relative flex min-h-[240px] flex-1 items-center justify-center overflow-hidden p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:p-3 lg:min-h-0">
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_18%,rgba(245,230,188,0.08),transparent_32%),radial-gradient(circle_at_20%_80%,rgba(217,70,239,0.1),transparent_32%),radial-gradient(circle_at_80%_75%,rgba(34,211,238,0.08),transparent_28%)]" />
                 {localVideoURL && backgroundStyle === "blur" && (
                   <video
@@ -4198,9 +4198,9 @@ export default function ProjectDetailsPage() {
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_0,rgba(0,0,0,0.34)_64%,rgba(0,0,0,0.84)_100%)]" />
 
                 <div className={`relative z-10 max-w-full ${canvasFrameClass}`}>
-                  <div className="absolute -inset-5 rounded-[3rem] bg-gradient-to-br from-fuchsia-500/20 via-transparent to-cyan-300/18 blur-2xl" />
+                  <div className="absolute -inset-3 rounded-[2.4rem] bg-gradient-to-br from-fuchsia-500/18 via-transparent to-cyan-300/16 blur-2xl" />
 
-                  <div className="relative h-full w-full overflow-hidden rounded-[2rem] border border-white/12 bg-black shadow-2xl shadow-black ring-1 ring-white/[0.035]">
+                  <div className="relative h-full w-full overflow-hidden rounded-[1.55rem] border border-white/12 bg-black shadow-2xl shadow-black ring-1 ring-white/[0.035]">
                     {localVideoURL ? (
                       <>
                         {fitMode === "blurredBackground" && (
@@ -4269,15 +4269,15 @@ export default function ProjectDetailsPage() {
                 </div>
               </div>
 
-              <div className="shrink-0 border-t border-white/10 bg-black/22 p-3">
-                <div className="flex flex-col gap-3">
+              <div className="shrink-0 border-t border-white/10 bg-black/22 p-2.5">
+                <div className="flex flex-col gap-2.5">
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                      <p className="text-xs font-black uppercase tracking-[0.24em] text-white/32">
+                      <p className="text-[10px] font-black uppercase tracking-[0.22em] text-white/32">
                         Timeline
                       </p>
 
-                      <p className="mt-0.5 text-xs text-white/48">
+                      <p className="mt-0.5 text-[11px] text-white/48">
                         Selected range: {trimStart}s to{" "}
                         {trimEnd || videoDuration}s · {selectedRange}s
                       </p>
@@ -4287,18 +4287,18 @@ export default function ProjectDetailsPage() {
                       <button
                         onClick={handlePlayTrimPreview}
                         disabled={!localVideoURL}
-                        className="rounded-2xl bg-white px-4 py-2.5 text-xs font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-45"
+                        className="rounded-2xl bg-white px-3.5 py-2 text-xs font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         Preview
                       </button>
 
-                      <span className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-4 py-2.5 text-xs font-black text-emerald-100">
+                      <span className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-3.5 py-2 text-xs font-black text-emerald-100">
                         {autoSaveStatus}
                       </span>
                     </div>
                   </div>
 
-                  <div className="grid gap-3 xl:grid-cols-[96px_1fr_96px] xl:items-center">
+                  <div className="grid gap-2.5 xl:grid-cols-[86px_1fr_86px] xl:items-center">
                     <div>
                       <label className="text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
                         Start
@@ -4311,17 +4311,17 @@ export default function ProjectDetailsPage() {
                         onChange={(event) =>
                           setTrimStart(Number(event.target.value))
                         }
-                        className="mt-1.5 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300/60"
+                        className="mt-1 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-2 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300/60"
                       />
                     </div>
 
                     <div className="min-w-0">
-                      <div className="mb-2 flex items-center justify-between text-xs font-bold text-white/38">
+                      <div className="mb-1.5 flex items-center justify-between text-[11px] font-bold text-white/38">
                         <span>0s</span>
                         <span>{videoDuration || 0}s</span>
                       </div>
 
-                      <div className="relative h-4 overflow-hidden rounded-full border border-white/10 bg-black/45">
+                      <div className="relative h-3.5 overflow-hidden rounded-full border border-white/10 bg-black/45">
                         <div
                           className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-fuchsia-300 via-cyan-200 to-amber-200"
                           style={{
@@ -4391,7 +4391,7 @@ export default function ProjectDetailsPage() {
                         onChange={(event) =>
                           setTrimEnd(Number(event.target.value))
                         }
-                        className="mt-1.5 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-2.5 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300/60"
+                        className="mt-1 w-full rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-2 text-sm font-bold text-white outline-none transition focus:border-fuchsia-300/60"
                       />
                     </div>
                   </div>
@@ -4402,7 +4402,7 @@ export default function ProjectDetailsPage() {
 
           <aside
             ref={inspectorRef}
-            className="min-w-0 scroll-mt-24 overflow-visible rounded-[1.6rem] lg:min-h-0 lg:scroll-mt-0 lg:overflow-hidden"
+            className="min-w-0 scroll-mt-24 overflow-visible rounded-[1.35rem] lg:min-h-0 lg:scroll-mt-0 lg:overflow-hidden"
           >
             {renderInspector()}
           </aside>

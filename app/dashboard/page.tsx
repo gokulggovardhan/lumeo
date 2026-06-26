@@ -120,96 +120,129 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#07070A] px-6 py-8 text-[#F7F0DE] sm:px-10 lg:px-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(167,139,250,0.15),transparent_34%),radial-gradient(circle_at_84%_12%,rgba(244,114,182,0.10),transparent_30%)]" />
+    <main className="relative min-h-screen overflow-hidden bg-[#07070A] px-4 py-5 text-[#F7F0DE] sm:px-6 lg:px-10">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(167,139,250,0.15),transparent_34%),radial-gradient(circle_at_84%_12%,rgba(244,114,182,0.10),transparent_30%),radial-gradient(circle_at_50%_100%,rgba(243,231,200,0.08),transparent_34%)]" />
 
-      <nav className="relative z-10 mx-auto flex max-w-7xl items-center justify-between rounded-3xl border border-[#F3E7C8]/10 bg-[#111018]/72 px-5 py-4 shadow-2xl shadow-black/25 backdrop-blur-xl">
+      <nav className="relative z-10 mx-auto flex max-w-7xl items-center justify-between rounded-[1.5rem] border border-[#F3E7C8]/10 bg-[#111018]/74 px-4 py-3 shadow-2xl shadow-black/25 backdrop-blur-xl">
         <Link href="/" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F3E7C8] font-bold text-[#111018]">
-            L
+          <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-2xl border border-[#F3E7C8]/16 bg-[#090812] text-[#F3E7C8] shadow-lg shadow-fuchsia-500/10">
+            <span className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(243,231,200,0.32),transparent_34%),linear-gradient(135deg,rgba(217,70,239,0.28),rgba(34,211,238,0.14))]" />
+            <span className="relative font-black">L</span>
           </div>
-          <span className="text-xl font-bold tracking-tight">Lumeo</span>
+          <span className="text-lg font-black tracking-tight">Lumeo</span>
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <Link
             href="/"
-            className="rounded-full border border-[#F3E7C8]/12 bg-white/[0.035] px-5 py-2 text-sm font-semibold text-[#F7F0DE]/65 transition hover:border-[#F3E7C8]/30 hover:text-white"
+            className="rounded-full border border-[#F3E7C8]/12 bg-white/[0.035] px-4 py-2 text-sm font-semibold text-[#F7F0DE]/65 transition hover:border-[#F3E7C8]/30 hover:text-white"
           >
             Home
           </Link>
 
           <button
             onClick={handleLogout}
-            className="rounded-full bg-[#F3E7C8] px-5 py-2 text-sm font-semibold text-[#111018] transition hover:bg-white"
+            className="rounded-full bg-[#F3E7C8] px-4 py-2 text-sm font-bold text-[#111018] transition hover:bg-white"
           >
             Sign out
           </button>
         </div>
       </nav>
 
-      <section className="relative z-10 mx-auto max-w-7xl py-16">
-        <div className="rounded-[2.5rem] border border-[#F3E7C8]/10 bg-[#111018]/70 p-8 shadow-2xl shadow-black/30 backdrop-blur-2xl sm:p-12">
-          <p className="text-sm font-bold uppercase tracking-[0.3em] text-[#D8C48E]">
-            Studio
-          </p>
+      <section className="relative z-10 mx-auto max-w-7xl py-8 sm:py-10">
+        <div className="rounded-[2rem] border border-[#F3E7C8]/10 bg-[#111018]/70 p-5 shadow-2xl shadow-black/30 backdrop-blur-2xl sm:p-7 lg:p-8">
+          <div className="grid gap-6 lg:grid-cols-[1fr_420px] lg:items-end">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-[#D8C48E]">
+                Studio
+              </p>
 
-          <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
-            Welcome to Lumeo Studio
-          </h1>
+              <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-5xl">
+                Welcome to Lumeo Studio
+              </h1>
 
-          <p className="mt-4 text-lg text-[#F7F0DE]/60">
-            You are signed in as {user.email}
-          </p>
+              <p className="mt-3 max-w-xl text-sm leading-6 text-[#F7F0DE]/58 sm:text-base">
+                A calm workspace for turning source clips into polished short videos.
+              </p>
+            </div>
 
-          <div className="mt-10 rounded-3xl border border-[#F3E7C8]/10 bg-black/25 p-6">
-            <h2 className="text-2xl font-bold">New Project</h2>
-            <p className="mt-2 text-[#F7F0DE]/55">
-              Start a new creative workspace and save it to your account.
-            </p>
+            <div className="rounded-[1.5rem] border border-[#F3E7C8]/10 bg-white/[0.035] px-4 py-3 text-sm text-[#F7F0DE]/58">
+              <span className="font-bold text-[#F7F0DE]/82">Signed in</span>
+              <span className="mt-1 block truncate">{user.email}</span>
+            </div>
+          </div>
+
+          <div className="mt-7 rounded-[1.75rem] border border-[#F3E7C8]/10 bg-black/25 p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl border border-[#F3E7C8]/12 bg-[#F3E7C8]/10 text-[#F3E7C8]">
+                <span className="text-lg font-black">+</span>
+              </div>
+              <div>
+                <h2 className="text-xl font-black">New Project</h2>
+                <p className="mt-1 text-sm text-[#F7F0DE]/55">
+                  Name it, create it, start editing.
+                </p>
+              </div>
+            </div>
 
             <form
               onSubmit={handleCreateProject}
-              className="mt-6 grid gap-4 md:grid-cols-[1fr_160px]"
+              className="mt-5 grid gap-3 md:grid-cols-[1fr_150px]"
             >
               <input
                 value={projectTitle}
                 onChange={(event) => setProjectTitle(event.target.value)}
                 placeholder="Project title"
-                className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.06] px-5 py-4 text-[#F7F0DE] outline-none placeholder:text-[#F7F0DE]/35 focus:border-[#F3E7C8]/35"
+                className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.06] px-4 py-3.5 text-[#F7F0DE] outline-none placeholder:text-[#F7F0DE]/35 focus:border-[#F3E7C8]/35"
               />
 
               <button
                 disabled={saving}
-                className="rounded-2xl bg-[#F3E7C8] px-5 py-4 font-bold text-[#111018] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-2xl bg-[#F3E7C8] px-5 py-3.5 font-black text-[#111018] transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {saving ? "Saving..." : "Create"}
               </button>
             </form>
           </div>
 
-          <div className="mt-10">
-            <h2 className="text-2xl font-bold">Your Projects</h2>
+          <div className="mt-8">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-2xl font-black">Your Projects</h2>
+              <span className="rounded-full border border-[#F3E7C8]/10 bg-white/[0.035] px-3 py-1.5 text-xs font-bold text-[#F7F0DE]/48">
+                {projects.length} {projects.length === 1 ? "project" : "projects"}
+              </span>
+            </div>
 
             {projects.length === 0 ? (
-              <div className="mt-5 rounded-3xl border border-white/10 bg-black/25 p-6 text-white/55">
+              <div className="mt-5 rounded-[1.75rem] border border-white/10 bg-black/25 p-8 text-center text-white/55">
+                <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-[#F3E7C8]/10 bg-[#F3E7C8]/10 text-[#F3E7C8]">
+                  <span className="text-xl font-black">L</span>
+                </div>
                 No projects yet. Start your first project above.
               </div>
             ) : (
-              <div className="mt-5 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+              <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 {projects.map((project) => (
                   <div
                     key={project.id}
-                    className="rounded-3xl border border-[#F3E7C8]/10 bg-black/25 p-6 shadow-xl shadow-black/20"
+                    className="group rounded-[1.75rem] border border-[#F3E7C8]/10 bg-black/25 p-5 shadow-xl shadow-black/20 transition hover:border-[#F3E7C8]/22 hover:bg-white/[0.045]"
                   >
-                    <h3 className="text-2xl font-bold">{project.title}</h3>
-                    <p className="mt-3 text-[#F7F0DE]/50">
-                      Status: {project.status}
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="line-clamp-2 text-xl font-black">
+                        {project.title}
+                      </h3>
+                      <span className="rounded-full border border-emerald-300/15 bg-emerald-300/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-100">
+                        {project.status || "Draft"}
+                      </span>
+                    </div>
+
+                    <p className="mt-4 text-sm leading-6 text-[#F7F0DE]/48">
+                      Open the editor, continue your cut, and export when ready.
                     </p>
 
                     <Link
                       href={`/dashboard/projects/${project.id}`}
-                      className="mt-5 inline-flex rounded-full bg-[#F3E7C8] px-5 py-2 text-sm font-bold text-[#111018] transition hover:bg-white"
+                      className="mt-5 inline-flex rounded-full bg-[#F3E7C8] px-5 py-2 text-sm font-black text-[#111018] transition hover:bg-white"
                     >
                       Open Project
                     </Link>
