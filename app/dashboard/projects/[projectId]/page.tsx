@@ -1404,8 +1404,8 @@ export default function ProjectDetailsPage() {
   const titlePreviewSizeStyle = {
     fontSize: `clamp(0.72rem, ${2.05 * titleOverlayForExport.scale}vmin, ${2.85 * titleOverlayForExport.scale}rem)`,
     width: "fit-content",
-    minWidth: titleBackground ? "min(14rem, calc(100% - 36px))" : "auto",
-    maxWidth: titleBackground ? "min(90%, calc(100% - 36px))" : "min(86%, calc(100% - 44px))",
+    minWidth: "auto",
+    maxWidth: titleBackground ? "min(84%, calc(100% - 44px))" : "min(82%, calc(100% - 48px))",
     maxHeight: "calc(100% - 48px)",
     overflowWrap: "normal" as const,
     wordBreak: "normal" as const,
@@ -4038,17 +4038,20 @@ export default function ProjectDetailsPage() {
 
               <div className="mt-3 grid grid-cols-4 gap-2">
                 {titleSizePresets.map((item) => (
-                  <OptionButton
+                  <button
                     key={item.label}
-                    active={titleSizePreset === item.value}
                     onClick={() => {
                       setTitleSizePreset(item.value);
                       setTitleScale(item.scale);
                     }}
-                    small
+                    className={`flex h-10 min-w-0 items-center justify-center whitespace-nowrap rounded-xl border px-1.5 text-[11px] font-black transition ${
+                      titleSizePreset === item.value
+                        ? "border-white/20 bg-white text-black shadow-lg shadow-white/10"
+                        : "border-white/10 bg-white/[0.06] text-white/62 hover:bg-white/[0.12] hover:text-white"
+                    }`}
                   >
                     {item.label}
-                  </OptionButton>
+                  </button>
                 ))}
               </div>
             </div>

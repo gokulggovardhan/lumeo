@@ -762,17 +762,21 @@ function normalizeTitleOverlay(
   savedValue: unknown,
   legacyValue: unknown,
 ): TitleOverlaySettings {
+  const hasBodyTitle = bodyValue && typeof bodyValue === "object";
+  const hasSavedTitle = savedValue && typeof savedValue === "object";
   const source =
-    bodyValue && typeof bodyValue === "object"
+    hasBodyTitle
       ? (bodyValue as Record<string, unknown>)
-      : savedValue && typeof savedValue === "object"
+      : hasSavedTitle
         ? (savedValue as Record<string, unknown>)
         : {};
   const legacy =
     legacyValue && typeof legacyValue === "object"
       ? (legacyValue as Record<string, unknown>)
       : {};
-  const text = sanitizeTitleText(source.text || legacy.text);
+  const text = sanitizeTitleText(
+    hasBodyTitle || hasSavedTitle ? source.text : legacy.text,
+  );
   const preset = normalizeTitleStyle(source.preset || source.style);
   const position = normalizeTitlePosition(source.position);
   const positionCoordinates = getTitlePositionCoordinates(position);

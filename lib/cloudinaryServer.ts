@@ -367,7 +367,6 @@ function createTitleOverlayTransformation(
 ) {
   const style = getTitleStyle(title.style);
   const fontSize = getTitleFontSize(title, dimensions.width);
-  const maxWidth = Math.round(dimensions.width * (title.background ? 0.88 : 0.84));
   const layerX = Math.round(((title.x - 50) / 100) * dimensions.width);
   const layerY = Math.round(((title.y - 50) / 100) * dimensions.height);
   const textLayer: Record<string, unknown> = {
@@ -375,11 +374,9 @@ function createTitleOverlayTransformation(
       font_family: "Arial",
       font_size: fontSize,
       font_weight: style.fontWeight,
-      text: title.text,
+      text: getExportTitleText(title),
     },
     color: style.color,
-    width: maxWidth,
-    crop: "fit",
   };
 
   if (title.background && style.background) {
@@ -401,6 +398,35 @@ function sanitizeTitleText(value: unknown) {
   if (typeof value !== "string") return "";
 
   return value.replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function getExportTitleText(title: PhaseOneTitleOverlay) {
+  const words = title.text.split(" ");
+  const maxLineLength =
+    normalizeTitleScale(title.scale) >= 1.45
+      ? 14
+      : normalizeTitleScale(title.scale) >= 1.2
+        ? 18
+        : 24;
+  const lines: string[] = [];
+  let currentLine = "";
+
+  for (const word of words) {
+    const nextLine = currentLine ? `${currentLine} ${word}` : word;
+
+    if (currentLine && nextLine.length > maxLineLength) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = nextLine;
+    }
+  }
+
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+
+  return lines.slice(0, 3).join("\n");
 }
 
 function normalizeTitleStyle(value: unknown) {
