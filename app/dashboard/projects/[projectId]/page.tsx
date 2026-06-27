@@ -168,10 +168,75 @@ const titlePositionPresets = titlePositions.filter(
 );
 
 const titleSizePresets: { label: string; scale: number }[] = [
-  { label: "Small", scale: 0.85 },
+  { label: "Small", scale: 0.68 },
   { label: "Medium", scale: 1 },
-  { label: "Large", scale: 1.18 },
-  { label: "Hero", scale: 1.4 },
+  { label: "Large", scale: 1.32 },
+  { label: "Hero", scale: 1.6 },
+];
+
+const smartTitleTemplates: {
+  label: string;
+  text: string;
+  style: TitleStyle;
+  position: TitlePosition;
+  scale: number;
+  background: boolean;
+  shadow: boolean;
+}[] = [
+  {
+    label: "Hook",
+    text: "Wait for the result",
+    style: "creatorBold",
+    position: "top",
+    scale: 1.32,
+    background: true,
+    shadow: true,
+  },
+  {
+    label: "Tutorial",
+    text: "How to edit faster",
+    style: "cleanLower",
+    position: "top",
+    scale: 1,
+    background: true,
+    shadow: false,
+  },
+  {
+    label: "Before / After",
+    text: "Before -> After",
+    style: "softCaption",
+    position: "center",
+    scale: 1.32,
+    background: true,
+    shadow: true,
+  },
+  {
+    label: "Quote",
+    text: "Create more. Stress less.",
+    style: "minimalTag",
+    position: "center",
+    scale: 1,
+    background: false,
+    shadow: true,
+  },
+  {
+    label: "Offer",
+    text: "Limited time offer",
+    style: "softCaption",
+    position: "bottom",
+    scale: 1.32,
+    background: true,
+    shadow: true,
+  },
+  {
+    label: "CTA",
+    text: "Follow for more",
+    style: "cinematic",
+    position: "bottom",
+    scale: 1,
+    background: true,
+    shadow: true,
+  },
 ];
 
 function getOutputDimensions(
@@ -791,7 +856,7 @@ function normalizeTitleScale(value: unknown) {
 
   if (!Number.isFinite(parsed)) return 1;
 
-  return Math.min(1.6, Math.max(0.8, parsed));
+  return Math.min(1.6, Math.max(0.65, parsed));
 }
 
 function getTitleScaleFromLegacySize(value: unknown) {
@@ -3894,7 +3959,43 @@ export default function ProjectDetailsPage() {
             <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-3.5">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-black uppercase tracking-[0.16em] text-white/45">
-                  Preset
+                  Smart templates
+                </p>
+                <p className="text-[11px] font-bold text-white/30">
+                  Ready-made
+                </p>
+              </div>
+
+              <p className="mt-1 text-[11px] font-bold text-white/34">
+                Start with a ready-made creator title.
+              </p>
+
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {smartTitleTemplates.map((template) => (
+                  <button
+                    key={template.label}
+                    onClick={() => {
+                      setOverlayText(template.text);
+                      setTitleEnabled(true);
+                      setTitleStyle(template.style);
+                      setTitlePosition(template.position);
+                      setTitleScale(template.scale);
+                      setTitleBackground(template.background);
+                      setTitleShadow(template.shadow);
+                      setTitleFineTuneOpen(false);
+                    }}
+                    className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-center text-xs font-black text-white/70 transition hover:border-fuchsia-200/35 hover:bg-white/[0.09] hover:text-white"
+                  >
+                    {template.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-3.5">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-black uppercase tracking-[0.16em] text-white/45">
+                  Style
                 </p>
                 <p className="text-[11px] font-bold text-white/30">
                   Creator styles
@@ -3958,7 +4059,7 @@ export default function ProjectDetailsPage() {
 
             <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-3.5">
               <p className="text-xs font-black uppercase tracking-[0.16em] text-white/45">
-                Style
+                Finishing
               </p>
 
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -4009,7 +4110,7 @@ export default function ProjectDetailsPage() {
                   <RangeControl
                     label="Text size"
                     value={Number(titleScale.toFixed(2))}
-                    min={0.8}
+                    min={0.65}
                     max={1.6}
                     step={0.05}
                     suffix="x"
