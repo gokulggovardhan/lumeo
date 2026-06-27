@@ -91,11 +91,11 @@ const studioTools: { key: ToolKey; label: string; description: string }[] =
     { key: "export", label: "Export", description: "Output settings" },
   ];
 
-const frameOptions: { value: CanvasFormat; label: string }[] = [
-  { value: "9:16", label: "9:16" },
-  { value: "1:1", label: "1:1" },
-  { value: "4:5", label: "4:5" },
-  { value: "16:9", label: "16:9" },
+const frameOptions: { value: CanvasFormat; label: string; description: string }[] = [
+  { value: "9:16", label: "9:16", description: "Shorts/Reels" },
+  { value: "1:1", label: "1:1", description: "Square" },
+  { value: "4:5", label: "4:5", description: "Instagram" },
+  { value: "16:9", label: "16:9", description: "YouTube" },
 ];
 
 const backgroundBlurOptions: { value: BackgroundBlurStyle; label: string }[] = [
@@ -112,28 +112,28 @@ const backgroundDimOptions: { value: BackgroundDimStyle; label: string }[] = [
 const titleStyles: { value: TitleStyle; label: string; description: string }[] = [
   {
     value: "cleanLower",
-    label: "Clean Lower",
-    description: "Premium lower-third style",
+    label: "Clean",
+    description: "Polished lower title",
   },
   {
     value: "creatorBold",
-    label: "Creator Bold",
-    description: "Bold centered creator title",
+    label: "Bold",
+    description: "Strong creator title",
   },
   {
     value: "minimalTag",
-    label: "Minimal Tag",
-    description: "Small compact label",
+    label: "Minimal",
+    description: "Compact label",
   },
   {
     value: "cinematic",
-    label: "Cinematic",
-    description: "Elegant wide title",
+    label: "Creator",
+    description: "Elegant hero title",
   },
   {
     value: "softCaption",
-    label: "Soft Caption",
-    description: "Readable caption-style title",
+    label: "Highlight",
+    description: "Readable tinted title",
   },
 ];
 
@@ -165,6 +165,10 @@ const focusPresets: { label: string; x: number; y: number }[] = [
   { label: "Higher", x: 0, y: 14 },
   { label: "Lower", x: 0, y: -14 },
 ];
+
+const titlePositionPresets = titlePositions.filter(
+  (item) => item.value === "top" || item.value === "center" || item.value === "bottom",
+);
 
 function getOutputDimensions(
   canvasFormat: CanvasFormat,
@@ -1194,6 +1198,8 @@ export default function ProjectDetailsPage() {
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [videoVolume, setVideoVolume] = useState(100);
   const [mutedOriginal, setMutedOriginal] = useState(false);
+  const [audioFadeIn, setAudioFadeIn] = useState(false);
+  const [audioFadeOut, setAudioFadeOut] = useState(false);
 
   const [titleStyle, setTitleStyle] = useState<TitleStyle>("cleanLower");
   const [titlePosition, setTitlePosition] = useState<TitlePosition>("lower");
@@ -1442,6 +1448,8 @@ export default function ProjectDetailsPage() {
             setPlaybackSpeed(editor.playback?.speed ?? 1);
             setVideoVolume(editor.playback?.videoVolume ?? 100);
             setMutedOriginal(editor.playback?.mutedOriginal ?? false);
+            setAudioFadeIn(Boolean(editor.audio?.fadeIn));
+            setAudioFadeOut(Boolean(editor.audio?.fadeOut));
 
             const savedTitles = editor.titles || {};
             const savedTitleOverlay = editor.titleOverlay || {};
@@ -1691,13 +1699,51 @@ export default function ProjectDetailsPage() {
     };
   }, []);
 
+  function getPreviewOriginalVolume(currentTime: number) {
+    if (mutedOriginal) return 0;
+
+    const baseVolume = Math.min(Math.max(videoVolume / 100, 0), 1);
+    const fadeDuration = 1.5;
+    const endTime = trimEnd || videoDuration || 0;
+    let fadeMultiplier = 1;
+
+    if (audioFadeIn) {
+      const fadeStart = trimStart || 0;
+      fadeMultiplier = Math.min(
+        fadeMultiplier,
+        Math.max(0, Math.min(1, (currentTime - fadeStart) / fadeDuration)),
+      );
+    }
+
+    if (audioFadeOut && endTime > 0) {
+      fadeMultiplier = Math.min(
+        fadeMultiplier,
+        Math.max(0, Math.min(1, (endTime - currentTime) / fadeDuration)),
+      );
+    }
+
+    return Math.min(1, Math.max(0, baseVolume * fadeMultiplier));
+  }
+
   useEffect(() => {
     if (!videoRef.current) return;
 
     videoRef.current.playbackRate = playbackSpeed;
-    videoRef.current.volume = Math.min(Math.max(videoVolume / 100, 0), 1);
+    videoRef.current.volume = getPreviewOriginalVolume(
+      videoRef.current.currentTime || 0,
+    );
     videoRef.current.muted = mutedOriginal;
-  }, [playbackSpeed, videoVolume, mutedOriginal, localVideoURL]);
+  }, [
+    playbackSpeed,
+    videoVolume,
+    mutedOriginal,
+    audioFadeIn,
+    audioFadeOut,
+    localVideoURL,
+    trimStart,
+    trimEnd,
+    videoDuration,
+  ]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -1875,6 +1921,10 @@ export default function ProjectDetailsPage() {
   const handleVideoTimeUpdate = () => {
     if (!videoRef.current) return;
 
+    videoRef.current.volume = getPreviewOriginalVolume(
+      videoRef.current.currentTime || 0,
+    );
+
     if (trimEnd > 0 && videoRef.current.currentTime >= Number(trimEnd)) {
       videoRef.current.pause();
     }
@@ -1885,6 +1935,24 @@ export default function ProjectDetailsPage() {
 
     videoRef.current.currentTime = Number(trimStart) || 0;
     videoRef.current.play();
+  };
+
+  const adjustReframeScale = (delta: number) => {
+    setReframeScale((value) => clampReframeScale(Number(value) + delta));
+  };
+
+  const nudgeReframe = (axis: "x" | "y", delta: number) => {
+    if (axis === "x") {
+      setReframeX((value) => clampReframeOffset(Number(value) + delta));
+      return;
+    }
+
+    setReframeY((value) => clampReframeOffset(Number(value) + delta));
+  };
+
+  const centerReframe = () => {
+    setReframeX(0);
+    setReframeY(0);
   };
 
   const applyEffectPreset = (
@@ -2832,6 +2900,8 @@ export default function ProjectDetailsPage() {
       },
       "editor.audio": {
         musicVolume: Number(musicVolume) || 80,
+        fadeIn: audioFadeIn,
+        fadeOut: audioFadeOut,
       },
       "editor.textOverlay": {
         text: visibleOverlayText,
@@ -2966,6 +3036,8 @@ export default function ProjectDetailsPage() {
     playbackSpeed,
     videoVolume,
     mutedOriginal,
+    audioFadeIn,
+    audioFadeOut,
     titleStyle,
     titlePosition,
     titleScale,
@@ -3099,6 +3171,8 @@ export default function ProjectDetailsPage() {
     setPlaybackSpeed(1);
     setVideoVolume(100);
     setMutedOriginal(false);
+    setAudioFadeIn(false);
+    setAudioFadeOut(false);
     setTitleStyle("cleanLower");
     setTitlePosition("lower");
     setTitleScale(1);
@@ -3380,7 +3454,10 @@ export default function ProjectDetailsPage() {
                     onClick={() => setCanvasFormat(item.value)}
                     small
                   >
-                    {item.label}
+                    <span className="block">{item.label}</span>
+                    <span className="mt-1 block text-[10px] font-bold opacity-55">
+                      {item.description}
+                    </span>
                   </OptionButton>
                 ))}
               </div>
@@ -3389,28 +3466,35 @@ export default function ProjectDetailsPage() {
             <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
               <p className="text-sm font-black text-white/70">Composition</p>
 
-              <div className="mt-3 grid gap-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <OptionButton
                   active={fitMode === "cover"}
                   onClick={() => setFitMode("cover")}
+                  small
                 >
-                  Cinematic Fill
+                  Fill
                 </OptionButton>
 
                 <OptionButton
                   active={fitMode === "contain"}
                   onClick={() => setFitMode("contain")}
+                  small
                 >
-                  Original View
+                  Fit
                 </OptionButton>
 
                 <OptionButton
                   active={fitMode === "blurredBackground"}
                   onClick={() => setFitMode("blurredBackground")}
+                  small
                 >
                   Blurred Background
                 </OptionButton>
               </div>
+
+              <p className="mt-3 text-xs leading-5 text-white/42">
+                Fill gives social crops. Fit keeps the full clip visible.
+              </p>
             </div>
 
             <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
@@ -3440,6 +3524,23 @@ export default function ProjectDetailsPage() {
                   onChange={(value) => setReframeScale(clampReframeScale(value))}
                 />
               </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <OptionButton
+                  active={false}
+                  onClick={() => adjustReframeScale(-0.08)}
+                  small
+                >
+                  Zoom -
+                </OptionButton>
+                <OptionButton
+                  active={false}
+                  onClick={() => adjustReframeScale(0.08)}
+                  small
+                >
+                  Zoom +
+                </OptionButton>
+              </div>
             </div>
 
             <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
@@ -3464,6 +3565,40 @@ export default function ProjectDetailsPage() {
               </div>
 
               <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-3 gap-2">
+                  <OptionButton active={false} onClick={centerReframe} small>
+                    Center
+                  </OptionButton>
+                  <OptionButton
+                    active={false}
+                    onClick={() => nudgeReframe("y", 8)}
+                    small
+                  >
+                    Move up
+                  </OptionButton>
+                  <OptionButton
+                    active={false}
+                    onClick={() => nudgeReframe("y", -8)}
+                    small
+                  >
+                    Move down
+                  </OptionButton>
+                  <OptionButton
+                    active={false}
+                    onClick={() => nudgeReframe("x", 8)}
+                    small
+                  >
+                    Move left
+                  </OptionButton>
+                  <OptionButton
+                    active={false}
+                    onClick={() => nudgeReframe("x", -8)}
+                    small
+                  >
+                    Move right
+                  </OptionButton>
+                </div>
+
                 <div>
                   <RangeControl
                     label="Horizontal focus"
@@ -3784,8 +3919,8 @@ export default function ProjectDetailsPage() {
                 Position
               </label>
 
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                {titlePositions.map((item) => (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {titlePositionPresets.map((item) => (
                   <OptionButton
                     key={item.value}
                     active={titlePosition === item.value}
@@ -3808,6 +3943,24 @@ export default function ProjectDetailsPage() {
                 suffix="x"
                 onChange={(value) => setTitleScale(normalizeTitleScale(value))}
               />
+
+              <div className="mt-3 grid grid-cols-4 gap-2">
+                {[
+                  ["S", 0.85],
+                  ["M", 1],
+                  ["L", 1.18],
+                  ["Hero", 1.4],
+                ].map(([label, value]) => (
+                  <OptionButton
+                    key={String(label)}
+                    active={Math.abs(titleScale - Number(value)) < 0.03}
+                    onClick={() => setTitleScale(Number(value))}
+                    small
+                  >
+                    {label}
+                  </OptionButton>
+                ))}
+              </div>
             </div>
 
             <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
@@ -3880,6 +4033,41 @@ export default function ProjectDetailsPage() {
             >
               {mutedOriginal ? "Original muted" : "Mute original audio"}
             </button>
+
+            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.045] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-black text-white/70">Soft fades</p>
+                  <p className="mt-1 text-xs leading-5 text-white/42">
+                    Preview only for now. Export keeps the original source audio.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setAudioFadeIn(!audioFadeIn)}
+                  className={`rounded-2xl border px-4 py-3 text-sm font-black transition ${
+                    audioFadeIn
+                      ? "border-white/20 bg-white text-black"
+                      : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
+                  }`}
+                >
+                  Fade in
+                </button>
+
+                <button
+                  onClick={() => setAudioFadeOut(!audioFadeOut)}
+                  className={`rounded-2xl border px-4 py-3 text-sm font-black transition ${
+                    audioFadeOut
+                      ? "border-white/20 bg-white text-black"
+                      : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
+                  }`}
+                >
+                  Fade out
+                </button>
+              </div>
+            </div>
 
             {localAudioURL ? (
               <>
@@ -4628,8 +4816,8 @@ export default function ProjectDetailsPage() {
                       </p>
 
                       <p className="mt-0.5 text-[11px] text-white/48">
-                        Selected range: {trimStart}s to{" "}
-                        {trimEnd || videoDuration}s · {selectedRange}s
+                        Start {trimStart}s · End {trimEnd || videoDuration}s ·{" "}
+                        Duration {selectedRange}s
                       </p>
                     </div>
 
@@ -4646,6 +4834,12 @@ export default function ProjectDetailsPage() {
                         {autoSaveStatus}
                       </span>
                     </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <StatPill label="Start" value={`${trimStart}s`} />
+                    <StatPill label="End" value={`${trimEnd || videoDuration || 0}s`} />
+                    <StatPill label="Selected" value={`${selectedRange}s`} />
                   </div>
 
                   <div className="grid gap-2.5 xl:grid-cols-[86px_1fr_86px] xl:items-center">
