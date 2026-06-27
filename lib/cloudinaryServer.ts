@@ -367,14 +367,9 @@ function createTitleOverlayTransformation(
 ) {
   const style = getTitleStyle(title.style);
   const fontSize = getTitleFontSize(title, dimensions.width);
-  const maxWidth = Math.round(dimensions.width * 0.76);
-  const safeX = Math.round((title.x / 100) * dimensions.width);
-  const safeY = Math.round((title.y / 100) * dimensions.height);
-  const layerX = getTitleLayerX(title.align, safeX, maxWidth, dimensions.width);
-  const layerY = Math.max(
-    24,
-    Math.min(dimensions.height - Math.round(fontSize * 1.4), safeY - fontSize),
-  );
+  const maxWidth = Math.round(dimensions.width * (title.background ? 0.88 : 0.84));
+  const layerX = Math.round(((title.x - 50) / 100) * dimensions.width);
+  const layerY = Math.round(((title.y - 50) / 100) * dimensions.height);
   const textLayer: Record<string, unknown> = {
     overlay: {
       font_family: "Arial",
@@ -395,23 +390,11 @@ function createTitleOverlayTransformation(
     textLayer,
     {
       flags: "layer_apply",
-      gravity: "north_west",
+      gravity: "center",
       x: layerX,
       y: layerY,
     },
   ];
-}
-
-function getTitleLayerX(
-  align: string,
-  x: number,
-  width: number,
-  canvasWidth: number,
-) {
-  const targetX =
-    align === "left" ? x : align === "right" ? x - width : x - width / 2;
-
-  return Math.round(Math.max(24, Math.min(canvasWidth - width - 24, targetX)));
 }
 
 function sanitizeTitleText(value: unknown) {
@@ -449,18 +432,18 @@ function normalizeTitlePosition(value: unknown) {
 }
 
 function getTitlePositionCoordinates(position: string) {
-  if (position === "top") return { x: 50, y: 16 };
+  if (position === "top") return { x: 50, y: 14 };
   if (position === "center") return { x: 50, y: 50 };
-  if (position === "bottom") return { x: 50, y: 86 };
+  if (position === "bottom") return { x: 50, y: 81 };
   return { x: 50, y: 76 };
 }
 
 function normalizeTitleScale(value: unknown) {
-  if (value === "small") return 0.85;
-  if (value === "medium") return 0.95;
-  if (value === "xl") return 1.35;
+  if (value === "small") return 0.68;
+  if (value === "medium") return 1;
+  if (value === "xl") return 1.6;
 
-  return clampNumber(value, 0.8, 1.6, 1);
+  return clampNumber(value, 0.65, 1.6, 1);
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
@@ -473,22 +456,22 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
 
 function getTitleStyle(style: string) {
   if (style === "creatorBold") {
-    return { color: "#FFF6D8", background: "#00000055", fontWeight: "bold" };
+    return { color: "#FFF6D8", background: "#0000004D", fontWeight: "bold" };
   }
 
   if (style === "minimalTag") {
-    return { color: "#F3E7C8", background: "#000000AA", fontWeight: "bold" };
+    return { color: "#F3E7C8", background: "#00000075", fontWeight: "bold" };
   }
 
   if (style === "cinematic") {
-    return { color: "#F5E6BC", background: "#00000033", fontWeight: "normal" };
+    return { color: "#F5E6BC", background: "#0000003D", fontWeight: "normal" };
   }
 
   if (style === "softCaption") {
-    return { color: "#FFFFFF", background: "#000000BB", fontWeight: "bold" };
+    return { color: "#FFFFFF", background: "#0000008A", fontWeight: "bold" };
   }
 
-  return { color: "#F3E7C8", background: "#00000099", fontWeight: "bold" };
+  return { color: "#F3E7C8", background: "#00000066", fontWeight: "normal" };
 }
 
 function getTitleFontSize(title: PhaseOneTitleOverlay, width: number) {

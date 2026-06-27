@@ -1402,8 +1402,8 @@ export default function ProjectDetailsPage() {
   const titlePreviewAlignClass = "text-center";
   const titlePreviewTransform = "translate(-50%, -50%)";
   const titlePreviewSizeStyle = {
-    fontSize: `clamp(0.95rem, ${2.05 * titleOverlayForExport.scale}vmin, ${2.85 * titleOverlayForExport.scale}rem)`,
-    width: "max-content",
+    fontSize: `clamp(0.72rem, ${2.05 * titleOverlayForExport.scale}vmin, ${2.85 * titleOverlayForExport.scale}rem)`,
+    width: "fit-content",
     minWidth: titleBackground ? "min(14rem, calc(100% - 36px))" : "auto",
     maxWidth: titleBackground ? "min(90%, calc(100% - 36px))" : "min(86%, calc(100% - 44px))",
     maxHeight: "calc(100% - 48px)",

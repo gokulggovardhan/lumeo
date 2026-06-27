@@ -831,18 +831,18 @@ function normalizeTitlePosition(value: unknown): TitlePosition {
 }
 
 function getTitlePositionCoordinates(position: TitlePosition) {
-  if (position === "top") return { x: 50, y: 16 };
+  if (position === "top") return { x: 50, y: 14 };
   if (position === "center") return { x: 50, y: 50 };
-  if (position === "bottom") return { x: 50, y: 86 };
+  if (position === "bottom") return { x: 50, y: 81 };
   return { x: 50, y: 76 };
 }
 
 function normalizeTitleScale(value: unknown) {
-  if (value === "small") return 0.85;
-  if (value === "medium") return 0.95;
-  if (value === "xl") return 1.35;
+  if (value === "small") return 0.68;
+  if (value === "medium") return 1;
+  if (value === "xl") return 1.6;
 
-  return clampNumber(value, 0.8, 1.6, 1);
+  return clampNumber(value, 0.65, 1.6, 1);
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
