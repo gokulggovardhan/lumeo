@@ -138,10 +138,10 @@ const titleStyles: { value: TitleStyle; label: string; description: string }[] =
 ];
 
 const titlePositions: { value: TitlePosition; label: string; x: number; y: number }[] = [
-  { value: "top", label: "Top", x: 50, y: 16 },
+  { value: "top", label: "Top", x: 50, y: 14 },
   { value: "center", label: "Center", x: 50, y: 50 },
   { value: "lower", label: "Lower", x: 50, y: 76 },
-  { value: "bottom", label: "Bottom", x: 50, y: 86 },
+  { value: "bottom", label: "Bottom", x: 50, y: 81 },
 ];
 
 const reframeDefaults: ReframeState = {
@@ -180,14 +180,14 @@ const smartTitleTemplates: {
 }[] = [
   {
     label: "Hook",
-    text: "Wait for the result",
+    text: "Wait for it",
   },
   {
-    label: "Tutorial",
+    label: "How-to",
     text: "How to edit faster",
   },
   {
-    label: "Before / After",
+    label: "Before After",
     text: "Before → After",
   },
   {
@@ -199,7 +199,7 @@ const smartTitleTemplates: {
     text: "Limited time offer",
   },
   {
-    label: "CTA",
+    label: "Follow",
     text: "Follow for more",
   },
 ];
@@ -1355,7 +1355,15 @@ export default function ProjectDetailsPage() {
         : visibleOverlayText.length > 26
           ? 0.92
           : 1;
-  const titleRenderScale = normalizeTitleScale(normalizedTitleScale * titleLengthScale);
+  const heroFitScale =
+    normalizedTitleScale >= 1.55 && visibleOverlayText.length > 14
+      ? visibleOverlayText.length > 28
+        ? 0.76
+        : 0.88
+      : 1;
+  const titleRenderScale = normalizeTitleScale(
+    normalizedTitleScale * titleLengthScale * heroFitScale,
+  );
   const titleOverlayForExport = {
     enabled: titleEnabled && hasActiveTitleOverlay,
     text: hasActiveTitleOverlay ? visibleOverlayText : "",
@@ -1384,12 +1392,15 @@ export default function ProjectDetailsPage() {
   const titlePreviewTransform = "translate(-50%, -50%)";
   const titlePreviewSizeStyle = {
     fontSize: `clamp(0.95rem, ${2.05 * titleOverlayForExport.scale}vmin, ${2.85 * titleOverlayForExport.scale}rem)`,
-    maxWidth: "min(82%, calc(100% - 48px))",
+    width: "max-content",
+    minWidth: titleBackground ? "min(14rem, calc(100% - 36px))" : "auto",
+    maxWidth: titleBackground ? "min(90%, calc(100% - 36px))" : "min(86%, calc(100% - 44px))",
     maxHeight: "calc(100% - 48px)",
-    overflowWrap: "break-word" as const,
-    wordBreak: "break-word" as const,
+    overflowWrap: "normal" as const,
+    wordBreak: "normal" as const,
     whiteSpace: "normal" as const,
     boxSizing: "border-box" as const,
+    hyphens: "none" as const,
   };
   const canvasFrameClass =
     canvasFormat === "9:16"
@@ -4028,7 +4039,7 @@ export default function ProjectDetailsPage() {
 
             <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-3.5">
               <p className="text-xs font-black uppercase tracking-[0.16em] text-white/45">
-                Finishing
+                Finish
               </p>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -4938,10 +4949,6 @@ export default function ProjectDetailsPage() {
                       >
                         Preview
                       </button>
-
-                      <span className="rounded-2xl border border-emerald-300/20 bg-emerald-300/10 px-3.5 py-2 text-xs font-black text-emerald-100">
-                        {autoSaveStatus}
-                      </span>
                     </div>
                   </div>
 
