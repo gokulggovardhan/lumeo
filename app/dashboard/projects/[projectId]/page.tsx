@@ -61,6 +61,7 @@ type TitleStyle =
   | "softCaption";
 type TitleAlign = "left" | "center" | "right";
 type TitleSize = "small" | "medium" | "large" | "xl";
+type TitleSizePreset = "small" | "medium" | "large" | "hero" | "custom";
 type TitlePosition = "top" | "center" | "lower" | "bottom";
 type ReframeState = {
   scale: number;
@@ -167,11 +168,11 @@ const titlePositionPresets = titlePositions.filter(
   (item) => item.value === "top" || item.value === "center" || item.value === "bottom",
 );
 
-const titleSizePresets: { label: string; scale: number }[] = [
-  { label: "Small", scale: 0.68 },
-  { label: "Medium", scale: 1 },
-  { label: "Large", scale: 1.32 },
-  { label: "Hero", scale: 1.6 },
+const titleSizePresets: { value: TitleSizePreset; label: string; scale: number }[] = [
+  { value: "small", label: "Small", scale: 0.68 },
+  { value: "medium", label: "Medium", scale: 1 },
+  { value: "large", label: "Large", scale: 1.32 },
+  { value: "hero", label: "Hero", scale: 1.6 },
 ];
 
 const smartTitleTemplates: {
@@ -824,10 +825,18 @@ function normalizeTitleScale(value: unknown) {
   return Math.min(1.6, Math.max(0.65, parsed));
 }
 
+function getTitleSizePresetFromScale(scale: number): TitleSizePreset {
+  const matchedPreset = titleSizePresets.find(
+    (preset) => Math.abs(scale - preset.scale) < 0.025,
+  );
+
+  return matchedPreset?.value || "custom";
+}
+
 function getTitleScaleFromLegacySize(value: unknown) {
-  if (value === "small") return 0.85;
-  if (value === "medium") return 0.95;
-  if (value === "xl") return 1.35;
+  if (value === "small") return 0.68;
+  if (value === "medium") return 1;
+  if (value === "xl") return 1.6;
   return 1;
 }
 
@@ -1239,6 +1248,8 @@ export default function ProjectDetailsPage() {
   const [titleStyle, setTitleStyle] = useState<TitleStyle>("cleanLower");
   const [titlePosition, setTitlePosition] = useState<TitlePosition>("bottom");
   const [titleScale, setTitleScale] = useState(1);
+  const [titleSizePreset, setTitleSizePreset] =
+    useState<TitleSizePreset>("medium");
   const [titleBackground, setTitleBackground] = useState(false);
   const [titleShadow, setTitleShadow] = useState(true);
   const [titleEnabled, setTitleEnabled] = useState(false);
@@ -1380,14 +1391,14 @@ export default function ProjectDetailsPage() {
   };
   const titlePreviewClass =
     titleStyle === "creatorBold"
-      ? `${titleBackground ? "rounded-2xl bg-black/34 px-3.5 py-1.5 backdrop-blur-sm" : ""} text-[#FFF6D8] font-black tracking-tight ${titleShadow ? "[text-shadow:0_5px_18px_rgba(0,0,0,0.68)]" : ""}`
+      ? `${titleBackground ? "rounded-[1.05rem] bg-black/30 px-3.5 py-1.5 backdrop-blur-md ring-1 ring-white/10" : ""} text-[#FFF6D8] font-extrabold tracking-tight ${titleShadow ? "[text-shadow:0_4px_16px_rgba(0,0,0,0.62)]" : ""}`
       : titleStyle === "minimalTag"
-        ? `${titleBackground ? "rounded-full bg-black/52 px-3 py-1.5 backdrop-blur-md" : ""} text-[#F3E7C8] text-sm font-black uppercase tracking-[0.13em] ${titleShadow ? "[text-shadow:0_4px_14px_rgba(0,0,0,0.62)]" : ""}`
+        ? `${titleBackground ? "rounded-full bg-black/46 px-3 py-1.5 backdrop-blur-md ring-1 ring-white/10" : ""} text-[#F3E7C8] text-sm font-extrabold uppercase tracking-[0.12em] ${titleShadow ? "[text-shadow:0_3px_12px_rgba(0,0,0,0.58)]" : ""}`
         : titleStyle === "cinematic"
-          ? `${titleBackground ? "rounded-2xl bg-black/26 px-3.5 py-1.5 backdrop-blur-sm" : ""} font-serif text-[#F5E6BC] font-semibold uppercase tracking-[0.1em] ${titleShadow ? "[text-shadow:0_5px_18px_rgba(0,0,0,0.66)]" : ""}`
+          ? `${titleBackground ? "rounded-[1.05rem] bg-black/24 px-3.5 py-1.5 backdrop-blur-md ring-1 ring-white/10" : ""} font-serif text-[#F5E6BC] font-semibold uppercase tracking-[0.09em] ${titleShadow ? "[text-shadow:0_4px_15px_rgba(0,0,0,0.58)]" : ""}`
           : titleStyle === "softCaption"
-            ? `${titleBackground ? "rounded-2xl bg-black/62 px-3.5 py-1.5 backdrop-blur-md" : ""} text-white font-black ${titleShadow ? "[text-shadow:0_5px_16px_rgba(0,0,0,0.66)]" : ""}`
-            : `${titleBackground ? "rounded-2xl bg-black/46 px-3.5 py-1.5 backdrop-blur-md" : ""} text-[#F3E7C8] font-bold ${titleShadow ? "[text-shadow:0_5px_16px_rgba(0,0,0,0.66)]" : ""}`;
+            ? `${titleBackground ? "rounded-[1.05rem] bg-black/56 px-3.5 py-1.5 backdrop-blur-md ring-1 ring-white/10" : ""} text-white font-extrabold ${titleShadow ? "[text-shadow:0_4px_14px_rgba(0,0,0,0.62)]" : ""}`
+            : `${titleBackground ? "rounded-[1.05rem] bg-black/40 px-3.5 py-1.5 backdrop-blur-md ring-1 ring-white/10" : ""} text-[#F3E7C8] font-semibold ${titleShadow ? "[text-shadow:0_4px_14px_rgba(0,0,0,0.58)]" : ""}`;
   const titlePreviewAlignClass = "text-center";
   const titlePreviewTransform = "translate(-50%, -50%)";
   const titlePreviewSizeStyle = {
@@ -1522,13 +1533,13 @@ export default function ProjectDetailsPage() {
             setTitleEnabled(Boolean(savedTitles.enabled) || savedTitleText.length > 0);
             setTitleStyle(normalizeTitleStyle(savedTitles.preset || savedTitleOverlay.preset || savedTitleOverlay.style));
             setTitlePosition(normalizeTitlePosition(savedTitles.position || savedTitleOverlay.position));
-            setTitleScale(
-              normalizeTitleScale(
-                savedTitles.size ??
-                  savedTitleOverlay.scale ??
-                  getTitleScaleFromLegacySize(savedTitleOverlay.size),
-              ),
+            const savedTitleScale = normalizeTitleScale(
+              savedTitles.size ??
+                savedTitleOverlay.scale ??
+                getTitleScaleFromLegacySize(savedTitleOverlay.size),
             );
+            setTitleScale(savedTitleScale);
+            setTitleSizePreset(getTitleSizePresetFromScale(savedTitleScale));
             setTitleBackground(
               typeof savedTitles.background === "boolean"
                 ? savedTitles.background
@@ -3239,6 +3250,7 @@ export default function ProjectDetailsPage() {
     setTitleStyle("cleanLower");
     setTitlePosition("bottom");
     setTitleScale(1);
+    setTitleSizePreset("medium");
     setTitleBackground(false);
     setTitleShadow(true);
     setTitleEnabled(false);
@@ -3959,6 +3971,7 @@ export default function ProjectDetailsPage() {
                         setTitleStyle("cleanLower");
                         setTitlePosition("top");
                         setTitleScale(1);
+                        setTitleSizePreset("medium");
                         setTitleBackground(false);
                         setTitleShadow(true);
                       }
@@ -4027,8 +4040,11 @@ export default function ProjectDetailsPage() {
                 {titleSizePresets.map((item) => (
                   <OptionButton
                     key={item.label}
-                    active={Math.abs(titleScale - item.scale) < 0.03}
-                    onClick={() => setTitleScale(item.scale)}
+                    active={titleSizePreset === item.value}
+                    onClick={() => {
+                      setTitleSizePreset(item.value);
+                      setTitleScale(item.scale);
+                    }}
                     small
                   >
                     {item.label}
@@ -4039,7 +4055,7 @@ export default function ProjectDetailsPage() {
 
             <div className="rounded-[1.35rem] border border-white/10 bg-white/[0.045] p-3.5">
               <p className="text-xs font-black uppercase tracking-[0.16em] text-white/45">
-                Finish
+                Effects
               </p>
 
               <div className="mt-3 grid grid-cols-2 gap-2">
@@ -4104,8 +4120,17 @@ export default function ProjectDetailsPage() {
                     max={1.6}
                     step={0.05}
                     suffix="x"
-                    onChange={(value) => setTitleScale(normalizeTitleScale(value))}
+                    onChange={(value) => {
+                      setTitleSizePreset("custom");
+                      setTitleScale(normalizeTitleScale(value));
+                    }}
                   />
+
+                  {titleSizePreset === "custom" && (
+                    <p className="mt-3 inline-flex rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white/42">
+                      Custom size
+                    </p>
+                  )}
                 </div>
               )}
             </div>
@@ -4117,6 +4142,7 @@ export default function ProjectDetailsPage() {
                 setTitleStyle("cleanLower");
                 setTitlePosition("bottom");
                 setTitleScale(1);
+                setTitleSizePreset("medium");
                 setTitleBackground(false);
                 setTitleShadow(true);
                 setTitleFineTuneOpen(false);
