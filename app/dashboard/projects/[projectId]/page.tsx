@@ -92,10 +92,10 @@ const studioTools: { key: ToolKey; label: string; description: string }[] =
   ];
 
 const frameOptions: { value: CanvasFormat; label: string; description: string }[] = [
-  { value: "9:16", label: "9:16", description: "Shorts/Reels" },
-  { value: "1:1", label: "1:1", description: "Square" },
-  { value: "4:5", label: "4:5", description: "Instagram" },
-  { value: "16:9", label: "16:9", description: "YouTube" },
+  { value: "9:16", label: "9:16", description: "Vertical" },
+  { value: "1:1", label: "1:1", description: "Classic" },
+  { value: "4:5", label: "4:5", description: "Portrait" },
+  { value: "16:9", label: "16:9", description: "Wide" },
 ];
 
 const backgroundBlurOptions: { value: BackgroundBlurStyle; label: string }[] = [
@@ -155,15 +155,12 @@ const subjectSizePresets: { label: string; scale: number }[] = [
   { label: "Wide", scale: 0.9 },
   { label: "Natural", scale: 1 },
   { label: "Close", scale: 1.18 },
-  { label: "Hero", scale: 1.35 },
 ];
 
-const focusPresets: { label: string; x: number; y: number }[] = [
+const positionPresets: { label: string; x: number; y: number }[] = [
   { label: "Center", x: 0, y: 0 },
-  { label: "Face left", x: 16, y: 0 },
-  { label: "Face right", x: -16, y: 0 },
-  { label: "Higher", x: 0, y: 14 },
-  { label: "Lower", x: 0, y: -14 },
+  { label: "Top", x: 0, y: 18 },
+  { label: "Bottom", x: 0, y: -18 },
 ];
 
 const titlePositionPresets = titlePositions.filter(
@@ -1192,6 +1189,7 @@ export default function ProjectDetailsPage() {
   const [reframeX, setReframeX] = useState(reframeDefaults.x);
   const [reframeY, setReframeY] = useState(reframeDefaults.y);
   const [safeZones, setSafeZones] = useState(reframeDefaults.safeZones);
+  const [fineTuneOpen, setFineTuneOpen] = useState(false);
 
   const [rotate, setRotate] = useState(0);
   const [flipX, setFlipX] = useState(false);
@@ -3442,8 +3440,8 @@ export default function ProjectDetailsPage() {
           title="Reframe Studio"
           subtitle="Compose your video for shorts, reels, posts, and widescreen exports."
         >
-          <div className="space-y-5">
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
+          <div className="space-y-3.5">
+            <div className="rounded-[1.35rem] bg-white/[0.045] p-3.5">
               <p className="text-sm font-black text-white/70">Canvas</p>
 
               <div className="mt-3 grid grid-cols-4 gap-2">
@@ -3455,7 +3453,7 @@ export default function ProjectDetailsPage() {
                     small
                   >
                     <span className="block">{item.label}</span>
-                    <span className="mt-1 block text-[10px] font-bold opacity-55">
+                    <span className="mt-0.5 block text-[10px] font-bold opacity-55">
                       {item.description}
                     </span>
                   </OptionButton>
@@ -3463,18 +3461,10 @@ export default function ProjectDetailsPage() {
               </div>
             </div>
 
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-sm font-black text-white/70">Composition</p>
+            <div className="rounded-[1.35rem] bg-white/[0.045] p-3.5">
+              <p className="text-sm font-black text-white/70">Fit</p>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <OptionButton
-                  active={fitMode === "cover"}
-                  onClick={() => setFitMode("cover")}
-                  small
-                >
-                  Fill
-                </OptionButton>
-
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 <OptionButton
                   active={fitMode === "contain"}
                   onClick={() => setFitMode("contain")}
@@ -3484,23 +3474,27 @@ export default function ProjectDetailsPage() {
                 </OptionButton>
 
                 <OptionButton
+                  active={fitMode === "cover"}
+                  onClick={() => setFitMode("cover")}
+                  small
+                >
+                  Fill
+                </OptionButton>
+
+                <OptionButton
                   active={fitMode === "blurredBackground"}
                   onClick={() => setFitMode("blurredBackground")}
                   small
                 >
-                  Blurred Background
+                  Blur
                 </OptionButton>
               </div>
-
-              <p className="mt-3 text-xs leading-5 text-white/42">
-                Fill gives social crops. Fit keeps the full clip visible.
-              </p>
             </div>
 
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-sm font-black text-white/70">Subject Size</p>
+            <div className="rounded-[1.35rem] bg-white/[0.045] p-3.5">
+              <p className="text-sm font-black text-white/70">Subject</p>
 
-              <div className="mt-3 grid grid-cols-4 gap-2">
+              <div className="mt-3 grid grid-cols-3 gap-2">
                 {subjectSizePresets.map((item) => (
                   <OptionButton
                     key={item.label}
@@ -3512,42 +3506,13 @@ export default function ProjectDetailsPage() {
                   </OptionButton>
                 ))}
               </div>
-
-              <div className="mt-4">
-                <RangeControl
-                  label="Fine scale"
-                  value={Number(currentReframe.scale.toFixed(2))}
-                  min={0.85}
-                  max={1.6}
-                  step={0.01}
-                  suffix="x"
-                  onChange={(value) => setReframeScale(clampReframeScale(value))}
-                />
-              </div>
-
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <OptionButton
-                  active={false}
-                  onClick={() => adjustReframeScale(-0.08)}
-                  small
-                >
-                  Zoom -
-                </OptionButton>
-                <OptionButton
-                  active={false}
-                  onClick={() => adjustReframeScale(0.08)}
-                  small
-                >
-                  Zoom +
-                </OptionButton>
-              </div>
             </div>
 
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-              <p className="text-sm font-black text-white/70">Focus Point</p>
+            <div className="rounded-[1.35rem] bg-white/[0.045] p-3.5">
+              <p className="text-sm font-black text-white/70">Position</p>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {focusPresets.map((item) => (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                {positionPresets.map((item) => (
                   <OptionButton
                     key={item.label}
                     active={
@@ -3563,8 +3528,52 @@ export default function ProjectDetailsPage() {
                   </OptionButton>
                 ))}
               </div>
+            </div>
+
+            <details
+              open={fineTuneOpen}
+              onToggle={(event) =>
+                setFineTuneOpen((event.currentTarget as HTMLDetailsElement).open)
+              }
+              className="group rounded-[1.35rem] bg-white/[0.035] p-3.5"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-black text-white/68">
+                Fine tune
+                <span className="rounded-full border border-white/10 bg-white/[0.055] px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-white/40 transition group-open:text-white/70">
+                  {fineTuneOpen ? "Hide" : "Open"}
+                </span>
+              </summary>
 
               <div className="mt-4 space-y-4">
+                <div>
+                  <RangeControl
+                    label="Fine scale"
+                    value={Number(currentReframe.scale.toFixed(2))}
+                    min={0.85}
+                    max={1.6}
+                    step={0.01}
+                    suffix="x"
+                    onChange={(value) => setReframeScale(clampReframeScale(value))}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <OptionButton
+                    active={false}
+                    onClick={() => adjustReframeScale(-0.08)}
+                    small
+                  >
+                    Zoom -
+                  </OptionButton>
+                  <OptionButton
+                    active={false}
+                    onClick={() => adjustReframeScale(0.08)}
+                    small
+                  >
+                    Zoom +
+                  </OptionButton>
+                </div>
+
                 <div className="grid grid-cols-3 gap-2">
                   <OptionButton active={false} onClick={centerReframe} small>
                     Center
@@ -3574,127 +3583,108 @@ export default function ProjectDetailsPage() {
                     onClick={() => nudgeReframe("y", 8)}
                     small
                   >
-                    Move up
+                    Up
                   </OptionButton>
                   <OptionButton
                     active={false}
                     onClick={() => nudgeReframe("y", -8)}
                     small
                   >
-                    Move down
+                    Down
                   </OptionButton>
                   <OptionButton
                     active={false}
                     onClick={() => nudgeReframe("x", 8)}
                     small
                   >
-                    Move left
+                    Left
                   </OptionButton>
                   <OptionButton
                     active={false}
                     onClick={() => nudgeReframe("x", -8)}
                     small
                   >
-                    Move right
+                    Right
                   </OptionButton>
                 </div>
 
-                <div>
-                  <RangeControl
-                    label="Horizontal focus"
-                    value={currentReframe.x}
-                    min={-40}
-                    max={40}
-                    onChange={(value) => setReframeX(clampReframeOffset(value))}
-                  />
-                  <div className="mt-1 flex justify-between text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
-                    <span>Left</span>
-                    <span>Center</span>
-                    <span>Right</span>
-                  </div>
-                </div>
+                <RangeControl
+                  label="Horizontal focus"
+                  value={currentReframe.x}
+                  min={-40}
+                  max={40}
+                  onChange={(value) => setReframeX(clampReframeOffset(value))}
+                />
 
-                <div>
-                  <RangeControl
-                    label="Vertical focus"
-                    value={currentReframe.y}
-                    min={-40}
-                    max={40}
-                    onChange={(value) => setReframeY(clampReframeOffset(value))}
-                  />
-                  <div className="mt-1 flex justify-between text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
-                    <span>Top</span>
-                    <span>Middle</span>
-                    <span>Bottom</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+                <RangeControl
+                  label="Vertical focus"
+                  value={currentReframe.y}
+                  min={-40}
+                  max={40}
+                  onChange={(value) => setReframeY(clampReframeOffset(value))}
+                />
 
-            {fitMode === "blurredBackground" && (
-              <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-                <p className="text-sm font-black text-white/70">
-                  Background look
+                {fitMode === "blurredBackground" && (
+                  <div className="rounded-2xl bg-black/20 p-3">
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-white/38">
+                      Blur look
+                    </p>
+                    <div className="mt-3 grid grid-cols-3 gap-2">
+                      {backgroundBlurOptions.map((item) => (
+                        <OptionButton
+                          key={item.value}
+                          active={backgroundBlurStyle === item.value}
+                          onClick={() => setBackgroundBlurStyle(item.value)}
+                          small
+                        >
+                          {item.label}
+                        </OptionButton>
+                      ))}
+                    </div>
+
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {backgroundDimOptions.map((item) => (
+                        <OptionButton
+                          key={item.value}
+                          active={backgroundDimStyle === item.value}
+                          onClick={() => setBackgroundDimStyle(item.value)}
+                          small
+                        >
+                          {item.label}
+                        </OptionButton>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setSafeZones(!safeZones)}
+                  className={`w-full rounded-2xl border px-4 py-3 text-sm font-black transition ${
+                    safeZones
+                      ? "border-white/20 bg-white text-black"
+                      : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
+                  }`}
+                >
+                  Show safe zones
+                </button>
+
+                <p className="text-xs leading-5 text-white/38">
+                  Preview guide only. Safe zones are never included in exports.
                 </p>
 
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  {backgroundBlurOptions.map((item) => (
-                    <OptionButton
-                      key={item.value}
-                      active={backgroundBlurStyle === item.value}
-                      onClick={() => setBackgroundBlurStyle(item.value)}
-                      small
-                    >
-                      {item.label}
-                    </OptionButton>
-                  ))}
-                </div>
-
-                <p className="mt-4 text-sm font-black text-white/70">Dim</p>
-
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {backgroundDimOptions.map((item) => (
-                    <OptionButton
-                      key={item.value}
-                      active={backgroundDimStyle === item.value}
-                      onClick={() => setBackgroundDimStyle(item.value)}
-                      small
-                    >
-                      {item.label}
-                    </OptionButton>
-                  ))}
-                </div>
+                <button
+                  onClick={() => {
+                    setReframeScale(reframeDefaults.scale);
+                    setReframeX(reframeDefaults.x);
+                    setReframeY(reframeDefaults.y);
+                    setSafeZones(reframeDefaults.safeZones);
+                  }}
+                  className="w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/65 transition hover:bg-white hover:text-black"
+                >
+                  Reset composition
+                </button>
               </div>
-            )}
-
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/[0.04] p-4">
-              <button
-                onClick={() => setSafeZones(!safeZones)}
-                className={`w-full rounded-2xl border px-4 py-3 text-sm font-black transition ${
-                  safeZones
-                    ? "border-white/20 bg-white text-black"
-                    : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
-                }`}
-              >
-                Show safe zones
-              </button>
-
-              <p className="mt-2 text-xs leading-5 text-white/42">
-                Preview guide only. Safe zones are never included in exports.
-              </p>
-
-              <button
-                onClick={() => {
-                  setReframeScale(reframeDefaults.scale);
-                  setReframeX(reframeDefaults.x);
-                  setReframeY(reframeDefaults.y);
-                  setSafeZones(reframeDefaults.safeZones);
-                }}
-                className="mt-3 w-full rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3 text-sm font-black text-white/65 transition hover:bg-white hover:text-black"
-              >
-                Reset composition
-              </button>
-            </div>
+            </details>
           </div>
         </Panel>
       );
