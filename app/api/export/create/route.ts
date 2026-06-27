@@ -215,6 +215,8 @@ export async function POST(request: NextRequest) {
   let temporaryPublicId = "";
   let failedStage: ExportFailureStage = "unknown";
   let cloudinaryServer: CloudinaryServerModule | null = null;
+  const exportStartedAt = Date.now();
+  let stageStartedAt = exportStartedAt;
 
   try {
     const body = (await request.json()) as ExportRequestBody;
@@ -235,6 +237,7 @@ export async function POST(request: NextRequest) {
     console.info("[Lumeo Export] phase one export started", { projectId });
 
     failedStage = "serverModules";
+    stageStartedAt = Date.now();
     const [
       { getFirebaseAdminDbOnly },
       loadedCloudinaryServer,
@@ -245,8 +248,12 @@ export async function POST(request: NextRequest) {
       import("@/lib/googleDriveServer"),
     ]);
     cloudinaryServer = loadedCloudinaryServer;
+    logExportStageTiming("serverModules", exportStartedAt, stageStartedAt, {
+      projectId,
+    });
 
     failedStage = "projectRead";
+    stageStartedAt = Date.now();
     const db = getFirebaseAdminDbOnly();
     const projectRef = db.collection("projects").doc(projectId);
     const snapshot = await projectRef.get();
@@ -264,6 +271,9 @@ export async function POST(request: NextRequest) {
     }
 
     const project = snapshot.data() as ProjectData;
+    logExportStageTiming("projectRead", exportStartedAt, stageStartedAt, {
+      projectId,
+    });
     failedStage = "mediaFileIdCheck";
     const sourceFileId = project.editor?.media?.storage?.fileId;
     const previousExportFileId = getSafeFileId(project.editor?.export);
@@ -281,8 +291,18 @@ export async function POST(request: NextRequest) {
     }
 
     failedStage = "settingsResolve";
+    stageStartedAt = Date.now();
     const settings = resolveExportSettings(project, body.settings);
     const dimensions = getOutputDimensions(settings.canvasFormat, settings.resolution);
+    logExportStageTiming("settingsResolve", exportStartedAt, stageStartedAt, {
+      projectId,
+      resolution: settings.resolution,
+      fps: settings.fps,
+      canvasFormat: settings.canvasFormat,
+      frameMode: settings.frameMode,
+      outputWidth: dimensions.width,
+      outputHeight: dimensions.height,
+    });
     console.info("[Lumeo Export] resolved export settings", {
       resolution: settings.resolution,
       fps: settings.fps,
@@ -294,8 +314,14 @@ export async function POST(request: NextRequest) {
     });
 
     failedStage = "sourceDownload";
+    stageStartedAt = Date.now();
     console.info("[Lumeo Export] source download started", { projectId });
     const source = await googleDriveServer.downloadDriveFileBuffer(sourceFileId);
+    logExportStageTiming("sourceDownload", exportStartedAt, stageStartedAt, {
+      projectId,
+      sourceSize: source.size,
+      sourceMimeType: source.mimeType,
+    });
     console.info("[Lumeo Export] source download completed", {
       fileName: source.fileName,
       size: source.size,
@@ -303,6 +329,7 @@ export async function POST(request: NextRequest) {
     });
 
     failedStage = "tempRenderUpload";
+    stageStartedAt = Date.now();
     console.info("[Lumeo Export] temporary transform source upload started", {
       projectId,
     });
@@ -312,12 +339,17 @@ export async function POST(request: NextRequest) {
       fileName: source.fileName,
     });
     temporaryPublicId = temporarySource.publicId;
+    logExportStageTiming("tempRenderUpload", exportStartedAt, stageStartedAt, {
+      projectId,
+      bytes: temporarySource.bytes,
+    });
     console.info("[Lumeo Export] temporary transform source upload completed", {
       publicId: temporaryPublicId,
       bytes: temporarySource.bytes,
     });
 
     failedStage = "transformedFetch";
+    stageStartedAt = Date.now();
     const transformedExport = await fetchTransformedExportWithFallbacks({
       cloudinaryServer,
       publicId: temporaryPublicId,
@@ -325,6 +357,11 @@ export async function POST(request: NextRequest) {
       dimensions,
     });
     const exportBytes = transformedExport.bytes;
+    logExportStageTiming("transformedFetch", exportStartedAt, stageStartedAt, {
+      projectId,
+      bytes: exportBytes.byteLength,
+      variant: transformedExport.variant,
+    });
     console.info("[Lumeo Export] transformed MP4 fetch completed", {
       size: exportBytes.byteLength,
       variant: transformedExport.variant,
@@ -334,6 +371,7 @@ export async function POST(request: NextRequest) {
     const fileName = createExportFileName(project.title, projectId, settings);
 
     failedStage = "permanentExportUpload";
+    stageStartedAt = Date.now();
     console.info("[Lumeo Export] permanent export upload started", {
       projectId,
       fileName,
@@ -351,17 +389,26 @@ export async function POST(request: NextRequest) {
         uploadedAt: createdAt,
       },
     });
+    logExportStageTiming("permanentExportUpload", exportStartedAt, stageStartedAt, {
+      projectId,
+      bytes: exportBytes.byteLength,
+    });
     console.info("[Lumeo Export] permanent export upload completed", {
       fileName: uploadedExport.fileName,
       size: uploadedExport.size,
     });
 
     failedStage = "downloadUrlCreate";
+    stageStartedAt = Date.now();
     const downloadUrl = await googleDriveServer.createDriveDownloadUrl(
       uploadedExport.fileId,
     );
+    logExportStageTiming("downloadUrlCreate", exportStartedAt, stageStartedAt, {
+      projectId,
+    });
 
     failedStage = "metadataSave";
+    stageStartedAt = Date.now();
     let metadataSaved = true;
     const exportMetadata = createExportMetadata({
       fileId: uploadedExport.fileId,
@@ -380,11 +427,19 @@ export async function POST(request: NextRequest) {
       });
 
       console.info("[Lumeo Export] project export metadata saved", { projectId });
+      logExportStageTiming("metadataSave", exportStartedAt, stageStartedAt, {
+        projectId,
+        metadataSaved: true,
+      });
     } catch (metadataError) {
       metadataSaved = false;
       console.error("[Lumeo Export] project export metadata save failed", {
         projectId,
         error: metadataError,
+      });
+      logExportStageTiming("metadataSave", exportStartedAt, stageStartedAt, {
+        projectId,
+        metadataSaved: false,
       });
     }
 
@@ -399,16 +454,25 @@ export async function POST(request: NextRequest) {
 
     failedStage = "tempCleanup";
     try {
+      stageStartedAt = Date.now();
       console.info("[Lumeo Export] temporary cleanup started", {
         publicId: temporaryPublicId,
       });
       await cloudinaryServer.deleteTemporaryCloudinaryVideo(temporaryPublicId);
+      logExportStageTiming("tempCleanup", exportStartedAt, stageStartedAt, {
+        projectId,
+      });
       console.info("[Lumeo Export] temporary cleanup completed", {
         publicId: temporaryPublicId,
       });
     } catch (cleanupError) {
       console.error("[Lumeo Export] temporary cleanup failed", cleanupError);
     }
+
+    console.info("[Lumeo Export] total export duration", {
+      projectId,
+      totalMs: Date.now() - exportStartedAt,
+    });
 
     return NextResponse.json({
       success: true,
@@ -435,6 +499,7 @@ export async function POST(request: NextRequest) {
     console.error("[Lumeo Export] phase one export failed", {
       failedStage,
       error,
+      totalMs: Date.now() - exportStartedAt,
     });
 
     if (temporaryPublicId) {
@@ -1053,6 +1118,20 @@ function getRetryAfterMs(value: string | null) {
 function delay(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
+  });
+}
+
+function logExportStageTiming(
+  stage: ExportFailureStage,
+  exportStartedAt: number,
+  stageStartedAt: number,
+  details: Record<string, unknown> = {},
+) {
+  console.info("[Lumeo Export] stage timing", {
+    stage,
+    stageMs: Date.now() - stageStartedAt,
+    totalMs: Date.now() - exportStartedAt,
+    ...details,
   });
 }
 

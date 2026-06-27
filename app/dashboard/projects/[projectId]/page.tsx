@@ -663,12 +663,19 @@ type CloudExportResponse =
       downloadUrl?: string;
       fileName: string;
       createdAt: string;
+      exportInfo?: {
+        resolution?: string;
+        fps?: number;
+        transformFallbackUsed?: boolean;
+        transformVariant?: string;
+      };
     }
   | {
       success: false;
       error?: string;
       failedStage?: string;
       details?: string;
+      diagnostic?: unknown;
     };
 
 const LEGACY_DEFAULT_OVERLAY_TEXT = "Your title here";
@@ -2262,6 +2269,42 @@ export default function ProjectDetailsPage() {
     }, 900);
   };
 
+  const startStagedExportProgress = (
+    runId: number,
+    phase: string,
+    start: number,
+    ceiling: number,
+    intervalMs = 1200,
+  ) => {
+    clearExportProgressTimer();
+    setExportStatus(phase);
+    setExportPhase(phase);
+    updateExportProgress(
+      runId,
+      "stage-start",
+      Math.max(exportProgressRef.current, start),
+      phase,
+    );
+
+    exportProgressTimerRef.current = setInterval(() => {
+      if (runId !== exportRunIdRef.current) {
+        clearExportProgressTimer();
+        return;
+      }
+
+      const current = exportProgressRef.current;
+      const distance = Math.max(1, ceiling - current);
+      const increment = distance > 20 ? 2 : 1;
+      const nextProgress = Math.min(ceiling, current + increment);
+
+      updateExportProgress(runId, "stage-timer", nextProgress, phase);
+
+      if (nextProgress >= ceiling) {
+        clearExportProgressTimer();
+      }
+    }, intervalMs);
+  };
+
   const startExportRun = (phase: string) => {
     clearExportProgressTimer();
     exportRunIdRef.current += 1;
@@ -2364,9 +2407,24 @@ export default function ProjectDetailsPage() {
   const handleExportVideo = async () => {
     if (exporting) return;
 
+    if (!hasSavedSourceMedia && localVideoURL) {
+      console.info("[Lumeo Export] local-only export fallback started", {
+        projectId,
+        quality: productionExportQualityLabel,
+        canvasFormat,
+        frameMode: fitMode,
+      });
+      await handleExperimentalExportVideo();
+      return;
+    }
+
     const exportEnd = Number(trimEnd || videoDuration || 0);
     const exportStart = Number(trimStart) || 0;
     let runId = exportRunIdRef.current;
+    const exportStartedAt = performance.now();
+    let sourceLoadedAt = exportStartedAt;
+    let renderingStartedAt = exportStartedAt;
+    let renderingCompletedAt = exportStartedAt;
 
     if (exportEnd > 0 && exportStart >= exportEnd) {
       alert("Trim start should be less than trim end");
@@ -2378,9 +2436,41 @@ export default function ProjectDetailsPage() {
       setLastExportAction("video");
       runId = startExportRun("Preparing export...");
 
+      console.info("[Lumeo Export] export started", {
+        projectId,
+        quality: productionExportQualityLabel,
+        canvasFormat,
+        frameMode: fitMode,
+        hasSavedSourceMedia,
+        availableOnDevice: Boolean(localVideoURL),
+      });
+
+      if (hasSavedSourceMedia && !localVideoURL) {
+        startStagedExportProgress(
+          runId,
+          "Syncing original source before export...",
+          4,
+          18,
+          900,
+        );
+
+        if (!cloudSyncing) {
+          void syncOriginalVideoFromCloud(true);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 700));
+      }
+
       if (!hasSavedSourceMedia) {
         throw new Error("Saved media is required before export.");
       }
+
+      sourceLoadedAt = performance.now();
+      console.info("[Lumeo Export] source loaded", {
+        projectId,
+        elapsedMs: Math.round(sourceLoadedAt - exportStartedAt),
+        source: localVideoURL ? "device" : "saved-source",
+      });
 
       console.info("[Lumeo Export] cloud export requested", {
         projectId,
@@ -2392,6 +2482,14 @@ export default function ProjectDetailsPage() {
         fps: productionExportFps,
         reframe: currentReframe,
       });
+
+      renderingStartedAt = performance.now();
+      console.info("[Lumeo Export] rendering started", {
+        projectId,
+        quality: productionExportQualityLabel,
+        elapsedMs: Math.round(renderingStartedAt - exportStartedAt),
+      });
+      startStagedExportProgress(runId, "Rendering video...", 22, 88, 1400);
 
       const response = await fetch("/api/export/create", {
         method: "POST",
@@ -2425,6 +2523,7 @@ export default function ProjectDetailsPage() {
           console.error("[Lumeo Export] cloud export server diagnostics", {
             failedStage: payload.failedStage,
             details: payload.details,
+            diagnostic: payload.diagnostic,
           });
         }
 
@@ -2435,14 +2534,34 @@ export default function ProjectDetailsPage() {
 
       if (runId !== exportRunIdRef.current) return;
 
+      renderingCompletedAt = performance.now();
+      console.info("[Lumeo Export] rendering completed", {
+        projectId,
+        elapsedMs: Math.round(renderingCompletedAt - exportStartedAt),
+        renderMs: Math.round(renderingCompletedAt - renderingStartedAt),
+        transformFallbackUsed: payload.exportInfo?.transformFallbackUsed,
+        transformVariant: payload.exportInfo?.transformVariant,
+      });
+
       clearExportProgressTimer();
+      setExportStatus("Finalizing download...");
+      setExportPhase("Finalizing download...");
+      updateExportProgress(runId, "finalizing", 96, "Finalizing download...");
       setDownloadUrl(payload.downloadUrl);
       setDownloadName(payload.fileName);
-      updateExportProgress(runId, "complete", 100, "Export complete");
-      setExportStatus("Export complete");
-      setExportPhase("Export complete");
+      console.info("[Lumeo Export] download prepared", {
+        projectId,
+        fileName: payload.fileName,
+        elapsedMs: Math.round(performance.now() - exportStartedAt),
+      });
+      updateExportProgress(runId, "complete", 100, "Export ready");
+      setExportStatus("Export ready");
+      setExportPhase("Export ready");
     } catch (error) {
-      console.error("[Lumeo Export] cloud export failed", error);
+      console.error("[Lumeo Export] cloud export failed", {
+        error,
+        elapsedMs: Math.round(performance.now() - exportStartedAt),
+      });
 
       if (runId !== exportRunIdRef.current) {
         return;
@@ -2450,12 +2569,16 @@ export default function ProjectDetailsPage() {
 
       clearExportProgressTimer();
       updateExportProgress(runId, "failed", 0, "failed");
-      setExportError("Export failed. Please try again.");
+      setExportError("Export failed. Please retry.");
       setExportStatus("");
       setExportPhase("failed");
     } finally {
       if (runId === exportRunIdRef.current) {
         setExporting(false);
+        console.info("[Lumeo Export] total export duration", {
+          projectId,
+          totalMs: Math.round(performance.now() - exportStartedAt),
+        });
       }
     }
   };
@@ -3856,12 +3979,17 @@ export default function ProjectDetailsPage() {
 
     if (activeTool === "export") {
       const visibleProgress = exportProgress;
-      const visiblePhase = exportPhase || exportStatus || "Preparing export...";
+      const visiblePhase =
+        exportPhase === "idle"
+          ? "Ready to export"
+          : exportPhase || exportStatus || "Ready to export";
+      const sourceReadyForExport = hasSavedSourceMedia || Boolean(localVideoURL);
+      const localOnlySource = Boolean(localVideoURL) && !hasSavedSourceMedia;
 
       return (
         <Panel
           title="Export Studio"
-          subtitle="Choose output format and quality, then create your download."
+          subtitle="Create a polished MP4 download from your current edit."
         >
           <div className="space-y-5">
             <div className="rounded-[1.6rem] border border-fuchsia-300/15 bg-gradient-to-br from-fuchsia-300/12 via-white/[0.04] to-cyan-300/10 p-4">
@@ -3879,6 +4007,41 @@ export default function ProjectDetailsPage() {
                   ? "1080p · 30fps"
                   : "720p · 30fps"}
               </p>
+
+              <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-black uppercase tracking-[0.16em] text-white/42">
+                    Status
+                  </span>
+                  <span
+                    className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${
+                      sourceReadyForExport
+                        ? "border-emerald-200/18 bg-emerald-200/10 text-emerald-100"
+                        : localOnlySource
+                          ? "border-amber-200/18 bg-amber-200/10 text-amber-100"
+                          : "border-white/10 bg-white/[0.06] text-white/48"
+                    }`}
+                  >
+                    {sourceReadyForExport
+                      ? localOnlySource
+                        ? "Ready on this device"
+                        : "Ready to export"
+                      : localOnlySource
+                        ? "Cloud backup pending"
+                        : "Add a video"}
+                  </span>
+                </div>
+
+                <p className="mt-2 text-xs leading-5 text-white/46">
+                  {sourceReadyForExport
+                    ? localOnlySource
+                      ? "You can export from this device while backup finishes."
+                      : "Your saved source is ready for export."
+                    : localOnlySource
+                      ? "Local editing stays available while backup finishes."
+                      : "Choose a video in Media to begin."}
+                </p>
+              </div>
 
               {localVideoBytes > 100 * 1024 * 1024 && (
                 <p className="mt-3 rounded-2xl border border-amber-300/20 bg-amber-300/10 px-4 py-3 text-xs font-bold leading-5 text-amber-100/78">
@@ -3926,14 +4089,17 @@ export default function ProjectDetailsPage() {
                 </OptionButton>
               </div>
 
+              <p className="mt-3 text-xs font-bold leading-5 text-white/42">
+                720p is fastest. 1080p creates a sharper file and may take longer.
+              </p>
             </div>
 
             <button
               onClick={handleExportVideo}
-              disabled={exporting || !hasSavedSourceMedia}
+              disabled={exporting || !sourceReadyForExport}
               className="w-full rounded-2xl bg-white px-5 py-3 font-black text-black transition hover:bg-fuchsia-100 disabled:cursor-not-allowed disabled:opacity-55"
             >
-              {exporting ? "Preparing export..." : "Export Video"}
+              {exporting ? visiblePhase : "Export Video"}
             </button>
 
             {userExportRequested && !downloadUrl && !exportError && (
@@ -3998,7 +4164,7 @@ export default function ProjectDetailsPage() {
                 <div className="mb-4 flex items-center justify-between gap-3">
                   <div>
                     <p className="text-sm font-black text-emerald-100">
-                      Export complete
+                      Export ready
                     </p>
                     <p className="mt-1 text-xs font-bold text-emerald-100/62">
                       Click Download video to save it to your computer.
