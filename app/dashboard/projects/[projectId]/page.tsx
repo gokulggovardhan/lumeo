@@ -177,65 +177,30 @@ const titleSizePresets: { label: string; scale: number }[] = [
 const smartTitleTemplates: {
   label: string;
   text: string;
-  style: TitleStyle;
-  position: TitlePosition;
-  scale: number;
-  background: boolean;
-  shadow: boolean;
 }[] = [
   {
     label: "Hook",
     text: "Wait for the result",
-    style: "creatorBold",
-    position: "top",
-    scale: 1.32,
-    background: true,
-    shadow: true,
   },
   {
     label: "Tutorial",
     text: "How to edit faster",
-    style: "cleanLower",
-    position: "top",
-    scale: 1,
-    background: true,
-    shadow: false,
   },
   {
     label: "Before / After",
-    text: "Before -> After",
-    style: "softCaption",
-    position: "center",
-    scale: 1.32,
-    background: true,
-    shadow: true,
+    text: "Before → After",
   },
   {
     label: "Quote",
     text: "Create more. Stress less.",
-    style: "minimalTag",
-    position: "center",
-    scale: 1,
-    background: false,
-    shadow: true,
   },
   {
     label: "Offer",
     text: "Limited time offer",
-    style: "softCaption",
-    position: "bottom",
-    scale: 1.32,
-    background: true,
-    shadow: true,
   },
   {
     label: "CTA",
     text: "Follow for more",
-    style: "cinematic",
-    position: "bottom",
-    scale: 1,
-    background: true,
-    shadow: true,
   },
 ];
 
@@ -1274,7 +1239,7 @@ export default function ProjectDetailsPage() {
   const [titleStyle, setTitleStyle] = useState<TitleStyle>("cleanLower");
   const [titlePosition, setTitlePosition] = useState<TitlePosition>("bottom");
   const [titleScale, setTitleScale] = useState(1);
-  const [titleBackground, setTitleBackground] = useState(true);
+  const [titleBackground, setTitleBackground] = useState(false);
   const [titleShadow, setTitleShadow] = useState(true);
   const [titleEnabled, setTitleEnabled] = useState(false);
   const [overlayText, setOverlayText] = useState("");
@@ -1407,14 +1372,14 @@ export default function ProjectDetailsPage() {
   };
   const titlePreviewClass =
     titleStyle === "creatorBold"
-      ? `${titleBackground ? "rounded-2xl bg-black/38 px-4 py-2 backdrop-blur-sm" : ""} text-[#FFF6D8] font-black tracking-tight ${titleShadow ? "[text-shadow:0_6px_22px_rgba(0,0,0,0.78)]" : ""}`
+      ? `${titleBackground ? "rounded-2xl bg-black/34 px-3.5 py-1.5 backdrop-blur-sm" : ""} text-[#FFF6D8] font-black tracking-tight ${titleShadow ? "[text-shadow:0_5px_18px_rgba(0,0,0,0.68)]" : ""}`
       : titleStyle === "minimalTag"
-        ? `${titleBackground ? "rounded-full bg-black/58 px-3.5 py-1.5 backdrop-blur-md" : ""} text-[#F3E7C8] text-sm font-black uppercase tracking-[0.13em] ${titleShadow ? "[text-shadow:0_5px_18px_rgba(0,0,0,0.68)]" : ""}`
+        ? `${titleBackground ? "rounded-full bg-black/52 px-3 py-1.5 backdrop-blur-md" : ""} text-[#F3E7C8] text-sm font-black uppercase tracking-[0.13em] ${titleShadow ? "[text-shadow:0_4px_14px_rgba(0,0,0,0.62)]" : ""}`
         : titleStyle === "cinematic"
-          ? `${titleBackground ? "rounded-2xl bg-black/28 px-4 py-2 backdrop-blur-sm" : ""} font-serif text-[#F5E6BC] font-semibold uppercase tracking-[0.1em] ${titleShadow ? "[text-shadow:0_7px_24px_rgba(0,0,0,0.76)]" : ""}`
+          ? `${titleBackground ? "rounded-2xl bg-black/26 px-3.5 py-1.5 backdrop-blur-sm" : ""} font-serif text-[#F5E6BC] font-semibold uppercase tracking-[0.1em] ${titleShadow ? "[text-shadow:0_5px_18px_rgba(0,0,0,0.66)]" : ""}`
           : titleStyle === "softCaption"
-            ? `${titleBackground ? "rounded-2xl bg-black/68 px-4 py-2 backdrop-blur-md" : ""} text-white font-black ${titleShadow ? "[text-shadow:0_6px_20px_rgba(0,0,0,0.72)]" : ""}`
-            : `${titleBackground ? "rounded-2xl bg-black/52 px-4 py-2 backdrop-blur-md" : ""} text-[#F3E7C8] font-bold ${titleShadow ? "[text-shadow:0_6px_20px_rgba(0,0,0,0.72)]" : ""}`;
+            ? `${titleBackground ? "rounded-2xl bg-black/62 px-3.5 py-1.5 backdrop-blur-md" : ""} text-white font-black ${titleShadow ? "[text-shadow:0_5px_16px_rgba(0,0,0,0.66)]" : ""}`
+            : `${titleBackground ? "rounded-2xl bg-black/46 px-3.5 py-1.5 backdrop-blur-md" : ""} text-[#F3E7C8] font-bold ${titleShadow ? "[text-shadow:0_5px_16px_rgba(0,0,0,0.66)]" : ""}`;
   const titlePreviewAlignClass = "text-center";
   const titlePreviewTransform = "translate(-50%, -50%)";
   const titlePreviewSizeStyle = {
@@ -1558,7 +1523,7 @@ export default function ProjectDetailsPage() {
                 ? savedTitles.background
                 : typeof savedTitleOverlay.background === "boolean"
                   ? savedTitleOverlay.background
-                  : true,
+                  : false,
             );
             setTitleShadow(
               typeof savedTitles.shadow === "boolean"
@@ -3263,7 +3228,7 @@ export default function ProjectDetailsPage() {
     setTitleStyle("cleanLower");
     setTitlePosition("bottom");
     setTitleScale(1);
-    setTitleBackground(true);
+    setTitleBackground(false);
     setTitleShadow(true);
     setTitleEnabled(false);
     setOverlayText("");
@@ -3967,7 +3932,7 @@ export default function ProjectDetailsPage() {
               </div>
 
               <p className="mt-1 text-[11px] font-bold text-white/34">
-                Start with a ready-made creator title.
+                Quick text ideas. Your current style stays applied.
               </p>
 
               <div className="mt-3 grid grid-cols-3 gap-2">
@@ -3975,16 +3940,20 @@ export default function ProjectDetailsPage() {
                   <button
                     key={template.label}
                     onClick={() => {
+                      const isStartingFresh = !titleEnabled && visibleOverlayText.length === 0;
+
                       setOverlayText(template.text);
                       setTitleEnabled(true);
-                      setTitleStyle(template.style);
-                      setTitlePosition(template.position);
-                      setTitleScale(template.scale);
-                      setTitleBackground(template.background);
-                      setTitleShadow(template.shadow);
+                      if (isStartingFresh) {
+                        setTitleStyle("cleanLower");
+                        setTitlePosition("top");
+                        setTitleScale(1);
+                        setTitleBackground(false);
+                        setTitleShadow(true);
+                      }
                       setTitleFineTuneOpen(false);
                     }}
-                    className="rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-center text-xs font-black text-white/70 transition hover:border-fuchsia-200/35 hover:bg-white/[0.09] hover:text-white"
+                    className="rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 text-center text-[11px] font-black text-white/70 transition hover:border-fuchsia-200/35 hover:bg-white/[0.09] hover:text-white"
                   >
                     {template.label}
                   </button>
@@ -4062,27 +4031,37 @@ export default function ProjectDetailsPage() {
                 Finishing
               </p>
 
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
                   onClick={() => setTitleBackground(!titleBackground)}
-                  className={`rounded-2xl border px-4 py-2.5 text-sm font-black transition ${
+                  className={`flex items-center justify-between rounded-xl border px-3 py-2 text-xs font-black transition ${
                     titleBackground
-                      ? "border-fuchsia-200/45 bg-white text-black shadow-lg shadow-fuchsia-500/10"
-                      : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
+                      ? "border-fuchsia-200/35 bg-white/[0.13] text-white shadow-md shadow-fuchsia-500/10"
+                      : "border-white/10 bg-white/[0.04] text-white/58 hover:bg-white/[0.08] hover:text-white"
                   }`}
                 >
-                  Background
+                  <span>Plate</span>
+                  <span
+                    className={`h-3.5 w-3.5 rounded-full border ${
+                      titleBackground ? "border-fuchsia-100 bg-fuchsia-100" : "border-white/20 bg-white/5"
+                    }`}
+                  />
                 </button>
 
                 <button
                   onClick={() => setTitleShadow(!titleShadow)}
-                  className={`rounded-2xl border px-4 py-2.5 text-sm font-black transition ${
+                  className={`flex items-center justify-between rounded-xl border px-3 py-2 text-xs font-black transition ${
                     titleShadow
-                      ? "border-fuchsia-200/45 bg-white text-black shadow-lg shadow-fuchsia-500/10"
-                      : "border-white/10 bg-white/[0.06] text-white/65 hover:bg-white hover:text-black"
+                      ? "border-fuchsia-200/35 bg-white/[0.13] text-white shadow-md shadow-fuchsia-500/10"
+                      : "border-white/10 bg-white/[0.04] text-white/58 hover:bg-white/[0.08] hover:text-white"
                   }`}
                 >
-                  Shadow
+                  <span>Shadow</span>
+                  <span
+                    className={`h-3.5 w-3.5 rounded-full border ${
+                      titleShadow ? "border-fuchsia-100 bg-fuchsia-100" : "border-white/20 bg-white/5"
+                    }`}
+                  />
                 </button>
               </div>
             </div>
@@ -4127,7 +4106,7 @@ export default function ProjectDetailsPage() {
                 setTitleStyle("cleanLower");
                 setTitlePosition("bottom");
                 setTitleScale(1);
-                setTitleBackground(true);
+                setTitleBackground(false);
                 setTitleShadow(true);
                 setTitleFineTuneOpen(false);
               }}
