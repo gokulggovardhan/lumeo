@@ -35,4 +35,4 @@ https://lumeo.in
 
 ## Developer
 
-Developed by Govardhan Gudapakam.
+Created by Govardhan Gudapakam.
