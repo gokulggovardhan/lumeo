@@ -104,13 +104,15 @@ export function PublicPageShell({
   children,
   maxWidth = "max-w-[1360px]",
   contentClassName = "px-5 py-8 sm:px-8 lg:py-10",
+  mainClassName = "min-h-screen bg-[#0C1220] text-[#F0EAD6]",
 }: {
   children: ReactNode;
   maxWidth?: string;
   contentClassName?: string;
+  mainClassName?: string;
 }) {
   return (
-    <main className="min-h-screen bg-[#0C1220] text-[#F0EAD6]">
+    <main className={mainClassName}>
       <PublicNav maxWidth={maxWidth} />
       <div className={`mx-auto ${maxWidth} ${contentClassName}`}>
         {children}
@@ -129,28 +131,31 @@ export function ToolPlaceholder({
   accepted: string;
 }) {
   return (
-    <PublicPageShell>
-      <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+    <PublicPageShell
+      mainClassName="min-h-screen bg-[#0C1220] text-[#F0EAD6] lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden"
+      contentClassName="px-5 py-8 sm:px-8 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:justify-center lg:overflow-hidden lg:py-6"
+    >
+      <section className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
         <div>
-        <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
-          PDF workspace
-        </p>
-        <h1 className="font-serif text-4xl tracking-[-0.02em] text-[#F0EAD6] sm:text-6xl">
-          {title}
-        </h1>
-        <p className="mt-5 max-w-2xl text-base leading-7 text-[#F0EAD6]/55">
-          {description}
-        </p>
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
+            PDF workspace
+          </p>
+          <h1 className="font-serif text-4xl tracking-[-0.02em] text-[#F0EAD6] sm:text-6xl">
+            {title}
+          </h1>
+          <p className="mt-4 max-w-2xl text-base leading-7 text-[#F0EAD6]/55">
+            {description}
+          </p>
         </div>
-        <div className="rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/72 p-5 text-sm leading-6 text-[#F0EAD6]/52">
+        <div className="rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/72 p-4 text-sm leading-6 text-[#F0EAD6]/52">
           Tool engine coming next. This page is a preview of the document
           workspace layout and does not upload files.
         </div>
       </section>
 
-      <section className="mt-10 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-xl border border-dashed border-[#C9A84C]/35 bg-[#F0EAD6] p-8 text-[#1C1710] shadow-2xl shadow-black/20 sm:p-10">
-          <div className="mb-5 flex justify-start">
+      <section className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-xl border border-dashed border-[#C9A84C]/35 bg-[#F0EAD6] p-7 text-[#1C1710] shadow-2xl shadow-black/20 sm:p-8">
+          <div className="mb-4 flex justify-start">
             <BrandLockup tone="dark" markSize="h-10 w-10" />
           </div>
           <h2 className="font-serif text-3xl tracking-[-0.01em]">
@@ -160,11 +165,11 @@ export function ToolPlaceholder({
             This workspace will accept {accepted}. The processing engine is
             coming next, so no files are uploaded from this placeholder.
           </p>
-          <p className="mt-6 inline-flex rounded-full border border-[#1E6B4A]/20 bg-[#1E6B4A]/10 px-4 py-2 text-xs font-bold text-[#1E6B4A]">
+          <p className="mt-5 inline-flex rounded-full border border-[#1E6B4A]/20 bg-[#1E6B4A]/10 px-4 py-2 text-xs font-bold text-[#1E6B4A]">
             Tool engine coming next.
           </p>
         </div>
-        <div className="rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-6 shadow-2xl shadow-black/20">
+        <div className="rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-5 shadow-2xl shadow-black/20">
           <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
             Privacy approach
           </p>

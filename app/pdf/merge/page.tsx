@@ -13,8 +13,11 @@ export const metadata: Metadata = {
 
 export default function MergePdfPage() {
   return (
-    <PublicPageShell contentClassName="px-5 py-5 sm:px-8 lg:h-[calc(100dvh-57px)] lg:overflow-hidden lg:py-3">
-      <section className="flex flex-col justify-center lg:min-h-[58px]">
+    <PublicPageShell
+      mainClassName="min-h-screen bg-[#0C1220] text-[#F0EAD6] lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden"
+      contentClassName="px-5 py-5 sm:px-8 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:py-2"
+    >
+      <section className="shrink-0">
         <div>
           <h1 className="font-serif text-3xl leading-tight tracking-[-0.02em] text-[#F0EAD6] sm:text-4xl">
             Merge PDF
@@ -25,7 +28,7 @@ export default function MergePdfPage() {
         </div>
       </section>
 
-      <div className="mt-2 lg:h-[calc(100%-66px)] lg:overflow-hidden">
+      <div className="mt-2 lg:min-h-0 lg:flex-1 lg:overflow-hidden">
         <MergePdfTool />
       </div>
     </PublicPageShell>

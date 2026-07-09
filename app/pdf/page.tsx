@@ -41,21 +41,24 @@ const tools = [
 
 export default function PdfHubPage() {
   return (
-    <PublicPageShell>
+    <PublicPageShell
+      mainClassName="min-h-screen bg-[#0C1220] text-[#F0EAD6] lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden"
+      contentClassName="px-5 py-8 sm:px-8 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:justify-center lg:overflow-hidden lg:py-6"
+    >
       <section>
-        <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
+        <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
           PDF tools
         </p>
         <h1 className="max-w-3xl font-serif text-4xl tracking-[-0.02em] sm:text-6xl">
           Choose a careful workspace for your document.
         </h1>
-        <p className="mt-5 max-w-2xl text-base leading-7 text-[#F0EAD6]/55">
+        <p className="mt-4 max-w-2xl text-base leading-7 text-[#F0EAD6]/55">
           Start with a focused PDF tool. Each workspace is designed around
           privacy, clarity, and control.
         </p>
       </section>
 
-      <section className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      <section className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         {tools.map((tool) => (
           <Link
             key={tool.title}
