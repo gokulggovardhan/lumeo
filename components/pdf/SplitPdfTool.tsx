@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDocument } from "pdf-lib";
 
 type SplitMode = "extract" | "ranges" | "everyPage" | "everyN" | "remove";
 type ResultKind = "pdf" | "zip";
@@ -112,6 +112,16 @@ function parsePageList(input: string, totalPages: number) {
   if (text.toLowerCase() === "all") {
     return Array.from({ length: totalPages }, (_, index) => index + 1);
   }
+  if (text.toLowerCase() === "odd") {
+    return Array.from({ length: totalPages }, (_, index) => index + 1).filter(
+      (page) => page % 2 === 1,
+    );
+  }
+  if (text.toLowerCase() === "even") {
+    return Array.from({ length: totalPages }, (_, index) => index + 1).filter(
+      (page) => page % 2 === 0,
+    );
+  }
 
   const pages: number[] = [];
 
@@ -140,13 +150,15 @@ function parsePageList(input: string, totalPages: number) {
     }
   }
 
-  if (!pages.length) throw new Error("No pages selected.");
-  return pages;
+  const uniquePages = Array.from(new Set(pages));
+  if (!uniquePages.length) throw new Error("No pages selected.");
+  return uniquePages;
 }
 
 function parseRangeGroups(input: string, totalPages: number) {
+  const separator = input.includes("|") ? "|" : ",";
   const groups = input
-    .split("|")
+    .split(separator)
     .map((group) => group.trim())
     .filter(Boolean)
     .map((group) => parsePageList(group, totalPages));
@@ -192,8 +204,10 @@ export default function SplitPdfTool() {
   const [analysis, setAnalysis] = useState<PdfAnalysis | null>(null);
   const [mode, setMode] = useState<SplitMode>("extract");
   const [rangeInput, setRangeInput] = useState("1");
+  const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [chunkSize, setChunkSize] = useState(2);
   const [outputName, setOutputName] = useState("lumeo-split");
+  const [methodDrawerOpen, setMethodDrawerOpen] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState("Ready");
   const [cleanupMessage, setCleanupMessage] = useState("");
@@ -208,6 +222,8 @@ export default function SplitPdfTool() {
   const resultType: ResultKind = mode === "extract" || mode === "remove" ? "pdf" : "zip";
   const pageCount = analysis?.pageCount ?? 0;
   const largeFile = Boolean(analysis && analysis.size > 75 * 1024 * 1024);
+  const selectedMode = splitModes.find((item) => item.value === mode) ?? splitModes[0];
+  const usesPageSelection = mode === "extract" || mode === "remove";
 
   useEffect(() => {
     return () => {
@@ -226,10 +242,12 @@ export default function SplitPdfTool() {
     setAnalysis(null);
     setMode("extract");
     setRangeInput("1");
+    setSelectedPages([]);
     setChunkSize(2);
     setOutputName("lumeo-split");
     setError("");
     setStatus("Ready");
+    setMethodDrawerOpen(false);
     if (inputRef.current) inputRef.current.value = "";
   }
 
@@ -257,6 +275,7 @@ export default function SplitPdfTool() {
       setAnalysis(nextAnalysis);
       setMode("extract");
       setRangeInput(nextAnalysis.pageCount > 1 ? "1-2" : "1");
+      setSelectedPages(nextAnalysis.pageCount > 1 ? [1, 2] : [1]);
       setOutputName("lumeo-split");
       setStatus("Ready to split");
     } catch {
@@ -274,16 +293,26 @@ export default function SplitPdfTool() {
     if (!analysis) return;
     const total = analysis.pageCount;
     const half = Math.max(1, Math.ceil(total / 2));
+    const setPages = (pages: number[]) => {
+      setSelectedPages(pages);
+      setRangeInput(pages.join(","));
+      clearResult();
+    };
 
-    if (preset === "first") setRangeInput("1");
-    if (preset === "last") setRangeInput(String(total));
+    if (preset === "all") setPages(Array.from({ length: total }, (_, index) => index + 1));
+    if (preset === "first") setPages([1]);
+    if (preset === "last") setPages([total]);
     if (preset === "odd") {
-      setRangeInput(Array.from({ length: total }, (_, index) => index + 1).filter((page) => page % 2 === 1).join(","));
+      setPages(Array.from({ length: total }, (_, index) => index + 1).filter((page) => page % 2 === 1));
     }
     if (preset === "even") {
-      setRangeInput(Array.from({ length: total }, (_, index) => index + 1).filter((page) => page % 2 === 0).join(","));
+      setPages(Array.from({ length: total }, (_, index) => index + 1).filter((page) => page % 2 === 0));
     }
-    if (preset === "halves") setRangeInput(`1-${half} | ${half + 1}-${total}`);
+    if (preset === "firstHalf") setPages(Array.from({ length: half }, (_, index) => index + 1));
+    if (preset === "secondHalf") {
+      setPages(Array.from({ length: total - half }, (_, index) => half + index + 1));
+    }
+    if (preset === "halves") setRangeInput(`1-${half}, ${half + 1}-${total}`);
     if (preset === "every2") {
       setChunkSize(2);
       setRangeInput("1-2 | 3-4");
@@ -294,11 +323,53 @@ export default function SplitPdfTool() {
     }
   }
 
+  function setModeSafely(nextMode: SplitMode) {
+    setMode(nextMode);
+    setMethodDrawerOpen(false);
+    setError("");
+    clearResult();
+
+    if (!analysis) return;
+    if (nextMode === "extract") {
+      const pages = analysis.pageCount > 1 ? [1, 2] : [1];
+      setSelectedPages(pages);
+      setRangeInput(pages.join(","));
+    }
+    if (nextMode === "ranges") {
+      setSelectedPages([]);
+      setRangeInput(`1-${Math.min(3, pageCount)}, ${Math.min(4, pageCount)}-${pageCount}`);
+    }
+    if (nextMode === "remove") {
+      setSelectedPages([1]);
+      setRangeInput("1");
+    }
+    if (nextMode === "everyPage" || nextMode === "everyN") {
+      setSelectedPages([]);
+    }
+  }
+
+  function togglePage(page: number) {
+    if (!usesPageSelection) return;
+
+    setSelectedPages((current) => {
+      const next = current.includes(page)
+        ? current.filter((item) => item !== page)
+        : [...current, page].sort((a, b) => a - b);
+      setRangeInput(next.join(","));
+      clearResult();
+      return next;
+    });
+  }
+
   function getGroupsForMode() {
     if (!analysis) throw new Error("Please add one PDF file.");
     const total = analysis.pageCount;
 
-    if (mode === "extract") return [parsePageList(rangeInput, total)];
+    if (mode === "extract") {
+      const pages = selectedPages.length ? selectedPages : parsePageList(rangeInput, total);
+      if (!pages.length) throw new Error("Choose at least one page.");
+      return [pages];
+    }
     if (mode === "ranges") return parseRangeGroups(rangeInput, total);
     if (mode === "everyPage") return Array.from({ length: total }, (_, index) => [index + 1]);
     if (mode === "everyN") {
@@ -315,7 +386,8 @@ export default function SplitPdfTool() {
       return groups;
     }
 
-    const removePages = new Set(parsePageList(rangeInput, total));
+    const pagesToRemove = selectedPages.length ? selectedPages : parsePageList(rangeInput, total);
+    const removePages = new Set(pagesToRemove);
     const remaining = Array.from({ length: total }, (_, index) => index + 1).filter(
       (page) => !removePages.has(page),
     );
@@ -352,8 +424,10 @@ export default function SplitPdfTool() {
           const bytes = await createPdfFromPages(analysis.bytes, group);
           const partName =
             mode === "everyN"
-              ? `${sourceBaseName}-part-${String(index + 1).padStart(2, "0")}.pdf`
-              : `${sourceBaseName}-${describePages(group)}.pdf`;
+              ? `${sourceBaseName}-part-${String(index + 1).padStart(2, "0")}-${describePages(group)}.pdf`
+              : mode === "ranges"
+                ? `${sourceBaseName}-range-${group[0]}-${group[group.length - 1]}.pdf`
+                : `${sourceBaseName}-${describePages(group)}.pdf`;
           zip.file(partName, bytes);
         }
 
@@ -380,6 +454,7 @@ export default function SplitPdfTool() {
           "Enter a valid page range.",
           "Page range is outside this PDF.",
           "No pages selected.",
+          "Choose at least one page.",
           "Please add one PDF file.",
         ].includes(message)
           ? message
@@ -452,6 +527,9 @@ export default function SplitPdfTool() {
           </p>
           <p className="mt-6 text-sm font-semibold text-[#F0EAD6]/74">
             Drop one PDF here
+          </p>
+          <p className="mt-1 text-xs text-[#F0EAD6]/42">
+            Choose file from your device
           </p>
           <button
             type="button"
@@ -534,9 +612,15 @@ export default function SplitPdfTool() {
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
-                Page map
+                Pages
               </p>
-              <p className="text-xs text-[#F0EAD6]/38">Visual page helper. No thumbnails yet.</p>
+              <p className="text-xs text-[#F0EAD6]/38">
+                {usesPageSelection
+                  ? selectedPages.length
+                    ? `Selected: ${selectedPages.length} ${selectedPages.length === 1 ? "page" : "pages"}`
+                    : "No pages selected"
+                  : `${analysis.pageCount} pages in this PDF`}
+              </p>
             </div>
           </div>
           <div className="no-scrollbar grid max-h-[18rem] grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6 lg:max-h-full lg:grid-cols-8 xl:grid-cols-10">
@@ -544,10 +628,15 @@ export default function SplitPdfTool() {
               <button
                 type="button"
                 key={page}
-                onClick={() => setRangeInput((current) => (current ? `${current},${page}` : String(page)))}
-                className="rounded-lg border border-[#E8DFC8]/8 bg-[#F0EAD6]/[0.035] px-2 py-2 text-xs font-semibold text-[#F0EAD6]/62 transition hover:-translate-y-0.5 hover:border-[#C9A84C]/34 hover:text-[#F0EAD6]"
+                onClick={() => togglePage(page)}
+                disabled={!usesPageSelection}
+                className={`rounded-lg border px-2 py-2 text-xs font-semibold transition hover:-translate-y-0.5 disabled:hover:translate-y-0 ${
+                  selectedPages.includes(page)
+                    ? "border-[#1E6B4A]/60 bg-[#1E6B4A]/18 text-[#F0EAD6]"
+                    : "border-[#E8DFC8]/8 bg-[#F0EAD6]/[0.035] text-[#F0EAD6]/62 hover:border-[#C9A84C]/34 hover:text-[#F0EAD6] disabled:cursor-default disabled:opacity-55"
+                }`}
               >
-                Page {page}
+                {page}
               </button>
             ))}
           </div>
@@ -565,33 +654,52 @@ export default function SplitPdfTool() {
 
       <aside className="flex min-h-0 flex-col rounded-2xl border border-[#E8DFC8]/10 bg-[#0A101C] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.26)]">
         <div className="border-b border-[#E8DFC8]/10 pb-3">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
-            Split method
-          </p>
-          <div className="mt-3 grid gap-2">
-            {splitModes.map((item) => (
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
+              Split method
+            </p>
+            <button
+              type="button"
+              onClick={() => setMethodDrawerOpen((open) => !open)}
+              className="rounded-full border border-[#E8DFC8]/12 px-3 py-1.5 text-xs font-bold text-[#F0EAD6]/60 transition hover:border-[#C9A84C]/34 hover:text-[#F0EAD6]"
+            >
+              Change
+            </button>
+          </div>
+          <div className="mt-3 rounded-xl border border-[#1E6B4A]/42 bg-[#1E6B4A]/14 px-3 py-2">
+            <span className="block text-sm font-bold text-[#F0EAD6]">
+              {selectedMode.label}
+            </span>
+            <span className="mt-0.5 block text-xs text-[#F0EAD6]/46">
+              {selectedMode.helper}
+            </span>
+          </div>
+          {methodDrawerOpen ? (
+            <div className="mt-2 grid gap-1 rounded-xl border border-[#E8DFC8]/10 bg-[#050914]/88 p-2">
+              {splitModes.map((item) => (
               <button
                 type="button"
                 key={item.value}
-                onClick={() => {
-                  setMode(item.value);
-                  setError("");
-                  clearResult();
-                  if (item.value === "extract") setRangeInput("1");
-                  if (item.value === "ranges") setRangeInput(`1-${Math.min(3, pageCount)} | ${Math.min(4, pageCount)}-${pageCount}`);
-                  if (item.value === "remove") setRangeInput("1");
-                }}
+                onClick={() => setModeSafely(item.value)}
                 className={`rounded-xl border px-3 py-2 text-left transition ${
                   mode === item.value
                     ? "border-[#1E6B4A]/55 bg-[#1E6B4A]/16"
                     : "border-[#E8DFC8]/8 bg-[#F0EAD6]/[0.025] hover:border-[#C9A84C]/28"
                 }`}
               >
-                <span className="block text-sm font-bold text-[#F0EAD6]">{item.label}</span>
-                <span className="mt-0.5 block text-xs text-[#F0EAD6]/42">{item.helper}</span>
+                <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#F0EAD6]">
+                  {item.label}
+                  {mode === item.value ? (
+                    <span className="text-[#A8E0C1]">✓</span>
+                  ) : null}
+                </span>
+                <span className="mt-0.5 block text-xs text-[#F0EAD6]/42">
+                  {item.helper}
+                </span>
               </button>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : null}
         </div>
 
         <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto py-3">
@@ -603,14 +711,22 @@ export default function SplitPdfTool() {
               <input
                 value={rangeInput}
                 onChange={(event) => {
-                  setRangeInput(event.target.value);
+                  const value = event.target.value;
+                  setRangeInput(value);
+                  if (usesPageSelection && analysis) {
+                    try {
+                      setSelectedPages(parsePageList(value, analysis.pageCount));
+                    } catch {
+                      setSelectedPages([]);
+                    }
+                  }
                   clearResult();
                 }}
                 className="mt-2 h-11 w-full rounded-xl border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.035] px-3 text-sm font-semibold text-[#F0EAD6] outline-none transition placeholder:text-[#F0EAD6]/25 focus:border-[#C9A84C]/45"
                 placeholder={mode === "ranges" ? "1-3 | 4-6" : "1-3,5"}
               />
               <p className="mt-2 text-xs text-[#F0EAD6]/38">
-                Examples: 1-3,5 or 1-2 | 3-5. You can also use end.
+                Examples: 1-3, 5, odd, even, all, or 1-end.
               </p>
             </div>
           ) : null}
@@ -642,10 +758,13 @@ export default function SplitPdfTool() {
               <div className="mt-2 flex flex-wrap gap-2">
                 {mode === "extract" ? (
                   <>
+                    <button className="preset-button" type="button" onClick={() => applyPreset("all")}>All</button>
                     <button className="preset-button" type="button" onClick={() => applyPreset("first")}>First page</button>
                     <button className="preset-button" type="button" onClick={() => applyPreset("last")}>Last page</button>
                     <button className="preset-button" type="button" onClick={() => applyPreset("odd")}>Odd pages</button>
                     <button className="preset-button" type="button" onClick={() => applyPreset("even")}>Even pages</button>
+                    <button className="preset-button" type="button" onClick={() => applyPreset("firstHalf")}>First half</button>
+                    <button className="preset-button" type="button" onClick={() => applyPreset("secondHalf")}>Second half</button>
                   </>
                 ) : null}
                 {mode === "ranges" ? (
@@ -657,8 +776,11 @@ export default function SplitPdfTool() {
                 ) : null}
                 {mode === "remove" ? (
                   <>
+                    <button className="preset-button" type="button" onClick={() => applyPreset("all")}>All</button>
                     <button className="preset-button" type="button" onClick={() => applyPreset("first")}>Remove first page</button>
                     <button className="preset-button" type="button" onClick={() => applyPreset("last")}>Remove last page</button>
+                    <button className="preset-button" type="button" onClick={() => applyPreset("odd")}>Odd pages</button>
+                    <button className="preset-button" type="button" onClick={() => applyPreset("even")}>Even pages</button>
                   </>
                 ) : null}
               </div>
@@ -667,7 +789,7 @@ export default function SplitPdfTool() {
 
           <div className="mt-4">
             <label className="text-xs font-bold uppercase tracking-[0.16em] text-[#F0EAD6]/42">
-              Output file name
+              {resultType === "pdf" ? "Output file name" : "ZIP file name"}
             </label>
             <input
               value={outputName}
