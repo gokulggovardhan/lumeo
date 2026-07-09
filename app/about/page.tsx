@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import PublicFooter from "@/components/PublicFooter";
+import { PublicNav } from "@/components/PublicPdfChrome";
 
 export const metadata: Metadata = {
   title: "About Lumeo PDF Workspace",
@@ -21,37 +21,19 @@ export const metadata: Metadata = {
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-[#07070A] text-[#F7F0DE]">
-      <nav className="border-b border-[#F3E7C8]/10 px-6 py-4">
-        <div className="mx-auto flex max-w-4xl items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E7C8] text-sm font-bold text-[#111018]">
-              L
-            </div>
-            <span className="font-bold tracking-tight">
-              Lumeo PDF Workspace
-            </span>
-          </Link>
+    <main className="min-h-screen bg-[#0C1220] text-[#F0EAD6]">
+      <PublicNav maxWidth="max-w-[900px]" />
 
-          <Link
-            href="/"
-            className="rounded-full border border-[#F3E7C8]/10 px-4 py-2 text-sm font-semibold text-[#F7F0DE]/55 transition hover:border-[#F3E7C8]/30 hover:text-white"
-          >
-            Back home
-          </Link>
-        </div>
-      </nav>
-
-      <section className="mx-auto max-w-4xl px-6 py-20">
-        <p className="mb-4 text-xs font-bold uppercase tracking-[0.24em] text-[#D8C48E]">
+      <section className="mx-auto max-w-[900px] px-5 py-16 sm:px-8">
+        <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
           About
         </p>
 
-        <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-          Lumeo is a clean PDF workspace for everyday documents.
+        <h1 className="max-w-3xl font-serif text-4xl leading-tight tracking-[-0.02em] sm:text-6xl">
+          Lumeo is a careful PDF workspace for everyday documents.
         </h1>
 
-        <div className="mt-10 space-y-7 text-base leading-8 text-[#F7F0DE]/60">
+        <div className="mt-10 space-y-7 text-base leading-8 text-[#F0EAD6]/58">
           <p>
             Lumeo PDF Workspace is being built for people who need simple,
             private tools to prepare common documents without a cluttered
@@ -90,10 +72,10 @@ export default function AboutPage() {
           ].map((item) => (
             <div
               key={item.title}
-              className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.035] p-5"
+              className="rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-5"
             >
               <h2 className="text-base font-bold">{item.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-[#F7F0DE]/45">
+              <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/48">
                 {item.description}
               </p>
             </div>

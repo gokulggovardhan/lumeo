@@ -5,17 +5,32 @@ import { PDFDocument, rgb } from "pdf-lib";
 
 type MergeStatus = "Ready" | "Merging in your browser..." | "Download ready";
 type CleanupMessage = "" | "Temporary file cleared from this session.";
-type PageFormat = "smartA4" | "original";
+type PageFormat =
+  | "smartA4Portrait"
+  | "smartA4Landscape"
+  | "matchFirst"
+  | "original";
 type MarginPreset = "compact" | "clean" | "wide";
+type PageSizeType = "A4" | "Letter" | "Custom" | "Mixed";
+
+type PageSize = {
+  width: number;
+  height: number;
+};
 
 type SelectedPdf = {
   id: string;
   file: File;
   pageCount: number;
+  pageSizes: PageSize[];
+  pageSizeType: PageSizeType;
 };
 
 const A4_WIDTH = 595.28;
 const A4_HEIGHT = 841.89;
+const LETTER_WIDTH = 612;
+const LETTER_HEIGHT = 792;
+const LARGE_FILE_WARNING_BYTES = 80 * 1024 * 1024;
 
 const marginOptions: Array<{
   value: MarginPreset;
@@ -65,6 +80,67 @@ function sanitizePdfFileName(value: string) {
   return safeName.toLowerCase().endsWith(".pdf") ? safeName : `${safeName}.pdf`;
 }
 
+function sizesMatch(a: PageSize, b: PageSize, tolerance = 8) {
+  return (
+    Math.abs(a.width - b.width) <= tolerance &&
+    Math.abs(a.height - b.height) <= tolerance
+  );
+}
+
+function matchesKnownSize(
+  size: PageSize,
+  width: number,
+  height: number,
+  tolerance = 12,
+) {
+  const portraitMatch =
+    Math.abs(size.width - width) <= tolerance &&
+    Math.abs(size.height - height) <= tolerance;
+  const landscapeMatch =
+    Math.abs(size.width - height) <= tolerance &&
+    Math.abs(size.height - width) <= tolerance;
+  return portraitMatch || landscapeMatch;
+}
+
+function getPageSizeType(pageSizes: PageSize[]): PageSizeType {
+  if (pageSizes.length === 0) return "Custom";
+
+  const firstSize = pageSizes[0];
+  const hasMixedSizes = pageSizes.some((size) => !sizesMatch(size, firstSize));
+  if (hasMixedSizes) return "Mixed";
+
+  if (matchesKnownSize(firstSize, A4_WIDTH, A4_HEIGHT)) return "A4";
+  if (matchesKnownSize(firstSize, LETTER_WIDTH, LETTER_HEIGHT)) return "Letter";
+  return "Custom";
+}
+
+function getSizeSignature(size: PageSize) {
+  return `${Math.round(size.width)}x${Math.round(size.height)}`;
+}
+
+function getOutputStyleLabel(format: PageFormat) {
+  if (format === "smartA4Portrait") return "Smart A4 Portrait";
+  if (format === "smartA4Landscape") return "Smart A4 Landscape";
+  if (format === "matchFirst") return "Match first PDF";
+  return "Keep original size";
+}
+
+function getOutputPageSize(format: PageFormat, firstPageSize?: PageSize) {
+  if (format === "smartA4Landscape") {
+    return { width: A4_HEIGHT, height: A4_WIDTH };
+  }
+
+  if (format === "matchFirst" && firstPageSize) {
+    return { width: firstPageSize.width, height: firstPageSize.height };
+  }
+
+  return { width: A4_WIDTH, height: A4_HEIGHT };
+}
+
+function isSmartFitFormat(format: PageFormat) {
+  return format !== "original";
+}
+
 function MergeIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 32 32" className="h-8 w-8" fill="none">
@@ -90,7 +166,7 @@ function MergeIcon() {
 
 function PdfFileIcon() {
   return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#FF7A3D]/22 bg-[#FF5A36]/10 text-[#FFB07C]">
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#C9A84C]/22 bg-[#1E6B4A]/10 text-[#C9A84C]">
       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
         <path
           d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z"
@@ -112,14 +188,17 @@ function PdfFileIcon() {
 export default function MergePdfTool() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<SelectedPdf[]>([]);
-  const [pageFormat, setPageFormat] = useState<PageFormat>("smartA4");
+  const [pageFormat, setPageFormat] = useState<PageFormat>("smartA4Portrait");
   const [marginPreset, setMarginPreset] = useState<MarginPreset>("clean");
   const [status, setStatus] = useState<MergeStatus>("Ready");
   const [error, setError] = useState("");
+  const [softWarning, setSoftWarning] = useState("");
   const [downloadUrl, setDownloadUrl] = useState("");
   const [downloadName, setDownloadName] = useState("lumeo-merged.pdf");
   const [outputName, setOutputName] = useState("lumeo-merged.pdf");
   const [isDragging, setIsDragging] = useState(false);
+  const [draggingFileId, setDraggingFileId] = useState("");
+  const [dragOverFileId, setDragOverFileId] = useState("");
   const [cleanupMessage, setCleanupMessage] = useState<CleanupMessage>("");
 
   const totalSize = useMemo(
@@ -134,6 +213,23 @@ export default function MergePdfTool() {
 
   const selectedMargin =
     marginOptions.find((option) => option.value === marginPreset)?.points ?? 24;
+
+  const firstPageSize = files[0]?.pageSizes[0];
+  const outputStyleLabel = getOutputStyleLabel(pageFormat);
+  const showMarginOptions = isSmartFitFormat(pageFormat);
+  const hasLargeFiles = totalSize >= LARGE_FILE_WARNING_BYTES;
+  const mixedPageSizesDetected = useMemo(() => {
+    const pageSizeSignatures = new Set<string>();
+
+    for (const item of files) {
+      if (item.pageSizeType === "Mixed") return true;
+      for (const size of item.pageSizes) {
+        pageSizeSignatures.add(getSizeSignature(size));
+      }
+    }
+
+    return pageSizeSignatures.size > 1;
+  }, [files]);
 
   useEffect(() => {
     return () => {
@@ -158,16 +254,27 @@ export default function MergePdfTool() {
     clearDownload();
     setFiles([]);
     setError("");
+    setSoftWarning("");
     setStatus("Ready");
     setCleanupMessage("");
     setOutputName("lumeo-merged.pdf");
     setDownloadName("lumeo-merged.pdf");
-    setPageFormat("smartA4");
+    setPageFormat("smartA4Portrait");
     setMarginPreset("clean");
+  };
+
+  const clearAllFiles = () => {
+    clearDownload();
+    setFiles([]);
+    setError("");
+    setSoftWarning("");
+    setStatus("Ready");
+    setCleanupMessage("");
   };
 
   const addFiles = async (incomingFiles: FileList | File[]) => {
     resetReadyState();
+    setSoftWarning("");
 
     const nextFiles = Array.from(incomingFiles);
     if (nextFiles.length === 0) return;
@@ -185,15 +292,33 @@ export default function MergePdfTool() {
 
     const readableFiles: SelectedPdf[] = [];
     let unreadableCount = 0;
+    let duplicateDetected = false;
+    const existingKeys = new Set(
+      files.map((item) => `${item.file.name}-${item.file.size}`),
+    );
+    const incomingKeys = new Set<string>();
 
     for (const file of nextFiles) {
+      const duplicateKey = `${file.name}-${file.size}`;
+      if (existingKeys.has(duplicateKey) || incomingKeys.has(duplicateKey)) {
+        duplicateDetected = true;
+      }
+      incomingKeys.add(duplicateKey);
+
       try {
         const bytes = await file.arrayBuffer();
         const pdf = await PDFDocument.load(bytes, { ignoreEncryption: false });
+        const pageSizes = pdf.getPages().map((page) => {
+          const { width, height } = page.getSize();
+          return { width, height };
+        });
+
         readableFiles.push({
           id: createFileId(file),
           file,
           pageCount: pdf.getPageCount(),
+          pageSizes,
+          pageSizeType: getPageSizeType(pageSizes),
         });
       } catch {
         unreadableCount += 1;
@@ -205,7 +330,13 @@ export default function MergePdfTool() {
     }
 
     if (unreadableCount > 0) {
-      setError("One or more files could not be read as PDF.");
+      setError(
+        "This file could not be read. It may be damaged or password-protected.",
+      );
+    }
+
+    if (duplicateDetected) {
+      setSoftWarning("Duplicate file detected.");
     }
   };
 
@@ -221,6 +352,22 @@ export default function MergePdfTool() {
       if (nextIndex < 0 || nextIndex >= current.length) return current;
       const next = [...current];
       [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+      return next;
+    });
+  };
+
+  const reorderFilesById = (draggedId: string, targetId: string) => {
+    if (!draggedId || !targetId || draggedId === targetId) return;
+
+    resetReadyState();
+    setFiles((current) => {
+      const draggedIndex = current.findIndex((item) => item.id === draggedId);
+      const targetIndex = current.findIndex((item) => item.id === targetId);
+      if (draggedIndex < 0 || targetIndex < 0) return current;
+
+      const next = [...current];
+      const [draggedItem] = next.splice(draggedIndex, 1);
+      next.splice(targetIndex, 0, draggedItem);
       return next;
     });
   };
@@ -253,6 +400,7 @@ export default function MergePdfTool() {
         const sourcePdf = await PDFDocument.load(bytes, {
           ignoreEncryption: false,
         });
+        const outputPageSize = getOutputPageSize(pageFormat, firstPageSize);
 
         if (pageFormat === "original") {
           const copiedPages = await mergedPdf.copyPages(
@@ -267,23 +415,26 @@ export default function MergePdfTool() {
           const embeddedPage = await mergedPdf.embedPage(sourcePage);
           const { width: sourceWidth, height: sourceHeight } =
             sourcePage.getSize();
-          const availableWidth = A4_WIDTH - selectedMargin * 2;
-          const availableHeight = A4_HEIGHT - selectedMargin * 2;
+          const availableWidth = outputPageSize.width - selectedMargin * 2;
+          const availableHeight = outputPageSize.height - selectedMargin * 2;
           const scale = Math.min(
             availableWidth / sourceWidth,
             availableHeight / sourceHeight,
           );
           const drawWidth = sourceWidth * scale;
           const drawHeight = sourceHeight * scale;
-          const x = (A4_WIDTH - drawWidth) / 2;
-          const y = (A4_HEIGHT - drawHeight) / 2;
-          const page = mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]);
+          const x = (outputPageSize.width - drawWidth) / 2;
+          const y = (outputPageSize.height - drawHeight) / 2;
+          const page = mergedPdf.addPage([
+            outputPageSize.width,
+            outputPageSize.height,
+          ]);
 
           page.drawRectangle({
             x: 0,
             y: 0,
-            width: A4_WIDTH,
-            height: A4_HEIGHT,
+            width: outputPageSize.width,
+            height: outputPageSize.height,
             color: rgb(1, 1, 1),
           });
           page.drawPage(embeddedPage, {
@@ -340,7 +491,7 @@ export default function MergePdfTool() {
   };
 
   return (
-    <section className="rounded-[2rem] border border-white/10 bg-[#101018] p-5 shadow-2xl shadow-black/30 sm:p-8">
+    <section className="rounded-xl border border-white/10 bg-[#1A2840] p-5 shadow-2xl shadow-black/30 sm:p-8">
       <input
         ref={inputRef}
         type="file"
@@ -368,15 +519,15 @@ export default function MergePdfTool() {
           setIsDragging(false);
           void addFiles(event.dataTransfer.files);
         }}
-        className={`group relative overflow-hidden rounded-[1.75rem] border border-dashed p-8 text-center transition-all duration-300 sm:p-12 ${
+        className={`group relative overflow-hidden rounded-xl border border-dashed p-8 text-center transition-all duration-300 sm:p-12 ${
           isDragging
-            ? "scale-[1.01] border-[#FF7A3D]/70 bg-[#FF5A36]/12 shadow-[0_0_70px_rgba(255,90,54,0.18)]"
-            : "border-[#FF7A3D]/28 bg-[#FF5A36]/[0.04] hover:-translate-y-1 hover:border-[#FF7A3D]/42 hover:bg-[#FF5A36]/[0.07] hover:shadow-[0_0_60px_rgba(255,90,54,0.10)]"
+            ? "scale-[1.01] border-[#C9A84C]/70 bg-[#1E6B4A]/12 shadow-[0_18px_55px_rgba(30,107,74,0.18)]"
+            : "border-[#C9A84C]/28 bg-[#1E6B4A]/[0.04] hover:-translate-y-1 hover:border-[#C9A84C]/42 hover:bg-[#1E6B4A]/[0.07] hover:shadow-[0_18px_55px_rgba(30,107,74,0.12)]"
         }`}
       >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,90,54,0.14),transparent_42%)] opacity-70 transition group-hover:opacity-100" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(201,168,76,0.13),transparent_42%)] opacity-70 transition group-hover:opacity-100" />
         <div className="relative">
-          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-[#FF7A3D]/22 bg-[#FF5A36]/10 text-[#FFB07C] shadow-[0_0_40px_rgba(255,90,54,0.16)]">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-xl border border-[#C9A84C]/22 bg-[#1E6B4A]/10 text-[#C9A84C] shadow-[0_14px_38px_rgba(30,107,74,0.18)]">
             <MergeIcon />
           </div>
           <h2 className="text-2xl font-semibold tracking-[-0.02em]">
@@ -388,19 +539,19 @@ export default function MergePdfTool() {
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="mt-6 rounded-full bg-[#FF5A36] px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#FF6E45] active:scale-[0.98]"
+            className="mt-6 rounded-full bg-[#1E6B4A] px-6 py-3 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98]"
           >
             Select PDFs
           </button>
         </div>
       </div>
 
-      <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm text-white/54">
+      <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.035] p-4 text-sm text-white/54">
         Files stay on this device for this tool. Files are merged in your
         browser and are not uploaded.
       </div>
 
-      <div className="mt-4 rounded-2xl border border-[#FF7A3D]/18 bg-[#FF5A36]/[0.055] p-4">
+      <div className="mt-4 rounded-lg border border-[#C9A84C]/18 bg-[#1E6B4A]/[0.055] p-4">
         <p className="text-sm font-semibold text-white">Private by design</p>
         <p className="mt-2 text-sm leading-6 text-white/54">
           Files stay on your device for this tool. Nothing is uploaded or stored
@@ -412,7 +563,7 @@ export default function MergePdfTool() {
         </p>
       </div>
 
-      <div className="mt-6 grid gap-3 rounded-[1.5rem] border border-white/10 bg-[#07070A]/62 p-4 sm:grid-cols-4 sm:p-5">
+      <div className="mt-6 grid gap-3 rounded-xl border border-white/10 bg-[#0C1220]/62 p-4 sm:grid-cols-4 sm:p-5">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/34">
             Files
@@ -432,54 +583,54 @@ export default function MergePdfTool() {
             Output
           </p>
           <p className="mt-1 text-sm font-semibold text-white">
-            {pageFormat === "smartA4" ? "Smart A4 fit" : "Original size"}
+            {outputStyleLabel}
           </p>
         </div>
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/34">
             Mode
           </p>
-          <p className="mt-1 text-sm font-semibold text-[#FFB07C]">
+          <p className="mt-1 text-sm font-semibold text-[#C9A84C]">
             Browser-only
           </p>
         </div>
       </div>
 
-      <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-[#07070A]/62 p-4 sm:p-5">
+      <div className="mt-6 rounded-xl border border-white/10 bg-[#0C1220]/62 p-4 sm:p-5">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/34">
           Step 2 - Choose output style
         </p>
         <div>
           <p className="text-sm font-semibold text-white">Page format</p>
           <p className="mt-1 text-xs font-medium text-white/42">
-            {pageFormat === "smartA4"
-              ? "Best for scanned documents, forms, and mixed-size PDFs."
-              : "Preserves each PDF page exactly as provided."}
+            {pageFormat === "original"
+              ? "Preserves each PDF page exactly as provided."
+              : "Best for scanned documents, forms, and mixed-size PDFs."}
           </p>
         </div>
 
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <button
             type="button"
-            onClick={() => updatePageFormat("smartA4")}
-            className={`relative rounded-2xl border p-4 text-left transition-all duration-300 active:scale-[0.99] ${
-              pageFormat === "smartA4"
-                ? "border-[#FF7A3D]/50 bg-[#FF5A36]/12 shadow-[0_0_36px_rgba(255,90,54,0.12)]"
-                : "border-white/10 bg-white/[0.035] hover:-translate-y-0.5 hover:border-[#FF7A3D]/24 hover:bg-white/[0.052]"
+            onClick={() => updatePageFormat("smartA4Portrait")}
+            className={`relative rounded-lg border p-4 text-left transition-all duration-300 active:scale-[0.99] ${
+              pageFormat === "smartA4Portrait"
+                ? "border-[#C9A84C]/50 bg-[#1E6B4A]/12 shadow-[0_14px_38px_rgba(30,107,74,0.14)]"
+                : "border-white/10 bg-white/[0.035] hover:-translate-y-0.5 hover:border-[#C9A84C]/24 hover:bg-white/[0.052]"
             }`}
           >
             <span
-              className={`pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset transition ${
-                pageFormat === "smartA4"
-                  ? "ring-[#FF7A3D]/36"
+              className={`pointer-events-none absolute inset-0 rounded-lg ring-1 ring-inset transition ${
+                pageFormat === "smartA4Portrait"
+                  ? "ring-[#C9A84C]/36"
                   : "ring-transparent"
               }`}
             />
             <span className="relative flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-white">
-                Smart A4 fit
+                Smart A4 Portrait
               </span>
-              <span className="rounded-full border border-[#FF7A3D]/24 bg-[#FF5A36]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#FFB07C]">
+              <span className="rounded-full border border-[#C9A84C]/24 bg-[#1E6B4A]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#C9A84C]">
                 Recommended
               </span>
             </span>
@@ -490,17 +641,65 @@ export default function MergePdfTool() {
 
           <button
             type="button"
-            onClick={() => updatePageFormat("original")}
-            className={`relative rounded-2xl border p-4 text-left transition-all duration-300 active:scale-[0.99] ${
-              pageFormat === "original"
-                ? "border-[#FF7A3D]/50 bg-[#FF5A36]/12 shadow-[0_0_36px_rgba(255,90,54,0.12)]"
-                : "border-white/10 bg-white/[0.035] hover:-translate-y-0.5 hover:border-[#FF7A3D]/24 hover:bg-white/[0.052]"
+            onClick={() => updatePageFormat("smartA4Landscape")}
+            className={`relative rounded-lg border p-4 text-left transition-all duration-300 active:scale-[0.99] ${
+              pageFormat === "smartA4Landscape"
+                ? "border-[#C9A84C]/50 bg-[#1E6B4A]/12 shadow-[0_14px_38px_rgba(30,107,74,0.14)]"
+                : "border-white/10 bg-white/[0.035] hover:-translate-y-0.5 hover:border-[#C9A84C]/24 hover:bg-white/[0.052]"
             }`}
           >
             <span
-              className={`pointer-events-none absolute inset-0 rounded-2xl ring-1 ring-inset transition ${
+              className={`pointer-events-none absolute inset-0 rounded-lg ring-1 ring-inset transition ${
+                pageFormat === "smartA4Landscape"
+                  ? "ring-[#C9A84C]/36"
+                  : "ring-transparent"
+              }`}
+            />
+            <span className="relative text-sm font-semibold text-white">
+              Smart A4 Landscape
+            </span>
+            <span className="relative mt-2 block text-xs leading-5 text-white/46">
+              Useful for wide pages and presentations.
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => updatePageFormat("matchFirst")}
+            className={`relative rounded-lg border p-4 text-left transition-all duration-300 active:scale-[0.99] ${
+              pageFormat === "matchFirst"
+                ? "border-[#C9A84C]/50 bg-[#1E6B4A]/12 shadow-[0_14px_38px_rgba(30,107,74,0.14)]"
+                : "border-white/10 bg-white/[0.035] hover:-translate-y-0.5 hover:border-[#C9A84C]/24 hover:bg-white/[0.052]"
+            }`}
+          >
+            <span
+              className={`pointer-events-none absolute inset-0 rounded-lg ring-1 ring-inset transition ${
+                pageFormat === "matchFirst"
+                  ? "ring-[#C9A84C]/36"
+                  : "ring-transparent"
+              }`}
+            />
+            <span className="relative text-sm font-semibold text-white">
+              Match first PDF
+            </span>
+            <span className="relative mt-2 block text-xs leading-5 text-white/46">
+              Uses the first PDF page size for all pages.
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => updatePageFormat("original")}
+            className={`relative rounded-lg border p-4 text-left transition-all duration-300 active:scale-[0.99] ${
+              pageFormat === "original"
+                ? "border-[#C9A84C]/50 bg-[#1E6B4A]/12 shadow-[0_14px_38px_rgba(30,107,74,0.14)]"
+                : "border-white/10 bg-white/[0.035] hover:-translate-y-0.5 hover:border-[#C9A84C]/24 hover:bg-white/[0.052]"
+            }`}
+          >
+            <span
+              className={`pointer-events-none absolute inset-0 rounded-lg ring-1 ring-inset transition ${
                 pageFormat === "original"
-                  ? "ring-[#FF7A3D]/36"
+                  ? "ring-[#C9A84C]/36"
                   : "ring-transparent"
               }`}
             />
@@ -508,12 +707,12 @@ export default function MergePdfTool() {
               Keep original size
             </span>
             <span className="relative mt-2 block text-xs leading-5 text-white/46">
-              Preserves each original page size.
+              Preserves every original page size.
             </span>
           </button>
         </div>
 
-        {pageFormat === "smartA4" ? (
+        {showMarginOptions ? (
           <div className="mt-4">
             <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/34">
               A4 margin
@@ -524,16 +723,16 @@ export default function MergePdfTool() {
                   key={option.value}
                   type="button"
                   onClick={() => updateMarginPreset(option.value)}
-                  className={`rounded-2xl border p-3 text-left transition-all duration-300 active:scale-[0.99] ${
+                  className={`rounded-lg border p-3 text-left transition-all duration-300 active:scale-[0.99] ${
                     marginPreset === option.value
-                      ? "border-[#FF7A3D]/45 bg-[#FF5A36]/12"
-                      : "border-white/10 bg-white/[0.03] hover:border-[#FF7A3D]/24"
+                      ? "border-[#C9A84C]/45 bg-[#1E6B4A]/12"
+                      : "border-white/10 bg-white/[0.03] hover:border-[#C9A84C]/24"
                   }`}
                 >
                   <span className="flex items-center gap-2 text-sm font-semibold text-white">
                     {option.label}
                     {option.recommended ? (
-                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-[#FFB07C]">
+                      <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] text-[#C9A84C]">
                         Recommended
                       </span>
                     ) : null}
@@ -548,7 +747,7 @@ export default function MergePdfTool() {
         ) : null}
       </div>
 
-      <label className="mt-6 block rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+      <label className="mt-6 block rounded-xl border border-white/10 bg-white/[0.035] p-4 sm:p-5">
         <span className="mb-3 block text-xs font-semibold uppercase tracking-[0.18em] text-white/34">
           Step 3 - Merge & download
         </span>
@@ -560,7 +759,7 @@ export default function MergePdfTool() {
             setStatus("Ready");
             clearDownload();
           }}
-          className="mt-3 w-full rounded-2xl border border-white/10 bg-[#07070A]/76 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-[#FF7A3D]/45 focus:ring-2 focus:ring-[#FF7A3D]/12"
+          className="mt-3 w-full rounded-lg border border-white/10 bg-[#0C1220]/76 px-4 py-3 text-sm font-semibold text-white outline-none transition focus:border-[#C9A84C]/45 focus:ring-2 focus:ring-[#C9A84C]/12"
           placeholder="lumeo-merged.pdf"
         />
         <span className="mt-2 block text-xs leading-5 text-white/38">
@@ -581,11 +780,11 @@ export default function MergePdfTool() {
             type="button"
             disabled={files.length < 2 || status === "Merging in your browser..."}
             onClick={mergePdfs}
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#111017] transition-all duration-300 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 active:scale-[0.98]"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-[#1C1710] transition-all duration-300 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0 active:scale-[0.98]"
           >
             {status === "Merging in your browser..." ? (
               <>
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#111017]/20 border-t-[#111017]" />
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#1C1710]/20 border-t-[#1C1710]" />
                 Merging in your browser...
               </>
             ) : status === "Download ready" ? (
@@ -597,24 +796,54 @@ export default function MergePdfTool() {
         </div>
       </div>
 
+      {files.length >= 2 ? (
+        <div className="mt-5 rounded-lg border border-[#C9A84C]/18 bg-[#1E6B4A]/[0.055] p-4 text-sm font-semibold text-[#F0EAD6]">
+          Ready to merge: {files.length} files - {totalPages} pages -{" "}
+          {outputStyleLabel}
+          {showMarginOptions
+            ? ` - ${
+                marginOptions.find((option) => option.value === marginPreset)
+                  ?.label ?? "Clean"
+              } margin`
+            : ""}
+        </div>
+      ) : null}
+
       {error ? (
-        <div className="mt-5 rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
+        <div className="mt-5 rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
           {error}
         </div>
       ) : null}
 
+      {softWarning ? (
+        <div className="mt-5 rounded-lg border border-[#C9A84C]/20 bg-[#C9A84C]/10 p-4 text-sm font-medium text-[#F0EAD6]">
+          {softWarning}
+        </div>
+      ) : null}
+
+      {hasLargeFiles ? (
+        <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.035] p-4 text-sm font-medium text-white/58">
+          Large files may take longer because merging happens in your browser.
+        </div>
+      ) : null}
+
+      {mixedPageSizesDetected ? (
+        <div className="mt-5 rounded-lg border border-[#C9A84C]/18 bg-[#1E6B4A]/[0.055] p-4 text-sm font-medium text-[#F0EAD6]">
+          Mixed page sizes detected - Smart fit recommended.
+        </div>
+      ) : null}
+
       {cleanupMessage ? (
-        <div className="mt-5 rounded-2xl border border-[#FF7A3D]/18 bg-[#FF5A36]/[0.06] p-4 text-sm font-medium text-[#FFD2B8]">
+        <div className="mt-5 rounded-lg border border-[#C9A84C]/18 bg-[#1E6B4A]/[0.06] p-4 text-sm font-medium text-[#F0EAD6]">
           {cleanupMessage}
         </div>
       ) : null}
 
       {downloadUrl ? (
-        <div className="mt-6 rounded-[1.5rem] border border-[#FF7A3D]/24 bg-[#FF5A36]/10 p-5">
+        <div className="mt-6 rounded-xl border border-[#C9A84C]/24 bg-[#1E6B4A]/10 p-5">
           <p className="text-lg font-semibold text-white">Merged PDF ready</p>
           <p className="mt-2 text-sm leading-6 text-white/52">
-            {downloadName} -{" "}
-            {pageFormat === "smartA4" ? "Smart A4 fit" : "Original size"}
+            {downloadName} - {outputStyleLabel} - {totalPages} pages
           </p>
           <p className="mt-1 text-xs font-medium text-white/42">
             Created locally in your browser.
@@ -626,7 +855,7 @@ export default function MergePdfTool() {
             <button
               type="button"
               onClick={downloadMergedPdf}
-              className="rounded-full bg-[#FF5A36] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#FF6E45] active:scale-[0.98]"
+              className="rounded-full bg-[#1E6B4A] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98]"
             >
               Download merged PDF
             </button>
@@ -642,13 +871,22 @@ export default function MergePdfTool() {
       ) : null}
 
       {files.length > 0 && !downloadUrl ? (
-        <button
-          type="button"
-          onClick={startNewMerge}
-          className="mt-5 rounded-full border border-white/10 px-5 py-2.5 text-sm font-semibold text-white/52 transition hover:border-white/20 hover:text-white"
-        >
-          Start new merge
-        </button>
+        <div className="mt-5 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={clearAllFiles}
+            className="rounded-full border border-white/10 px-5 py-2.5 text-sm font-semibold text-white/52 transition hover:border-white/20 hover:text-white"
+          >
+            Clear all
+          </button>
+          <button
+            type="button"
+            onClick={startNewMerge}
+            className="rounded-full border border-white/10 px-5 py-2.5 text-sm font-semibold text-white/52 transition hover:border-white/20 hover:text-white"
+          >
+            Start new merge
+          </button>
+        </div>
       ) : null}
 
       {files.length > 0 ? (
@@ -659,7 +897,38 @@ export default function MergePdfTool() {
           {files.map((item, index) => (
             <div
               key={item.id}
-              className="grid gap-3 rounded-2xl border border-white/10 bg-[#07070A]/72 p-4 transition-all duration-300 hover:-translate-y-0.5 hover:border-[#FF7A3D]/24 hover:bg-[#0D0D13] sm:grid-cols-[auto_1fr_auto] sm:items-center"
+              draggable={status !== "Merging in your browser..."}
+              onDragStart={(event) => {
+                setDraggingFileId(item.id);
+                event.dataTransfer.effectAllowed = "move";
+                event.dataTransfer.setData("text/plain", item.id);
+              }}
+              onDragOver={(event) => {
+                event.preventDefault();
+                if (dragOverFileId !== item.id) setDragOverFileId(item.id);
+              }}
+              onDragLeave={() => {
+                if (dragOverFileId === item.id) setDragOverFileId("");
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                const draggedId =
+                  event.dataTransfer.getData("text/plain") || draggingFileId;
+                reorderFilesById(draggedId, item.id);
+                setDraggingFileId("");
+                setDragOverFileId("");
+              }}
+              onDragEnd={() => {
+                setDraggingFileId("");
+                setDragOverFileId("");
+              }}
+              className={`grid cursor-grab gap-3 rounded-lg border p-4 transition-all duration-300 active:cursor-grabbing sm:grid-cols-[auto_1fr_auto] sm:items-center ${
+                draggingFileId === item.id
+                  ? "scale-[0.99] border-[#C9A84C]/45 bg-[#1E6B4A]/10 opacity-70"
+                  : dragOverFileId === item.id
+                    ? "border-[#C9A84C]/45 bg-[#1E6B4A]/[0.08] shadow-[0_14px_38px_rgba(30,107,74,0.12)]"
+                    : "border-white/10 bg-[#0C1220]/72 hover:-translate-y-0.5 hover:border-[#C9A84C]/24 hover:bg-[#0D0D13]"
+              }`}
             >
               <div className="flex items-center gap-3">
                 <span className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-xs font-semibold text-white/58">
@@ -674,7 +943,7 @@ export default function MergePdfTool() {
                 </p>
                 <p className="mt-1 text-xs font-medium text-white/40">
                   {formatFileSize(item.file.size)} | {item.pageCount} page
-                  {item.pageCount === 1 ? "" : "s"}
+                  {item.pageCount === 1 ? "" : "s"} | {item.pageSizeType}
                 </p>
               </div>
 

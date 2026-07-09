@@ -17,9 +17,12 @@ const trustLinks = [
 
 export default function PublicFooter() {
   return (
-    <footer className="border-t border-[#F3E7C8]/10 px-6 py-10 text-center text-xs text-[#F7F0DE]/35">
-      <div className="mx-auto flex max-w-5xl flex-col items-center gap-6">
-        <Link href="/" className="font-semibold transition hover:text-white">
+    <footer className="border-t border-[#E8DFC8]/12 px-6 py-10 text-center text-xs text-[#F0EAD6]/40">
+      <div className="mx-auto flex max-w-[900px] flex-col items-center gap-6">
+        <Link
+          href="/"
+          className="font-semibold text-[#F0EAD6]/68 transition hover:text-[#F0EAD6]"
+        >
           Lumeo PDF Workspace
         </Link>
 
@@ -28,7 +31,7 @@ export default function PublicFooter() {
             <Link
               key={link.href}
               href={link.href}
-              className="transition hover:text-white"
+              className="transition hover:text-[#F0EAD6]"
             >
               {link.label}
             </Link>

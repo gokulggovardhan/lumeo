@@ -1,20 +1,21 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { DM_Sans, DM_Serif_Display } from "next/font/google";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const dmSans = DM_Sans({
+  variable: "--font-dm-sans",
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const dmSerif = DM_Serif_Display({
+  variable: "--font-dm-serif",
   subsets: ["latin"],
+  weight: "400",
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://lumeo.in"),
-  title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
+  title: "Lumeo PDF Workspace - Simple, Private PDF Tools",
   description:
     "Merge, split, compress, and convert PDF files with a clean, privacy-first PDF workspace for everyday documents.",
   applicationName: "Lumeo",
@@ -44,7 +45,7 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://lumeo.in",
     siteName: "Lumeo",
-    title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
+    title: "Lumeo PDF Workspace - Simple, Private PDF Tools",
     description:
       "Merge, split, compress, and convert PDF files with a clean, privacy-first PDF workspace for everyday documents.",
     images: [
@@ -58,7 +59,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
+    title: "Lumeo PDF Workspace - Simple, Private PDF Tools",
     description:
       "Merge, split, compress, and convert PDF files with a clean, privacy-first PDF workspace for everyday documents.",
     images: ["/og-image.svg"],
@@ -73,7 +74,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${dmSans.variable} ${dmSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

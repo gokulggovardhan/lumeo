@@ -1,16 +1,17 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { LumeoSealMark } from "@/components/PublicPdfChrome";
 
 export const metadata: Metadata = {
-  title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
+  title: "Lumeo PDF Workspace - Simple, Private PDF Tools",
   description:
     "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
+    title: "Lumeo PDF Workspace - Simple, Private PDF Tools",
     description:
       "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
     url: "https://lumeo.in",
@@ -19,7 +20,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
+    title: "Lumeo PDF Workspace - Simple, Private PDF Tools",
     description:
       "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
   },
@@ -115,199 +116,141 @@ const structuredData = [
   },
 ];
 
-function LumeoMark() {
-  return (
-    <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#FF7A3D]/25 bg-[#111017] shadow-[0_0_28px_rgba(255,90,54,0.14)]">
-      <span className="absolute inset-0 rounded-xl bg-gradient-to-br from-[#FF7A3D]/22 via-transparent to-white/5" />
-      <svg
-        aria-hidden="true"
-        viewBox="0 0 24 24"
-        className="relative h-5 w-5 text-[#FFB07C]"
-        fill="none"
-      >
-        <path
-          d="M7 5v14h9"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2.2"
-        />
-        <path d="M14 9.25 18.25 12 14 14.75V9.25Z" fill="currentColor" />
-      </svg>
-    </span>
-  );
-}
-
-function IconFrame({ children }: { children: ReactNode }) {
-  return (
-    <span className="relative flex h-12 w-12 items-center justify-center rounded-2xl border border-[#FF7A3D]/20 bg-[#FF5A36]/10 text-[#FFB07C] shadow-[0_0_32px_rgba(255,90,54,0.12)] transition duration-300 group-hover:-translate-y-0.5 group-hover:border-[#FF7A3D]/40 group-hover:bg-[#FF5A36]/16 group-hover:shadow-[0_0_42px_rgba(255,90,54,0.22)]">
-      <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/10 to-transparent" />
-      <span className="relative">{children}</span>
-    </span>
-  );
-}
-
 function ToolIcon({ kind }: { kind: ToolKind }) {
   const iconClass = "h-6 w-6";
 
-  if (kind === "merge") {
-    return (
-      <IconFrame>
-        <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
-          <path d="M6 5.5h6.5l2 2V15H6V5.5Z" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M10 9.5h7.5l1.5 1.5v7.5H10v-9Z" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M4.5 18.5h3M16.5 5.5h3M17.5 5.5v3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
-        </svg>
-      </IconFrame>
-    );
-  }
-
-  if (kind === "split") {
-    return (
-      <IconFrame>
-        <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
-          <path d="M8 4.8h8v14.4H8V4.8Z" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M12 6.5v11" stroke="currentColor" strokeDasharray="2 2" strokeLinecap="round" strokeWidth="1.5" />
-          <path d="M6 12H3.5m0 0 2-2m-2 2 2 2M18 12h2.5m0 0-2-2m2 2-2 2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-        </svg>
-      </IconFrame>
-    );
-  }
-
-  if (kind === "compress") {
-    return (
-      <IconFrame>
-        <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
-          <path d="M7 4.75h8.5L18 7.25v12H7V4.75Z" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M15 4.9v3h3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-          <path d="M9 12h2.25M15 12h-2.25M12 9.25v2.5M12 14.25v-2.5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
-          <path d="M9.6 9.6 12 12l2.4-2.4M9.6 14.4 12 12l2.4 2.4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.45" />
-        </svg>
-      </IconFrame>
-    );
-  }
-
-  if (kind === "jpgToPdf") {
-    return (
-      <IconFrame>
-        <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
-          <path d="M4.8 6.5h8.2v7.2H4.8V6.5Z" stroke="currentColor" strokeWidth="1.7" />
-          <path d="m5.7 13 2.2-2.35 1.35 1.35 1.15-1.2 1.8 2.2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.45" />
-          <path d="M15 10.3h4.2v7.2H11v-2.1" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-          <path d="M13.7 13.9h3.1M13.7 16h2.2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.45" />
-        </svg>
-      </IconFrame>
-    );
-  }
-
-  return (
-    <IconFrame>
-      <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
+  const paths: Record<ToolKind, ReactNode> = {
+    merge: (
+      <>
+        <path d="M6 5.5h6.5l2 2V15H6V5.5Z" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M10 9.5h7.5l1.5 1.5v7.5H10v-9Z" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M4.5 18.5h3M16.5 5.5h3M17.5 5.5v3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
+      </>
+    ),
+    split: (
+      <>
+        <path d="M8 4.8h8v14.4H8V4.8Z" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M12 6.5v11" stroke="currentColor" strokeDasharray="2 2" strokeLinecap="round" strokeWidth="1.5" />
+        <path d="M6 12H3.5m0 0 2-2m-2 2 2 2M18 12h2.5m0 0-2-2m2 2-2 2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+      </>
+    ),
+    compress: (
+      <>
+        <path d="M7 4.75h8.5L18 7.25v12H7V4.75Z" stroke="currentColor" strokeWidth="1.7" />
+        <path d="M15 4.9v3h3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+        <path d="M9.4 9.4 12 12l2.6-2.6M9.4 14.6 12 12l2.6 2.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.55" />
+      </>
+    ),
+    jpgToPdf: (
+      <>
+        <path d="M4.8 6.5h8.2v7.2H4.8V6.5Z" stroke="currentColor" strokeWidth="1.7" />
+        <path d="m5.7 13 2.2-2.35 1.35 1.35 1.15-1.2 1.8 2.2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.45" />
+        <path d="M15 10.3h4.2v7.2H11v-2.1" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+      </>
+    ),
+    pdfToJpg: (
+      <>
         <path d="M5.8 4.75h8.5l2.5 2.5v6.5h-11V4.75Z" stroke="currentColor" strokeWidth="1.7" />
         <path d="M14.2 4.9v3h3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-        <path d="M8.2 10.1h5.5M8.2 12.1h3.7" stroke="currentColor" strokeLinecap="round" strokeWidth="1.45" />
         <path d="M10.8 15.3h8.4v4H10.8v-4Z" stroke="currentColor" strokeWidth="1.7" />
-        <path d="m11.7 18.8 1.55-1.55 1.05 1.05.9-.95 1.45 1.45" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.25" />
+      </>
+    ),
+  };
+
+  return (
+    <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-[#1E6B4A]/20 bg-[#1E6B4A]/10 text-[#1E6B4A] transition duration-300 group-hover:border-[#1E6B4A]/35 group-hover:bg-[#1E6B4A]/14">
+      <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
+        {paths[kind]}
       </svg>
-    </IconFrame>
+    </span>
   );
 }
 
 function PrivacyIcon({ kind }: { kind: PrivacyKind }) {
   const iconClass = "h-5 w-5";
+  const icon =
+    kind === "browser" ? (
+      <rect x="4.5" y="6" width="15" height="11.5" rx="2" stroke="currentColor" strokeWidth="1.7" />
+    ) : kind === "account" ? (
+      <path d="m7.5 12.2 3 3 6-6.4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    ) : (
+      <path d="M7 4.8h7.5L17 7.3v11.9H7V4.8Z" stroke="currentColor" strokeWidth="1.7" />
+    );
 
   return (
-    <span className="mb-5 flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.045] text-[#FFB07C]">
-      {kind === "browser" && (
-        <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
-          <rect x="4.5" y="6" width="15" height="11.5" rx="2" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M4.8 9.5h14.4M9.5 20h5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
-        </svg>
-      )}
-      {kind === "account" && (
-        <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
-          <path d="M12 4.5a7 7 0 1 0 7 7" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
-          <path d="m15.5 5.5 1.75 1.75L20.5 4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-          <path d="M8.8 15.2c.7-1.25 1.75-1.85 3.2-1.85s2.5.6 3.2 1.85M12 11.6a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" stroke="currentColor" strokeLinecap="round" strokeWidth="1.45" />
-        </svg>
-      )}
-      {kind === "handling" && (
-        <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
-          <path d="M7 4.8h7.5L17 7.3v11.9H7V4.8Z" stroke="currentColor" strokeWidth="1.7" />
-          <path d="M14.4 5v3h3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-          <path d="M9.5 12h5M9.5 15h4" stroke="currentColor" strokeLinecap="round" strokeWidth="1.55" />
-        </svg>
-      )}
+    <span className="mb-5 flex h-10 w-10 items-center justify-center rounded-lg border border-[#C9A84C]/25 bg-[#C9A84C]/10 text-[#C9A84C]">
+      <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
+        {icon}
+      </svg>
     </span>
   );
 }
 
 function HeroDocumentVisual() {
   return (
-    <div className="relative min-h-[430px] overflow-hidden rounded-[2rem] border border-white/10 bg-[#101018]/88 p-5 shadow-2xl shadow-black/45 backdrop-blur-2xl">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_35%_20%,rgba(255,90,54,0.20),transparent_34%),radial-gradient(circle_at_78%_80%,rgba(180,130,255,0.13),transparent_34%)]" />
-      <div className="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.035)_1px,transparent_1px)] [background-size:32px_32px]" />
-
+    <div className="relative min-h-[410px] overflow-hidden rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-5 shadow-2xl shadow-black/30">
+      <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:32px_32px]" />
       <div className="relative flex items-center justify-between">
-        <span className="rounded-full border border-[#FF7A3D]/18 bg-[#FF5A36]/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#FFB07C]">
-          PDF
+        <span className="rounded-full border border-[#C9A84C]/28 bg-[#C9A84C]/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
+          Document desk
         </span>
-        <span className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1 text-[10px] font-black text-white/48">
+        <span className="rounded-full border border-[#E8DFC8]/14 bg-[#0C1220]/45 px-3 py-1 text-[10px] font-bold text-[#F0EAD6]/52">
           Ready when tools launch
         </span>
       </div>
 
-      <div className="relative mx-auto mt-10 h-[305px] max-w-[410px]">
-        <div className="lumeo-float absolute left-3 top-10 h-52 w-36 rotate-[-8deg] rounded-3xl border border-white/12 bg-[#F8F1E6] p-4 text-[#141017] shadow-2xl shadow-black/35">
+      <div className="relative mx-auto mt-10 h-[300px] max-w-[390px]">
+        <div className="notary-float absolute left-3 top-9 h-52 w-36 rotate-[-6deg] rounded-lg border border-[#E8DFC8] bg-[#F0EAD6] p-4 text-[#1C1710] shadow-2xl shadow-black/30">
           <div className="mb-4 flex items-center justify-between">
-            <span className="rounded-full bg-[#FF5A36]/14 px-2 py-1 text-[9px] font-black text-[#C6451F]">
+            <span className="rounded-full bg-[#1E6B4A]/10 px-2 py-1 text-[9px] font-bold text-[#1E6B4A]">
               PDF
             </span>
-            <span className="h-2 w-2 rounded-full bg-[#FF5A36]" />
+            <span className="h-2 w-2 rounded-full bg-[#C9A84C]" />
           </div>
           <div className="space-y-2">
-            <div className="h-2 rounded-full bg-[#141017]/22" />
-            <div className="h-2 w-4/5 rounded-full bg-[#141017]/16" />
-            <div className="h-2 w-2/3 rounded-full bg-[#141017]/12" />
+            <div className="h-2 rounded-full bg-[#1C1710]/22" />
+            <div className="h-2 w-4/5 rounded-full bg-[#1C1710]/16" />
+            <div className="h-2 w-2/3 rounded-full bg-[#1C1710]/12" />
           </div>
-          <div className="mt-9 h-16 rounded-2xl bg-[#FF5A36]/12" />
+          <div className="mt-9 h-16 rounded-md bg-[#1E6B4A]/10" />
         </div>
 
-        <div className="lumeo-float-slow absolute left-1/2 top-2 h-64 w-44 -translate-x-1/2 rounded-[2rem] border border-[#FF7A3D]/22 bg-[#17151d] p-5 shadow-[0_30px_90px_rgba(0,0,0,0.45)]">
+        <div className="notary-float-center absolute left-1/2 top-0 h-64 w-44 -translate-x-1/2 rounded-lg border border-[#E8DFC8] bg-[#F0EAD6] p-5 text-[#1C1710] shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
           <div className="mb-5 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-[0.22em] text-[#FFB07C]">
+            <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#1E6B4A]">
               Lumeo
             </span>
-            <span className="h-8 w-8 rounded-2xl border border-[#FF7A3D]/22 bg-[#FF5A36]/14" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#C9A84C]/45 bg-[#C9A84C]/12 text-[#C9A84C]">
+              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+                <path d="m8.5 12.2 2.5 2.5 4.8-5.4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" />
+              </svg>
+            </span>
           </div>
           <div className="space-y-2">
-            <div className="h-2.5 rounded-full bg-white/22" />
-            <div className="h-2.5 w-5/6 rounded-full bg-white/14" />
-            <div className="h-2.5 w-2/3 rounded-full bg-white/10" />
+            <div className="h-2.5 rounded-full bg-[#1C1710]/22" />
+            <div className="h-2.5 w-5/6 rounded-full bg-[#1C1710]/14" />
+            <div className="h-2.5 w-2/3 rounded-full bg-[#1C1710]/10" />
           </div>
           <div className="mt-8 grid grid-cols-2 gap-2">
-            <div className="h-16 rounded-2xl bg-[#FF5A36]/16" />
-            <div className="h-16 rounded-2xl bg-white/8" />
-          </div>
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-            <div className="lumeo-shimmer h-full w-2/3 rounded-full bg-[#FF7A3D]/70" />
+            <div className="h-16 rounded-md bg-[#1E6B4A]/12" />
+            <div className="h-16 rounded-md bg-[#C9A84C]/14" />
           </div>
         </div>
 
-        <div className="lumeo-float-delayed absolute right-2 top-20 h-48 w-36 rotate-[7deg] rounded-3xl border border-white/12 bg-[#F8F1E6]/92 p-4 text-[#141017] shadow-2xl shadow-black/30">
-          <div className="mb-4 h-20 rounded-2xl bg-[#141017]/10" />
+        <div className="notary-float-delayed absolute right-2 top-20 h-48 w-36 rotate-[5deg] rounded-lg border border-[#E8DFC8] bg-[#E8DFC8] p-4 text-[#1C1710] shadow-2xl shadow-black/25">
+          <div className="mb-4 h-20 rounded-md bg-[#1C1710]/10" />
           <div className="space-y-2">
-            <div className="h-2 rounded-full bg-[#141017]/22" />
-            <div className="h-2 w-3/4 rounded-full bg-[#141017]/14" />
+            <div className="h-2 rounded-full bg-[#1C1710]/22" />
+            <div className="h-2 w-3/4 rounded-full bg-[#1C1710]/14" />
           </div>
         </div>
 
-        <div className="absolute bottom-0 left-1/2 flex -translate-x-1/2 gap-2 rounded-full border border-white/10 bg-[#07070A]/76 px-3 py-2 text-xs font-black text-white/58 shadow-2xl shadow-black/35 backdrop-blur-xl">
-          <span className="rounded-full bg-[#FF5A36]/18 px-3 py-1 text-[#FFB07C]">
+        <div className="absolute bottom-0 left-1/2 flex -translate-x-1/2 gap-2 rounded-full border border-[#E8DFC8]/14 bg-[#0C1220]/82 px-3 py-2 text-xs font-bold text-[#F0EAD6]/58 shadow-2xl shadow-black/30">
+          <span className="rounded-full bg-[#1E6B4A]/28 px-3 py-1 text-[#F0EAD6]">
             Merge
           </span>
-          <span className="rounded-full bg-white/[0.055] px-3 py-1">Split</span>
-          <span className="rounded-full bg-white/[0.055] px-3 py-1">Convert</span>
+          <span className="rounded-full bg-[#E8DFC8]/8 px-3 py-1">Split</span>
+          <span className="rounded-full bg-[#E8DFC8]/8 px-3 py-1">Convert</span>
         </div>
       </div>
     </div>
@@ -316,83 +259,69 @@ function HeroDocumentVisual() {
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#07070A] text-[#F8F1E6]">
+    <main className="min-h-screen overflow-hidden bg-[#0C1220] text-[#F0EAD6]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
 
       <style>{`
-        @keyframes lumeoGradientDrift {
-          0%, 100% { transform: translate3d(0, 0, 0) scale(1); opacity: 0.82; }
-          50% { transform: translate3d(2%, -2%, 0) scale(1.05); opacity: 1; }
+        @keyframes notaryFloat {
+          0%, 100% { transform: translateY(0) rotate(var(--notary-rotate, 0deg)); }
+          50% { transform: translateY(-8px) rotate(var(--notary-rotate, 0deg)); }
         }
 
-        @keyframes lumeoFloat {
-          0%, 100% { transform: translateY(0) rotate(var(--lumeo-rotate, 0deg)); }
-          50% { transform: translateY(-10px) rotate(var(--lumeo-rotate, 0deg)); }
-        }
-
-        @keyframes lumeoFloatCenter {
+        @keyframes notaryFloatCenter {
           0%, 100% { transform: translateX(-50%) translateY(0); }
-          50% { transform: translateX(-50%) translateY(-12px); }
+          50% { transform: translateX(-50%) translateY(-10px); }
         }
 
-        @keyframes lumeoShimmer {
-          0%, 100% { transform: translateX(-10%); opacity: 0.68; }
-          50% { transform: translateX(18%); opacity: 1; }
-        }
-
-        .lumeo-bg-drift { animation: lumeoGradientDrift 12s ease-in-out infinite; }
-        .lumeo-float { --lumeo-rotate: -8deg; animation: lumeoFloat 6.5s ease-in-out infinite; }
-        .lumeo-float-delayed { --lumeo-rotate: 7deg; animation: lumeoFloat 7.8s ease-in-out infinite 0.6s; }
-        .lumeo-float-slow { animation: lumeoFloatCenter 8s ease-in-out infinite 0.2s; }
-        .lumeo-shimmer { animation: lumeoShimmer 5.4s ease-in-out infinite; }
+        .notary-float { --notary-rotate: -6deg; animation: notaryFloat 7s ease-in-out infinite; }
+        .notary-float-delayed { --notary-rotate: 5deg; animation: notaryFloat 8s ease-in-out infinite 0.4s; }
+        .notary-float-center { animation: notaryFloatCenter 8.5s ease-in-out infinite 0.2s; }
       `}</style>
 
-      <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#07070A]/88 px-5 py-3.5 backdrop-blur-xl sm:px-8 lg:px-12">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
+      <nav className="sticky top-0 z-50 border-b border-[#E8DFC8]/12 bg-[#0C1220]/92 px-5 py-4 backdrop-blur-md sm:px-8">
+        <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <LumeoMark />
-            <span className="truncate text-sm font-semibold tracking-tight sm:text-base">
+            <LumeoSealMark />
+            <span className="truncate text-sm font-semibold tracking-tight">
               Lumeo PDF Workspace
             </span>
           </Link>
 
-          <div className="hidden items-center gap-7 text-sm font-medium text-white/52 md:flex">
-            <a href="#tools" className="transition hover:text-white">
+          <div className="hidden items-center gap-7 text-sm font-medium text-[#F0EAD6]/50 md:flex">
+            <a href="#tools" className="transition hover:text-[#F0EAD6]">
               Tools
             </a>
-            <a href="#privacy" className="transition hover:text-white">
+            <a href="#privacy" className="transition hover:text-[#F0EAD6]">
               Privacy
             </a>
           </div>
 
           <a
             href="#tools"
-            className="shrink-0 rounded-full border border-[#FF7A3D]/22 bg-[#FF5A36]/10 px-4 py-2 text-xs font-semibold text-[#FFB07C] transition hover:border-[#FF7A3D]/42 hover:bg-[#FF5A36]/16"
+            className="shrink-0 rounded-full bg-[#1E6B4A] px-4 py-2 text-xs font-semibold text-[#F0EAD6] transition hover:bg-[#257B56]"
           >
             Choose a tool
           </a>
         </div>
       </nav>
 
-      <section className="relative overflow-hidden px-5 pb-16 pt-16 sm:px-8 sm:pt-20 lg:px-12 lg:pb-24 lg:pt-24">
-        <div className="lumeo-bg-drift pointer-events-none absolute inset-[-8%] bg-[radial-gradient(circle_at_30%_0%,rgba(255,90,54,0.18),transparent_34%),radial-gradient(circle_at_78%_12%,rgba(180,130,255,0.12),transparent_32%),radial-gradient(circle_at_55%_82%,rgba(255,122,61,0.10),transparent_28%)]" />
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.026)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:44px_44px]" />
-
-        <div className="relative z-10 mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1fr_0.92fr] lg:items-center">
+      <section className="relative px-5 pb-16 pt-16 sm:px-8 sm:pt-20 lg:pb-24 lg:pt-24">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.05] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:48px_48px]" />
+        <div className="relative z-10 mx-auto grid max-w-[1100px] gap-12 lg:grid-cols-[1fr_0.9fr] lg:items-center">
           <div>
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs font-semibold text-white/54">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#FF7A3D]" />
-              Lumeo PDF Workspace
+            <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-[#C9A84C]/28 bg-[#C9A84C]/8 px-4 py-2 text-xs font-semibold text-[#C9A84C]">
+              <LumeoSealMark />
+              Private by design
             </div>
 
-            <h1 className="max-w-3xl text-5xl font-semibold leading-[1.02] tracking-[-0.035em] sm:text-6xl lg:text-[4.55rem]">
+            <h1 className="max-w-3xl font-serif text-5xl leading-[1.02] tracking-[-0.03em] sm:text-6xl lg:text-[4.6rem]">
               Simple, private PDF tools.
             </h1>
 
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-white/58">
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-[#F0EAD6]/58">
               Merge, split, compress, and convert PDF files with a clean
               workspace designed for everyday documents.
             </p>
@@ -400,39 +329,36 @@ export default function Home() {
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <a
                 href="#tools"
-                className="rounded-full bg-[#FF5A36] px-7 py-3.5 text-center text-sm font-semibold text-white shadow-[0_18px_60px_rgba(255,90,54,0.22)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#FF6E45]"
+                className="rounded-full bg-[#1E6B4A] px-7 py-3.5 text-center text-sm font-semibold text-[#F0EAD6] shadow-[0_18px_50px_rgba(30,107,74,0.22)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#257B56]"
               >
                 Choose a tool
               </a>
               <a
                 href="#privacy"
-                className="rounded-full border border-white/12 px-7 py-3.5 text-center text-sm font-semibold text-white/70 transition duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:text-white"
+                className="rounded-full border border-[#E8DFC8]/16 px-7 py-3.5 text-center text-sm font-semibold text-[#F0EAD6]/70 transition duration-300 hover:-translate-y-0.5 hover:border-[#E8DFC8]/32 hover:text-[#F0EAD6]"
               >
                 How privacy works
               </a>
             </div>
 
-            <div className="mt-8 max-w-xl rounded-2xl border border-[#FF7A3D]/18 bg-[#FF5A36]/8 p-4 text-sm font-medium leading-6 text-[#FFD2B8]/78">
+            <div className="mt-8 max-w-xl rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-4 text-sm font-medium leading-6 text-[#F0EAD6]/62">
               Designed to be private, simple, and fast.
             </div>
           </div>
 
-          <div className="relative">
-            <div className="pointer-events-none absolute -inset-6 rounded-[3rem] bg-[radial-gradient(circle_at_42%_18%,rgba(255,90,54,0.18),transparent_42%),radial-gradient(circle_at_80%_78%,rgba(180,130,255,0.12),transparent_40%)] blur-xl" />
-            <HeroDocumentVisual />
-          </div>
+          <HeroDocumentVisual />
         </div>
       </section>
 
-      <section id="tools" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12">
+      <section id="tools" className="mx-auto max-w-[1100px] px-5 py-16 sm:px-8">
         <div className="mb-10 max-w-2xl">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[#FFB07C]">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
             Core tools
           </p>
-          <h2 className="text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">
+          <h2 className="font-serif text-4xl tracking-[-0.02em] sm:text-5xl">
             Essential PDF tools.
           </h2>
-          <p className="mt-4 text-base leading-7 text-white/50">
+          <p className="mt-4 text-base leading-7 text-[#F0EAD6]/50">
             Choose a tool to prepare, organize, or convert your PDF files.
           </p>
         </div>
@@ -442,14 +368,14 @@ export default function Home() {
             <Link
               key={tool.title}
               href={tool.href}
-              className="group rounded-3xl border border-white/10 bg-[#0B0C0F]/88 p-6 shadow-2xl shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-[#FF7A3D]/32 hover:bg-[#12121b] hover:shadow-[0_24px_80px_rgba(255,90,54,0.10)]"
+              className="group rounded-xl border border-[#E8DFC8] bg-[#F0EAD6] p-5 text-[#1C1710] shadow-2xl shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-[#C9A84C] hover:bg-[#F5EFDD]"
             >
               <ToolIcon kind={tool.kind} />
-              <h3 className="mt-6 text-lg font-semibold">{tool.title}</h3>
-              <p className="mt-3 min-h-[4rem] text-sm leading-6 text-white/48">
+              <h3 className="mt-6 text-lg font-bold">{tool.title}</h3>
+              <p className="mt-3 min-h-[4rem] text-sm leading-6 text-[#1C1710]/65">
                 {tool.description}
               </p>
-              <span className="mt-5 inline-flex items-center gap-2 text-xs font-semibold text-[#FFB07C]/72 transition group-hover:text-[#FFB07C]">
+              <span className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-[#1E6B4A] transition">
                 Open tool
                 <span className="transition duration-300 group-hover:translate-x-1">
                   -&gt;
@@ -460,16 +386,13 @@ export default function Home() {
         </div>
       </section>
 
-      <section
-        id="privacy"
-        className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12"
-      >
+      <section id="privacy" className="mx-auto max-w-[1100px] px-5 py-16 sm:px-8">
         <div className="mb-10 max-w-2xl">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[#FFB07C]">
+          <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
             Privacy
           </p>
-          <h2 className="text-3xl font-semibold tracking-[-0.025em] sm:text-4xl">
-            A simpler approach to everyday files.
+          <h2 className="font-serif text-4xl tracking-[-0.02em] sm:text-5xl">
+            A careful desk for everyday files.
           </h2>
         </div>
 
@@ -477,11 +400,11 @@ export default function Home() {
           {privacyCards.map((card) => (
             <div
               key={card.title}
-              className="rounded-3xl border border-white/10 bg-white/[0.035] p-6 shadow-2xl shadow-black/15 backdrop-blur transition duration-300 hover:border-[#FF7A3D]/24 hover:bg-white/[0.052]"
+              className="rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-6 shadow-2xl shadow-black/15 transition duration-300 hover:border-[#C9A84C]/30"
             >
               <PrivacyIcon kind={card.kind} />
               <h3 className="text-lg font-semibold">{card.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-white/50">
+              <p className="mt-3 text-sm leading-6 text-[#F0EAD6]/50">
                 {card.description}
               </p>
             </div>
@@ -489,41 +412,42 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12">
-        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#101018] p-10 text-center shadow-2xl shadow-black/25 sm:p-16">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FF7A3D]/60 to-transparent" />
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(255,90,54,0.12),transparent_42%)]" />
-          <div className="relative">
-            <h2 className="text-3xl font-semibold tracking-[-0.025em] sm:text-5xl">
-              Start with one PDF task.
-            </h2>
-            <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-white/50">
-              Choose a tool and continue when the engine is ready.
-            </p>
-            <a
-              href="#tools"
-              className="mt-8 inline-flex rounded-full bg-[#FF5A36] px-8 py-3.5 text-sm font-semibold text-white transition duration-300 hover:-translate-y-0.5 hover:bg-[#FF6E45]"
-            >
-              Choose a tool
-            </a>
+      <section className="mx-auto max-w-[1100px] px-5 py-16 sm:px-8">
+        <div className="rounded-xl border border-[#E8DFC8]/14 bg-[#F0EAD6] p-10 text-center text-[#1C1710] shadow-2xl shadow-black/25 sm:p-16">
+          <div className="mx-auto mb-6 flex justify-center">
+            <LumeoSealMark />
           </div>
+          <h2 className="font-serif text-4xl tracking-[-0.02em] sm:text-5xl">
+            Start with one PDF task.
+          </h2>
+          <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-[#1C1710]/65">
+            Choose a tool and continue when the engine is ready.
+          </p>
+          <a
+            href="#tools"
+            className="mt-8 inline-flex rounded-full bg-[#1E6B4A] px-8 py-3.5 text-sm font-semibold text-[#F0EAD6] transition duration-300 hover:-translate-y-0.5 hover:bg-[#257B56]"
+          >
+            Choose a tool
+          </a>
         </div>
       </section>
 
-      <footer className="border-t border-white/10 px-5 py-8 sm:px-8 lg:px-12">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm text-white/42 md:flex-row md:items-center md:justify-between">
+      <footer className="border-t border-[#E8DFC8]/12 px-5 py-8 sm:px-8">
+        <div className="mx-auto flex max-w-[1100px] flex-col gap-5 text-sm text-[#F0EAD6]/42 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="font-semibold text-white/58">Lumeo PDF Workspace</p>
-            <p className="mt-1 italic">Built by Govardhan Gudapakam</p>
+            <p className="font-semibold text-[#F0EAD6]/68">
+              Lumeo PDF Workspace
+            </p>
+            <p className="mt-1">Built by Govardhan Gudapakam</p>
           </div>
           <div className="flex flex-wrap gap-4 font-semibold">
-            <Link href="/about" className="transition hover:text-white">
+            <Link href="/about" className="transition hover:text-[#F0EAD6]">
               About
             </Link>
-            <Link href="/privacy" className="transition hover:text-white">
+            <Link href="/privacy" className="transition hover:text-[#F0EAD6]">
               Privacy
             </Link>
-            <Link href="/terms" className="transition hover:text-white">
+            <Link href="/terms" className="transition hover:text-[#F0EAD6]">
               Terms
             </Link>
           </div>

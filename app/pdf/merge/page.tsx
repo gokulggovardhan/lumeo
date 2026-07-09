@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import MergePdfTool from "@/components/pdf/MergePdfTool";
+import { PublicPageShell } from "@/components/PublicPdfChrome";
 
 export const metadata: Metadata = {
-  title: "Merge PDF Online – Lumeo PDF Workspace",
+  title: "Merge PDF Online - Lumeo PDF Workspace",
   description:
     "Combine multiple PDF files into one clean document with Lumeo PDF Workspace.",
   alternates: {
@@ -13,34 +13,22 @@ export const metadata: Metadata = {
 
 export default function MergePdfPage() {
   return (
-    <main className="min-h-screen bg-[#07070A] px-5 py-8 text-[#F8F1E6] sm:px-8 lg:px-12">
-      <div className="mx-auto max-w-4xl">
-        <nav className="flex items-center justify-between border-b border-white/10 pb-5">
-          <Link href="/" className="text-sm font-black text-white">
-            Lumeo PDF Workspace
-          </Link>
-          <Link
-            href="/"
-            className="rounded-full border border-white/10 px-4 py-2 text-xs font-black text-white/60 transition hover:text-white"
-          >
-            Back to Lumeo PDF
-          </Link>
-        </nav>
+    <PublicPageShell maxWidth="max-w-[900px]">
+      <section>
+        <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
+          PDF workspace
+        </p>
+        <h1 className="font-serif text-4xl tracking-[-0.02em] text-[#F0EAD6] sm:text-6xl">
+          Merge PDF
+        </h1>
+        <p className="mt-5 max-w-2xl text-base leading-7 text-[#F0EAD6]/55">
+          Combine multiple PDF files into one clean document.
+        </p>
+      </section>
 
-        <section className="py-14">
-          <p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#FFB07C]">
-            PDF workspace
-          </p>
-          <h1 className="text-4xl font-black tracking-tight sm:text-6xl">
-            Merge PDF
-          </h1>
-          <p className="mt-5 max-w-2xl text-base leading-7 text-white/54">
-            Combine multiple PDF files into one clean document.
-          </p>
-        </section>
-
+      <div className="mt-12">
         <MergePdfTool />
       </div>
-    </main>
+    </PublicPageShell>
   );
 }
