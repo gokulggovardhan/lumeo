@@ -1,14 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PDFDocument } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 
 type MergeStatus = "Ready" | "Merging..." | "Download ready";
+type PageFormat = "smartA4" | "original";
 
 type SelectedPdf = {
   id: string;
   file: File;
 };
+
+const A4_WIDTH = 595.28;
+const A4_HEIGHT = 841.89;
+const PAGE_MARGIN = 24;
 
 function formatFileSize(size: number) {
   if (size < 1024) return `${size} B`;
@@ -47,6 +52,7 @@ function MergeIcon() {
 export default function MergePdfTool() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [files, setFiles] = useState<SelectedPdf[]>([]);
+  const [pageFormat, setPageFormat] = useState<PageFormat>("smartA4");
   const [status, setStatus] = useState<MergeStatus>("Ready");
   const [error, setError] = useState("");
   const [downloadUrl, setDownloadUrl] = useState("");
@@ -118,6 +124,13 @@ export default function MergePdfTool() {
     });
   };
 
+  const updatePageFormat = (format: PageFormat) => {
+    setPageFormat(format);
+    setError("");
+    setStatus("Ready");
+    clearDownload();
+  };
+
   const mergePdfs = async () => {
     if (files.length < 2) {
       setError("Choose at least two PDF files to merge.");
@@ -136,11 +149,46 @@ export default function MergePdfTool() {
         const sourcePdf = await PDFDocument.load(bytes, {
           ignoreEncryption: false,
         });
-        const copiedPages = await mergedPdf.copyPages(
-          sourcePdf,
-          sourcePdf.getPageIndices(),
-        );
-        copiedPages.forEach((page) => mergedPdf.addPage(page));
+
+        if (pageFormat === "original") {
+          const copiedPages = await mergedPdf.copyPages(
+            sourcePdf,
+            sourcePdf.getPageIndices(),
+          );
+          copiedPages.forEach((page) => mergedPdf.addPage(page));
+          continue;
+        }
+
+        for (const sourcePage of sourcePdf.getPages()) {
+          const embeddedPage = await mergedPdf.embedPage(sourcePage);
+          const { width: sourceWidth, height: sourceHeight } =
+            sourcePage.getSize();
+          const availableWidth = A4_WIDTH - PAGE_MARGIN * 2;
+          const availableHeight = A4_HEIGHT - PAGE_MARGIN * 2;
+          const scale = Math.min(
+            availableWidth / sourceWidth,
+            availableHeight / sourceHeight,
+          );
+          const drawWidth = sourceWidth * scale;
+          const drawHeight = sourceHeight * scale;
+          const x = (A4_WIDTH - drawWidth) / 2;
+          const y = (A4_HEIGHT - drawHeight) / 2;
+          const page = mergedPdf.addPage([A4_WIDTH, A4_HEIGHT]);
+
+          page.drawRectangle({
+            x: 0,
+            y: 0,
+            width: A4_WIDTH,
+            height: A4_HEIGHT,
+            color: rgb(1, 1, 1),
+          });
+          page.drawPage(embeddedPage, {
+            x,
+            y,
+            width: drawWidth,
+            height: drawHeight,
+          });
+        }
       }
 
       const mergedBytes = await mergedPdf.save();
@@ -159,6 +207,7 @@ export default function MergePdfTool() {
         error: mergeError,
         fileCount: files.length,
         totalSize,
+        pageFormat,
       });
       setStatus("Ready");
       setError(
@@ -218,7 +267,59 @@ export default function MergePdfTool() {
       </div>
 
       <div className="mt-5 rounded-2xl border border-white/10 bg-white/[0.035] p-4 text-sm text-white/54">
-        Files are merged in your browser for this tool and are not uploaded.
+        Files are merged in your browser and are not uploaded.
+      </div>
+
+      <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-[#07070A]/62 p-4 sm:p-5">
+        <div>
+          <p className="text-sm font-semibold text-white">Page format</p>
+          <p className="mt-1 text-xs font-medium text-white/42">
+            {pageFormat === "smartA4"
+              ? "Best for scanned documents, forms, and mixed-size PDFs."
+              : "Preserves each PDF page exactly as provided."}
+          </p>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <button
+            type="button"
+            onClick={() => updatePageFormat("smartA4")}
+            className={`rounded-2xl border p-4 text-left transition ${
+              pageFormat === "smartA4"
+                ? "border-[#FF7A3D]/42 bg-[#FF5A36]/12 shadow-[0_0_36px_rgba(255,90,54,0.10)]"
+                : "border-white/10 bg-white/[0.035] hover:border-[#FF7A3D]/24 hover:bg-white/[0.052]"
+            }`}
+          >
+            <span className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-semibold text-white">
+                Smart A4 fit
+              </span>
+              <span className="rounded-full border border-[#FF7A3D]/24 bg-[#FF5A36]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-[#FFB07C]">
+                Recommended
+              </span>
+            </span>
+            <span className="mt-2 block text-xs leading-5 text-white/46">
+              Makes every page the same clean A4 size.
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => updatePageFormat("original")}
+            className={`rounded-2xl border p-4 text-left transition ${
+              pageFormat === "original"
+                ? "border-[#FF7A3D]/42 bg-[#FF5A36]/12 shadow-[0_0_36px_rgba(255,90,54,0.10)]"
+                : "border-white/10 bg-white/[0.035] hover:border-[#FF7A3D]/24 hover:bg-white/[0.052]"
+            }`}
+          >
+            <span className="text-sm font-semibold text-white">
+              Keep original size
+            </span>
+            <span className="mt-2 block text-xs leading-5 text-white/46">
+              Preserves the original size of every page.
+            </span>
+          </button>
+        </div>
       </div>
 
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
