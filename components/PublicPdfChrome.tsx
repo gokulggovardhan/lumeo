@@ -60,7 +60,7 @@ export function BrandLockup({
 
 export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }) {
   return (
-    <nav className="border-b border-[#E8DFC8]/12 px-5 py-4 sm:px-8">
+    <nav className="border-b border-[#E8DFC8]/12 px-5 py-3 sm:px-8">
       <div className={`mx-auto flex ${maxWidth} items-center justify-between gap-4`}>
         <Link href="/" className="flex min-w-0 items-center">
           <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
@@ -87,7 +87,7 @@ export function PublicPageShell({
   return (
     <main className="min-h-screen bg-[#0C1220] text-[#F0EAD6]">
       <PublicNav maxWidth={maxWidth} />
-      <div className={`mx-auto ${maxWidth} px-5 py-12 sm:px-8 lg:py-16`}>
+      <div className={`mx-auto ${maxWidth} px-5 py-8 sm:px-8 lg:py-10`}>
         {children}
       </div>
     </main>

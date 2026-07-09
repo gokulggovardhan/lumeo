@@ -531,7 +531,7 @@ export default function MergePdfTool() {
 
   if (files.length === 0) {
     return (
-      <section className="pb-8">
+      <section className="pb-4 lg:flex lg:min-h-[calc(100dvh-190px)] lg:flex-col lg:justify-center">
         <input
           ref={inputRef}
           type="file"
@@ -555,7 +555,7 @@ export default function MergePdfTool() {
             setIsDragging(false);
             void addFiles(event.dataTransfer.files);
           }}
-          className={`group relative overflow-hidden rounded-xl border border-dashed px-5 py-8 shadow-2xl shadow-black/28 transition-all duration-300 sm:px-8 sm:py-10 lg:px-10 lg:py-12 ${
+          className={`group relative w-full overflow-hidden rounded-xl border border-dashed px-5 py-7 shadow-2xl shadow-black/28 transition-all duration-300 sm:px-8 lg:px-9 lg:py-9 ${
             isDragging
               ? "border-[#C9A84C]/64 bg-[#1E6B4A]/14 shadow-[0_24px_70px_rgba(30,107,74,0.2)]"
               : "border-[#E8DFC8]/18 bg-[#1A2840] hover:-translate-y-0.5 hover:border-[#C9A84C]/36 hover:bg-[#1A2840]/92"
@@ -565,12 +565,12 @@ export default function MergePdfTool() {
           <div className="pointer-events-none absolute inset-0 opacity-[0.055] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:42px_42px]" />
 
           <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex max-w-2xl flex-col gap-5 sm:flex-row sm:items-center">
-              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-[#C9A84C]/24 bg-[#0C1220]/64 text-[#C9A84C] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#1E6B4A]/14">
+            <div className="flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#C9A84C]/24 bg-[#0C1220]/64 text-[#C9A84C] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#1E6B4A]/14">
                 <MergeIcon />
               </span>
               <div>
-                <p className="text-2xl font-semibold tracking-[-0.02em] text-[#F0EAD6] sm:text-3xl">
+                <p className="text-2xl font-semibold tracking-[-0.02em] text-[#F0EAD6]">
                   Drop PDFs here
                 </p>
                 <p className="mt-2 text-base text-[#F0EAD6]/52">
@@ -614,7 +614,7 @@ export default function MergePdfTool() {
   }
 
   return (
-    <section className="pb-28 lg:pb-0">
+    <section className="pb-28 lg:h-[calc(100dvh-190px)] lg:min-h-[520px] lg:overflow-hidden lg:pb-0">
       <style>{`
         @keyframes consoleReveal {
           from { opacity: 0; transform: translateY(8px); }
@@ -633,15 +633,15 @@ export default function MergePdfTool() {
         }}
       />
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.42fr)_minmax(360px,0.78fr)] lg:items-start">
-        <div className="min-w-0 space-y-5">
-          <section className="animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840] p-4 shadow-2xl shadow-black/24 sm:p-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="grid gap-4 lg:h-full lg:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.72fr)] lg:items-stretch">
+        <div className="flex min-h-0 min-w-0 flex-col gap-3">
+          <section className="animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840] p-3 shadow-2xl shadow-black/24 sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
                   1 Add PDFs
                 </p>
-                <p className="mt-1 text-sm text-[#F0EAD6]/48">
+                <p className="mt-0.5 text-xs text-[#F0EAD6]/48">
                   Add more PDFs to this document deck.
                 </p>
               </div>
@@ -667,16 +667,16 @@ export default function MergePdfTool() {
                 setIsDragging(false);
                 void addFiles(event.dataTransfer.files);
               }}
-              className={`group relative overflow-hidden rounded-xl border border-dashed px-4 py-4 transition-all duration-300 sm:px-5 ${
+              className={`group relative overflow-hidden rounded-xl border border-dashed px-4 py-3 transition-all duration-300 ${
                 isDragging
                   ? "border-[#C9A84C]/60 bg-[#1E6B4A]/14 shadow-[0_18px_50px_rgba(30,107,74,0.18)]"
                   : "border-[#E8DFC8]/16 bg-[#0C1220]/70 hover:border-[#C9A84C]/34 hover:bg-[#0C1220]/82"
               }`}
             >
               <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#C9A84C]/28 to-transparent opacity-0 transition group-hover:opacity-100" />
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#C9A84C]/20 bg-[#F0EAD6]/[0.045] text-[#C9A84C] transition group-hover:bg-[#1E6B4A]/16">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#C9A84C]/20 bg-[#F0EAD6]/[0.045] text-[#C9A84C] transition group-hover:bg-[#1E6B4A]/16">
                     <MergeIcon />
                   </span>
                   <div>
@@ -691,7 +691,7 @@ export default function MergePdfTool() {
                 <button
                   type="button"
                   onClick={() => inputRef.current?.click()}
-                  className="inline-flex items-center justify-center rounded-full bg-[#1E6B4A] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98]"
+                className="inline-flex items-center justify-center rounded-full bg-[#1E6B4A] px-4 py-2 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98]"
                 >
                   Select PDFs
                 </button>
@@ -699,13 +699,13 @@ export default function MergePdfTool() {
             </div>
           </section>
 
-          <section className="animate-[consoleReveal_320ms_ease-out] rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/88 p-4 shadow-2xl shadow-black/18 sm:p-5">
-            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <section className="flex min-h-0 flex-1 animate-[consoleReveal_320ms_ease-out] flex-col rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/88 p-3 shadow-2xl shadow-black/18 sm:p-4">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
                   2 Arrange
                 </p>
-                <p className="mt-1 text-sm text-[#F0EAD6]/48">
+                <p className="mt-0.5 text-xs text-[#F0EAD6]/48">
                   Drag rows into the order you want.
                 </p>
               </div>
@@ -721,7 +721,7 @@ export default function MergePdfTool() {
                 Add at least two PDFs to begin arranging your merge.
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="min-h-0 space-y-2 overflow-y-auto pr-1 lg:max-h-full">
                 {files.map((item, index) => (
                   <div
                     key={item.id}
@@ -750,7 +750,7 @@ export default function MergePdfTool() {
                       setDraggingFileId("");
                       setDragOverFileId("");
                     }}
-                    className={`grid cursor-grab gap-3 rounded-lg border px-3 py-2.5 transition-all duration-300 active:cursor-grabbing sm:grid-cols-[auto_auto_1fr_auto] sm:items-center ${
+                    className={`grid cursor-grab gap-2 rounded-lg border px-3 py-2 transition-all duration-300 active:cursor-grabbing sm:grid-cols-[auto_auto_1fr_auto] sm:items-center ${
                       draggingFileId === item.id
                         ? "scale-[0.99] border-[#C9A84C]/45 bg-[#1E6B4A]/10 opacity-70"
                         : dragOverFileId === item.id
@@ -816,7 +816,7 @@ export default function MergePdfTool() {
             )}
           </section>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             {error ? (
               <div className="rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
                 {error}
@@ -848,7 +848,7 @@ export default function MergePdfTool() {
             ) : null}
           </div>
 
-          <div className="rounded-xl border border-[#C9A84C]/18 bg-[#0C1220]/54 px-4 py-3 text-sm text-[#F0EAD6]/54">
+          <div className="rounded-xl border border-[#C9A84C]/18 bg-[#0C1220]/54 px-4 py-2.5 text-xs text-[#F0EAD6]/54">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <p className="font-semibold text-[#F0EAD6]/74">
                 Private by design - Browser-only - Cleared after download
@@ -858,18 +858,18 @@ export default function MergePdfTool() {
           </div>
         </div>
 
-        <aside className="lg:sticky lg:top-24">
-          <div className="rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-4 shadow-2xl shadow-black/28 sm:p-5">
-            <div className="mb-4">
+        <aside className="lg:min-h-0">
+          <div className="flex h-full flex-col rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-4 shadow-2xl shadow-black/28">
+            <div className="mb-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
                 3 Output
               </p>
               <p className="mt-1 text-sm text-[#F0EAD6]/48">
-                One notary setting controls the finish.
+                One setting controls the finish.
               </p>
             </div>
 
-            <div className="rounded-lg border border-[#C9A84C]/22 bg-[#0C1220]/62 p-4">
+            <div className="rounded-lg border border-[#C9A84C]/22 bg-[#0C1220]/62 p-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F0EAD6]/34">
@@ -990,7 +990,7 @@ export default function MergePdfTool() {
               </div>
             ) : null}
 
-            <label className="mt-4 block rounded-lg border border-[#E8DFC8]/10 bg-[#0C1220]/50 p-3">
+            <label className="mt-3 block rounded-lg border border-[#E8DFC8]/10 bg-[#0C1220]/50 p-3">
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#F0EAD6]/34">
                 File name
               </span>
@@ -1006,7 +1006,7 @@ export default function MergePdfTool() {
               />
             </label>
 
-            <div className="mt-5 border-t border-[#E8DFC8]/10 pt-5">
+            <div className="mt-auto border-t border-[#E8DFC8]/10 pt-4">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
                 4 Download
               </p>
