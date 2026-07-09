@@ -60,7 +60,7 @@ export function BrandLockup({
 
 export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }) {
   return (
-    <nav className="border-b border-[#E8DFC8]/12 px-5 py-3 sm:px-8">
+    <nav className="border-b border-[#E8DFC8]/12 px-5 py-2 sm:px-8">
       <div className={`mx-auto flex ${maxWidth} items-center justify-between gap-4`}>
         <Link href="/" className="flex min-w-0 items-center">
           <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
@@ -68,9 +68,31 @@ export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }
 
         <Link
           href="/"
-          className="rounded-full border border-[#E8DFC8]/16 px-4 py-2 text-xs font-semibold text-[#F0EAD6]/58 transition hover:border-[#E8DFC8]/32 hover:text-[#F0EAD6]"
+          aria-label="Go to Lumeo PDF home"
+          title="Home"
+          className="group inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E8DFC8]/16 text-[#F0EAD6]/58 transition hover:border-[#E8DFC8]/32 hover:text-[#F0EAD6]"
         >
-          Back to Lumeo PDF
+          <svg
+            aria-hidden="true"
+            viewBox="0 0 24 24"
+            className="h-4.5 w-4.5"
+            fill="none"
+          >
+            <path
+              d="m5 11 7-6 7 6"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            />
+            <path
+              d="M7.5 10.5v7.2h9v-7.2"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.8"
+            />
+          </svg>
         </Link>
       </div>
     </nav>

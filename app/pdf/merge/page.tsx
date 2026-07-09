@@ -13,8 +13,8 @@ export const metadata: Metadata = {
 
 export default function MergePdfPage() {
   return (
-    <PublicPageShell contentClassName="px-5 py-5 sm:px-8 lg:py-4">
-      <section className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+    <PublicPageShell contentClassName="px-5 py-5 sm:px-8 lg:h-[calc(100dvh-57px)] lg:overflow-hidden lg:py-3">
+      <section className="flex flex-col gap-2 lg:h-[66px] lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="mb-1.5 text-[11px] font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
             PDF workspace
@@ -26,12 +26,12 @@ export default function MergePdfPage() {
             Combine PDFs into one clean document.
           </p>
         </div>
-        <div className="rounded-full border border-[#E8DFC8]/12 bg-[#1A2840]/72 px-3 py-1.5 text-xs font-semibold text-[#F0EAD6]/52">
+        <div className="hidden rounded-full border border-[#E8DFC8]/12 bg-[#1A2840]/72 px-3 py-1.5 text-xs font-semibold text-[#F0EAD6]/52 sm:block">
           Browser-first document console
         </div>
       </section>
 
-      <div className="mt-3">
+      <div className="mt-3 lg:h-[calc(100%-78px)] lg:overflow-hidden">
         <MergePdfTool />
       </div>
     </PublicPageShell>
