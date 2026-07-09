@@ -70,12 +70,12 @@ export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }
           href="/"
           aria-label="Go to Lumeo PDF home"
           title="Home"
-          className="group inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E8DFC8]/16 text-[#F0EAD6]/58 transition hover:border-[#E8DFC8]/32 hover:text-[#F0EAD6]"
+          className="group inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#E8DFC8]/16 px-3 text-[#F0EAD6]/62 transition hover:border-[#E8DFC8]/32 hover:bg-[#F0EAD6]/[0.035] hover:text-[#F0EAD6] sm:h-11 sm:px-3.5"
         >
           <svg
             aria-hidden="true"
             viewBox="0 0 24 24"
-            className="h-4.5 w-4.5"
+            className="h-5 w-5"
             fill="none"
           >
             <path
@@ -93,6 +93,7 @@ export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }
               strokeWidth="1.8"
             />
           </svg>
+          <span className="hidden text-xs font-semibold sm:inline">Home</span>
         </Link>
       </div>
     </nav>

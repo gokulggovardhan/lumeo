@@ -851,9 +851,11 @@ export default function MergePdfTool() {
           <div className="rounded-xl border border-[#C9A84C]/18 bg-[#0C1220]/54 px-4 py-2 text-xs text-[#F0EAD6]/54">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <p className="font-semibold text-[#F0EAD6]/74">
-                Private by design - Browser-only - Cleared after download
+                Private by design &middot; Browser-only &middot; Cleared after download
               </p>
-              <p>Files stay on your device for this tool. No server upload.</p>
+              <p className="lg:hidden">
+                Files stay on your device. No server upload.
+              </p>
             </div>
           </div>
         </div>
