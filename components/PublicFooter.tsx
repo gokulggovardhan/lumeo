@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 
 const trustLinks = [
   {
@@ -21,9 +22,15 @@ export default function PublicFooter() {
       <div className="mx-auto flex max-w-[900px] flex-col items-center gap-6">
         <Link
           href="/"
-          className="font-semibold text-[#F0EAD6]/68 transition hover:text-[#F0EAD6]"
+          className="transition opacity-80 hover:opacity-100"
         >
-          Lumeo PDF Workspace
+          <Image
+            src="/brand/lumeo-pdf-logo-light.png"
+            alt="Lumeo PDF Workspace"
+            width={1916}
+            height={821}
+            className="h-9 w-auto max-w-[190px] object-contain"
+          />
         </Link>
 
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">

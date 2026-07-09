@@ -7,13 +7,13 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Simple, private PDF tools for everyday documents.",
     start_url: "/",
     display: "standalone",
-    background_color: "#07070A",
-    theme_color: "#F3E7C8",
+    background_color: "#0C1220",
+    theme_color: "#1E6B4A",
     icons: [
       {
-        src: "/lumeo-mark.svg",
-        sizes: "any",
-        type: "image/svg+xml",
+        src: "/brand/lumeo-pdf-mark.png",
+        sizes: "1254x1254",
+        type: "image/png",
         purpose: "maskable",
       },
     ],
