@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Lumeo",
     short_name: "Lumeo",
-    description: "Premium online creative studio for polished short videos.",
+    description: "Simple, private PDF tools for everyday documents.",
     start_url: "/",
     display: "standalone",
     background_color: "#07070A",

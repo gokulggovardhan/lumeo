@@ -3,14 +3,14 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Lumeo PDF Workspace - Premium Private PDF Tools",
+  title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
   description:
     "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Lumeo PDF Workspace - Premium Private PDF Tools",
+    title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
     description:
       "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
     url: "https://lumeo.in",
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Lumeo PDF Workspace - Premium Private PDF Tools",
+    title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
     description:
       "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
   },

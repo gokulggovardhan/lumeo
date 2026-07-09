@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Compress PDF Online - Lumeo PDF Workspace",
+  title: "Compress PDF Online – Lumeo PDF Workspace",
   description:
     "Reduce PDF file size for email, forms, and sharing with Lumeo PDF Workspace.",
   alternates: {

@@ -5,14 +5,14 @@ import PublicFooter from "@/components/PublicFooter";
 export const metadata: Metadata = {
   title: "Lumeo Terms of Use",
   description:
-    "Terms of Use for Lumeo, a premium online creative studio for short-form video creation.",
+    "Terms of Use for Lumeo PDF Workspace, a simple PDF workspace for everyday documents.",
   alternates: {
     canonical: "https://lumeo.in/terms",
   },
   openGraph: {
     title: "Lumeo Terms of Use",
     description:
-      "Terms of Use for Lumeo, a premium online creative studio for short-form video creation.",
+      "Terms of Use for Lumeo PDF Workspace, a simple PDF workspace for everyday documents.",
     url: "https://lumeo.in/terms",
     siteName: "Lumeo",
     type: "website",
@@ -28,7 +28,9 @@ export default function TermsPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E7C8] text-sm font-bold text-[#111018]">
               L
             </div>
-            <span className="font-bold tracking-tight">Lumeo</span>
+            <span className="font-bold tracking-tight">
+              Lumeo PDF Workspace
+            </span>
           </Link>
 
           <Link
@@ -50,7 +52,7 @@ export default function TermsPage() {
         </h1>
 
         <p className="mt-4 text-sm text-[#F7F0DE]/40">
-          Last updated: June 2026
+          Last updated: July 2026
         </p>
 
         <div className="mt-10 space-y-10 text-base leading-8 text-[#F7F0DE]/60">
@@ -59,32 +61,20 @@ export default function TermsPage() {
               Use of Lumeo
             </h2>
             <p>
-              Lumeo is an online creative studio for creating and editing
-              short-form videos. By using Lumeo, you agree to use the platform
-              responsibly, lawfully, and in accordance with these terms.
+              Lumeo PDF Workspace provides simple document tools and public
+              information pages. By using Lumeo, you agree to use the site
+              responsibly and lawfully.
             </p>
           </section>
 
           <section>
             <h2 className="mb-3 text-xl font-bold text-[#F7F0DE]">
-              Your content
+              Your files
             </h2>
             <p>
-              You retain ownership of the videos, audio, images, text, and
-              other materials you upload or create using Lumeo. By uploading
-              content, you confirm that you have the rights needed to use that
-              content and that your use does not violate the rights of others.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-xl font-bold text-[#F7F0DE]">
-              Uploads and exports
-            </h2>
-            <p>
-              Lumeo processes uploaded media to provide editing, preview, and
-              export features. You are responsible for reviewing your exported
-              content before publishing or sharing it outside Lumeo.
+              You are responsible for the files you choose to use with Lumeo
+              and for making sure you have the rights needed to process,
+              convert, or share those files.
             </p>
           </section>
 
@@ -93,10 +83,9 @@ export default function TermsPage() {
               Acceptable use
             </h2>
             <p>
-              You may not use Lumeo to upload, create, edit, or distribute
-              unlawful, harmful, abusive, infringing, or misleading content. You
-              may not attempt to interfere with the platform, misuse storage or
-              export systems, or access data that does not belong to you.
+              You may not use Lumeo for unlawful, harmful, infringing, abusive,
+              or misleading activity, or attempt to interfere with the site or
+              access data that does not belong to you.
             </p>
           </section>
 
@@ -105,22 +94,10 @@ export default function TermsPage() {
               Service availability
             </h2>
             <p>
-              Lumeo is provided as an online service and may change as the
-              platform develops. We aim to provide a reliable experience, but we
-              do not guarantee uninterrupted access, error-free operation, or
-              permanent availability of any specific feature.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-xl font-bold text-[#F7F0DE]">
-              Responsibility
-            </h2>
-            <p>
-              Lumeo is designed to support creative workflows, but you remain
-              responsible for your content, your project decisions, and how you
-              use exported videos. You should keep backup copies of important
-              original files outside the platform.
+              Lumeo may change as the product develops. We aim to provide a
+              reliable experience, but we do not guarantee uninterrupted access,
+              error-free operation, or permanent availability of any specific
+              feature.
             </p>
           </section>
 
@@ -130,8 +107,7 @@ export default function TermsPage() {
             </h2>
             <p>
               These Terms of Use may be updated as Lumeo develops. Continued
-              use of the platform after updates means you accept the revised
-              terms.
+              use of the site after updates means you accept the revised terms.
             </p>
           </section>
         </div>

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Merge PDF Online - Lumeo PDF Workspace",
+  title: "Merge PDF Online – Lumeo PDF Workspace",
   description:
     "Combine multiple PDF files into one clean document with Lumeo PDF Workspace.",
   alternates: {

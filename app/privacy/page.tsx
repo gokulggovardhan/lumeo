@@ -5,14 +5,14 @@ import PublicFooter from "@/components/PublicFooter";
 export const metadata: Metadata = {
   title: "Lumeo Privacy Policy",
   description:
-    "Privacy Policy for Lumeo, a premium online creative studio for short-form video creation.",
+    "Privacy Policy for Lumeo PDF Workspace, a simple, privacy-first PDF workspace for everyday documents.",
   alternates: {
     canonical: "https://lumeo.in/privacy",
   },
   openGraph: {
     title: "Lumeo Privacy Policy",
     description:
-      "Privacy Policy for Lumeo, a premium online creative studio for short-form video creation.",
+      "Privacy Policy for Lumeo PDF Workspace, a simple, privacy-first PDF workspace for everyday documents.",
     url: "https://lumeo.in/privacy",
     siteName: "Lumeo",
     type: "website",
@@ -28,7 +28,9 @@ export default function PrivacyPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E7C8] text-sm font-bold text-[#111018]">
               L
             </div>
-            <span className="font-bold tracking-tight">Lumeo</span>
+            <span className="font-bold tracking-tight">
+              Lumeo PDF Workspace
+            </span>
           </Link>
 
           <Link
@@ -50,7 +52,7 @@ export default function PrivacyPage() {
         </h1>
 
         <p className="mt-4 text-sm text-[#F7F0DE]/40">
-          Last updated: June 2026
+          Last updated: July 2026
         </p>
 
         <div className="mt-10 space-y-10 text-base leading-8 text-[#F7F0DE]/60">
@@ -59,11 +61,9 @@ export default function PrivacyPage() {
               Information we collect
             </h2>
             <p>
-              When you use Lumeo, we may collect basic account information such
-              as your name and email address for sign-in and project access. We
-              may also store project settings, editor preferences, uploaded
-              media details, and export-related information needed to provide
-              the editing experience.
+              Lumeo may collect basic information needed to operate the site,
+              such as browser session data, usage diagnostics, and information
+              you choose to provide when using future account-based features.
             </p>
           </section>
 
@@ -72,34 +72,19 @@ export default function PrivacyPage() {
               How we use information
             </h2>
             <p>
-              We use information to provide core Lumeo features such as account
-              access, project saving, media editing, preview, export, and
-              project management. We do not sell your personal information.
+              We use information to provide, maintain, secure, and improve
+              Lumeo PDF Workspace. We do not sell your personal information.
             </p>
           </section>
 
           <section>
             <h2 className="mb-3 text-xl font-bold text-[#F7F0DE]">
-              Uploaded media
+              Document files
             </h2>
             <p>
-              Media uploaded to Lumeo is used to power your editing workspace
-              and export flow. Your uploaded files are associated with your
-              project and account. When you delete a project, Lumeo is designed
-              to remove the related project media and generated exports from
-              active storage.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="mb-3 text-xl font-bold text-[#F7F0DE]">
-              Project data
-            </h2>
-            <p>
-              Lumeo stores project information such as timeline settings,
-              reframe settings, title settings, export preferences, and related
-              editing metadata so your workspace can be restored when you
-              return.
+              Lumeo is being designed so most PDF tools can run in your browser
+              where possible. If server processing is required later, files
+              should be temporary and handled with clear deletion rules.
             </p>
           </section>
 
@@ -108,9 +93,9 @@ export default function PrivacyPage() {
               Cookies and session data
             </h2>
             <p>
-              Lumeo may use cookies or similar browser storage for sign-in,
-              security, session management, and essential product behavior.
-              These are used to keep the product working reliably.
+              Lumeo may use cookies or similar browser storage for essential
+              site behavior, security, session management, and product
+              reliability.
             </p>
           </section>
 
@@ -119,10 +104,9 @@ export default function PrivacyPage() {
               Security
             </h2>
             <p>
-              We take reasonable steps to protect account, project, and media
-              data. However, no online service can guarantee absolute security.
-              You should keep copies of important original media files outside
-              of Lumeo.
+              We take reasonable steps to protect data. No online service can
+              guarantee absolute security, so you should keep backup copies of
+              important files.
             </p>
           </section>
 

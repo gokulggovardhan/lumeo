@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "Split PDF Online - Lumeo PDF Workspace",
+  title: "Split PDF Online – Lumeo PDF Workspace",
   description:
     "Extract selected pages or prepare separate documents from one PDF with Lumeo PDF Workspace.",
   alternates: {

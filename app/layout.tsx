@@ -14,20 +14,21 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://lumeo.in"),
-  title: "Lumeo - Premium Online Video Editor for Creators",
+  title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
   description:
-    "Create, edit, reframe, title, and export polished videos for reels, shorts, podcasts, education, social media, and creator workflows with Lumeo.",
+    "Merge, split, compress, and convert PDF files with a clean, privacy-first PDF workspace for everyday documents.",
   applicationName: "Lumeo",
   authors: [{ name: "Lumeo" }],
   creator: "Lumeo",
   publisher: "Lumeo",
   keywords: [
-    "online video editor",
-    "creator studio",
-    "video editing workspace",
-    "reels editor",
-    "shorts editor",
-    "social media video editor",
+    "PDF tools",
+    "merge PDF",
+    "split PDF",
+    "compress PDF",
+    "JPG to PDF",
+    "PDF to JPG",
+    "private PDF workspace",
     "Lumeo",
   ],
   alternates: {
@@ -43,23 +44,23 @@ export const metadata: Metadata = {
     type: "website",
     url: "https://lumeo.in",
     siteName: "Lumeo",
-    title: "Lumeo - Premium Online Video Editor for Creators",
+    title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
     description:
-      "Create, edit, reframe, title, and export polished videos for reels, shorts, podcasts, education, social media, and creator workflows with Lumeo.",
+      "Merge, split, compress, and convert PDF files with a clean, privacy-first PDF workspace for everyday documents.",
     images: [
       {
         url: "/og-image.svg",
         width: 1200,
         height: 630,
-        alt: "Lumeo Studio - Create clean short videos.",
+        alt: "Lumeo PDF Workspace - Simple, private PDF tools.",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Lumeo - Premium Online Video Editor for Creators",
+    title: "Lumeo PDF Workspace – Simple, Private PDF Tools",
     description:
-      "Create, edit, reframe, title, and export polished videos for reels, shorts, podcasts, education, social media, and creator workflows with Lumeo.",
+      "Merge, split, compress, and convert PDF files with a clean, privacy-first PDF workspace for everyday documents.",
     images: ["/og-image.svg"],
   },
 };

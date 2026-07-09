@@ -3,16 +3,16 @@ import Link from "next/link";
 import PublicFooter from "@/components/PublicFooter";
 
 export const metadata: Metadata = {
-  title: "About Lumeo – Premium Online Creative Studio",
+  title: "About Lumeo PDF Workspace",
   description:
-    "Learn about Lumeo, a premium online creative studio built for focused short-form video creation.",
+    "Learn about Lumeo PDF Workspace, a simple, private PDF workspace for everyday documents.",
   alternates: {
     canonical: "https://lumeo.in/about",
   },
   openGraph: {
-    title: "About Lumeo",
+    title: "About Lumeo PDF Workspace",
     description:
-      "Lumeo is a premium online creative studio built for focused short-form video creation.",
+      "Learn about Lumeo PDF Workspace, a simple, private PDF workspace for everyday documents.",
     url: "https://lumeo.in/about",
     siteName: "Lumeo",
     type: "website",
@@ -28,7 +28,9 @@ export default function AboutPage() {
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E7C8] text-sm font-bold text-[#111018]">
               L
             </div>
-            <span className="font-bold tracking-tight">Lumeo</span>
+            <span className="font-bold tracking-tight">
+              Lumeo PDF Workspace
+            </span>
           </Link>
 
           <Link
@@ -46,59 +48,56 @@ export default function AboutPage() {
         </p>
 
         <h1 className="max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-          Lumeo is a focused creative studio for polished short videos.
+          Lumeo is a clean PDF workspace for everyday documents.
         </h1>
 
         <div className="mt-10 space-y-7 text-base leading-8 text-[#F7F0DE]/60">
           <p>
-            Lumeo is being built as a premium online creative studio for
-            creators who want to turn raw clips into clean, polished short-form
-            videos. The goal is to keep the editing experience focused, calm,
-            and export-ready.
+            Lumeo PDF Workspace is being built for people who need simple,
+            private tools to prepare common documents without a cluttered
+            interface.
           </p>
 
           <p>
-            Instead of copying large editing suites, Lumeo focuses on the
-            creator workflow that matters most: upload a clip, trim it, reframe
-            it, add titles, adjust sound, and export a clean video for social
-            platforms and creator projects.
+            The product focuses on practical PDF tasks such as merging,
+            splitting, compressing, and converting files for forms, resumes,
+            statements, invoices, and office documents.
           </p>
 
           <p>
-            The platform is designed for video creators, short-form content
-            makers, educators, podcasters, developers, social media teams, and
-            businesses that need a simple but premium editing workspace.
-          </p>
-
-          <p>
-            Lumeo is still growing step by step. New features are added only
-            when they improve the real editing workflow and maintain the clean,
-            reliable studio experience.
+            Lumeo is designed around clarity and control. Most tools are
+            intended to run in the browser where possible, and any future server
+            processing should use clear temporary file handling rules.
           </p>
         </div>
 
         <div className="mt-14 grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.035] p-5">
-            <h2 className="text-base font-bold">Focused</h2>
-            <p className="mt-2 text-sm leading-6 text-[#F7F0DE]/45">
-              Built around the essential creator workflow without unnecessary
-              clutter.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.035] p-5">
-            <h2 className="text-base font-bold">Short-form first</h2>
-            <p className="mt-2 text-sm leading-6 text-[#F7F0DE]/45">
-              Designed for vertical, square, and widescreen creator outputs.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.035] p-5">
-            <h2 className="text-base font-bold">Premium feel</h2>
-            <p className="mt-2 text-sm leading-6 text-[#F7F0DE]/45">
-              A calm, polished workspace for creating clean video exports.
-            </p>
-          </div>
+          {[
+            {
+              title: "Simple",
+              description: "Focused document tasks without unnecessary clutter.",
+            },
+            {
+              title: "Private",
+              description:
+                "Built around browser-first workflows where possible.",
+            },
+            {
+              title: "Practical",
+              description:
+                "Made for everyday PDFs people actually need to prepare.",
+            },
+          ].map((item) => (
+            <div
+              key={item.title}
+              className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.035] p-5"
+            >
+              <h2 className="text-base font-bold">{item.title}</h2>
+              <p className="mt-2 text-sm leading-6 text-[#F7F0DE]/45">
+                {item.description}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
 

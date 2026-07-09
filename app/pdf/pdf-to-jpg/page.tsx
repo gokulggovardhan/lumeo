@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "PDF to JPG Online - Lumeo PDF Workspace",
+  title: "PDF to JPG Online – Lumeo PDF Workspace",
   description:
     "Export PDF pages as high-quality images with Lumeo PDF Workspace.",
   alternates: {
