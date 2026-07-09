@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { ToolPlaceholder } from "@/components/PublicPdfChrome";
+import { PdfToolPlaceholder } from "@/components/pdf/PdfToolPlaceholder";
+import { getPdfTool } from "@/components/pdf/PdfToolRegistry";
 
 export const metadata: Metadata = {
   title: "PDF to JPG Online - Lumeo PDF Workspace",
@@ -11,11 +12,5 @@ export const metadata: Metadata = {
 };
 
 export default function PdfToJpgPage() {
-  return (
-    <ToolPlaceholder
-      title="PDF to JPG"
-      description="Export PDF pages as high-quality images."
-      accepted="a PDF file"
-    />
-  );
+  return <PdfToolPlaceholder tool={getPdfTool("pdf-to-jpg")} />;
 }

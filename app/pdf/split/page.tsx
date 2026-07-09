@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { ToolPlaceholder } from "@/components/PublicPdfChrome";
+import { PdfToolPlaceholder } from "@/components/pdf/PdfToolPlaceholder";
+import { getPdfTool } from "@/components/pdf/PdfToolRegistry";
 
 export const metadata: Metadata = {
   title: "Split PDF Online - Lumeo PDF Workspace",
@@ -11,11 +12,5 @@ export const metadata: Metadata = {
 };
 
 export default function SplitPdfPage() {
-  return (
-    <ToolPlaceholder
-      title="Split PDF"
-      description="Extract selected pages or prepare separate documents from one PDF."
-      accepted="a PDF file"
-    />
-  );
+  return <PdfToolPlaceholder tool={getPdfTool("split")} />;
 }
