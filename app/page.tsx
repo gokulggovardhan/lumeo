@@ -1,277 +1,270 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import AuthButton from "@/components/AuthButton";
-import SeoStructuredData from "@/components/SeoStructuredData";
-import PublicFooter from "@/components/PublicFooter";
 
-const tools = [
-  {
-    title: "Trim",
-    description: "Set clean start and end points for a focused short video.",
-    href: "/features",
+export const metadata: Metadata = {
+  title: "Lumeo PDF Workspace - Premium Private PDF Tools",
+  description:
+    "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
+  alternates: {
+    canonical: "/",
   },
-  {
-    title: "Frame",
-    description: "Reframe clips for vertical, square, or widescreen output.",
-    href: "/video-reframe-tool",
-  },
-  {
-    title: "Titles",
+  openGraph: {
+    title: "Lumeo PDF Workspace - Premium Private PDF Tools",
     description:
-      "Add polished creator-ready titles with clean presets and readable overlays.",
-    href: "/add-titles-to-video",
+      "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
+    url: "https://lumeo.in",
+    siteName: "Lumeo PDF Workspace",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Lumeo PDF Workspace - Premium Private PDF Tools",
+    description:
+      "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
+  },
+};
+
+const primaryTools = [
+  {
+    title: "Merge PDF",
+    href: "/pdf/merge",
+    description: "Combine multiple PDF files into one clean document.",
+    icon: "M",
   },
   {
-    title: "Sound",
-    description: "Prepare clean audio levels for your final clip.",
-    href: "/features",
+    title: "Split PDF",
+    href: "/pdf/split",
+    description: "Extract selected pages or prepare separate documents.",
+    icon: "S",
   },
   {
-    title: "Export",
-    description: "Create a polished MP4 download for publishing and sharing.",
-    href: "/features",
+    title: "Compress PDF",
+    href: "/pdf/compress",
+    description: "Reduce file size for email, forms, and sharing.",
+    icon: "C",
   },
   {
-    title: "Auto-save",
-    description: "Keep your media and project settings saved as you work.",
-    href: "/features",
+    title: "JPG to PDF",
+    href: "/pdf/jpg-to-pdf",
+    description: "Turn photos, scans, and images into a clean PDF.",
+    icon: "J",
+  },
+  {
+    title: "PDF to JPG",
+    href: "/pdf/pdf-to-jpg",
+    description: "Export PDF pages as high-quality images.",
+    icon: "P",
   },
 ];
 
-const studioPreviewSteps = [
+const workflows = [
   {
-    title: "Trim clips",
-    description: "Clean start and end",
-    primaryWidth: "78%",
-    secondaryWidth: "46%",
+    title: "Job Application PDF",
+    tools: ["JPG to PDF", "Merge PDF", "Compress PDF", "Add Page Numbers"],
   },
   {
-    title: "Frame for socials",
-    description: "Vertical-ready layout",
-    primaryWidth: "66%",
-    secondaryWidth: "58%",
+    title: "Government Document PDF",
+    tools: ["JPG to PDF", "Compress PDF", "Rotate PDF", "Reorder Pages"],
   },
   {
-    title: "Export clean MP4",
-    description: "Ready to publish",
-    primaryWidth: "86%",
-    secondaryWidth: "38%",
+    title: "Bank Statement PDF",
+    tools: ["Compress PDF", "Split PDF", "Protect PDF"],
+  },
+  {
+    title: "Invoice PDF",
+    tools: ["Merge PDF", "Add Watermark", "Compress PDF"],
+  },
+  {
+    title: "Study Notes PDF",
+    tools: ["JPG to PDF", "Merge PDF", "Add Page Numbers"],
+  },
+  {
+    title: "Office Report PDF",
+    tools: ["Merge PDF", "Reorder Pages", "Watermark", "Compress PDF"],
   },
 ];
+
+const comingNextTools = [
+  "Rotate PDF",
+  "Delete Pages",
+  "Reorder Pages",
+  "Add Page Numbers",
+  "Add Watermark",
+  "Protect PDF",
+  "Unlock PDF",
+  "Sign PDF",
+  "OCR PDF",
+  "Redact PDF",
+];
+
+const useCases = [
+  "Resumes",
+  "Forms",
+  "Invoices",
+  "Bank statements",
+  "Scanned documents",
+  "Office files",
+];
+
+const structuredData = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Lumeo",
+    url: "https://lumeo.in",
+    description:
+      "Lumeo PDF Workspace is a premium online workspace for preparing everyday PDF documents.",
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    name: "Lumeo PDF Workspace",
+    url: "https://lumeo.in",
+    applicationCategory: "ProductivityApplication",
+    operatingSystem: "Web",
+    description:
+      "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
+    publisher: {
+      "@type": "Organization",
+      name: "Lumeo",
+      url: "https://lumeo.in",
+    },
+  },
+];
+
+function ToolIcon({ label }: { label: string }) {
+  return (
+    <span className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#FF7A3D]/20 bg-[#FF5A36]/10 text-sm font-black text-[#FFB07C] shadow-[0_0_32px_rgba(255,90,54,0.12)]">
+      <span className="absolute inset-0 rounded-2xl bg-gradient-to-br from-white/10 to-transparent" />
+      <span className="relative">{label}</span>
+    </span>
+  );
+}
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#07070A] text-[#F7F0DE]">
-      <SeoStructuredData />
+    <main className="min-h-screen bg-[#07070A] text-[#F8F1E6]">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
 
-      <style>{`
-        @keyframes lumeoPreviewFloat {
-          0%, 100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-7px);
-          }
-        }
-
-        @keyframes lumeoPreviewGlow {
-          0%, 100% {
-            opacity: 0.72;
-            box-shadow: 0 0 0 rgba(243, 231, 200, 0);
-          }
-          50% {
-            opacity: 1;
-            box-shadow: 0 0 28px rgba(243, 231, 200, 0.16);
-          }
-        }
-
-        @keyframes lumeoBarMove {
-          0%, 100% {
-            transform: translateX(-8%);
-          }
-          50% {
-            transform: translateX(8%);
-          }
-        }
-
-        @keyframes lumeoTimelinePulse {
-          0%, 100% {
-            opacity: 0.72;
-          }
-          50% {
-            opacity: 1;
-          }
-        }
-      `}</style>
-
-      <nav className="relative z-50 border-b border-[#F3E7C8]/10 bg-[#07070A]/90 px-5 py-3.5 backdrop-blur-xl sm:px-8 lg:px-12">
+      <nav className="sticky top-0 z-50 border-b border-white/10 bg-[#07070A]/88 px-5 py-3.5 backdrop-blur-xl sm:px-8 lg:px-12">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#F3E7C8] text-sm font-bold text-[#111018]">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#FF7A3D]/25 bg-[#111017] text-sm font-black text-[#FFB07C] shadow-[0_0_28px_rgba(255,90,54,0.14)]">
               L
-            </div>
-            <span className="text-base font-bold tracking-tight">Lumeo</span>
+            </span>
+            <span className="text-sm font-black tracking-tight sm:text-base">
+              Lumeo PDF Workspace
+            </span>
           </Link>
 
-          <div className="hidden items-center gap-8 text-sm font-semibold text-[#F7F0DE]/55 md:flex">
+          <div className="hidden items-center gap-7 text-sm font-bold text-white/52 md:flex">
+            <a href="#workflows" className="transition hover:text-white">
+              Workflows
+            </a>
             <a href="#tools" className="transition hover:text-white">
               Tools
             </a>
-            <a href="#studio" className="transition hover:text-white">
-              Studio
+            <a href="#privacy" className="transition hover:text-white">
+              Privacy
             </a>
           </div>
 
-          <AuthButton />
+          <a
+            href="#tools"
+            className="rounded-full border border-[#FF7A3D]/22 bg-[#FF5A36]/10 px-4 py-2 text-xs font-black text-[#FFB07C] transition hover:border-[#FF7A3D]/42 hover:bg-[#FF5A36]/16"
+          >
+            Choose a tool
+          </a>
         </div>
       </nav>
 
-      <section className="relative overflow-hidden px-5 pb-14 pt-14 sm:px-8 sm:pt-18 lg:px-12 lg:pb-16 lg:pt-20">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_6%,rgba(243,231,200,0.12),transparent_32%),radial-gradient(circle_at_74%_9%,rgba(167,139,250,0.14),transparent_38%),linear-gradient(rgba(243,231,200,0.025)_1px,transparent_1px),linear-gradient(90deg,rgba(243,231,200,0.02)_1px,transparent_1px)] bg-[size:auto,auto,44px_44px,44px_44px]" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-[#07070A] via-transparent to-transparent" />
+      <section className="relative overflow-hidden px-5 pb-16 pt-16 sm:px-8 sm:pt-20 lg:px-12 lg:pb-20 lg:pt-24">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_0%,rgba(255,90,54,0.16),transparent_34%),radial-gradient(circle_at_78%_12%,rgba(180,130,255,0.12),transparent_32%),linear-gradient(rgba(255,255,255,0.028)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.022)_1px,transparent_1px)] bg-[size:auto,auto,44px_44px,44px_44px]" />
 
-        <div className="relative z-10 mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.98fr_1.02fr] lg:items-center">
+        <div className="relative z-10 mx-auto grid max-w-7xl gap-12 lg:grid-cols-[1fr_0.92fr] lg:items-center">
           <div>
-            <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-[#F3E7C8]/10 bg-white/[0.03] px-3.5 py-1.5 text-xs font-bold text-[#F7F0DE]/50">
-              <span className="h-1.5 w-1.5 rounded-full bg-[#F3E7C8]" />
-              Lumeo Studio
+            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs font-black text-white/54">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#FF7A3D]" />
+              Lumeo PDF Workspace
             </div>
 
-            <h1 className="max-w-xl text-5xl font-bold leading-[1.05] tracking-tight sm:text-6xl lg:text-[4.25rem]">
-              Create clean
-              <br />
-              <span className="text-[#F3E7C8]">short videos.</span>
+            <h1 className="max-w-3xl text-5xl font-black leading-[1.02] tracking-tight sm:text-6xl lg:text-[4.55rem]">
+              PDF tools that feel calm, private, and premium.
             </h1>
 
-            <p className="mt-6 max-w-md text-lg leading-7 text-[#F7F0DE]/58">
-              Lumeo is an online creative studio for video creators to edit,
-              reframe, title, and export polished clips.
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-white/58">
+              Merge, compress, convert, and prepare everyday documents with a
+              clean PDF workspace built for resumes, forms, invoices, bank
+              statements, and office files.
             </p>
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
-              <Link
-                href="/dashboard"
-                className="rounded-full bg-[#F3E7C8] px-7 py-3.5 text-center text-sm font-bold text-[#111018] transition hover:bg-white"
-              >
-                Open Studio
-              </Link>
               <a
                 href="#tools"
-                className="rounded-full border border-[#F3E7C8]/14 px-7 py-3.5 text-center text-sm font-bold text-[#F7F0DE]/70 transition hover:border-[#F3E7C8]/30 hover:text-white"
+                className="rounded-full bg-[#FF5A36] px-7 py-3.5 text-center text-sm font-black text-white shadow-[0_18px_60px_rgba(255,90,54,0.22)] transition hover:bg-[#FF6E45]"
               >
-                Explore Tools
+                Choose a PDF tool
+              </a>
+              <a
+                href="#privacy"
+                className="rounded-full border border-white/12 px-7 py-3.5 text-center text-sm font-black text-white/70 transition hover:border-white/25 hover:text-white"
+              >
+                See privacy approach
               </a>
             </div>
 
-            <div className="mt-8 flex flex-wrap gap-2.5">
-              {["Trim clips", "Frame for socials", "Export clean MP4"].map(
-                (item) => (
-                  <span
-                    key={item}
-                    className="rounded-full border border-[#F3E7C8]/10 bg-white/[0.035] px-4 py-2 text-xs font-bold text-[#F7F0DE]/54 backdrop-blur"
-                  >
-                    {item}
-                  </span>
-                ),
-              )}
+            <div className="mt-8 max-w-xl rounded-2xl border border-[#FF7A3D]/18 bg-[#FF5A36]/8 p-4 text-sm font-semibold leading-6 text-[#FFD2B8]/78">
+              Most tools are designed to run in your browser where possible.
             </div>
           </div>
 
-          <div id="studio" className="relative mx-auto w-full max-w-[560px]">
-            <div className="pointer-events-none absolute -inset-8 rounded-[3rem] bg-[radial-gradient(circle_at_50%_20%,rgba(243,231,200,0.13),transparent_48%),radial-gradient(circle_at_78%_70%,rgba(167,139,250,0.14),transparent_42%)] blur-xl" />
-
-            <div className="relative rounded-[2rem] border border-[#F3E7C8]/10 bg-[#101115]/88 p-4 shadow-2xl shadow-black/45 backdrop-blur-2xl sm:p-5">
+          <div className="relative">
+            <div className="pointer-events-none absolute -inset-6 rounded-[3rem] bg-[radial-gradient(circle_at_40%_20%,rgba(255,90,54,0.17),transparent_42%),radial-gradient(circle_at_80%_78%,rgba(180,130,255,0.13),transparent_40%)] blur-xl" />
+            <div className="relative rounded-[2rem] border border-white/10 bg-[#101018]/88 p-4 shadow-2xl shadow-black/45 backdrop-blur-2xl sm:p-5">
               <div className="mb-4 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-[#F3E7C8]" />
-                  <span className="text-[11px] font-black uppercase tracking-[0.2em] text-[#F7F0DE]/42">
-                    Studio
-                  </span>
-                </div>
-                <span
-                  className="rounded-full border border-[#F3E7C8]/10 bg-[#F3E7C8]/8 px-3 py-1 text-[10px] font-black text-[#F3E7C8]/78"
-                  style={{ animation: "lumeoPreviewGlow 3.2s ease-in-out infinite" }}
-                >
-                  Ready to export
+                <span className="text-[11px] font-black uppercase tracking-[0.22em] text-white/36">
+                  Document desk
+                </span>
+                <span className="rounded-full border border-[#FF7A3D]/18 bg-[#FF5A36]/10 px-3 py-1 text-[10px] font-black text-[#FFB07C]">
+                  Private by design
                 </span>
               </div>
 
-              <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_150px]">
-                <div className="relative mx-auto aspect-[9/16] w-full max-w-[290px] overflow-hidden rounded-[1.5rem] border border-[#F3E7C8]/10 bg-[#07070A] shadow-2xl shadow-black/35">
-                  <div className="flex items-center justify-between border-b border-[#F3E7C8]/10 px-3 py-2">
-                    <span className="rounded-full bg-[#F3E7C8]/10 px-2.5 py-1 text-[10px] font-black text-[#F3E7C8]/78">
-                      9:16
-                    </span>
-                    <span className="rounded-full bg-white/[0.055] px-2.5 py-1 text-[10px] font-black text-[#F7F0DE]/48">
-                      720p
-                    </span>
-                  </div>
-
-                  <div className="relative h-[calc(100%-2.3rem)] overflow-hidden bg-[radial-gradient(circle_at_42%_28%,rgba(243,231,200,0.24),transparent_18%),radial-gradient(circle_at_58%_58%,rgba(167,139,250,0.22),transparent_24%),linear-gradient(145deg,#242633,#11131c_46%,#07070A)]">
-                    <div className="absolute inset-5 rounded-[1.25rem] border border-white/8 bg-black/16" />
-                    <div className="absolute left-5 top-5 h-16 w-16 rounded-full bg-[#F3E7C8]/8 blur-xl" />
-                    <div className="absolute bottom-5 left-5 right-5">
-                      <div className="mb-2 flex items-center gap-1.5">
-                        <span className="h-1.5 w-8 rounded-full bg-[#F3E7C8]/40" />
-                        <span className="h-1.5 w-4 rounded-full bg-white/18" />
+              <div className="grid gap-3">
+                {primaryTools.slice(0, 3).map((tool, index) => (
+                  <Link
+                    key={tool.title}
+                    href={tool.href}
+                    className="group flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.045] p-4 transition hover:border-[#FF7A3D]/28 hover:bg-white/[0.065]"
+                  >
+                    <ToolIcon label={tool.icon} />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <h3 className="font-black">{tool.title}</h3>
+                        <span className="text-xs font-black text-[#FFB07C]/70 transition group-hover:text-[#FFB07C]">
+                          Open
+                        </span>
                       </div>
-                      <div className="h-1.5 overflow-hidden rounded-full bg-black/35">
-                        <div
-                          className="h-full w-[62%] rounded-full bg-[#F3E7C8]/70"
-                          style={{ animation: "lumeoBarMove 5.4s ease-in-out infinite" }}
-                        />
-                      </div>
+                      <p className="mt-1 text-sm leading-6 text-white/44">
+                        {tool.description}
+                      </p>
                     </div>
-                  </div>
-                </div>
-
-                <div className="grid gap-3">
-                  {studioPreviewSteps.map((item, index) => (
-                    <div
-                      key={item.title}
-                      className="rounded-2xl border border-[#F3E7C8]/10 bg-white/[0.045] p-3 transition hover:border-[#F3E7C8]/24 hover:bg-white/[0.07]"
-                      style={{
-                        animation: "lumeoPreviewFloat 5.4s ease-in-out infinite",
-                        animationDelay: `${index * 0.45}s`,
-                      }}
-                    >
-                      <div className="mb-3 flex items-start justify-between gap-2">
-                        <div>
-                          <span className="block text-xs font-black text-[#F7F0DE]/78">
-                            {item.title}
-                          </span>
-                          <span className="mt-1 block text-[10px] font-bold text-[#F7F0DE]/34">
-                            {item.description}
-                          </span>
-                        </div>
-                        <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[#F3E7C8]/70" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <div
-                          className="h-1.5 rounded-full bg-[#F3E7C8]/18"
-                          style={{ width: item.primaryWidth }}
-                        />
-                        <div
-                          className="h-1.5 rounded-full bg-white/10"
-                          style={{ width: item.secondaryWidth }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                  </Link>
+                ))}
               </div>
 
-              <div
-                className="mt-4 rounded-2xl border border-[#F3E7C8]/10 bg-[#07070A]/88 p-3"
-                style={{ animation: "lumeoTimelinePulse 4.8s ease-in-out infinite" }}
-              >
-                <div className="mb-2 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.18em] text-[#F7F0DE]/32">
-                  <span>Timeline</span>
-                  <span>00:24</span>
+              <div className="mt-4 rounded-2xl border border-white/10 bg-[#07070A]/72 p-4">
+                <div className="mb-3 flex items-center justify-between text-[10px] font-black uppercase tracking-[0.18em] text-white/32">
+                  <span>Workspace flow</span>
+                  <span>PDF</span>
                 </div>
-                <div className="grid grid-cols-[0.55fr_1fr_0.7fr] gap-1.5">
-                  <div className="h-8 rounded-md bg-[#F3E7C8]/12" />
-                  <div className="h-8 rounded-md bg-[#F3E7C8]/28" />
-                  <div className="h-8 rounded-md bg-white/10" />
+                <div className="grid grid-cols-[0.8fr_1.15fr_0.7fr] gap-2">
+                  <div className="h-11 rounded-xl bg-[#FF5A36]/14" />
+                  <div className="h-11 rounded-xl bg-[#FF5A36]/28" />
+                  <div className="h-11 rounded-xl bg-white/10" />
                 </div>
               </div>
             </div>
@@ -280,31 +273,76 @@ export default function Home() {
       </section>
 
       <section
-        id="tools"
+        id="workflows"
         className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12"
       >
-        <div className="mb-12 max-w-xl">
-          <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#D8C48E]">
-            Tools
+        <div className="mb-10 max-w-2xl">
+          <p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#FFB07C]">
+            Workflow-first
           </p>
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Everything you need to finish the clip.
+          <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
+            What are you preparing today?
           </h2>
+          <p className="mt-4 text-base leading-7 text-white/50">
+            Start from the document outcome, then choose the tools that fit the
+            job.
+          </p>
         </div>
 
-        <div className="grid gap-px overflow-hidden rounded-2xl border border-[#F3E7C8]/10 bg-[#F3E7C8]/10 sm:grid-cols-2 lg:grid-cols-3">
-          {tools.map((tool) => (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {workflows.map((workflow) => (
+            <div
+              key={workflow.title}
+              className="rounded-2xl border border-white/10 bg-[#101018] p-5 transition hover:border-[#FF7A3D]/22 hover:bg-[#13131d]"
+            >
+              <h3 className="text-lg font-black">{workflow.title}</h3>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {workflow.tools.map((tool) => (
+                  <span
+                    key={tool}
+                    className="rounded-full border border-white/10 bg-white/[0.045] px-3 py-1.5 text-xs font-bold text-white/56"
+                  >
+                    {tool}
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section id="tools" className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12">
+        <div className="mb-10 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+          <div className="max-w-2xl">
+            <p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#FFB07C]">
+              Primary tools
+            </p>
+            <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
+              Clean tools for everyday PDFs.
+            </h2>
+          </div>
+          <Link
+            href="/pdf"
+            className="text-sm font-black text-[#FFB07C] transition hover:text-white"
+          >
+            View PDF hub
+          </Link>
+        </div>
+
+        <div className="grid gap-px overflow-hidden rounded-3xl border border-white/10 bg-white/10 sm:grid-cols-2 lg:grid-cols-5">
+          {primaryTools.map((tool) => (
             <Link
               key={tool.title}
               href={tool.href}
-              className="group bg-[#0B0C0F] p-7 transition hover:bg-[#15161B]"
+              className="group bg-[#0B0C0F] p-6 transition hover:bg-[#15151f]"
             >
-              <h3 className="text-lg font-bold">{tool.title}</h3>
-              <p className="mt-2.5 text-sm leading-6 text-[#F7F0DE]/50">
+              <ToolIcon label={tool.icon} />
+              <h3 className="mt-6 text-lg font-black">{tool.title}</h3>
+              <p className="mt-3 min-h-[4.5rem] text-sm leading-6 text-white/48">
                 {tool.description}
               </p>
-              <span className="mt-5 inline-flex text-xs font-bold text-[#D8C48E]/70 transition group-hover:text-[#F3E7C8]">
-                Explore →
+              <span className="mt-5 inline-flex text-xs font-black text-[#FFB07C]/72 transition group-hover:text-[#FFB07C]">
+                Open tool
               </span>
             </Link>
           ))}
@@ -312,44 +350,30 @@ export default function Home() {
       </section>
 
       <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12">
-        <div className="grid gap-10 lg:grid-cols-[0.86fr_1.14fr] lg:items-start">
-          <div>
-            <p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#D8C48E]">
-              Creator Workflow
-            </p>
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Built for focused creators.
-            </h2>
-            <p className="mt-5 max-w-xl text-base leading-7 text-[#F7F0DE]/52">
-              Lumeo keeps the editing experience clean, focused, and
-              export-ready so creators can move from raw clip to polished short
-              without unnecessary clutter.
-            </p>
+        <div className="rounded-3xl border border-white/10 bg-[#101018] p-6 sm:p-8">
+          <div className="mb-7 flex flex-col justify-between gap-4 md:flex-row md:items-end">
+            <div>
+              <p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#FFB07C]">
+                Coming next
+              </p>
+              <h2 className="text-2xl font-black tracking-tight sm:text-3xl">
+                More document controls are on the roadmap.
+              </h2>
+            </div>
+            <span className="rounded-full border border-white/10 px-3 py-1.5 text-xs font-black text-white/44">
+              Planned tools
+            </span>
           </div>
 
-          <div className="grid gap-px overflow-hidden rounded-2xl border border-[#F3E7C8]/10 bg-[#F3E7C8]/10 md:grid-cols-3">
-            {[
-              {
-                title: "Short-form first",
-                description:
-                  "Compose clips for vertical, square, and widescreen outputs.",
-              },
-              {
-                title: "Studio calm",
-                description:
-                  "A clean workspace for trimming, framing, titles, sound, and export.",
-              },
-              {
-                title: "Export ready",
-                description:
-                  "Prepare polished MP4 clips for social posts and creator workflows.",
-              },
-            ].map((item) => (
-              <div key={item.title} className="bg-[#0B0C0F] p-7">
-                <span className="mb-6 block h-1 w-10 rounded-full bg-[#F3E7C8]/70" />
-                <h3 className="text-lg font-bold">{item.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-[#F7F0DE]/50">
-                  {item.description}
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            {comingNextTools.map((tool) => (
+              <div
+                key={tool}
+                className="rounded-2xl border border-white/8 bg-white/[0.035] px-4 py-3"
+              >
+                <p className="text-sm font-black text-white/70">{tool}</p>
+                <p className="mt-1 text-xs font-bold text-white/32">
+                  Coming next
                 </p>
               </div>
             ))}
@@ -357,26 +381,94 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:px-12">
-        <div className="relative overflow-hidden rounded-2xl border border-[#F3E7C8]/10 bg-[#101115] p-10 text-center sm:p-16">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#F3E7C8]/50 to-transparent" />
-
-          <h2 className="text-3xl font-bold tracking-tight sm:text-5xl">
-            Start with one clip.
-          </h2>
-          <p className="mx-auto mt-5 max-w-md text-base leading-7 text-[#F7F0DE]/50">
-            Open Studio and create your next short.
+      <section
+        id="privacy"
+        className="mx-auto grid max-w-7xl gap-8 px-5 py-16 sm:px-8 lg:grid-cols-[0.86fr_1.14fr] lg:px-12"
+      >
+        <div>
+          <p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#FFB07C]">
+            Privacy-first
           </p>
-          <Link
-            href="/dashboard"
-            className="mt-8 inline-flex rounded-full bg-[#F3E7C8] px-8 py-3.5 text-sm font-bold text-[#111018] transition hover:bg-white"
-          >
-            Open Studio
-          </Link>
+          <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
+            Built around privacy, clarity, and control.
+          </h2>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {[
+            "Your files stay private.",
+            "No unnecessary sign-in.",
+            "Most tools are designed to run in your browser where possible.",
+            "If server processing is required later, files should be temporary and handled with clear deletion rules.",
+          ].map((item) => (
+            <div
+              key={item}
+              className="rounded-2xl border border-white/10 bg-white/[0.035] p-5 text-sm font-semibold leading-6 text-white/58"
+            >
+              {item}
+            </div>
+          ))}
         </div>
       </section>
 
-      <PublicFooter />
+      <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12">
+        <div className="mb-7">
+          <p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#FFB07C]">
+            Real documents
+          </p>
+          <h2 className="text-3xl font-black tracking-tight sm:text-4xl">
+            Made for everyday paperwork.
+          </h2>
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          {useCases.map((useCase) => (
+            <span
+              key={useCase}
+              className="rounded-full border border-white/10 bg-[#101018] px-5 py-2.5 text-sm font-bold text-white/58"
+            >
+              {useCase}
+            </span>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-5 py-16 sm:px-8 lg:px-12">
+        <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#101018] p-10 text-center sm:p-16">
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#FF7A3D]/60 to-transparent" />
+          <h2 className="text-3xl font-black tracking-tight sm:text-5xl">
+            Prepare your next PDF calmly.
+          </h2>
+          <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-white/50">
+            Pick the document workflow, open the right tool, and keep the
+            workspace focused on the file you need to finish.
+          </p>
+          <a
+            href="#tools"
+            className="mt-8 inline-flex rounded-full bg-[#FF5A36] px-8 py-3.5 text-sm font-black text-white transition hover:bg-[#FF6E45]"
+          >
+            Choose a PDF tool
+          </a>
+        </div>
+      </section>
+
+      <footer className="border-t border-white/10 px-5 py-8 sm:px-8 lg:px-12">
+        <div className="mx-auto flex max-w-7xl flex-col gap-5 text-sm text-white/38 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="font-bold">© 2026 Lumeo. All rights reserved.</p>
+            <p className="mt-1 italic">Developed by Govardhan Gudapakam</p>
+          </div>
+          <div className="flex flex-wrap gap-4 font-bold">
+            <Link href="/about" className="transition hover:text-white">
+              About
+            </Link>
+            <Link href="/privacy" className="transition hover:text-white">
+              Privacy
+            </Link>
+            <Link href="/terms" className="transition hover:text-white">
+              Terms
+            </Link>
+          </div>
+        </div>
+      </footer>
     </main>
   );
 }
