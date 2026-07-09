@@ -198,6 +198,53 @@ function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return copy.buffer;
 }
 
+function SplitIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 32 32" className="h-8 w-8" fill="none">
+      <path
+        d="M8 6.5h10.5l2.5 2.5v16.5H8v-19Z"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M18.4 7v3.2h3.2M12 15.8h8M16 11.8v8"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.7"
+      />
+      <path
+        d="M5.5 13.5H3.8M5.5 18.5H3.8M28.2 13.5h-1.7M28.2 18.5h-1.7"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.7"
+      />
+    </svg>
+  );
+}
+
+function PdfFileIcon() {
+  return (
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#C9A84C]/22 bg-[#1E6B4A]/10 text-[#C9A84C]">
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+        <path
+          d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z"
+          stroke="currentColor"
+          strokeWidth="1.7"
+        />
+        <path
+          d="M14.1 4v3.3h3.2M8.8 11.2h6.4M8.8 14h4.6"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.55"
+        />
+      </svg>
+    </span>
+  );
+}
+
 export default function SplitPdfTool() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
@@ -481,120 +528,119 @@ export default function SplitPdfTool() {
 
   if (!analysis) {
     return (
-      <div
-        className="flex min-h-[28rem] flex-col rounded-2xl border border-[#E8DFC8]/10 bg-gradient-to-br from-[#10192A] via-[#0D1524] to-[#090F1A] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)] lg:min-h-0 lg:flex-1"
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragActive(false);
-          handleFiles(event.dataTransfer.files);
-        }}
-      >
+      <section className="pb-4 lg:flex lg:h-full lg:flex-col lg:justify-center lg:pb-0">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="hidden"
+          onChange={(event) => {
+            handleFiles(event.target.files ?? []);
+            event.target.value = "";
+          }}
+        />
+
         <div
-          className={`flex flex-1 flex-col items-center justify-center rounded-2xl border border-dashed p-7 text-center transition sm:p-10 ${
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragActive(true);
+          }}
+          onDragLeave={() => setDragActive(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragActive(false);
+            handleFiles(event.dataTransfer.files);
+          }}
+          className={`group relative w-full overflow-hidden rounded-xl border border-dashed px-5 py-7 shadow-2xl shadow-black/32 transition-all duration-300 sm:px-8 lg:px-10 lg:py-8 ${
             dragActive
-              ? "border-[#C9A84C]/70 bg-[#C9A84C]/10"
-              : "border-[#C9A84C]/32 bg-[#0A101C]/72"
+              ? "border-[#C9A84C]/64 bg-[#1E6B4A]/14 shadow-[0_24px_70px_rgba(30,107,74,0.2)]"
+              : "border-[#E8DFC8]/18 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] hover:-translate-y-0.5 hover:border-[#C9A84C]/36"
           }`}
         >
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-[#C9A84C]/24 bg-[#F0EAD6]/8 text-[#C9A84C]">
-            <svg aria-hidden="true" viewBox="0 0 24 24" className="h-8 w-8" fill="none">
-              <path
-                d="M7 3.75h7.2L18 7.55v12.7H7z"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.6"
-              />
-              <path
-                d="M14 4v4h4M9.4 12h5.2M9.4 15.2h3.4"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.6"
-              />
-            </svg>
+          <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#C9A84C]/42 to-transparent opacity-80" />
+          <div className="pointer-events-none absolute inset-0 opacity-[0.055] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:42px_42px]" />
+
+          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center">
+              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#C9A84C]/24 bg-[#0C1220]/64 text-[#C9A84C] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#1E6B4A]/14">
+                <SplitIcon />
+              </span>
+              <div>
+                <p className="text-2xl font-semibold tracking-[-0.02em] text-[#F0EAD6]">
+                  Drop one PDF here
+                </p>
+                <p className="mt-2 text-base text-[#F0EAD6]/52">
+                  Choose file from your device
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="inline-flex w-full items-center justify-center rounded-full bg-[#1E6B4A] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(30,107,74,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98] sm:w-auto"
+            >
+              Select PDF
+            </button>
           </div>
-          <h2 className="mt-5 font-serif text-4xl tracking-[-0.02em] text-[#F0EAD6]">
-            Split PDF
-          </h2>
-          <p className="mt-2 text-sm text-[#F0EAD6]/52">
-            Extract pages or separate one PDF into smaller files.
-          </p>
-          <p className="mt-6 text-sm font-semibold text-[#F0EAD6]/74">
-            Drop one PDF here
-          </p>
-          <p className="mt-1 text-xs text-[#F0EAD6]/42">
-            Choose file from your device
-          </p>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="mt-4 inline-flex h-11 items-center justify-center rounded-full bg-[#1E6B4A] px-6 text-sm font-bold text-[#F0EAD6] shadow-[0_14px_35px_rgba(30,107,74,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98]"
-          >
-            Select PDF
-          </button>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="application/pdf,.pdf"
-            className="hidden"
-            onChange={(event) => handleFiles(event.target.files ?? [])}
-          />
-          {error ? <p className="mt-4 text-sm text-[#F0A8A8]">{error}</p> : null}
         </div>
-        <div className="mt-4 rounded-xl border border-[#C9A84C]/18 bg-[#0A101C]/82 px-4 py-3 text-center text-xs font-semibold text-[#F0EAD6]/68">
-          Private by design · Browser-only · Cleared after download
+
+        <div className="mt-4 text-center">
+          <p className="text-sm font-semibold text-[#F0EAD6]/68">
+            Private by design &middot; Browser-only &middot; Cleared after download
+          </p>
+          <p className="mt-1 text-xs text-[#F0EAD6]/38">
+            Files stay on your device for this tool.
+          </p>
         </div>
-      </div>
+
+        {error ? (
+          <div className="mt-4 rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
+            {error}
+          </div>
+        ) : null}
+      </section>
     );
   }
 
   return (
-    <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-[minmax(0,1.65fr)_minmax(340px,0.72fr)] lg:overflow-hidden 2xl:grid-cols-[minmax(0,1.9fr)_minmax(360px,0.72fr)]">
-      <section className="flex min-h-0 flex-col rounded-2xl border border-[#E8DFC8]/10 bg-gradient-to-br from-[#10192A] via-[#0D1524] to-[#090F1A] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#E8DFC8]/10 pb-3">
-          <div className="min-w-0">
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
-              Document tray
-            </p>
-            <h2 className="mt-1 truncate font-serif text-2xl text-[#F0EAD6]">
-              {analysis.name}
-            </h2>
-          </div>
-          <button
-            type="button"
-            onClick={resetTool}
-            className="rounded-full border border-[#E8DFC8]/12 px-3 py-2 text-xs font-bold text-[#F0EAD6]/55 transition hover:border-[#C9A84C]/35 hover:text-[#F0EAD6]"
-          >
-            Start new split
-          </button>
-        </div>
-
-        <div className="mt-3 grid gap-3 sm:grid-cols-4">
-          {[
-            ["Pages", String(analysis.pageCount)],
-            ["Size", formatBytes(analysis.size)],
-            ["Page type", analysis.pageSizeType],
-            ["Status", status],
-          ].map(([label, value]) => (
-            <div
-              key={label}
-              className="rounded-xl border border-[#E8DFC8]/8 bg-[#0A101C]/58 px-3 py-2"
-            >
-              <p className="text-[0.65rem] font-bold uppercase tracking-[0.16em] text-[#F0EAD6]/34">
-                {label}
-              </p>
-              <p className="mt-1 truncate text-sm font-semibold text-[#F0EAD6]/76">
-                {value}
-              </p>
+    <section className="pb-28 lg:h-full lg:overflow-hidden lg:pb-0">
+      <div className="grid h-full gap-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(340px,0.72fr)] lg:overflow-hidden 2xl:grid-cols-[minmax(0,1.95fr)_minmax(360px,0.72fr)]">
+        <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[#E8DFC8]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
+          <section className="shrink-0">
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
+                  Document tray
+                </p>
+                <p className="mt-0.5 text-xs text-[#F0EAD6]/48">
+                  Source PDF.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={resetTool}
+                className="rounded-full border border-[#E8DFC8]/12 px-3 py-1.5 text-xs font-semibold text-[#F0EAD6]/56 transition hover:border-[#E8DFC8]/22 hover:text-[#F0EAD6]"
+              >
+                Start new
+              </button>
             </div>
-          ))}
-        </div>
+
+            <div className="grid gap-2 rounded-lg border border-[#E8DFC8]/10 bg-[#0A101C]/74 px-3 py-2 transition-all duration-300 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+              <PdfFileIcon />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-[#F0EAD6]">
+                  {analysis.name}
+                </p>
+                <p className="mt-1 text-xs font-medium text-[#F0EAD6]/42">
+                  {analysis.pageCount} page{analysis.pageCount === 1 ? "" : "s"} - {formatBytes(analysis.size)} - {analysis.pageSizeType}
+                </p>
+              </div>
+              <span className="rounded-full border border-[#1E6B4A]/24 bg-[#1E6B4A]/10 px-3 py-1.5 text-xs font-semibold text-[#A8E0C1]">
+                {status}
+              </span>
+            </div>
+          </section>
 
         {largeFile ? (
           <div className="mt-3 rounded-xl border border-[#C9A84C]/20 bg-[#C9A84C]/8 px-3 py-2 text-xs text-[#E8DFC8]/72">
@@ -608,7 +654,7 @@ export default function SplitPdfTool() {
           </div>
         ) : null}
 
-        <div className="mt-4 min-h-0 flex-1 overflow-hidden rounded-2xl border border-[#E8DFC8]/8 bg-[#0A101C]/50 p-3">
+        <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-[#E8DFC8]/10 bg-[#0A101C]/62 p-3">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
@@ -623,7 +669,7 @@ export default function SplitPdfTool() {
               </p>
             </div>
           </div>
-          <div className="no-scrollbar grid max-h-[18rem] grid-cols-4 gap-2 overflow-y-auto sm:grid-cols-6 lg:max-h-full lg:grid-cols-8 xl:grid-cols-10">
+          <div className="no-scrollbar grid max-h-[16rem] grid-cols-5 gap-2 overflow-y-auto sm:grid-cols-8 lg:max-h-full lg:grid-cols-10 xl:grid-cols-12">
             {pageChips.map((page) => (
               <button
                 type="button"
@@ -642,17 +688,20 @@ export default function SplitPdfTool() {
           </div>
         </div>
 
-        <div className="mt-4 rounded-xl border border-[#C9A84C]/18 bg-[#0A101C]/82 px-4 py-3">
-          <p className="text-xs font-semibold text-[#F0EAD6]/72">
-            Private by design · Browser-only · Cleared after download
-          </p>
-          <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/42">
-            Files stay on your device. No server upload.
-          </p>
+        <div className="rounded-xl border border-[#C9A84C]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#F0EAD6]/54 shadow-inner shadow-black/20">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <p className="font-semibold text-[#F0EAD6]/74">
+              Private by design &middot; Browser-only &middot; Cleared after download
+            </p>
+            <p className="lg:hidden">
+              Files stay on your device. No server upload.
+            </p>
+          </div>
         </div>
-      </section>
+      </div>
 
-      <aside className="flex min-h-0 flex-col rounded-2xl border border-[#E8DFC8]/10 bg-[#0A101C] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.26)]">
+      <aside className="lg:min-h-0">
+        <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#E8DFC8]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
         <div className="border-b border-[#E8DFC8]/10 pb-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
@@ -844,7 +893,9 @@ export default function SplitPdfTool() {
             </button>
           )}
         </div>
+        </div>
       </aside>
+      </div>
 
       <style jsx>{`
         .preset-button {
@@ -864,6 +915,6 @@ export default function SplitPdfTool() {
           transform: translateY(-1px);
         }
       `}</style>
-    </div>
+    </section>
   );
 }
