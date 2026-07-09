@@ -1,11 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
-import {
-  LumeoLogoDark,
-  LumeoLogoLight,
-  LumeoSealMark,
-} from "@/components/PublicPdfChrome";
+import { BrandLockup, LumeoSealMark } from "@/components/PublicPdfChrome";
 
 export const metadata: Metadata = {
   title: "Lumeo PDF Workspace - Simple, Private PDF Tools",
@@ -288,7 +284,7 @@ export default function Home() {
       <nav className="sticky top-0 z-50 border-b border-[#E8DFC8]/12 bg-[#0C1220]/92 px-5 py-4 backdrop-blur-md sm:px-8">
         <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
-            <LumeoLogoLight className="h-9 w-auto max-w-[168px] object-contain sm:max-w-[190px]" />
+            <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
           </Link>
 
           <div className="hidden items-center gap-7 text-sm font-medium text-[#F0EAD6]/50 md:flex">
@@ -415,9 +411,6 @@ export default function Home() {
 
       <section className="mx-auto max-w-[1100px] px-5 py-16 sm:px-8">
         <div className="rounded-xl border border-[#E8DFC8]/14 bg-[#F0EAD6] p-10 text-center text-[#1C1710] shadow-2xl shadow-black/25 sm:p-16">
-          <div className="mx-auto mb-6 flex justify-center">
-            <LumeoLogoDark className="h-12 w-auto max-w-[230px] object-contain" />
-          </div>
           <h2 className="font-serif text-4xl tracking-[-0.02em] sm:text-5xl">
             Start with one PDF task.
           </h2>

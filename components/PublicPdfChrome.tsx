@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 
 export function LumeoSealMark() {
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-[#C9A84C]/35 bg-[#1E6B4A] shadow-[0_10px_30px_rgba(0,0,0,0.22)]">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#C9A84C]/28 bg-[#F0EAD6] p-0.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
       <Image
         src="/brand/lumeo-pdf-mark.png"
         alt=""
@@ -17,28 +17,44 @@ export function LumeoSealMark() {
   );
 }
 
-export function LumeoLogoLight({ className = "h-8 w-auto" }: { className?: string }) {
-  return (
-    <Image
-      src="/brand/lumeo-pdf-logo-light.png"
-      alt="Lumeo PDF Workspace"
-      width={1916}
-      height={821}
-      className={className}
-      priority
-    />
-  );
-}
+export function BrandLockup({
+  tone = "light",
+  markSize = "h-9 w-9",
+}: {
+  tone?: "light" | "dark";
+  markSize?: string;
+}) {
+  const primaryText = tone === "dark" ? "text-[#1C1710]" : "text-[#F0EAD6]";
+  const secondaryText =
+    tone === "dark" ? "text-[#1E6B4A]" : "text-[#F0EAD6]/54";
 
-export function LumeoLogoDark({ className = "h-8 w-auto" }: { className?: string }) {
   return (
-    <Image
-      src="/brand/lumeo-pdf-logo-dark.png"
-      alt="Lumeo PDF Workspace"
-      width={1916}
-      height={821}
-      className={className}
-    />
+    <span className="flex min-w-0 items-center gap-3">
+      <span
+        className={`flex shrink-0 items-center justify-center rounded-lg border border-[#C9A84C]/28 bg-[#F0EAD6] p-0.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${markSize}`}
+      >
+        <Image
+          src="/brand/lumeo-pdf-mark.png"
+          alt=""
+          width={40}
+          height={40}
+          className="h-full w-full object-contain"
+          priority
+        />
+      </span>
+      <span className="min-w-0 leading-none">
+        <span
+          className={`block font-serif text-[1.35rem] leading-none tracking-[-0.02em] ${primaryText}`}
+        >
+          Lumeo
+        </span>
+        <span
+          className={`mt-1 block text-[0.58rem] font-bold uppercase tracking-[0.19em] ${secondaryText}`}
+        >
+          PDF Workspace
+        </span>
+      </span>
+    </span>
   );
 }
 
@@ -47,7 +63,7 @@ export function PublicNav({ maxWidth = "max-w-[1100px]" }: { maxWidth?: string }
     <nav className="border-b border-[#E8DFC8]/12 px-5 py-4 sm:px-8">
       <div className={`mx-auto flex ${maxWidth} items-center justify-between gap-4`}>
         <Link href="/" className="flex min-w-0 items-center">
-          <LumeoLogoLight className="h-9 w-auto max-w-[168px] object-contain sm:max-w-[190px]" />
+          <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
         </Link>
 
         <Link
@@ -102,7 +118,7 @@ export function ToolPlaceholder({
       <section className="mt-12 rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-5 shadow-2xl shadow-black/20 sm:p-8">
         <div className="rounded-xl border border-dashed border-[#C9A84C]/35 bg-[#F0EAD6] p-8 text-center text-[#1C1710] sm:p-12">
           <div className="mx-auto mb-5 flex justify-center">
-            <LumeoLogoDark className="h-11 w-auto max-w-[220px] object-contain" />
+            <BrandLockup tone="dark" markSize="h-10 w-10" />
           </div>
           <h2 className="font-serif text-3xl tracking-[-0.01em]">
             Document tray preview

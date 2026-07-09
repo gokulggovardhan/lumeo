@@ -36,9 +36,12 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   icons: {
-    icon: "/brand/lumeo-pdf-mark.png",
-    shortcut: "/brand/lumeo-pdf-mark.png",
-    apple: "/brand/lumeo-pdf-mark.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: "/apple-icon.png",
   },
   manifest: "/manifest.webmanifest",
   openGraph: {

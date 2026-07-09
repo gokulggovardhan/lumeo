@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { BrandLockup } from "@/components/PublicPdfChrome";
 
 const trustLinks = [
   {
@@ -22,16 +22,14 @@ export default function PublicFooter() {
       <div className="mx-auto flex max-w-[900px] flex-col items-center gap-6">
         <Link
           href="/"
-          className="transition opacity-80 hover:opacity-100"
+          className="transition opacity-90 hover:opacity-100"
         >
-          <Image
-            src="/brand/lumeo-pdf-logo-light.png"
-            alt="Lumeo PDF Workspace"
-            width={1916}
-            height={821}
-            className="h-9 w-auto max-w-[190px] object-contain"
-          />
+          <BrandLockup markSize="h-9 w-9" />
         </Link>
+
+        <div className="space-y-1">
+          <p className="font-semibold text-[#F0EAD6]/66">Built by Govardhan Gudapakam</p>
+        </div>
 
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
           {trustLinks.map((link) => (
@@ -47,7 +45,6 @@ export default function PublicFooter() {
 
         <div className="space-y-1">
           <p>2026 Lumeo. All rights reserved.</p>
-          <p>Built by Govardhan Gudapakam</p>
         </div>
       </div>
     </footer>
