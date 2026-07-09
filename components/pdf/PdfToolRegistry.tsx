@@ -43,9 +43,9 @@ export const pdfTools: PdfToolDefinition[] = [
     shortTitle: "Split",
     description: "Extract selected pages or separate one PDF into smaller files.",
     route: "/pdf/split",
-    status: "coming-next",
-    browserNote: "Browser-first where possible",
-    engineNote: "Tool engine coming next.",
+    status: "live",
+    browserNote: "Browser-first split",
+    engineNote: "Live now",
     accepted: "one PDF file",
     bullets: [
       "Extract selected pages",
