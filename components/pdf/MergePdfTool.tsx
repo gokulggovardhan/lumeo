@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PDFDocument, rgb } from "pdf-lib";
 
 type MergeStatus = "Ready" | "Merging in your browser..." | "Download ready";
+type CleanupMessage = "" | "Temporary file cleared from this session.";
 type PageFormat = "smartA4" | "original";
 type MarginPreset = "compact" | "clean" | "wide";
 
@@ -119,6 +120,7 @@ export default function MergePdfTool() {
   const [downloadName, setDownloadName] = useState("lumeo-merged.pdf");
   const [outputName, setOutputName] = useState("lumeo-merged.pdf");
   const [isDragging, setIsDragging] = useState(false);
+  const [cleanupMessage, setCleanupMessage] = useState<CleanupMessage>("");
 
   const totalSize = useMemo(
     () => files.reduce((sum, item) => sum + item.file.size, 0),
@@ -148,7 +150,20 @@ export default function MergePdfTool() {
   const resetReadyState = () => {
     setError("");
     setStatus("Ready");
+    setCleanupMessage("");
     clearDownload();
+  };
+
+  const startNewMerge = () => {
+    clearDownload();
+    setFiles([]);
+    setError("");
+    setStatus("Ready");
+    setCleanupMessage("");
+    setOutputName("lumeo-merged.pdf");
+    setDownloadName("lumeo-merged.pdf");
+    setPageFormat("smartA4");
+    setMarginPreset("clean");
   };
 
   const addFiles = async (incomingFiles: FileList | File[]) => {
@@ -290,6 +305,7 @@ export default function MergePdfTool() {
       const safeName = sanitizePdfFileName(outputName);
       setDownloadUrl(url);
       setDownloadName(safeName);
+      setCleanupMessage("");
       setStatus("Download ready");
     } catch (mergeError) {
       console.error("[Lumeo PDF] Merge failed", {
@@ -305,6 +321,24 @@ export default function MergePdfTool() {
     }
   };
 
+  const downloadMergedPdf = () => {
+    if (!downloadUrl) return;
+
+    const link = document.createElement("a");
+    link.href = downloadUrl;
+    link.download = downloadName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    window.setTimeout(() => {
+      URL.revokeObjectURL(downloadUrl);
+      setDownloadUrl("");
+      setStatus("Ready");
+      setCleanupMessage("Temporary file cleared from this session.");
+    }, 800);
+  };
+
   return (
     <section className="rounded-[2rem] border border-white/10 bg-[#101018] p-5 shadow-2xl shadow-black/30 sm:p-8">
       <input
@@ -318,6 +352,10 @@ export default function MergePdfTool() {
           event.target.value = "";
         }}
       />
+
+      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/34">
+        Step 1 - Add PDFs
+      </p>
 
       <div
         onDragOver={(event) => {
@@ -362,6 +400,18 @@ export default function MergePdfTool() {
         browser and are not uploaded.
       </div>
 
+      <div className="mt-4 rounded-2xl border border-[#FF7A3D]/18 bg-[#FF5A36]/[0.055] p-4">
+        <p className="text-sm font-semibold text-white">Private by design</p>
+        <p className="mt-2 text-sm leading-6 text-white/54">
+          Files stay on your device for this tool. Nothing is uploaded or stored
+          on our servers.
+        </p>
+        <p className="mt-1 text-xs leading-5 text-white/38">
+          Temporary browser files are cleared after download or when you start
+          over.
+        </p>
+      </div>
+
       <div className="mt-6 grid gap-3 rounded-[1.5rem] border border-white/10 bg-[#07070A]/62 p-4 sm:grid-cols-4 sm:p-5">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/34">
@@ -396,6 +446,9 @@ export default function MergePdfTool() {
       </div>
 
       <div className="mt-6 rounded-[1.5rem] border border-white/10 bg-[#07070A]/62 p-4 sm:p-5">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/34">
+          Step 2 - Choose output style
+        </p>
         <div>
           <p className="text-sm font-semibold text-white">Page format</p>
           <p className="mt-1 text-xs font-medium text-white/42">
@@ -496,6 +549,9 @@ export default function MergePdfTool() {
       </div>
 
       <label className="mt-6 block rounded-[1.5rem] border border-white/10 bg-white/[0.035] p-4 sm:p-5">
+        <span className="mb-3 block text-xs font-semibold uppercase tracking-[0.18em] text-white/34">
+          Step 3 - Merge & download
+        </span>
         <span className="text-sm font-semibold text-white">Output file name</span>
         <input
           value={outputName}
@@ -547,6 +603,12 @@ export default function MergePdfTool() {
         </div>
       ) : null}
 
+      {cleanupMessage ? (
+        <div className="mt-5 rounded-2xl border border-[#FF7A3D]/18 bg-[#FF5A36]/[0.06] p-4 text-sm font-medium text-[#FFD2B8]">
+          {cleanupMessage}
+        </div>
+      ) : null}
+
       {downloadUrl ? (
         <div className="mt-6 rounded-[1.5rem] border border-[#FF7A3D]/24 bg-[#FF5A36]/10 p-5">
           <p className="text-lg font-semibold text-white">Merged PDF ready</p>
@@ -557,18 +619,43 @@ export default function MergePdfTool() {
           <p className="mt-1 text-xs font-medium text-white/42">
             Created locally in your browser.
           </p>
-          <a
-            href={downloadUrl}
-            download={downloadName}
-            className="mt-5 inline-flex rounded-full bg-[#FF5A36] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#FF6E45] active:scale-[0.98]"
-          >
-            Download merged PDF
-          </a>
+          <p className="mt-1 text-xs font-medium text-white/42">
+            After download, the temporary file is cleared from this session.
+          </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={downloadMergedPdf}
+              className="rounded-full bg-[#FF5A36] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#FF6E45] active:scale-[0.98]"
+            >
+              Download merged PDF
+            </button>
+            <button
+              type="button"
+              onClick={startNewMerge}
+              className="rounded-full border border-white/10 px-5 py-2.5 text-sm font-semibold text-white/62 transition hover:border-white/20 hover:text-white"
+            >
+              Start new merge
+            </button>
+          </div>
         </div>
+      ) : null}
+
+      {files.length > 0 && !downloadUrl ? (
+        <button
+          type="button"
+          onClick={startNewMerge}
+          className="mt-5 rounded-full border border-white/10 px-5 py-2.5 text-sm font-semibold text-white/52 transition hover:border-white/20 hover:text-white"
+        >
+          Start new merge
+        </button>
       ) : null}
 
       {files.length > 0 ? (
         <div className="mt-6 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/34">
+            Selected PDFs
+          </p>
           {files.map((item, index) => (
             <div
               key={item.id}
