@@ -14,16 +14,16 @@ export const metadata: Metadata = {
 export default function MergePdfPage() {
   return (
     <PublicPageShell
-      maxWidth="max-w-[1600px]"
+      maxWidth="max-w-[1700px]"
       mainClassName="min-h-screen bg-[#0C1220] text-[#F0EAD6] lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden"
-      contentClassName="px-5 py-5 sm:px-8 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:px-10 lg:py-2"
+      contentClassName="px-5 py-5 sm:px-8 lg:flex lg:w-[95vw] lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:px-8 lg:py-2 2xl:px-10"
     >
       <section className="shrink-0">
         <div>
-          <h1 className="font-serif text-3xl leading-tight tracking-[-0.02em] text-[#F0EAD6] sm:text-4xl">
+          <h1 className="font-serif text-4xl leading-tight tracking-[-0.02em] text-[#F0EAD6] sm:text-5xl lg:text-[2.85rem]">
             Merge PDF
           </h1>
-          <p className="mt-0.5 max-w-2xl text-sm leading-5 text-[#F0EAD6]/55">
+          <p className="mt-0.5 max-w-2xl text-base leading-5 text-[#F0EAD6]/58">
             Combine PDFs into one clean document.
           </p>
         </div>
