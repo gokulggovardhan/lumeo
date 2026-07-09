@@ -282,7 +282,7 @@ export default function Home() {
       `}</style>
 
       <nav className="sticky top-0 z-50 border-b border-[#E8DFC8]/12 bg-[#0C1220]/92 px-5 py-4 backdrop-blur-md sm:px-8">
-        <div className="mx-auto flex max-w-[1100px] items-center justify-between gap-4">
+        <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-4">
           <Link href="/" className="flex min-w-0 items-center gap-3">
             <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
           </Link>
@@ -307,7 +307,7 @@ export default function Home() {
 
       <section className="relative px-5 pb-16 pt-16 sm:px-8 sm:pt-20 lg:pb-24 lg:pt-24">
         <div className="pointer-events-none absolute inset-0 opacity-[0.05] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:48px_48px]" />
-        <div className="relative z-10 mx-auto grid max-w-[1100px] gap-12 lg:grid-cols-[1fr_0.9fr] lg:items-center">
+        <div className="relative z-10 mx-auto grid max-w-[1360px] gap-12 lg:grid-cols-[1fr_0.86fr] lg:items-center">
           <div>
             <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-[#C9A84C]/28 bg-[#C9A84C]/8 px-4 py-2 text-xs font-semibold text-[#C9A84C]">
               <LumeoSealMark />
@@ -347,7 +347,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="tools" className="mx-auto max-w-[1100px] px-5 py-16 sm:px-8">
+      <section id="tools" className="mx-auto max-w-[1360px] px-5 py-16 sm:px-8">
         <div className="mb-10 max-w-2xl">
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
             Core tools
@@ -383,7 +383,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="privacy" className="mx-auto max-w-[1100px] px-5 py-16 sm:px-8">
+      <section id="privacy" className="mx-auto max-w-[1360px] px-5 py-16 sm:px-8">
         <div className="mb-10 max-w-2xl">
           <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
             Privacy
@@ -409,7 +409,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-[1100px] px-5 py-16 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-5 py-16 sm:px-8">
         <div className="rounded-xl border border-[#E8DFC8]/14 bg-[#F0EAD6] p-10 text-center text-[#1C1710] shadow-2xl shadow-black/25 sm:p-16">
           <h2 className="font-serif text-4xl tracking-[-0.02em] sm:text-5xl">
             Start with one PDF task.
@@ -427,7 +427,7 @@ export default function Home() {
       </section>
 
       <footer className="border-t border-[#E8DFC8]/12 px-5 py-8 sm:px-8">
-        <div className="mx-auto flex max-w-[1100px] flex-col gap-5 text-sm text-[#F0EAD6]/42 md:flex-row md:items-center md:justify-between">
+        <div className="mx-auto flex max-w-[1360px] flex-col gap-5 text-sm text-[#F0EAD6]/42 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="font-semibold text-[#F0EAD6]/68">
               Lumeo PDF Workspace

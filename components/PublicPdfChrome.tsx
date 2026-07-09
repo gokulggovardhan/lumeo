@@ -58,7 +58,7 @@ export function BrandLockup({
   );
 }
 
-export function PublicNav({ maxWidth = "max-w-[1100px]" }: { maxWidth?: string }) {
+export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }) {
   return (
     <nav className="border-b border-[#E8DFC8]/12 px-5 py-4 sm:px-8">
       <div className={`mx-auto flex ${maxWidth} items-center justify-between gap-4`}>
@@ -79,7 +79,7 @@ export function PublicNav({ maxWidth = "max-w-[1100px]" }: { maxWidth?: string }
 
 export function PublicPageShell({
   children,
-  maxWidth = "max-w-[1100px]",
+  maxWidth = "max-w-[1360px]",
 }: {
   children: ReactNode;
   maxWidth?: string;
@@ -87,7 +87,9 @@ export function PublicPageShell({
   return (
     <main className="min-h-screen bg-[#0C1220] text-[#F0EAD6]">
       <PublicNav maxWidth={maxWidth} />
-      <div className={`mx-auto ${maxWidth} px-5 py-16 sm:px-8`}>{children}</div>
+      <div className={`mx-auto ${maxWidth} px-5 py-12 sm:px-8 lg:py-16`}>
+        {children}
+      </div>
     </main>
   );
 }
@@ -102,8 +104,9 @@ export function ToolPlaceholder({
   accepted: string;
 }) {
   return (
-    <PublicPageShell maxWidth="max-w-[900px]">
-      <section>
+    <PublicPageShell>
+      <section className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
+        <div>
         <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
           PDF workspace
         </p>
@@ -113,29 +116,39 @@ export function ToolPlaceholder({
         <p className="mt-5 max-w-2xl text-base leading-7 text-[#F0EAD6]/55">
           {description}
         </p>
+        </div>
+        <div className="rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/72 p-5 text-sm leading-6 text-[#F0EAD6]/52">
+          Tool engine coming next. This page is a preview of the document
+          workspace layout and does not upload files.
+        </div>
       </section>
 
-      <section className="mt-12 rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-5 shadow-2xl shadow-black/20 sm:p-8">
-        <div className="rounded-xl border border-dashed border-[#C9A84C]/35 bg-[#F0EAD6] p-8 text-center text-[#1C1710] sm:p-12">
-          <div className="mx-auto mb-5 flex justify-center">
+      <section className="mt-10 grid gap-5 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-xl border border-dashed border-[#C9A84C]/35 bg-[#F0EAD6] p-8 text-[#1C1710] shadow-2xl shadow-black/20 sm:p-10">
+          <div className="mb-5 flex justify-start">
             <BrandLockup tone="dark" markSize="h-10 w-10" />
           </div>
           <h2 className="font-serif text-3xl tracking-[-0.01em]">
             Document tray preview
           </h2>
-          <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#1C1710]/68">
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#1C1710]/68">
             This workspace will accept {accepted}. The processing engine is
             coming next, so no files are uploaded from this placeholder.
           </p>
-          <p className="mx-auto mt-6 inline-flex rounded-full border border-[#1E6B4A]/20 bg-[#1E6B4A]/10 px-4 py-2 text-xs font-bold text-[#1E6B4A]">
+          <p className="mt-6 inline-flex rounded-full border border-[#1E6B4A]/20 bg-[#1E6B4A]/10 px-4 py-2 text-xs font-bold text-[#1E6B4A]">
             Tool engine coming next.
           </p>
         </div>
-        <p className="mt-5 text-sm font-medium leading-6 text-[#F0EAD6]/50">
-          Privacy note: Most tools are designed to run in your browser where
-          possible. If server processing is required later, files should be
-          temporary and handled with clear deletion rules.
-        </p>
+        <div className="rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-6 shadow-2xl shadow-black/20">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
+            Privacy approach
+          </p>
+          <p className="mt-4 text-sm font-medium leading-6 text-[#F0EAD6]/50">
+            Most tools are designed to run in your browser where possible. If
+            server processing is required later, files should be temporary and
+            handled with clear deletion rules.
+          </p>
+        </div>
       </section>
     </PublicPageShell>
   );

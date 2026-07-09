@@ -22,9 +22,9 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <main className="min-h-screen bg-[#0C1220] text-[#F0EAD6]">
-      <PublicNav maxWidth="max-w-[900px]" />
+      <PublicNav />
 
-      <section className="mx-auto max-w-[900px] px-5 py-16 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-5 py-16 sm:px-8">
         <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
           About
         </p>
@@ -33,7 +33,7 @@ export default function AboutPage() {
           Lumeo is a careful PDF workspace for everyday documents.
         </h1>
 
-        <div className="mt-10 space-y-7 text-base leading-8 text-[#F0EAD6]/58">
+        <div className="mt-10 max-w-4xl space-y-7 text-base leading-8 text-[#F0EAD6]/58">
           <p>
             Lumeo PDF Workspace is being built for people who need simple,
             private tools to prepare common documents without a cluttered
@@ -53,7 +53,7 @@ export default function AboutPage() {
           </p>
         </div>
 
-        <div className="mt-14 grid gap-4 sm:grid-cols-3">
+        <div className="mt-14 grid gap-4 lg:grid-cols-3">
           {[
             {
               title: "Simple",

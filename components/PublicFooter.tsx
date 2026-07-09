@@ -19,7 +19,7 @@ const trustLinks = [
 export default function PublicFooter() {
   return (
     <footer className="border-t border-[#E8DFC8]/12 px-6 py-10 text-center text-xs text-[#F0EAD6]/40">
-      <div className="mx-auto flex max-w-[900px] flex-col items-center gap-6">
+      <div className="mx-auto flex max-w-[1360px] flex-col items-center gap-6">
         <Link
           href="/"
           className="transition opacity-90 hover:opacity-100"

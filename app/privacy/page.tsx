@@ -49,9 +49,9 @@ const sections = [
 export default function PrivacyPage() {
   return (
     <main className="min-h-screen bg-[#0C1220] text-[#F0EAD6]">
-      <PublicNav maxWidth="max-w-[900px]" />
+      <PublicNav />
 
-      <section className="mx-auto max-w-[900px] px-5 py-16 sm:px-8">
+      <section className="mx-auto max-w-[1360px] px-5 py-16 sm:px-8">
         <p className="mb-4 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
           Privacy
         </p>
@@ -64,7 +64,7 @@ export default function PrivacyPage() {
           Last updated: July 2026
         </p>
 
-        <div className="mt-10 space-y-4">
+        <div className="mt-10 grid gap-4 lg:grid-cols-2">
           {sections.map((section) => (
             <section
               key={section.title}
