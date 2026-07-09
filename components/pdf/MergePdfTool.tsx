@@ -529,8 +529,98 @@ export default function MergePdfTool() {
 
   const readySummary = `${files.length} file${files.length === 1 ? "" : "s"} - ${totalPages} pages - ${outputStyleLabel}`;
 
+  if (files.length === 0) {
+    return (
+      <section className="pb-8">
+        <input
+          ref={inputRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          multiple
+          className="hidden"
+          onChange={(event) => {
+            if (event.target.files) void addFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
+
+        <div
+          onDragOver={(event) => {
+            event.preventDefault();
+            setIsDragging(true);
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={(event) => {
+            event.preventDefault();
+            setIsDragging(false);
+            void addFiles(event.dataTransfer.files);
+          }}
+          className={`group relative overflow-hidden rounded-xl border border-dashed px-5 py-8 shadow-2xl shadow-black/28 transition-all duration-300 sm:px-8 sm:py-10 lg:px-10 lg:py-12 ${
+            isDragging
+              ? "border-[#C9A84C]/64 bg-[#1E6B4A]/14 shadow-[0_24px_70px_rgba(30,107,74,0.2)]"
+              : "border-[#E8DFC8]/18 bg-[#1A2840] hover:-translate-y-0.5 hover:border-[#C9A84C]/36 hover:bg-[#1A2840]/92"
+          }`}
+        >
+          <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#C9A84C]/42 to-transparent opacity-80" />
+          <div className="pointer-events-none absolute inset-0 opacity-[0.055] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:42px_42px]" />
+
+          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex max-w-2xl flex-col gap-5 sm:flex-row sm:items-center">
+              <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border border-[#C9A84C]/24 bg-[#0C1220]/64 text-[#C9A84C] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#1E6B4A]/14">
+                <MergeIcon />
+              </span>
+              <div>
+                <p className="text-2xl font-semibold tracking-[-0.02em] text-[#F0EAD6] sm:text-3xl">
+                  Drop PDFs here
+                </p>
+                <p className="mt-2 text-base text-[#F0EAD6]/52">
+                  or choose files from your device
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="inline-flex w-full items-center justify-center rounded-full bg-[#1E6B4A] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(30,107,74,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98] sm:w-auto"
+            >
+              Select PDFs
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-4 text-center">
+          <p className="text-sm font-semibold text-[#F0EAD6]/68">
+            Private by design &middot; Browser-only &middot; Cleared after download
+          </p>
+          <p className="mt-1 text-xs text-[#F0EAD6]/38">
+            Files stay on your device for this tool.
+          </p>
+        </div>
+
+        {error ? (
+          <div className="mt-4 rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
+            {error}
+          </div>
+        ) : null}
+
+        {softWarning ? (
+          <div className="mt-4 rounded-lg border border-[#C9A84C]/20 bg-[#C9A84C]/10 p-4 text-sm font-medium text-[#F0EAD6]">
+            {softWarning}
+          </div>
+        ) : null}
+      </section>
+    );
+  }
+
   return (
     <section className="pb-28 lg:pb-0">
+      <style>{`
+        @keyframes consoleReveal {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
       <input
         ref={inputRef}
         type="file"
@@ -545,14 +635,14 @@ export default function MergePdfTool() {
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.42fr)_minmax(360px,0.78fr)] lg:items-start">
         <div className="min-w-0 space-y-5">
-          <section className="rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840] p-4 shadow-2xl shadow-black/24 sm:p-5">
+          <section className="animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840] p-4 shadow-2xl shadow-black/24 sm:p-5">
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
                   1 Add PDFs
                 </p>
                 <p className="mt-1 text-sm text-[#F0EAD6]/48">
-                  Place the source files in your document tray.
+                  Add more PDFs to this document deck.
                 </p>
               </div>
               {files.length > 0 ? (
@@ -609,7 +699,7 @@ export default function MergePdfTool() {
             </div>
           </section>
 
-          <section className="rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/88 p-4 shadow-2xl shadow-black/18 sm:p-5">
+          <section className="animate-[consoleReveal_320ms_ease-out] rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/88 p-4 shadow-2xl shadow-black/18 sm:p-5">
             <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
