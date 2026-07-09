@@ -633,9 +633,9 @@ export default function MergePdfTool() {
         }}
       />
 
-      <div className="grid gap-3 lg:h-full lg:grid-cols-[minmax(0,1.58fr)_minmax(330px,0.7fr)] lg:items-stretch">
+      <div className="grid gap-4 lg:h-full lg:grid-cols-[minmax(0,1.75fr)_minmax(340px,0.72fr)] lg:items-stretch 2xl:grid-cols-[minmax(0,1.95fr)_minmax(360px,0.72fr)]">
         <div className="flex min-h-0 min-w-0 flex-col gap-3">
-          <section className="animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840] p-2.5 shadow-2xl shadow-black/24">
+          <section className="animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#E8DFC8]/12 bg-[#121C2E] p-2.5 shadow-2xl shadow-black/24">
             <div className="mb-2.5 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
@@ -699,7 +699,7 @@ export default function MergePdfTool() {
             </div>
           </section>
 
-          <section className="flex min-h-0 flex-1 animate-[consoleReveal_320ms_ease-out] flex-col rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/88 p-3 shadow-2xl shadow-black/18">
+          <section className="flex min-h-0 flex-1 animate-[consoleReveal_320ms_ease-out] flex-col rounded-xl border border-[#E8DFC8]/12 bg-[#121C2E]/92 p-3 shadow-2xl shadow-black/18">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
@@ -861,7 +861,7 @@ export default function MergePdfTool() {
         </div>
 
         <aside className="lg:min-h-0">
-          <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-2.5 shadow-2xl shadow-black/28">
+          <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#E8DFC8]/14 bg-[#121C2E] p-2.5 shadow-2xl shadow-black/28">
             <div className="mb-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
                 Output

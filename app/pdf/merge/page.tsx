@@ -14,8 +14,9 @@ export const metadata: Metadata = {
 export default function MergePdfPage() {
   return (
     <PublicPageShell
+      maxWidth="max-w-[1600px]"
       mainClassName="min-h-screen bg-[#0C1220] text-[#F0EAD6] lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden"
-      contentClassName="px-5 py-5 sm:px-8 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:py-2"
+      contentClassName="px-5 py-5 sm:px-8 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:px-10 lg:py-2"
     >
       <section className="shrink-0">
         <div>
