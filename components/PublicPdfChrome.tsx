@@ -80,14 +80,16 @@ export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }
 export function PublicPageShell({
   children,
   maxWidth = "max-w-[1360px]",
+  contentClassName = "px-5 py-8 sm:px-8 lg:py-10",
 }: {
   children: ReactNode;
   maxWidth?: string;
+  contentClassName?: string;
 }) {
   return (
     <main className="min-h-screen bg-[#0C1220] text-[#F0EAD6]">
       <PublicNav maxWidth={maxWidth} />
-      <div className={`mx-auto ${maxWidth} px-5 py-8 sm:px-8 lg:py-10`}>
+      <div className={`mx-auto ${maxWidth} ${contentClassName}`}>
         {children}
       </div>
     </main>
