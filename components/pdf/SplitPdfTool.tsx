@@ -567,10 +567,10 @@ export default function SplitPdfTool() {
               </span>
               <div>
                 <p className="text-2xl font-semibold tracking-[-0.02em] text-[#F0EAD6]">
-                  Drop one PDF here
+                  Drop PDFs here
                 </p>
                 <p className="mt-2 text-base text-[#F0EAD6]/52">
-                  Choose file from your device
+                  or choose files from your device
                 </p>
               </div>
             </div>

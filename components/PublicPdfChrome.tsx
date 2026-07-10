@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { ReactNode } from "react";
+import { PdfToolSwitcher } from "@/components/pdf/PdfToolSwitcher";
 
 export function LumeoSealMark() {
   return (
@@ -66,35 +67,38 @@ export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }
           <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
         </Link>
 
-        <Link
-          href="/"
-          aria-label="Go to Lumeo PDF home"
-          title="Home"
-          className="group inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#E8DFC8]/16 px-3 text-[#F0EAD6]/62 transition hover:border-[#E8DFC8]/32 hover:bg-[#F0EAD6]/[0.035] hover:text-[#F0EAD6] sm:h-11 sm:px-3.5"
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="h-5 w-5"
-            fill="none"
+        <div className="flex shrink-0 items-center gap-2">
+          <PdfToolSwitcher />
+          <Link
+            href="/"
+            aria-label="Go to Lumeo PDF home"
+            title="Home"
+            className="group inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#E8DFC8]/16 px-3 text-[#F0EAD6]/62 transition hover:border-[#E8DFC8]/32 hover:bg-[#F0EAD6]/[0.035] hover:text-[#F0EAD6] sm:h-11 sm:px-3.5"
           >
-            <path
-              d="m5 11 7-6 7 6"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-            />
-            <path
-              d="M7.5 10.5v7.2h9v-7.2"
-              stroke="currentColor"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="1.8"
-            />
-          </svg>
-          <span className="hidden text-xs font-semibold sm:inline">Home</span>
-        </Link>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-5 w-5"
+              fill="none"
+            >
+              <path
+                d="m5 11 7-6 7 6"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+              />
+              <path
+                d="M7.5 10.5v7.2h9v-7.2"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+              />
+            </svg>
+            <span className="hidden text-xs font-semibold sm:inline">Home</span>
+          </Link>
+        </div>
       </div>
     </nav>
   );
