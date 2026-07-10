@@ -3,7 +3,7 @@ import { PdfToolPlaceholder } from "@/components/pdf/PdfToolPlaceholder";
 import { getPdfTool } from "@/components/pdf/PdfToolRegistry";
 
 export const metadata: Metadata = {
-  title: "Compress PDF Online - Lumeo PDF Workspace",
+  title: "Compress PDF Online - Reduce PDF Size | Lumeo PDF",
   description:
     "Reduce PDF file size for email, forms, and sharing with Lumeo PDF Workspace.",
   alternates: {

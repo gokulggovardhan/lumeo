@@ -4,25 +4,32 @@ import Link from "next/link";
 import { BrandLockup, LumeoSealMark } from "@/components/PublicPdfChrome";
 
 export const metadata: Metadata = {
-  title: "Lumeo PDF Workspace - Simple, Private PDF Tools",
+  title: "Lumeo PDF - Private Browser PDF Tools | Merge, Split & Convert PDFs",
   description:
-    "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
+    "Merge, split, compress, and convert PDFs privately with Lumeo PDF Workspace. Fast browser-first PDF tools where your files stay on your device.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Lumeo PDF Workspace - Simple, Private PDF Tools",
-    description:
-      "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
+    title: "Lumeo PDF Workspace",
+    description: "Private browser-first PDF tools for everyday documents.",
     url: "https://lumeo.in",
-    siteName: "Lumeo PDF Workspace",
+    siteName: "Lumeo PDF",
     type: "website",
+    images: [
+      {
+        url: "/og-image.svg",
+        width: 1200,
+        height: 630,
+        alt: "Lumeo PDF Workspace",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Lumeo PDF Workspace - Simple, Private PDF Tools",
-    description:
-      "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
+    title: "Lumeo PDF Workspace",
+    description: "Private PDF tools that run in your browser.",
+    images: ["/og-image.svg"],
   },
 };
 
@@ -93,24 +100,27 @@ const privacyCards: Array<{
 const structuredData = [
   {
     "@context": "https://schema.org",
-    "@type": "Organization",
-    name: "Lumeo",
+    "@type": "WebSite",
+    name: "Lumeo PDF",
+    alternateName: ["Lumeo", "Lumeo PDF Workspace", "lumeo.in"],
     url: "https://lumeo.in",
-    description:
-      "Lumeo PDF Workspace is a clean online workspace for everyday PDF documents.",
   },
   {
     "@context": "https://schema.org",
-    "@type": "WebApplication",
+    "@type": "SoftwareApplication",
     name: "Lumeo PDF Workspace",
     url: "https://lumeo.in",
     applicationCategory: "ProductivityApplication",
-    operatingSystem: "Web",
-    description:
-      "Merge, split, compress, convert, and prepare PDF files with a clean, privacy-first PDF workspace for everyday documents.",
+    operatingSystem: "Web Browser",
+    featureList: ["Merge PDF", "Split PDF", "Compress PDF", "Convert PDF"],
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "USD",
+    },
     publisher: {
       "@type": "Organization",
-      name: "Lumeo",
+      name: "Lumeo PDF",
       url: "https://lumeo.in",
     },
   },

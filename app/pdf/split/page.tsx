@@ -3,9 +3,9 @@ import { PublicPageShell } from "@/components/PublicPdfChrome";
 import SplitPdfTool from "@/components/pdf/SplitPdfTool";
 
 export const metadata: Metadata = {
-  title: "Split PDF Online - Lumeo PDF Workspace",
+  title: "Split PDF Online - Extract PDF Pages Privately | Lumeo PDF",
   description:
-    "Extract selected pages or prepare separate documents from one PDF with Lumeo PDF Workspace.",
+    "Split PDF files, extract pages, remove pages, and create smaller PDFs privately in your browser.",
   alternates: {
     canonical: "/pdf/split",
   },

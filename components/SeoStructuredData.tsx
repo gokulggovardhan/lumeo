@@ -1,24 +1,27 @@
-const organizationSchema = {
+const websiteSchema = {
   "@context": "https://schema.org",
-  "@type": "Organization",
-  name: "Lumeo",
+  "@type": "WebSite",
+  name: "Lumeo PDF",
+  alternateName: ["Lumeo", "Lumeo PDF Workspace", "lumeo.in"],
   url: "https://lumeo.in",
-  description:
-    "Lumeo is a premium online creative studio for creators, teams, educators, podcasters, developers, and businesses.",
 };
 
-const webApplicationSchema = {
+const softwareApplicationSchema = {
   "@context": "https://schema.org",
-  "@type": "WebApplication",
-  name: "Lumeo",
+  "@type": "SoftwareApplication",
+  name: "Lumeo PDF Workspace",
   url: "https://lumeo.in",
-  applicationCategory: "MultimediaApplication",
-  operatingSystem: "Web",
-  description:
-    "Create, edit, reframe, title, and export polished videos for reels, shorts, podcasts, education, social media, and creator workflows with Lumeo.",
+  applicationCategory: "ProductivityApplication",
+  operatingSystem: "Web Browser",
+  featureList: ["Merge PDF", "Split PDF", "Compress PDF", "Convert PDF"],
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "USD",
+  },
   publisher: {
     "@type": "Organization",
-    name: "Lumeo",
+    name: "Lumeo PDF",
     url: "https://lumeo.in",
   },
 };
@@ -29,13 +32,13 @@ export default function SeoStructuredData() {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(organizationSchema),
+          __html: JSON.stringify(websiteSchema),
         }}
       />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(webApplicationSchema),
+          __html: JSON.stringify(softwareApplicationSchema),
         }}
       />
     </>

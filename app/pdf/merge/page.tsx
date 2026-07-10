@@ -3,9 +3,9 @@ import MergePdfTool from "@/components/pdf/MergePdfTool";
 import { PublicPageShell } from "@/components/PublicPdfChrome";
 
 export const metadata: Metadata = {
-  title: "Merge PDF Online - Lumeo PDF Workspace",
+  title: "Merge PDF Online - Combine PDF Files Privately | Lumeo PDF",
   description:
-    "Combine multiple PDF files into one clean document with Lumeo PDF Workspace.",
+    "Merge PDF files securely in your browser. Combine documents without uploading files.",
   alternates: {
     canonical: "/pdf/merge",
   },

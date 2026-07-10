@@ -3,7 +3,7 @@ import { PdfToolPlaceholder } from "@/components/pdf/PdfToolPlaceholder";
 import { getPdfTool } from "@/components/pdf/PdfToolRegistry";
 
 export const metadata: Metadata = {
-  title: "JPG to PDF Online - Lumeo PDF Workspace",
+  title: "JPG to PDF Converter Online | Lumeo PDF",
   description:
     "Turn photos, scans, and images into a clean PDF document with Lumeo PDF Workspace.",
   alternates: {
