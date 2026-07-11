@@ -1,3 +1,4 @@
+// app/page.tsx
 import type { Metadata } from "next";
 import Link from "next/link";
 import PublicFooter from "@/components/PublicFooter";
@@ -6,23 +7,23 @@ import { PdfToolLauncher } from "@/components/pdf/PdfToolLauncher";
 
 export const metadata: Metadata = {
   title: {
-    absolute: "Lumeo PDF - Private Browser PDF Tools | Merge, Split & Convert PDFs",
+    absolute: "Lumeo PDF - Merge, Split & Compress PDFs Privately in Your Browser",
   },
   description:
-    "Merge, split, compress, and convert PDFs privately with Lumeo PDF Workspace. Fast browser-first PDF tools where your files stay on your device.",
+    "Merge, split, and compress PDFs for free. Lumeo runs in your browser — files are processed locally and never stored on our servers.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
     title: "Lumeo PDF - Private Browser PDF Tools",
     description:
-      "A premium browser-first PDF workspace for private document merging, splitting, compression, and conversion.",
+      "Merge, split, and compress PDFs for free. Files are processed in your browser, not on a server.",
     url: "https://lumeo.in",
     siteName: "Lumeo PDF",
     type: "website",
     images: [
       {
-        url: "/og-image.svg",
+        url: "/og-image.png",
         width: 1200,
         height: 630,
         alt: "Lumeo PDF Workspace",
@@ -33,7 +34,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Lumeo PDF Workspace",
     description: "Private PDF tools that run in your browser.",
-    images: ["/og-image.svg"],
+    images: ["/og-image.png"],
   },
 };
 
@@ -53,8 +54,8 @@ const structuredData = [
     applicationCategory: "BusinessApplication",
     operatingSystem: "Any modern browser",
     description:
-      "A premium browser-first PDF workspace for private document merging, splitting, compression, and conversion.",
-    featureList: ["Merge PDF", "Split PDF", "Compress PDF", "Convert PDF"],
+      "A browser-first PDF workspace for private document merging, splitting, and compression.",
+    featureList: ["Merge PDF", "Split PDF", "Compress PDF"],
     publisher: {
       "@type": "Organization",
       name: "Lumeo PDF",
@@ -108,6 +109,9 @@ export default function Home() {
             </h1>
             <p className="mt-1.5 text-sm text-[#F0EAD6]/46">
               Choose a tool to begin.
+            </p>
+            <p className="mt-3 text-xs font-medium text-[#F0EAD6]/70">
+              Files are processed in your browser and never stored on our servers.
             </p>
           </header>
 

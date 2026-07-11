@@ -1,3 +1,4 @@
+// PublicFooter.tsx
 import Link from "next/link";
 import { BrandLockup } from "@/components/PublicPdfChrome";
 
@@ -68,10 +69,10 @@ export default function PublicFooter() {
         </div>
 
         <div className="border-t border-[#E8DFC8]/8 pt-4 md:col-span-2 md:flex md:items-center md:justify-between md:gap-6">
-          <p className="font-semibold text-[#F0EAD6]/62">
+          <p>&copy; {year} Lumeo PDF Workspace. All rights reserved.</p>
+          <p className="mt-1.5 text-[#F0EAD6]/30 md:mt-0">
             Built by Govardhan Gudapakam
           </p>
-          <p className="mt-1.5 md:mt-0">&copy; {year} Lumeo PDF Workspace. All rights reserved.</p>
         </div>
       </div>
     </footer>

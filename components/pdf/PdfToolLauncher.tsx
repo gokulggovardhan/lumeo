@@ -1,3 +1,4 @@
+// PdfToolLauncher.tsx
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { pdfTools } from "./PdfToolRegistry";
@@ -101,7 +102,7 @@ function PdfToolDockItem({
           {tool.title}
         </span>
         {!live ? (
-          <span className="mt-1 block text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[#C9A84C]/68">
+          <span className="mt-1 block text-[0.62rem] font-semibold uppercase tracking-[0.16em] text-[#F0EAD6]/38">
             Soon
           </span>
         ) : null}
