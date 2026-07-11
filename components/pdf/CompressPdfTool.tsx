@@ -338,6 +338,8 @@ export default function CompressPdfTool() {
   const [status, setStatus] = useState<CompressStage>("Ready");
   const [progressDetail, setProgressDetail] = useState("");
   const [cleanupMessage, setCleanupMessage] = useState("");
+  const [previewIssue, setPreviewIssue] = useState("");
+  const [blockingError, setBlockingError] = useState("");
   const [isCompressing, setIsCompressing] = useState(false);
   const [result, setResult] = useState<CompressResult | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
@@ -378,6 +380,8 @@ export default function CompressPdfTool() {
 
   const profileLabel = profiles[profile].label;
   const outputFileName = sanitizePdfFileName(outputName);
+  const displayStatus = blockingError ? "Needs attention" : error ? "Retry available" : status;
+  const canCompress = Boolean(analysis) && !isCompressing && !blockingError;
 
   const clearPreview = useCallback(() => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -442,6 +446,8 @@ export default function CompressPdfTool() {
     resetSettings("balanced");
     setOutputName("lumeo-compressed.pdf");
     setError("");
+    setPreviewIssue("");
+    setBlockingError("");
     setStatus("Ready");
     setProgressDetail("");
     setAdvancedOpen(false);
@@ -451,6 +457,7 @@ export default function CompressPdfTool() {
 
   async function renderPreview(doc: PDFDocumentProxy, pageNumber: number, currentSession: number) {
     try {
+      setPreviewIssue("");
       const page = await doc.getPage(pageNumber);
       if (currentSession !== sessionRef.current) return;
       const viewport = page.getViewport({ scale: 0.35 });
@@ -474,7 +481,7 @@ export default function CompressPdfTool() {
       clearPreview();
       setPreviewUrl(url);
     } catch {
-      setProgressDetail("Representative preview could not be rendered. Compression can still be attempted.");
+      setPreviewIssue("Preview could not be rendered. Compression can still be attempted.");
     }
   }
 
@@ -482,6 +489,8 @@ export default function CompressPdfTool() {
     const nextSession = sessionRef.current + 1;
     sessionRef.current = nextSession;
     setError("");
+    setPreviewIssue("");
+    setBlockingError("");
     setCleanupMessage("");
     setProgressDetail("");
     setStatus("Analysing document");
@@ -556,6 +565,7 @@ export default function CompressPdfTool() {
           : "This file could not be read. It may be damaged or password-protected.";
       setStatus("Ready");
       setError(message);
+      setBlockingError(message);
       setAnalysis(null);
     }
   }
@@ -588,18 +598,26 @@ export default function CompressPdfTool() {
   }
 
   async function handleCompress() {
-    if (!analysis || isCompressing) return;
+    if (!analysis || isCompressing || blockingError) return;
     setIsCompressing(true);
     setError("");
+    setBlockingError("");
     setCleanupMessage("");
     clearResult();
     setStatus("Preparing compression plan");
     setProgressDetail("Preparing compression plan.");
 
     const currentSession = sessionRef.current;
+    let processingDoc: PDFDocumentProxy | null = null;
     try {
-      const doc = pdfJsDocRef.current;
-      if (!doc) throw new Error("Document preview engine is not ready. Replace the file and try again.");
+      const pdfJs = await loadPdfJsModule();
+      const loadingTask = pdfJs.getDocument({
+        data: new Uint8Array(copyArrayBuffer(analysis.bytes)),
+        useWorkerFetch: false,
+      });
+      processingDoc = await loadingTask.promise;
+      if (currentSession !== sessionRef.current) return;
+
       const sourcePdf = await PDFDocument.load(copyArrayBuffer(analysis.bytes));
       const output = await PDFDocument.create();
       if (selectedPlan.metadata === "preserve") {
@@ -613,7 +631,7 @@ export default function CompressPdfTool() {
         if (currentSession !== sessionRef.current) return;
         setStatus("Processing images");
         setProgressDetail(`Processing page ${pageIndex} of ${analysis.pageCount}.`);
-        const page = await doc.getPage(pageIndex);
+        const page = await processingDoc.getPage(pageIndex);
         const pageInfo = analysis.pages[pageIndex - 1];
         const scale = Math.max(MIN_RENDER_SCALE, Math.min(MAX_RENDER_SCALE, selectedPlan.dpi / 72));
         const viewport = page.getViewport({ scale });
@@ -696,10 +714,21 @@ export default function CompressPdfTool() {
         compressError instanceof Error
           ? compressError.message
           : "Compression failed. Try a safer profile or a smaller PDF.";
-      setError(message);
+      setError(
+        message.includes("Document preview engine")
+          ? "Compression engine could not start. Reanalyse the document or try again."
+          : message,
+      );
       setStatus("Ready");
       setProgressDetail("");
     } finally {
+      if (processingDoc) {
+        try {
+          await (processingDoc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
+        } catch {
+          // Processing document may already be destroyed after cancellation.
+        }
+      }
       setIsCompressing(false);
     }
   }
@@ -823,12 +852,32 @@ export default function CompressPdfTool() {
                 </p>
               </div>
               <span className="rounded-full border border-[#1E6B4A]/24 bg-[#1E6B4A]/10 px-3 py-1.5 text-xs font-semibold text-[#A8E0C1]">
-                {status}
+                {displayStatus}
               </span>
             </div>
           </section>
 
-          <div className="grid gap-3 md:grid-cols-3">
+          <div className="grid gap-3 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#F0EAD6]">
+                {analysis.opportunity === "High" ? "Image-heavy document" : analysis.opportunity === "Moderate" ? "Balanced document" : "Already compact document"}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/48">
+                Compression opportunity: {analysis.opportunity} · Recommended: {profiles[analysis.recommendation].label}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/38">
+                {opportunityCopy}
+              </p>
+            </div>
+            {previewUrl ? (
+              <div className="hidden h-24 w-20 overflow-hidden rounded-lg border border-[#E8DFC8]/12 bg-[#F0EAD6]/[0.04] md:block">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={previewUrl} alt={`Representative preview of page ${analysis.samplePage}`} className="h-full w-full object-contain" />
+              </div>
+            ) : null}
+          </div>
+
+          <div className="hidden gap-3 md:grid-cols-3">
             <div className="rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/64 p-3">
               <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Compression opportunity</p>
               <p className="mt-2 text-2xl font-bold text-[#F0EAD6]">{analysis.opportunity}</p>
@@ -846,7 +895,7 @@ export default function CompressPdfTool() {
             </div>
           </div>
 
-          <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[0.8fr_1.2fr] lg:overflow-hidden">
+          <div className="hidden min-h-0 flex-1 gap-3 lg:grid-cols-[0.8fr_1.2fr] lg:overflow-hidden">
             <div className="min-h-0 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/62 p-3">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">Quality preview</p>
               <p className="mt-1 text-xs text-[#F0EAD6]/40">Representative original preview · Page {analysis.samplePage}</p>
@@ -895,7 +944,7 @@ export default function CompressPdfTool() {
         <aside className="lg:min-h-0">
           <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#E8DFC8]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
             <div className="border-b border-[#E8DFC8]/10 pb-3">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">Essential profile</p>
+              <p className="text-xs font-semibold text-[#F0EAD6]/68">Compression profile</p>
               <div className="mt-3 grid gap-2">
                 {(Object.keys(profiles) as CompressProfile[]).map((item) => (
                   <button
@@ -926,9 +975,10 @@ export default function CompressPdfTool() {
               <button
                 type="button"
                 onClick={() => setAdvancedOpen((open) => !open)}
-                className="flex w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 py-2 text-left text-xs font-bold uppercase tracking-[0.16em] text-[#F0EAD6]/54 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]"
+                aria-expanded={advancedOpen}
+                className="flex w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 py-2 text-left text-xs font-semibold text-[#F0EAD6]/54 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]"
               >
-                Advanced
+                Advanced options
                 <span>{advancedOpen ? "−" : "+"}</span>
               </button>
               {advancedOpen ? (
@@ -986,9 +1036,10 @@ export default function CompressPdfTool() {
               <button
                 type="button"
                 onClick={() => setExpertOpen((open) => !open)}
-                className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 py-2 text-left text-xs font-bold uppercase tracking-[0.16em] text-[#F0EAD6]/54 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]"
+                aria-expanded={expertOpen}
+                className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 py-2 text-left text-xs font-semibold text-[#F0EAD6]/54 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]"
               >
-                Expert
+                Document and output details
                 <span>{expertOpen ? "−" : "+"}</span>
               </button>
               {expertOpen ? (
@@ -1008,7 +1059,7 @@ export default function CompressPdfTool() {
                 </div>
               ) : null}
 
-              <div className="mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3">
+              <div className={expertOpen ? "mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Compression plan</p>
                 <ul className="mt-2 space-y-1.5 text-xs text-[#F0EAD6]/50">
                   <li>Images: render at {selectedPlan.dpi} DPI</li>
@@ -1019,7 +1070,7 @@ export default function CompressPdfTool() {
                 </ul>
               </div>
 
-              <div className="mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3">
+              <div className={expertOpen ? "mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Output manifest</p>
                 <ul className="mt-2 space-y-1.5 text-xs text-[#F0EAD6]/50">
                   <li>1 compressed PDF</li>
@@ -1030,7 +1081,7 @@ export default function CompressPdfTool() {
                 </ul>
               </div>
 
-              <div className="mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3">
+              <div className={expertOpen ? "mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Privacy proof</p>
                 <dl className="mt-2 grid gap-1.5 text-xs text-[#F0EAD6]/50">
                   <div className="flex justify-between gap-3"><dt>Processing location</dt><dd className="font-bold text-[#F0EAD6]/76">This browser</dd></div>
@@ -1048,6 +1099,7 @@ export default function CompressPdfTool() {
               </div>
 
               {error ? <div role="alert" className="mt-4 rounded-xl border border-[#F0A8A8]/20 bg-[#F0A8A8]/10 px-3 py-2 text-sm text-[#F0C0C0]">{error}</div> : null}
+              {previewIssue ? <div className="mt-4 rounded-xl border border-[#C9A84C]/18 bg-[#C9A84C]/8 px-3 py-2 text-xs text-[#E8DFC8]/70">{previewIssue}</div> : null}
               {cleanupMessage ? <div className="mt-4 rounded-xl border border-[#1E6B4A]/26 bg-[#1E6B4A]/12 px-3 py-2 text-sm text-[#A8E0C1]">{cleanupMessage}</div> : null}
               {progressDetail ? <div aria-live="polite" className="mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.035] px-3 py-2 text-xs text-[#F0EAD6]/48">{progressDetail}</div> : null}
             </div>
@@ -1084,8 +1136,8 @@ export default function CompressPdfTool() {
                   </button>
                 </div>
               ) : (
-                <button type="button" disabled={isCompressing} onClick={handleCompress} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#1E6B4A] px-5 text-sm font-bold text-[#F0EAD6] shadow-[0_14px_35px_rgba(30,107,74,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55">
-                  {isCompressing ? "Compressing in your browser..." : "Compress PDF"}
+                <button type="button" disabled={!canCompress} onClick={handleCompress} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#1E6B4A] px-5 text-sm font-bold text-[#F0EAD6] shadow-[0_14px_35px_rgba(30,107,74,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55">
+                  {isCompressing ? "Compressing in your browser..." : error ? "Retry compression" : "Compress PDF"}
                 </button>
               )}
             </div>

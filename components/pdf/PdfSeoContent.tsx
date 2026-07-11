@@ -90,16 +90,16 @@ function ToolFaq({
   const faqId = `${title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-faq`;
 
   return (
-    <section aria-labelledby={faqId} className="mt-10">
+    <section aria-labelledby={faqId} className="mx-auto mt-10 max-w-4xl">
       <h2
         id={faqId}
-        className="font-serif text-3xl tracking-[-0.02em] text-[#F0EAD6]"
+        className="font-serif text-2xl tracking-[-0.02em] text-[#F0EAD6] sm:text-3xl"
       >
         Questions about {title}
       </h2>
-      <div className="mt-4 divide-y divide-[#E8DFC8]/10 rounded-2xl border border-[#E8DFC8]/12 bg-[#0A101C]/70">
+      <div className="mt-4 divide-y divide-[#E8DFC8]/10 border-y border-[#E8DFC8]/12">
         {items.map((item) => (
-          <details key={item.question} className="group p-4">
+          <details key={item.question} className="group py-4">
             <summary className="cursor-pointer list-none text-sm font-semibold text-[#F0EAD6] marker:hidden">
               <span className="flex items-center justify-between gap-4">
                 {item.question}
@@ -156,25 +156,25 @@ export function ToolSeoSection({
   relatedLinks: RelatedLink[];
 }) {
   return (
-    <section className="bg-[#0C1220] px-5 pb-16 pt-10 text-[#F0EAD6] sm:px-8">
+    <section className="bg-[#0C1220] px-5 pb-14 pt-14 text-[#F0EAD6] sm:px-8 lg:pt-24">
       <div className="mx-auto max-w-[1180px]">
         <Breadcrumbs current={toolName} currentUrl={toolUrl} />
-        <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_0.72fr]">
+        <div className="mt-6 grid gap-8 lg:grid-cols-[1fr_0.62fr]">
           <section aria-labelledby={`${toolName}-seo-heading`}>
             <h2
               id={`${toolName}-seo-heading`}
-              className="max-w-3xl font-serif text-4xl leading-tight tracking-[-0.02em]"
+              className="max-w-3xl font-serif text-3xl leading-tight tracking-[-0.02em] sm:text-4xl"
             >
               {heading}
             </h2>
             <p className="mt-4 max-w-3xl text-base leading-7 text-[#F0EAD6]/56">
               {copy}
             </p>
-            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            <div className="mt-7 grid gap-4 sm:grid-cols-3">
               {benefits.map((benefit) => (
                 <article
                   key={benefit.title}
-                  className="rounded-2xl border border-[#E8DFC8]/10 bg-[#0A101C]/72 p-4"
+                  className="border-t border-[#E8DFC8]/12 pt-4"
                 >
                   <h3 className="text-sm font-bold text-[#F0EAD6]">
                     {benefit.title}
@@ -187,14 +187,14 @@ export function ToolSeoSection({
             </div>
           </section>
 
-          <aside className="rounded-2xl border border-[#C9A84C]/18 bg-[#0A101C]/72 p-5">
-            <h2 className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
+          <aside className="border-l border-[#E8DFC8]/12 pl-0 lg:pl-6">
+            <h2 className="text-sm font-bold text-[#F0EAD6]">
               How it works
             </h2>
             <ol className="mt-4 space-y-3">
               {steps.map((step, index) => (
                 <li key={step} className="flex gap-3 text-sm text-[#F0EAD6]/60">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#C9A84C]/24 text-xs font-bold text-[#C9A84C]">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-[#C9A84C]/20 text-xs font-bold text-[#C9A84C]">
                     {index + 1}
                   </span>
                   <span>{step}</span>
@@ -202,7 +202,7 @@ export function ToolSeoSection({
               ))}
             </ol>
 
-            <h2 className="mt-7 text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
+            <h2 className="mt-7 text-sm font-bold text-[#F0EAD6]">
               Related tools
             </h2>
             <div className="mt-3 flex flex-wrap gap-2">
@@ -238,19 +238,19 @@ export function ToolSeoSection({
 
 export function PdfHubSeoContent() {
   return (
-    <section className="bg-[#0C1220] px-5 pb-16 pt-10 text-[#F0EAD6] sm:px-8">
+    <section className="bg-[#0C1220] px-5 pb-14 pt-14 text-[#F0EAD6] sm:px-8 lg:pt-20">
       <div className="mx-auto max-w-[1180px]">
         <section aria-labelledby="pdf-workspace-directory">
           <h2
             id="pdf-workspace-directory"
-            className="max-w-3xl font-serif text-4xl leading-tight tracking-[-0.02em]"
+            className="max-w-3xl font-serif text-3xl leading-tight tracking-[-0.02em] sm:text-4xl"
           >
             A calm directory for everyday PDF work
           </h2>
           <p className="mt-4 max-w-3xl text-base leading-7 text-[#F0EAD6]/56">
             Lumeo PDF Workspace brings private document tools into one focused
-            place. Start with live browser-first tools, then move between
-            planned compression and conversion workspaces as they become active.
+            place. Start with live browser-first merge, split, and compress
+            tools, then move between planned conversion workspaces as they become active.
           </p>
         </section>
 

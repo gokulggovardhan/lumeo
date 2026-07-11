@@ -32,26 +32,22 @@ export default function PublicFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-[#E8DFC8]/12 bg-[#0A101C] px-6 py-10 text-xs text-[#F0EAD6]/42">
-      <div className="mx-auto grid max-w-[1360px] gap-8 md:grid-cols-[1.2fr_1.8fr]">
+    <footer className="border-t border-[#E8DFC8]/12 bg-[#0A101C] px-6 py-8 text-xs text-[#F0EAD6]/42">
+      <div className="mx-auto grid max-w-[1360px] gap-7 md:grid-cols-[1fr_1.8fr]">
         <Link
           href="/"
           className="max-w-xs transition opacity-90 hover:opacity-100"
         >
           <BrandLockup markSize="h-9 w-9" />
-          <p className="mt-4 text-sm leading-6 text-[#F0EAD6]/48">
-            Premium browser-first PDF tools for private, professional document
-            handling.
-          </p>
         </Link>
 
-        <div className="grid gap-7 sm:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-3">
           {footerGroups.map((group) => (
             <nav key={group.title} aria-label={group.title}>
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#C9A84C]">
                 {group.title}
               </p>
-              <div className="mt-3 grid gap-2">
+              <div className="mt-3 grid gap-1.5">
                 {group.links.map((link) => (
                   <Link
                     key={link.href}
@@ -66,7 +62,7 @@ export default function PublicFooter() {
           ))}
         </div>
 
-        <div className="border-t border-[#E8DFC8]/10 pt-6 md:col-span-2">
+        <div className="border-t border-[#E8DFC8]/10 pt-5 md:col-span-2">
           <p className="font-semibold text-[#F0EAD6]/62">
             Built by Govardhan Gudapakam
           </p>

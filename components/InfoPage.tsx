@@ -42,7 +42,7 @@ export function InfoPageShell({
   return (
     <main className="min-h-screen bg-[#0C1220] text-[#F0EAD6]">
       <PublicNav />
-      <article className="mx-auto max-w-[1180px] px-5 py-12 sm:px-8 sm:py-16">
+      <article className="mx-auto max-w-[1180px] px-5 py-10 sm:px-8 sm:py-14">
         <header className="mx-auto max-w-[820px]">
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#C9A84C]">
             {eyebrow}
@@ -76,7 +76,7 @@ export function InfoPageShell({
             </div>
           ) : null}
         </header>
-        <div className="mx-auto mt-10 max-w-[820px] space-y-5 sm:mt-12">
+        <div className="mx-auto mt-10 max-w-[820px] space-y-9 sm:mt-12">
           {children}
         </div>
       </article>
@@ -89,10 +89,10 @@ export function InfoPageSection({ id, eyebrow, title, children }: InfoSection) {
   return (
     <section
       id={id}
-      className="rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840]/72 p-5 shadow-[0_18px_60px_rgba(0,0,0,0.18)] sm:p-7"
+      className="border-t border-[#E8DFC8]/12 pt-7"
     >
       {eyebrow ? (
-        <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
+        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#C9A84C]/86">
           {eyebrow}
         </p>
       ) : null}
@@ -108,7 +108,7 @@ export function InfoPageSection({ id, eyebrow, title, children }: InfoSection) {
 
 export function InfoCallout({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-xl border border-[#C9A84C]/24 bg-[#C9A84C]/10 px-4 py-3 text-sm font-medium leading-7 text-[#E8DFC8]/78">
+    <div className="border-l border-[#C9A84C]/45 bg-[#C9A84C]/8 px-4 py-3 text-sm font-medium leading-7 text-[#E8DFC8]/78">
       {children}
     </div>
   );
@@ -124,7 +124,7 @@ export function InfoDefinitionList({
       {items.map((item) => (
         <div
           key={item.term}
-          className="grid gap-1 rounded-lg border border-[#E8DFC8]/10 bg-[#0C1220]/42 p-4 sm:grid-cols-[180px_1fr] sm:gap-4"
+          className="grid gap-1 border-t border-[#E8DFC8]/10 py-3 sm:grid-cols-[180px_1fr] sm:gap-4"
         >
           <dt className="text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]">
             {item.term}

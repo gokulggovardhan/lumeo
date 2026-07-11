@@ -44,36 +44,42 @@ const coreTools: Array<{
   href: string;
   description: string;
   kind: ToolKind;
+  status: "available" | "development";
 }> = [
   {
     title: "Merge PDF",
     href: "/pdf/merge",
     description: "Combine multiple PDF files into one document.",
     kind: "merge",
+    status: "available",
   },
   {
     title: "Split PDF",
     href: "/pdf/split",
     description: "Extract pages or separate one PDF into smaller files.",
     kind: "split",
+    status: "available",
   },
   {
     title: "Compress PDF",
     href: "/pdf/compress",
     description: "Reduce PDF file size for sharing and uploads.",
     kind: "compress",
+    status: "available",
   },
   {
     title: "JPG to PDF",
     href: "/pdf/jpg-to-pdf",
     description: "Convert images into a clean PDF document.",
     kind: "jpgToPdf",
+    status: "development",
   },
   {
     title: "PDF to JPG",
     href: "/pdf/pdf-to-jpg",
     description: "Export PDF pages as image files.",
     kind: "pdfToJpg",
+    status: "development",
   },
 ];
 
@@ -315,30 +321,29 @@ export default function Home() {
         </div>
       </nav>
 
-      <section className="relative px-5 pb-16 pt-16 sm:px-8 sm:pt-20 lg:pb-24 lg:pt-24">
+      <section className="relative px-5 pb-8 pt-10 sm:px-8 sm:pt-12 lg:pb-10 lg:pt-12">
         <div className="pointer-events-none absolute inset-0 opacity-[0.05] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:48px_48px]" />
-        <div className="relative z-10 mx-auto grid max-w-[1360px] gap-12 lg:grid-cols-[1fr_0.86fr] lg:items-center">
+        <div className="relative z-10 mx-auto grid max-w-[1360px] gap-8 xl:grid-cols-[1fr_0.62fr] xl:items-center">
           <div>
-            <div className="mb-6 inline-flex items-center gap-3 rounded-full border border-[#C9A84C]/28 bg-[#C9A84C]/8 px-4 py-2 text-xs font-semibold text-[#C9A84C]">
+            <div className="mb-4 inline-flex items-center gap-3 rounded-full border border-[#C9A84C]/24 bg-[#C9A84C]/8 px-4 py-2 text-xs font-semibold text-[#C9A84C]">
               <LumeoSealMark />
               Private by design
             </div>
 
-            <h1 className="max-w-3xl font-serif text-5xl leading-[1.02] tracking-[-0.03em] sm:text-6xl lg:text-[4.6rem]">
-              Simple, private PDF tools.
+            <h1 className="max-w-3xl font-serif text-4xl leading-[1.04] tracking-[-0.03em] sm:text-5xl lg:text-[3.8rem]">
+              Private PDF tools, beautifully organised.
             </h1>
 
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-[#F0EAD6]/58">
-              Merge, split, compress, and convert PDF files with a clean
-              workspace designed for everyday documents.
+            <p className="mt-4 max-w-2xl text-base leading-7 text-[#F0EAD6]/58 sm:text-lg">
+              Merge, split, compress, and convert documents directly in your browser.
             </p>
 
-            <div className="mt-9 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
               <a
                 href="#tools"
                 className="rounded-full bg-[#1E6B4A] px-7 py-3.5 text-center text-sm font-semibold text-[#F0EAD6] shadow-[0_18px_50px_rgba(30,107,74,0.22)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#257B56]"
               >
-                Choose a tool
+                Explore PDF tools
               </a>
               <a
                 href="#privacy"
@@ -348,42 +353,50 @@ export default function Home() {
               </a>
             </div>
 
-            <div className="mt-8 max-w-xl rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-4 text-sm font-medium leading-6 text-[#F0EAD6]/62">
+            <div className="mt-5 max-w-xl rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/70 p-3 text-sm font-medium leading-6 text-[#F0EAD6]/62">
               Designed to be private, simple, and fast.
             </div>
           </div>
 
-          <HeroDocumentVisual />
+          <div className="hidden xl:block [&>div]:min-h-[300px]">
+            <HeroDocumentVisual />
+          </div>
         </div>
       </section>
 
-      <section id="tools" className="mx-auto max-w-[1360px] px-5 py-16 sm:px-8">
-        <div className="mb-10 max-w-2xl">
-          <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
-            Core tools
+      <section id="tools" className="mx-auto max-w-[1360px] px-5 py-8 sm:px-8 lg:py-10">
+        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
+            Tools
           </p>
-          <h2 className="font-serif text-4xl tracking-[-0.02em] sm:text-5xl">
+          <h2 className="font-serif text-3xl tracking-[-0.02em] sm:text-4xl">
             Essential PDF tools.
           </h2>
-          <p className="mt-4 text-base leading-7 text-[#F0EAD6]/50">
+          </div>
+          <p className="max-w-md text-sm leading-6 text-[#F0EAD6]/50">
             Choose a tool to prepare, organize, or convert your PDF files.
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           {coreTools.map((tool) => (
             <Link
               key={tool.title}
               href={tool.href}
-              className="group rounded-xl border border-[#E8DFC8] bg-[#F0EAD6] p-5 text-[#1C1710] shadow-2xl shadow-black/20 transition duration-300 hover:-translate-y-1 hover:border-[#C9A84C] hover:bg-[#F5EFDD]"
+              className={`group rounded-xl border p-4 text-[#1C1710] shadow-2xl shadow-black/16 transition duration-300 hover:-translate-y-0.5 ${
+                tool.status === "available"
+                  ? "border-[#E8DFC8] bg-[#F0EAD6] hover:border-[#C9A84C] hover:bg-[#F5EFDD]"
+                  : "border-[#E8DFC8]/18 bg-[#1A2840] text-[#F0EAD6] hover:border-[#C9A84C]/34"
+              }`}
             >
               <ToolIcon kind={tool.kind} />
-              <h3 className="mt-6 text-lg font-bold">{tool.title}</h3>
-              <p className="mt-3 min-h-[4rem] text-sm leading-6 text-[#1C1710]/65">
+              <h3 className="mt-4 text-base font-bold">{tool.title}</h3>
+              <p className={`mt-2 min-h-[3.2rem] text-sm leading-5 ${tool.status === "available" ? "text-[#1C1710]/65" : "text-[#F0EAD6]/50"}`}>
                 {tool.description}
               </p>
-              <span className="mt-5 inline-flex items-center gap-2 text-xs font-bold text-[#1E6B4A] transition">
-                Open tool
+              <span className={`mt-4 inline-flex items-center gap-2 text-xs font-bold transition ${tool.status === "available" ? "text-[#1E6B4A]" : "text-[#C9A84C]"}`}>
+                {tool.status === "available" ? "Open workspace" : "In development"}
                 <span className="transition duration-300 group-hover:translate-x-1">
                   -&gt;
                 </span>
