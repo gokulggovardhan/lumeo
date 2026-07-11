@@ -1,50 +1,76 @@
 import Link from "next/link";
 import { BrandLockup } from "@/components/PublicPdfChrome";
 
-const trustLinks = [
+const footerGroups = [
   {
-    label: "About",
-    href: "/about",
+    title: "Workspace",
+    links: [
+      { label: "PDF Tools", href: "/pdf" },
+      { label: "Merge PDF", href: "/pdf/merge" },
+      { label: "Split PDF", href: "/pdf/split" },
+    ],
   },
   {
-    label: "Privacy",
-    href: "/privacy",
+    title: "Company",
+    links: [
+      { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
+    ],
   },
   {
-    label: "Terms",
-    href: "/terms",
+    title: "Trust",
+    links: [
+      { label: "Privacy", href: "/privacy" },
+      { label: "Security", href: "/security" },
+      { label: "Accessibility", href: "/accessibility" },
+      { label: "Terms", href: "/terms" },
+    ],
   },
 ];
 
 export default function PublicFooter() {
+  const year = new Date().getFullYear();
+
   return (
-    <footer className="border-t border-[#E8DFC8]/12 px-6 py-10 text-center text-xs text-[#F0EAD6]/40">
-      <div className="mx-auto flex max-w-[1360px] flex-col items-center gap-6">
+    <footer className="border-t border-[#E8DFC8]/12 bg-[#0A101C] px-6 py-10 text-xs text-[#F0EAD6]/42">
+      <div className="mx-auto grid max-w-[1360px] gap-8 md:grid-cols-[1.2fr_1.8fr]">
         <Link
           href="/"
-          className="transition opacity-90 hover:opacity-100"
+          className="max-w-xs transition opacity-90 hover:opacity-100"
         >
           <BrandLockup markSize="h-9 w-9" />
+          <p className="mt-4 text-sm leading-6 text-[#F0EAD6]/48">
+            Premium browser-first PDF tools for private, professional document
+            handling.
+          </p>
         </Link>
 
-        <div className="space-y-1">
-          <p className="font-semibold text-[#F0EAD6]/66">Built by Govardhan Gudapakam</p>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
-          {trustLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="transition hover:text-[#F0EAD6]"
-            >
-              {link.label}
-            </Link>
+        <div className="grid gap-7 sm:grid-cols-3">
+          {footerGroups.map((group) => (
+            <nav key={group.title} aria-label={group.title}>
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#C9A84C]">
+                {group.title}
+              </p>
+              <div className="mt-3 grid gap-2">
+                {group.links.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="text-sm transition hover:text-[#F0EAD6] focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/45"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </nav>
           ))}
         </div>
 
-        <div className="space-y-1">
-          <p>2026 Lumeo. All rights reserved.</p>
+        <div className="border-t border-[#E8DFC8]/10 pt-6 md:col-span-2">
+          <p className="font-semibold text-[#F0EAD6]/62">
+            Built by Govardhan Gudapakam
+          </p>
+          <p className="mt-2">© {year} Lumeo PDF Workspace. All rights reserved.</p>
         </div>
       </div>
     </footer>

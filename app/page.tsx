@@ -448,8 +448,17 @@ export default function Home() {
             <Link href="/about" className="transition hover:text-[#F0EAD6]">
               About
             </Link>
+            <Link href="/contact" className="transition hover:text-[#F0EAD6]">
+              Contact
+            </Link>
             <Link href="/privacy" className="transition hover:text-[#F0EAD6]">
               Privacy
+            </Link>
+            <Link href="/security" className="transition hover:text-[#F0EAD6]">
+              Security
+            </Link>
+            <Link href="/accessibility" className="transition hover:text-[#F0EAD6]">
+              Accessibility
             </Link>
             <Link href="/terms" className="transition hover:text-[#F0EAD6]">
               Terms
