@@ -1,0 +1,130 @@
+name: Lumeo Production Health
+
+on:
+  schedule:
+    - cron: "30 */6 * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumeo-production-health
+  cancel-in-progress: true
+
+jobs:
+  check-production:
+    name: Check lumeo.in
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Verify production routes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_url="https://lumeo.in"
+
+          routes=(
+            "/"
+            "/pdf"
+            "/pdf/merge"
+            "/pdf/split"
+            "/pdf/compress"
+            "/pdf/jpg-to-pdf"
+            "/pdf/pdf-to-jpg"
+            "/guides"
+            "/about"
+            "/privacy"
+            "/terms"
+            "/contact"
+            "/security"
+            "/accessibility"
+            "/sitemap.xml"
+            "/robots.txt"
+          )
+
+          for route in "${routes[@]}"; do
+            url="${base_url}${route}"
+
+            status_code="$(
+              curl \
+                --location \
+                --silent \
+                --show-error \
+                --output /dev/null \
+                --write-out "%{http_code}" \
+                --max-time 30 \
+                "$url"
+            )"
+
+            if [ "$status_code" != "200" ]; then
+              echo "FAIL ${route} returned HTTP ${status_code}"
+              exit 1
+            fi
+
+            echo "PASS ${route} HTTP ${status_code}"
+          done
+
+      - name: Verify production social images
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          base_url="https://lumeo.in"
+
+          image_routes=(
+            "/opengraph-image"
+            "/twitter-image"
+          )
+
+          for route in "${image_routes[@]}"; do
+            url="${base_url}${route}"
+
+            headers="$(
+              curl \
+                --location \
+                --silent \
+                --show-error \
+                --head \
+                --max-time 30 \
+                "$url"
+            )"
+
+            status_code="$(
+              printf "%s" "$headers" |
+              awk '/^HTTP\// { code=$2 } END { print code }'
+            )"
+
+            content_type="$(
+              printf "%s" "$headers" |
+              awk -F': ' '
+                tolower($1) == "content-type" {
+                  value=tolower($2)
+                }
+                END {
+                  gsub("\r", "", value)
+                  print value
+                }
+              '
+            )"
+
+            if [ "$status_code" != "200" ]; then
+              echo "FAIL ${route} returned HTTP ${status_code}"
+              exit 1
+            fi
+
+            case "$content_type" in
+              image/*)
+                echo "PASS ${route} HTTP ${status_code} (${content_type})"
+                ;;
+              *)
+                echo "FAIL ${route} returned ${content_type:-no content type}"
+                exit 1
+                ;;
+            esac
+          done
+
+          echo "Lumeo production health verification passed."
