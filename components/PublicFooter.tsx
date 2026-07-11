@@ -71,7 +71,7 @@ export default function PublicFooter() {
           <p className="font-semibold text-[#F0EAD6]/62">
             Built by Govardhan Gudapakam
           </p>
-          <p className="mt-2">© {year} Lumeo PDF Workspace. All rights reserved.</p>
+          <p className="mt-2">&copy; {year} Lumeo PDF Workspace. All rights reserved.</p>
         </div>
       </div>
     </footer>

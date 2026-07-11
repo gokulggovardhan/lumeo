@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import type { ReactNode } from "react";
 import Link from "next/link";
-import { BrandLockup, LumeoSealMark } from "@/components/PublicPdfChrome";
+import PublicFooter from "@/components/PublicFooter";
+import { BrandLockup } from "@/components/PublicPdfChrome";
+import { PdfToolLauncher } from "@/components/pdf/PdfToolLauncher";
 
 export const metadata: Metadata = {
   title: {
@@ -36,79 +37,6 @@ export const metadata: Metadata = {
   },
 };
 
-type ToolKind = "merge" | "split" | "compress" | "jpgToPdf" | "pdfToJpg";
-type PrivacyKind = "browser" | "account" | "handling";
-
-const coreTools: Array<{
-  title: string;
-  href: string;
-  description: string;
-  kind: ToolKind;
-  status: "available" | "development";
-}> = [
-  {
-    title: "Merge PDF",
-    href: "/pdf/merge",
-    description: "Combine multiple PDF files into one document.",
-    kind: "merge",
-    status: "available",
-  },
-  {
-    title: "Split PDF",
-    href: "/pdf/split",
-    description: "Extract pages or separate one PDF into smaller files.",
-    kind: "split",
-    status: "available",
-  },
-  {
-    title: "Compress PDF",
-    href: "/pdf/compress",
-    description: "Reduce PDF file size for sharing and uploads.",
-    kind: "compress",
-    status: "available",
-  },
-  {
-    title: "JPG to PDF",
-    href: "/pdf/jpg-to-pdf",
-    description: "Convert images into a clean PDF document.",
-    kind: "jpgToPdf",
-    status: "development",
-  },
-  {
-    title: "PDF to JPG",
-    href: "/pdf/pdf-to-jpg",
-    description: "Export PDF pages as image files.",
-    kind: "pdfToJpg",
-    status: "development",
-  },
-];
-
-const privacyCards: Array<{
-  title: string;
-  description: string;
-  kind: PrivacyKind;
-}> = [
-  {
-    title: "Browser-first where possible",
-    description: "Most tools are designed to run in your browser where possible.",
-    kind: "browser",
-  },
-  {
-    title: "No unnecessary sign-in",
-    description: "Start with simple tools without creating an account.",
-    kind: "account",
-  },
-  {
-    title: "Clear file handling",
-    description:
-      "If server processing is required later, files should be temporary and handled with clear deletion rules.",
-    kind: "handling",
-  },
-];
-
-const availableTools = coreTools.filter((tool) => tool.status === "available");
-const comingTools = coreTools.filter((tool) => tool.status === "development");
-
 const structuredData = [
   {
     "@context": "https://schema.org",
@@ -135,351 +63,66 @@ const structuredData = [
   },
 ];
 
-function ToolIcon({ kind }: { kind: ToolKind }) {
-  const iconClass = "h-6 w-6";
-
-  const paths: Record<ToolKind, ReactNode> = {
-    merge: (
-      <>
-        <path d="M6 5.5h6.5l2 2V15H6V5.5Z" stroke="currentColor" strokeWidth="1.7" />
-        <path d="M10 9.5h7.5l1.5 1.5v7.5H10v-9Z" stroke="currentColor" strokeWidth="1.7" />
-        <path d="M4.5 18.5h3M16.5 5.5h3M17.5 5.5v3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.7" />
-      </>
-    ),
-    split: (
-      <>
-        <path d="M8 4.8h8v14.4H8V4.8Z" stroke="currentColor" strokeWidth="1.7" />
-        <path d="M12 6.5v11" stroke="currentColor" strokeDasharray="2 2" strokeLinecap="round" strokeWidth="1.5" />
-        <path d="M6 12H3.5m0 0 2-2m-2 2 2 2M18 12h2.5m0 0-2-2m2 2-2 2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-      </>
-    ),
-    compress: (
-      <>
-        <path d="M7 4.75h8.5L18 7.25v12H7V4.75Z" stroke="currentColor" strokeWidth="1.7" />
-        <path d="M15 4.9v3h3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-        <path d="M9.4 9.4 12 12l2.6-2.6M9.4 14.6 12 12l2.6 2.6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.55" />
-      </>
-    ),
-    jpgToPdf: (
-      <>
-        <path d="M4.8 6.5h8.2v7.2H4.8V6.5Z" stroke="currentColor" strokeWidth="1.7" />
-        <path d="m5.7 13 2.2-2.35 1.35 1.35 1.15-1.2 1.8 2.2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.45" />
-        <path d="M15 10.3h4.2v7.2H11v-2.1" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-      </>
-    ),
-    pdfToJpg: (
-      <>
-        <path d="M5.8 4.75h8.5l2.5 2.5v6.5h-11V4.75Z" stroke="currentColor" strokeWidth="1.7" />
-        <path d="M14.2 4.9v3h3" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
-        <path d="M10.8 15.3h8.4v4H10.8v-4Z" stroke="currentColor" strokeWidth="1.7" />
-      </>
-    ),
-  };
-
-  return (
-    <span className="flex h-12 w-12 items-center justify-center rounded-lg border border-[#1E6B4A]/20 bg-[#1E6B4A]/10 text-[#1E6B4A] transition duration-300 group-hover:border-[#1E6B4A]/35 group-hover:bg-[#1E6B4A]/14">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
-        {paths[kind]}
-      </svg>
-    </span>
-  );
-}
-
-function PrivacyIcon({ kind }: { kind: PrivacyKind }) {
-  const iconClass = "h-5 w-5";
-  const icon =
-    kind === "browser" ? (
-      <rect x="4.5" y="6" width="15" height="11.5" rx="2" stroke="currentColor" strokeWidth="1.7" />
-    ) : kind === "account" ? (
-      <path d="m7.5 12.2 3 3 6-6.4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
-    ) : (
-      <path d="M7 4.8h7.5L17 7.3v11.9H7V4.8Z" stroke="currentColor" strokeWidth="1.7" />
-    );
-
-  return (
-    <span className="mb-5 flex h-10 w-10 items-center justify-center rounded-lg border border-[#C9A84C]/25 bg-[#C9A84C]/10 text-[#C9A84C]">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className={iconClass} fill="none">
-        {icon}
-      </svg>
-    </span>
-  );
-}
-
-function HeroDocumentVisual() {
-  return (
-    <div className="relative min-h-[410px] overflow-hidden rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-5 shadow-2xl shadow-black/30">
-      <div className="absolute inset-0 opacity-[0.08] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:32px_32px]" />
-      <div className="relative flex items-center justify-between">
-        <span className="rounded-full border border-[#C9A84C]/28 bg-[#C9A84C]/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
-          Document desk
-        </span>
-        <span className="rounded-full border border-[#E8DFC8]/14 bg-[#0C1220]/45 px-3 py-1 text-[10px] font-bold text-[#F0EAD6]/52">
-          Ready when tools launch
-        </span>
-      </div>
-
-      <div className="relative mx-auto mt-10 h-[300px] max-w-[390px]">
-        <div className="notary-float absolute left-3 top-9 h-52 w-36 rotate-[-6deg] rounded-lg border border-[#E8DFC8] bg-[#F0EAD6] p-4 text-[#1C1710] shadow-2xl shadow-black/30">
-          <div className="mb-4 flex items-center justify-between">
-            <span className="rounded-full bg-[#1E6B4A]/10 px-2 py-1 text-[9px] font-bold text-[#1E6B4A]">
-              PDF
-            </span>
-            <span className="h-2 w-2 rounded-full bg-[#C9A84C]" />
-          </div>
-          <div className="space-y-2">
-            <div className="h-2 rounded-full bg-[#1C1710]/22" />
-            <div className="h-2 w-4/5 rounded-full bg-[#1C1710]/16" />
-            <div className="h-2 w-2/3 rounded-full bg-[#1C1710]/12" />
-          </div>
-          <div className="mt-9 h-16 rounded-md bg-[#1E6B4A]/10" />
-        </div>
-
-        <div className="notary-float-center absolute left-1/2 top-0 h-64 w-44 -translate-x-1/2 rounded-lg border border-[#E8DFC8] bg-[#F0EAD6] p-5 text-[#1C1710] shadow-[0_30px_80px_rgba(0,0,0,0.35)]">
-          <div className="mb-5 flex items-center justify-between">
-            <span className="text-[10px] font-bold uppercase tracking-[0.22em] text-[#1E6B4A]">
-              Lumeo
-            </span>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-[#C9A84C]/45 bg-[#C9A84C]/12 text-[#C9A84C]">
-              <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-                <path d="m8.5 12.2 2.5 2.5 4.8-5.4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.9" />
-              </svg>
-            </span>
-          </div>
-          <div className="space-y-2">
-            <div className="h-2.5 rounded-full bg-[#1C1710]/22" />
-            <div className="h-2.5 w-5/6 rounded-full bg-[#1C1710]/14" />
-            <div className="h-2.5 w-2/3 rounded-full bg-[#1C1710]/10" />
-          </div>
-          <div className="mt-8 grid grid-cols-2 gap-2">
-            <div className="h-16 rounded-md bg-[#1E6B4A]/12" />
-            <div className="h-16 rounded-md bg-[#C9A84C]/14" />
-          </div>
-        </div>
-
-        <div className="notary-float-delayed absolute right-2 top-20 h-48 w-36 rotate-[5deg] rounded-lg border border-[#E8DFC8] bg-[#E8DFC8] p-4 text-[#1C1710] shadow-2xl shadow-black/25">
-          <div className="mb-4 h-20 rounded-md bg-[#1C1710]/10" />
-          <div className="space-y-2">
-            <div className="h-2 rounded-full bg-[#1C1710]/22" />
-            <div className="h-2 w-3/4 rounded-full bg-[#1C1710]/14" />
-          </div>
-        </div>
-
-        <div className="absolute bottom-0 left-1/2 flex -translate-x-1/2 gap-2 rounded-full border border-[#E8DFC8]/14 bg-[#0C1220]/82 px-3 py-2 text-xs font-bold text-[#F0EAD6]/58 shadow-2xl shadow-black/30">
-          <span className="rounded-full bg-[#1E6B4A]/28 px-3 py-1 text-[#F0EAD6]">
-            Merge
-          </span>
-          <span className="rounded-full bg-[#E8DFC8]/8 px-3 py-1">Split</span>
-          <span className="rounded-full bg-[#E8DFC8]/8 px-3 py-1">Convert</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#0C1220] text-[#F0EAD6]">
+    <main className="min-h-screen bg-[#0C1220] text-[#F0EAD6]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
 
-      <style>{`
-        @keyframes notaryFloat {
-          0%, 100% { transform: translateY(0) rotate(var(--notary-rotate, 0deg)); }
-          50% { transform: translateY(-8px) rotate(var(--notary-rotate, 0deg)); }
-        }
-
-        @keyframes notaryFloatCenter {
-          0%, 100% { transform: translateX(-50%) translateY(0); }
-          50% { transform: translateX(-50%) translateY(-10px); }
-        }
-
-        .notary-float { --notary-rotate: -6deg; animation: notaryFloat 7s ease-in-out infinite; }
-        .notary-float-delayed { --notary-rotate: 5deg; animation: notaryFloat 8s ease-in-out infinite 0.4s; }
-        .notary-float-center { animation: notaryFloatCenter 8.5s ease-in-out infinite 0.2s; }
-      `}</style>
-
-      <nav className="sticky top-0 z-50 border-b border-[#E8DFC8]/12 bg-[#0C1220]/92 px-5 py-4 backdrop-blur-md sm:px-8">
+      <nav className="sticky top-0 z-50 border-b border-[#E8DFC8]/10 bg-[#0C1220]/94 px-5 py-3 backdrop-blur-md sm:px-8">
         <div className="mx-auto flex max-w-[1360px] items-center justify-between gap-4">
-          <Link href="/" className="flex min-w-0 items-center gap-3">
+          <Link href="/" aria-label="Lumeo PDF home">
             <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
           </Link>
 
-          <div className="hidden items-center gap-7 text-sm font-medium text-[#F0EAD6]/50 md:flex">
-            <a href="#tools" className="transition hover:text-[#F0EAD6]">
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#F0EAD6]/58 sm:gap-5 sm:text-sm">
+            <Link
+              href="/pdf"
+              className="rounded-full px-3 py-2 transition hover:bg-[#F0EAD6]/[0.04] hover:text-[#F0EAD6]"
+            >
               Tools
-            </a>
-            <a href="#privacy" className="transition hover:text-[#F0EAD6]">
+            </Link>
+            <Link
+              href="/guides"
+              className="hidden rounded-full px-3 py-2 transition hover:bg-[#F0EAD6]/[0.04] hover:text-[#F0EAD6] sm:inline-flex"
+            >
+              Guides
+            </Link>
+            <Link
+              href="/privacy"
+              className="rounded-full px-3 py-2 transition hover:bg-[#F0EAD6]/[0.04] hover:text-[#F0EAD6]"
+            >
               Privacy
-            </a>
+            </Link>
           </div>
-
-          <a
-            href="#tools"
-            className="shrink-0 rounded-full bg-[#1E6B4A] px-4 py-2 text-xs font-semibold text-[#F0EAD6] transition hover:bg-[#257B56]"
-          >
-            Choose a tool
-          </a>
         </div>
       </nav>
 
-      <section className="relative px-5 pb-8 pt-10 sm:px-8 sm:pt-12 lg:pb-10 lg:pt-12">
-        <div className="pointer-events-none absolute inset-0 opacity-[0.05] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:48px_48px]" />
-        <div className="relative z-10 mx-auto grid max-w-[1360px] gap-8 xl:grid-cols-[1fr_0.62fr] xl:items-center">
-          <div>
-            <div className="mb-4 inline-flex items-center gap-3 rounded-full border border-[#C9A84C]/24 bg-[#C9A84C]/8 px-4 py-2 text-xs font-semibold text-[#C9A84C]">
-              <LumeoSealMark />
-              Private by design
+      <section className="relative overflow-hidden">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:48px_48px]" />
+
+        <div className="relative mx-auto max-w-[1360px] px-5 pb-12 pt-7 sm:px-8 sm:pt-9">
+          <header className="mb-6 flex flex-col gap-4 border-b border-[#E8DFC8]/10 pb-6 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C9A84C]">
+                Lumeo PDF Workspace
+              </p>
+              <h1 className="mt-2 font-serif text-3xl leading-tight tracking-[-0.025em] text-[#F0EAD6] sm:text-4xl lg:text-[2.8rem]">
+                Choose a PDF tool.
+              </h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#F0EAD6]/52 sm:text-base">
+                Merge, split, and compress documents directly in your browser.
+              </p>
             </div>
+          </header>
 
-            <h1 className="max-w-3xl font-serif text-4xl leading-[1.04] tracking-[-0.03em] sm:text-5xl lg:text-[3.8rem]">
-              Private PDF tools, beautifully organised.
-            </h1>
-
-            <p className="mt-4 max-w-2xl text-base leading-7 text-[#F0EAD6]/58 sm:text-lg">
-              Merge, split, compress, and convert documents directly in your browser.
-            </p>
-
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <a
-                href="#tools"
-                className="rounded-full bg-[#1E6B4A] px-7 py-3.5 text-center text-sm font-semibold text-[#F0EAD6] shadow-[0_18px_50px_rgba(30,107,74,0.22)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#257B56]"
-              >
-                Explore PDF tools
-              </a>
-              <a
-                href="#privacy"
-                className="rounded-full border border-[#E8DFC8]/16 px-7 py-3.5 text-center text-sm font-semibold text-[#F0EAD6]/70 transition duration-300 hover:-translate-y-0.5 hover:border-[#E8DFC8]/32 hover:text-[#F0EAD6]"
-              >
-                How privacy works
-              </a>
-            </div>
-
-            <div className="mt-5 max-w-xl rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/70 p-3 text-sm font-medium leading-6 text-[#F0EAD6]/62">
-              Designed to be private, simple, and fast.
-            </div>
-          </div>
-
-          <div className="hidden xl:block [&>div]:min-h-[300px]">
-            <HeroDocumentVisual />
-          </div>
+          <PdfToolLauncher showHeading={false} />
         </div>
       </section>
 
-      <section id="tools" className="mx-auto max-w-[1360px] px-5 py-8 sm:px-8 lg:py-10">
-        <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
-            Tools
-          </p>
-          <h2 className="font-serif text-3xl tracking-[-0.02em] sm:text-4xl">
-            Essential PDF tools.
-          </h2>
-          </div>
-          <p className="max-w-md text-sm leading-6 text-[#F0EAD6]/50">
-            Choose a tool to prepare, organize, or convert your PDF files.
-          </p>
-        </div>
-
-        <p className="mb-3 text-xs font-semibold text-[#F0EAD6]/52">
-          Available now
-        </p>
-        <div className="grid gap-3 lg:grid-cols-3">
-          {availableTools.map((tool) => (
-            <Link
-              key={tool.title}
-              href={tool.href}
-              className="group rounded-xl border border-[#E8DFC8] bg-[#F0EAD6] p-4 text-[#1C1710] shadow-2xl shadow-black/16 transition duration-300 hover:-translate-y-0.5 hover:border-[#C9A84C] hover:bg-[#F5EFDD]"
-            >
-              <ToolIcon kind={tool.kind} />
-              <h3 className="mt-4 text-base font-bold">{tool.title}</h3>
-              <p className="mt-2 min-h-[2.7rem] text-sm leading-5 text-[#1C1710]/65">
-                {tool.description}
-              </p>
-            </Link>
-          ))}
-        </div>
-
-        <p className="mb-3 mt-5 text-xs font-semibold text-[#F0EAD6]/52">
-          Coming next
-        </p>
-        <div className="grid gap-3 sm:grid-cols-2">
-          {comingTools.map((tool) => (
-            <Link
-              key={tool.title}
-              href={tool.href}
-              className="group rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840]/72 p-4 text-[#F0EAD6] transition duration-300 hover:-translate-y-0.5 hover:border-[#C9A84C]/30"
-            >
-              <ToolIcon kind={tool.kind} />
-              <h3 className="mt-4 text-base font-bold">{tool.title}</h3>
-              <p className="mt-2 text-sm leading-5 text-[#F0EAD6]/50">
-                {tool.description}
-              </p>
-              <span className="mt-4 inline-flex text-xs font-bold text-[#C9A84C]">
-                In development
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section id="privacy" className="mx-auto max-w-[1360px] px-5 py-16 sm:px-8">
-        <div className="mb-10 max-w-2xl">
-          <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
-            Privacy
-          </p>
-          <h2 className="font-serif text-4xl tracking-[-0.02em] sm:text-5xl">
-            A careful desk for everyday files.
-          </h2>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {privacyCards.map((card) => (
-            <div
-              key={card.title}
-              className="rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-6 shadow-2xl shadow-black/15 transition duration-300 hover:border-[#C9A84C]/30"
-            >
-              <PrivacyIcon kind={card.kind} />
-              <h3 className="text-lg font-semibold">{card.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-[#F0EAD6]/50">
-                {card.description}
-              </p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <footer className="border-t border-[#E8DFC8]/12 px-5 py-8 sm:px-8">
-        <div className="mx-auto flex max-w-[1360px] flex-col gap-5 text-sm text-[#F0EAD6]/42 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="font-semibold text-[#F0EAD6]/68">
-              Lumeo PDF Workspace
-            </p>
-            <p className="mt-1">Built by Govardhan Gudapakam</p>
-          </div>
-          <div className="flex flex-wrap gap-4 font-semibold">
-            <Link href="/about" className="transition hover:text-[#F0EAD6]">
-              About
-            </Link>
-            <Link href="/contact" className="transition hover:text-[#F0EAD6]">
-              Contact
-            </Link>
-            <Link href="/privacy" className="transition hover:text-[#F0EAD6]">
-              Privacy
-            </Link>
-            <Link href="/security" className="transition hover:text-[#F0EAD6]">
-              Security
-            </Link>
-            <Link href="/accessibility" className="transition hover:text-[#F0EAD6]">
-              Accessibility
-            </Link>
-            <Link href="/terms" className="transition hover:text-[#F0EAD6]">
-              Terms
-            </Link>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </main>
   );
 }

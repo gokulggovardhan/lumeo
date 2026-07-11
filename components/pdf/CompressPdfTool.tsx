@@ -328,7 +328,7 @@ export default function CompressPdfTool() {
   const [resolution, setResolution] = useState<ResolutionPreset>("dpi150");
   const [quality, setQuality] = useState<ImageQuality>("balanced");
   const [colour, setColour] = useState<ColourMode>("preserve");
-  const [metadata, setMetadata] = useState<MetadataMode>("fresh");
+  const [metadata, setMetadata] = useState<MetadataMode>("preserve");
   const [customDpi, setCustomDpi] = useState(150);
   const [customQuality, setCustomQuality] = useState(74);
   const [outputName, setOutputName] = useState("lumeo-compressed.pdf");
@@ -1056,7 +1056,6 @@ export default function CompressPdfTool() {
                   <li>Images: render at {selectedPlan.dpi} DPI</li>
                   <li>Image quality: {Math.round(selectedPlan.quality * 100)}%</li>
                   <li>Colour: {selectedPlan.colour === "grayscale" ? "Grayscale image content" : "Preserved"}</li>
-                  <li>Metadata: {selectedPlan.metadata === "fresh" ? "Non-essential metadata removed" : "Document information preserved where supported"}</li>
                   <li>Text, links, forms: review output; page appearance is rebuilt as images</li>
                 </ul>
               </div>
