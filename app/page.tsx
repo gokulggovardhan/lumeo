@@ -4,15 +4,18 @@ import Link from "next/link";
 import { BrandLockup, LumeoSealMark } from "@/components/PublicPdfChrome";
 
 export const metadata: Metadata = {
-  title: "Lumeo PDF - Private Browser PDF Tools | Merge, Split & Convert PDFs",
+  title: {
+    absolute: "Lumeo PDF - Private Browser PDF Tools | Merge, Split & Convert PDFs",
+  },
   description:
     "Merge, split, compress, and convert PDFs privately with Lumeo PDF Workspace. Fast browser-first PDF tools where your files stay on your device.",
   alternates: {
     canonical: "/",
   },
   openGraph: {
-    title: "Lumeo PDF Workspace",
-    description: "Private browser-first PDF tools for everyday documents.",
+    title: "Lumeo PDF - Private Browser PDF Tools",
+    description:
+      "A premium browser-first PDF workspace for private document merging, splitting, compression, and conversion.",
     url: "https://lumeo.in",
     siteName: "Lumeo PDF",
     type: "website",
@@ -110,14 +113,11 @@ const structuredData = [
     "@type": "SoftwareApplication",
     name: "Lumeo PDF Workspace",
     url: "https://lumeo.in",
-    applicationCategory: "ProductivityApplication",
-    operatingSystem: "Web Browser",
+    applicationCategory: "BusinessApplication",
+    operatingSystem: "Any modern browser",
+    description:
+      "A premium browser-first PDF workspace for private document merging, splitting, compression, and conversion.",
     featureList: ["Merge PDF", "Split PDF", "Compress PDF", "Convert PDF"],
-    offers: {
-      "@type": "Offer",
-      price: "0",
-      priceCurrency: "USD",
-    },
     publisher: {
       "@type": "Organization",
       name: "Lumeo PDF",

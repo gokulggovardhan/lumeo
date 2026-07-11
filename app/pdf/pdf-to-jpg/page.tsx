@@ -3,11 +3,29 @@ import { PdfToolPlaceholder } from "@/components/pdf/PdfToolPlaceholder";
 import { getPdfTool } from "@/components/pdf/PdfToolRegistry";
 
 export const metadata: Metadata = {
-  title: "PDF to JPG Converter Online | Lumeo PDF",
+  title: {
+    absolute: "PDF to JPG Converter Online | Lumeo PDF",
+  },
   description:
-    "Export PDF pages as high-quality images with Lumeo PDF Workspace.",
+    "PDF to JPG is a planned browser-first Lumeo PDF Workspace tool for converting PDF pages into image files.",
   alternates: {
     canonical: "/pdf/pdf-to-jpg",
+  },
+  openGraph: {
+    title: "PDF to JPG Converter Online | Lumeo PDF",
+    description:
+      "A planned browser-first workspace for converting PDF pages into image files.",
+    url: "https://lumeo.in/pdf/pdf-to-jpg",
+    siteName: "Lumeo PDF",
+    type: "website",
+    images: ["/og-image.svg"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "PDF to JPG Converter Online | Lumeo PDF",
+    description:
+      "A planned browser-first workspace for converting PDF pages into image files.",
+    images: ["/og-image.svg"],
   },
 };
 

@@ -15,7 +15,10 @@ const dmSerif = DM_Serif_Display({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://lumeo.in"),
-  title: "Lumeo PDF - Private Browser PDF Tools | Merge, Split & Convert PDFs",
+  title: {
+    default: "Lumeo PDF - Private Browser PDF Tools | Merge, Split & Convert PDFs",
+    template: "%s | Lumeo PDF",
+  },
   description:
     "Merge, split, compress, and convert PDFs privately with Lumeo PDF Workspace. Fast browser-first PDF tools where your files stay on your device.",
   applicationName: "Lumeo PDF",

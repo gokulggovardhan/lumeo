@@ -11,14 +11,11 @@ const softwareApplicationSchema = {
   "@type": "SoftwareApplication",
   name: "Lumeo PDF Workspace",
   url: "https://lumeo.in",
-  applicationCategory: "ProductivityApplication",
-  operatingSystem: "Web Browser",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Any modern browser",
+  description:
+    "A premium browser-first PDF workspace for private document merging, splitting, compression, and conversion.",
   featureList: ["Merge PDF", "Split PDF", "Compress PDF", "Convert PDF"],
-  offers: {
-    "@type": "Offer",
-    price: "0",
-    priceCurrency: "USD",
-  },
   publisher: {
     "@type": "Organization",
     name: "Lumeo PDF",
