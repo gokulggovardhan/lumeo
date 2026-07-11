@@ -100,9 +100,8 @@ const profiles: Record<
 > = {
   highQuality: {
     label: "High quality",
-    description:
-      "Conservative compression for professional documents where clarity matters most.",
-    dpi: 180,
+    description: "Preserves more visual detail.",
+    dpi: 220,
     quality: 0.86,
     qualityLabel: "high",
     colour: "preserve",
@@ -110,36 +109,34 @@ const profiles: Record<
   },
   balanced: {
     label: "Balanced",
-    description:
-      "Recommended for most documents. Reduces file size while preserving readable text and images.",
+    description: "Recommended for most documents.",
     dpi: 150,
     quality: 0.74,
     qualityLabel: "balanced",
     colour: "preserve",
-    metadata: "fresh",
+    metadata: "preserve",
   },
   smaller: {
     label: "Smaller file",
-    description:
-      "Stronger image reduction for sharing, email, and upload limits.",
+    description: "Prioritises a lower output size.",
     dpi: 96,
     quality: 0.58,
     qualityLabel: "compact",
-    colour: "grayscale",
-    metadata: "fresh",
+    colour: "preserve",
+    metadata: "preserve",
   },
 };
 
 const resolutionOptions: Array<{ value: ResolutionPreset; label: string; dpi: number; helper: string }> = [
-  { value: "dpi220", label: "220 DPI", dpi: 220, helper: "Sharper output for detailed review." },
-  { value: "dpi150", label: "150 DPI", dpi: 150, helper: "Suitable for screen viewing and office documents." },
-  { value: "dpi96", label: "96 DPI", dpi: 96, helper: "Best for smaller files where high-resolution printing is not required." },
+  { value: "dpi220", label: "Print quality", dpi: 220, helper: "Sharper output for detailed review." },
+  { value: "dpi150", label: "Profile default", dpi: 150, helper: "Suitable for most office documents." },
+  { value: "dpi96", label: "Compact", dpi: 96, helper: "Best for smaller files where high-resolution printing is not required." },
 ];
 
 const qualityOptions: Array<{ value: ImageQuality; label: string; quality: number }> = [
-  { value: "high", label: "High", quality: 0.86 },
-  { value: "balanced", label: "Balanced", quality: 0.74 },
-  { value: "compact", label: "Compact", quality: 0.58 },
+  { value: "high", label: "Higher clarity", quality: 0.86 },
+  { value: "balanced", label: "Profile default", quality: 0.74 },
+  { value: "compact", label: "Smaller output", quality: 0.58 },
 ];
 
 function formatFileSize(size: number) {
@@ -320,6 +317,7 @@ export default function CompressPdfTool() {
   const renderTaskRef = useRef<RenderTask | null>(null);
   const sessionRef = useRef(0);
   const timersRef = useRef<number[]>([]);
+  const resultHeadingRef = useRef<HTMLParagraphElement | null>(null);
 
   const [dragActive, setDragActive] = useState(false);
   const [analysis, setAnalysis] = useState<CompressAnalysis | null>(null);
@@ -424,6 +422,12 @@ export default function CompressPdfTool() {
       void cleanupTasks();
     };
   }, [cleanupTasks, previewUrl, result?.url]);
+
+  useEffect(() => {
+    if (result) {
+      resultHeadingRef.current?.focus();
+    }
+  }, [result]);
 
   function resetSettings(nextProfile: CompressProfile) {
     const base = profiles[nextProfile];
@@ -943,7 +947,7 @@ export default function CompressPdfTool() {
 
         <aside className="lg:min-h-0">
           <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#E8DFC8]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
-            <div className="border-b border-[#E8DFC8]/10 pb-3">
+            <div className={result ? "hidden" : "border-b border-[#E8DFC8]/10 pb-3"}>
               <p className="text-xs font-semibold text-[#F0EAD6]/68">Compression profile</p>
               <div className="mt-3 grid gap-2">
                 {(Object.keys(profiles) as CompressProfile[]).map((item) => (
@@ -971,7 +975,7 @@ export default function CompressPdfTool() {
               </div>
             </div>
 
-            <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto py-3">
+            <div className={result ? "hidden" : "no-scrollbar min-h-0 flex-1 overflow-y-auto py-3"}>
               <button
                 type="button"
                 onClick={() => setAdvancedOpen((open) => !open)}
@@ -1012,19 +1016,6 @@ export default function CompressPdfTool() {
                         ["grayscale", "Grayscale image content"],
                       ].map(([value, label]) => (
                         <button key={value} type="button" onClick={() => { setColour(value as ColourMode); clearResult(); }} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${colour === value ? "border-[#1E6B4A]/50 bg-[#1E6B4A]/14 text-[#A8E0C1]" : "border-[#E8DFC8]/10 text-[#F0EAD6]/48 hover:border-[#C9A84C]/30"}`}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#C9A84C]">Metadata</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {[
-                        ["fresh", "Remove non-essential metadata"],
-                        ["preserve", "Preserve document information"],
-                      ].map(([value, label]) => (
-                        <button key={value} type="button" onClick={() => { setMetadata(value as MetadataMode); clearResult(); }} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${metadata === value ? "border-[#1E6B4A]/50 bg-[#1E6B4A]/14 text-[#A8E0C1]" : "border-[#E8DFC8]/10 text-[#F0EAD6]/48 hover:border-[#C9A84C]/30"}`}>
                           {label}
                         </button>
                       ))}
@@ -1081,16 +1072,6 @@ export default function CompressPdfTool() {
                 </ul>
               </div>
 
-              <div className={expertOpen ? "mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Privacy proof</p>
-                <dl className="mt-2 grid gap-1.5 text-xs text-[#F0EAD6]/50">
-                  <div className="flex justify-between gap-3"><dt>Processing location</dt><dd className="font-bold text-[#F0EAD6]/76">This browser</dd></div>
-                  <div className="flex justify-between gap-3"><dt>Required upload</dt><dd className="font-bold text-[#F0EAD6]/76">None</dd></div>
-                  <div className="flex justify-between gap-3"><dt>Document storage</dt><dd className="font-bold text-[#F0EAD6]/76">Not stored remotely</dd></div>
-                  <div className="flex justify-between gap-3"><dt>Temporary output</dt><dd className="font-bold text-[#F0EAD6]/76">Cleared on reset</dd></div>
-                </dl>
-              </div>
-
               <div className="mt-4">
                 <label className="text-xs font-bold uppercase tracking-[0.16em] text-[#F0EAD6]/42">
                   Output file name
@@ -1104,13 +1085,13 @@ export default function CompressPdfTool() {
               {progressDetail ? <div aria-live="polite" className="mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.035] px-3 py-2 text-xs text-[#F0EAD6]/48">{progressDetail}</div> : null}
             </div>
 
-            <div className="border-t border-[#E8DFC8]/10 pt-3">
+            <div className={result ? "flex min-h-0 flex-1 flex-col justify-center border-0 pt-0" : "border-t border-[#E8DFC8]/10 pt-3"}>
               {result ? (
-                <div className={`mb-3 rounded-xl border p-3 ${result.tone === "success" ? "border-[#1E6B4A]/28 bg-[#1E6B4A]/12" : result.tone === "limited" ? "border-[#C9A84C]/24 bg-[#C9A84C]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10"}`}>
-                  <p className="text-sm font-bold text-[#F0EAD6]">
+                <div className={`mb-4 rounded-xl border p-4 ${result.tone === "success" ? "border-[#1E6B4A]/28 bg-[#1E6B4A]/12" : result.tone === "limited" ? "border-[#C9A84C]/24 bg-[#C9A84C]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10"}`}>
+                  <p ref={resultHeadingRef} tabIndex={-1} className="text-lg font-bold text-[#F0EAD6] outline-none">
                     {result.tone === "success" ? "Compression complete" : result.tone === "limited" ? "Compression completed with limited reduction" : "The compressed result is larger than the original"}
                   </p>
-                  <div className="mt-2 grid gap-1 text-xs text-[#F0EAD6]/50">
+                  <div className="mt-4 grid gap-2 text-sm text-[#F0EAD6]/58">
                     <p>Original: {formatFileSize(result.originalSize)}</p>
                     <p>Compressed: {formatFileSize(result.compressedSize)}</p>
                     <p>

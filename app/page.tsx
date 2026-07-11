@@ -106,6 +106,9 @@ const privacyCards: Array<{
   },
 ];
 
+const availableTools = coreTools.filter((tool) => tool.status === "available");
+const comingTools = coreTools.filter((tool) => tool.status === "development");
+
 const structuredData = [
   {
     "@context": "https://schema.org",
@@ -379,27 +382,42 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {coreTools.map((tool) => (
+        <p className="mb-3 text-xs font-semibold text-[#F0EAD6]/52">
+          Available now
+        </p>
+        <div className="grid gap-3 lg:grid-cols-3">
+          {availableTools.map((tool) => (
             <Link
               key={tool.title}
               href={tool.href}
-              className={`group rounded-xl border p-4 text-[#1C1710] shadow-2xl shadow-black/16 transition duration-300 hover:-translate-y-0.5 ${
-                tool.status === "available"
-                  ? "border-[#E8DFC8] bg-[#F0EAD6] hover:border-[#C9A84C] hover:bg-[#F5EFDD]"
-                  : "border-[#E8DFC8]/18 bg-[#1A2840] text-[#F0EAD6] hover:border-[#C9A84C]/34"
-              }`}
+              className="group rounded-xl border border-[#E8DFC8] bg-[#F0EAD6] p-4 text-[#1C1710] shadow-2xl shadow-black/16 transition duration-300 hover:-translate-y-0.5 hover:border-[#C9A84C] hover:bg-[#F5EFDD]"
             >
               <ToolIcon kind={tool.kind} />
               <h3 className="mt-4 text-base font-bold">{tool.title}</h3>
-              <p className={`mt-2 min-h-[3.2rem] text-sm leading-5 ${tool.status === "available" ? "text-[#1C1710]/65" : "text-[#F0EAD6]/50"}`}>
+              <p className="mt-2 min-h-[2.7rem] text-sm leading-5 text-[#1C1710]/65">
                 {tool.description}
               </p>
-              <span className={`mt-4 inline-flex items-center gap-2 text-xs font-bold transition ${tool.status === "available" ? "text-[#1E6B4A]" : "text-[#C9A84C]"}`}>
-                {tool.status === "available" ? "Open workspace" : "In development"}
-                <span className="transition duration-300 group-hover:translate-x-1">
-                  -&gt;
-                </span>
+            </Link>
+          ))}
+        </div>
+
+        <p className="mb-3 mt-5 text-xs font-semibold text-[#F0EAD6]/52">
+          Coming next
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {comingTools.map((tool) => (
+            <Link
+              key={tool.title}
+              href={tool.href}
+              className="group rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840]/72 p-4 text-[#F0EAD6] transition duration-300 hover:-translate-y-0.5 hover:border-[#C9A84C]/30"
+            >
+              <ToolIcon kind={tool.kind} />
+              <h3 className="mt-4 text-base font-bold">{tool.title}</h3>
+              <p className="mt-2 text-sm leading-5 text-[#F0EAD6]/50">
+                {tool.description}
+              </p>
+              <span className="mt-4 inline-flex text-xs font-bold text-[#C9A84C]">
+                In development
               </span>
             </Link>
           ))}
@@ -429,23 +447,6 @@ export default function Home() {
               </p>
             </div>
           ))}
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-[1360px] px-5 py-16 sm:px-8">
-        <div className="rounded-xl border border-[#E8DFC8]/14 bg-[#F0EAD6] p-10 text-center text-[#1C1710] shadow-2xl shadow-black/25 sm:p-16">
-          <h2 className="font-serif text-4xl tracking-[-0.02em] sm:text-5xl">
-            Start with one PDF task.
-          </h2>
-          <p className="mx-auto mt-5 max-w-lg text-base leading-7 text-[#1C1710]/65">
-            Choose a tool and continue when the engine is ready.
-          </p>
-          <a
-            href="#tools"
-            className="mt-8 inline-flex rounded-full bg-[#1E6B4A] px-8 py-3.5 text-sm font-semibold text-[#F0EAD6] transition duration-300 hover:-translate-y-0.5 hover:bg-[#257B56]"
-          >
-            Choose a tool
-          </a>
         </div>
       </section>
 

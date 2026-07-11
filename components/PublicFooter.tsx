@@ -8,7 +8,12 @@ const footerGroups = [
       { label: "PDF Tools", href: "/pdf" },
       { label: "Merge PDF", href: "/pdf/merge" },
       { label: "Split PDF", href: "/pdf/split" },
+      { label: "Compress PDF", href: "/pdf/compress" },
     ],
+  },
+  {
+    title: "Resources",
+    links: [{ label: "Guides", href: "/guides" }],
   },
   {
     title: "Company",
@@ -41,7 +46,7 @@ export default function PublicFooter() {
           <BrandLockup markSize="h-9 w-9" />
         </Link>
 
-        <div className="grid gap-6 sm:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-4">
           {footerGroups.map((group) => (
             <nav key={group.title} aria-label={group.title}>
               <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#C9A84C]">
