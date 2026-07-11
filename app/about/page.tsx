@@ -22,14 +22,12 @@ export const metadata: Metadata = {
     url: "https://lumeo.in/about",
     siteName: "Lumeo PDF",
     type: "website",
-    images: ["/og-image.svg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "About Lumeo PDF Workspace",
     description:
       "Learn how Lumeo PDF is building a calm, private document workspace.",
-    images: ["/og-image.svg"],
   },
 };
 

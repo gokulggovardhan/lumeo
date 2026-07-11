@@ -19,14 +19,12 @@ export const metadata: Metadata = {
     url: "https://lumeo.in/pdf",
     siteName: "Lumeo PDF",
     type: "website",
-    images: ["/og-image.svg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "Private PDF Tools Online - Lumeo PDF Workspace",
     description:
       "Professional browser-first PDF tools designed for privacy, speed, and premium document handling.",
-    images: ["/og-image.svg"],
   },
 };
 

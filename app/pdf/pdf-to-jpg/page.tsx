@@ -18,14 +18,12 @@ export const metadata: Metadata = {
     url: "https://lumeo.in/pdf/pdf-to-jpg",
     siteName: "Lumeo PDF",
     type: "website",
-    images: ["/og-image.svg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "PDF to JPG Converter Online | Lumeo PDF",
     description:
       "A planned browser-first workspace for converting PDF pages into image files.",
-    images: ["/og-image.svg"],
   },
 };
 

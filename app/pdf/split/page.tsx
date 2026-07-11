@@ -19,14 +19,12 @@ export const metadata: Metadata = {
     url: "https://lumeo.in/pdf/split",
     siteName: "Lumeo PDF",
     type: "website",
-    images: ["/og-image.svg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "Split PDF Online Privately - Lumeo PDF",
     description:
       "Split and extract PDF pages directly on your device using Lumeo PDF Workspace.",
-    images: ["/og-image.svg"],
   },
 };
 

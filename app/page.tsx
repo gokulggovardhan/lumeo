@@ -21,20 +21,11 @@ export const metadata: Metadata = {
     url: "https://lumeo.in",
     siteName: "Lumeo PDF",
     type: "website",
-    images: [
-      {
-        url: "/og-image.png",
-        width: 1200,
-        height: 630,
-        alt: "Lumeo PDF Workspace",
-      },
-    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Lumeo PDF Workspace",
     description: "Private PDF tools that run in your browser.",
-    images: ["/og-image.png"],
   },
 };
 

@@ -19,14 +19,12 @@ export const metadata: Metadata = {
     url: "https://lumeo.in/pdf/compress",
     siteName: "Lumeo PDF",
     type: "website",
-    images: ["/og-image.svg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "Compress PDF Online Privately - Lumeo PDF",
     description:
       "Compress PDF files privately in your browser with Lumeo PDF Workspace.",
-    images: ["/og-image.svg"],
   },
 };
 

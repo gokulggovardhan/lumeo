@@ -24,13 +24,11 @@ export const metadata: Metadata = {
     url: "https://lumeo.in/terms",
     siteName: "Lumeo PDF",
     type: "website",
-    images: ["/og-image.svg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "Terms of Use - Lumeo PDF Workspace",
     description: "Terms for accessing and using Lumeo PDF Workspace.",
-    images: ["/og-image.svg"],
   },
 };
 

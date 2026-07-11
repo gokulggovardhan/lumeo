@@ -25,14 +25,12 @@ export const metadata: Metadata = {
     url: "https://lumeo.in/privacy",
     siteName: "Lumeo PDF",
     type: "website",
-    images: ["/og-image.svg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "Privacy Policy - Lumeo PDF Workspace",
     description:
       "Understand Lumeo PDF's browser-first privacy approach.",
-    images: ["/og-image.svg"],
   },
 };
 

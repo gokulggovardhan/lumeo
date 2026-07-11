@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "verify:public": "node scripts/verify-public-routes.mjs",
     "copy-ffmpeg-core": "node scripts/copy-ffmpeg-core.mjs",
     "postinstall": "npm run copy-ffmpeg-core",
     "start": "next start",
@@ -15,23 +16,23 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "cloudinary": "^2.10.0",
-    "firebase": "^12.15.0",
-    "firebase-admin": "^14.0.0",
+    "firebase": "^12.16.0",
+    "firebase-admin": "^14.1.0",
     "jszip": "^3.10.1",
-    "next": "16.2.9",
+    "next": "^16.2.10",
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.1.200",
-    "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/node": "^24.13.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.9",
-    "tailwindcss": "^4",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^16.2.10",
+    "tailwindcss": "^4.3.2",
     "typescript": "^5"
   }
 }

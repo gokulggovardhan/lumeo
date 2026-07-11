@@ -22,14 +22,12 @@ export const metadata: Metadata = {
     url: "https://lumeo.in/security",
     siteName: "Lumeo PDF",
     type: "website",
-    images: ["/og-image.svg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "Security and Browser-First Processing - Lumeo PDF",
     description:
       "Learn about Lumeo PDF's browser-first security approach.",
-    images: ["/og-image.svg"],
   },
 };
 

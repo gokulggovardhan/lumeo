@@ -66,13 +66,11 @@ export const metadata: Metadata = {
     url: "https://lumeo.in/guides",
     siteName: "Lumeo PDF",
     type: "website",
-    images: ["/og-image.svg"],
   },
   twitter: {
     card: "summary_large_image",
     title: "Lumeo PDF Guides",
     description: "Concise help for private browser-first PDF tools.",
-    images: ["/og-image.svg"],
   },
 };
 
