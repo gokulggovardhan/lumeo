@@ -36,7 +36,7 @@ export default function PdfHubPage() {
       <PublicPageShell
         maxWidth="max-w-[1360px]"
         mainClassName="min-h-screen bg-[#0C1220] text-[#F0EAD6]"
-        contentClassName="px-5 py-7 sm:px-8 sm:py-9 lg:py-10"
+        contentClassName="px-5 py-7 sm:px-8 sm:py-9"
       >
         <PdfToolLauncher />
       </PublicPageShell>

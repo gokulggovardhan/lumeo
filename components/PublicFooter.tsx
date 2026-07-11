@@ -37,8 +37,8 @@ export default function PublicFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="border-t border-[#E8DFC8]/12 bg-[#0A101C] px-6 py-8 text-xs text-[#F0EAD6]/42">
-      <div className="mx-auto grid max-w-[1360px] gap-7 md:grid-cols-[1fr_1.8fr]">
+    <footer className="border-t border-[#E8DFC8]/10 bg-[#0A101C] px-5 py-6 text-xs text-[#F0EAD6]/40 sm:px-8">
+      <div className="mx-auto grid max-w-[1360px] gap-5 md:grid-cols-[0.75fr_2fr]">
         <Link
           href="/"
           className="max-w-xs transition opacity-90 hover:opacity-100"
@@ -46,18 +46,18 @@ export default function PublicFooter() {
           <BrandLockup markSize="h-9 w-9" />
         </Link>
 
-        <div className="grid gap-6 sm:grid-cols-4">
+        <div className="grid gap-5 sm:grid-cols-4">
           {footerGroups.map((group) => (
             <nav key={group.title} aria-label={group.title}>
-              <p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#C9A84C]">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#C9A84C]/72">
                 {group.title}
               </p>
-              <div className="mt-3 grid gap-1.5">
+              <div className="mt-2.5 grid gap-1">
                 {group.links.map((link) => (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="text-sm transition hover:text-[#F0EAD6] focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/45"
+                    className="text-[0.8rem] transition hover:text-[#F0EAD6] focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/45"
                   >
                     {link.label}
                   </Link>
@@ -67,11 +67,11 @@ export default function PublicFooter() {
           ))}
         </div>
 
-        <div className="border-t border-[#E8DFC8]/10 pt-5 md:col-span-2">
+        <div className="border-t border-[#E8DFC8]/8 pt-4 md:col-span-2 md:flex md:items-center md:justify-between md:gap-6">
           <p className="font-semibold text-[#F0EAD6]/62">
             Built by Govardhan Gudapakam
           </p>
-          <p className="mt-2">&copy; {year} Lumeo PDF Workspace. All rights reserved.</p>
+          <p className="mt-1.5 md:mt-0">&copy; {year} Lumeo PDF Workspace. All rights reserved.</p>
         </div>
       </div>
     </footer>

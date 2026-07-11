@@ -100,22 +100,15 @@ export default function Home() {
         </div>
       </nav>
 
-      <section className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 opacity-[0.035] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:48px_48px]" />
-
-        <div className="relative mx-auto max-w-[1360px] px-5 pb-12 pt-7 sm:px-8 sm:pt-9">
-          <header className="mb-6 flex flex-col gap-4 border-b border-[#E8DFC8]/10 pb-6 md:flex-row md:items-end md:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#C9A84C]">
-                Lumeo PDF Workspace
-              </p>
-              <h1 className="mt-2 font-serif text-3xl leading-tight tracking-[-0.025em] text-[#F0EAD6] sm:text-4xl lg:text-[2.8rem]">
-                Choose a PDF tool.
-              </h1>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-[#F0EAD6]/52 sm:text-base">
-                Merge, split, and compress documents directly in your browser.
-              </p>
-            </div>
+      <section>
+        <div className="mx-auto max-w-[1360px] px-5 pb-10 pt-7 sm:px-8 sm:pb-12 sm:pt-9">
+          <header className="mb-5">
+            <h1 className="font-serif text-3xl leading-tight tracking-[-0.025em] text-[#F0EAD6] sm:text-4xl">
+              PDF Workspace
+            </h1>
+            <p className="mt-1.5 text-sm text-[#F0EAD6]/46">
+              Choose a tool to begin.
+            </p>
           </header>
 
           <PdfToolLauncher showHeading={false} />
