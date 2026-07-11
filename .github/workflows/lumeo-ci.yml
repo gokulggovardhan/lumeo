@@ -1,0 +1,70 @@
+name: Lumeo CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumeo-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Validate Lumeo PDF Workspace
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Run focused Lumeo PDF lint
+        run: >
+          npm exec eslint --
+          app/layout.tsx
+          app/page.tsx
+          app/opengraph-image.tsx
+          app/twitter-image.tsx
+          app/about/page.tsx
+          app/accessibility/page.tsx
+          app/contact/page.tsx
+          app/guides/page.tsx
+          app/privacy/page.tsx
+          app/security/page.tsx
+          app/terms/page.tsx
+          app/pdf/page.tsx
+          app/pdf/merge/page.tsx
+          app/pdf/split/page.tsx
+          app/pdf/compress/page.tsx
+          app/pdf/jpg-to-pdf/page.tsx
+          app/pdf/pdf-to-jpg/page.tsx
+          components/PublicFooter.tsx
+          components/PublicPdfChrome.tsx
+          components/pdf/PdfToolLauncher.tsx
+          components/pdf/PdfToolRegistry.tsx
+          scripts/verify-public-routes.mjs
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Verify public routes
+        run: npm run verify:public
