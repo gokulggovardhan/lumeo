@@ -101,14 +101,17 @@ function stopServer(child) {
       ],
       {
         stdio: "ignore",
+        timeout: 5000,
         windowsHide: true,
       },
     );
-
-    return;
+  } else {
+    child.kill("SIGTERM");
   }
 
-  child.kill("SIGTERM");
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+  child.unref();
 }
 
 async function waitForServer(
