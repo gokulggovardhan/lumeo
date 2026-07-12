@@ -3,13 +3,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PDFDocument, rgb } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import {
+  compressionProfiles as profiles,
+  type ColourMode,
+  type CompressProfile,
+  type ImageQuality,
+  type MetadataMode,
+} from "@/lib/compressionProfiles";
+import {
+  MAX_TARGET_PASSES,
+  chooseBetterTargetCandidate,
+  chooseTargetOutcome,
+  createTargetCompressionRequest,
+  initialTargetParameters,
+  nextTargetStrength,
+  parametersForStrength,
+  qualityOutlookForTarget,
+  requiredReductionPercent,
+  targetValueToBytes,
+  validateTargetBytes,
+  type CompressionMode,
+  type TargetCompressionAttempt,
+  type TargetOutcome,
+  type TargetQualityOutlook,
+  type TargetUnit,
+} from "@/lib/compressionTarget";
 
-type CompressProfile = "highQuality" | "balanced" | "smaller";
-type ImageQuality = "high" | "balanced" | "compact";
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
-type ColourMode = "preserve" | "grayscale";
-type MetadataMode = "fresh" | "preserve";
 type ExpertMode = "profile" | "custom";
+type TargetPreset = "100" | "200" | "400" | "custom";
 type CompressStage =
   | "Ready"
   | "Analysing document"
@@ -58,8 +80,16 @@ type CompressResult = {
   savedBytes: number;
   savedPercent: number;
   pageCount: number;
-  profile: CompressProfile;
+  mode: CompressionMode;
+  profile?: CompressProfile;
+  grayscale: boolean;
   tone: ResultTone;
+  target?: {
+    outcome: TargetOutcome;
+    requestedBytes: number;
+    attempts: TargetCompressionAttempt[];
+    qualityOutlook: TargetQualityOutlook;
+  };
 };
 
 type PdfJsModule = typeof import("pdfjs-dist");
@@ -85,47 +115,6 @@ async function loadPdfJsModule() {
 
   return pdfJsModulePromise;
 }
-
-const profiles: Record<
-  CompressProfile,
-  {
-    label: string;
-    description: string;
-    dpi: number;
-    quality: number;
-    qualityLabel: ImageQuality;
-    colour: ColourMode;
-    metadata: MetadataMode;
-  }
-> = {
-  highQuality: {
-    label: "High quality",
-    description: "Preserves more visual detail.",
-    dpi: 220,
-    quality: 0.86,
-    qualityLabel: "high",
-    colour: "preserve",
-    metadata: "preserve",
-  },
-  balanced: {
-    label: "Balanced",
-    description: "Recommended for most documents.",
-    dpi: 150,
-    quality: 0.74,
-    qualityLabel: "balanced",
-    colour: "preserve",
-    metadata: "preserve",
-  },
-  smaller: {
-    label: "Smaller file",
-    description: "Prioritises a lower output size.",
-    dpi: 96,
-    quality: 0.58,
-    qualityLabel: "compact",
-    colour: "preserve",
-    metadata: "preserve",
-  },
-};
 
 const resolutionOptions: Array<{ value: ResolutionPreset; label: string; dpi: number; helper: string }> = [
   { value: "dpi220", label: "Print quality", dpi: 220, helper: "Sharper output for detailed review." },
@@ -318,10 +307,16 @@ export default function CompressPdfTool() {
   const sessionRef = useRef(0);
   const timersRef = useRef<number[]>([]);
   const resultHeadingRef = useRef<HTMLParagraphElement | null>(null);
+  const customTargetInputRef = useRef<HTMLInputElement | null>(null);
 
   const [dragActive, setDragActive] = useState(false);
   const [analysis, setAnalysis] = useState<CompressAnalysis | null>(null);
+  const [compressionMode, setCompressionMode] =
+    useState<CompressionMode>("quality");
   const [profile, setProfile] = useState<CompressProfile>("balanced");
+  const [targetPreset, setTargetPreset] = useState<TargetPreset>("400");
+  const [customTargetValue, setCustomTargetValue] = useState("400");
+  const [targetUnit, setTargetUnit] = useState<TargetUnit>("KB");
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [expertOpen, setExpertOpen] = useState(false);
   const [expertMode, setExpertMode] = useState<ExpertMode>("profile");
@@ -379,7 +374,37 @@ export default function CompressPdfTool() {
   const profileLabel = profiles[profile].label;
   const outputFileName = sanitizePdfFileName(outputName);
   const displayStatus = blockingError ? "Needs attention" : error ? "Retry available" : status;
-  const canCompress = Boolean(analysis) && !isCompressing && !blockingError;
+  const targetBytes = useMemo(() => {
+    const numericValue =
+      targetPreset === "custom"
+        ? customTargetValue.trim()
+          ? Number(customTargetValue)
+          : Number.NaN
+        : Number(targetPreset);
+    return targetValueToBytes(
+      numericValue,
+      targetPreset === "custom" ? targetUnit : "KB",
+    );
+  }, [customTargetValue, targetPreset, targetUnit]);
+  const targetError = useMemo(
+    () =>
+      compressionMode === "target" && analysis
+        ? validateTargetBytes(targetBytes, analysis.size)
+        : "",
+    [analysis, compressionMode, targetBytes],
+  );
+  const targetOutlook = useMemo(
+    () =>
+      analysis
+        ? qualityOutlookForTarget(analysis.size, targetBytes, analysis.pageCount)
+        : "Good",
+    [analysis, targetBytes],
+  );
+  const canCompress =
+    Boolean(analysis) &&
+    !isCompressing &&
+    !blockingError &&
+    (compressionMode === "quality" || !targetError);
 
   const clearPreview = useCallback(() => {
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -429,12 +454,15 @@ export default function CompressPdfTool() {
     }
   }, [result]);
 
-  function resetSettings(nextProfile: CompressProfile) {
+  function resetSettings(
+    nextProfile: CompressProfile,
+    preserveColour = false,
+  ) {
     const base = profiles[nextProfile];
     setProfile(nextProfile);
     setResolution(base.dpi >= 180 ? "dpi220" : base.dpi <= 100 ? "dpi96" : "dpi150");
     setQuality(base.qualityLabel);
-    setColour(base.colour);
+    if (!preserveColour) setColour(base.colour);
     setMetadata(base.metadata);
     setExpertMode("profile");
     setCustomDpi(base.dpi);
@@ -447,6 +475,10 @@ export default function CompressPdfTool() {
     clearPreview();
     void cleanupTasks();
     setAnalysis(null);
+    setCompressionMode("quality");
+    setTargetPreset("400");
+    setCustomTargetValue("400");
+    setTargetUnit("KB");
     resetSettings("balanced");
     setOutputName("lumeo-compressed.pdf");
     setError("");
@@ -601,8 +633,109 @@ export default function CompressPdfTool() {
     }
   }
 
+  async function buildCompressedCandidate({
+    processingDoc,
+    sourcePdf,
+    dpi,
+    imageQuality,
+    colourMode,
+    metadataMode,
+    currentSession,
+    passLabel,
+  }: {
+    processingDoc: PDFDocumentProxy;
+    sourcePdf: PDFDocument;
+    dpi: number;
+    imageQuality: number;
+    colourMode: ColourMode;
+    metadataMode: MetadataMode;
+    currentSession: number;
+    passLabel: string;
+  }) {
+    if (!analysis) throw new Error("Document analysis is unavailable.");
+    const output = await PDFDocument.create();
+    if (metadataMode === "preserve") {
+      await copyMetadata(sourcePdf, output);
+    } else {
+      output.setTitle("Compressed PDF");
+      output.setCreator("Lumeo PDF Workspace");
+    }
+
+    for (let pageIndex = 1; pageIndex <= analysis.pageCount; pageIndex += 1) {
+      if (currentSession !== sessionRef.current) {
+        throw new DOMException("Compression cancelled.", "AbortError");
+      }
+
+      setStatus("Processing images");
+      setProgressDetail(
+        `${passLabel} · page ${pageIndex} of ${analysis.pageCount}`,
+      );
+      const page = await processingDoc.getPage(pageIndex);
+      const pageInfo = analysis.pages[pageIndex - 1];
+      const baseViewport = page.getViewport({ scale: 1 });
+      const requestedScale = Math.max(
+        MIN_RENDER_SCALE,
+        Math.min(MAX_RENDER_SCALE, dpi / 72),
+      );
+      const dimensionScale = Math.min(
+        requestedScale,
+        5200 / Math.max(baseViewport.width, baseViewport.height),
+      );
+      const viewport = page.getViewport({ scale: Math.max(0.25, dimensionScale) });
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) {
+        throw new Error("Browser memory limitation while preparing this page.");
+      }
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      context.fillStyle = "#FFFFFF";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      const task = page.render({ canvas, canvasContext: context, viewport });
+      renderTaskRef.current = task;
+      await task.promise;
+      renderTaskRef.current = null;
+      if (colourMode === "grayscale") applyGrayscale(canvas);
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", imageQuality),
+      );
+      canvas.width = 0;
+      canvas.height = 0;
+      page.cleanup();
+      if (!blob) throw new Error("Compression failed while rebuilding a page.");
+      const imageBytes = await blob.arrayBuffer();
+      const image = await output.embedJpg(imageBytes);
+      const outputPage = output.addPage([pageInfo.width, pageInfo.height]);
+      outputPage.drawRectangle({
+        x: 0,
+        y: 0,
+        width: pageInfo.width,
+        height: pageInfo.height,
+        color: rgb(1, 1, 1),
+      });
+      outputPage.drawImage(image, {
+        x: 0,
+        y: 0,
+        width: pageInfo.width,
+        height: pageInfo.height,
+      });
+
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    }
+
+    setStatus("Rebuilding document");
+    setProgressDetail(`${passLabel} · rebuilding document`);
+    return output.save({ useObjectStreams: true });
+  }
+
   async function handleCompress() {
     if (!analysis || isCompressing || blockingError) return;
+    if (compressionMode === "target" && targetError) {
+      setError(targetError);
+      return;
+    }
     setIsCompressing(true);
     setError("");
     setBlockingError("");
@@ -623,65 +756,129 @@ export default function CompressPdfTool() {
       if (currentSession !== sessionRef.current) return;
 
       const sourcePdf = await PDFDocument.load(copyArrayBuffer(analysis.bytes));
-      const output = await PDFDocument.create();
-      if (selectedPlan.metadata === "preserve") {
-        await copyMetadata(sourcePdf, output);
-      } else {
-        output.setTitle("Compressed PDF");
-        output.setCreator("Lumeo PDF Workspace");
-      }
+      let outputBytes: Uint8Array;
+      let targetResult: CompressResult["target"];
 
-      for (let pageIndex = 1; pageIndex <= analysis.pageCount; pageIndex += 1) {
-        if (currentSession !== sessionRef.current) return;
-        setStatus("Processing images");
-        setProgressDetail(`Processing page ${pageIndex} of ${analysis.pageCount}.`);
-        const page = await processingDoc.getPage(pageIndex);
-        const pageInfo = analysis.pages[pageIndex - 1];
-        const scale = Math.max(MIN_RENDER_SCALE, Math.min(MAX_RENDER_SCALE, selectedPlan.dpi / 72));
-        const viewport = page.getViewport({ scale });
-        const canvas = document.createElement("canvas");
-        const context = canvas.getContext("2d", { alpha: false });
-        if (!context) throw new Error("Browser memory limitation while preparing this page.");
-        canvas.width = Math.max(1, Math.floor(viewport.width));
-        canvas.height = Math.max(1, Math.floor(viewport.height));
-        context.fillStyle = "#FFFFFF";
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        const task = page.render({ canvas, canvasContext: context, viewport });
-        renderTaskRef.current = task;
-        await task.promise;
-        renderTaskRef.current = null;
-        if (selectedPlan.colour === "grayscale") applyGrayscale(canvas);
-
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, "image/jpeg", selectedPlan.quality),
+      if (compressionMode === "target") {
+        const request = createTargetCompressionRequest(
+          targetBytes,
+          colour === "grayscale",
         );
-        canvas.width = 0;
-        canvas.height = 0;
-        if (!blob) throw new Error("Compression failed while rebuilding a page.");
-        const imageBytes = await blob.arrayBuffer();
-        const image = await output.embedJpg(imageBytes);
-        const outputPage = output.addPage([pageInfo.width, pageInfo.height]);
-        outputPage.drawRectangle({
-          x: 0,
-          y: 0,
-          width: pageInfo.width,
-          height: pageInfo.height,
-          color: rgb(1, 1, 1),
-        });
-        outputPage.drawImage(image, {
-          x: 0,
-          y: 0,
-          width: pageInfo.width,
-          height: pageInfo.height,
-        });
+        const attempts: TargetCompressionAttempt[] = [];
+        const outlook = qualityOutlookForTarget(
+          analysis.size,
+          request.targetBytes,
+          analysis.pageCount,
+        );
+        let parameters = initialTargetParameters(
+          analysis.size,
+          request.targetBytes,
+          analysis.pageCount,
+        );
+        let largestTooLargeStrength: number | null = null;
+        let smallestSuccessfulStrength: number | null = null;
+        let bestCandidate: Uint8Array | null = null;
+        let bestCandidateBytes: number | null = null;
+        let bestUnderTargetBytes: number | null = null;
+        let smallestCandidateBytes = Number.POSITIVE_INFINITY;
 
-        await new Promise((resolve) => window.setTimeout(resolve, 0));
+        for (let pass = 1; pass <= MAX_TARGET_PASSES; pass += 1) {
+          setProgressDetail(`Building pass ${pass} of ${MAX_TARGET_PASSES}`);
+          const candidate = await buildCompressedCandidate({
+            processingDoc,
+            sourcePdf,
+            dpi: parameters.dpi,
+            imageQuality: parameters.imageQuality,
+            colourMode: request.grayscale ? "grayscale" : "preserve",
+            metadataMode: "preserve",
+            currentSession,
+            passLabel: `Building pass ${pass} of ${MAX_TARGET_PASSES}`,
+          });
+          const candidateBytes = candidate.byteLength;
+          attempts.push({
+            pass,
+            dpi: parameters.dpi,
+            imageQuality: parameters.imageQuality,
+            outputBytes: candidateBytes,
+          });
+          smallestCandidateBytes = Math.min(
+            smallestCandidateBytes,
+            candidateBytes,
+          );
+          if (candidateBytes <= request.targetBytes) {
+            bestUnderTargetBytes =
+              bestUnderTargetBytes === null
+                ? candidateBytes
+                : Math.max(bestUnderTargetBytes, candidateBytes);
+            smallestSuccessfulStrength =
+              smallestSuccessfulStrength === null
+                ? parameters.strength
+                : Math.min(smallestSuccessfulStrength, parameters.strength);
+          } else {
+            largestTooLargeStrength =
+              largestTooLargeStrength === null
+                ? parameters.strength
+                : Math.max(largestTooLargeStrength, parameters.strength);
+          }
+
+          if (
+            chooseBetterTargetCandidate({
+              currentBytes: bestCandidateBytes,
+              candidateBytes,
+              targetBytes: request.targetBytes,
+            })
+          ) {
+            bestCandidate = candidate;
+            bestCandidateBytes = candidateBytes;
+          }
+
+          const closeEnough =
+            candidateBytes <= request.targetBytes &&
+            request.targetBytes - candidateBytes <= request.targetBytes * 0.04;
+          if (closeEnough || (parameters.strength >= 0.995 && candidateBytes > request.targetBytes)) {
+            break;
+          }
+
+          setProgressDetail("Refining target");
+          const nextStrength = nextTargetStrength({
+            currentStrength: parameters.strength,
+            outputBytes: candidateBytes,
+            targetBytes: request.targetBytes,
+            largestTooLargeStrength,
+            smallestSuccessfulStrength,
+          });
+          if (Math.abs(nextStrength - parameters.strength) < 0.01) break;
+          parameters = parametersForStrength(nextStrength);
+          await new Promise((resolve) => window.setTimeout(resolve, 0));
+        }
+
+        if (!bestCandidate || bestCandidateBytes === null) {
+          throw new Error("No compression candidate could be generated.");
+        }
+        outputBytes = bestCandidate;
+        targetResult = {
+          outcome: chooseTargetOutcome({
+            targetBytes: request.targetBytes,
+            originalBytes: analysis.size,
+            bestUnderTargetBytes,
+            smallestCandidateBytes,
+          }),
+          requestedBytes: request.targetBytes,
+          attempts,
+          qualityOutlook: outlook,
+        };
+      } else {
+        outputBytes = await buildCompressedCandidate({
+          processingDoc,
+          sourcePdf,
+          dpi: selectedPlan.dpi,
+          imageQuality: selectedPlan.quality,
+          colourMode: selectedPlan.colour,
+          metadataMode: selectedPlan.metadata,
+          currentSession,
+          passLabel: "Processing document",
+        });
       }
-
-      setStatus("Rebuilding document");
-      setProgressDetail("Rebuilding document.");
-      const outputBytes = await output.save({ useObjectStreams: true });
       const outputBuffer = toArrayBuffer(outputBytes);
 
       setStatus("Validating output");
@@ -708,20 +905,28 @@ export default function CompressPdfTool() {
         savedBytes,
         savedPercent,
         pageCount: analysis.pageCount,
-        profile,
+        mode: compressionMode,
+        profile: compressionMode === "quality" ? profile : undefined,
+        grayscale: colour === "grayscale",
         tone,
+        target: targetResult,
       });
       setStatus("Download ready");
-      setProgressDetail("Compression complete.");
+      setProgressDetail(
+        compressionMode === "target" ? "Target analysis complete." : "Compression complete.",
+      );
     } catch (compressError) {
+      if (currentSession !== sessionRef.current) return;
       const message =
         compressError instanceof Error
           ? compressError.message
           : "Compression failed. Try a safer profile or a smaller PDF.";
       setError(
-        message.includes("Document preview engine")
-          ? "Compression engine could not start. Reanalyse the document or try again."
-          : message,
+        compressionMode === "target"
+          ? `Unable to process. ${message}`
+          : message.includes("Document preview engine")
+            ? "Compression engine could not start. Reanalyse the document or try again."
+            : message,
       );
       setStatus("Ready");
       setProgressDetail("");
@@ -948,31 +1153,170 @@ export default function CompressPdfTool() {
         <aside className="lg:min-h-0">
           <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#E8DFC8]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
             <div className={result ? "hidden" : "border-b border-[#E8DFC8]/10 pb-3"}>
-              <p className="text-xs font-semibold text-[#F0EAD6]/68">Compression profile</p>
-              <div className="mt-3 grid gap-2">
-                {(Object.keys(profiles) as CompressProfile[]).map((item) => (
+              <p className="text-xs font-semibold text-[#F0EAD6]/68">
+                Compression mode
+              </p>
+              <div
+                className="mt-2 grid grid-cols-2 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/54 p-1"
+                aria-label="Compression mode"
+              >
+                {[
+                  ["quality", "Quality mode"],
+                  ["target", "Target size"],
+                ].map(([value, label]) => (
                   <button
-                    key={item}
+                    key={value}
                     type="button"
+                    aria-pressed={compressionMode === value}
                     onClick={() => {
-                      resetSettings(item);
+                      setCompressionMode(value as CompressionMode);
+                      setAdvancedOpen(false);
+                      setExpertOpen(false);
+                      setError("");
                       clearResult();
                     }}
-                    aria-pressed={profile === item}
-                    className={`rounded-xl border px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/45 ${
-                      profile === item
-                        ? "border-[#1E6B4A]/55 bg-[#1E6B4A]/16"
-                        : "border-[#E8DFC8]/8 bg-[#F0EAD6]/[0.025] hover:border-[#C9A84C]/28"
+                    className={`min-h-11 rounded-lg px-2 text-xs font-bold transition motion-reduce:transition-none ${
+                      compressionMode === value
+                        ? "bg-[#1E6B4A]/20 text-[#F0EAD6] ring-1 ring-[#1E6B4A]/55"
+                        : "text-[#F0EAD6]/46 hover:text-[#F0EAD6]"
                     }`}
                   >
-                    <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#F0EAD6]">
-                      {profiles[item].label}
-                      {analysis.recommendation === item ? <span className="rounded-full bg-[#C9A84C]/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[#C9A84C]">Recommended</span> : null}
-                    </span>
-                    <span className="mt-0.5 block text-xs text-[#F0EAD6]/42">{profiles[item].description}</span>
+                    {compressionMode === value ? "✓ " : ""}
+                    {label}
                   </button>
                 ))}
               </div>
+
+              {compressionMode === "quality" ? (
+                <div className="mt-3 grid gap-2">
+                  {(Object.keys(profiles) as CompressProfile[]).map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => {
+                        resetSettings(item, true);
+                        clearResult();
+                      }}
+                      aria-pressed={profile === item}
+                      className={`rounded-xl border px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/45 motion-reduce:transition-none ${
+                        profile === item
+                          ? "border-[#1E6B4A]/55 bg-[#1E6B4A]/16"
+                          : "border-[#E8DFC8]/8 bg-[#F0EAD6]/[0.025] hover:border-[#C9A84C]/28"
+                      }`}
+                    >
+                      <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#F0EAD6]">
+                        <span>{profile === item ? "✓ " : ""}{profiles[item].label}</span>
+                        {analysis.recommendation === item ? <span className="rounded-full bg-[#C9A84C]/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[#C9A84C]">Recommended</span> : null}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-[#F0EAD6]/42">{profiles[item].description}</span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-3">
+                  <p className="text-sm font-bold text-[#F0EAD6]">
+                    Target Size Studio
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/44">
+                    Set the maximum size you need. Lumeo adapts resolution and
+                    image quality while protecting readability.
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {[
+                      ["100", "Under 100 KB"],
+                      ["200", "Under 200 KB"],
+                      ["400", "Under 400 KB"],
+                      ["custom", "Custom target"],
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={targetPreset === value}
+                        onClick={() => {
+                          setTargetPreset(value as TargetPreset);
+                          setError("");
+                          clearResult();
+                        }}
+                        className={`min-h-11 rounded-lg border px-2 text-xs font-bold transition motion-reduce:transition-none ${
+                          targetPreset === value
+                            ? "border-[#1E6B4A]/55 bg-[#1E6B4A]/16 text-[#F0EAD6]"
+                            : "border-[#E8DFC8]/9 text-[#F0EAD6]/48 hover:border-[#C9A84C]/28"
+                        }`}
+                      >
+                        {targetPreset === value ? "✓ " : ""}
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  {targetPreset === "custom" ? (
+                    <div className="mt-3 grid grid-cols-[minmax(0,1fr)_5.5rem] gap-2">
+                      <label className="text-xs font-semibold text-[#F0EAD6]/62">
+                        Target size
+                        <input
+                          ref={customTargetInputRef}
+                          type="number"
+                          inputMode="decimal"
+                          min={targetUnit === "KB" ? 20 : 0.02}
+                          step={targetUnit === "KB" ? 10 : 0.1}
+                          value={customTargetValue}
+                          onChange={(event) => {
+                            setCustomTargetValue(event.target.value);
+                            setError("");
+                            clearResult();
+                          }}
+                          className="mt-1.5 h-11 w-full rounded-lg border border-[#E8DFC8]/12 bg-[#F0EAD6]/[0.035] px-3 text-base text-[#F0EAD6] outline-none focus:border-[#C9A84C]/45"
+                        />
+                      </label>
+                      <label className="text-xs font-semibold text-[#F0EAD6]/62">
+                        Unit
+                        <select
+                          value={targetUnit}
+                          onChange={(event) => {
+                            setTargetUnit(event.target.value as TargetUnit);
+                            setError("");
+                            clearResult();
+                          }}
+                          className="mt-1.5 h-11 w-full rounded-lg border border-[#E8DFC8]/12 bg-[#111A2B] px-2 text-sm font-bold text-[#F0EAD6] outline-none focus:border-[#C9A84C]/45"
+                        >
+                          <option value="KB">KB</option>
+                          <option value="MB">MB</option>
+                        </select>
+                      </label>
+                    </div>
+                  ) : null}
+                  <div aria-live="polite" className="mt-3 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/68 p-3">
+                    {targetError ? (
+                      <p role="alert" className="text-xs font-semibold text-[#F0C0C0]">
+                        {targetError}
+                      </p>
+                    ) : (
+                      <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+                        <div><dt className="text-[#F0EAD6]/38">Original</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">{formatFileSize(analysis.size)}</dd></div>
+                        <div><dt className="text-[#F0EAD6]/38">Target</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">Under {formatFileSize(targetBytes)}</dd></div>
+                        <div><dt className="text-[#F0EAD6]/38">Reduction needed</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">{requiredReductionPercent(analysis.size, targetBytes).toFixed(0)}%</dd></div>
+                        <div><dt className="text-[#F0EAD6]/38">Pages</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">{analysis.pageCount}</dd></div>
+                        <div><dt className="text-[#F0EAD6]/38">Quality outlook</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">{targetOutlook}</dd></div>
+                        <div><dt className="text-[#F0EAD6]/38">Method</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">Adaptive multi-pass</dd></div>
+                      </dl>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="button"
+                aria-pressed={colour === "grayscale"}
+                onClick={() => {
+                  setColour((current) => current === "grayscale" ? "preserve" : "grayscale");
+                  clearResult();
+                }}
+                className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 text-left text-xs font-semibold text-[#F0EAD6]/58 transition hover:border-[#C9A84C]/28 motion-reduce:transition-none"
+              >
+                <span>Grayscale</span>
+                <span className={colour === "grayscale" ? "text-[#A8E0C1]" : "text-[#F0EAD6]/34"}>
+                  {colour === "grayscale" ? "On" : "Off"}
+                </span>
+              </button>
             </div>
 
             <div className={result ? "hidden" : "no-scrollbar min-h-0 flex-1 overflow-y-auto py-3"}>
@@ -980,12 +1324,12 @@ export default function CompressPdfTool() {
                 type="button"
                 onClick={() => setAdvancedOpen((open) => !open)}
                 aria-expanded={advancedOpen}
-                className="flex w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 py-2 text-left text-xs font-semibold text-[#F0EAD6]/54 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]"
+                className={compressionMode === "quality" ? "flex w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 py-2 text-left text-xs font-semibold text-[#F0EAD6]/54 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]" : "hidden"}
               >
                 Advanced options
                 <span>{advancedOpen ? "−" : "+"}</span>
               </button>
-              {advancedOpen ? (
+              {compressionMode === "quality" && advancedOpen ? (
                 <div className="mt-3 space-y-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/62 p-3">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#C9A84C]">Image resolution</p>
@@ -1008,19 +1352,6 @@ export default function CompressPdfTool() {
                       ))}
                     </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#C9A84C]">Colour</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {[
-                        ["preserve", "Preserve colour"],
-                        ["grayscale", "Grayscale image content"],
-                      ].map(([value, label]) => (
-                        <button key={value} type="button" onClick={() => { setColour(value as ColourMode); clearResult(); }} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${colour === value ? "border-[#1E6B4A]/50 bg-[#1E6B4A]/14 text-[#A8E0C1]" : "border-[#E8DFC8]/10 text-[#F0EAD6]/48 hover:border-[#C9A84C]/30"}`}>
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
                 </div>
               ) : null}
 
@@ -1028,12 +1359,12 @@ export default function CompressPdfTool() {
                 type="button"
                 onClick={() => setExpertOpen((open) => !open)}
                 aria-expanded={expertOpen}
-                className="mt-3 flex w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 py-2 text-left text-xs font-semibold text-[#F0EAD6]/54 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]"
+                className={compressionMode === "quality" ? "mt-3 flex w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 py-2 text-left text-xs font-semibold text-[#F0EAD6]/54 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]" : "hidden"}
               >
                 Document and output details
                 <span>{expertOpen ? "−" : "+"}</span>
               </button>
-              {expertOpen ? (
+              {compressionMode === "quality" && expertOpen ? (
                 <div className="mt-3 space-y-3 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/62 p-3">
                   <label className="flex items-center gap-2 text-sm font-semibold text-[#F0EAD6]/68">
                     <input type="checkbox" checked={expertMode === "custom"} onChange={(event) => setExpertMode(event.target.checked ? "custom" : "profile")} />
@@ -1050,7 +1381,7 @@ export default function CompressPdfTool() {
                 </div>
               ) : null}
 
-              <div className={expertOpen ? "mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
+              <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Compression plan</p>
                 <ul className="mt-2 space-y-1.5 text-xs text-[#F0EAD6]/50">
                   <li>Images: render at {selectedPlan.dpi} DPI</li>
@@ -1060,7 +1391,7 @@ export default function CompressPdfTool() {
                 </ul>
               </div>
 
-              <div className={expertOpen ? "mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
+              <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
                 <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Output manifest</p>
                 <ul className="mt-2 space-y-1.5 text-xs text-[#F0EAD6]/50">
                   <li>1 compressed PDF</li>
@@ -1086,23 +1417,44 @@ export default function CompressPdfTool() {
 
             <div className={result ? "flex min-h-0 flex-1 flex-col justify-center border-0 pt-0" : "border-t border-[#E8DFC8]/10 pt-3"}>
               {result ? (
-                <div className={`mb-4 rounded-xl border p-4 ${result.tone === "success" ? "border-[#1E6B4A]/28 bg-[#1E6B4A]/12" : result.tone === "limited" ? "border-[#C9A84C]/24 bg-[#C9A84C]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10"}`}>
+                <div className={`mb-4 rounded-xl border p-4 ${result.target ? result.target.outcome === "achieved" ? "border-[#1E6B4A]/28 bg-[#1E6B4A]/12" : result.target.outcome === "closest-safe" ? "border-[#C9A84C]/24 bg-[#C9A84C]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10" : result.tone === "success" ? "border-[#1E6B4A]/28 bg-[#1E6B4A]/12" : result.tone === "limited" ? "border-[#C9A84C]/24 bg-[#C9A84C]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10"}`}>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
+                    Size Outcome
+                  </p>
                   <p ref={resultHeadingRef} tabIndex={-1} className="text-lg font-bold text-[#F0EAD6] outline-none">
-                    {result.tone === "success" ? "Compression complete" : result.tone === "limited" ? "Compression completed with limited reduction" : "The compressed result is larger than the original"}
+                    {result.mode === "target"
+                      ? result.target?.outcome === "achieved"
+                        ? "Target achieved"
+                        : result.target?.outcome === "closest-safe"
+                          ? "Closest safe result"
+                          : result.target?.outcome === "not-beneficial"
+                            ? "Compression not beneficial"
+                            : "Unable to process"
+                      : result.tone === "success"
+                        ? "Compression complete"
+                        : result.tone === "limited"
+                          ? "Compression completed with limited reduction"
+                          : "The compressed result is larger than the original"}
                   </p>
                   <div className="mt-4 grid gap-2 text-sm text-[#F0EAD6]/58">
+                    {result.target ? <p>Requested: Under {formatFileSize(result.target.requestedBytes)}</p> : null}
                     <p>Original: {formatFileSize(result.originalSize)}</p>
-                    <p>Compressed: {formatFileSize(result.compressedSize)}</p>
+                    <p>{result.target?.outcome === "closest-safe" ? "Safest result" : "Result"}: {formatFileSize(result.compressedSize)}</p>
                     <p>
                       {result.savedBytes >= 0 ? "Saved" : "Increase"}: {formatFileSize(Math.abs(result.savedBytes))} · {Math.abs(result.savedPercent).toFixed(1)}%
                     </p>
-                    <p>Pages: {result.pageCount} · Profile: {profiles[result.profile].label}</p>
+                    <p>Pages: {result.pageCount}</p>
+                    {result.mode === "quality" && result.profile ? <p>Profile: {profiles[result.profile].label}</p> : null}
+                    {result.target ? <p>Passes: {result.target.attempts.length}</p> : null}
+                    {result.target ? <p>Quality: {result.target.qualityOutlook}</p> : null}
+                    <p>Grayscale: {result.grayscale ? "On" : "Off"}</p>
+                    {result.target?.outcome === "closest-safe" ? <p className="text-[#E8DFC8]/70">Reason: Reducing further would significantly affect readability.</p> : null}
                     {result.tone === "larger" ? <p className="font-semibold text-[#F0C0C0]">Recommendation: keep original.</p> : null}
                   </div>
                 </div>
               ) : (
                 <p className="mb-3 text-xs text-[#F0EAD6]/42">
-                  Ready to compress · {profileLabel}
+                  Ready to compress · {compressionMode === "target" ? `Under ${formatFileSize(targetBytes)}` : profileLabel}
                 </p>
               )}
 
@@ -1111,6 +1463,16 @@ export default function CompressPdfTool() {
                   <button type="button" onClick={handleDownload} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#1E6B4A] px-5 text-sm font-bold text-[#F0EAD6] shadow-[0_14px_35px_rgba(30,107,74,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98]">
                     Download compressed PDF
                   </button>
+                  <div className={`grid gap-2 ${result.mode === "target" ? "grid-cols-2" : "grid-cols-1"}`}>
+                    <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); }} className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#E8DFC8]/12 px-3 text-xs font-bold text-[#F0EAD6]/62 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]">
+                      Compress again
+                    </button>
+                    {result.mode === "target" ? (
+                      <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); window.setTimeout(() => customTargetInputRef.current?.focus(), 0); }} className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#E8DFC8]/12 px-3 text-xs font-bold text-[#F0EAD6]/62 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]">
+                        Change target
+                      </button>
+                    ) : null}
+                  </div>
                   <button type="button" onClick={resetTool} className="inline-flex h-10 w-full items-center justify-center rounded-full border border-[#E8DFC8]/12 px-5 text-sm font-bold text-[#F0EAD6]/62 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]">
                     Clear and start new
                   </button>
