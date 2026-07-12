@@ -3,17 +3,20 @@
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
   type ChangeEvent,
   type ReactNode,
 } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import {
   doc,
+  type DocumentData,
   onSnapshot,
   serverTimestamp,
+  type Unsubscribe,
   updateDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
@@ -69,18 +72,7 @@ type ReframeState = {
   y: number;
   safeZones: boolean;
 };
-
-const tools: { key: ToolKey; label: string; description: string; icon: string }[] =
-  [
-    { key: "media", label: "Media", description: "Video and music", icon: "◉" },
-    { key: "canvas", label: "Frame", description: "Layout and view", icon: "▣" },
-    { key: "edit", label: "Cut", description: "Trim and motion", icon: "✂" },
-    { key: "text", label: "Titles", description: "Hooks and overlays", icon: "T" },
-    { key: "audio", label: "Sound", description: "Audio mix", icon: "♫" },
-    { key: "effects", label: "Effects", description: "Look and color", icon: "✦" },
-    { key: "export", label: "Export", description: "Output settings", icon: "⇩" },
-    { key: "project", label: "Project", description: "Save and manage", icon: "✓" },
-  ];
+type EffectPreset = "clean" | "cinematic" | "warm" | "mono" | "soft" | "punchy";
 
 const studioTools: { key: ToolKey; label: string; description: string }[] =
   [
@@ -577,70 +569,6 @@ function StudioEmptyState() {
   );
 }
 
-function UploadDropzone({
-  id,
-  title,
-  subtitle,
-  accept,
-  onChange,
-}: {
-  id: string;
-  title: string;
-  subtitle: string;
-  accept: string;
-  onChange: (event: ChangeEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <div>
-      <input
-        id={id}
-        type="file"
-        accept={accept}
-        onChange={onChange}
-        className="sr-only"
-      />
-
-      <label
-        htmlFor={id}
-        className="group relative flex cursor-pointer flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border border-dashed border-white/14 bg-gradient-to-br from-white/[0.075] via-white/[0.035] to-cyan-200/[0.045] px-5 py-8 text-center shadow-xl shadow-black/10 transition hover:border-cyan-200/28 hover:bg-white/[0.08] hover:shadow-cyan-300/10"
-      >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(245,230,188,0.14),transparent_42%)] opacity-80" />
-
-        <div
-          className="relative flex h-14 w-14 items-center justify-center rounded-2xl border border-white/12 bg-[#090812] text-[#f8eed0] shadow-xl shadow-fuchsia-500/10 transition group-hover:scale-105"
-          style={{ animation: "lumeoFloat 4.8s ease-in-out infinite" }}
-        >
-          <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" aria-hidden="true">
-            <path
-              d="M12 15V5M8 9l4-4 4 4"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M5 15.5V17a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1.5"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-            />
-          </svg>
-        </div>
-
-        <p className="relative mt-4 text-base font-black text-white">{title}</p>
-
-        <p className="relative mt-2 max-w-[260px] text-sm leading-6 text-white/45">
-          {subtitle}
-        </p>
-
-        <span className="relative mt-5 rounded-full border border-white/10 bg-black/35 px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-white/62">
-          Choose from device
-        </span>
-      </label>
-    </div>
-  );
-}
-
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/[0.045] px-3 py-2">
@@ -797,12 +725,6 @@ function normalizeTitleStyle(value: unknown): TitleStyle {
   }
   if (value === "softCaption" || value === "caption") return "softCaption";
   return "cleanLower";
-}
-
-function normalizeTitleSize(value: unknown): TitleSize {
-  return value === "small" || value === "medium" || value === "xl"
-    ? value
-    : "large";
 }
 
 function normalizeTitlePosition(value: unknown): TitlePosition {
@@ -1173,7 +1095,6 @@ export default function ProjectDetailsPage() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
   const videoUploadRequestRef = useRef<XMLHttpRequest | null>(null);
   const videoUploadCopyAbortRef = useRef<AbortController | null>(null);
   const videoUploadCancelledRef = useRef(false);
@@ -1186,13 +1107,13 @@ export default function ProjectDetailsPage() {
 
   const [activeTool, setActiveTool] = useState<ToolKey>("media");
 
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
-  const [project, setProject] = useState<any>(null);
+  const [project, setProject] = useState<DocumentData | null>(null);
 
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState("Draft");
-  const [saving, setSaving] = useState(false);
+  const [, setSaving] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState("Saved");
   const [projectDeleting, setProjectDeleting] = useState(false);
   const [projectDeleteStatus, setProjectDeleteStatus] = useState("");
@@ -1203,22 +1124,23 @@ export default function ProjectDetailsPage() {
   const [localVideoSize, setLocalVideoSize] = useState("");
   const [localVideoBytes, setLocalVideoBytes] = useState(0);
   const [videoDuration, setVideoDuration] = useState(0);
-  const [videoRestored, setVideoRestored] = useState(false);
+  const [, setVideoRestored] = useState(false);
   const [localMediaRestoreChecked, setLocalMediaRestoreChecked] =
     useState(false);
   const [videoUploading, setVideoUploading] = useState(false);
   const [videoUploadProgress, setVideoUploadProgress] = useState(0);
   const [videoUploadStatus, setVideoUploadStatus] = useState("");
-  const [videoStorageMetadata, setVideoStorageMetadata] = useState<any>(null);
+  const [videoStorageMetadata, setVideoStorageMetadata] =
+    useState<DocumentData | null>(null);
   const [pendingCloudinaryUpload, setPendingCloudinaryUpload] =
     useState<TemporaryCloudinaryUpload | null>(null);
   const [cloudSyncing, setCloudSyncing] = useState(false);
-  const [cloudSyncStatus, setCloudSyncStatus] = useState("");
+  const [, setCloudSyncStatus] = useState("");
   const [cloudSyncError, setCloudSyncError] = useState("");
 
   const [localAudioURL, setLocalAudioURL] = useState("");
   const [localAudioName, setLocalAudioName] = useState("");
-  const [audioRestored, setAudioRestored] = useState(false);
+  const [, setAudioRestored] = useState(false);
 
   const [trimStart, setTrimStart] = useState(0);
   const [trimEnd, setTrimEnd] = useState(0);
@@ -1289,7 +1211,7 @@ export default function ProjectDetailsPage() {
   const [downloadName, setDownloadName] = useState("");
   const [engineReady, setEngineReady] = useState(false);
   const [enginePreparing, setEnginePreparing] = useState(false);
-  const [engineProgress, setEngineProgress] = useState(0);
+  const [, setEngineProgress] = useState(0);
   const [exportError, setExportError] = useState("");
   const [exportPhase, setExportPhase] = useState("idle");
   const [userExportRequested, setUserExportRequested] = useState(false);
@@ -1307,7 +1229,19 @@ export default function ProjectDetailsPage() {
   const inspectorRef = useRef<HTMLDivElement | null>(null);
   const projectLoadedRef = useRef(false);
   const initialAutoSaveSkippedRef = useRef(false);
-  const projectDataRef = useRef<any>(null);
+  const projectDataRef = useRef<DocumentData | null>(null);
+  const saveEditorSettingsRef = useRef<(silent?: boolean) => Promise<void>>(
+    async () => {},
+  );
+
+  const clearExportProgressTimer = useCallback(() => {
+    if (!exportProgressTimerRef.current) {
+      return;
+    }
+
+    clearInterval(exportProgressTimerRef.current);
+    exportProgressTimerRef.current = null;
+  }, []);
 
   const productionExportResolution =
     exportResolution === "1080p" ? "1080p" : "720p";
@@ -1426,21 +1360,21 @@ export default function ProjectDetailsPage() {
     projectLoadedRef.current = false;
     initialAutoSaveSkippedRef.current = false;
     cloudSyncAttemptedRef.current = "";
-    setCloudSyncing(false);
-    setCloudSyncStatus("");
-    setCloudSyncError("");
-    setLocalMediaRestoreChecked(false);
-    setProjectDeleteStatus("");
-    setProjectDeleteError("");
-    setAutoSaveStatus("Saved");
   }, [projectId]);
 
   useEffect(() => {
-    let unsubscribeProject: any;
+    let unsubscribeProject: Unsubscribe | undefined;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setChecking(false);
+      setCloudSyncing(false);
+      setCloudSyncStatus("");
+      setCloudSyncError("");
+      setLocalMediaRestoreChecked(false);
+      setProjectDeleteStatus("");
+      setProjectDeleteError("");
+      setAutoSaveStatus("Saved");
 
       if (unsubscribeProject) {
         unsubscribeProject();
@@ -1453,7 +1387,7 @@ export default function ProjectDetailsPage() {
 
         unsubscribeProject = onSnapshot(projectRef, (snapshot) => {
           if (snapshot.exists()) {
-            const data: any = {
+            const data: DocumentData = {
               id: snapshot.id,
               ...snapshot.data(),
             };
@@ -1617,9 +1551,11 @@ export default function ProjectDetailsPage() {
 
   useEffect(() => {
     let active = true;
-    setLocalMediaRestoreChecked(false);
 
     async function restoreLocalMedia() {
+      if (!active) return;
+      setLocalMediaRestoreChecked(false);
+
       try {
         const savedVideo = await getMediaFromBrowser(videoStorageKey);
 
@@ -1654,14 +1590,17 @@ export default function ProjectDetailsPage() {
       }
     }
 
-    restoreLocalMedia();
+    const restoreTimer = window.setTimeout(() => {
+      void restoreLocalMedia();
+    }, 0);
 
     return () => {
       active = false;
+      window.clearTimeout(restoreTimer);
     };
   }, [videoStorageKey, audioStorageKey]);
 
-  const syncOriginalVideoFromCloud = async (force = false) => {
+  const syncOriginalVideoFromCloud = useCallback(async (force = false) => {
     const fileId =
       typeof videoStorageMetadata?.fileId === "string"
         ? videoStorageMetadata.fileId
@@ -1715,7 +1654,7 @@ export default function ProjectDetailsPage() {
     } finally {
       setCloudSyncing(false);
     }
-  };
+  }, [projectId, videoStorageKey, videoStorageMetadata]);
 
   useEffect(() => {
     const fileId =
@@ -1727,12 +1666,19 @@ export default function ProjectDetailsPage() {
       return;
     }
 
-    void syncOriginalVideoFromCloud();
+    const syncTimer = window.setTimeout(() => {
+      void syncOriginalVideoFromCloud();
+    }, 0);
+
+    return () => {
+      window.clearTimeout(syncTimer);
+    };
   }, [
     videoStorageMetadata?.fileId,
     localMediaRestoreChecked,
     localVideoURL,
     cloudSyncing,
+    syncOriginalVideoFromCloud,
   ]);
 
   useEffect(() => {
@@ -1771,9 +1717,9 @@ export default function ProjectDetailsPage() {
       videoUploadCancelledRef.current = true;
       videoUploadInProgressRef.current = false;
     };
-  }, []);
+  }, [clearExportProgressTimer]);
 
-  function getPreviewOriginalVolume(currentTime: number) {
+  const getPreviewOriginalVolume = useCallback((currentTime: number) => {
     if (mutedOriginal) return 0;
 
     const baseVolume = Math.min(Math.max(videoVolume / 100, 0), 1);
@@ -1797,7 +1743,15 @@ export default function ProjectDetailsPage() {
     }
 
     return Math.min(1, Math.max(0, baseVolume * fadeMultiplier));
-  }
+  }, [
+    audioFadeIn,
+    audioFadeOut,
+    mutedOriginal,
+    trimEnd,
+    trimStart,
+    videoDuration,
+    videoVolume,
+  ]);
 
   useEffect(() => {
     if (!videoRef.current) return;
@@ -1817,6 +1771,7 @@ export default function ProjectDetailsPage() {
     trimStart,
     trimEnd,
     videoDuration,
+    getPreviewOriginalVolume,
   ]);
 
   useEffect(() => {
@@ -1832,33 +1787,37 @@ export default function ProjectDetailsPage() {
 
     let active = true;
 
-    setEnginePreparing(true);
-
-    preloadFFmpeg((progress) => {
+    const preloadTimer = window.setTimeout(() => {
       if (!active) return;
-      setEngineProgress(Math.min(100, Math.max(0, Math.round(progress))));
-    })
-      .then(() => {
-        if (!active) return;
-        setEngineReady(true);
-        setEngineProgress(100);
-        setExportPhase("");
-      })
-      .catch((error) => {
-        console.error("FFmpeg preload failed", error);
+      setEnginePreparing(true);
 
+      preloadFFmpeg((progress) => {
         if (!active) return;
-        resetFFmpeg();
-        setEngineReady(false);
-        setEngineProgress(0);
+        setEngineProgress(Math.min(100, Math.max(0, Math.round(progress))));
       })
-      .finally(() => {
-        if (!active) return;
-        setEnginePreparing(false);
-      });
+        .then(() => {
+          if (!active) return;
+          setEngineReady(true);
+          setEngineProgress(100);
+          setExportPhase("");
+        })
+        .catch((error) => {
+          console.error("FFmpeg preload failed", error);
+
+          if (!active) return;
+          resetFFmpeg();
+          setEngineReady(false);
+          setEngineProgress(0);
+        })
+        .finally(() => {
+          if (!active) return;
+          setEnginePreparing(false);
+        });
+    }, 0);
 
     return () => {
       active = false;
+      window.clearTimeout(preloadTimer);
     };
   }, [activeTool, localVideoURL, engineReady, enginePreparing]);
 
@@ -1866,8 +1825,8 @@ export default function ProjectDetailsPage() {
     try {
       await signOut(auth);
       router.push("/");
-    } catch (error: any) {
-      alert(error.message);
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Sign out failed.");
     }
   };
 
@@ -1925,30 +1884,6 @@ export default function ProjectDetailsPage() {
     void handleUploadVideo(file);
   };
 
-  const handleAudioSelect = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-
-    if (!file) return;
-
-    if (!file.type.startsWith("audio/")) {
-      alert("Please select an audio/music file");
-      return;
-    }
-
-    const url = URL.createObjectURL(file);
-
-    setLocalAudioURL(url);
-    setLocalAudioName(file.name);
-    setAudioRestored(false);
-    resetExportState();
-
-    try {
-      await saveMediaToBrowser(audioStorageKey, file);
-    } catch {
-      alert("Sound preview works, but browser could not save it locally.");
-    }
-  };
-
   const handleClearLocalMedia = async () => {
     const confirmed = confirm(
       "Clear locally saved video and music for this project?"
@@ -1976,8 +1911,8 @@ export default function ProjectDetailsPage() {
       setLocalAudioName("");
       setAudioRestored(false);
       resetExportState();
-    } catch (error: any) {
-      alert(error.message);
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Local media cleanup failed.");
     }
   };
 
@@ -2029,15 +1964,7 @@ export default function ProjectDetailsPage() {
     setReframeY(0);
   };
 
-  const applyEffectPreset = (
-    preset:
-      | "clean"
-      | "cinematic"
-      | "warm"
-      | "mono"
-      | "soft"
-      | "punchy"
-  ) => {
+  const applyEffectPreset = (preset: EffectPreset) => {
     if (preset === "clean") {
       setBrightness(100);
       setContrast(100);
@@ -2110,19 +2037,6 @@ export default function ProjectDetailsPage() {
     setVideoUploadStatus("");
     setVideoStorageMetadata(null);
     setPendingCloudinaryUpload(null);
-  };
-
-  const handleCancelVideoUpload = () => {
-    videoUploadRunIdRef.current += 1;
-    videoUploadCancelledRef.current = true;
-    videoUploadRequestRef.current?.abort();
-    videoUploadRequestRef.current = null;
-    videoUploadCopyAbortRef.current?.abort();
-    videoUploadCopyAbortRef.current = null;
-    videoUploadInProgressRef.current = false;
-    setVideoUploading(false);
-    setVideoUploadProgress(0);
-    setVideoUploadStatus("");
   };
 
   const handleUploadVideo = async (selectedFile?: File) => {
@@ -2346,15 +2260,6 @@ export default function ProjectDetailsPage() {
     setDownloadName("");
   };
 
-  const clearExportProgressTimer = () => {
-    if (!exportProgressTimerRef.current) {
-      return;
-    }
-
-    clearInterval(exportProgressTimerRef.current);
-    exportProgressTimerRef.current = null;
-  };
-
   const updateExportProgress = (
     runId: number,
     source: string,
@@ -2563,10 +2468,6 @@ export default function ProjectDetailsPage() {
     const exportEnd = Number(trimEnd || videoDuration || 0);
     const exportStart = Number(trimStart) || 0;
     let runId = exportRunIdRef.current;
-    const exportStartedAt = performance.now();
-    let sourceLoadedAt = exportStartedAt;
-    let renderingStartedAt = exportStartedAt;
-    let renderingCompletedAt = exportStartedAt;
 
     if (exportEnd > 0 && exportStart >= exportEnd) {
       alert("Trim start should be less than trim end");
@@ -2607,10 +2508,8 @@ export default function ProjectDetailsPage() {
         throw new Error("Saved media is required before export.");
       }
 
-      sourceLoadedAt = performance.now();
       console.info("[Lumeo Export] source loaded", {
         projectId,
-        elapsedMs: Math.round(sourceLoadedAt - exportStartedAt),
         source: localVideoURL ? "device" : "saved-source",
       });
 
@@ -2625,11 +2524,9 @@ export default function ProjectDetailsPage() {
         reframe: currentReframe,
       });
 
-      renderingStartedAt = performance.now();
       console.info("[Lumeo Export] rendering started", {
         projectId,
         quality: productionExportQualityLabel,
-        elapsedMs: Math.round(renderingStartedAt - exportStartedAt),
       });
       startStagedExportProgress(runId, "Rendering video...", 22, 88, 1400);
 
@@ -2676,11 +2573,8 @@ export default function ProjectDetailsPage() {
 
       if (runId !== exportRunIdRef.current) return;
 
-      renderingCompletedAt = performance.now();
       console.info("[Lumeo Export] rendering completed", {
         projectId,
-        elapsedMs: Math.round(renderingCompletedAt - exportStartedAt),
-        renderMs: Math.round(renderingCompletedAt - renderingStartedAt),
         transformFallbackUsed: payload.exportInfo?.transformFallbackUsed,
         transformVariant: payload.exportInfo?.transformVariant,
       });
@@ -2694,7 +2588,6 @@ export default function ProjectDetailsPage() {
       console.info("[Lumeo Export] download prepared", {
         projectId,
         fileName: payload.fileName,
-        elapsedMs: Math.round(performance.now() - exportStartedAt),
       });
       updateExportProgress(runId, "complete", 100, "Export ready");
       setExportStatus("Export ready");
@@ -2702,7 +2595,6 @@ export default function ProjectDetailsPage() {
     } catch (error) {
       console.error("[Lumeo Export] cloud export failed", {
         error,
-        elapsedMs: Math.round(performance.now() - exportStartedAt),
       });
 
       if (runId !== exportRunIdRef.current) {
@@ -2717,10 +2609,7 @@ export default function ProjectDetailsPage() {
     } finally {
       if (runId === exportRunIdRef.current) {
         setExporting(false);
-        console.info("[Lumeo Export] total export duration", {
-          projectId,
-          totalMs: Math.round(performance.now() - exportStartedAt),
-        });
+        console.info("[Lumeo Export] export finished", { projectId });
       }
     }
   };
@@ -2800,7 +2689,7 @@ export default function ProjectDetailsPage() {
       updateExportProgress(runId, "complete", 100, "Export complete");
       setExportStatus("Export complete");
       setExportPhase("Export complete");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Video export failed", { failurePoint, error });
 
       if (runId !== exportRunIdRef.current) {
@@ -2883,7 +2772,7 @@ export default function ProjectDetailsPage() {
       updateExportProgress(runId, "complete", 100, "Export complete");
       setExportStatus("Export complete");
       setExportPhase("Export complete");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Audio extraction failed", { failurePoint, error });
 
       if (runId !== exportRunIdRef.current) {
@@ -3054,19 +2943,19 @@ export default function ProjectDetailsPage() {
       await updateDoc(doc(db, "projects", projectId), buildEditorUpdatePayload());
 
       setAutoSaveStatus("Saved");
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Editor settings save failed", error);
       if (!silent) {
-        alert(error.message);
+        alert(error instanceof Error ? error.message : "Editor settings save failed.");
       }
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSave = async () => {
-    await saveEditorSettings(false);
-  };
+  useEffect(() => {
+    saveEditorSettingsRef.current = saveEditorSettings;
+  });
 
   useEffect(() => {
     if (!user || !projectId || !projectLoadedRef.current) return;
@@ -3083,7 +2972,7 @@ export default function ProjectDetailsPage() {
     setAutoSaveStatus("Saving...");
 
     autoSaveTimerRef.current = setTimeout(() => {
-      void saveEditorSettings(true);
+      void saveEditorSettingsRef.current(true);
     }, 900);
 
     return () => {
@@ -4247,17 +4136,17 @@ export default function ProjectDetailsPage() {
         <Panel title="Visual Effects" subtitle="Apply presets or tune the look manually.">
           <div className="space-y-6">
             <div className="grid grid-cols-2 gap-2">
-              {[
+              {([
                 ["clean", "Clean"],
                 ["cinematic", "Cinematic"],
                 ["warm", "Warm"],
                 ["mono", "Mono"],
                 ["soft", "Soft"],
                 ["punchy", "Punchy"],
-              ].map(([key, label]) => (
+              ] satisfies Array<[EffectPreset, string]>).map(([key, label]) => (
                 <button
                   key={key}
-                  onClick={() => applyEffectPreset(key as any)}
+                  onClick={() => applyEffectPreset(key)}
                   className="rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-3 text-sm font-black text-white/68 transition hover:bg-white hover:text-black"
                 >
                   {label}

@@ -1,7 +1,8 @@
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import type { User } from "firebase/auth";
 
-export async function saveUserProfile(user: any) {
+export async function saveUserProfile(user: User | null) {
   if (!user) return;
 
   const userRef = doc(db, "users", user.uid);

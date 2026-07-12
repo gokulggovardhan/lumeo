@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithPopup } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  type AuthError,
+} from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { saveUserProfile } from "@/lib/userProfile";
 
@@ -46,8 +50,8 @@ export default function LoginPage() {
     const result = await signInWithPopup(auth, googleProvider);
     await saveUserProfile(result.user);
     router.push("/dashboard");
-  } catch (error: any) {
-    const code = error?.code || "";
+  } catch (error: unknown) {
+    const code = (error as Partial<AuthError>)?.code || "";
 
     if (
       code === "auth/popup-closed-by-user" ||

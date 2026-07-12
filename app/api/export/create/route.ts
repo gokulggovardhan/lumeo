@@ -546,10 +546,7 @@ function resolveExportSettings(
   const resolution = normalizeResolution(
     bodySettings?.resolution || project.editor?.exportSettings?.resolution,
   );
-  const fps = normalizeFps(
-    resolution,
-    bodySettings?.fps || project.editor?.exportSettings?.fps,
-  );
+  const fps = normalizeFps();
   const background = normalizeBackgroundSettings(
     bodySettings?.background,
     project.editor?.canvas,
@@ -637,10 +634,7 @@ function normalizeResolution(value: unknown): ExportResolution {
   return value === "1080p" ? "1080p" : "720p";
 }
 
-function normalizeFps(
-  resolution: ExportResolution,
-  value: unknown,
-): ExportFps {
+function normalizeFps(): ExportFps {
   return 30;
 }
 

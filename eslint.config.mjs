@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Copied verbatim from @ffmpeg/core by scripts/copy-ffmpeg-core.mjs.
+    "public/ffmpeg/**",
   ]),
 ]);
 

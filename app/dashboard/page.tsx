@@ -3,21 +3,25 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, type Unsubscribe, type User } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { createProject, listenToUserProjects } from "@/lib/projects";
+import {
+  createProject,
+  listenToUserProjects,
+  type ProjectSummary,
+} from "@/lib/projects";
 import { saveUserProfile } from "@/lib/userProfile";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [checking, setChecking] = useState(true);
-  const [projects, setProjects] = useState<any[]>([]);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [projectTitle, setProjectTitle] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    let unsubscribeProjects: any;
+    let unsubscribeProjects: Unsubscribe | undefined;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
@@ -51,8 +55,8 @@ export default function DashboardPage() {
     try {
       await signOut(auth);
       router.push("/");
-    } catch (error: any) {
-      alert(error.message);
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Sign out failed.");
     }
   };
 
@@ -68,8 +72,8 @@ export default function DashboardPage() {
       setSaving(true);
       await createProject(user, projectTitle.trim(), "Video Project");
       setProjectTitle("");
-    } catch (error: any) {
-      alert(error.message);
+    } catch (error: unknown) {
+      alert(error instanceof Error ? error.message : "Project creation failed.");
     } finally {
       setSaving(false);
     }

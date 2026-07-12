@@ -8,6 +8,7 @@ export type TargetOutcome =
 export type TargetQualityOutlook =
   | "Excellent"
   | "Good"
+  | "Moderate"
   | "Aggressive"
   | "Extreme"
   | "Unlikely";
@@ -96,6 +97,7 @@ export function qualityOutlookForTarget(
   const bytesPerPage = targetBytes / Math.max(1, pageCount);
   if (ratio >= 0.68 && bytesPerPage >= 110_000) return "Excellent";
   if (ratio >= 0.42 && bytesPerPage >= 70_000) return "Good";
+  if (ratio >= 0.32 && bytesPerPage >= 55_000) return "Moderate";
   if (ratio >= 0.24 && bytesPerPage >= 45_000) return "Aggressive";
   if (ratio >= 0.12 && bytesPerPage >= 28_000) return "Extreme";
   return "Unlikely";

@@ -2,7 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
+import {
+  onAuthStateChanged,
+  signInWithPopup,
+  signOut,
+  type AuthError,
+  type User,
+} from "firebase/auth";
 import { auth, googleProvider } from "@/lib/firebase";
 import { saveUserProfile } from "@/lib/userProfile";
 
@@ -21,7 +27,7 @@ function MiniSpinner({ dark = false }: { dark?: boolean }) {
 
 export default function AuthButton() {
   const router = useRouter();
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -59,8 +65,8 @@ export default function AuthButton() {
       const result = await signInWithPopup(auth, googleProvider);
       await saveUserProfile(result.user);
       router.push("/dashboard");
-    } catch (error: any) {
-      const code = error?.code || "";
+    } catch (error: unknown) {
+      const code = (error as Partial<AuthError>)?.code || "";
 
       if (
         code === "auth/popup-closed-by-user" ||
