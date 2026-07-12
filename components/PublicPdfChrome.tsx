@@ -1,11 +1,13 @@
-import Link from "next/link";
+// components/PublicPdfChrome.tsx
+
 import Image from "next/image";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { PdfToolSwitcher } from "@/components/pdf/PdfToolSwitcher";
 
 export function LumeoSealMark() {
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#C9A84C]/28 bg-[#F0EAD6] p-0.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#F0EAD6] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
       <Image
         src="/brand/lumeo-pdf-mark.png"
         alt=""
@@ -25,14 +27,14 @@ export function BrandLockup({
   tone?: "light" | "dark";
   markSize?: string;
 }) {
-  const primaryText = tone === "dark" ? "text-[#1C1710]" : "text-[#F0EAD6]";
+  const primaryText = tone === "dark" ? "text-[#151A22]" : "text-[#F0EAD6]";
   const secondaryText =
-    tone === "dark" ? "text-[#1E6B4A]" : "text-[#F0EAD6]/54";
+    tone === "dark" ? "text-[#1E6B4A]" : "text-[#CBA052]/72";
 
   return (
     <span className="flex min-w-0 items-center gap-3">
       <span
-        className={`flex shrink-0 items-center justify-center rounded-lg border border-[#C9A84C]/28 bg-[#F0EAD6] p-0.5 shadow-[0_10px_30px_rgba(0,0,0,0.18)] ${markSize}`}
+        className={`flex shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#F0EAD6] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)] ${markSize}`}
       >
         <Image
           src="/brand/lumeo-pdf-mark.png"
@@ -43,14 +45,15 @@ export function BrandLockup({
           priority
         />
       </span>
+
       <span className="min-w-0 leading-none">
         <span
-          className={`block font-serif text-[1.35rem] leading-none tracking-[-0.02em] ${primaryText}`}
+          className={`block text-[1.25rem] font-bold leading-none tracking-[-0.025em] ${primaryText}`}
         >
           Lumeo
         </span>
         <span
-          className={`mt-1 block text-[0.58rem] font-bold uppercase tracking-[0.19em] ${secondaryText}`}
+          className={`mt-1 block text-[0.54rem] font-bold uppercase tracking-[0.19em] ${secondaryText}`}
         >
           PDF Workspace
         </span>
@@ -59,11 +62,20 @@ export function BrandLockup({
   );
 }
 
-export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }) {
+function HomeIcon() {
   return (
-    <nav className="border-b border-[#E8DFC8]/12 px-5 py-2 sm:px-8">
-      <div className={`mx-auto flex ${maxWidth} items-center justify-between gap-4`}>
-        <Link href="/" className="flex min-w-0 items-center">
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[1.05rem] w-[1.05rem]" fill="none">
+      <path d="m5 11 7-6 7 6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
+      <path d="M7.5 10.5v7.2h9v-7.2" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
+export function PublicNav({ maxWidth = "max-w-[1160px]" }: { maxWidth?: string }) {
+  return (
+    <nav className="lumeo-nav-enter relative z-30 border-b border-[#E8DFC8]/8 bg-[#0C1220]/92 px-5 backdrop-blur-xl sm:px-8">
+      <div className={`mx-auto flex h-[70px] ${maxWidth} items-center justify-between gap-4`}>
+        <Link href="/" className="flex min-w-0 items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45">
           <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
         </Link>
 
@@ -73,30 +85,9 @@ export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }
             href="/"
             aria-label="Go to Lumeo PDF home"
             title="Home"
-            className="group inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#E8DFC8]/16 px-3 text-[#F0EAD6]/62 transition hover:border-[#E8DFC8]/32 hover:bg-[#F0EAD6]/[0.035] hover:text-[#F0EAD6] sm:h-11 sm:px-3.5"
+            className="lumeo-press lumeo-focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.02] text-[#F0EAD6]/64 transition hover:border-[#CBA052]/28 hover:bg-[#CBA052]/[0.08] hover:text-[#D8BC7A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45 sm:h-11 sm:w-11"
           >
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="h-5 w-5"
-              fill="none"
-            >
-              <path
-                d="m5 11 7-6 7 6"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-              />
-              <path
-                d="M7.5 10.5v7.2h9v-7.2"
-                stroke="currentColor"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="1.8"
-              />
-            </svg>
-            <span className="hidden text-xs font-semibold sm:inline">Home</span>
+            <HomeIcon />
           </Link>
         </div>
       </div>
@@ -106,7 +97,7 @@ export function PublicNav({ maxWidth = "max-w-[1360px]" }: { maxWidth?: string }
 
 export function PublicPageShell({
   children,
-  maxWidth = "max-w-[1360px]",
+  maxWidth = "max-w-[1160px]",
   contentClassName = "px-5 py-8 sm:px-8 lg:py-10",
   mainClassName = "min-h-screen bg-[#0C1220] text-[#F0EAD6]",
 }: {
@@ -116,10 +107,15 @@ export function PublicPageShell({
   mainClassName?: string;
 }) {
   return (
-    <main className={mainClassName}>
-      <PublicNav maxWidth={maxWidth} />
-      <div className={`mx-auto ${maxWidth} ${contentClassName}`}>
-        {children}
+    <main className={`lumeo-page-enter relative overflow-x-hidden ${mainClassName}`}>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="lumeo-ambient absolute -left-44 -top-48 h-[32rem] w-[32rem] rounded-full bg-[#0D2C6D]/20 blur-[150px]" />
+        <div className="lumeo-ambient absolute -right-44 top-0 [animation-delay:-4s] h-[30rem] w-[30rem] rounded-full bg-[#CBA052]/[0.06] blur-[155px]" />
+      </div>
+
+      <div className="relative z-10">
+        <PublicNav maxWidth={maxWidth} />
+        <div className={`mx-auto ${maxWidth} ${contentClassName}`}>{children}</div>
       </div>
     </main>
   );
@@ -136,52 +132,25 @@ export function ToolPlaceholder({
 }) {
   return (
     <PublicPageShell
-      mainClassName="min-h-screen bg-[#0C1220] text-[#F0EAD6] lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden"
-      contentClassName="px-5 py-8 sm:px-8 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:justify-center lg:overflow-hidden lg:py-6"
+      mainClassName="min-h-dvh bg-[#0C1220] text-[#F0EAD6]"
+      contentClassName="px-5 py-14 sm:px-8 sm:py-20"
+      maxWidth="max-w-[820px]"
     >
-      <section className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-end">
-        <div>
-          <p className="mb-3 text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
-            PDF workspace
-          </p>
-          <h1 className="font-serif text-4xl tracking-[-0.02em] text-[#F0EAD6] sm:text-6xl">
-            {title}
-          </h1>
-          <p className="mt-4 max-w-2xl text-base leading-7 text-[#F0EAD6]/55">
-            {description}
-          </p>
-        </div>
-        <div className="rounded-xl border border-[#E8DFC8]/12 bg-[#1A2840]/72 p-4 text-sm leading-6 text-[#F0EAD6]/52">
-          Tool engine coming next. This page is a preview of the document
-          workspace layout and does not upload files.
-        </div>
-      </section>
+      <section className="mx-auto text-center">
+        <p className="text-[0.64rem] font-bold uppercase tracking-[0.2em] text-[#CBA052]">
+          Coming next
+        </p>
+        <h1 className="mt-4 text-4xl font-bold tracking-[-0.04em] text-[#F0EAD6] sm:text-6xl">
+          {title}
+        </h1>
+        <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[#F0EAD6]/60 sm:text-lg sm:leading-8">
+          {description}
+        </p>
 
-      <section className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-xl border border-dashed border-[#C9A84C]/35 bg-[#F0EAD6] p-7 text-[#1C1710] shadow-2xl shadow-black/20 sm:p-8">
-          <div className="mb-4 flex justify-start">
-            <BrandLockup tone="dark" markSize="h-10 w-10" />
-          </div>
-          <h2 className="font-serif text-3xl tracking-[-0.01em]">
-            Document tray preview
-          </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-[#1C1710]/68">
-            This workspace will accept {accepted}. The processing engine is
-            coming next, so no files are uploaded from this placeholder.
-          </p>
-          <p className="mt-5 inline-flex rounded-full border border-[#1E6B4A]/20 bg-[#1E6B4A]/10 px-4 py-2 text-xs font-bold text-[#1E6B4A]">
-            Tool engine coming next.
-          </p>
-        </div>
-        <div className="rounded-xl border border-[#E8DFC8]/14 bg-[#1A2840] p-5 shadow-2xl shadow-black/20">
-          <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#C9A84C]">
-            Privacy approach
-          </p>
-          <p className="mt-4 text-sm font-medium leading-6 text-[#F0EAD6]/50">
-            Most tools are designed to run in your browser where possible. If
-            server processing is required later, files should be temporary and
-            handled with clear deletion rules.
-          </p>
+        <div className="mx-auto mt-10 max-w-2xl rounded-[24px] border border-[#E8DFC8]/8 bg-[#111A2B]/92 px-6 py-8 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:px-8">
+          <p className="text-xl font-bold text-[#F0EAD6]">This workspace is being prepared.</p>
+          <p className="mt-3 text-sm leading-6 text-[#F0EAD6]/54">Accepted format: {accepted}</p>
+          <p className="mt-5 text-xs font-semibold text-[#9FD0B5]">Private by design · Browser-first where possible</p>
         </div>
       </section>
     </PublicPageShell>

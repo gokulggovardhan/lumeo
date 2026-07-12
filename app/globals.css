@@ -3,8 +3,12 @@
 :root {
   --background: #0c1220;
   --foreground: #f0ead6;
-  --font-sans: var(--font-dm-sans), Arial, Helvetica, sans-serif;
+  --font-sans: var(--font-manrope), Arial, Helvetica, sans-serif;
   --font-serif: var(--font-dm-serif), Georgia, serif;
+  --lumeo-gold: #cba052;
+  --lumeo-green: #1e6b4a;
+  --lumeo-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --lumeo-spring: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 * {
@@ -19,11 +23,31 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-dm-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a {
+  touch-action: manipulation;
+}
+
+button:active:not(:disabled),
+a:active {
+  transform: scale(0.985);
 }
 
 ::selection {
-  background: rgba(201, 168, 76, 0.35);
+  background: rgba(203, 160, 82, 0.34);
+  color: #fffdf7;
 }
 
 .no-scrollbar {
@@ -33,4 +57,268 @@ body {
 
 .no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+.lumeo-page-enter {
+  animation: lumeo-page-enter 640ms var(--lumeo-ease) both;
+}
+
+.lumeo-fade-up {
+  animation: lumeo-fade-up 620ms var(--lumeo-ease) both;
+}
+
+.lumeo-fade-up-delay-1 {
+  animation-delay: 70ms;
+}
+
+.lumeo-fade-up-delay-2 {
+  animation-delay: 140ms;
+}
+
+.lumeo-fade-up-delay-3 {
+  animation-delay: 210ms;
+}
+
+.lumeo-card {
+  transform: translateZ(0);
+  transition:
+    transform 220ms var(--lumeo-spring),
+    border-color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 260ms var(--lumeo-ease);
+}
+
+.lumeo-card:hover {
+  transform: translateY(-5px) scale(1.006);
+}
+
+.lumeo-card:active {
+  transform: translateY(-1px) scale(0.992);
+}
+
+.lumeo-card-icon {
+  transition:
+    transform 260ms var(--lumeo-spring),
+    color 200ms ease,
+    background-color 200ms ease,
+    border-color 200ms ease,
+    box-shadow 260ms ease;
+}
+
+.lumeo-card:hover .lumeo-card-icon {
+  transform: translateY(-2px) rotate(-1.5deg) scale(1.045);
+  box-shadow: 0 14px 34px rgba(203, 160, 82, 0.11);
+}
+
+.lumeo-arrow {
+  transition:
+    transform 240ms var(--lumeo-spring),
+    color 180ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+
+.lumeo-card:hover .lumeo-arrow {
+  transform: translateX(4px);
+}
+
+.lumeo-shine {
+  position: relative;
+  overflow: hidden;
+}
+
+.lumeo-shine::after {
+  position: absolute;
+  inset: -120% auto -120% -45%;
+  width: 32%;
+  content: "";
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(240, 234, 214, 0.09),
+    transparent
+  );
+  transform: rotate(18deg);
+  transition: left 680ms var(--lumeo-ease);
+}
+
+.lumeo-shine:hover::after {
+  left: 125%;
+}
+
+.lumeo-press {
+  transition:
+    transform 170ms var(--lumeo-spring),
+    box-shadow 220ms ease,
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.lumeo-press:hover {
+  transform: translateY(-2px);
+}
+
+.lumeo-press:active {
+  transform: translateY(0) scale(0.975);
+}
+
+.lumeo-primary-action {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.lumeo-primary-action::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background: linear-gradient(
+    105deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.16) 48%,
+    transparent 76%
+  );
+  transform: translateX(-145%);
+  transition: transform 620ms var(--lumeo-ease);
+}
+
+.lumeo-primary-action:hover::before {
+  transform: translateX(145%);
+}
+
+.lumeo-upload-surface {
+  transition:
+    transform 240ms var(--lumeo-spring),
+    border-color 220ms ease,
+    box-shadow 260ms ease,
+    background-color 220ms ease;
+}
+
+.lumeo-upload-surface:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.33),
+    0 0 0 1px rgba(203, 160, 82, 0.06);
+}
+
+.lumeo-upload-surface:focus-within {
+  border-color: rgba(203, 160, 82, 0.42);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.33),
+    0 0 0 4px rgba(203, 160, 82, 0.08);
+}
+
+.lumeo-ambient {
+  animation: lumeo-ambient 12s ease-in-out infinite alternate;
+}
+
+.lumeo-nav-enter {
+  animation: lumeo-nav-enter 520ms var(--lumeo-ease) both;
+}
+
+.lumeo-soft-pulse {
+  animation: lumeo-soft-pulse 2.8s ease-in-out infinite;
+}
+
+.lumeo-status-dot {
+  animation: lumeo-status-dot 2.2s ease-in-out infinite;
+}
+
+.lumeo-focus-ring:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 2px #0c1220,
+    0 0 0 4px rgba(203, 160, 82, 0.58);
+}
+
+@keyframes lumeo-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+    filter: blur(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes lumeo-nav-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lumeo-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes lumeo-ambient {
+  0% {
+    transform: translate3d(-1.5%, -1%, 0) scale(0.98);
+  }
+  100% {
+    transform: translate3d(2%, 1.5%, 0) scale(1.05);
+  }
+}
+
+@keyframes lumeo-soft-pulse {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes lumeo-status-dot {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(30, 107, 74, 0.28);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(30, 107, 74, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  button:active:not(:disabled),
+  a:active,
+  .lumeo-card:hover,
+  .lumeo-card:active,
+  .lumeo-press:hover,
+  .lumeo-press:active,
+  .lumeo-upload-surface:hover {
+    transform: none !important;
+  }
 }
