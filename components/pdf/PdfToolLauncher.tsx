@@ -1,9 +1,11 @@
+// components/pdf/PdfToolLauncher.tsx
+
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { pdfTools } from "./PdfToolRegistry";
 import type { PdfToolDefinition, PdfToolSlug } from "./PdfToolRegistry";
 
-function ToolGlyph({ slug, live }: { slug: PdfToolSlug; live: boolean }) {
+function ToolGlyph({ slug }: { slug: PdfToolSlug }) {
   const paths: Record<PdfToolSlug, ReactNode> = {
     merge: (
       <>
@@ -25,154 +27,81 @@ function ToolGlyph({ slug, live }: { slug: PdfToolSlug; live: boolean }) {
         <path d="m9 9.5 3 3 3-3M9 15.5l3-3 3 3" />
       </>
     ),
-    "jpg-to-pdf": (
-      <>
-        <path d="M4.5 6h8.5v7H4.5V6Z" />
-        <path d="m5.5 12 2.2-2.2 1.4 1.4 1.3-1.2 1.6 2" />
-        <path d="M15 9.5h4.5v8H10.5v-2" />
-      </>
-    ),
-    "pdf-to-jpg": (
-      <>
-        <path d="M5.5 4.5h8l3 3V14h-11V4.5Z" />
-        <path d="M13.5 4.8v3h3" />
-        <path d="M10.5 15.5h9v4h-9v-4Z" />
-      </>
-    ),
+    "jpg-to-pdf": <path d="M4.5 6h8.5v7H4.5V6Zm10.5 3.5h4.5v8H10.5v-2" />,
+    "pdf-to-jpg": <path d="M5.5 4.5h8l3 3V14h-11V4.5Zm5 11h9v4h-9v-4Z" />,
   };
 
   return (
     <span
       aria-hidden="true"
-      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${
-        live
-          ? "border-[#1E6B4A]/28 bg-[#1E6B4A]/12 text-[#8DD0AB]"
-          : "border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.025] text-[#F0EAD6]/34"
-      }`}
+      className="lumeo-card-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#CBA052]/22 bg-[linear-gradient(145deg,rgba(203,160,82,0.14),rgba(30,107,74,0.08))] text-[#D8BC7A] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
     >
-      <svg
-        viewBox="0 0 24 24"
-        className="h-5 w-5"
-        fill="none"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="1.55"
-      >
+      <svg viewBox="0 0 24 24" className="h-[1.3rem] w-[1.3rem]" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.55">
         {paths[slug]}
       </svg>
     </span>
   );
 }
 
-function LiveToolCard({ tool }: { tool: PdfToolDefinition }) {
+function ArrowIcon() {
   return (
-    <li>
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+      <path d="M5 12h14M14 7l5 5-5 5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function LiveToolCard({ tool, index }: { tool: PdfToolDefinition; index: number }) {
+  return (
+    <li className="lumeo-fade-up min-w-0" style={{ animationDelay: `${index * 80}ms` }}>
       <Link
         href={tool.route}
         aria-label={`Open ${tool.title} workspace`}
-        className="group flex h-full min-h-[9.5rem] flex-col rounded-2xl border border-[#E8DFC8]/10 bg-[#0C1423]/78 p-4 transition duration-200 hover:border-[#C9A84C]/28 hover:bg-[#111C2D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C9A84C]/55 motion-reduce:transition-none"
+        className="lumeo-card lumeo-shine group relative flex h-full min-h-[10.75rem] flex-col overflow-hidden rounded-[22px] border border-[#E8DFC8]/8 bg-[linear-gradient(180deg,rgba(17,26,43,0.98),rgba(13,21,36,0.98))] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(240,234,214,0.035)] transition duration-200 hover:-translate-y-1 hover:border-[#CBA052]/30 hover:shadow-[0_24px_58px_rgba(0,0,0,0.38),0_0_28px_rgba(203,160,82,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/50 motion-reduce:transform-none sm:p-6"
       >
-        <div className="flex items-start justify-between gap-3">
-          <ToolGlyph slug={tool.slug} live />
-          <span className="inline-flex items-center gap-1.5 text-[0.62rem] font-bold uppercase tracking-[0.14em] text-[#A8E0C1]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#55B581]" />
-            Ready
+        <div aria-hidden="true" className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/48 to-transparent opacity-60 transition group-hover:opacity-100" />
+
+        <div className="flex items-start justify-between gap-4">
+          <ToolGlyph slug={tool.slug} />
+          <span className="lumeo-arrow flex h-9 w-9 items-center justify-center rounded-full border border-[#E8DFC8]/9 bg-[#F0EAD6]/[0.02] text-[#CBA052] transition duration-200 group-hover:translate-x-0.5 group-hover:border-[#CBA052]/28 group-hover:bg-[#CBA052]/[0.08] motion-reduce:transform-none">
+            <ArrowIcon />
           </span>
         </div>
-        <h2 className="mt-4 font-serif text-xl tracking-[-0.015em] text-[#F0EAD6]">
+
+        <h2 className="mt-5 text-[1.28rem] font-bold tracking-[-0.025em] text-[#F0EAD6]">
           {tool.title}
         </h2>
-        <p className="mt-1.5 text-xs leading-5 text-[#F0EAD6]/46">
+        <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/60">
           {tool.description}
         </p>
-        <span className="mt-auto pt-4 text-xs font-bold text-[#C9A84C]">
-          Open workspace
-        </span>
       </Link>
     </li>
   );
 }
 
-function PlannedToolCard({ tool }: { tool: PdfToolDefinition }) {
-  return (
-    <li>
-      <article className="flex h-full min-h-[8.5rem] flex-col rounded-2xl border border-[#E8DFC8]/8 bg-[#0A101C]/48 p-4">
-        <div className="flex items-start justify-between gap-3">
-          <ToolGlyph slug={tool.slug} live={false} />
-          <span className="text-[0.62rem] font-bold uppercase tracking-[0.14em] text-[#F0EAD6]/38">
-            Soon
-          </span>
-        </div>
-        <h2 className="mt-3 font-serif text-lg text-[#F0EAD6]/68">
-          {tool.title}
-        </h2>
-        <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/36">
-          {tool.description}
-        </p>
-        <span className="mt-auto pt-3 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[#F0EAD6]/30">
-          In development
-        </span>
-      </article>
-    </li>
-  );
-}
-
-export function PdfToolLauncher({
-  showHeading = true,
-}: {
-  showHeading?: boolean;
-}) {
+export function PdfToolLauncher({ showHeading = true }: { showHeading?: boolean }) {
   const liveTools = pdfTools.filter((tool) => tool.status === "live");
-  const plannedTools = pdfTools.filter((tool) => tool.status !== "live");
 
   return (
-    <section
-      aria-label="PDF tools"
-      className="rounded-[24px] border border-[#E8DFC8]/12 bg-[#111A2A]/88 p-4 shadow-[inset_0_1px_0_rgba(240,234,214,0.04),0_28px_80px_rgba(0,0,0,0.22)] sm:p-5"
-    >
+    <section aria-label="PDF tools">
       {showHeading ? (
-        <header className="mb-5">
-          <h1 className="font-serif text-3xl leading-tight tracking-[-0.025em] text-[#F0EAD6] sm:text-4xl">
-            PDF Tools
-          </h1>
-          <p className="mt-1.5 text-sm text-[#F0EAD6]/46">
-            Choose a workspace to begin.
+        <header className="mb-7 text-center">
+          <p className="text-[0.63rem] font-bold uppercase tracking-[0.2em] text-[#CBA052]">
+            Lumeo PDF Workspace
           </p>
+          <h1 className="mt-3 text-4xl font-bold tracking-[-0.04em] text-[#F0EAD6] sm:text-5xl">
+            Choose a tool. Get it done.
+          </h1>
         </header>
-      ) : (
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <div>
-            <p className="text-[0.65rem] font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
-              Document tools
-            </p>
-            <p className="mt-1 text-sm text-[#F0EAD6]/46">
-              Choose the task you need.
-            </p>
-          </div>
-          <span className="hidden text-xs text-[#F0EAD6]/34 sm:inline">
-            {liveTools.length} ready
-          </span>
-        </div>
-      )}
+      ) : null}
 
       <nav aria-label="Available PDF tools">
-        <ul className="grid gap-3 sm:grid-cols-3">
-          {liveTools.map((tool) => (
-            <LiveToolCard key={tool.slug} tool={tool} />
+        <ul className="grid gap-4 md:grid-cols-3">
+          {liveTools.map((tool, index) => (
+            <LiveToolCard key={tool.slug} tool={tool} index={index} />
           ))}
         </ul>
       </nav>
-
-      <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-        {plannedTools.map((tool) => (
-          <PlannedToolCard key={tool.slug} tool={tool} />
-        ))}
-      </ul>
-
-      <p className="mt-4 border-t border-[#E8DFC8]/8 pt-3 text-center text-[0.7rem] font-semibold text-[#F0EAD6]/42 sm:text-left sm:text-xs">
-        Private by design &middot; Browser-only &middot; Cleared after download
-      </p>
     </section>
   );
 }

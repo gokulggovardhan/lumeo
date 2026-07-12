@@ -291,7 +291,7 @@ function CompressIcon() {
 
 function DocumentIcon() {
   return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#C9A84C]/22 bg-[#1E6B4A]/10 text-[#C9A84C]">
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#CBA052]/10 text-[#CBA052]">
       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
         <path d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z" stroke="currentColor" strokeWidth="1.7" />
         <path d="M14.1 4v3.3h3.2M9 12h6M9 15h4.4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.55" />
@@ -975,24 +975,23 @@ export default function CompressPdfTool() {
           setDragActive(false);
           handleFiles(event.dataTransfer.files);
         }}
-        className={`group relative w-full overflow-hidden rounded-xl border border-dashed px-5 py-7 shadow-2xl shadow-black/32 transition-all duration-300 sm:px-8 lg:px-10 lg:py-8 ${
+        className={`lumeo-upload-surface group relative mx-auto w-full max-w-[1040px] overflow-hidden rounded-[24px] border px-5 py-7 shadow-2xl shadow-black/32 transition-all duration-300 sm:px-8 lg:px-10 lg:py-8 ${
           dragActive
-            ? "border-[#C9A84C]/64 bg-[#1E6B4A]/14 shadow-[0_24px_70px_rgba(30,107,74,0.2)]"
-            : "border-[#E8DFC8]/18 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] hover:-translate-y-0.5 hover:border-[#C9A84C]/36"
+            ? "border-[#CBA052]/64 bg-[#CBA052]/14 shadow-[0_24px_70px_rgba(245,158,11,0.2)]"
+            : "border-[#FFFFFF]/18 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] hover:-translate-y-0.5 hover:border-[#CBA052]/36"
         }`}
       >
-        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#C9A84C]/42 to-transparent opacity-80" />
-        <div className="pointer-events-none absolute inset-0 opacity-[0.055] [background-image:linear-gradient(#F0EAD6_1px,transparent_1px),linear-gradient(90deg,#F0EAD6_1px,transparent_1px)] [background-size:42px_42px]" />
+        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/42 to-transparent opacity-80" />
         <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center">
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#C9A84C]/24 bg-[#0C1220]/64 text-[#C9A84C] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#1E6B4A]/14">
+            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#CBA052]/24 bg-[#0C1220]/64 text-[#CBA052] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#CBA052]/14">
               <CompressIcon />
             </span>
             <div>
-              <p className="text-2xl font-semibold tracking-[-0.02em] text-[#F0EAD6]">
+              <p className="text-2xl font-semibold tracking-[-0.02em] text-[#FFFFFF]">
                 Drop PDFs here
               </p>
-              <p className="mt-2 text-base text-[#F0EAD6]/52">
+              <p className="mt-2 text-base text-[#FFFFFF]/52">
                 or choose files from your device
               </p>
             </div>
@@ -1000,7 +999,7 @@ export default function CompressPdfTool() {
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
-            className="inline-flex w-full items-center justify-center rounded-full bg-[#1E6B4A] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(30,107,74,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98] sm:w-auto"
+            className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex w-full items-center justify-center rounded-full bg-[#1E6B4A] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(245,158,11,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98] sm:w-auto"
           >
             Select PDF
           </button>
@@ -1014,10 +1013,10 @@ export default function CompressPdfTool() {
       <section className="pb-4 lg:flex lg:h-full lg:flex-col lg:justify-center lg:pb-0">
         {uploadArea}
         <div className="mt-4 text-center">
-          <p className="text-sm font-semibold text-[#F0EAD6]/68">
+          <p className="text-sm font-semibold text-[#FFFFFF]/68">
             Private by design &middot; Browser-only &middot; Cleared after download
           </p>
-          <p className="mt-1 text-xs text-[#F0EAD6]/38">
+          <p className="mt-1 text-xs text-[#FFFFFF]/38">
             Files stay on your device for this tool.
           </p>
         </div>
@@ -1033,53 +1032,53 @@ export default function CompressPdfTool() {
   return (
     <section className="pb-28 lg:h-full lg:overflow-hidden lg:pb-0">
       <div className="grid h-full gap-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(340px,0.72fr)] lg:overflow-hidden 2xl:grid-cols-[minmax(0,1.95fr)_minmax(360px,0.72fr)]">
-        <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[#E8DFC8]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
+        <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
           <section className="shrink-0">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#C9A84C]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
                   Document profile
                 </p>
-                <p className="mt-0.5 text-xs text-[#F0EAD6]/48">
+                <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
                   Estimated local analysis.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={resetTool}
-                className="rounded-full border border-[#E8DFC8]/12 px-3 py-1.5 text-xs font-semibold text-[#F0EAD6]/56 transition hover:border-[#E8DFC8]/22 hover:text-[#F0EAD6]"
+                className="rounded-full border border-[#FFFFFF]/12 px-3 py-1.5 text-xs font-semibold text-[#FFFFFF]/56 transition hover:border-[#FFFFFF]/22 hover:text-[#FFFFFF]"
               >
                 Start new
               </button>
             </div>
-            <div className="grid gap-2 rounded-lg border border-[#E8DFC8]/10 bg-[#0A101C]/74 px-3 py-2 sm:grid-cols-[auto_1fr_auto] sm:items-center">
+            <div className="grid gap-2 rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/74 px-3 py-2 sm:grid-cols-[auto_1fr_auto] sm:items-center">
               <DocumentIcon />
               <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[#F0EAD6]">{analysis.name}</p>
-                <p className="mt-1 text-xs font-medium text-[#F0EAD6]/42">
+                <p className="truncate text-sm font-semibold text-[#FFFFFF]">{analysis.name}</p>
+                <p className="mt-1 text-xs font-medium text-[#FFFFFF]/42">
                   {analysis.pageCount} page{analysis.pageCount === 1 ? "" : "s"} · {formatFileSize(analysis.size)} · {analysis.pageSizeType}
                 </p>
               </div>
-              <span className="rounded-full border border-[#1E6B4A]/24 bg-[#1E6B4A]/10 px-3 py-1.5 text-xs font-semibold text-[#A8E0C1]">
+              <span className="rounded-full border border-[#CBA052]/24 bg-[#CBA052]/10 px-3 py-1.5 text-xs font-semibold text-[#9FD0B5]">
                 {displayStatus}
               </span>
             </div>
           </section>
 
-          <div className="grid gap-3 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
+          <div className="grid gap-3 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-[#F0EAD6]">
+              <p className="text-sm font-semibold text-[#FFFFFF]">
                 {analysis.opportunity === "High" ? "Image-heavy document" : analysis.opportunity === "Moderate" ? "Balanced document" : "Already compact document"}
               </p>
-              <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/48">
+              <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/48">
                 Compression opportunity: {analysis.opportunity} · Recommended: {profiles[analysis.recommendation].label}
               </p>
-              <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/38">
+              <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/38">
                 {opportunityCopy}
               </p>
             </div>
             {previewUrl ? (
-              <div className="hidden h-24 w-20 overflow-hidden rounded-lg border border-[#E8DFC8]/12 bg-[#F0EAD6]/[0.04] md:block">
+              <div className="hidden h-24 w-20 overflow-hidden rounded-lg border border-[#FFFFFF]/12 bg-[#FFFFFF]/[0.04] md:block">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={previewUrl} alt={`Representative preview of page ${analysis.samplePage}`} className="h-full w-full object-contain" />
               </div>
@@ -1087,77 +1086,77 @@ export default function CompressPdfTool() {
           </div>
 
           <div className="hidden gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/64 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Compression opportunity</p>
-              <p className="mt-2 text-2xl font-bold text-[#F0EAD6]">{analysis.opportunity}</p>
-              <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/42">{opportunityCopy}</p>
+            <div className="rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/64 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#CBA052]">Compression opportunity</p>
+              <p className="mt-2 text-2xl font-bold text-[#FFFFFF]">{analysis.opportunity}</p>
+              <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/42">{opportunityCopy}</p>
             </div>
-            <div className="rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/64 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Estimated image-heavy pages</p>
-              <p className="mt-2 text-2xl font-bold text-[#F0EAD6]">{Math.round(analysis.estimatedImageHeavyRatio * 100)}%</p>
-              <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/42">Based on local document signals, not remote analysis.</p>
+            <div className="rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/64 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#CBA052]">Estimated image-heavy pages</p>
+              <p className="mt-2 text-2xl font-bold text-[#FFFFFF]">{Math.round(analysis.estimatedImageHeavyRatio * 100)}%</p>
+              <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/42">Based on local document signals, not remote analysis.</p>
             </div>
-            <div className="rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/64 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Recommended for this document</p>
-              <p className="mt-2 text-2xl font-bold text-[#F0EAD6]">{profiles[analysis.recommendation].label}</p>
-              <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/42">{profileExplanation(analysis.opportunity)}</p>
+            <div className="rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/64 p-3">
+              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[#CBA052]">Recommended for this document</p>
+              <p className="mt-2 text-2xl font-bold text-[#FFFFFF]">{profiles[analysis.recommendation].label}</p>
+              <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/42">{profileExplanation(analysis.opportunity)}</p>
             </div>
           </div>
 
           <div className="hidden min-h-0 flex-1 gap-3 lg:grid-cols-[0.8fr_1.2fr] lg:overflow-hidden">
-            <div className="min-h-0 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/62 p-3">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">Quality preview</p>
-              <p className="mt-1 text-xs text-[#F0EAD6]/40">Representative original preview · Page {analysis.samplePage}</p>
-              <div className="mt-3 flex h-64 items-center justify-center overflow-hidden rounded-lg border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.04] lg:h-full lg:min-h-[16rem]">
+            <div className="min-h-0 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#CBA052]">Quality preview</p>
+              <p className="mt-1 text-xs text-[#FFFFFF]/40">Representative original preview · Page {analysis.samplePage}</p>
+              <div className="mt-3 flex h-64 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.04] lg:h-full lg:min-h-[16rem]">
                 {previewUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={previewUrl} alt={`Representative preview of page ${analysis.samplePage}`} className="h-full w-full object-contain" />
                 ) : (
-                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#F0EAD6]/28">Preview</span>
+                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-[#FFFFFF]/28">Preview</span>
                 )}
               </div>
             </div>
-            <div className="no-scrollbar min-h-0 overflow-y-auto rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/62 p-3">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#C9A84C]">Risk notes</p>
+            <div className="no-scrollbar min-h-0 overflow-y-auto rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#CBA052]">Risk notes</p>
               <div className="mt-3 space-y-2">
-                <div className="rounded-lg border border-[#C9A84C]/18 bg-[#C9A84C]/8 p-3 text-xs leading-5 text-[#E8DFC8]/74">
+                <div className="rounded-lg border border-[#CBA052]/18 bg-[#CBA052]/8 p-3 text-xs leading-5 text-[#FFFFFF]/74">
                   This compression pass rebuilds page appearance as optimized images. Review the output before replacing files that need selectable text, forms, links, signatures, or archival conformance.
                 </div>
                 {analysis.opportunity === "Low" ? (
-                  <div className="rounded-lg border border-[#C9A84C]/18 bg-[#C9A84C]/8 p-3 text-xs leading-5 text-[#E8DFC8]/74">
+                  <div className="rounded-lg border border-[#CBA052]/18 bg-[#CBA052]/8 p-3 text-xs leading-5 text-[#FFFFFF]/74">
                     This PDF already appears well optimised. Strong compression may reduce image clarity without producing meaningful savings.
                   </div>
                 ) : null}
                 {analysis.risks.length ? (
                   analysis.risks.map((risk) => (
-                    <div key={risk.title} className="rounded-lg border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.035] p-3">
-                      <p className="text-sm font-bold text-[#F0EAD6]">{risk.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/46">{risk.description}</p>
+                    <div key={risk.title} className="rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] p-3">
+                      <p className="text-sm font-bold text-[#FFFFFF]">{risk.title}</p>
+                      <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">{risk.description}</p>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm leading-6 text-[#F0EAD6]/46">No specific form, signature, attachment, PDF/A, or large-file risk markers were detected in the sampled local analysis.</p>
+                  <p className="text-sm leading-6 text-[#FFFFFF]/46">No specific form, signature, attachment, PDF/A, or large-file risk markers were detected in the sampled local analysis.</p>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#C9A84C]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#F0EAD6]/54 shadow-inner shadow-black/20">
+          <div className="rounded-xl border border-[#CBA052]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-semibold text-[#F0EAD6]/74">Private by design &middot; Browser-only &middot; Cleared after download</p>
+              <p className="font-semibold text-[#FFFFFF]/74">Private by design &middot; Browser-only &middot; Cleared after download</p>
               <p className="lg:hidden">Files stay on your device. No server upload.</p>
             </div>
           </div>
         </div>
 
         <aside className="lg:min-h-0">
-          <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#E8DFC8]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
-            <div className={result ? "hidden" : "border-b border-[#E8DFC8]/10 pb-3"}>
-              <p className="text-xs font-semibold text-[#F0EAD6]/68">
+          <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
+            <div className={result ? "hidden" : "border-b border-[#FFFFFF]/10 pb-3"}>
+              <p className="text-xs font-semibold text-[#FFFFFF]/68">
                 Compression mode
               </p>
               <div
-                className="mt-2 grid grid-cols-2 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/54 p-1"
+                className="mt-2 grid grid-cols-2 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/54 p-1"
                 aria-label="Compression mode"
               >
                 {[
@@ -1177,8 +1176,8 @@ export default function CompressPdfTool() {
                     }}
                     className={`min-h-11 rounded-lg px-2 text-xs font-bold transition motion-reduce:transition-none ${
                       compressionMode === value
-                        ? "bg-[#1E6B4A]/20 text-[#F0EAD6] ring-1 ring-[#1E6B4A]/55"
-                        : "text-[#F0EAD6]/46 hover:text-[#F0EAD6]"
+                        ? "bg-[#CBA052]/20 text-[#FFFFFF] ring-1 ring-[#CBA052]/55"
+                        : "text-[#FFFFFF]/46 hover:text-[#FFFFFF]"
                     }`}
                   >
                     {compressionMode === value ? "✓ " : ""}
@@ -1198,26 +1197,26 @@ export default function CompressPdfTool() {
                         clearResult();
                       }}
                       aria-pressed={profile === item}
-                      className={`rounded-xl border px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/45 motion-reduce:transition-none ${
+                      className={`rounded-xl border px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 motion-reduce:transition-none ${
                         profile === item
-                          ? "border-[#1E6B4A]/55 bg-[#1E6B4A]/16"
-                          : "border-[#E8DFC8]/8 bg-[#F0EAD6]/[0.025] hover:border-[#C9A84C]/28"
+                          ? "border-[#CBA052]/55 bg-[#CBA052]/16"
+                          : "border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.025] hover:border-[#CBA052]/28"
                       }`}
                     >
-                      <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#F0EAD6]">
+                      <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#FFFFFF]">
                         <span>{profile === item ? "✓ " : ""}{profiles[item].label}</span>
-                        {analysis.recommendation === item ? <span className="rounded-full bg-[#C9A84C]/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[#C9A84C]">Recommended</span> : null}
+                        {analysis.recommendation === item ? <span className="rounded-full bg-[#CBA052]/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[#CBA052]">Recommended</span> : null}
                       </span>
-                      <span className="mt-0.5 block text-xs text-[#F0EAD6]/42">{profiles[item].description}</span>
+                      <span className="mt-0.5 block text-xs text-[#FFFFFF]/42">{profiles[item].description}</span>
                     </button>
                   ))}
                 </div>
               ) : (
                 <div className="mt-3">
-                  <p className="text-sm font-bold text-[#F0EAD6]">
+                  <p className="text-sm font-bold text-[#FFFFFF]">
                     Target Size Studio
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/44">
+                  <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/44">
                     Set the maximum size you need. Lumeo adapts resolution and
                     image quality while protecting readability.
                   </p>
@@ -1239,8 +1238,8 @@ export default function CompressPdfTool() {
                         }}
                         className={`min-h-11 rounded-lg border px-2 text-xs font-bold transition motion-reduce:transition-none ${
                           targetPreset === value
-                            ? "border-[#1E6B4A]/55 bg-[#1E6B4A]/16 text-[#F0EAD6]"
-                            : "border-[#E8DFC8]/9 text-[#F0EAD6]/48 hover:border-[#C9A84C]/28"
+                            ? "border-[#CBA052]/55 bg-[#CBA052]/16 text-[#FFFFFF]"
+                            : "border-[#FFFFFF]/9 text-[#FFFFFF]/48 hover:border-[#CBA052]/28"
                         }`}
                       >
                         {targetPreset === value ? "✓ " : ""}
@@ -1250,7 +1249,7 @@ export default function CompressPdfTool() {
                   </div>
                   {targetPreset === "custom" ? (
                     <div className="mt-3 grid grid-cols-[minmax(0,1fr)_5.5rem] gap-2">
-                      <label className="text-xs font-semibold text-[#F0EAD6]/62">
+                      <label className="text-xs font-semibold text-[#FFFFFF]/62">
                         Target size
                         <input
                           ref={customTargetInputRef}
@@ -1264,10 +1263,10 @@ export default function CompressPdfTool() {
                             setError("");
                             clearResult();
                           }}
-                          className="mt-1.5 h-11 w-full rounded-lg border border-[#E8DFC8]/12 bg-[#F0EAD6]/[0.035] px-3 text-base text-[#F0EAD6] outline-none focus:border-[#C9A84C]/45"
+                          className="mt-1.5 h-11 w-full rounded-lg border border-[#FFFFFF]/12 bg-[#FFFFFF]/[0.035] px-3 text-base text-[#FFFFFF] outline-none focus:border-[#CBA052]/45"
                         />
                       </label>
-                      <label className="text-xs font-semibold text-[#F0EAD6]/62">
+                      <label className="text-xs font-semibold text-[#FFFFFF]/62">
                         Unit
                         <select
                           value={targetUnit}
@@ -1276,7 +1275,7 @@ export default function CompressPdfTool() {
                             setError("");
                             clearResult();
                           }}
-                          className="mt-1.5 h-11 w-full rounded-lg border border-[#E8DFC8]/12 bg-[#111A2B] px-2 text-sm font-bold text-[#F0EAD6] outline-none focus:border-[#C9A84C]/45"
+                          className="mt-1.5 h-11 w-full rounded-lg border border-[#FFFFFF]/12 bg-[#111A2B] px-2 text-sm font-bold text-[#FFFFFF] outline-none focus:border-[#CBA052]/45"
                         >
                           <option value="KB">KB</option>
                           <option value="MB">MB</option>
@@ -1284,19 +1283,19 @@ export default function CompressPdfTool() {
                       </label>
                     </div>
                   ) : null}
-                  <div aria-live="polite" className="mt-3 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/68 p-3">
+                  <div aria-live="polite" className="mt-3 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/68 p-3">
                     {targetError ? (
                       <p role="alert" className="text-xs font-semibold text-[#F0C0C0]">
                         {targetError}
                       </p>
                     ) : (
                       <dl className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
-                        <div><dt className="text-[#F0EAD6]/38">Original</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">{formatFileSize(analysis.size)}</dd></div>
-                        <div><dt className="text-[#F0EAD6]/38">Target</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">Under {formatFileSize(targetBytes)}</dd></div>
-                        <div><dt className="text-[#F0EAD6]/38">Reduction needed</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">{requiredReductionPercent(analysis.size, targetBytes).toFixed(0)}%</dd></div>
-                        <div><dt className="text-[#F0EAD6]/38">Pages</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">{analysis.pageCount}</dd></div>
-                        <div><dt className="text-[#F0EAD6]/38">Quality outlook</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">{targetOutlook}</dd></div>
-                        <div><dt className="text-[#F0EAD6]/38">Method</dt><dd className="mt-0.5 font-bold text-[#F0EAD6]">Adaptive multi-pass</dd></div>
+                        <div><dt className="text-[#FFFFFF]/38">Original</dt><dd className="mt-0.5 font-bold text-[#FFFFFF]">{formatFileSize(analysis.size)}</dd></div>
+                        <div><dt className="text-[#FFFFFF]/38">Target</dt><dd className="mt-0.5 font-bold text-[#FFFFFF]">Under {formatFileSize(targetBytes)}</dd></div>
+                        <div><dt className="text-[#FFFFFF]/38">Reduction needed</dt><dd className="mt-0.5 font-bold text-[#FFFFFF]">{requiredReductionPercent(analysis.size, targetBytes).toFixed(0)}%</dd></div>
+                        <div><dt className="text-[#FFFFFF]/38">Pages</dt><dd className="mt-0.5 font-bold text-[#FFFFFF]">{analysis.pageCount}</dd></div>
+                        <div><dt className="text-[#FFFFFF]/38">Quality outlook</dt><dd className="mt-0.5 font-bold text-[#FFFFFF]">{targetOutlook}</dd></div>
+                        <div><dt className="text-[#FFFFFF]/38">Method</dt><dd className="mt-0.5 font-bold text-[#FFFFFF]">Adaptive multi-pass</dd></div>
                       </dl>
                     )}
                   </div>
@@ -1310,10 +1309,10 @@ export default function CompressPdfTool() {
                   setColour((current) => current === "grayscale" ? "preserve" : "grayscale");
                   clearResult();
                 }}
-                className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 text-left text-xs font-semibold text-[#F0EAD6]/58 transition hover:border-[#C9A84C]/28 motion-reduce:transition-none"
+                className="mt-3 flex min-h-11 w-full items-center justify-between rounded-xl border border-[#FFFFFF]/10 px-3 text-left text-xs font-semibold text-[#FFFFFF]/58 transition hover:border-[#CBA052]/28 motion-reduce:transition-none"
               >
                 <span>Grayscale</span>
-                <span className={colour === "grayscale" ? "text-[#A8E0C1]" : "text-[#F0EAD6]/34"}>
+                <span className={colour === "grayscale" ? "text-[#9FD0B5]" : "text-[#FFFFFF]/34"}>
                   {colour === "grayscale" ? "On" : "Off"}
                 </span>
               </button>
@@ -1324,29 +1323,29 @@ export default function CompressPdfTool() {
                 type="button"
                 onClick={() => setAdvancedOpen((open) => !open)}
                 aria-expanded={advancedOpen}
-                className={compressionMode === "quality" ? "flex w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 py-2 text-left text-xs font-semibold text-[#F0EAD6]/54 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]" : "hidden"}
+                className={compressionMode === "quality" ? "flex w-full items-center justify-between rounded-xl border border-[#FFFFFF]/10 px-3 py-2 text-left text-xs font-semibold text-[#FFFFFF]/54 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]" : "hidden"}
               >
                 Advanced options
                 <span>{advancedOpen ? "−" : "+"}</span>
               </button>
               {compressionMode === "quality" && advancedOpen ? (
-                <div className="mt-3 space-y-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/62 p-3">
+                <div className="mt-3 space-y-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#C9A84C]">Image resolution</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image resolution</p>
                     <div className="mt-2 grid gap-2">
                       {resolutionOptions.map((item) => (
-                        <button key={item.value} type="button" onClick={() => { setResolution(item.value); clearResult(); }} className={`rounded-lg border px-3 py-2 text-left text-xs transition ${resolution === item.value ? "border-[#1E6B4A]/50 bg-[#1E6B4A]/14 text-[#F0EAD6]" : "border-[#E8DFC8]/8 text-[#F0EAD6]/52 hover:border-[#C9A84C]/28"}`}>
+                        <button key={item.value} type="button" onClick={() => { setResolution(item.value); clearResult(); }} className={`rounded-lg border px-3 py-2 text-left text-xs transition ${resolution === item.value ? "border-[#CBA052]/50 bg-[#CBA052]/14 text-[#FFFFFF]" : "border-[#FFFFFF]/8 text-[#FFFFFF]/52 hover:border-[#CBA052]/28"}`}>
                           <span className="font-bold">{item.label}</span>
-                          <span className="mt-0.5 block text-[#F0EAD6]/38">{item.helper}</span>
+                          <span className="mt-0.5 block text-[#FFFFFF]/38">{item.helper}</span>
                         </button>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#C9A84C]">Image quality</p>
+                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image quality</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {qualityOptions.map((item) => (
-                        <button key={item.value} type="button" onClick={() => { setQuality(item.value); clearResult(); }} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${quality === item.value ? "border-[#1E6B4A]/50 bg-[#1E6B4A]/14 text-[#A8E0C1]" : "border-[#E8DFC8]/10 text-[#F0EAD6]/48 hover:border-[#C9A84C]/30"}`}>
+                        <button key={item.value} type="button" onClick={() => { setQuality(item.value); clearResult(); }} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${quality === item.value ? "border-[#CBA052]/50 bg-[#CBA052]/14 text-[#9FD0B5]" : "border-[#FFFFFF]/10 text-[#FFFFFF]/48 hover:border-[#CBA052]/30"}`}>
                           {item.label}
                         </button>
                       ))}
@@ -1359,31 +1358,31 @@ export default function CompressPdfTool() {
                 type="button"
                 onClick={() => setExpertOpen((open) => !open)}
                 aria-expanded={expertOpen}
-                className={compressionMode === "quality" ? "mt-3 flex w-full items-center justify-between rounded-xl border border-[#E8DFC8]/10 px-3 py-2 text-left text-xs font-semibold text-[#F0EAD6]/54 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]" : "hidden"}
+                className={compressionMode === "quality" ? "mt-3 flex w-full items-center justify-between rounded-xl border border-[#FFFFFF]/10 px-3 py-2 text-left text-xs font-semibold text-[#FFFFFF]/54 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]" : "hidden"}
               >
                 Document and output details
                 <span>{expertOpen ? "−" : "+"}</span>
               </button>
               {compressionMode === "quality" && expertOpen ? (
-                <div className="mt-3 space-y-3 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/62 p-3">
-                  <label className="flex items-center gap-2 text-sm font-semibold text-[#F0EAD6]/68">
+                <div className="mt-3 space-y-3 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
+                  <label className="flex items-center gap-2 text-sm font-semibold text-[#FFFFFF]/68">
                     <input type="checkbox" checked={expertMode === "custom"} onChange={(event) => setExpertMode(event.target.checked ? "custom" : "profile")} />
                     Use custom DPI and quality
                   </label>
-                  <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#C9A84C]">
+                  <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">
                     Custom DPI
-                    <input type="number" min={72} max={240} value={customDpi} onChange={(event) => { setCustomDpi(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.035] px-3 text-sm text-[#F0EAD6] outline-none focus:border-[#C9A84C]/45" />
+                    <input type="number" min={72} max={240} value={customDpi} onChange={(event) => { setCustomDpi(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm text-[#FFFFFF] outline-none focus:border-[#CBA052]/45" />
                   </label>
-                  <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#C9A84C]">
+                  <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">
                     Custom quality
-                    <input type="number" min={35} max={92} value={customQuality} onChange={(event) => { setCustomQuality(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.035] px-3 text-sm text-[#F0EAD6] outline-none focus:border-[#C9A84C]/45" />
+                    <input type="number" min={35} max={92} value={customQuality} onChange={(event) => { setCustomQuality(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm text-[#FFFFFF] outline-none focus:border-[#CBA052]/45" />
                   </label>
                 </div>
               ) : null}
 
-              <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Compression plan</p>
-                <ul className="mt-2 space-y-1.5 text-xs text-[#F0EAD6]/50">
+              <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">Compression plan</p>
+                <ul className="mt-2 space-y-1.5 text-xs text-[#FFFFFF]/50">
                   <li>Images: render at {selectedPlan.dpi} DPI</li>
                   <li>Image quality: {Math.round(selectedPlan.quality * 100)}%</li>
                   <li>Colour: {selectedPlan.colour === "grayscale" ? "Grayscale image content" : "Preserved"}</li>
@@ -1391,9 +1390,9 @@ export default function CompressPdfTool() {
                 </ul>
               </div>
 
-              <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]">Output manifest</p>
-                <ul className="mt-2 space-y-1.5 text-xs text-[#F0EAD6]/50">
+              <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">Output manifest</p>
+                <ul className="mt-2 space-y-1.5 text-xs text-[#FFFFFF]/50">
                   <li>1 compressed PDF</li>
                   <li>{profileLabel} profile</li>
                   <li>Original page order preserved</li>
@@ -1403,25 +1402,25 @@ export default function CompressPdfTool() {
               </div>
 
               <div className="mt-4">
-                <label className="text-xs font-bold uppercase tracking-[0.16em] text-[#F0EAD6]/42">
+                <label className="text-xs font-bold uppercase tracking-[0.16em] text-[#FFFFFF]/42">
                   Output file name
-                  <input value={outputName} onChange={(event) => setOutputName(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.035] px-3 text-sm font-semibold normal-case tracking-normal text-[#F0EAD6] outline-none transition placeholder:text-[#F0EAD6]/25 focus:border-[#C9A84C]/45" />
+                  <input value={outputName} onChange={(event) => setOutputName(event.target.value)} className="mt-2 h-11 w-full rounded-xl border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm font-semibold normal-case tracking-normal text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/25 focus:border-[#CBA052]/45" />
                 </label>
               </div>
 
               {error ? <div role="alert" className="mt-4 rounded-xl border border-[#F0A8A8]/20 bg-[#F0A8A8]/10 px-3 py-2 text-sm text-[#F0C0C0]">{error}</div> : null}
-              {previewIssue ? <div className="mt-4 rounded-xl border border-[#C9A84C]/18 bg-[#C9A84C]/8 px-3 py-2 text-xs text-[#E8DFC8]/70">{previewIssue}</div> : null}
-              {cleanupMessage ? <div className="mt-4 rounded-xl border border-[#1E6B4A]/26 bg-[#1E6B4A]/12 px-3 py-2 text-sm text-[#A8E0C1]">{cleanupMessage}</div> : null}
-              {progressDetail ? <div aria-live="polite" className="mt-4 rounded-xl border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.035] px-3 py-2 text-xs text-[#F0EAD6]/48">{progressDetail}</div> : null}
+              {previewIssue ? <div className="mt-4 rounded-xl border border-[#CBA052]/18 bg-[#CBA052]/8 px-3 py-2 text-xs text-[#FFFFFF]/70">{previewIssue}</div> : null}
+              {cleanupMessage ? <div className="mt-4 rounded-xl border border-[#CBA052]/26 bg-[#CBA052]/12 px-3 py-2 text-sm text-[#9FD0B5]">{cleanupMessage}</div> : null}
+              {progressDetail ? <div aria-live="polite" className="mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 py-2 text-xs text-[#FFFFFF]/48">{progressDetail}</div> : null}
             </div>
 
-            <div className={result ? "flex min-h-0 flex-1 flex-col justify-center border-0 pt-0" : "border-t border-[#E8DFC8]/10 pt-3"}>
+            <div className={result ? "flex min-h-0 flex-1 flex-col justify-center border-0 pt-0" : "border-t border-[#FFFFFF]/10 pt-3"}>
               {result ? (
-                <div className={`mb-4 rounded-xl border p-4 ${result.target ? result.target.outcome === "achieved" ? "border-[#1E6B4A]/28 bg-[#1E6B4A]/12" : result.target.outcome === "closest-safe" ? "border-[#C9A84C]/24 bg-[#C9A84C]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10" : result.tone === "success" ? "border-[#1E6B4A]/28 bg-[#1E6B4A]/12" : result.tone === "limited" ? "border-[#C9A84C]/24 bg-[#C9A84C]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10"}`}>
-                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#C9A84C]">
+                <div className={`mb-4 rounded-xl border p-4 ${result.target ? result.target.outcome === "achieved" ? "border-[#CBA052]/28 bg-[#CBA052]/12" : result.target.outcome === "closest-safe" ? "border-[#CBA052]/24 bg-[#CBA052]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10" : result.tone === "success" ? "border-[#CBA052]/28 bg-[#CBA052]/12" : result.tone === "limited" ? "border-[#CBA052]/24 bg-[#CBA052]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10"}`}>
+                  <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#CBA052]">
                     Size Outcome
                   </p>
-                  <p ref={resultHeadingRef} tabIndex={-1} className="text-lg font-bold text-[#F0EAD6] outline-none">
+                  <p ref={resultHeadingRef} tabIndex={-1} className="text-lg font-bold text-[#FFFFFF] outline-none">
                     {result.mode === "target"
                       ? result.target?.outcome === "achieved"
                         ? "Target achieved"
@@ -1436,7 +1435,7 @@ export default function CompressPdfTool() {
                           ? "Compression completed with limited reduction"
                           : "The compressed result is larger than the original"}
                   </p>
-                  <div className="mt-4 grid gap-2 text-sm text-[#F0EAD6]/58">
+                  <div className="mt-4 grid gap-2 text-sm text-[#FFFFFF]/58">
                     {result.target ? <p>Requested: Under {formatFileSize(result.target.requestedBytes)}</p> : null}
                     <p>Original: {formatFileSize(result.originalSize)}</p>
                     <p>{result.target?.outcome === "closest-safe" ? "Safest result" : "Result"}: {formatFileSize(result.compressedSize)}</p>
@@ -1448,37 +1447,37 @@ export default function CompressPdfTool() {
                     {result.target ? <p>Passes: {result.target.attempts.length}</p> : null}
                     {result.target ? <p>Quality: {result.target.qualityOutlook}</p> : null}
                     <p>Grayscale: {result.grayscale ? "On" : "Off"}</p>
-                    {result.target?.outcome === "closest-safe" ? <p className="text-[#E8DFC8]/70">Reason: Reducing further would significantly affect readability.</p> : null}
+                    {result.target?.outcome === "closest-safe" ? <p className="text-[#FFFFFF]/70">Reason: Reducing further would significantly affect readability.</p> : null}
                     {result.tone === "larger" ? <p className="font-semibold text-[#F0C0C0]">Recommendation: keep original.</p> : null}
                   </div>
                 </div>
               ) : (
-                <p className="mb-3 text-xs text-[#F0EAD6]/42">
+                <p className="mb-3 text-xs text-[#FFFFFF]/42">
                   Ready to compress · {compressionMode === "target" ? `Under ${formatFileSize(targetBytes)}` : profileLabel}
                 </p>
               )}
 
               {result ? (
                 <div className="grid gap-2">
-                  <button type="button" onClick={handleDownload} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#1E6B4A] px-5 text-sm font-bold text-[#F0EAD6] shadow-[0_14px_35px_rgba(30,107,74,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98]">
+                  <button type="button" onClick={handleDownload} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#CBA052] px-5 text-sm font-bold text-[#FFFFFF] shadow-[0_14px_35px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98]">
                     Download compressed PDF
                   </button>
                   <div className={`grid gap-2 ${result.mode === "target" ? "grid-cols-2" : "grid-cols-1"}`}>
-                    <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); }} className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#E8DFC8]/12 px-3 text-xs font-bold text-[#F0EAD6]/62 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]">
+                    <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); }} className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#FFFFFF]/12 px-3 text-xs font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
                       Compress again
                     </button>
                     {result.mode === "target" ? (
-                      <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); window.setTimeout(() => customTargetInputRef.current?.focus(), 0); }} className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#E8DFC8]/12 px-3 text-xs font-bold text-[#F0EAD6]/62 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]">
+                      <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); window.setTimeout(() => customTargetInputRef.current?.focus(), 0); }} className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#FFFFFF]/12 px-3 text-xs font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
                         Change target
                       </button>
                     ) : null}
                   </div>
-                  <button type="button" onClick={resetTool} className="inline-flex h-10 w-full items-center justify-center rounded-full border border-[#E8DFC8]/12 px-5 text-sm font-bold text-[#F0EAD6]/62 transition hover:border-[#C9A84C]/30 hover:text-[#F0EAD6]">
+                  <button type="button" onClick={resetTool} className="inline-flex h-10 w-full items-center justify-center rounded-full border border-[#FFFFFF]/12 px-5 text-sm font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
                     Clear and start new
                   </button>
                 </div>
               ) : (
-                <button type="button" disabled={!canCompress} onClick={handleCompress} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#1E6B4A] px-5 text-sm font-bold text-[#F0EAD6] shadow-[0_14px_35px_rgba(30,107,74,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55">
+                <button type="button" disabled={!canCompress} onClick={handleCompress} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#CBA052] px-5 text-sm font-bold text-[#FFFFFF] shadow-[0_14px_35px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55">
                   {isCompressing ? "Compressing in your browser..." : error ? "Retry compression" : "Compress PDF"}
                 </button>
               )}
