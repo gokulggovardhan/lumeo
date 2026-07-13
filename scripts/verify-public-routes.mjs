@@ -6,6 +6,7 @@ import path from "node:path";
 const routes = [
   "/",
   "/pdf",
+  "/pdf-tools",
   "/pdf/merge",
   "/pdf/split",
   "/pdf/compress",

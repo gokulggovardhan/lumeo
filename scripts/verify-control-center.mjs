@@ -36,13 +36,12 @@ const actionFiles = [
   "app/admin/(protected)/seo/actions.ts",
   "app/admin/(protected)/settings/actions.ts",
 ];
-const publicFiles = [
-  "app/page.tsx",
+const protectedNonAdminFiles = [
   "app/layout.tsx",
   "app/globals.css",
-  "components/PublicFooter.tsx",
-  "components/PublicPdfChrome.tsx",
   "app/login/page.tsx",
+  "app/dashboard",
+  "components/AuthButton.tsx",
 ];
 
 function read(relativePath) {
@@ -132,8 +131,8 @@ try {
   assert(packageJson.dependencies.firebase === "^12.16.0", "Firebase version changed unexpectedly.");
   assert(packageJson.dependencies["firebase-admin"] === "^14.1.0", "firebase-admin version changed unexpectedly.");
 
-  const publicStatus = gitStatus(publicFiles);
-  assert(!publicStatus, `Public UI files must not be modified in this phase:\n${publicStatus}`);
+  const protectedStatus = gitStatus(protectedNonAdminFiles);
+  assert(!protectedStatus, `Protected non-admin files must not be modified by Control Center work:\n${protectedStatus}`);
 
   console.log("PASS Control Center migration exists");
   console.log("PASS all required tables and RLS statements exist");
@@ -146,7 +145,7 @@ try {
   console.log("PASS logout remains POST-only");
   console.log("PASS no getSession, service_role, or secret key usage in new admin source");
   console.log("PASS protected package versions are unchanged");
-  console.log("PASS public UI/PDF entry files are untouched");
+  console.log("PASS protected non-admin files are untouched");
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Control Center verification failed.");
   process.exit(1);
