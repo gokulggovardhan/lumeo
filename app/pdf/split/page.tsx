@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { PublicPageShell } from "@/components/PublicPdfChrome";
+import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import SplitPdfTool from "@/components/pdf/SplitPdfTool";
 
 export const metadata: Metadata = {
@@ -22,7 +22,7 @@ export const metadata: Metadata = {
 
 export default function SplitPdfPage() {
   return (
-    <PublicPageShell
+    <PublicCatalogPageShell
       maxWidth="max-w-[1080px]"
       mainClassName="min-h-dvh bg-[#0C1220] text-[#F0EAD6]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
@@ -40,6 +40,6 @@ export default function SplitPdfPage() {
       </header>
 
       <div className="lumeo-fade-up lumeo-fade-up-delay-1"><SplitPdfTool /></div>
-    </PublicPageShell>
+    </PublicCatalogPageShell>
   );
 }

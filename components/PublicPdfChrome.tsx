@@ -3,7 +3,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { PdfToolSwitcher } from "@/components/pdf/PdfToolSwitcher";
 
 export function LumeoSealMark() {
   return (
@@ -71,7 +70,13 @@ function HomeIcon() {
   );
 }
 
-export function PublicNav({ maxWidth = "max-w-[1160px]" }: { maxWidth?: string }) {
+export function PublicNav({
+  maxWidth = "max-w-[1160px]",
+  toolsMenu,
+}: {
+  maxWidth?: string;
+  toolsMenu?: ReactNode;
+}) {
   return (
     <nav className="lumeo-nav-enter relative z-30 border-b border-[#E8DFC8]/8 bg-[#0C1220]/92 px-5 backdrop-blur-xl sm:px-8">
       <div className={`mx-auto flex h-[70px] ${maxWidth} items-center justify-between gap-4`}>
@@ -80,7 +85,14 @@ export function PublicNav({ maxWidth = "max-w-[1160px]" }: { maxWidth?: string }
         </Link>
 
         <div className="flex shrink-0 items-center gap-2">
-          <PdfToolSwitcher />
+          {toolsMenu ?? (
+            <Link
+              href="/pdf-tools"
+              className="lumeo-press lumeo-focus-ring inline-flex h-10 items-center justify-center rounded-full border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.02] px-3.5 text-sm font-semibold text-[#F0EAD6]/72 transition hover:border-[#CBA052]/28 hover:bg-[#F0EAD6]/[0.04] hover:text-[#F0EAD6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45 sm:h-11 sm:px-4"
+            >
+              PDF Tools
+            </Link>
+          )}
           <Link
             href="/"
             aria-label="Go to Lumeo PDF home"
@@ -100,11 +112,13 @@ export function PublicPageShell({
   maxWidth = "max-w-[1160px]",
   contentClassName = "px-5 py-8 sm:px-8 lg:py-10",
   mainClassName = "min-h-screen bg-[#0C1220] text-[#F0EAD6]",
+  toolsMenu,
 }: {
   children: ReactNode;
   maxWidth?: string;
   contentClassName?: string;
   mainClassName?: string;
+  toolsMenu?: ReactNode;
 }) {
   return (
     <main className={`lumeo-page-enter relative overflow-x-hidden ${mainClassName}`}>
@@ -114,7 +128,7 @@ export function PublicPageShell({
       </div>
 
       <div className="relative z-10">
-        <PublicNav maxWidth={maxWidth} />
+        <PublicNav maxWidth={maxWidth} toolsMenu={toolsMenu} />
         <div className={`mx-auto ${maxWidth} ${contentClassName}`}>{children}</div>
       </div>
     </main>

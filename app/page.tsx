@@ -5,6 +5,7 @@ import Link from "next/link";
 import PublicFooter from "@/components/PublicFooter";
 import { BrandLockup } from "@/components/PublicPdfChrome";
 import { PdfToolLauncher } from "@/components/pdf/PdfToolLauncher";
+import { PublicPdfToolsMenu } from "@/components/public/PublicPdfToolsMenu";
 
 export const metadata: Metadata = {
   title: {
@@ -75,9 +76,7 @@ export default function Home() {
           </Link>
 
           <div className="flex items-center gap-1 text-xs font-semibold text-[#F0EAD6]/64 sm:gap-2 sm:text-sm">
-            <Link href="/" className="rounded-full px-3 py-2.5 text-[#F0EAD6] transition hover:bg-[#F0EAD6]/[0.045] sm:px-4">
-              Tools
-            </Link>
+            <PublicPdfToolsMenu />
             <Link href="/guides" className="hidden rounded-full px-4 py-2.5 transition hover:bg-[#F0EAD6]/[0.045] hover:text-[#F0EAD6] sm:inline-flex">
               Guides
             </Link>

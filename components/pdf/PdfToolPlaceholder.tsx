@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PublicPageShell } from "@/components/PublicPdfChrome";
+import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import { getStatusLabel } from "./PdfToolRegistry";
 import type { PdfToolDefinition } from "./PdfToolRegistry";
 import { PdfTrustRail } from "./PdfTrustRail";
@@ -14,7 +14,7 @@ function StatusBadge({ tool }: { tool: PdfToolDefinition }) {
 
 export function PdfToolPlaceholder({ tool }: { tool: PdfToolDefinition }) {
   return (
-    <PublicPageShell
+    <PublicCatalogPageShell
       maxWidth="max-w-[1700px]"
       mainClassName="min-h-screen bg-[#0C1220] text-[#F0EAD6] lg:flex lg:h-dvh lg:flex-col lg:overflow-hidden"
       contentClassName="px-5 py-5 sm:px-8 lg:flex lg:w-[95vw] lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-hidden lg:px-8 lg:py-2 2xl:px-10"
@@ -116,13 +116,13 @@ export function PdfToolPlaceholder({ tool }: { tool: PdfToolDefinition }) {
           </div>
 
           <Link
-            href="/pdf"
+            href="/pdf-tools"
             className="mt-4 inline-flex h-10 items-center justify-center rounded-full border border-[#E8DFC8]/12 px-4 text-xs font-bold text-[#F0EAD6]/62 transition hover:border-[#C9A84C]/34 hover:text-[#F0EAD6]"
           >
             View all tools
           </Link>
         </aside>
       </section>
-    </PublicPageShell>
+    </PublicCatalogPageShell>
   );
 }
