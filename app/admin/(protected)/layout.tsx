@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { AdminShell } from "@/components/admin/AdminShell";
+import { ControlCenterShell } from "@/components/admin/ControlCenterShell";
 import { requireAdmin } from "@/lib/admin/auth";
 
 export const metadata = {
@@ -20,8 +20,8 @@ export default async function ProtectedAdminLayout({
   const admin = await requireAdmin();
 
   return (
-    <AdminShell email={admin.email} role={admin.role}>
+    <ControlCenterShell email={admin.email} role={admin.role}>
       {children}
-    </AdminShell>
+    </ControlCenterShell>
   );
 }

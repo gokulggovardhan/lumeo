@@ -1,3 +1,5 @@
+begin;
+
 create table if not exists public.admin_members (
   user_id uuid primary key references auth.users(id) on delete cascade,
   role text not null default 'admin',
@@ -48,7 +50,15 @@ for select
 to authenticated
 using (auth.uid() = user_id);
 
+revoke all on table public.admin_members from anon;
+revoke all on table public.admin_members from authenticated;
+grant select on table public.admin_members to authenticated;
+
+revoke all on function public.set_updated_at() from public;
+
 -- Manual first-admin bootstrap example. Replace the placeholder with a real
 -- Supabase Authentication user UUID in the Supabase SQL Editor.
 -- insert into public.admin_members (user_id, role)
 -- values ('AUTH_USER_UUID_HERE', 'owner');
+
+commit;

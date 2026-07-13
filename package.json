@@ -8,6 +8,7 @@
     "verify:public": "node scripts/verify-public-routes.mjs",
     "verify:supabase": "node scripts/verify-supabase-env.mjs",
     "verify:admin-auth": "node scripts/verify-admin-auth.mjs",
+    "verify:control-center": "node scripts/verify-control-center.mjs",
     "test:compression-target": "node --no-warnings --test --experimental-strip-types tests/compression-target.test.ts",
     "copy-ffmpeg-core": "node scripts/copy-ffmpeg-core.mjs",
     "postinstall": "npm run copy-ffmpeg-core",
