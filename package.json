@@ -11,6 +11,7 @@
     "verify:control-center": "node scripts/verify-control-center.mjs",
     "verify:public-catalog": "node scripts/verify-public-tool-catalog.mjs",
     "verify:analytics": "node scripts/verify-privacy-analytics.mjs",
+    "verify:aura": "node scripts/verify-lumeo-aura.mjs",
     "test": "node --no-warnings --test --experimental-strip-types",
     "test:compression-target": "node --no-warnings --test --experimental-strip-types tests/compression-target.test.ts",
     "copy-ffmpeg-core": "node scripts/copy-ffmpeg-core.mjs",

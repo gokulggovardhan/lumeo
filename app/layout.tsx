@@ -90,6 +90,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <AnalyticsProvider>
+          <a href="#main-content" className="aura-skip-link">
+            Skip to content
+          </a>
           <AnalyticsPageView />
           {children}
         </AnalyticsProvider>
