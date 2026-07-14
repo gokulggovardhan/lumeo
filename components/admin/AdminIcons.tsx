@@ -11,6 +11,7 @@ const paths: Record<string, string> = {
   audit: "M6 4h12v16H6V4Zm3 5h6M9 13h6M9 17h3",
   system: "M12 3v3m0 12v3m9-9h-3M6 12H3m15.4-6.4-2.1 2.1M7.7 16.3l-2.1 2.1m12.8 0-2.1-2.1M7.7 7.7 5.6 5.6",
   settings: "M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm0-5v3m0 12v3M4.9 4.9 7 7m10 10 2.1 2.1M3 12h3m12 0h3M4.9 19.1 7 17m10-10 2.1-2.1",
+  design: "M4 6h16M6 6v12a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V6M8 10h8M8 14h5",
 };
 
 export function AdminIcon({

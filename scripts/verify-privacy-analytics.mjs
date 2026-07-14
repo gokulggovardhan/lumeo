@@ -94,10 +94,11 @@ try {
   assert(/grant execute on function public\.get_admin_analytics_summary\(date, date\) to authenticated/i.test(adminMigration), "Admin aggregate RPC must grant authenticated execution.");
   assert(!/grant\s+select[\s\S]*analytics_events[\s\S]*to\s+authenticated/i.test(adminMigration), "Migration 005 must not grant broad authenticated analytics_events SELECT.");
   assert(!/create policy[\s\S]*analytics_events[\s\S]*to anon/i.test(adminMigration), "Migration 005 must not add anon analytics_events policy.");
-  const adminReturn = adminMigration.slice(
-    adminMigration.indexOf("return jsonb_build_object"),
-    adminMigration.indexOf("end;\n$$;"),
-  );
+  const adminReturnStart = adminMigration.indexOf("return jsonb_build_object");
+  const adminReturnTail = adminMigration.slice(adminReturnStart);
+  const adminReturnEndMatch = /end;\s*\$\$;/i.exec(adminReturnTail);
+  assert(adminReturnStart > -1 && adminReturnEndMatch, "Admin aggregate RPC return block could not be isolated.");
+  const adminReturn = adminReturnTail.slice(0, adminReturnEndMatch.index);
   for (const aggregateKey of ["total_events", "daily_trend", "top_tools_by_opens", "device_summary", "browser_summary", "operating_system_summary"]) {
     assert(adminMigration.includes(aggregateKey), `Admin aggregate RPC return missing ${aggregateKey}.`);
   }

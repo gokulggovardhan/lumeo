@@ -37,7 +37,6 @@ const actionFiles = [
   "app/admin/(protected)/settings/actions.ts",
 ];
 const protectedNonAdminFiles = [
-  "app/globals.css",
   "app/login/page.tsx",
   "app/dashboard",
   "components/AuthButton.tsx",

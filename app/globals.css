@@ -9,6 +9,113 @@
   --lumeo-green: #1e6b4a;
   --lumeo-ease: cubic-bezier(0.22, 1, 0.36, 1);
   --lumeo-spring: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Lumeo Aura: luminous evolution of Midnight Notary. */
+  --lumeo-ink-950: #08101d;
+  --lumeo-ink-900: #0c1626;
+  --lumeo-ink-850: #101d31;
+  --lumeo-ink-800: #14243b;
+  --lumeo-ink-750: #19304d;
+  --lumeo-paper-50: #fffdf7;
+  --lumeo-paper-100: #f8f2e7;
+  --lumeo-paper-200: #e8dfc8;
+  --lumeo-paper-400: #beb39c;
+  --lumeo-paper-600: #837966;
+  --lumeo-seal-400: #42a77a;
+  --lumeo-seal-500: #28865e;
+  --lumeo-seal-600: #1e6b4a;
+  --lumeo-seal-700: #17553c;
+  --lumeo-gold-300: #e3c983;
+  --lumeo-gold-400: #cfaf5c;
+  --lumeo-gold-500: #b9923e;
+  --lumeo-aura-300: #73c9e8;
+  --lumeo-aura-400: #3fafd8;
+  --lumeo-aura-500: #2387b2;
+  --lumeo-success: #42a77a;
+  --lumeo-warning: #e3c983;
+  --lumeo-danger: #d97171;
+  --lumeo-info: #73c9e8;
+  --lumeo-seal-rgb: 30 107 74;
+  --lumeo-gold-rgb: 207 175 92;
+  --lumeo-aura-rgb: 63 175 216;
+  --lumeo-paper-rgb: 248 242 231;
+
+  --surface-canvas: radial-gradient(circle at 14% 8%, rgba(var(--lumeo-aura-rgb), 0.12), transparent 30%),
+    linear-gradient(135deg, var(--lumeo-ink-950), var(--lumeo-ink-900) 42%, #0f1b2e);
+  --surface-base: rgba(16, 29, 49, 0.88);
+  --surface-raised: rgba(20, 36, 59, 0.86);
+  --surface-elevated: rgba(25, 48, 77, 0.78);
+  --surface-floating: rgba(255, 253, 247, 0.94);
+  --surface-input: rgba(255, 253, 247, 0.07);
+  --surface-overlay: rgba(8, 16, 29, 0.72);
+  --border-subtle: rgba(var(--lumeo-paper-rgb), 0.08);
+  --border-default: rgba(var(--lumeo-paper-rgb), 0.14);
+  --border-strong: rgba(var(--lumeo-paper-rgb), 0.24);
+  --border-focus: rgba(var(--lumeo-aura-rgb), 0.58);
+  --border-premium: rgba(var(--lumeo-gold-rgb), 0.36);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.16);
+  --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.18);
+  --shadow-md: 0 18px 48px rgba(0, 0, 0, 0.24);
+  --shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 42px 120px rgba(0, 0, 0, 0.36);
+  --shadow-floating: 0 24px 70px rgba(8, 16, 29, 0.22), inset 0 1px 0 rgba(255, 253, 247, 0.4);
+  --shadow-focus: 0 0 0 4px rgba(var(--lumeo-aura-rgb), 0.16);
+  --shadow-success: 0 18px 44px rgba(var(--lumeo-seal-rgb), 0.2);
+
+  --text-display-xl: clamp(3.25rem, 8vw, 7rem);
+  --text-display-lg: clamp(2.75rem, 6vw, 5.5rem);
+  --text-display-md: clamp(2.25rem, 4.5vw, 4rem);
+  --text-heading-xl: clamp(1.9rem, 3vw, 3rem);
+  --text-heading-lg: clamp(1.55rem, 2.2vw, 2.25rem);
+  --text-heading-md: 1.35rem;
+  --text-heading-sm: 1.125rem;
+  --text-body-lg: 1.0625rem;
+  --text-body-md: 0.96rem;
+  --text-body-sm: 0.86rem;
+  --text-label: 0.78rem;
+  --text-caption: 0.74rem;
+  --text-micro: 0.68rem;
+  --leading-display: 0.96;
+  --leading-heading: 1.12;
+  --leading-body: 1.65;
+  --tracking-display: -0.01em;
+  --tracking-label: 0.08em;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --container-compact: 42rem;
+  --container-content: 68rem;
+  --container-workspace: 92rem;
+  --container-wide: 108rem;
+  --container-full: 100%;
+  --page-gutter: clamp(1rem, 3vw, 2.5rem);
+
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.55rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.75rem;
+  --radius-pill: 999px;
+
+  --motion-instant: 90ms;
+  --motion-fast: 140ms;
+  --motion-standard: 200ms;
+  --motion-expressive: 280ms;
+  --motion-entrance: 360ms;
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-enter: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-spring-soft: cubic-bezier(0.2, 0.85, 0.25, 1);
 }
 
 * {
@@ -21,7 +128,7 @@ html {
 
 body {
   margin: 0;
-  background: var(--background);
+  background: var(--surface-canvas);
   color: var(--foreground);
   font-family: var(--font-manrope), Arial, Helvetica, sans-serif;
   text-rendering: optimizeLegibility;
@@ -48,6 +155,58 @@ a:active {
 ::selection {
   background: rgba(203, 160, 82, 0.34);
   color: #fffdf7;
+}
+
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 3px;
+}
+
+.aura-skip-link {
+  position: fixed;
+  left: var(--space-4);
+  top: var(--space-4);
+  z-index: 9999;
+  border-radius: var(--radius-pill);
+  background: var(--lumeo-paper-50);
+  color: var(--lumeo-ink-950);
+  padding: var(--space-3) var(--space-5);
+  font-weight: 800;
+  transform: translateY(-150%);
+  transition: transform var(--motion-fast) var(--ease-enter);
+}
+
+.aura-skip-link:focus {
+  transform: translateY(0);
+}
+
+.aura-container {
+  width: min(100% - (var(--page-gutter) * 2), var(--container-wide));
+  margin-inline: auto;
+}
+
+.aura-surface {
+  border: 1px solid var(--border-subtle);
+  background: linear-gradient(180deg, rgba(var(--lumeo-paper-rgb), 0.08), rgba(var(--lumeo-paper-rgb), 0.035));
+  box-shadow: var(--shadow-md);
+}
+
+.aura-text-display {
+  font-family: var(--font-serif);
+  font-size: var(--text-display-md);
+  line-height: var(--leading-display);
+  letter-spacing: var(--tracking-display);
+}
+
+.aura-text-label {
+  font-size: var(--text-label);
+  font-weight: 800;
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+}
+
+.aura-tabular {
+  font-variant-numeric: tabular-nums;
 }
 
 .no-scrollbar {
@@ -227,6 +386,54 @@ a:active {
   animation: lumeo-status-dot 2.2s ease-in-out infinite;
 }
 
+.aura-fade-in {
+  animation: aura-fade-in var(--motion-entrance) var(--ease-enter) both;
+}
+
+.aura-fade-up {
+  animation: aura-fade-up var(--motion-entrance) var(--ease-enter) both;
+}
+
+.aura-scale-in {
+  animation: aura-scale-in var(--motion-expressive) var(--ease-enter) both;
+}
+
+.aura-slide-down {
+  animation: aura-slide-down var(--motion-expressive) var(--ease-enter) both;
+}
+
+.aura-menu-reveal {
+  animation: aura-menu-reveal var(--motion-expressive) var(--ease-enter) both;
+}
+
+.aura-drawer-enter {
+  animation: aura-drawer-enter var(--motion-entrance) var(--ease-enter) both;
+}
+
+.aura-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+
+.aura-shimmer::after {
+  animation: aura-shimmer 1.6s var(--ease-standard) infinite;
+  background: linear-gradient(90deg, transparent, rgba(var(--lumeo-paper-rgb), 0.14), transparent);
+  content: "";
+  inset: 0;
+  position: absolute;
+  transform: translateX(-100%);
+}
+
+.aura-success-reveal {
+  animation: aura-success-reveal var(--motion-entrance) var(--ease-enter) both;
+}
+
+.aura-progress-sheen {
+  background-image: linear-gradient(110deg, rgba(var(--lumeo-seal-rgb), 0.95), rgba(var(--lumeo-aura-rgb), 0.72), rgba(var(--lumeo-seal-rgb), 0.95));
+  background-size: 180% 100%;
+  animation: aura-progress-sheen 1.4s var(--ease-standard) infinite;
+}
+
 .lumeo-focus-ring:focus-visible {
   outline: none;
   box-shadow:
@@ -298,6 +505,89 @@ a:active {
   }
 }
 
+@keyframes aura-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes aura-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aura-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes aura-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aura-menu-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes aura-drawer-enter {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes aura-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes aura-success-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes aura-progress-sheen {
+  to {
+    background-position: 180% 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -318,7 +608,21 @@ a:active {
   .lumeo-card:active,
   .lumeo-press:hover,
   .lumeo-press:active,
-  .lumeo-upload-surface:hover {
+  .lumeo-upload-surface:hover,
+  .aura-fade-in,
+  .aura-fade-up,
+  .aura-scale-in,
+  .aura-slide-down,
+  .aura-menu-reveal,
+  .aura-drawer-enter,
+  .aura-success-reveal,
+  .aura-progress-sheen {
     transform: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText;
   }
 }
