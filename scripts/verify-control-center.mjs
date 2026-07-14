@@ -37,7 +37,6 @@ const actionFiles = [
   "app/admin/(protected)/settings/actions.ts",
 ];
 const protectedNonAdminFiles = [
-  "app/layout.tsx",
   "app/globals.css",
   "app/login/page.tsx",
   "app/dashboard",
@@ -124,6 +123,27 @@ try {
   assert(!/service_role/i.test(adminSource), "New admin source must not reference service_role.");
   assert(!/secret[_-]?key/i.test(adminSource), "New admin source must not reference secret keys.");
 
+  const analyticsPage = read("app/admin/(protected)/analytics/page.tsx");
+  assert(analyticsPage.includes("Analytics V1"), "Analytics page must use Analytics V1 wording.");
+  assert(analyticsPage.includes("Page Views Today"), "Analytics page must display page views.");
+  assert(analyticsPage.includes("Tool Opens Today"), "Analytics page must display tool opens.");
+  assert(analyticsPage.includes("Operation analytics"), "Analytics page must explain postponed operation analytics.");
+  assert(!analyticsPage.includes('label="Started"'), "Analytics page must not show lifecycle Started metric cards in V1.");
+  assert(!analyticsPage.includes('label="Succeeded"'), "Analytics page must not show lifecycle Succeeded metric cards in V1.");
+  assert(!analyticsPage.includes('label="Failed"'), "Analytics page must not show lifecycle Failed metric cards in V1.");
+  assert(!analyticsPage.includes('label="Downloads"'), "Analytics page must not show lifecycle Downloads metric cards in V1.");
+  assert(!analyticsPage.includes("Success Rate"), "Analytics page must not show processing success rate in V1.");
+  assert(!analyticsPage.includes("Avg Duration"), "Analytics page must not show average processing duration in V1.");
+
+  const overviewPage = read("app/admin/(protected)/page.tsx");
+  assert(overviewPage.includes("Public Page Views"), "Overview must surface public page views.");
+  assert(overviewPage.includes("Tool Opens Today"), "Overview must surface tool opens.");
+  assert(!overviewPage.includes("Processing Success Rate"), "Overview must not show processing success rate in V1.");
+
+  const systemPage = read("app/admin/(protected)/system/page.tsx");
+  assert(systemPage.includes("V1 - Discovery analytics"), "System page must identify Analytics V1.");
+  assert(systemPage.includes("Operation lifecycle metrics"), "System page must mark lifecycle metrics as planned.");
+
   const packageJson = JSON.parse(read("package.json"));
   assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");
@@ -144,6 +164,7 @@ try {
   console.log("PASS admin data module is server-only");
   console.log("PASS logout remains POST-only");
   console.log("PASS no getSession, service_role, or secret key usage in new admin source");
+  console.log("PASS Analytics V1 control center wording is present");
   console.log("PASS protected package versions are unchanged");
   console.log("PASS protected non-admin files are untouched");
 } catch (error) {

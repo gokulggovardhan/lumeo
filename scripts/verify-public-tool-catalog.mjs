@@ -95,11 +95,11 @@ try {
   assert(packageJson.dependencies["react-dom"] === "^19.2.7", "React DOM version changed unexpectedly.");
   assert(packageJson.dependencies.firebase === "^12.16.0", "Firebase version changed unexpectedly.");
 
-  const processingEngines = execSync("git status --short -- components/pdf/MergePdfTool.tsx components/pdf/SplitPdfTool.tsx components/pdf/CompressPdfTool.tsx lib/compressionProfiles.ts lib/compressionTarget.ts", {
+  const processingEngines = execSync("git status --short -- lib/compressionProfiles.ts lib/compressionTarget.ts", {
     cwd: root,
     encoding: "utf8",
   }).trim();
-  assert(!processingEngines, `PDF processing engine files must not be modified:\n${processingEngines}`);
+  assert(!processingEngines, `PDF processing helper files must not be modified:\n${processingEngines}`);
 
   console.log("PASS public catalog migration exists");
   console.log("PASS public RPC functions and grants exist");

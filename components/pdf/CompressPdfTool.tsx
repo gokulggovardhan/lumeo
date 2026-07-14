@@ -28,6 +28,8 @@ import {
   type TargetQualityOutlook,
   type TargetUnit,
 } from "@/lib/compressionTarget";
+import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
 type ExpertMode = "profile" | "custom";
@@ -301,7 +303,9 @@ function DocumentIcon() {
 }
 
 export default function CompressPdfTool() {
+  const { availability, track } = useAnalytics();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
   const sessionRef = useRef(0);
@@ -447,6 +451,14 @@ export default function CompressPdfTool() {
       void cleanupTasks();
     };
   }, [cleanupTasks, previewUrl, result?.url]);
+
+  useEffect(() => {
+    if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
+    const result = track({ eventName: "tool_opened", toolSlug: "compress" });
+    if (result.accepted) {
+      openedTrackedRef.current = true;
+    }
+  }, [availability, track]);
 
   useEffect(() => {
     if (result) {

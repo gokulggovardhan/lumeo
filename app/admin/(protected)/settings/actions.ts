@@ -50,5 +50,9 @@ export async function updateSiteSetting(formData: FormData) {
     changes: { key },
   });
   revalidatePath("/admin/settings");
+  if (key === "public_analytics_enabled") {
+    revalidatePath("/");
+    revalidatePath("/pdf-tools");
+  }
   return successState("Setting saved.");
 }

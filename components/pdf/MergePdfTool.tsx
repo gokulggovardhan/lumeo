@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PDFDocument, rgb } from "pdf-lib";
+import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type MergeStatus = "Ready" | "Merging in your browser..." | "Download ready";
 type CleanupMessage = "" | "Temporary file cleared from this session.";
@@ -186,7 +188,9 @@ function PdfFileIcon() {
 }
 
 export default function MergePdfTool() {
+  const { availability, track } = useAnalytics();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const openedTrackedRef = useRef(false);
   const [files, setFiles] = useState<SelectedPdf[]>([]);
   const [pageFormat, setPageFormat] = useState<PageFormat>("smartA4Portrait");
   const [marginPreset, setMarginPreset] = useState<MarginPreset>("clean");
@@ -241,6 +245,18 @@ export default function MergePdfTool() {
       if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     };
   }, [downloadUrl]);
+
+  useEffect(() => {
+    const shouldAttempt = shouldAttemptOnce({
+      availability,
+      alreadyAccepted: openedTrackedRef.current,
+    });
+    if (!shouldAttempt) return;
+    const result = track({ eventName: "tool_opened", toolSlug: "merge" });
+    if (result.accepted) {
+      openedTrackedRef.current = true;
+    }
+  }, [availability, track]);
 
   const clearDownload = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);

@@ -16,7 +16,7 @@ const approvedSettings = [
   ["support_email", "Support email", "Contact email shown where approved."],
   ["contact_page_enabled", "Contact page enabled", "Database setting only in this phase."],
   ["maintenance_mode", "Maintenance mode", "Stored only; no public behavior yet."],
-  ["public_analytics_enabled", "Public analytics enabled", "Stored only; no tracking in this phase."],
+  ["public_analytics_enabled", "Public analytics enabled", "Enables optional anonymous product-use events. Do Not Track is still respected."],
   ["homepage_privacy_message", "Homepage privacy message", "Future homepage copy foundation."],
   ["default_seo_suffix", "Default SEO suffix", "Future SEO helper text."],
 ] as const;

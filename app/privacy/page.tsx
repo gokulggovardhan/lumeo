@@ -104,10 +104,14 @@ export default function PrivacyPage() {
 
         <InfoPageSection title="Analytics and diagnostics">
           <p>
-            Lumeo currently does not intentionally send document names or
-            document contents to analytics services. Product diagnostics, if
-            added in the future, should avoid document content and should be
-            disclosed clearly.
+            Lumeo may record optional anonymous product-use events to understand
+            reliability and which PDF tools need attention. These events use a
+            temporary browser-session ID and coarse categories only.
+          </p>
+          <p>
+            Analytics events do not include documents, filenames, document
+            contents, exact file sizes, extracted text, passwords, emails, or
+            account identifiers. Do Not Track disables optional analytics.
           </p>
         </InfoPageSection>
 

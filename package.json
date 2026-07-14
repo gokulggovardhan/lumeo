@@ -10,6 +10,8 @@
     "verify:admin-auth": "node scripts/verify-admin-auth.mjs",
     "verify:control-center": "node scripts/verify-control-center.mjs",
     "verify:public-catalog": "node scripts/verify-public-tool-catalog.mjs",
+    "verify:analytics": "node scripts/verify-privacy-analytics.mjs",
+    "test": "node --no-warnings --test --experimental-strip-types",
     "test:compression-target": "node --no-warnings --test --experimental-strip-types tests/compression-target.test.ts",
     "copy-ffmpeg-core": "node scripts/copy-ffmpeg-core.mjs",
     "postinstall": "npm run copy-ffmpeg-core",

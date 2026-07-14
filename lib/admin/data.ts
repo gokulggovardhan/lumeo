@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import type { AdminContext } from "@/lib/admin/types";
 import type {
   Announcement,
+  AdminAnalyticsSummaryResult,
   AuditLog,
   DailyToolMetric,
   FeatureFlag,
@@ -35,22 +36,43 @@ export type OverviewData = {
   enabledFeatureFlags: number;
   auditActions24h: number;
   analyticsEventsToday: number;
-  processingSuccessRate: number | null;
+  analyticsPageViewsToday: number;
+  analyticsToolOpensToday: number;
+  mostUsedTool: string | null;
+  analyticsEnabled: boolean;
+  analyticsDataStatus: "available" | "unavailable";
   recentAuditLogs: AuditLog[];
   tools: ToolWithCategory[];
   homepageSlots: HomepageSlotView[];
 };
 
 export type AnalyticsSummary = {
+  dataStatus: "available" | "unavailable";
   eventsToday: number;
+  pageViewsToday: number;
   toolOpens: number;
   processingStarted: number;
   processingSucceeded: number;
   processingFailed: number;
+  downloadsStarted: number;
   successRate: number | null;
   averageDurationMs: number | null;
   latestEventAt: string | null;
   dailyMetrics: DailyToolMetric[];
+  sevenDayTotals: Array<{
+    date: string;
+    events: number;
+    pageViews: number;
+    toolOpens: number;
+    succeeded: number;
+    failed: number;
+  }>;
+  topToolsByOpens: Array<{ toolSlug: string; count: number }>;
+  topToolsBySuccess: Array<{ toolSlug: string; count: number }>;
+  errorSummary: Array<{ errorCode: string; count: number }>;
+  deviceSummary: Array<{ label: string; count: number }>;
+  browserSummary: Array<{ label: string; count: number }>;
+  osSummary: Array<{ label: string; count: number }>;
 };
 
 export type SystemStatus = {
@@ -62,7 +84,10 @@ export type SystemStatus = {
   deploymentEnvironment: string;
   currentTimestamp: string;
   analyticsCollectionStatus: "schema-ready";
+  analyticsEnabled: boolean;
+  adminAnalyticsRpcStatus: "available" | "unavailable";
   latestAnalyticsEventAt: string | null;
+  latestDailyMetricDate: string | null;
   latestAuditAt: string | null;
   toolCatalogCount: number;
   homepageSlotCount: number;
@@ -81,6 +106,17 @@ function todayIsoDate() {
 
 function yesterdayIso() {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+}
+
+function isPublicAnalyticsEnabled(setting: SiteSetting | null | undefined) {
+  const value = setting?.value;
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      "enabled" in value &&
+      value.enabled === true,
+  );
 }
 
 export async function getToolCategories(): Promise<DataResult<ToolCategory[]>> {
@@ -187,52 +223,245 @@ export async function getAuditLogs(limit = 50, offset = 0): Promise<DataResult<A
   return safe((data ?? []) as AuditLog[], error);
 }
 
+function unavailableAnalyticsSummary(): AnalyticsSummary {
+  return {
+    dataStatus: "unavailable",
+    eventsToday: 0,
+    pageViewsToday: 0,
+    toolOpens: 0,
+    processingStarted: 0,
+    processingSucceeded: 0,
+    processingFailed: 0,
+    downloadsStarted: 0,
+    successRate: null,
+    averageDurationMs: null,
+    latestEventAt: null,
+    dailyMetrics: [],
+    sevenDayTotals: [],
+    topToolsByOpens: [],
+    topToolsBySuccess: [],
+    errorSummary: [],
+    deviceSummary: [],
+    browserSummary: [],
+    osSummary: [],
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function parseCount(value: unknown) {
+  return numberValue(value) ?? 0;
+}
+
+function parseToolRows(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  const rows: Array<{ toolSlug: string; count: number }> = [];
+  for (const row of value) {
+    if (!isRecord(row)) return null;
+    const toolSlug = stringValue(row.tool_slug);
+    const count = numberValue(row.event_count);
+    if (!toolSlug || count === null) return null;
+    rows.push({ toolSlug, count });
+  }
+  return rows;
+}
+
+function parseCategoryRows(value: unknown, key: string) {
+  if (!Array.isArray(value)) return null;
+  const rows: Array<{ label: string; count: number }> = [];
+  for (const row of value) {
+    if (!isRecord(row)) return null;
+    const label = stringValue(row[key]);
+    const count = numberValue(row.event_count);
+    if (!label || count === null) return null;
+    rows.push({ label, count });
+  }
+  return rows;
+}
+
+function parseErrorRows(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  const rows: Array<{ errorCode: string; count: number }> = [];
+  for (const row of value) {
+    if (!isRecord(row)) return null;
+    const errorCode = stringValue(row.error_code);
+    const count = numberValue(row.event_count);
+    if (!errorCode || count === null) return null;
+    rows.push({ errorCode, count });
+  }
+  return rows;
+}
+
+function parseDailyRows(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  const rows: Array<{
+    date: string;
+    events: number;
+    succeeded: number;
+    failed: number;
+    toolOpens: number;
+    processingStarted: number;
+    downloadsStarted: number;
+    pageViews: number;
+  }> = [];
+  for (const row of value) {
+    if (!isRecord(row)) return null;
+    const date = stringValue(row.date);
+    if (!date) return null;
+    const events = parseCount(row.total_events);
+    const toolOpens = parseCount(row.tool_opens);
+    const processingStarted = parseCount(row.processing_started);
+    const succeeded = parseCount(row.processing_succeeded);
+    const failed = parseCount(row.processing_failed);
+    const downloadsStarted = parseCount(row.downloads_started);
+    rows.push({
+      date,
+      events,
+      succeeded,
+      failed,
+      toolOpens,
+      processingStarted,
+      downloadsStarted,
+      pageViews: Math.max(
+        0,
+        events -
+          toolOpens -
+          processingStarted -
+          succeeded -
+          failed -
+          downloadsStarted,
+      ),
+    });
+  }
+  return rows;
+}
+
+function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
+  if (!isRecord(value) || !isRecord(value.summary)) return null;
+
+  const dailyRows = parseDailyRows(value.daily_trend);
+  const topToolsByOpens = parseToolRows(value.top_tools_by_opens);
+  const topToolsBySuccess = parseToolRows(value.top_tools_by_success);
+  const errorSummary = parseErrorRows(value.error_summary);
+  const deviceSummary = parseCategoryRows(value.device_summary, "device_class");
+  const browserSummary = parseCategoryRows(value.browser_summary, "browser_family");
+  const osSummary = parseCategoryRows(value.operating_system_summary, "operating_system");
+
+  if (
+    !dailyRows ||
+    !topToolsByOpens ||
+    !topToolsBySuccess ||
+    !errorSummary ||
+    !deviceSummary ||
+    !browserSummary ||
+    !osSummary
+  ) {
+    return null;
+  }
+
+  const processingSucceeded = parseCount(value.summary.processing_succeeded);
+  const processingFailed = parseCount(value.summary.processing_failed);
+  const eventsToday = parseCount(value.summary.total_events);
+  const toolOpens = parseCount(value.summary.tool_opens);
+  const processingStarted = parseCount(value.summary.processing_started);
+  const downloadsStarted = parseCount(value.summary.downloads_started);
+  const completed = processingSucceeded + processingFailed;
+  const averageDuration = value.summary.average_successful_duration_ms;
+  const successfulDurationTotal = parseCount(value.summary.successful_duration_total_ms);
+  const pageViewsToday = Math.max(
+    0,
+    eventsToday -
+      toolOpens -
+      processingStarted -
+      processingSucceeded -
+      processingFailed -
+      downloadsStarted,
+  );
+
+  return {
+    dataStatus: "available",
+    eventsToday,
+    pageViewsToday,
+    toolOpens,
+    processingStarted,
+    processingSucceeded,
+    processingFailed,
+    downloadsStarted,
+    successRate: completed > 0 ? Math.round((processingSucceeded / completed) * 1000) / 10 : null,
+    averageDurationMs: numberValue(averageDuration),
+    latestEventAt: stringValue(value.summary.latest_event_at),
+    dailyMetrics: dailyRows.map((row) => ({
+      metric_date: row.date,
+      tool_slug: "all",
+      tool_opens: row.toolOpens,
+      processing_started: row.processingStarted,
+      processing_succeeded: row.succeeded,
+      processing_failed: row.failed,
+      total_duration_ms: successfulDurationTotal,
+    })),
+    sevenDayTotals: dailyRows.map((row) => ({
+      date: row.date,
+      events: row.events,
+      pageViews: row.pageViews,
+      toolOpens: row.toolOpens,
+      succeeded: row.succeeded,
+      failed: row.failed,
+    })),
+    topToolsByOpens: topToolsByOpens.map((row) => ({
+      toolSlug: row.toolSlug,
+      count: row.count,
+    })),
+    topToolsBySuccess: topToolsBySuccess.map((row) => ({
+      toolSlug: row.toolSlug,
+      count: row.count,
+    })),
+    errorSummary: errorSummary.map((row) => ({
+      errorCode: row.errorCode,
+      count: row.count,
+    })),
+    deviceSummary: deviceSummary.map((row) => ({
+      label: row.label,
+      count: row.count,
+    })),
+    browserSummary: browserSummary.map((row) => ({
+      label: row.label,
+      count: row.count,
+    })),
+    osSummary: osSummary.map((row) => ({
+      label: row.label,
+      count: row.count,
+    })),
+  };
+}
+
 export async function getAnalyticsSummary(): Promise<DataResult<AnalyticsSummary>> {
   const supabase = await createClient();
   const today = todayIsoDate();
-  const since = `${today}T00:00:00.000Z`;
+  const { data, error } = await supabase.rpc("get_admin_analytics_summary", {
+    p_start_date: today,
+    p_end_date: today,
+  });
 
-  const [{ count: eventsToday, error: eventError }, { data: latest }, { data: metrics, error: metricError }] =
-    await Promise.all([
-      supabase
-        .from("analytics_events")
-        .select("id", { count: "exact", head: true })
-        .gte("occurred_at", since),
-      supabase
-        .from("analytics_events")
-        .select("occurred_at")
-        .order("occurred_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("daily_tool_metrics")
-        .select("*")
-        .gte("metric_date", new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
-        .order("metric_date", { ascending: false }),
-    ]);
+  if (error) {
+    return safe(unavailableAnalyticsSummary(), error);
+  }
 
-  const dailyMetrics = (metrics ?? []) as DailyToolMetric[];
-  const todayMetrics = dailyMetrics.filter((metric) => metric.metric_date === today);
-  const processingStarted = todayMetrics.reduce((sum, metric) => sum + metric.processing_started, 0);
-  const processingSucceeded = todayMetrics.reduce((sum, metric) => sum + metric.processing_succeeded, 0);
-  const processingFailed = todayMetrics.reduce((sum, metric) => sum + metric.processing_failed, 0);
-  const totalDuration = todayMetrics.reduce((sum, metric) => sum + metric.total_duration_ms, 0);
-  const completed = processingSucceeded + processingFailed;
+  const parsed = parseAdminAnalyticsSummary(data as AdminAnalyticsSummaryResult | unknown);
+  if (!parsed) {
+    return safe(unavailableAnalyticsSummary(), new Error("Malformed admin analytics aggregate."));
+  }
 
-  return safe(
-    {
-      eventsToday: eventsToday ?? 0,
-      toolOpens: todayMetrics.reduce((sum, metric) => sum + metric.tool_opens, 0),
-      processingStarted,
-      processingSucceeded,
-      processingFailed,
-      successRate: completed > 0 ? Math.round((processingSucceeded / completed) * 1000) / 10 : null,
-      averageDurationMs: completed > 0 ? Math.round(totalDuration / completed) : null,
-      latestEventAt: (latest as { occurred_at?: string } | null)?.occurred_at ?? null,
-      dailyMetrics,
-    },
-    eventError ?? metricError,
-  );
+  return safe(parsed, null);
 }
 
 export async function getOverviewData(): Promise<DataResult<OverviewData>> {
@@ -264,7 +493,11 @@ export async function getOverviewData(): Promise<DataResult<OverviewData>> {
       enabledFeatureFlags: flags.filter((flag) => flag.is_enabled).length,
       auditActions24h: auditActions24h ?? 0,
       analyticsEventsToday: analyticsResult.data.eventsToday,
-      processingSuccessRate: analyticsResult.data.successRate,
+      analyticsPageViewsToday: analyticsResult.data.pageViewsToday,
+      analyticsToolOpensToday: analyticsResult.data.toolOpens,
+      mostUsedTool: analyticsResult.data.topToolsByOpens[0]?.toolSlug ?? null,
+      analyticsEnabled: analyticsResult.data.dataStatus === "available",
+      analyticsDataStatus: analyticsResult.data.dataStatus,
       recentAuditLogs: auditResult.data,
       tools,
       homepageSlots: slotsResult.data,
@@ -281,7 +514,14 @@ export async function getOverviewData(): Promise<DataResult<OverviewData>> {
 
 export async function getSystemStatus(admin: AdminContext): Promise<DataResult<SystemStatus>> {
   const supabase = await createClient();
-  const [{ count: toolCount, error: toolError }, { count: slotCount, error: slotError }, auditResult, analyticsResult] =
+  const [
+    { count: toolCount, error: toolError },
+    { count: slotCount, error: slotError },
+    auditResult,
+    analyticsSummaryResult,
+    dailyMetricResult,
+    analyticsSettingResult,
+  ] =
     await Promise.all([
       supabase.from("pdf_tools").select("id", { count: "exact", head: true }),
       supabase.from("homepage_tool_slots").select("slot_number", { count: "exact", head: true }),
@@ -291,11 +531,17 @@ export async function getSystemStatus(admin: AdminContext): Promise<DataResult<S
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      getAnalyticsSummary(),
       supabase
-        .from("analytics_events")
-        .select("occurred_at")
-        .order("occurred_at", { ascending: false })
+        .from("daily_tool_metrics")
+        .select("metric_date")
+        .order("metric_date", { ascending: false })
         .limit(1)
+        .maybeSingle(),
+      supabase
+        .from("site_settings")
+        .select("key, value, description, is_public, updated_by, updated_at")
+        .eq("key", "public_analytics_enabled")
         .maybeSingle(),
     ]);
 
@@ -309,11 +555,19 @@ export async function getSystemStatus(admin: AdminContext): Promise<DataResult<S
       deploymentEnvironment: process.env.VERCEL_ENV ?? "local",
       currentTimestamp: new Date().toISOString(),
       analyticsCollectionStatus: "schema-ready",
-      latestAnalyticsEventAt: (analyticsResult.data as { occurred_at?: string } | null)?.occurred_at ?? null,
+      analyticsEnabled: isPublicAnalyticsEnabled(analyticsSettingResult.data as SiteSetting | null),
+      adminAnalyticsRpcStatus: analyticsSummaryResult.data.dataStatus,
+      latestAnalyticsEventAt: analyticsSummaryResult.data.latestEventAt,
+      latestDailyMetricDate: (dailyMetricResult.data as { metric_date?: string } | null)?.metric_date ?? null,
       latestAuditAt: (auditResult.data as { created_at?: string } | null)?.created_at ?? null,
       toolCatalogCount: toolCount ?? 0,
       homepageSlotCount: slotCount ?? 0,
     },
-    toolError ?? slotError ?? auditResult.error ?? analyticsResult.error,
+    toolError ??
+      slotError ??
+      auditResult.error ??
+      analyticsSummaryResult.error ??
+      dailyMetricResult.error ??
+      analyticsSettingResult.error,
   );
 }
