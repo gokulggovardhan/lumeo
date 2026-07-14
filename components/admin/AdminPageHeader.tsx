@@ -15,14 +15,14 @@ export function AdminPageHeader({
     <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div className="max-w-3xl">
         {eyebrow && (
-          <p className="text-[0.68rem] font-bold uppercase tracking-[0.24em] text-[#CBA052]/72">
+          <p className="aura-text-label text-[var(--lumeo-gold-300)]">
             {eyebrow}
           </p>
         )}
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#F0EAD6] sm:text-4xl">
+        <h1 className="mt-2 font-serif text-[length:var(--text-heading-xl)] font-semibold tracking-tight text-[var(--lumeo-paper-50)] sm:text-[length:var(--text-display-md)]">
           {title}
         </h1>
-        <p className="mt-3 text-sm leading-6 text-[#F0EAD6]/58">{description}</p>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--lumeo-paper-400)]">{description}</p>
       </div>
       {meta}
     </header>

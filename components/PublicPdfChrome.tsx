@@ -78,7 +78,7 @@ export function PublicNav({
   toolsMenu?: ReactNode;
 }) {
   return (
-    <nav className="lumeo-nav-enter relative z-30 border-b border-[#E8DFC8]/8 bg-[#0C1220]/92 px-5 backdrop-blur-xl sm:px-8">
+    <nav className="lumeo-nav-enter aura-public-nav relative z-30 border-b border-[var(--border-subtle)] bg-[rgba(8,16,29,0.78)] px-5 shadow-[var(--shadow-xs)] backdrop-blur-xl sm:px-8">
       <div className={`mx-auto flex h-[70px] ${maxWidth} items-center justify-between gap-4`}>
         <Link href="/" className="flex min-w-0 items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45">
           <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
@@ -88,7 +88,7 @@ export function PublicNav({
           {toolsMenu ?? (
             <Link
               href="/pdf-tools"
-              className="lumeo-press lumeo-focus-ring inline-flex h-10 items-center justify-center rounded-full border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.02] px-3.5 text-sm font-semibold text-[#F0EAD6]/72 transition hover:border-[#CBA052]/28 hover:bg-[#F0EAD6]/[0.04] hover:text-[#F0EAD6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45 sm:h-11 sm:px-4"
+              className="lumeo-press lumeo-focus-ring inline-flex h-10 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.055)] px-3.5 text-sm font-extrabold text-[var(--lumeo-paper-200)] transition hover:border-[var(--border-premium)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.09)] hover:text-[var(--lumeo-paper-50)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.18)] sm:h-11 sm:px-4"
             >
               PDF Tools
             </Link>
@@ -97,7 +97,7 @@ export function PublicNav({
             href="/"
             aria-label="Go to Lumeo PDF home"
             title="Home"
-            className="lumeo-press lumeo-focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.02] text-[#F0EAD6]/64 transition hover:border-[#CBA052]/28 hover:bg-[#CBA052]/[0.08] hover:text-[#D8BC7A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45 sm:h-11 sm:w-11"
+            className="lumeo-press lumeo-focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.055)] text-[var(--lumeo-paper-400)] transition hover:border-[var(--border-premium)] hover:bg-[rgba(var(--lumeo-gold-rgb),0.1)] hover:text-[var(--lumeo-gold-300)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.18)] sm:h-11 sm:w-11"
           >
             <HomeIcon />
           </Link>
@@ -121,10 +121,10 @@ export function PublicPageShell({
   toolsMenu?: ReactNode;
 }) {
   return (
-    <main className={`lumeo-page-enter relative overflow-x-hidden ${mainClassName}`}>
+    <main id="main-content" className={`lumeo-page-enter aura-page-shell relative overflow-x-hidden ${mainClassName}`}>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="lumeo-ambient absolute -left-44 -top-48 h-[32rem] w-[32rem] rounded-full bg-[#0D2C6D]/20 blur-[150px]" />
-        <div className="lumeo-ambient absolute -right-44 top-0 [animation-delay:-4s] h-[30rem] w-[30rem] rounded-full bg-[#CBA052]/[0.06] blur-[155px]" />
+        <div className="lumeo-ambient absolute -left-44 -top-48 h-[32rem] w-[32rem] rounded-full bg-[rgba(var(--lumeo-aura-rgb),0.14)] blur-[150px]" />
+        <div className="lumeo-ambient absolute -right-44 top-0 [animation-delay:-4s] h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--lumeo-gold-rgb),0.08)] blur-[155px]" />
       </div>
 
       <div className="relative z-10">

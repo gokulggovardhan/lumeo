@@ -6,9 +6,9 @@ export function AdminEmptyState({
   description: string;
 }) {
   return (
-    <div className="rounded-[1.2rem] border border-dashed border-[#E8DFC8]/16 bg-[#0C1220]/46 p-6 text-center">
-      <p className="text-sm font-semibold text-[#F0EAD6]">{title}</p>
-      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[#F0EAD6]/54">{description}</p>
+    <div className="rounded-[var(--radius-xl)] border border-dashed border-[var(--border-default)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-6 text-center">
+      <p className="text-sm font-semibold text-[var(--lumeo-paper-50)]">{title}</p>
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--lumeo-paper-400)]">{description}</p>
     </div>
   );
 }

@@ -16,6 +16,7 @@ export const adminNavigation: AdminNavItem[] = [
   { label: "System", href: "/admin/system", icon: "system" },
   { label: "Settings", href: "/admin/settings", icon: "settings" },
   { label: "Design System", href: "/admin/design-system", icon: "design" },
+  { label: "Guide", href: "/admin/guide", icon: "guide" },
 ];
 
 export function isActiveAdminRoute(pathname: string, href: string) {

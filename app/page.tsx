@@ -53,7 +53,7 @@ const structuredData = [
 
 export default function Home() {
   return (
-    <main className="lumeo-page-enter relative flex min-h-dvh flex-col overflow-x-hidden bg-[#0C1220] text-[#F0EAD6]">
+    <main id="main-content" className="lumeo-page-enter aura-home relative flex min-h-dvh flex-col overflow-x-hidden bg-[var(--surface-canvas)] text-[var(--lumeo-paper-100)]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
@@ -65,22 +65,22 @@ export default function Home() {
         <div className="absolute bottom-[-18rem] left-[44%] h-[28rem] w-[28rem] rounded-full bg-[#1E6B4A]/[0.07] blur-[150px]" />
       </div>
 
-      <nav className="lumeo-nav-enter relative z-30 border-b border-[#E8DFC8]/8 bg-[#0C1220]/92 px-5 backdrop-blur-xl sm:px-8">
+      <nav className="lumeo-nav-enter aura-public-nav relative z-30 border-b border-[var(--border-subtle)] bg-[rgba(8,16,29,0.78)] px-5 shadow-[var(--shadow-xs)] backdrop-blur-xl sm:px-8">
         <div className="mx-auto flex h-[70px] max-w-[1160px] items-center justify-between gap-4">
           <Link
             href="/"
             aria-label="Lumeo PDF home"
-            className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/50"
+            className="rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]"
           >
             <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
           </Link>
 
-          <div className="flex items-center gap-1 text-xs font-semibold text-[#F0EAD6]/64 sm:gap-2 sm:text-sm">
+          <div className="flex items-center gap-1 text-xs font-semibold text-[var(--lumeo-paper-400)] sm:gap-2 sm:text-sm">
             <PublicPdfToolsMenu />
-            <Link href="/guides" className="hidden rounded-full px-4 py-2.5 transition hover:bg-[#F0EAD6]/[0.045] hover:text-[#F0EAD6] sm:inline-flex">
+            <Link href="/guides" className="hidden rounded-full px-4 py-2.5 transition hover:bg-[rgba(var(--lumeo-paper-rgb),0.06)] hover:text-[var(--lumeo-paper-50)] sm:inline-flex">
               Guides
             </Link>
-            <Link href="/privacy" className="rounded-full px-3 py-2.5 transition hover:bg-[#F0EAD6]/[0.045] hover:text-[#F0EAD6] sm:px-4">
+            <Link href="/privacy" className="rounded-full px-3 py-2.5 transition hover:bg-[rgba(var(--lumeo-paper-rgb),0.06)] hover:text-[var(--lumeo-paper-50)] sm:px-4">
               Privacy
             </Link>
           </div>
@@ -89,17 +89,20 @@ export default function Home() {
 
       <section className="relative z-10 flex-1">
         <div className="mx-auto w-full max-w-[1160px] px-5 pb-10 pt-7 sm:px-8 sm:pb-12 sm:pt-9 lg:pb-14">
-          <section aria-labelledby="tool-heading">
+          <section aria-labelledby="tool-heading" className="aura-home-workspace">
             <header className="lumeo-fade-up mx-auto mb-7 max-w-3xl text-center sm:mb-8">
-              <p className="text-[0.63rem] font-bold uppercase tracking-[0.2em] text-[#CBA052]">
+              <p className="aura-text-label text-[var(--lumeo-gold-300)]">
                 Lumeo PDF Workspace
               </p>
               <h1
                 id="tool-heading"
-                className="mt-3 text-[2.25rem] font-bold leading-[1.05] tracking-[-0.04em] text-[#F0EAD6] sm:text-[3rem]"
+                className="mt-3 font-serif text-[var(--text-display-md)] leading-[var(--leading-display)] tracking-[var(--tracking-display)] text-[var(--lumeo-paper-50)]"
               >
-                Choose a tool. Get it done.
+                Work with PDFs beautifully.
               </h1>
+              <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-[var(--lumeo-paper-400)]">
+                Private, fast, browser-first.
+              </p>
             </header>
 
             <div className="lumeo-fade-up lumeo-fade-up-delay-1"><PdfToolLauncher showHeading={false} /></div>
@@ -107,10 +110,10 @@ export default function Home() {
 
           <section className="lumeo-fade-up lumeo-fade-up-delay-2 mx-auto mt-8 max-w-3xl text-center sm:mt-9">
             <p className="text-sm leading-6 text-[#F0EAD6]/64 sm:text-base">
-              Merge, split or compress a PDF privately in your browser.
+              Choose a workspace and keep moving. The tools stay first.
             </p>
             <p className="mt-3 text-xs font-semibold text-[#F0EAD6]/48">
-              Browser-only · No account · Cleared after download
+              Private by design · Browser-only · Cleared after download
             </p>
           </section>
         </div>

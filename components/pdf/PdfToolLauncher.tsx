@@ -41,7 +41,7 @@ function ToolGlyph({ iconKey }: { iconKey: string }) {
   return (
     <span
       aria-hidden="true"
-      className="lumeo-card-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-[15px] border border-[#CBA052]/22 bg-[linear-gradient(145deg,rgba(203,160,82,0.14),rgba(30,107,74,0.08))] text-[#D8BC7A] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]"
+      className="lumeo-card-icon flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--radius-lg)] border border-[var(--border-premium)] bg-[linear-gradient(145deg,rgba(var(--lumeo-gold-rgb),0.16),rgba(var(--lumeo-aura-rgb),0.08))] text-[var(--lumeo-gold-300)] shadow-[inset_0_1px_0_rgba(255,253,247,0.08)]"
     >
       <svg viewBox="0 0 24 24" className="h-[1.3rem] w-[1.3rem]" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.55">
         {paths[iconKey] ?? paths.all}
@@ -70,21 +70,21 @@ function ToolCard({
       <Link
         href={tool.route}
         aria-label={`Open ${tool.toolName}`}
-        className="lumeo-card lumeo-shine group relative flex h-full min-h-[10.75rem] flex-col overflow-hidden rounded-[22px] border border-[#E8DFC8]/8 bg-[linear-gradient(180deg,rgba(17,26,43,0.98),rgba(13,21,36,0.98))] p-5 shadow-[0_18px_42px_rgba(0,0,0,0.28),inset_0_1px_0_rgba(240,234,214,0.035)] transition duration-200 hover:-translate-y-1 hover:border-[#CBA052]/30 hover:shadow-[0_24px_58px_rgba(0,0,0,0.38),0_0_28px_rgba(203,160,82,0.06)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/50 motion-reduce:transform-none sm:p-6"
+        className="lumeo-card lumeo-shine aura-tool-card group relative flex h-full min-h-[10.75rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[linear-gradient(180deg,rgba(25,48,77,0.82),rgba(16,29,49,0.94))] p-5 shadow-[var(--shadow-md)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-premium)] hover:shadow-[var(--shadow-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)] motion-reduce:transform-none sm:p-6"
       >
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/48 to-transparent opacity-60 transition group-hover:opacity-100" />
 
         <div className="flex items-start justify-between gap-4">
           <ToolGlyph iconKey={tool.iconKey} />
-          <span className="lumeo-arrow flex h-9 w-9 items-center justify-center rounded-full border border-[#E8DFC8]/9 bg-[#F0EAD6]/[0.02] text-[#CBA052] transition duration-200 group-hover:translate-x-0.5 group-hover:border-[#CBA052]/28 group-hover:bg-[#CBA052]/[0.08] motion-reduce:transform-none">
+          <span className="lumeo-arrow flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] text-[var(--lumeo-gold-300)] transition duration-200 group-hover:translate-x-0.5 group-hover:border-[var(--border-premium)] group-hover:bg-[rgba(var(--lumeo-gold-rgb),0.1)] motion-reduce:transform-none">
             <ArrowIcon />
           </span>
         </div>
 
-        <h2 className="mt-5 text-[1.28rem] font-bold tracking-[-0.025em] text-[#F0EAD6]">
+        <h2 className="mt-5 text-[1.28rem] font-black tracking-[-0.025em] text-[var(--lumeo-paper-50)]">
           {tool.toolName}
         </h2>
-        <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/60">
+        <p className="mt-2 text-sm leading-6 text-[var(--lumeo-paper-400)]">
           {tool.shortDescription}
         </p>
       </Link>
@@ -106,10 +106,10 @@ export async function PdfToolLauncher({ showHeading = true }: { showHeading?: bo
     <section aria-label="PDF tools">
       {showHeading ? (
         <header className="mb-7 text-center">
-          <p className="text-[0.63rem] font-bold uppercase tracking-[0.2em] text-[#CBA052]">
+          <p className="aura-text-label text-[var(--lumeo-gold-300)]">
             Lumeo PDF Workspace
           </p>
-          <h1 className="mt-3 text-4xl font-bold tracking-[-0.04em] text-[#F0EAD6] sm:text-5xl">
+          <h1 className="mt-3 font-serif text-[var(--text-heading-xl)] leading-[var(--leading-heading)] text-[var(--lumeo-paper-50)]">
             Choose a tool. Get it done.
           </h1>
         </header>

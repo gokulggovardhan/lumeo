@@ -257,3 +257,41 @@ Do not:
 - Document stored-only or planned behaviour honestly.
 - Do not add dependencies for simple UI primitives.
 - Verify with `npm.cmd run verify:aura`.
+
+## 24. Run 2 Rollout
+
+Run 2 applies the Aura foundation to the visible Lumeo product without rewriting processing engines or security boundaries.
+
+### Public surfaces
+
+- The homepage uses a brighter Aura canvas, compact product message and immediate PDF tool workspace.
+- The PDF tools directory keeps Supabase catalog data as its source of truth while adopting Aura cards, sections and focus states.
+- Informational pages use luminous document panels rather than dense dark blocks.
+- The PDF tools menu, public nav and footer use satin surfaces, restrained blur and accessible keyboard focus.
+
+### PDF tools
+
+Merge PDF, Split PDF and Compress PDF remain algorithmically unchanged. Run 2 preserves browser-first processing, output handling, analytics privacy rules and existing validation. Visual work is intentionally limited to shared shells, launchers, placeholders and surrounding navigation unless a future tool-specific pass is scheduled.
+
+### Control Center
+
+Shared admin primitives now use Aura surfaces, table styling, form focus states, tactile buttons and calmer empty states. This updates overview, analytics, tools, homepage, feature flags, announcements, SEO, audit, system and settings pages through their common components.
+
+### Guide and showcase
+
+The protected Design System showcase remains at `/admin/design-system`. The protected admin guide at `/admin/guide` explains runtime impact, stored-only states, dependencies, risk and deployment expectations for the current Control Center.
+
+### Run 2 constraints
+
+- No Supabase migrations changed.
+- No SQL was executed.
+- No PDF processing algorithms were changed.
+- No analytics provider, privacy rule or admin permission model was weakened.
+- No public claims were added for behaviour that is only stored for future wiring.
+
+### Run 3 candidates
+
+- Migrate individual Merge, Split and Compress internals to shared `ToolWorkspace` components after visual QA.
+- Add richer contextual guidance to each Control Center form.
+- Add compact Aura loading states for data-heavy admin tables.
+- Apply Aura result cards to future JPG/PDF conversion tools as they become real engines.

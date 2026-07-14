@@ -11,6 +11,12 @@ const ui = read("components/ui/Aura.tsx");
 const workspace = read("components/pdf/workspace/ToolWorkspace.tsx");
 const guidance = read("components/admin/guidance/AdminGuidance.tsx");
 const showcase = read("app/admin/(protected)/design-system/page.tsx");
+const guide = read("app/admin/(protected)/guide/page.tsx");
+const homepage = read("app/page.tsx");
+const pdfTools = read("app/pdf-tools/page.tsx");
+const publicChrome = read("components/PublicPdfChrome.tsx");
+const publicFooter = read("components/PublicFooter.tsx");
+const rolloutDoc = read("docs/LUMEO_AURA_ROLLOUT.md");
 
 test("Aura design tokens cover colour, surface, type, spacing, radius and motion", () => {
   for (const token of [
@@ -68,4 +74,28 @@ test("new Aura code avoids prohibited debug and secret patterns", () => {
   const combined = [ui, workspace, guidance, showcase].join("\n");
   assert.doesNotMatch(combined, /console\.(log|info|warn|error)/);
   assert.doesNotMatch(combined, /service_role|secret[_-]?key|password\s*=/i);
+});
+
+test("Run 2 public rollout uses Aura surfaces and keeps tools visible", () => {
+  assert.ok(homepage.includes("aura-home"));
+  assert.ok(homepage.includes("Work with PDFs beautifully."));
+  assert.ok(homepage.includes("Private, fast, browser-first."));
+  assert.ok(pdfTools.includes("aura-directory-section"));
+  assert.ok(publicChrome.includes("aura-public-nav"));
+  assert.ok(publicFooter.includes("aura-public-footer"));
+});
+
+test("Run 2 admin guide documents stored-only and runtime impact states", () => {
+  assert.ok(guide.includes("What happens when Compress PDF is disabled?"));
+  assert.ok(guide.includes("What happens when public analytics is disabled?"));
+  assert.ok(guide.includes("Stored only"));
+  assert.ok(guide.includes("Requires setup") || guide.includes("requires setup"));
+});
+
+test("Run 2 documentation records constraints and review URLs", () => {
+  assert.ok(rolloutDoc.includes("Run 2"));
+  assert.ok(rolloutDoc.includes("No SQL"));
+  assert.ok(rolloutDoc.includes("PDF processing algorithms"));
+  assert.ok(rolloutDoc.includes("http://localhost:3000/admin/design-system"));
+  assert.ok(rolloutDoc.includes("http://localhost:3000/admin/guide"));
 });

@@ -12,13 +12,13 @@ export function AdminMetricCard({
   tone?: "neutral" | "success" | "warning" | "danger" | "gold";
 }) {
   return (
-    <div className="rounded-[1.2rem] border border-[#E8DFC8]/10 bg-[#142034] p-5 transition duration-200 hover:-translate-y-0.5 hover:border-[#CBA052]/24 motion-reduce:hover:translate-y-0">
+    <div className="aura-card-lift rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-5 shadow-[var(--shadow-sm)] transition duration-200 hover:border-[var(--border-premium)] motion-reduce:hover:translate-y-0">
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#E8DFC8]/48">{label}</p>
+        <p className="aura-text-label text-[var(--lumeo-paper-400)]">{label}</p>
         <AdminStatusBadge tone={tone}>Live</AdminStatusBadge>
       </div>
-      <p className="mt-4 text-3xl font-semibold tracking-tight text-[#F0EAD6]">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">{detail}</p>
+      <p className="mt-4 text-3xl font-semibold tracking-tight text-[var(--lumeo-paper-50)] [font-variant-numeric:tabular-nums]">{value}</p>
+      <p className="mt-2 text-sm leading-6 text-[var(--lumeo-paper-400)]">{detail}</p>
     </div>
   );
 }

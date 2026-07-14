@@ -64,7 +64,7 @@ export function PublicPdfToolsMenuClient({
         aria-expanded={open}
         aria-controls={menuId}
         onClick={() => setOpen((value) => !value)}
-        className={`lumeo-press lumeo-focus-ring inline-flex items-center justify-center gap-2 rounded-full border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.02] text-sm font-semibold text-[#F0EAD6]/72 transition duration-200 hover:border-[#CBA052]/28 hover:bg-[#F0EAD6]/[0.04] hover:text-[#F0EAD6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45 ${
+        className={`lumeo-press lumeo-focus-ring inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.055)] text-sm font-extrabold text-[var(--lumeo-paper-200)] transition duration-200 hover:border-[var(--border-premium)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.09)] hover:text-[var(--lumeo-paper-50)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)] ${
           compact ? "h-10 px-3.5 sm:h-11 sm:px-4" : "px-3 py-2.5 sm:px-4"
         }`}
       >
@@ -74,22 +74,22 @@ export function PublicPdfToolsMenuClient({
 
       {open ? (
         <>
-          <div className="fixed inset-0 z-40 bg-[#0C1220]/56 md:hidden" aria-hidden="true" />
+          <div className="fixed inset-0 z-40 bg-[var(--surface-overlay)] md:hidden" aria-hidden="true" />
           <div
             id={menuId}
             role="dialog"
             aria-label="PDF Tools"
-            className="lumeo-fade-up fixed inset-x-3 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-[22px] border border-[#E8DFC8]/10 bg-[#111A2B] p-3 shadow-[0_28px_90px_rgba(0,0,0,0.52)] md:absolute md:inset-auto md:right-0 md:top-[calc(100%+0.65rem)] md:w-[min(46rem,calc(100vw-2rem))] md:max-h-[74vh]"
+            className="aura-menu-reveal fixed inset-x-3 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--lumeo-ink-850)] p-3 shadow-[var(--shadow-xl)] md:absolute md:inset-auto md:right-0 md:top-[calc(100%+0.65rem)] md:w-[min(46rem,calc(100vw-2rem))] md:max-h-[74vh]"
           >
-            <div className="flex items-center justify-between gap-4 border-b border-[#E8DFC8]/8 px-2 pb-3">
+            <div className="flex items-center justify-between gap-4 border-b border-[var(--border-subtle)] px-2 pb-3">
               <div>
-                <p className="text-sm font-bold text-[#F0EAD6]">PDF Tools</p>
-                <p className="mt-1 text-xs text-[#F0EAD6]/48">Choose a workspace by category.</p>
+                <p className="text-sm font-black text-[var(--lumeo-paper-50)]">PDF Tools</p>
+                <p className="mt-1 text-xs text-[var(--lumeo-paper-400)]">Choose a workspace by category.</p>
               </div>
               <Link
                 href="/pdf-tools"
                 onClick={() => setOpen(false)}
-                className="rounded-full border border-[#1E6B4A]/38 bg-[#1E6B4A]/12 px-3 py-2 text-xs font-bold text-[#DDF5E9] transition hover:bg-[#1E6B4A]/20"
+                className="rounded-full border border-[rgba(var(--lumeo-seal-rgb),0.38)] bg-[rgba(var(--lumeo-seal-rgb),0.14)] px-3 py-2 text-xs font-bold text-[var(--lumeo-paper-50)] transition hover:bg-[rgba(var(--lumeo-seal-rgb),0.22)]"
               >
                 View all PDF tools
               </Link>
@@ -97,21 +97,21 @@ export function PublicPdfToolsMenuClient({
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               {categories.map((category) => (
-                <section key={category.slug} className="rounded-2xl border border-[#E8DFC8]/8 bg-[#0C1220]/42 p-3">
-                  <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]/78">{category.name}</h2>
+                <section key={category.slug} className="rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-3">
+                  <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold-300)]">{category.name}</h2>
                   <div className="mt-2 grid gap-1.5">
                     {category.tools.map((tool) => (
                       <Link
                         key={tool.route}
                         href={tool.route}
                         onClick={() => setOpen(false)}
-                        className="group rounded-xl border border-transparent px-3 py-2.5 text-left transition duration-200 hover:border-[#E8DFC8]/10 hover:bg-[#F0EAD6]/[0.035] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/35"
+                        className="group rounded-xl border border-transparent px-3 py-2.5 text-left transition duration-200 hover:border-[var(--border-premium)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.055)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.18)]"
                       >
                         <span className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-semibold text-[#F0EAD6]">{tool.toolName}</span>
-                          <span aria-hidden="true" className="text-[#CBA052] transition group-hover:translate-x-0.5 motion-reduce:transform-none">→</span>
+                          <span className="text-sm font-semibold text-[var(--lumeo-paper-50)]">{tool.toolName}</span>
+                          <span aria-hidden="true" className="text-[var(--lumeo-gold-300)] transition group-hover:translate-x-0.5 motion-reduce:transform-none">→</span>
                         </span>
-                        <span className="mt-1 block text-xs leading-5 text-[#F0EAD6]/50">{tool.shortDescription}</span>
+                        <span className="mt-1 block text-xs leading-5 text-[var(--lumeo-paper-400)]">{tool.shortDescription}</span>
                       </Link>
                     ))}
                   </div>
