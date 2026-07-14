@@ -56,17 +56,17 @@ export default async function PdfToolsPage() {
         </p>
       </section>
 
-      <div className="mt-8 space-y-8">
+      <div className="mt-8 space-y-10">
         {catalog.categories.map((category, categoryIndex) => (
           <section
             key={category.slug}
-            className="lumeo-fade-up aura-directory-section rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5 shadow-[var(--shadow-md)] sm:p-6"
+            className="lumeo-fade-up aura-directory-section"
             style={{ animationDelay: `${categoryIndex * 70}ms` }}
           >
-            <div className="mb-5 border-b border-[var(--border-subtle)] pb-4">
-              <h2 className="text-xl font-black tracking-[-0.02em] text-[var(--lumeo-paper-50)]">{category.name}</h2>
+            <div className="mb-4">
+              <h2 className="text-xl font-black tracking-[-0.02em] text-[var(--text-primary)]">{category.name}</h2>
               {category.description ? (
-                <p className="mt-2 text-sm leading-6 text-[var(--lumeo-paper-400)]">{category.description}</p>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">{category.description}</p>
               ) : null}
             </div>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -74,11 +74,11 @@ export default async function PdfToolsPage() {
                 <Link
                   key={tool.route}
                   href={tool.route}
-                  className="group rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-5 shadow-[var(--shadow-xs)] transition duration-200 hover:-translate-y-0.5 hover:border-[var(--border-premium)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.075)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.18)] motion-reduce:transform-none"
+                  className="group aura-luminous-card rounded-[var(--radius-xl)] p-5 transition duration-200 hover:-translate-y-[3px] hover:shadow-[var(--shadow-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.18)] motion-reduce:transform-none"
                 >
-                  <span className="text-base font-black text-[var(--lumeo-paper-50)]">{tool.toolName}</span>
-                  <span className="mt-2 block text-sm leading-6 text-[var(--lumeo-paper-400)]">{tool.shortDescription}</span>
-                  <span className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-[var(--lumeo-gold-300)]">
+                  <span className="relative text-base font-black text-[var(--text-primary)]">{tool.toolName}</span>
+                  <span className="relative mt-2 block text-sm leading-6 text-[var(--text-secondary)]">{tool.shortDescription}</span>
+                  <span className="relative mt-4 inline-flex items-center gap-2 text-sm font-bold text-[var(--text-accent)]">
                     Open workspace
                     <span aria-hidden="true" className="transition group-hover:translate-x-0.5 motion-reduce:transform-none">→</span>
                   </span>
@@ -89,7 +89,7 @@ export default async function PdfToolsPage() {
         ))}
       </div>
 
-      <section className="mt-8 rounded-[var(--radius-2xl)] border border-[rgba(var(--lumeo-seal-rgb),0.28)] bg-[rgba(var(--lumeo-seal-rgb),0.1)] p-5 text-sm leading-6 text-[var(--lumeo-paper-100)]">
+      <section className="mt-8 rounded-[var(--radius-2xl)] bg-[rgba(var(--lumeo-seal-rgb),0.12)] p-5 text-sm font-semibold leading-6 text-[var(--text-success)] shadow-[inset_0_1px_0_rgba(255,253,247,0.08)]">
         Private by design · Browser-only where possible · Clear handling
       </section>
 

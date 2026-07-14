@@ -19,6 +19,9 @@ const packageJson = JSON.parse(read("package.json"));
 const globals = read("app/globals.css");
 const homepage = read("app/page.tsx");
 const pdfTools = read("app/pdf-tools/page.tsx");
+const mergePage = read("app/pdf/merge/page.tsx");
+const splitPage = read("app/pdf/split/page.tsx");
+const compressPage = read("app/pdf/compress/page.tsx");
 const publicChrome = read("components/PublicPdfChrome.tsx");
 const publicFooter = read("components/PublicFooter.tsx");
 const infoPage = read("components/InfoPage.tsx");
@@ -66,7 +69,12 @@ try {
   assert(packageJson.dependencies.firebase === "^12.16.0", "Firebase version changed unexpectedly.");
 
   assert(globals.includes("--surface-canvas") && globals.includes("--lumeo-aura-400"), "Aura base tokens are missing.");
+  for (const token of ["--text-primary", "--text-secondary", "--text-muted", "--text-inverse", "--text-accent"]) {
+    assert(globals.includes(token), `Missing semantic text token: ${token}`);
+  }
   assert(globals.includes("@media (prefers-reduced-motion: reduce)"), "Reduced-motion support is missing.");
+  assert(globals.includes(".aura-live-tool"), "Live PDF tool visual correction layer is missing.");
+  assert(!/--surface-canvas:\s*#fff/i.test(globals), "Public canvas must not be plain white.");
 
   const publicMarkers = [
     "aura-home",
@@ -84,9 +92,20 @@ try {
 
   assert(homepage.includes("Work with PDFs beautifully."), "Homepage Run 2 heading is missing.");
   assert(homepage.includes("Private, fast, browser-first."), "Homepage compact trust copy is missing.");
+  assert(homepage.includes("text-[var(--text-primary)]"), "Homepage must use high-contrast primary text token.");
+  assert(!homepage.includes("bg-[rgba(255,253,247"), "Homepage must not use a white public canvas.");
   assert(launcher.includes("getPublicHomepageTools"), "Tool launcher must continue deriving cards from the public catalog helper.");
   assert(pdfTools.includes("getPublicCatalog") || pdfTools.includes("PublicCatalog"), "PDF tools directory must remain catalog-backed.");
+  assert(!pdfTools.includes("rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-5"), "PDF tools directory must not use giant nested category panels.");
   assert(toolsMenu.includes("PublicPdfToolsMenuClient"), "PDF tools menu component appears missing.");
+  assert(!publicFooter.includes("bg-[rgba(255,253,247"), "Public footer must not be a white canvas block.");
+  assert(!publicChrome.includes("bg-[rgba(255,253,247"), "Public chrome must not be a flat pale strip.");
+  assert(infoPage.includes("text-[var(--text-primary)]"), "Info pages must use semantic high-contrast text.");
+  assert(read("app/guides/page.tsx").includes("text-[var(--text-primary)]"), "Guides headings must use semantic high-contrast text.");
+
+  assert(mergePage.includes("aura-live-tool aura-merge-tool"), "Merge page must use Aura live-tool visual layer.");
+  assert(splitPage.includes("aura-live-tool aura-split-tool"), "Split page must use Aura live-tool visual layer.");
+  assert(compressPage.includes("aura-live-tool aura-compress-tool"), "Compress page must use Aura live-tool visual layer.");
 
   const adminMarkers = [
     "AdminPageHeader",
@@ -135,6 +154,7 @@ try {
   assert(compress.includes("buildCompressedCandidate"), "Compress PDF algorithm marker missing.");
 
   assert(!/console\.(log|info|warn|error)/.test(rolloutSources), "Production debug logging must not be introduced.");
+  assert(!/processing_started|processing_succeeded|processing_failed|download_started/.test(rolloutSources), "Analytics V1 lifecycle events must not be reintroduced by Aura rollout.");
   assert(!/service_role|secret[_-]?key|password\s*=/.test(rolloutSources), "No hard-coded secrets may be introduced.");
 
   console.log("PASS Lumeo Aura Run 2 public shell markers exist");

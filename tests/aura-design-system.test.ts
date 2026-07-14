@@ -17,6 +17,9 @@ const pdfTools = read("app/pdf-tools/page.tsx");
 const publicChrome = read("components/PublicPdfChrome.tsx");
 const publicFooter = read("components/PublicFooter.tsx");
 const rolloutDoc = read("docs/LUMEO_AURA_ROLLOUT.md");
+const mergePage = read("app/pdf/merge/page.tsx");
+const splitPage = read("app/pdf/split/page.tsx");
+const compressPage = read("app/pdf/compress/page.tsx");
 
 test("Aura design tokens cover colour, surface, type, spacing, radius and motion", () => {
   for (const token of [
@@ -25,6 +28,9 @@ test("Aura design tokens cover colour, surface, type, spacing, radius and motion
     "--lumeo-seal-500",
     "--lumeo-gold-400",
     "--lumeo-aura-400",
+    "--text-primary",
+    "--text-secondary",
+    "--text-muted",
     "--surface-floating",
     "--text-display-xl",
     "--space-4",
@@ -80,9 +86,21 @@ test("Run 2 public rollout uses Aura surfaces and keeps tools visible", () => {
   assert.ok(homepage.includes("aura-home"));
   assert.ok(homepage.includes("Work with PDFs beautifully."));
   assert.ok(homepage.includes("Private, fast, browser-first."));
+  assert.ok(homepage.includes("text-[var(--text-primary)]"));
   assert.ok(pdfTools.includes("aura-directory-section"));
   assert.ok(publicChrome.includes("aura-public-nav"));
   assert.ok(publicFooter.includes("aura-public-footer"));
+  assert.doesNotMatch(homepage, /bg-\[rgba\(255,253,247/);
+  assert.doesNotMatch(publicChrome, /bg-\[rgba\(255,253,247/);
+  assert.doesNotMatch(publicFooter, /bg-\[rgba\(255,253,247/);
+});
+
+test("live PDF tool pages use the Aura visual layer without algorithm assertions changing", () => {
+  assert.ok(mergePage.includes("aura-live-tool aura-merge-tool"));
+  assert.ok(splitPage.includes("aura-live-tool aura-split-tool"));
+  assert.ok(compressPage.includes("aura-live-tool aura-compress-tool"));
+  assert.ok(css.includes(".aura-live-tool"));
+  assert.doesNotMatch([mergePage, splitPage, compressPage].join("\n"), /processing_started|processing_succeeded|processing_failed|download_started/);
 });
 
 test("Run 2 admin guide documents stored-only and runtime impact states", () => {

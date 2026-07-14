@@ -88,21 +88,21 @@ function ToolGuide({
   limitation: string;
 }) {
   return (
-    <div className="border-t border-[#E8DFC8]/12 py-5">
+    <div className="rounded-[var(--radius-xl)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-5 shadow-[inset_0_1px_0_rgba(255,253,247,0.06)]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="font-serif text-2xl text-[#F0EAD6]">{title}</h3>
-          <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/58">{use}</p>
-          <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/50">
+          <h3 className="font-serif text-2xl text-[var(--text-primary)]">{title}</h3>
+          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{use}</p>
+          <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
             Workflow: {workflow}
           </p>
-          <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/44">
+          <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
             Limitation: {limitation}
           </p>
         </div>
         <Link
           href={href}
-          className="shrink-0 rounded-full border border-[#E8DFC8]/14 px-4 py-2 text-sm font-semibold text-[#F0EAD6]/68 transition hover:border-[#C9A84C]/34 hover:text-[#F0EAD6]"
+          className="shrink-0 rounded-full bg-[rgba(var(--lumeo-paper-rgb),0.075)] px-4 py-2 text-sm font-semibold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--lumeo-gold-rgb),0.12)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]"
         >
           Open tool
         </Link>
@@ -113,20 +113,20 @@ function ToolGuide({
 
 function FaqGroup({ title, items }: { title: string; items: typeof allFaqs }) {
   return (
-    <section className="border-t border-[#E8DFC8]/12 pt-6">
-      <h3 className="font-serif text-2xl text-[#F0EAD6]">{title}</h3>
-      <div className="mt-4 divide-y divide-[#E8DFC8]/10 border-y border-[#E8DFC8]/12">
+    <section className="pt-2">
+      <h3 className="font-serif text-2xl text-[var(--text-primary)]">{title}</h3>
+      <div className="mt-4 grid gap-3">
         {items.map((item) => (
-          <details key={item.question} className="group py-4">
-            <summary className="cursor-pointer list-none text-sm font-semibold text-[#F0EAD6] marker:hidden">
+          <details key={item.question} className="group rounded-[var(--radius-xl)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-4 shadow-[inset_0_1px_0_rgba(255,253,247,0.06)]">
+            <summary className="cursor-pointer list-none text-sm font-semibold text-[var(--text-primary)] marker:hidden">
               <span className="flex items-center justify-between gap-4">
                 {item.question}
-                <span className="text-[#C9A84C] transition group-open:rotate-45">
+                <span className="text-[var(--text-accent)] transition group-open:rotate-45">
                   +
                 </span>
               </span>
             </summary>
-            <p className="mt-3 text-sm leading-6 text-[#F0EAD6]/55">
+            <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
               {item.answer}
             </p>
           </details>

@@ -30,10 +30,10 @@ const toneClasses: Record<Tone, string> = {
 };
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "border-[rgba(var(--lumeo-seal-rgb),0.55)] bg-[var(--lumeo-seal-500)] text-[var(--lumeo-paper-50)] shadow-[var(--shadow-success)] hover:bg-[var(--lumeo-seal-400)]",
-  secondary: "border-[var(--border-default)] bg-[rgba(var(--lumeo-paper-rgb),0.08)] text-[var(--lumeo-paper-50)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.13)]",
+  primary: "border-[rgba(var(--lumeo-seal-rgb),0.58)] bg-[linear-gradient(180deg,var(--lumeo-seal-400),var(--lumeo-seal-600))] text-[var(--text-primary)] shadow-[0_16px_38px_rgba(var(--lumeo-seal-rgb),0.28),inset_0_1px_0_rgba(255,253,247,0.2)] hover:brightness-110",
+  secondary: "border-[rgba(var(--lumeo-paper-rgb),0.1)] bg-[linear-gradient(180deg,rgba(255,253,247,0.09),rgba(255,253,247,0.045))] text-[var(--text-primary)] shadow-[var(--shadow-xs)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.12)]",
   ghost: "border-transparent bg-transparent text-[var(--lumeo-paper-200)] hover:border-[var(--border-subtle)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.06)]",
-  premium: "border-[var(--border-premium)] bg-[rgba(var(--lumeo-gold-rgb),0.12)] text-[var(--lumeo-gold-300)] hover:bg-[rgba(var(--lumeo-gold-rgb),0.18)]",
+  premium: "border-[rgba(var(--lumeo-gold-rgb),0.34)] bg-[linear-gradient(180deg,rgba(var(--lumeo-gold-rgb),0.16),rgba(var(--lumeo-gold-rgb),0.075))] text-[var(--text-accent)] hover:bg-[rgba(var(--lumeo-gold-rgb),0.18)]",
   danger: "border-[rgba(217,113,113,0.42)] bg-[rgba(217,113,113,0.14)] text-[var(--lumeo-danger)] hover:bg-[rgba(217,113,113,0.2)]",
 };
 
@@ -103,8 +103,8 @@ export function AuraCard({ className, interactive = false, ...props }: HTMLAttri
     <div
       {...props}
       className={cx(
-        "rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-5 shadow-[var(--shadow-sm)] transition duration-[var(--motion-standard)]",
-        interactive && "hover:-translate-y-1 hover:border-[var(--border-premium)] hover:shadow-[var(--shadow-md)]",
+        "aura-luminous-card rounded-[var(--radius-xl)] p-5 transition duration-[var(--motion-standard)]",
+        interactive && "hover:-translate-y-[3px] hover:shadow-[var(--shadow-lg)]",
         className,
       )}
     />
@@ -112,7 +112,7 @@ export function AuraCard({ className, interactive = false, ...props }: HTMLAttri
 }
 
 export function AuraPanel({ className, ...props }: HTMLAttributes<HTMLElement>) {
-  return <section {...props} className={cx("rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-6 shadow-[var(--shadow-md)]", className)} />;
+  return <section {...props} className={cx("aura-luminous-card rounded-[var(--radius-2xl)] p-6", className)} />;
 }
 
 function fieldClass(className?: string) {
@@ -543,10 +543,10 @@ export function AuraCommandMenu({ placeholder = "Search commands..." }: { placeh
 
 export function AuraUploadSurface({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
   return (
-    <div className="lumeo-upload-surface rounded-[var(--radius-2xl)] border border-dashed border-[var(--border-premium)] bg-[rgba(var(--lumeo-paper-rgb),0.055)] p-8 text-center">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-aura-rgb),0.12)] text-[var(--lumeo-aura-300)]">PDF</div>
-      <h3 className="mt-4 text-xl font-black text-[var(--lumeo-paper-50)]">{title}</h3>
-      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--lumeo-paper-400)]">{description}</p>
+    <div className="lumeo-upload-surface aura-luminous-card rounded-[var(--radius-2xl)] p-8 text-center shadow-[var(--shadow-lg)] transition duration-200 hover:shadow-[var(--shadow-xl)]">
+      <div className="mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-xl)] bg-[linear-gradient(145deg,rgba(var(--lumeo-aura-rgb),0.18),rgba(var(--lumeo-gold-rgb),0.11))] text-[var(--lumeo-aura-300)] shadow-[inset_0_1px_0_rgba(255,253,247,0.16)]">PDF</div>
+      <h3 className="mt-4 text-xl font-black text-[var(--text-primary)]">{title}</h3>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );
@@ -554,7 +554,7 @@ export function AuraUploadSurface({ title, description, action }: { title: strin
 
 export function AuraFileCard({ name, meta, action }: { name: string; meta: string; action?: ReactNode }) {
   return (
-    <div className="flex min-h-16 items-center justify-between gap-4 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.055)] p-3 transition hover:-translate-y-0.5 hover:border-[var(--border-premium)]">
+    <div className="flex min-h-16 items-center justify-between gap-4 rounded-[var(--radius-xl)] bg-[rgba(var(--lumeo-paper-rgb),0.06)] p-3 shadow-[inset_0_1px_0_rgba(255,253,247,0.06)] transition hover:-translate-y-0.5 hover:bg-[rgba(var(--lumeo-paper-rgb),0.09)]">
       <div className="min-w-0">
         <p className="truncate text-sm font-black text-[var(--lumeo-paper-50)]">{name}</p>
         <p className="mt-1 text-xs text-[var(--lumeo-paper-400)]">{meta}</p>

@@ -70,21 +70,21 @@ function ToolCard({
       <Link
         href={tool.route}
         aria-label={`Open ${tool.toolName}`}
-        className="lumeo-card lumeo-shine aura-tool-card group relative flex h-full min-h-[10.75rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[linear-gradient(180deg,rgba(25,48,77,0.82),rgba(16,29,49,0.94))] p-5 shadow-[var(--shadow-md)] transition duration-200 hover:-translate-y-1 hover:border-[var(--border-premium)] hover:shadow-[var(--shadow-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)] motion-reduce:transform-none sm:p-6"
+        className="lumeo-card lumeo-shine aura-tool-card aura-luminous-card group relative flex h-full min-h-[10.75rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] p-5 transition duration-200 hover:-translate-y-[3px] hover:shadow-[var(--shadow-xl)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)] motion-reduce:transform-none sm:p-6"
       >
         <div aria-hidden="true" className="pointer-events-none absolute inset-x-12 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/48 to-transparent opacity-60 transition group-hover:opacity-100" />
 
         <div className="flex items-start justify-between gap-4">
           <ToolGlyph iconKey={tool.iconKey} />
-          <span className="lumeo-arrow flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] text-[var(--lumeo-gold-300)] transition duration-200 group-hover:translate-x-0.5 group-hover:border-[var(--border-premium)] group-hover:bg-[rgba(var(--lumeo-gold-rgb),0.1)] motion-reduce:transform-none">
+          <span className="lumeo-arrow flex h-9 w-9 items-center justify-center rounded-full bg-[rgba(var(--lumeo-paper-rgb),0.07)] text-[var(--text-accent)] shadow-[inset_0_1px_0_rgba(255,253,247,0.08)] transition duration-200 group-hover:translate-x-0.5 group-hover:bg-[rgba(var(--lumeo-gold-rgb),0.13)] motion-reduce:transform-none">
             <ArrowIcon />
           </span>
         </div>
 
-        <h2 className="mt-5 text-[1.28rem] font-black tracking-[-0.025em] text-[var(--lumeo-paper-50)]">
+        <h2 className="relative mt-5 text-[1.28rem] font-black tracking-[-0.025em] text-[var(--text-primary)]">
           {tool.toolName}
         </h2>
-        <p className="mt-2 text-sm leading-6 text-[var(--lumeo-paper-400)]">
+        <p className="relative mt-2 text-sm leading-6 text-[var(--text-secondary)]">
           {tool.shortDescription}
         </p>
       </Link>

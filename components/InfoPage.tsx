@@ -40,7 +40,7 @@ export function InfoPageShell({
   actions?: InfoLink[];
 }) {
   return (
-    <main id="main-content" className="aura-info-page min-h-screen bg-[var(--surface-canvas)] text-[var(--lumeo-paper-100)]">
+    <main id="main-content" className="aura-info-page min-h-screen bg-[var(--surface-canvas)] text-[var(--text-primary)]">
       <PublicNav />
       <article className="mx-auto max-w-[1180px] px-5 py-10 sm:px-8 sm:py-14">
         <header className="mx-auto max-w-[820px]">
@@ -50,11 +50,11 @@ export function InfoPageShell({
           <h1 className="mt-4 font-serif text-[var(--text-display-md)] leading-[var(--leading-display)] tracking-[var(--tracking-display)] text-[var(--lumeo-paper-50)]">
             {title}
           </h1>
-          <p className="mt-5 text-base leading-8 text-[var(--lumeo-paper-400)] sm:text-lg">
+          <p className="mt-5 text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
             {description}
           </p>
           {lastUpdated ? (
-            <p className="mt-4 text-sm font-medium text-[#F0EAD6]/42">
+            <p className="mt-4 text-sm font-medium text-[var(--text-muted)]">
               Last updated: {lastUpdated}
             </p>
           ) : null}
@@ -89,17 +89,17 @@ export function InfoPageSection({ id, eyebrow, title, children }: InfoSection) {
   return (
     <section
       id={id}
-      className="rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-6 shadow-[var(--shadow-sm)]"
+          className="aura-luminous-card rounded-[var(--radius-2xl)] p-6"
     >
       {eyebrow ? (
         <p className="aura-text-label mb-3 text-[var(--lumeo-gold-300)]">
           {eyebrow}
         </p>
       ) : null}
-      <h2 className="font-serif text-2xl leading-tight text-[var(--lumeo-paper-50)] sm:text-3xl">
+      <h2 className="relative font-serif text-2xl leading-tight text-[var(--text-primary)] sm:text-3xl">
         {title}
       </h2>
-      <div className="mt-4 space-y-4 text-sm leading-7 text-[var(--lumeo-paper-400)] sm:text-base sm:leading-8">
+      <div className="relative mt-4 space-y-4 text-sm leading-7 text-[var(--text-secondary)] sm:text-base sm:leading-8">
         {children}
       </div>
     </section>
@@ -108,7 +108,7 @@ export function InfoPageSection({ id, eyebrow, title, children }: InfoSection) {
 
 export function InfoCallout({ children }: { children: ReactNode }) {
   return (
-    <div className="rounded-[var(--radius-xl)] border border-[var(--border-premium)] bg-[rgba(var(--lumeo-gold-rgb),0.1)] px-4 py-3 text-sm font-medium leading-7 text-[var(--lumeo-paper-200)]">
+    <div className="rounded-[var(--radius-xl)] bg-[rgba(var(--lumeo-gold-rgb),0.12)] px-4 py-3 text-sm font-semibold leading-7 text-[var(--text-secondary)] shadow-[inset_0_1px_0_rgba(255,253,247,0.08)]">
       {children}
     </div>
   );
@@ -124,12 +124,12 @@ export function InfoDefinitionList({
       {items.map((item) => (
         <div
           key={item.term}
-          className="grid gap-1 border-t border-[#E8DFC8]/10 py-3 sm:grid-cols-[180px_1fr] sm:gap-4"
+          className="grid gap-1 py-3 sm:grid-cols-[180px_1fr] sm:gap-4"
         >
-          <dt className="text-xs font-bold uppercase tracking-[0.16em] text-[#C9A84C]">
+          <dt className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-accent)]">
             {item.term}
           </dt>
-          <dd className="text-sm leading-6 text-[#F0EAD6]/62">
+          <dd className="text-sm leading-6 text-[var(--text-secondary)]">
             {item.description}
           </dd>
         </div>
@@ -143,7 +143,7 @@ export function InfoList({ items }: { items: string[] }) {
     <ul className="space-y-2">
       {items.map((item) => (
         <li key={item} className="flex gap-3">
-          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#C9A84C]" />
+          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--text-accent)]" />
           <span>{item}</span>
         </li>
       ))}
@@ -158,7 +158,7 @@ export function InfoInlineLinks({ links }: { links: InfoLink[] }) {
         <Link
           key={link.href}
           href={link.href}
-          className="rounded-full border border-[#E8DFC8]/14 px-4 py-2 text-sm font-bold text-[#F0EAD6]/62 transition hover:border-[#C9A84C]/34 hover:text-[#F0EAD6] focus:outline-none focus:ring-2 focus:ring-[#C9A84C]/45"
+          className="rounded-full bg-[rgba(var(--lumeo-paper-rgb),0.07)] px-4 py-2 text-sm font-bold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--lumeo-paper-rgb),0.12)] hover:text-[var(--text-primary)] focus:outline-none focus:ring-4 focus:ring-[rgba(var(--lumeo-aura-rgb),0.2)]"
         >
           {link.label}
         </Link>

@@ -31,6 +31,17 @@ export const auraSurfaceTokens = [
   "--surface-overlay",
 ] as const;
 
+export const auraTextTokens = [
+  "--text-primary",
+  "--text-secondary",
+  "--text-muted",
+  "--text-inverse",
+  "--text-accent",
+  "--text-success",
+  "--text-warning",
+  "--text-danger",
+] as const;
+
 export const auraMotionTokens = [
   "--motion-instant",
   "--motion-fast",

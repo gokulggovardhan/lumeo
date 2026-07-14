@@ -65,7 +65,7 @@ export default function Home() {
         <div className="absolute bottom-[-18rem] left-[44%] h-[28rem] w-[28rem] rounded-full bg-[#1E6B4A]/[0.07] blur-[150px]" />
       </div>
 
-      <nav className="lumeo-nav-enter aura-public-nav relative z-30 border-b border-[var(--border-subtle)] bg-[rgba(8,16,29,0.78)] px-5 shadow-[var(--shadow-xs)] backdrop-blur-xl sm:px-8">
+      <nav className="lumeo-nav-enter aura-public-nav relative z-30 bg-[linear-gradient(180deg,rgba(20,36,59,0.94),rgba(8,16,29,0.82))] px-5 shadow-[0_16px_44px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,253,247,0.08)] backdrop-blur-xl sm:px-8">
         <div className="mx-auto flex h-[70px] max-w-[1160px] items-center justify-between gap-4">
           <Link
             href="/"
@@ -75,12 +75,12 @@ export default function Home() {
             <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
           </Link>
 
-          <div className="flex items-center gap-1 text-xs font-semibold text-[var(--lumeo-paper-400)] sm:gap-2 sm:text-sm">
+          <div className="flex items-center gap-1 text-xs font-semibold text-[var(--text-secondary)] sm:gap-2 sm:text-sm">
             <PublicPdfToolsMenu />
-            <Link href="/guides" className="hidden rounded-full px-4 py-2.5 transition hover:bg-[rgba(var(--lumeo-paper-rgb),0.06)] hover:text-[var(--lumeo-paper-50)] sm:inline-flex">
+            <Link href="/guides" className="hidden min-h-11 items-center rounded-full px-4 py-2.5 transition hover:bg-[rgba(var(--lumeo-paper-rgb),0.08)] hover:text-[var(--text-primary)] sm:inline-flex">
               Guides
             </Link>
-            <Link href="/privacy" className="rounded-full px-3 py-2.5 transition hover:bg-[rgba(var(--lumeo-paper-rgb),0.06)] hover:text-[var(--lumeo-paper-50)] sm:px-4">
+            <Link href="/privacy" className="inline-flex min-h-11 items-center rounded-full px-3 py-2.5 transition hover:bg-[rgba(var(--lumeo-paper-rgb),0.08)] hover:text-[var(--text-primary)] sm:px-4">
               Privacy
             </Link>
           </div>
@@ -109,10 +109,10 @@ export default function Home() {
           </section>
 
           <section className="lumeo-fade-up lumeo-fade-up-delay-2 mx-auto mt-8 max-w-3xl text-center sm:mt-9">
-            <p className="text-sm leading-6 text-[#F0EAD6]/64 sm:text-base">
+            <p className="text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
               Choose a workspace and keep moving. The tools stay first.
             </p>
-            <p className="mt-3 text-xs font-semibold text-[#F0EAD6]/48">
+            <p className="mt-3 text-xs font-semibold text-[var(--text-muted)]">
               Private by design · Browser-only · Cleared after download
             </p>
           </section>
