@@ -15,6 +15,7 @@ export default async function AdminPage() {
   const admin = await requireAdmin();
   const [overview, system] = await Promise.all([getOverviewData(), getSystemStatus(admin)]);
   const data = overview.data;
+  const analyticsUnavailable = data.analyticsDataStatus === "unavailable";
 
   return (
     <div className="space-y-7">
@@ -42,7 +43,13 @@ export default async function AdminPage() {
         <AdminMetricCard label="Enabled PDF Tools" value={data.enabledTools} detail="Real enabled tools in the catalog." tone="success" />
         <AdminMetricCard label="Active Announcements" value={data.activeAnnouncements} detail="Announcements currently marked active." tone="neutral" />
         <AdminMetricCard label="Enabled Feature Flags" value={data.enabledFeatureFlags} detail="Flags currently enabled in the database." tone="gold" />
-        <AdminMetricCard label="Events Today" value={data.analyticsEventsToday} detail="Privacy-preserving analytics events today." tone="neutral" />
+        <AdminMetricCard label="Events Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsEventsToday} detail="Privacy-preserving analytics events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
+      </section>
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <AdminMetricCard label="Public Page Views" value={analyticsUnavailable ? "Unavailable" : data.analyticsPageViewsToday} detail="Public page-view events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
+        <AdminMetricCard label="Most Opened Tool" value={analyticsUnavailable ? "Unavailable" : data.mostUsedTool ?? "N/A"} detail="Based on tool-open events." tone={analyticsUnavailable ? "warning" : "neutral"} />
+        <AdminMetricCard label="Analytics Status" value={system.data.adminAnalyticsRpcStatus === "unavailable" ? "Read unavailable" : system.data.analyticsEnabled ? "Enabled" : "Disabled"} detail="Controlled by public_analytics_enabled." tone={system.data.adminAnalyticsRpcStatus === "unavailable" ? "warning" : system.data.analyticsEnabled ? "success" : "neutral"} />
+        <AdminMetricCard label="Tool Opens Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsToolOpensToday} detail="PDF tool workspaces opened today." tone={analyticsUnavailable ? "warning" : "gold"} />
       </section>
 
       <AdminSectionCard title="System readiness" description="Truthful checks from the current request and database foundation.">
@@ -50,7 +57,7 @@ export default async function AdminPage() {
           <AdminStatusBadge tone={system.data.supabaseReachable ? "success" : "warning"}>Database</AdminStatusBadge>
           <AdminStatusBadge tone={system.data.authenticatedAdmin ? "success" : "warning"}>Authentication</AdminStatusBadge>
           <AdminStatusBadge tone={admin.role ? "success" : "warning"}>Admin membership</AdminStatusBadge>
-          <AdminStatusBadge tone="neutral">Analytics schema-ready</AdminStatusBadge>
+          <AdminStatusBadge tone={system.data.analyticsEnabled ? "success" : "neutral"}>Analytics {system.data.analyticsEnabled ? "enabled" : "disabled"}</AdminStatusBadge>
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-[#E8DFC8]/8 bg-[#0C1220]/42 p-4">
@@ -86,11 +93,11 @@ export default async function AdminPage() {
           />
         </AdminSectionCard>
 
-        <AdminSectionCard title="Analytics foundation" description="No fake charts. Real events will appear when collection is enabled.">
+        <AdminSectionCard title="Analytics V1" description="Discovery analytics only. No fake charts or lifecycle placeholders.">
           <div className="rounded-[1.2rem] border border-dashed border-[#CBA052]/20 bg-[#0C1220]/42 p-6">
-            <p className="text-sm font-semibold text-[#F0EAD6]">Analytics will appear after privacy-preserving event collection is enabled.</p>
+            <p className="text-sm font-semibold text-[#F0EAD6]">Analytics V1 measures public page visits, tool discovery, and coarse platform usage.</p>
             <p className="mt-3 text-sm leading-6 text-[#F0EAD6]/54">
-              Current success rate: {data.processingSuccessRate === null ? "Unavailable" : `${data.processingSuccessRate}%`}
+              Processing lifecycle analytics will be added later through the shared browser-tool framework so every current and future PDF tool reports events consistently.
             </p>
           </div>
         </AdminSectionCard>

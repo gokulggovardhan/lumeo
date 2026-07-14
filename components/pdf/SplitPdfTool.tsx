@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import { degrees, PDFDocument } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type SplitMode = "extract" | "ranges" | "everyPage" | "everyN" | "remove";
 type ResultKind = "pdf" | "zip";
@@ -541,7 +543,9 @@ function SplitPageThumbnail({
 }
 
 export default function SplitPdfTool() {
+  const { availability, track } = useAnalytics();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const sessionRef = useRef(0);
   const thumbnailTasksRef = useRef<Map<number, RenderTask>>(new Map());
@@ -666,6 +670,14 @@ export default function SplitPdfTool() {
       void destroyPdfJsDocument();
     };
   }, [clearThumbnails, destroyPdfJsDocument, result?.url]);
+
+  useEffect(() => {
+    if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
+    const result = track({ eventName: "tool_opened", toolSlug: "split" });
+    if (result.accepted) {
+      openedTrackedRef.current = true;
+    }
+  }, [availability, track]);
 
   function resetEditableState(total = 1) {
     setMode("extract");

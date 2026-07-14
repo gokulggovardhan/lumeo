@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { DM_Serif_Display, Manrope } from "next/font/google";
+import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
+import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -86,7 +88,12 @@ export default function RootLayout({
       lang="en"
       className={`${manrope.variable} ${dmSerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <AnalyticsProvider>
+          <AnalyticsPageView />
+          {children}
+        </AnalyticsProvider>
+      </body>
     </html>
   );
 }

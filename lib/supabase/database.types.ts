@@ -20,6 +20,35 @@ export type SizeBucket =
   | "unknown";
 export type DeviceClass = "desktop" | "tablet" | "mobile" | "unknown";
 
+export type AdminAnalyticsSummaryResult = {
+  summary: {
+    total_events: number;
+    tool_opens: number;
+    processing_started: number;
+    processing_succeeded: number;
+    processing_failed: number;
+    downloads_started: number;
+    successful_duration_total_ms: number;
+    average_successful_duration_ms: number | null;
+    latest_event_at: string | null;
+  };
+  daily_trend: Array<{
+    date: string;
+    total_events: number;
+    tool_opens: number;
+    processing_started: number;
+    processing_succeeded: number;
+    processing_failed: number;
+    downloads_started: number;
+  }>;
+  top_tools_by_opens: Array<{ tool_slug: string; event_count: number }>;
+  top_tools_by_success: Array<{ tool_slug: string; event_count: number }>;
+  error_summary: Array<{ error_code: string; event_count: number }>;
+  device_summary: Array<{ device_class: DeviceClass; event_count: number }>;
+  browser_summary: Array<{ browser_family: string; event_count: number }>;
+  operating_system_summary: Array<{ operating_system: string; event_count: number }>;
+};
+
 export type ToolCategory = {
   id: string;
   slug: string;
@@ -173,6 +202,31 @@ export type ControlCenterDatabase = {
           changes: Json | null;
         };
         Returns: number;
+      };
+      get_public_analytics_setting: { Args: Record<string, never>; Returns: boolean };
+      record_public_analytics_event: {
+        Args: {
+          event_name: string;
+          tool_slug?: string | null;
+          anonymous_session_id?: string | null;
+          duration_ms?: number | null;
+          input_size_bucket?: SizeBucket | null;
+          output_size_bucket?: SizeBucket | null;
+          device_class?: DeviceClass | null;
+          browser_family?: string | null;
+          operating_system?: string | null;
+          success?: boolean | null;
+          error_code?: string | null;
+        };
+        Returns: number;
+      };
+      refresh_daily_tool_metrics: {
+        Args: { target_date?: string | null };
+        Returns: number;
+      };
+      get_admin_analytics_summary: {
+        Args: { p_start_date: string; p_end_date: string };
+        Returns: AdminAnalyticsSummaryResult;
       };
     };
   };
