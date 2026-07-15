@@ -14,11 +14,17 @@ const showcase = read("app/admin/(protected)/design-system/page.tsx");
 const guide = read("app/admin/(protected)/guide/page.tsx");
 const homepage = read("app/page.tsx");
 const pdfTools = read("app/pdf-tools/page.tsx");
+const launcher = read("components/pdf/PdfToolLauncher.tsx");
 const publicChrome = read("components/PublicPdfChrome.tsx");
 const publicFooter = read("components/PublicFooter.tsx");
+const publicMenu = read("components/public/PublicPdfToolsMenuClient.tsx");
+const placeholder = read("components/pdf/PdfToolPlaceholder.tsx");
+const directoryLoading = read("app/pdf-tools/loading.tsx");
+const directoryError = read("app/pdf-tools/error.tsx");
 const rolloutDoc = read("docs/LUMEO_AURA_ROLLOUT.md");
 const lumeo2Doc = read("docs/LUMEO_2_DESIGN_SYSTEM.md");
 const lumeo2Verifier = read("scripts/verify-lumeo-2-foundation.mjs");
+const publicExperienceVerifier = read("scripts/verify-lumeo-2-public-experience.mjs");
 const mergePage = read("app/pdf/merge/page.tsx");
 const splitPage = read("app/pdf/split/page.tsx");
 const compressPage = read("app/pdf/compress/page.tsx");
@@ -130,6 +136,58 @@ test("Lumeo 2 documentation and verifier cover the flagship foundation", () => {
   assert.ok(lumeo2Verifier.includes("components/analytics/AnalyticsProvider.tsx"));
 });
 
+test("Lumeo 2 public homepage keeps five configured slots plus permanent sixth card", () => {
+  assert.ok(homepage.includes("Documents, beautifully handled."));
+  assert.ok(homepage.includes("Fast PDF tools that work privately in your browser."));
+  assert.ok(homepage.includes("L2TrustRail"));
+  assert.ok(launcher.includes("getPublicHomepageTools"));
+  assert.ok(launcher.includes("configuredTools.slice(0, 5)"));
+  assert.ok(launcher.includes("All PDF Tools"));
+  assert.ok(launcher.includes("featured={index === 0}"));
+  assert.ok(launcher.includes("allTools={index === 5}"));
+  assert.doesNotMatch(homepage, /Start with Merge PDF/);
+  assert.doesNotMatch(homepage, /\b(ratings?|users?|downloads?|processed)\b/i);
+});
+
+test("Lumeo 2 public cards, navigation and menu are accessible", () => {
+  for (const name of ["L2FeaturedToolCard", "L2ToolCard", "L2DirectoryToolCard", "L2PublicHeader", "L2MenuSurface"]) {
+    assert.ok(ui.includes(`export function ${name}`), `${name} should exist`);
+  }
+  assert.ok(publicChrome.includes("L2PublicHeader"));
+  assert.ok(publicChrome.includes("L2MobileNavClient"));
+  assert.ok(publicMenu.includes("aria-expanded"));
+  assert.ok(publicMenu.includes("aria-controls"));
+  assert.ok(publicMenu.includes("aria-haspopup"));
+  assert.ok(publicMenu.includes("Escape"));
+  assert.ok(publicMenu.includes("View all PDF tools"));
+});
+
+test("Lumeo 2 directory, loading and error states use public foundations", () => {
+  assert.ok(pdfTools.includes("getPublicPdfCatalog"));
+  assert.ok(pdfTools.includes("L2DirectoryToolCard"));
+  assert.ok(directoryLoading.includes("L2SkeletonCard"));
+  assert.ok(directoryError.includes("L2PublicErrorState"));
+  assert.doesNotMatch(pdfTools, /\b(popular|ratings?|users?|downloads?)\b/i);
+});
+
+test("Lumeo 2 placeholder tools are clearly non-operational", () => {
+  assert.ok(placeholder.includes("Non-operational preview"));
+  assert.ok(placeholder.includes("No files can be selected or processed"));
+  assert.ok(placeholder.includes("Browse PDF tools"));
+  assert.ok(placeholder.includes("Back home"));
+  assert.doesNotMatch(placeholder, /AuraUploadSurface|Select files|Start conversion|Convert now/);
+});
+
+test("Lumeo 2 footer has grouped navigation and public verifier exists", () => {
+  assert.ok(publicFooter.includes("Tools"));
+  assert.ok(publicFooter.includes("Company"));
+  assert.ok(publicFooter.includes("Legal"));
+  assert.ok(publicFooter.includes("Private, browser-first PDF tools."));
+  assert.ok(publicExperienceVerifier.includes("verify:lumeo2-public-experience"));
+  assert.ok(lumeo2Doc.includes("Homepage Hierarchy"));
+  assert.ok(lumeo2Doc.includes("What Remains For Run 3") || lumeo2Doc.includes("What remains for Run 3"));
+});
+
 test("new Aura code avoids prohibited debug and secret patterns", () => {
   const combined = [ui, workspace, guidance, showcase].join("\n");
   assert.doesNotMatch(combined, /console\.(log|info|warn|error)/);
@@ -138,8 +196,8 @@ test("new Aura code avoids prohibited debug and secret patterns", () => {
 
 test("Run 2 public rollout uses Aura surfaces and keeps tools visible", () => {
   assert.ok(homepage.includes("aura-home"));
-  assert.ok(homepage.includes("Work with PDFs beautifully."));
-  assert.ok(homepage.includes("Private, fast, browser-first."));
+  assert.ok(homepage.includes("Documents, beautifully handled."));
+  assert.ok(homepage.includes("Fast PDF tools that work privately in your browser."));
   assert.ok(homepage.includes("text-[var(--text-primary)]"));
   assert.ok(pdfTools.includes("aura-directory-section"));
   assert.ok(publicChrome.includes("aura-public-nav"));

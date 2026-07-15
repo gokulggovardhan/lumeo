@@ -136,3 +136,69 @@ Run 2 should migrate pages gradually:
 Do use spacious hierarchy, warm editorial detail, precise controls and truthful status language.
 
 Do not use plain white canvases, pure black pages, oversized gradients, fake metrics, old checkbox-like toggles, excessive badges or copied PDF-site patterns.
+
+## Public Experience Rollout
+
+### Homepage Hierarchy
+
+The public homepage opens with a compact introduction, not a giant hero. The tools remain immediately visible and carry the primary action of the page.
+
+### Featured-Tool Rule
+
+The first configured homepage slot becomes the featured tool. This keeps the composition catalog-driven and lets operations change the lead tool without a code redesign.
+
+### Five Configured Plus Permanent Sixth Card
+
+Homepage slots 1 through 5 come from the public catalog configuration. The sixth card is always **All PDF Tools** and is never stored as a configurable slot.
+
+### Tool-Card Variants
+
+Use three public card variants:
+
+- Featured tool card for the first configured tool.
+- Standard tool card for configured tools two through five.
+- All PDF Tools card for the permanent directory entry.
+
+### Action Positioning
+
+Card actions sit at the bottom of the card and use one action only: **Open tool** for active tools and **Browse all tools** for the permanent card.
+
+### Navigation
+
+Public navigation uses the Lumeo 2 satin surface, compact height, visible logo, PDF Tools, Guides and Privacy links. Mobile uses one clear menu button and a drawer.
+
+### Menu
+
+The PDF Tools menu is a command-style panel with categorized sections, concise descriptions, Escape close, outside-click close and a footer action to view all tools.
+
+### Directory
+
+The `/pdf-tools` directory remains catalog-driven. Categories are separated by typography and spacing, not giant boxes. No fake counts, popularity, ratings or usage totals.
+
+### Placeholder Pages
+
+JPG to PDF and PDF to JPG remain clearly non-operational until engines exist. They must not show fake upload areas or disabled process buttons that resemble a working feature.
+
+### Footer
+
+The public footer groups links under Tools, Company and Legal. It stays compact and readable, with no fake version, fake social links or oversized empty block.
+
+### Mobile Behaviour
+
+Homepage cards stack in one column, directory cards stay readable, menus scroll safely, and no action is hidden off-screen.
+
+### Accessibility
+
+Public cards and menus require visible focus, semantic links, ARIA menu/drawer state, Escape close and text labels that do not depend on colour alone.
+
+### Performance
+
+The public experience uses CSS and existing components only. No animation library, no background video, no WebGL and no continuous pointer effects.
+
+### Future Public Tool Contribution Rules
+
+Future tools should register in the catalog, provide a concise description, use the shared Lumeo 2 card system, and avoid fake claims until a real browser-first engine exists.
+
+### What Remains For Run 3
+
+Run 3 should bring the internal Merge, Split and Compress workspaces onto the Lumeo 2 tool workspace primitives without changing their processing algorithms.

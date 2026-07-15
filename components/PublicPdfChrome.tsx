@@ -3,6 +3,8 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { L2PublicHeader, L2PublicNavLink } from "@/components/ui/Aura";
+import { L2MobileNavClient } from "@/components/public/L2MobileNavClient";
 
 export function LumeoSealMark() {
   return (
@@ -78,32 +80,32 @@ export function PublicNav({
   toolsMenu?: ReactNode;
 }) {
   return (
-    <nav className="lumeo-nav-enter aura-public-nav relative z-30 bg-[linear-gradient(180deg,rgba(20,36,59,0.94),rgba(8,16,29,0.82))] px-5 shadow-[0_16px_44px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,253,247,0.08)] backdrop-blur-xl sm:px-8">
-      <div className={`mx-auto flex h-[70px] ${maxWidth} items-center justify-between gap-4`}>
-        <Link href="/" className="flex min-w-0 items-center rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.22)]">
+    <L2PublicHeader className="lumeo-nav-enter aura-public-nav">
+      <nav className={`mx-auto flex min-h-16 ${maxWidth} items-center justify-between gap-4`} aria-label="Public navigation">
+        <Link href="/" className="flex min-w-0 items-center rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.22)]">
           <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
         </Link>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="hidden shrink-0 items-center gap-2 md:flex">
           {toolsMenu ?? (
-            <Link
-              href="/pdf-tools"
-              className="lumeo-press lumeo-focus-ring inline-flex h-10 items-center justify-center rounded-full bg-[rgba(var(--lumeo-paper-rgb),0.075)] px-3.5 text-sm font-extrabold text-[var(--text-secondary)] shadow-[inset_0_1px_0_rgba(255,253,247,0.08)] transition hover:bg-[rgba(var(--lumeo-paper-rgb),0.12)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.18)] sm:h-11 sm:px-4"
-            >
+            <L2PublicNavLink href="/pdf-tools">
               PDF Tools
-            </Link>
+            </L2PublicNavLink>
           )}
+          <L2PublicNavLink href="/guides">Guides</L2PublicNavLink>
+          <L2PublicNavLink href="/privacy">Privacy</L2PublicNavLink>
           <Link
             href="/"
             aria-label="Go to Lumeo PDF home"
             title="Home"
-            className="lumeo-press lumeo-focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(var(--lumeo-paper-rgb),0.075)] text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,247,0.08)] transition hover:bg-[rgba(var(--lumeo-gold-rgb),0.12)] hover:text-[var(--text-accent)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.18)] sm:h-11 sm:w-11"
+            className="lumeo-press lumeo-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[rgba(var(--paper-rgb),0.075)] text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition hover:bg-[rgba(var(--champagne-rgb),0.12)] hover:text-[var(--text-accent)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.18)]"
           >
             <HomeIcon />
           </Link>
         </div>
-      </div>
-    </nav>
+        <L2MobileNavClient />
+      </nav>
+    </L2PublicHeader>
   );
 }
 

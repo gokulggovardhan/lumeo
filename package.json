@@ -14,6 +14,7 @@
     "verify:aura": "node scripts/verify-lumeo-aura.mjs",
     "verify:aura-rollout": "node scripts/verify-lumeo-aura-rollout.mjs",
     "verify:lumeo2-foundation": "node scripts/verify-lumeo-2-foundation.mjs",
+    "verify:lumeo2-public-experience": "node scripts/verify-lumeo-2-public-experience.mjs",
     "test": "node --no-warnings --test --experimental-strip-types",
     "test:compression-target": "node --no-warnings --test --experimental-strip-types tests/compression-target.test.ts",
     "copy-ffmpeg-core": "node scripts/copy-ffmpeg-core.mjs",

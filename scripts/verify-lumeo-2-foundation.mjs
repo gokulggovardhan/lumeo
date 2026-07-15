@@ -148,9 +148,6 @@ const requiredUiMarkers = [
 ];
 
 const protectedFiles = [
-  "app/page.tsx",
-  "app/pdf-tools/page.tsx",
-  "app/guides/page.tsx",
   "components/pdf/MergePdfTool.tsx",
   "components/pdf/SplitPdfTool.tsx",
   "components/pdf/CompressPdfTool.tsx",
@@ -220,7 +217,7 @@ try {
   const modified = changedFiles();
   for (const file of modified) {
     assert(!file.startsWith("supabase/migrations/"), `Supabase migration changed in Lumeo 2 foundation run: ${file}`);
-    assert(!protectedFiles.includes(file), `Protected public/PDF/analytics/admin-data file changed: ${file}`);
+    assert(!protectedFiles.includes(file), `Protected PDF processing, analytics, or admin-data file changed: ${file}`);
   }
 
   const scannedSource = [ui, workspace, publicShell, footer, controlShell, sidebar, mobileNav, guidance, showcase, tokens, docs].join("\n");
@@ -231,7 +228,7 @@ try {
   console.log("PASS Lumeo 2 UI, upload, file-card, result, and workspace foundations exist");
   console.log("PASS protected showcase and documentation exist");
   console.log("PASS protected dependency versions remain unchanged");
-  console.log("PASS no migrations, PDF processing files, analytics provider, or public pages changed in this run");
+  console.log("PASS no migrations, PDF processing files, analytics provider, or admin data files changed");
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Lumeo 2 foundation verification failed.");
   process.exit(1);

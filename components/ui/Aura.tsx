@@ -1,7 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import type {
   ButtonHTMLAttributes,
+  ComponentProps,
   HTMLAttributes,
   InputHTMLAttributes,
   LabelHTMLAttributes,
@@ -700,6 +702,201 @@ export function AuraResultCard({
         </div>
       ) : null}
     </AuraCard>
+  );
+}
+
+type L2ToolCardData = {
+  toolName: string;
+  shortDescription: string;
+  route: string;
+  iconKey: string;
+  status?: string;
+};
+
+function L2Arrow() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+      <path d="M5 12h14M14 7l5 5-5 5" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function L2ToolIcon({ iconKey }: { iconKey: string }) {
+  const label = iconKey === "all" ? "All" : "PDF";
+  return (
+    <span aria-hidden="true" className="lumeo-card-icon grid h-12 w-12 shrink-0 place-items-center rounded-[var(--radius-lg)] bg-[linear-gradient(145deg,rgba(var(--champagne-rgb),0.16),rgba(var(--sky-rgb),0.08))] text-xs font-black text-[var(--text-accent)] shadow-[inset_0_1px_0_rgba(255,253,248,0.12)]">
+      {label}
+    </span>
+  );
+}
+
+export function L2PublicHeader({ children, className, ...props }: HTMLAttributes<HTMLElement>) {
+  return (
+    <header
+      {...props}
+      className={cx(
+        "l2-public-header sticky top-0 z-40 px-4 py-3 sm:px-6",
+        className,
+      )}
+    >
+      <div className="mx-auto max-w-[var(--container-wide)] rounded-[var(--radius-xl)] bg-[linear-gradient(180deg,rgba(22,39,64,0.88),rgba(8,17,31,0.78))] px-3 shadow-[0_18px_50px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,253,248,0.09)] backdrop-blur-xl">
+        {children}
+      </div>
+    </header>
+  );
+}
+
+export function L2PublicNavLink({
+  active = false,
+  className,
+  ...props
+}: { active?: boolean } & ComponentProps<typeof Link>) {
+  return (
+    <Link
+      {...props}
+      aria-current={active ? "page" : props["aria-current"]}
+      className={cx(
+        "inline-flex min-h-11 items-center rounded-[var(--radius-md)] px-3 text-sm font-extrabold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.075)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]",
+        active && "bg-[rgba(var(--paper-rgb),0.08)] text-[var(--text-primary)]",
+        className,
+      )}
+    />
+  );
+}
+
+export function L2MenuSurface({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div
+      {...props}
+      className={cx(
+        "l2-menu-surface rounded-[var(--radius-2xl)] bg-[var(--surface-floating)] p-3 shadow-[var(--shadow-xl)] ring-1 ring-[var(--border-hairline)]",
+        className,
+      )}
+    />
+  );
+}
+
+function L2ToolCardInner({
+  tool,
+  action,
+  featured = false,
+  allTools = false,
+}: {
+  tool: L2ToolCardData;
+  action: string;
+  featured?: boolean;
+  allTools?: boolean;
+}) {
+  return (
+    <>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[rgba(var(--champagne-rgb),0.48)] to-transparent opacity-70" />
+      <div className="flex items-start justify-between gap-4">
+        <L2ToolIcon iconKey={tool.iconKey} />
+        {tool.status && tool.status !== "active" ? <AuraStatus tone="planned" label={tool.status === "beta" ? "Beta" : "Soon"} /> : null}
+      </div>
+      <div className="mt-5 flex flex-1 flex-col">
+        <h2 className={cx("font-black tracking-[-0.025em] text-[var(--text-primary)]", featured ? "text-2xl sm:text-3xl" : "text-xl")}>{tool.toolName}</h2>
+        <p className={cx("mt-2 leading-6 text-[var(--text-secondary)]", featured ? "max-w-xl text-base" : "text-sm")}>{tool.shortDescription}</p>
+        <span className={cx("lumeo-arrow mt-auto inline-flex items-center gap-2 pt-6 text-sm font-black", allTools ? "text-[var(--text-info)]" : "text-[var(--text-accent)]")}>
+          {action}
+          <span className="transition group-hover:translate-x-1 motion-reduce:transform-none"><L2Arrow /></span>
+        </span>
+      </div>
+    </>
+  );
+}
+
+export function L2FeaturedToolCard({ tool, className }: { tool: L2ToolCardData; className?: string }) {
+  return (
+    <Link
+      href={tool.route}
+      aria-label={`Open ${tool.toolName}`}
+      className={cx(
+        "l2-featured-tool-card lumeo-card aura-luminous-card group relative flex min-h-[16rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] p-6 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)] motion-reduce:transform-none sm:p-7 lg:col-span-2",
+        className,
+      )}
+    >
+      <L2ToolCardInner tool={tool} action="Open tool" featured />
+    </Link>
+  );
+}
+
+export function L2ToolCard({ tool, allTools = false, className }: { tool: L2ToolCardData; allTools?: boolean; className?: string }) {
+  return (
+    <Link
+      href={tool.route}
+      aria-label={allTools ? "Browse all PDF tools" : `Open ${tool.toolName}`}
+      className={cx(
+        "l2-tool-card lumeo-card aura-luminous-card group relative flex min-h-[13rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] p-5 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)] motion-reduce:transform-none",
+        allTools && "bg-[linear-gradient(180deg,rgba(var(--sky-rgb),0.12),rgba(var(--paper-rgb),0.045))]",
+        className,
+      )}
+    >
+      <L2ToolCardInner tool={tool} action={allTools ? "Browse all tools" : "Open tool"} allTools={allTools} />
+    </Link>
+  );
+}
+
+export function L2DirectoryToolCard({ tool, className }: { tool: L2ToolCardData; className?: string }) {
+  return (
+    <Link
+      href={tool.route}
+      aria-label={`Open ${tool.toolName}`}
+      className={cx(
+        "l2-directory-tool-card group flex min-h-40 flex-col rounded-[var(--radius-xl)] bg-[rgba(var(--paper-rgb),0.055)] p-4 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)] transition hover:-translate-y-[2px] hover:bg-[rgba(var(--paper-rgb),0.08)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.18)] motion-reduce:transform-none",
+        className,
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <L2ToolIcon iconKey={tool.iconKey} />
+        {tool.status && tool.status !== "active" ? <AuraStatus tone="planned" label={tool.status === "beta" ? "Beta" : "Soon"} /> : null}
+      </div>
+      <h3 className="mt-4 text-base font-black text-[var(--text-primary)]">{tool.toolName}</h3>
+      <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{tool.shortDescription}</p>
+      <span className="mt-auto inline-flex items-center gap-2 pt-5 text-sm font-black text-[var(--text-accent)]">
+        Open workspace <span className="transition group-hover:translate-x-1 motion-reduce:transform-none"><L2Arrow /></span>
+      </span>
+    </Link>
+  );
+}
+
+export function L2TrustRail({ items, className }: { items: string[]; className?: string }) {
+  return (
+    <section className={cx("l2-trust-rail rounded-[var(--radius-2xl)] bg-[rgba(var(--paper-rgb),0.045)] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)]", className)} aria-label="Lumeo trust notes">
+      <ul className="grid gap-3 text-sm font-bold text-[var(--text-secondary)] md:grid-cols-3">
+        {items.map((item) => (
+          <li key={item} className="flex items-center gap-3">
+            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[var(--emerald-400)]" />
+            {item}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function L2PublicFooter({ children, className, ...props }: HTMLAttributes<HTMLElement>) {
+  return <footer {...props} className={cx("l2-public-footer aura-public-footer", className)}>{children}</footer>;
+}
+
+export function L2PublicEmptyState({ title, message, action }: { title: string; message: string; action?: ReactNode }) {
+  return <AuraEmptyState title={title} message={message} action={action} />;
+}
+
+export function L2PublicErrorState({ title, message, actions }: { title: string; message: string; actions?: ReactNode }) {
+  return (
+    <section className="l2-public-error-state aura-luminous-card mx-auto max-w-xl rounded-[var(--radius-2xl)] p-6 text-center">
+      <AuraStatus tone="warning" label="Needs a refresh" />
+      <h1 className="mt-4 text-3xl font-black tracking-[-0.03em] text-[var(--text-primary)]">{title}</h1>
+      <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">{message}</p>
+      {actions ? <div className="mt-6 flex flex-wrap justify-center gap-3">{actions}</div> : null}
+    </section>
+  );
+}
+
+export function L2SkeletonCard({ featured = false }: { featured?: boolean }) {
+  return (
+    <div className={cx("l2-skeleton-card aura-shimmer rounded-[var(--radius-2xl)] bg-[rgba(var(--paper-rgb),0.055)] shadow-[var(--shadow-sm)]", featured ? "min-h-[16rem] lg:col-span-2" : "min-h-[13rem]")} />
   );
 }
 
