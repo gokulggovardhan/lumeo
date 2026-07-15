@@ -27,9 +27,9 @@ export function ToolWorkspaceShell({
   action?: ReactNode;
 }) {
   return (
-    <section className="mx-auto grid min-h-[70dvh] w-full max-w-[var(--container-wide)] gap-5 px-[var(--page-gutter)] py-5">
+    <section className="aura-tool-workspace-shell mx-auto grid min-h-[70dvh] w-full max-w-[var(--container-wide)] gap-5 px-[var(--page-gutter)] py-5">
       <ToolStepHeader title={title} description={description} action={action} />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.75fr)]">
+      <div className="aura-tool-workspace-layout grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.75fr)]">
         {children}
       </div>
       <ToolPrivacyNote />
@@ -71,12 +71,21 @@ export function ToolUploadStage({
   description?: string;
   action?: ReactNode;
 }) {
-  return <AuraUploadSurface title={title} description={description} action={action ?? <AuraButton>Select files</AuraButton>} />;
+  return (
+    <AuraUploadSurface
+      title={title}
+      description={description}
+      supportedTypes="PDF documents"
+      privacyNote="Private by design · Browser-only"
+      multiple
+      action={action ?? <AuraButton>Select files</AuraButton>}
+    />
+  );
 }
 
 export function ToolSettingsStage({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <AuraPanel>
+    <AuraPanel className="aura-tool-workspace-inspector">
       <AuraSectionHeader title={title} description="Primary options first. Advanced controls appear only when useful." />
       <div className="mt-5 grid gap-3">{children}</div>
     </AuraPanel>
@@ -119,7 +128,7 @@ export function ToolActionBar({ children }: { children: ReactNode }) {
 
 export function ToolDocumentSummary({ title, details }: { title: string; details: string[] }) {
   return (
-    <AuraCard>
+    <AuraCard className="aura-tool-workspace-main">
       <p className="truncate text-base font-black text-[var(--lumeo-paper-50)]">{title}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {details.map((detail) => <AuraStatus key={detail} tone="neutral" label={detail} />)}
@@ -138,7 +147,7 @@ export function ToolModeCard({
   selected?: boolean;
 }) {
   return (
-    <AuraCard interactive className={selected ? "border-[var(--border-premium)] bg-[rgba(var(--lumeo-gold-rgb),0.09)]" : ""}>
+    <AuraCard interactive className={selected ? "border-[var(--border-selected)] bg-[var(--surface-selected)]" : ""}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="font-black text-[var(--lumeo-paper-50)]">{title}</p>

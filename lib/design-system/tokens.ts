@@ -21,25 +21,123 @@ export const auraColourTokens = [
   "--lumeo-aura-500",
 ] as const;
 
+export const lumeo2FoundationTokens = [
+  "--canvas-950",
+  "--canvas-900",
+  "--canvas-850",
+  "--canvas-800",
+  "--canvas-750",
+  "--paper-50",
+  "--paper-100",
+  "--paper-200",
+  "--paper-300",
+  "--paper-500",
+  "--paper-700",
+  "--emerald-400",
+  "--emerald-500",
+  "--emerald-600",
+  "--emerald-700",
+  "--champagne-300",
+  "--champagne-400",
+  "--champagne-500",
+  "--sky-300",
+  "--sky-400",
+  "--sky-500",
+  "--ruby-400",
+  "--ruby-500",
+  "--ruby-600",
+] as const;
+
 export const auraSurfaceTokens = [
   "--surface-canvas",
   "--surface-base",
   "--surface-raised",
   "--surface-elevated",
   "--surface-floating",
+  "--surface-interactive",
+  "--surface-selected",
   "--surface-input",
   "--surface-overlay",
+  "--surface-danger",
+  "--surface-success",
 ] as const;
 
 export const auraTextTokens = [
   "--text-primary",
   "--text-secondary",
   "--text-muted",
+  "--text-subtle",
   "--text-inverse",
+  "--text-on-accent",
   "--text-accent",
   "--text-success",
   "--text-warning",
   "--text-danger",
+  "--text-info",
+] as const;
+
+export const lumeo2BorderTokens = [
+  "--border-hairline",
+  "--border-subtle",
+  "--border-default",
+  "--border-strong",
+  "--border-focus",
+  "--border-selected",
+  "--border-danger",
+] as const;
+
+export const lumeo2ShadowTokens = [
+  "--shadow-xs",
+  "--shadow-sm",
+  "--shadow-md",
+  "--shadow-lg",
+  "--shadow-xl",
+  "--shadow-floating",
+  "--shadow-interactive",
+  "--shadow-focus",
+  "--shadow-success",
+  "--shadow-danger",
+] as const;
+
+export const lumeo2TypographyTokens = [
+  "--font-display-xl",
+  "--font-display-lg",
+  "--font-display-md",
+  "--font-heading-xl",
+  "--font-heading-lg",
+  "--font-heading-md",
+  "--font-heading-sm",
+  "--font-body-lg",
+  "--font-body-md",
+  "--font-body-sm",
+  "--font-label",
+  "--font-caption",
+  "--font-micro",
+] as const;
+
+export const lumeo2SpacingTokens = [
+  "--space-1",
+  "--space-2",
+  "--space-3",
+  "--space-4",
+  "--space-5",
+  "--space-6",
+  "--space-8",
+  "--space-10",
+  "--space-12",
+  "--space-16",
+  "--space-20",
+  "--space-24",
+] as const;
+
+export const lumeo2RadiusTokens = [
+  "--radius-xs",
+  "--radius-sm",
+  "--radius-md",
+  "--radius-lg",
+  "--radius-xl",
+  "--radius-2xl",
+  "--radius-pill",
 ] as const;
 
 export const auraMotionTokens = [
@@ -52,6 +150,7 @@ export const auraMotionTokens = [
   "--ease-enter",
   "--ease-exit",
   "--ease-spring-soft",
+  "--ease-emphasized",
 ] as const;
 
 export const auraComponentFoundations = [

@@ -5,6 +5,7 @@ import type {
   HTMLAttributes,
   InputHTMLAttributes,
   LabelHTMLAttributes,
+  KeyboardEvent as ReactKeyboardEvent,
   ReactNode,
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
@@ -12,7 +13,7 @@ import type {
 import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "planned" | "unavailable";
-type ButtonVariant = "primary" | "secondary" | "ghost" | "premium" | "danger";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "premium" | "danger" | "success" | "icon";
 type Size = "sm" | "md" | "lg";
 
 function cx(...values: Array<string | false | null | undefined>) {
@@ -20,21 +21,23 @@ function cx(...values: Array<string | false | null | undefined>) {
 }
 
 const toneClasses: Record<Tone, string> = {
-  neutral: "border-[var(--border-default)] bg-[rgba(var(--lumeo-paper-rgb),0.06)] text-[var(--lumeo-paper-100)]",
-  success: "border-[rgba(var(--lumeo-seal-rgb),0.36)] bg-[rgba(var(--lumeo-seal-rgb),0.13)] text-[var(--lumeo-seal-400)]",
-  warning: "border-[rgba(var(--lumeo-gold-rgb),0.4)] bg-[rgba(var(--lumeo-gold-rgb),0.12)] text-[var(--lumeo-gold-300)]",
-  danger: "border-[rgba(217,113,113,0.42)] bg-[rgba(217,113,113,0.12)] text-[var(--lumeo-danger)]",
-  info: "border-[rgba(var(--lumeo-aura-rgb),0.38)] bg-[rgba(var(--lumeo-aura-rgb),0.12)] text-[var(--lumeo-aura-300)]",
-  planned: "border-[rgba(var(--lumeo-paper-rgb),0.16)] bg-[rgba(var(--lumeo-paper-rgb),0.07)] text-[var(--lumeo-paper-200)]",
-  unavailable: "border-[rgba(var(--lumeo-paper-rgb),0.12)] bg-[rgba(var(--lumeo-paper-rgb),0.035)] text-[var(--lumeo-paper-400)]",
+  neutral: "border-[var(--border-default)] bg-[rgba(var(--paper-rgb),0.06)] text-[var(--text-secondary)]",
+  success: "border-[rgba(var(--emerald-rgb),0.36)] bg-[var(--surface-success)] text-[var(--text-success)]",
+  warning: "border-[rgba(var(--champagne-rgb),0.4)] bg-[rgba(var(--champagne-rgb),0.12)] text-[var(--text-warning)]",
+  danger: "border-[var(--border-danger)] bg-[var(--surface-danger)] text-[var(--text-danger)]",
+  info: "border-[rgba(var(--sky-rgb),0.38)] bg-[rgba(var(--sky-rgb),0.12)] text-[var(--text-info)]",
+  planned: "border-[rgba(var(--paper-rgb),0.16)] bg-[rgba(var(--paper-rgb),0.07)] text-[var(--text-secondary)]",
+  unavailable: "border-[rgba(var(--paper-rgb),0.12)] bg-[rgba(var(--paper-rgb),0.035)] text-[var(--text-subtle)]",
 };
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "border-[rgba(var(--lumeo-seal-rgb),0.58)] bg-[linear-gradient(180deg,var(--lumeo-seal-400),var(--lumeo-seal-600))] text-[var(--text-primary)] shadow-[0_16px_38px_rgba(var(--lumeo-seal-rgb),0.28),inset_0_1px_0_rgba(255,253,247,0.2)] hover:brightness-110",
-  secondary: "border-[rgba(var(--lumeo-paper-rgb),0.1)] bg-[linear-gradient(180deg,rgba(255,253,247,0.09),rgba(255,253,247,0.045))] text-[var(--text-primary)] shadow-[var(--shadow-xs)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.12)]",
-  ghost: "border-transparent bg-transparent text-[var(--lumeo-paper-200)] hover:border-[var(--border-subtle)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.06)]",
-  premium: "border-[rgba(var(--lumeo-gold-rgb),0.34)] bg-[linear-gradient(180deg,rgba(var(--lumeo-gold-rgb),0.16),rgba(var(--lumeo-gold-rgb),0.075))] text-[var(--text-accent)] hover:bg-[rgba(var(--lumeo-gold-rgb),0.18)]",
-  danger: "border-[rgba(217,113,113,0.42)] bg-[rgba(217,113,113,0.14)] text-[var(--lumeo-danger)] hover:bg-[rgba(217,113,113,0.2)]",
+  primary: "border-[rgba(var(--emerald-rgb),0.58)] bg-[linear-gradient(180deg,var(--emerald-400),var(--emerald-600))] text-[var(--text-on-accent)] shadow-[0_16px_38px_rgba(var(--emerald-rgb),0.28),inset_0_1px_0_rgba(255,253,248,0.22)] hover:brightness-110",
+  secondary: "border-[var(--border-hairline)] bg-[var(--surface-interactive)] text-[var(--text-primary)] shadow-[var(--shadow-xs)] hover:border-[var(--border-default)] hover:bg-[rgba(var(--paper-rgb),0.12)]",
+  ghost: "border-transparent bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:bg-[rgba(var(--paper-rgb),0.06)]",
+  premium: "border-[rgba(var(--champagne-rgb),0.34)] bg-[linear-gradient(180deg,rgba(var(--champagne-rgb),0.16),rgba(var(--champagne-rgb),0.075))] text-[var(--text-accent)] hover:bg-[rgba(var(--champagne-rgb),0.18)]",
+  danger: "border-[var(--border-danger)] bg-[var(--surface-danger)] text-[var(--text-danger)] hover:bg-[rgba(var(--ruby-rgb),0.2)]",
+  success: "border-[var(--border-selected)] bg-[var(--surface-success)] text-[var(--text-success)] shadow-[var(--shadow-success)] hover:bg-[rgba(var(--emerald-rgb),0.18)]",
+  icon: "min-w-11 border-[var(--border-default)] bg-[rgba(var(--paper-rgb),0.07)] px-0 text-[var(--text-secondary)] hover:border-[var(--border-focus)] hover:bg-[rgba(var(--paper-rgb),0.12)]",
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -61,7 +64,7 @@ export function AuraButton({
       {...props}
       disabled={disabled || loading}
       className={cx(
-        "inline-flex items-center justify-center gap-2 rounded-[var(--radius-pill)] border font-extrabold transition duration-[var(--motion-standard)] ease-[var(--ease-standard)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.22)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
+        "lumeo2-button-press inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] border font-extrabold transition duration-[var(--motion-standard)] ease-[var(--ease-standard)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.22)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
         buttonVariants[variant],
         sizeClasses[size],
         className,
@@ -85,7 +88,7 @@ export function AuraIconButton({
       aria-label={label}
       title={label}
       className={cx(
-        "inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-[var(--border-default)] bg-[rgba(var(--lumeo-paper-rgb),0.07)] text-[var(--lumeo-paper-100)] transition duration-[var(--motion-standard)] hover:border-[var(--border-premium)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.12)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.22)]",
+        "lumeo2-button-press inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(var(--paper-rgb),0.07)] text-[var(--text-secondary)] transition duration-[var(--motion-standard)] hover:border-[var(--border-premium)] hover:bg-[rgba(var(--paper-rgb),0.12)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.22)]",
         className,
       )}
     >
@@ -104,7 +107,7 @@ export function AuraCard({ className, interactive = false, ...props }: HTMLAttri
       {...props}
       className={cx(
         "aura-luminous-card rounded-[var(--radius-xl)] p-5 transition duration-[var(--motion-standard)]",
-        interactive && "hover:-translate-y-[3px] hover:shadow-[var(--shadow-lg)]",
+        interactive && "lumeo2-soft-card-lift focus-within:shadow-[var(--shadow-focus)]",
         className,
       )}
     />
@@ -213,8 +216,9 @@ export function AuraSwitch({
         {description ? <span className="mt-1 block text-xs leading-5 text-[var(--lumeo-paper-400)]">{description}</span> : null}
         {impact || disabledReason ? <span className="mt-1 block text-xs font-bold text-[var(--lumeo-gold-300)]">{disabledReason ?? impact}</span> : null}
       </span>
-      <span className={cx("relative h-7 w-12 shrink-0 rounded-full border transition", checked ? "border-[rgba(var(--lumeo-seal-rgb),0.62)] bg-[var(--lumeo-seal-500)]" : "border-[var(--border-default)] bg-[var(--lumeo-ink-750)]")}>
-        <span className={cx("absolute top-1 h-5 w-5 rounded-full bg-[var(--lumeo-paper-50)] shadow-[var(--shadow-xs)] transition-transform duration-[var(--motion-standard)]", checked ? "translate-x-6" : "translate-x-1")} />
+      <span className={cx("relative h-7 w-12 shrink-0 rounded-full border transition", checked ? "border-[rgba(var(--emerald-rgb),0.62)] bg-[var(--emerald-500)]" : "border-[var(--border-default)] bg-[var(--canvas-750)]")}>
+        <span aria-hidden="true" className={cx("absolute left-2 top-1 text-[10px] font-black text-[var(--text-on-accent)] transition-opacity", checked ? "opacity-100" : "opacity-0")}>✓</span>
+        <span className={cx("lumeo2-switch-slide absolute top-1 h-5 w-5 rounded-full bg-[var(--paper-50)] shadow-[var(--shadow-xs)]", checked ? "translate-x-6" : "translate-x-1")} />
       </span>
     </button>
   );
@@ -263,13 +267,27 @@ export function AuraSegmentedControl({
   className?: string;
 }) {
   const currentIndex = Math.max(0, options.findIndex((option) => option.value === value));
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const lastIndex = options.length - 1;
+    const nextIndex =
+      event.key === "Home"
+        ? 0
+        : event.key === "End"
+          ? lastIndex
+          : event.key === "ArrowLeft"
+            ? Math.max(0, currentIndex - 1)
+            : Math.min(lastIndex, currentIndex + 1);
+    onChange(options[nextIndex]?.value ?? value);
+  }
   return (
     <div className={className}>
       <p className="mb-2 text-sm font-extrabold text-[var(--lumeo-paper-50)]">{label}</p>
-      <div role="radiogroup" aria-label={label} className="relative flex overflow-x-auto rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.05)] p-1">
-        <span aria-hidden="true" className="absolute bottom-1 top-1 rounded-[var(--radius-pill)] bg-[rgba(var(--lumeo-seal-rgb),0.28)] transition-all duration-[var(--motion-standard)]" style={{ left: `calc(${currentIndex} * (100% / ${options.length}) + 0.25rem)`, width: `calc((100% - 0.5rem) / ${options.length})` }} />
+      <div role="radiogroup" aria-label={label} onKeyDown={handleKeyDown} className="relative flex overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border-hairline)] bg-[rgba(var(--paper-rgb),0.05)] p-1">
+        <span aria-hidden="true" className="lumeo2-segmented-indicator absolute bottom-1 top-1 rounded-[var(--radius-md)] bg-[var(--surface-selected)]" style={{ left: `calc(${currentIndex} * (100% / ${options.length}) + 0.25rem)`, width: `calc((100% - 0.5rem) / ${options.length})` }} />
         {options.map((option) => (
-          <button key={option.value} type="button" role="radio" aria-checked={value === option.value} onClick={() => onChange(option.value)} className="relative z-10 min-h-10 flex-1 whitespace-nowrap rounded-[var(--radius-pill)] px-4 text-sm font-extrabold text-[var(--lumeo-paper-100)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]">
+          <button key={option.value} type="button" role="radio" aria-checked={value === option.value} onClick={() => onChange(option.value)} className="relative z-10 min-h-10 flex-1 whitespace-nowrap rounded-[var(--radius-md)] px-4 text-sm font-extrabold text-[var(--lumeo-paper-100)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]">
             {option.label}
           </button>
         ))}
@@ -541,35 +559,146 @@ export function AuraCommandMenu({ placeholder = "Search commands..." }: { placeh
   return <AuraSearchInput aria-label="Command search" placeholder={placeholder} />;
 }
 
-export function AuraUploadSurface({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
+export function AuraUploadSurface({
+  title,
+  description,
+  supportedTypes,
+  privacyNote,
+  action,
+  dragActive = false,
+  loading = false,
+  error,
+  multiple = false,
+  onActivate,
+}: {
+  title: string;
+  description: string;
+  supportedTypes?: string;
+  privacyNote?: string;
+  action?: ReactNode;
+  dragActive?: boolean;
+  loading?: boolean;
+  error?: string;
+  multiple?: boolean;
+  onActivate?: () => void;
+}) {
+  function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (!onActivate || (event.key !== "Enter" && event.key !== " ")) return;
+    event.preventDefault();
+    onActivate();
+  }
+
   return (
-    <div className="lumeo-upload-surface aura-luminous-card rounded-[var(--radius-2xl)] p-8 text-center shadow-[var(--shadow-lg)] transition duration-200 hover:shadow-[var(--shadow-xl)]">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-xl)] bg-[linear-gradient(145deg,rgba(var(--lumeo-aura-rgb),0.18),rgba(var(--lumeo-gold-rgb),0.11))] text-[var(--lumeo-aura-300)] shadow-[inset_0_1px_0_rgba(255,253,247,0.16)]">PDF</div>
+    <div
+      role={onActivate ? "button" : undefined}
+      tabIndex={onActivate ? 0 : undefined}
+      aria-busy={loading || undefined}
+      aria-invalid={Boolean(error) || undefined}
+      aria-label={onActivate ? `${title}. ${description}` : undefined}
+      data-multiple={multiple ? "true" : "false"}
+      onClick={onActivate}
+      onKeyDown={handleKeyDown}
+      className={cx(
+        "lumeo-upload-surface aura-luminous-card rounded-[var(--radius-2xl)] p-8 text-center shadow-[var(--shadow-lg)] transition duration-200 hover:shadow-[var(--shadow-xl)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]",
+        dragActive && "lumeo2-drag-highlight border-[var(--border-focus)] bg-[rgba(var(--sky-rgb),0.08)]",
+        onActivate && "cursor-pointer",
+      )}
+    >
+      <div className="mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-xl)] bg-[linear-gradient(145deg,rgba(var(--sky-rgb),0.18),rgba(var(--champagne-rgb),0.11))] text-[var(--text-info)] shadow-[inset_0_1px_0_rgba(255,253,248,0.16)]">
+        {loading ? <span aria-hidden="true" className="h-5 w-5 rounded-full border-2 border-current border-r-transparent motion-safe:animate-spin" /> : "PDF"}
+      </div>
       <h3 className="mt-4 text-xl font-black text-[var(--text-primary)]">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
+      {supportedTypes ? <p className="mt-3 text-xs font-bold text-[var(--text-subtle)]">{supportedTypes}</p> : null}
+      {privacyNote ? <p className="mx-auto mt-2 max-w-md text-xs font-bold text-[var(--text-accent)]">{privacyNote}</p> : null}
+      {error ? <p aria-live="polite" className="mx-auto mt-3 max-w-md text-xs font-bold text-[var(--text-danger)]">{error}</p> : null}
       {action ? <div className="mt-5">{action}</div> : null}
     </div>
   );
 }
 
-export function AuraFileCard({ name, meta, action }: { name: string; meta: string; action?: ReactNode }) {
+export function AuraFileCard({
+  name,
+  meta,
+  status,
+  action,
+  onRemove,
+  removeLabel,
+  onMoveUp,
+  onMoveDown,
+  moveUpLabel,
+  moveDownLabel,
+}: {
+  name: string;
+  meta: string;
+  status?: string;
+  action?: ReactNode;
+  onRemove?: () => void;
+  removeLabel?: string;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+  moveUpLabel?: string;
+  moveDownLabel?: string;
+}) {
   return (
-    <div className="flex min-h-16 items-center justify-between gap-4 rounded-[var(--radius-xl)] bg-[rgba(var(--lumeo-paper-rgb),0.06)] p-3 shadow-[inset_0_1px_0_rgba(255,253,247,0.06)] transition hover:-translate-y-0.5 hover:bg-[rgba(var(--lumeo-paper-rgb),0.09)]">
-      <div className="min-w-0">
+    <div className="lumeo2-soft-card-lift flex min-h-16 items-center justify-between gap-4 rounded-[var(--radius-xl)] bg-[rgba(var(--paper-rgb),0.06)] p-3 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)] transition hover:bg-[rgba(var(--paper-rgb),0.09)]">
+      <div aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-lg)] bg-[rgba(var(--champagne-rgb),0.11)] text-xs font-black text-[var(--text-accent)]">PDF</div>
+      <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black text-[var(--lumeo-paper-50)]">{name}</p>
         <p className="mt-1 text-xs text-[var(--lumeo-paper-400)]">{meta}</p>
+        {status ? <p className="mt-1 text-xs font-bold text-[var(--text-success)]">{status}</p> : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      <div className="flex shrink-0 items-center gap-2">
+        {onMoveUp ? <AuraIconButton label={moveUpLabel ?? `Move ${name} up`} onClick={onMoveUp}>↑</AuraIconButton> : null}
+        {onMoveDown ? <AuraIconButton label={moveDownLabel ?? `Move ${name} down`} onClick={onMoveDown}>↓</AuraIconButton> : null}
+        {onRemove ? <AuraIconButton label={removeLabel ?? `Remove ${name}`} onClick={onRemove}>×</AuraIconButton> : null}
+        {action ? <div>{action}</div> : null}
+      </div>
     </div>
   );
 }
 
-export function AuraResultCard({ tone = "success", title, children, action }: { tone?: Tone; title: string; children?: ReactNode; action?: ReactNode }) {
+export function AuraResultCard({
+  tone = "success",
+  title,
+  details,
+  localMessage,
+  children,
+  action,
+  primaryAction,
+  secondaryAction,
+}: {
+  tone?: Tone;
+  title: string;
+  details?: Array<{ label: string; value: string }>;
+  localMessage?: string;
+  children?: ReactNode;
+  action?: ReactNode;
+  primaryAction?: ReactNode;
+  secondaryAction?: ReactNode;
+}) {
   return (
     <AuraCard className="aura-success-reveal">
       <AuraStatus tone={tone} label={title} />
+      {details?.length ? (
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+          {details.map((detail) => (
+            <div key={detail.label} className="rounded-[var(--radius-lg)] bg-[rgba(var(--paper-rgb),0.055)] p-3">
+              <dt className="text-xs font-bold text-[var(--text-subtle)]">{detail.label}</dt>
+              <dd className="mt-1 font-black text-[var(--text-primary)]">{detail.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
       {children ? <div className="mt-4 text-sm leading-6 text-[var(--lumeo-paper-200)]">{children}</div> : null}
-      {action ? <div className="mt-5">{action}</div> : null}
+      {localMessage ? <p className="mt-4 text-xs font-bold text-[var(--text-accent)]">{localMessage}</p> : null}
+      {action || primaryAction || secondaryAction ? (
+        <div className="mt-5 flex flex-wrap gap-3">
+          {primaryAction}
+          {secondaryAction}
+          {action}
+        </div>
+      ) : null}
     </AuraCard>
   );
 }
