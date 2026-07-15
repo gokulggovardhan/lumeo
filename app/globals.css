@@ -447,6 +447,15 @@ a:active {
   width: 100%;
 }
 
+.lumeo-upload-surface :is(button, a).lumeo-primary-action,
+.lumeo-upload-surface .lumeo-upload-action {
+  width: min(100%, 320px);
+}
+
+.l2-directory-card-surface {
+  border: 1px solid rgba(var(--paper-rgb), 0.075);
+}
+
 .l2-privacy-note {
   box-shadow: inset 0 1px 0 rgba(255, 253, 248, 0.06);
 }
@@ -478,6 +487,11 @@ a:active {
   }
 
   .l2-live-tool-workspace :is(button, a) {
+    width: 100%;
+  }
+
+  .lumeo-upload-surface :is(button, a).lumeo-primary-action,
+  .lumeo-upload-surface .lumeo-upload-action {
     width: 100%;
   }
 

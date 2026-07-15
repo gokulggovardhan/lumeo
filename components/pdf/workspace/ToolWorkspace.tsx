@@ -217,8 +217,8 @@ export function L2ToolPageHeader({
 
 export function L2ToolWorkspace({ children }: { children: ReactNode }) {
   return (
-    <section className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] gap-6">
-      <div className="l2-tool-workspace-grid grid gap-6 lg:grid-cols-[minmax(0,1.9fr)_minmax(330px,1fr)] xl:gap-8">
+    <section className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] gap-5">
+      <div className="l2-tool-workspace-grid grid gap-5 lg:grid-cols-[minmax(0,1.9fr)_minmax(330px,1fr)] xl:gap-7">
         {children}
       </div>
     </section>
@@ -301,7 +301,7 @@ export function L2UploadStage({
       supportedTypes={acceptedNote}
       privacyNote={privacyNote}
       icon={icon}
-      action={action ?? <AuraButton>{multiple ? "Select PDFs" : "Select PDF"}</AuraButton>}
+      action={action ?? <AuraButton className="lumeo-upload-action">{multiple ? "Select PDFs" : "Select PDF"}</AuraButton>}
       multiple={multiple}
       dragActive={dragActive}
       loading={loading}

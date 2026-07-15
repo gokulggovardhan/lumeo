@@ -89,7 +89,7 @@ export default function Home() {
           </section>
 
           <L2TrustRail
-            className="lumeo-fade-up lumeo-fade-up-delay-2 mt-8"
+            className="lumeo-fade-up lumeo-fade-up-delay-2 mt-6"
             items={[
               "Browser-first processing",
               "Files stay on your device for supported live tools",

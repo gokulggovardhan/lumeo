@@ -54,7 +54,7 @@ try {
     "L2PublicErrorState",
     "L2SkeletonCard",
   ]) {
-    assert(ui.includes(`export function ${component}`), `Missing Lumeo 2 public primitive: ${component}`);
+    assert(ui.includes(`export function ${component}`) || ui.includes(`export const ${component}`), `Missing Lumeo 2 public primitive: ${component}`);
   }
 
   assert(homepage.includes("Documents, beautifully handled."), "Homepage headline is missing.");
@@ -73,10 +73,20 @@ try {
 
   assert(chrome.includes("L2PublicHeader"), "Public navigation must use Lumeo 2 header surface.");
   assert(chrome.includes("L2MobileNavClient"), "Mobile navigation drawer is missing.");
-  assert(menu.includes("aria-expanded") && menu.includes("aria-controls") && menu.includes("aria-haspopup"), "PDF tools menu ARIA semantics are missing.");
+  assert(menu.includes("aria-expanded") && menu.includes("aria-controls") && menu.includes("aria-haspopup=\"menu\""), "PDF tools menu ARIA semantics are missing.");
+  assert(menu.includes("const [open, setOpen] = useState(false)") && menu.includes("buttonRef") && menu.includes("wrapperRef"), "PDF tools menu trigger and panel must share one client-owned state.");
+  assert(menu.includes("const MENU_ID = \"lumeo-pdf-tools-menu\""), "PDF tools menu must use the stable panel ID.");
+  assert(menu.includes("wrapperRef.current?.contains(target)"), "PDF tools menu outside-click handling must not treat the trigger or panel as outside.");
+  assert(menu.includes("document.addEventListener(\"pointerdown\", handlePointerDown, true)"), "PDF tools menu must close on outside pointer events.");
   assert(menu.includes("Escape"), "PDF tools menu must close on Escape.");
+  assert(menu.includes("onClick={() => {") && menu.includes("setOpen(false);"), "PDF tools menu links must close the menu.");
   assert(menu.includes("View all PDF tools"), "PDF tools menu footer action is missing.");
   assert(menu.includes("md:grid-cols-2"), "PDF tools menu must support two-column desktop layout.");
+  assert(menu.includes("aria-controls={MENU_ID}") && menu.includes("id={MENU_ID}"), "PDF tools menu trigger aria-controls must point to the real panel.");
+  assert(!menu.includes("console."), "PDF tools menu must not contain debug logging.");
+  assert(ui.includes("l2-trust-rail-grid") && ui.includes("sm:grid-cols-3") && ui.includes("sm:justify-center"), "Trust rail must use equal three-column spacing on comfortable viewports.");
+  assert(ui.includes("sm:max-w-[320px]") && css.includes("width: min(100%, 320px);"), "Upload action must be constrained on desktop.");
+  assert(ui.includes("l2-directory-card-surface") && css.includes(".l2-directory-card-surface"), "Directory cards must use the shared raised surface styling.");
 
   assert(directory.includes("getPublicPdfCatalog"), "Directory must remain catalog driven.");
   assert(directory.includes("L2DirectoryToolCard"), "Directory must use Lumeo 2 directory cards.");

@@ -173,7 +173,7 @@ test("Lumeo 2 public homepage keeps five configured slots plus permanent sixth c
 
 test("Lumeo 2 public cards, navigation and menu are accessible", () => {
   for (const name of ["L2FeaturedToolCard", "L2ToolCard", "L2DirectoryToolCard", "L2PublicHeader", "L2MenuSurface"]) {
-    assert.ok(ui.includes(`export function ${name}`), `${name} should exist`);
+    assert.ok(ui.includes(`export function ${name}`) || ui.includes(`export const ${name}`), `${name} should exist`);
   }
   assert.ok(publicChrome.includes("L2PublicHeader"));
   assert.ok(publicChrome.includes("L2MobileNavClient"));
@@ -182,6 +182,31 @@ test("Lumeo 2 public cards, navigation and menu are accessible", () => {
   assert.ok(publicMenu.includes("aria-haspopup"));
   assert.ok(publicMenu.includes("Escape"));
   assert.ok(publicMenu.includes("View all PDF tools"));
+});
+
+test("Lumeo 2 public interaction spacing fixes are guarded", () => {
+  assert.ok(publicMenu.includes("const [open, setOpen] = useState(false)"));
+  assert.ok(publicMenu.includes("buttonRef"));
+  assert.ok(publicMenu.includes("wrapperRef"));
+  assert.ok(publicMenu.includes("const MENU_ID = \"lumeo-pdf-tools-menu\""));
+  assert.ok(publicMenu.includes("aria-haspopup=\"menu\""));
+  assert.ok(publicMenu.includes("aria-expanded={open}"));
+  assert.ok(publicMenu.includes("aria-controls={MENU_ID}"));
+  assert.ok(publicMenu.includes("id={MENU_ID}"));
+  assert.ok(publicMenu.includes("wrapperRef.current?.contains(target)"));
+  assert.ok(publicMenu.includes("document.addEventListener(\"pointerdown\", handlePointerDown, true)"));
+  assert.ok(publicMenu.includes("setOpen((value) => !value)"));
+  assert.ok(publicMenu.includes("setOpen(false);"));
+  assert.doesNotMatch(publicMenu, /console\./);
+
+  assert.ok(ui.includes("l2-trust-rail-grid"));
+  assert.ok(ui.includes("sm:grid-cols-3"));
+  assert.ok(ui.includes("sm:justify-center"));
+  assert.ok(ui.includes("sm:max-w-[320px]"));
+  assert.ok(css.includes("width: min(100%, 320px);"));
+  assert.ok(css.includes("width: 100%;"));
+  assert.ok(ui.includes("l2-directory-card-surface"));
+  assert.ok(css.includes(".l2-directory-card-surface"));
 });
 
 test("Lumeo 2 directory, loading and error states use public foundations", () => {

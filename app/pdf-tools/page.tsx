@@ -56,20 +56,20 @@ export default async function PdfToolsPage() {
         </p>
       </section>
 
-      <div className="mt-8 space-y-9">
+      <div className="mt-7 space-y-7">
         {catalog.categories.map((category, categoryIndex) => (
           <section
             key={category.slug}
             className="lumeo-fade-up aura-directory-section"
             style={{ animationDelay: `${categoryIndex * 70}ms` }}
           >
-            <div className="mb-4 border-l border-[rgba(var(--champagne-rgb),0.42)] pl-4">
+            <div className="mb-3 border-l border-[rgba(var(--champagne-rgb),0.42)] pl-4">
               <h2 className="text-xl font-black tracking-[-0.02em] text-[var(--text-primary)]">{category.name}</h2>
               {category.description ? (
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">{category.description}</p>
               ) : null}
             </div>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
               {category.tools.map((tool) => (
                 <L2DirectoryToolCard key={tool.route} tool={tool} />
               ))}
@@ -78,9 +78,9 @@ export default async function PdfToolsPage() {
         ))}
       </div>
 
-      <L2TrustRail className="mt-8" items={["Catalog-driven tools", "Browser-first where supported", "No fake usage counts"]} />
+      <L2TrustRail className="mt-7" items={["Catalog-driven tools", "Browser-first where supported", "No fake usage counts"]} />
 
-      <div className="mt-10">
+      <div className="mt-8">
         <PublicFooter />
       </div>
     </PublicCatalogPageShell>

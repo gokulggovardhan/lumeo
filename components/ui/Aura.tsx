@@ -12,7 +12,7 @@ import type {
   SelectHTMLAttributes,
   TextareaHTMLAttributes,
 } from "react";
-import { createContext, useContext, useEffect, useId, useRef, useState } from "react";
+import { createContext, forwardRef, useContext, useEffect, useId, useRef, useState } from "react";
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "info" | "planned" | "unavailable";
 type ButtonVariant = "primary" | "secondary" | "ghost" | "premium" | "danger" | "success" | "icon";
@@ -603,20 +603,20 @@ export function AuraUploadSurface({
       onClick={onActivate}
       onKeyDown={handleKeyDown}
       className={cx(
-        "lumeo-upload-surface aura-luminous-card rounded-[var(--radius-2xl)] p-8 text-center shadow-[var(--shadow-lg)] transition duration-200 hover:shadow-[var(--shadow-xl)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]",
+        "lumeo-upload-surface aura-luminous-card rounded-[var(--radius-2xl)] p-6 text-center shadow-[var(--shadow-lg)] transition duration-200 hover:shadow-[var(--shadow-xl)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)] sm:p-7",
         dragActive && "lumeo2-drag-highlight border-[var(--border-focus)] bg-[rgba(var(--sky-rgb),0.08)]",
         onActivate && "cursor-pointer",
       )}
     >
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-xl)] bg-[linear-gradient(145deg,rgba(var(--sky-rgb),0.18),rgba(var(--champagne-rgb),0.11))] text-[var(--text-info)] shadow-[inset_0_1px_0_rgba(255,253,248,0.16)]">
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-xl)] bg-[linear-gradient(145deg,rgba(var(--sky-rgb),0.18),rgba(var(--champagne-rgb),0.11))] text-[var(--text-info)] shadow-[inset_0_1px_0_rgba(255,253,248,0.16)] sm:h-14 sm:w-14">
         {loading ? <span aria-hidden="true" className="h-5 w-5 rounded-full border-2 border-current border-r-transparent motion-safe:animate-spin" /> : icon ?? "PDF"}
       </div>
-      <h3 className="mt-4 text-xl font-black text-[var(--text-primary)]">{title}</h3>
+      <h3 className="mt-3 text-xl font-black text-[var(--text-primary)] sm:mt-4">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
       {supportedTypes ? <p className="mt-3 text-xs font-bold text-[var(--text-subtle)]">{supportedTypes}</p> : null}
       {privacyNote ? <p className="mx-auto mt-2 max-w-md text-xs font-bold text-[var(--text-accent)]">{privacyNote}</p> : null}
       {error ? <p aria-live="polite" className="mx-auto mt-3 max-w-md text-xs font-bold text-[var(--text-danger)]">{error}</p> : null}
-      {action ? <div className="mt-5">{action}</div> : null}
+      {action ? <div className="mx-auto mt-5 w-full sm:max-w-[320px]">{action}</div> : null}
     </div>
   );
 }
@@ -766,17 +766,20 @@ export function L2PublicNavLink({
   );
 }
 
-export function L2MenuSurface({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      {...props}
-      className={cx(
-        "l2-menu-surface rounded-[var(--radius-2xl)] bg-[var(--surface-floating)] p-3 shadow-[var(--shadow-xl)] ring-1 ring-[var(--border-hairline)]",
-        className,
-      )}
-    />
-  );
-}
+export const L2MenuSurface = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
+  function L2MenuSurface({ className, ...props }, ref) {
+    return (
+      <div
+        {...props}
+        ref={ref}
+        className={cx(
+          "l2-menu-surface rounded-[var(--radius-2xl)] bg-[var(--surface-floating)] p-3 shadow-[var(--shadow-xl)] ring-1 ring-[var(--border-hairline)]",
+          className,
+        )}
+      />
+    );
+  },
+);
 
 function L2ToolCardInner({
   tool,
@@ -845,7 +848,7 @@ export function L2DirectoryToolCard({ tool, className }: { tool: L2ToolCardData;
       href={tool.route}
       aria-label={`Open ${tool.toolName}`}
       className={cx(
-        "l2-directory-tool-card group flex min-h-40 flex-col rounded-[var(--radius-xl)] bg-[rgba(var(--paper-rgb),0.055)] p-4 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)] transition hover:-translate-y-[2px] hover:bg-[rgba(var(--paper-rgb),0.08)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.18)] motion-reduce:transform-none",
+        "l2-directory-tool-card l2-directory-card-surface group flex h-full min-h-40 flex-col rounded-[var(--radius-xl)] bg-[linear-gradient(180deg,rgba(var(--paper-rgb),0.075),rgba(var(--paper-rgb),0.045))] p-5 shadow-[var(--shadow-sm),inset_0_1px_0_rgba(255,253,248,0.075)] transition hover:-translate-y-[2px] hover:bg-[rgba(var(--paper-rgb),0.08)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.18)] motion-reduce:transform-none",
         className,
       )}
     >
@@ -865,11 +868,11 @@ export function L2DirectoryToolCard({ tool, className }: { tool: L2ToolCardData;
 export function L2TrustRail({ items, className }: { items: string[]; className?: string }) {
   return (
     <section className={cx("l2-trust-rail rounded-[var(--radius-2xl)] bg-[rgba(var(--paper-rgb),0.045)] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)]", className)} aria-label="Lumeo trust notes">
-      <ul className="grid gap-3 text-sm font-bold text-[var(--text-secondary)] md:grid-cols-3">
+      <ul className="l2-trust-rail-grid grid grid-cols-1 gap-3 text-sm font-bold text-[var(--text-secondary)] sm:grid-cols-3">
         {items.map((item) => (
-          <li key={item} className="flex items-center gap-3">
-            <span aria-hidden="true" className="h-2 w-2 rounded-full bg-[var(--emerald-400)]" />
-            {item}
+          <li key={item} className="flex min-w-0 items-center justify-start gap-2.5 sm:justify-center sm:text-center">
+            <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-[var(--emerald-400)]" />
+            <span className="min-w-0">{item}</span>
           </li>
         ))}
       </ul>
