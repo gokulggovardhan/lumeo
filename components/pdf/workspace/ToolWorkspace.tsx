@@ -1,7 +1,7 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { useState } from "react";
+import type { ChangeEvent, DragEvent, ReactNode } from "react";
+import { useId, useRef, useState } from "react";
 import {
   AuraButton,
   AuraCard,
@@ -275,11 +275,16 @@ export function L2UploadStage({
   acceptedNote = "PDF documents",
   privacyNote = "Browser-first processing for supported live tools",
   action,
+  inputId,
+  accept = "application/pdf,.pdf",
   multiple = true,
+  disabled = false,
   icon,
   dragActive = false,
   loading = false,
   error,
+  buttonLabel,
+  onFilesSelected,
   onActivate,
 }: {
   title?: string;
@@ -287,27 +292,116 @@ export function L2UploadStage({
   acceptedNote?: string;
   privacyNote?: string;
   action?: ReactNode;
+  inputId?: string;
+  accept?: string;
   multiple?: boolean;
+  disabled?: boolean;
   icon?: ReactNode;
   dragActive?: boolean;
   loading?: boolean;
   error?: string;
+  buttonLabel?: string;
+  onFilesSelected?: (files: FileList) => void;
   onActivate?: () => void;
 }) {
+  const generatedId = useId();
+  const resolvedInputId = inputId ?? `lumeo-upload-${generatedId}`;
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const dragDepthRef = useRef(0);
+  const [internalDragActive, setInternalDragActive] = useState(false);
+  const canSelect = Boolean(onFilesSelected) && !disabled && !loading;
+  const isDragActive = dragActive || internalDragActive;
+
+  function openFileChooser() {
+    if (!canSelect) return;
+    inputRef.current?.click();
+    onActivate?.();
+  }
+
+  function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
+    const selectedFiles = event.currentTarget.files;
+    if (selectedFiles?.length) onFilesSelected?.(selectedFiles);
+    event.currentTarget.value = "";
+  }
+
+  function handleDragEnter(event: DragEvent<HTMLDivElement>) {
+    if (!canSelect) return;
+    event.preventDefault();
+    dragDepthRef.current += 1;
+    setInternalDragActive(true);
+  }
+
+  function handleDragOver(event: DragEvent<HTMLDivElement>) {
+    if (!canSelect) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    if (!internalDragActive) setInternalDragActive(true);
+  }
+
+  function handleDragLeave(event: DragEvent<HTMLDivElement>) {
+    if (!canSelect) return;
+    event.preventDefault();
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setInternalDragActive(false);
+  }
+
+  function handleDrop(event: DragEvent<HTMLDivElement>) {
+    if (!canSelect) return;
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setInternalDragActive(false);
+    if (event.dataTransfer.files.length) onFilesSelected?.(event.dataTransfer.files);
+  }
+
+  const defaultAction = (
+    <button
+      type="button"
+      disabled={!canSelect}
+      aria-controls={resolvedInputId}
+      onClick={(event) => {
+        event.stopPropagation();
+        openFileChooser();
+      }}
+      className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--emerald-500),var(--emerald-700))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+    >
+      {buttonLabel ?? (multiple ? "Select PDFs" : "Select PDF")}
+    </button>
+  );
+
   return (
-    <AuraUploadSurface
-      title={title}
-      description={description}
-      supportedTypes={acceptedNote}
-      privacyNote={privacyNote}
-      icon={icon}
-      action={action ?? <AuraButton className="lumeo-upload-action">{multiple ? "Select PDFs" : "Select PDF"}</AuraButton>}
-      multiple={multiple}
-      dragActive={dragActive}
-      loading={loading}
-      error={error}
-      onActivate={onActivate}
-    />
+    <div
+      className="l2-upload-stage"
+      onDragEnter={handleDragEnter}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {onFilesSelected ? (
+        <input
+          ref={inputRef}
+          id={resolvedInputId}
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          disabled={disabled || loading}
+          className="sr-only"
+          onChange={handleInputChange}
+        />
+      ) : null}
+      <AuraUploadSurface
+        title={title}
+        description={description}
+        supportedTypes={acceptedNote}
+        privacyNote={privacyNote}
+        icon={icon}
+        action={action ?? defaultAction}
+        multiple={multiple}
+        dragActive={isDragActive}
+        loading={loading}
+        error={error}
+        onActivate={canSelect ? openFileChooser : onActivate}
+      />
+    </div>
   );
 }
 

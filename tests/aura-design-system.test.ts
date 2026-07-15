@@ -189,6 +189,7 @@ test("Lumeo 2 public interaction spacing fixes are guarded", () => {
   assert.ok(publicMenu.includes("buttonRef"));
   assert.ok(publicMenu.includes("wrapperRef"));
   assert.ok(publicMenu.includes("const MENU_ID = \"lumeo-pdf-tools-menu\""));
+  assert.ok(publicMenu.includes("type=\"button\""));
   assert.ok(publicMenu.includes("aria-haspopup=\"menu\""));
   assert.ok(publicMenu.includes("aria-expanded={open}"));
   assert.ok(publicMenu.includes("aria-controls={MENU_ID}"));
@@ -207,6 +208,19 @@ test("Lumeo 2 public interaction spacing fixes are guarded", () => {
   assert.ok(css.includes("width: 100%;"));
   assert.ok(ui.includes("l2-directory-card-surface"));
   assert.ok(css.includes(".l2-directory-card-surface"));
+
+  assert.ok(workspace.includes("type=\"file\""));
+  assert.ok(workspace.includes("accept={accept}"));
+  assert.ok(workspace.includes("multiple={multiple}"));
+  assert.ok(workspace.includes("inputRef.current?.click()"));
+  assert.ok(workspace.includes("event.currentTarget.files"));
+  assert.ok(workspace.includes("event.currentTarget.value = \"\""));
+  assert.ok(workspace.includes("onDragEnter={handleDragEnter}"));
+  assert.ok(workspace.includes("onDragOver={handleDragOver}"));
+  assert.ok(workspace.includes("onDragLeave={handleDragLeave}"));
+  assert.ok(workspace.includes("onDrop={handleDrop}"));
+  assert.ok(workspace.includes("event.preventDefault();"));
+  assert.ok(workspace.includes("onFilesSelected?.(event.dataTransfer.files)"));
 });
 
 test("Lumeo 2 directory, loading and error states use public foundations", () => {
@@ -306,6 +320,19 @@ test("Run 4 live PDF tools use shared workspace primitives internally", () => {
     assert.ok(source.includes("l2-tool-deep-workspace"), `${name} should use deep workspace class`);
     assert.ok(source.includes("lumeo-primary-action"), `${name} should mark its primary actions`);
   }
+
+  const mergeTool = read("components/pdf/MergePdfTool.tsx");
+  const splitTool = read("components/pdf/SplitPdfTool.tsx");
+  const compressTool = read("components/pdf/CompressPdfTool.tsx");
+  assert.ok(mergeTool.includes("inputId=\"merge-pdf-upload\""));
+  assert.ok(mergeTool.includes("multiple"));
+  assert.ok(mergeTool.includes("onFilesSelected={(selectedFiles)"));
+  assert.ok(splitTool.includes("inputId=\"split-pdf-upload\""));
+  assert.ok(splitTool.includes("multiple={false}"));
+  assert.ok(splitTool.includes("onFilesSelected={handleFiles}"));
+  assert.ok(compressTool.includes("inputId=\"compress-pdf-upload\""));
+  assert.ok(compressTool.includes("multiple={false}"));
+  assert.ok(compressTool.includes("onFilesSelected={handleFiles}"));
 });
 
 test("Run 4 live PDF tool rules remain tool-specific and truthful", () => {

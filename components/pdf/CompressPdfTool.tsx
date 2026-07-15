@@ -312,7 +312,6 @@ function DocumentIcon() {
 
 export default function CompressPdfTool() {
   const { availability, track } = useAnalytics();
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
@@ -321,7 +320,6 @@ export default function CompressPdfTool() {
   const resultHeadingRef = useRef<HTMLParagraphElement | null>(null);
   const customTargetInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [dragActive, setDragActive] = useState(false);
   const [analysis, setAnalysis] = useState<CompressAnalysis | null>(null);
   const [compressionMode, setCompressionMode] =
     useState<CompressionMode>("quality");
@@ -508,7 +506,6 @@ export default function CompressPdfTool() {
     setProgressDetail("");
     setAdvancedOpen(false);
     setExpertOpen(false);
-    if (inputRef.current) inputRef.current.value = "";
   }
 
   async function renderPreview(doc: PDFDocumentProxy, pageNumber: number, currentSession: number) {
@@ -974,44 +971,16 @@ export default function CompressPdfTool() {
 
   const uploadArea = (
     <>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf,.pdf"
-        className="hidden"
-        onChange={(event) => {
-          handleFiles(event.target.files ?? []);
-          event.target.value = "";
-        }}
-      />
-      <div
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragActive(false);
-          handleFiles(event.dataTransfer.files);
-        }}
-        className="mx-auto w-full max-w-[1040px]"
-      >
+      <div className="mx-auto w-full max-w-[1040px]">
         <L2UploadStage
+          inputId="compress-pdf-upload"
+          accept="application/pdf,.pdf"
           acceptedNote="PDF only · One file"
           multiple={false}
           icon={<CompressIcon />}
-          dragActive={dragActive}
           privacyNote="Browser-first processing for supported live tools"
-          action={(
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-7 py-3.5 text-sm font-semibold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
-            >
-              Select PDF
-            </button>
-          )}
+          buttonLabel="Select PDF"
+          onFilesSelected={handleFiles}
         />
       </div>
     </>

@@ -74,6 +74,7 @@ try {
   assert(chrome.includes("L2PublicHeader"), "Public navigation must use Lumeo 2 header surface.");
   assert(chrome.includes("L2MobileNavClient"), "Mobile navigation drawer is missing.");
   assert(menu.includes("aria-expanded") && menu.includes("aria-controls") && menu.includes("aria-haspopup=\"menu\""), "PDF tools menu ARIA semantics are missing.");
+  assert(menu.includes("type=\"button\"") && menu.includes("onClick={() => setOpen((value) => !value)}"), "PDF tools menu trigger must be a real button that toggles client state.");
   assert(menu.includes("const [open, setOpen] = useState(false)") && menu.includes("buttonRef") && menu.includes("wrapperRef"), "PDF tools menu trigger and panel must share one client-owned state.");
   assert(menu.includes("const MENU_ID = \"lumeo-pdf-tools-menu\""), "PDF tools menu must use the stable panel ID.");
   assert(menu.includes("wrapperRef.current?.contains(target)"), "PDF tools menu outside-click handling must not treat the trigger or panel as outside.");

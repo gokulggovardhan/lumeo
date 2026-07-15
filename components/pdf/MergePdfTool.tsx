@@ -548,46 +548,18 @@ export default function MergePdfTool() {
   if (files.length === 0) {
     return (
       <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf,.pdf"
-          multiple
-          className="hidden"
-          onChange={(event) => {
-            if (event.target.files) void addFiles(event.target.files);
-            event.target.value = "";
-          }}
-        />
-
-        <div
-          onDragOver={(event) => {
-            event.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(event) => {
-            event.preventDefault();
-            setIsDragging(false);
-            void addFiles(event.dataTransfer.files);
-          }}
-          className="mx-auto w-full max-w-[1040px]"
-        >
+        <div className="mx-auto w-full max-w-[1040px]">
           <L2UploadStage
+            inputId="merge-pdf-upload"
+            accept="application/pdf,.pdf"
             acceptedNote="PDF only · Minimum two files"
             multiple
             icon={<MergeIcon />}
-            dragActive={isDragging}
             privacyNote="Browser-first processing for supported live tools"
-            action={(
-              <button
-                type="button"
-                onClick={() => inputRef.current?.click()}
-                className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-7 py-3.5 text-sm font-semibold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
-              >
-                Select PDFs
-              </button>
-            )}
+            buttonLabel="Select PDFs"
+            onFilesSelected={(selectedFiles) => {
+              void addFiles(selectedFiles);
+            }}
           />
         </div>
 

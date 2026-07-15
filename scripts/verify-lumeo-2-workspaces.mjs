@@ -76,6 +76,15 @@ try {
   assert(css.includes("@media (max-width: 1023px)") && css.includes("position: static"), "Mobile sticky reset is missing.");
   assert(css.includes("@media (prefers-reduced-motion: reduce)"), "Reduced-motion support is missing.");
   assert(workspace.includes("Private by design · Browser-only · Cleared after download"), "Exact privacy note is missing.");
+  assert(workspace.includes("type=\"file\""), "Shared upload primitive must render a real file input.");
+  assert(workspace.includes("accept={accept}"), "Shared upload primitive must pass the configured PDF accept value.");
+  assert(workspace.includes("multiple={multiple}"), "Shared upload primitive must control multiple-file behavior.");
+  assert(workspace.includes("inputRef.current?.click()"), "Shared upload primitive must open the native file chooser from the select action.");
+  assert(workspace.includes("event.currentTarget.files"), "Shared upload primitive must forward selected files.");
+  assert(workspace.includes("event.currentTarget.value = \"\""), "Shared upload primitive must reset the input value after selection.");
+  assert(workspace.includes("onDragEnter={handleDragEnter}") && workspace.includes("onDragOver={handleDragOver}") && workspace.includes("onDrop={handleDrop}"), "Shared upload primitive must own drag/drop handlers.");
+  assert(workspace.includes("event.dataTransfer.dropEffect = \"copy\""), "Shared upload primitive must mark file drops as copy operations.");
+  assert(workspace.includes("onFilesSelected?.(event.dataTransfer.files)"), "Shared upload primitive must forward dropped files.");
 
   for (const [name, source] of [
     ["MergePdfTool", mergeTool],
@@ -91,11 +100,13 @@ try {
   }
 
   assert(mergeTool.includes("Merge options"), "Merge settings panel heading is missing.");
+  assert(mergeTool.includes("inputId=\"merge-pdf-upload\"") && mergeTool.includes("onFilesSelected={(selectedFiles)") && mergeTool.includes("multiple"), "Merge must use the shared multi-file upload contract.");
   assert(mergeTool.includes("One combined PDF using the file order shown."), "Merge must describe the truthful combined output.");
   assert(mergeTool.includes("Move ${item.file.name} up") && mergeTool.includes("Remove ${item.file.name}"), "Merge file controls must keep accessible labels.");
   assert(!/quality|metadata removal|compression|archive/i.test(mergeTool.match(/<L2ToolSettingsPanel title="Merge options"[\s\S]*?<\/L2ToolSettingsPanel>/)?.[0] ?? ""), "Merge settings panel includes invented settings.");
 
   assert(splitTool.includes("Document tray") && splitTool.includes("Source PDF"), "Split must retain one-document profile language.");
+  assert(splitTool.includes("inputId=\"split-pdf-upload\"") && splitTool.includes("multiple={false}") && splitTool.includes("onFilesSelected={handleFiles}"), "Split must use the shared one-file upload contract.");
   for (const splitMode of ['"extract"', '"ranges"', '"everyPage"', '"everyN"', '"remove"']) {
     assert(splitTool.includes(splitMode), `Split mode constant changed unexpectedly: ${splitMode}`);
   }
@@ -104,6 +115,7 @@ try {
   assert(mergeTool.includes("PDFDocument.create()") && mergeTool.includes("copyPages"), "Merge PDF creation markers changed unexpectedly.");
   assert(splitTool.includes("JSZip") && splitTool.includes("copyPages"), "Split ZIP/page-copy markers changed unexpectedly.");
   assert(compressTool.includes("Target Size Studio"), "Target Size Studio must remain present.");
+  assert(compressTool.includes("inputId=\"compress-pdf-upload\"") && compressTool.includes("multiple={false}") && compressTool.includes("onFilesSelected={handleFiles}"), "Compress must use the shared one-file upload contract.");
   assert(compressTool.includes("Under 100 KB") && compressTool.includes("Under 200 KB") && compressTool.includes("Under 400 KB"), "Target presets changed unexpectedly.");
   assert(compressTool.includes("220") && compressTool.includes("0.86") && compressTool.includes("150") && compressTool.includes("0.74") && compressTool.includes("96") && compressTool.includes("0.58"), "Compression profile values changed unexpectedly.");
   assert(compressTool.includes("Grayscale") && compressTool.includes("Quality mode") && compressTool.includes("Target size"), "Compress controls changed unexpectedly.");
