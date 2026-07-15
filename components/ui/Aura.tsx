@@ -566,6 +566,7 @@ export function AuraUploadSurface({
   description,
   supportedTypes,
   privacyNote,
+  icon,
   action,
   dragActive = false,
   loading = false,
@@ -577,6 +578,7 @@ export function AuraUploadSurface({
   description: string;
   supportedTypes?: string;
   privacyNote?: string;
+  icon?: ReactNode;
   action?: ReactNode;
   dragActive?: boolean;
   loading?: boolean;
@@ -607,7 +609,7 @@ export function AuraUploadSurface({
       )}
     >
       <div className="mx-auto grid h-14 w-14 place-items-center rounded-[var(--radius-xl)] bg-[linear-gradient(145deg,rgba(var(--sky-rgb),0.18),rgba(var(--champagne-rgb),0.11))] text-[var(--text-info)] shadow-[inset_0_1px_0_rgba(255,253,248,0.16)]">
-        {loading ? <span aria-hidden="true" className="h-5 w-5 rounded-full border-2 border-current border-r-transparent motion-safe:animate-spin" /> : "PDF"}
+        {loading ? <span aria-hidden="true" className="h-5 w-5 rounded-full border-2 border-current border-r-transparent motion-safe:animate-spin" /> : icon ?? "PDF"}
       </div>
       <h3 className="mt-4 text-xl font-black text-[var(--text-primary)]">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-secondary)]">{description}</p>

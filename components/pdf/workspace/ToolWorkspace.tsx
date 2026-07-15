@@ -276,6 +276,8 @@ export function L2UploadStage({
   privacyNote = "Browser-first processing for supported live tools",
   action,
   multiple = true,
+  icon,
+  dragActive = false,
   loading = false,
   error,
   onActivate,
@@ -286,6 +288,8 @@ export function L2UploadStage({
   privacyNote?: string;
   action?: ReactNode;
   multiple?: boolean;
+  icon?: ReactNode;
+  dragActive?: boolean;
   loading?: boolean;
   error?: string;
   onActivate?: () => void;
@@ -296,8 +300,10 @@ export function L2UploadStage({
       description={description}
       supportedTypes={acceptedNote}
       privacyNote={privacyNote}
+      icon={icon}
       action={action ?? <AuraButton>{multiple ? "Select PDFs" : "Select PDF"}</AuraButton>}
       multiple={multiple}
+      dragActive={dragActive}
       loading={loading}
       error={error}
       onActivate={onActivate}

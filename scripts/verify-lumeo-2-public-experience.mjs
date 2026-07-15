@@ -30,6 +30,9 @@ const placeholder = read("components/pdf/PdfToolPlaceholder.tsx");
 const footer = read("components/PublicFooter.tsx");
 const docs = read("docs/LUMEO_2_DESIGN_SYSTEM.md");
 const css = read("app/globals.css");
+const mergeTool = read("components/pdf/MergePdfTool.tsx");
+const splitTool = read("components/pdf/SplitPdfTool.tsx");
+const compressTool = read("components/pdf/CompressPdfTool.tsx");
 
 try {
   assert(packageJson.scripts["verify:lumeo2-public-experience"] === "node scripts/verify-lumeo-2-public-experience.mjs", "verify:lumeo2-public-experience script is missing.");
@@ -94,9 +97,13 @@ try {
   const modified = changedFiles();
   for (const file of modified) {
     assert(!file.startsWith("supabase/migrations/"), `Supabase migration changed: ${file}`);
-    assert(!["components/pdf/MergePdfTool.tsx", "components/pdf/SplitPdfTool.tsx", "components/pdf/CompressPdfTool.tsx"].includes(file), `PDF processing file changed: ${file}`);
     assert(!file.startsWith("components/analytics/") && !file.startsWith("lib/analytics/"), `Analytics V1 file changed: ${file}`);
   }
+
+  assert(mergeTool.includes("PDFDocument.create()") && mergeTool.includes("copyPages"), "Merge algorithm markers changed unexpectedly.");
+  assert(splitTool.includes("JSZip") && splitTool.includes("copyPages"), "Split algorithm markers changed unexpectedly.");
+  assert(compressTool.includes("Target Size Studio") && compressTool.includes("Under 100 KB") && compressTool.includes("Under 200 KB") && compressTool.includes("Under 400 KB"), "Compress Target Size Studio markers changed unexpectedly.");
+  assert(!/processing_started|processing_succeeded|processing_failed|download_started/.test([mergeTool, splitTool, compressTool].join("\n")), "Analytics lifecycle events must not be reintroduced.");
 
   const scannedSource = [homepage, launcher, ui, chrome, menu, directory, loading, errorPage, placeholder, footer, docs].join("\n");
   assert(!/console\.(log|info|warn|error)/.test(scannedSource), "Production debug logging must not be added.");

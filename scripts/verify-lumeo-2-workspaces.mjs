@@ -77,17 +77,44 @@ try {
   assert(css.includes("@media (prefers-reduced-motion: reduce)"), "Reduced-motion support is missing.");
   assert(workspace.includes("Private by design · Browser-only · Cleared after download"), "Exact privacy note is missing.");
 
+  for (const [name, source] of [
+    ["MergePdfTool", mergeTool],
+    ["SplitPdfTool", splitTool],
+    ["CompressPdfTool", compressTool],
+  ]) {
+    for (const component of ["L2ToolWorkspace", "L2ToolMainColumn", "L2ToolSettingsPanel", "L2UploadStage", "L2ActionArea", "L2PrivacyNote"]) {
+      assert(source.includes(component), `${name} must use ${component} internally.`);
+    }
+    assert(source.includes("l2-tool-empty-state"), `${name} must use the compact empty-state class.`);
+    assert(source.includes("l2-tool-deep-workspace"), `${name} must use the deep workspace class.`);
+    assert(source.includes("lumeo-primary-action"), `${name} must mark its dominant action.`);
+  }
+
+  assert(mergeTool.includes("Merge options"), "Merge settings panel heading is missing.");
+  assert(mergeTool.includes("One combined PDF using the file order shown."), "Merge must describe the truthful combined output.");
+  assert(mergeTool.includes("Move ${item.file.name} up") && mergeTool.includes("Remove ${item.file.name}"), "Merge file controls must keep accessible labels.");
+  assert(!/quality|metadata removal|compression|archive/i.test(mergeTool.match(/<L2ToolSettingsPanel title="Merge options"[\s\S]*?<\/L2ToolSettingsPanel>/)?.[0] ?? ""), "Merge settings panel includes invented settings.");
+
+  assert(splitTool.includes("Document tray") && splitTool.includes("Source PDF"), "Split must retain one-document profile language.");
+  for (const splitMode of ['"extract"', '"ranges"', '"everyPage"', '"everyN"', '"remove"']) {
+    assert(splitTool.includes(splitMode), `Split mode constant changed unexpectedly: ${splitMode}`);
+  }
+  assert(splitTool.includes("Examples: 1-3, 5, odd, even, all, or 1-end."), "Split page-range helper changed unexpectedly.");
+
   assert(mergeTool.includes("PDFDocument.create()") && mergeTool.includes("copyPages"), "Merge PDF creation markers changed unexpectedly.");
   assert(splitTool.includes("JSZip") && splitTool.includes("copyPages"), "Split ZIP/page-copy markers changed unexpectedly.");
   assert(compressTool.includes("Target Size Studio"), "Target Size Studio must remain present.");
   assert(compressTool.includes("Under 100 KB") && compressTool.includes("Under 200 KB") && compressTool.includes("Under 400 KB"), "Target presets changed unexpectedly.");
   assert(compressTool.includes("220") && compressTool.includes("0.86") && compressTool.includes("150") && compressTool.includes("0.74") && compressTool.includes("96") && compressTool.includes("0.58"), "Compression profile values changed unexpectedly.");
+  assert(compressTool.includes("Grayscale") && compressTool.includes("Quality mode") && compressTool.includes("Target size"), "Compress controls changed unexpectedly.");
+  assert(compressTool.includes("Target achieved") && compressTool.includes("Closest safe result") && compressTool.includes("Compression not beneficial") && compressTool.includes("Unable to process"), "Target status wording changed unexpectedly.");
 
   const analyticsLifecycleEvents = /processing_started|processing_succeeded|processing_failed|download_started/;
   assert(!analyticsLifecycleEvents.test([mergeTool, splitTool, compressTool].join("\n")), "Analytics V1 must remain tool_opened only in Run 3.");
 
   assert(docs.includes("Tool Workspace Lifecycle"), "Run 3 workspace documentation is missing.");
-  assert(docs.includes("What remains for Run 4") || docs.includes("What Remains For Run 4"), "Run 4 handoff documentation is missing.");
+  assert(docs.includes("Deep Workspace Implementation"), "Run 4 deep workspace documentation is missing.");
+  assert(docs.includes("What remains for Run 5") || docs.includes("What Remains For Run 5"), "Run 5 handoff documentation is missing.");
 
   const modified = changedFiles();
   for (const file of modified) {
@@ -95,12 +122,13 @@ try {
     assert(!file.startsWith("components/analytics/") && !file.startsWith("lib/analytics/"), `Analytics V1 file changed: ${file}`);
   }
 
-  const scannedSource = [workspace, css, tokens, mergePage, splitPage, compressPage, docs].join("\n");
+  const scannedSource = [workspace, css, tokens, mergePage, splitPage, compressPage, mergeTool, splitTool, compressTool, docs].join("\n");
   assert(!/console\.(log|info|warn|error)/.test(scannedSource), "Production debug logging must not be added.");
   assert(!/service_role|secret[_-]?key|password\s*=/.test(scannedSource), "No hard-coded secrets may be introduced.");
 
   console.log("PASS Lumeo 2 workspace primitives are present");
   console.log("PASS Merge, Split, and Compress routes use the shared L2 workspace shell");
+  console.log("PASS Merge, Split, and Compress internals use shared L2 workspace primitives");
   console.log("PASS sticky desktop and mobile stack safeguards are present");
   console.log("PASS protected processing, analytics, migration, and dependency constraints passed");
 } catch (error) {

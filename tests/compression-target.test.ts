@@ -132,6 +132,11 @@ test("preserves Target Size Studio presets and profile quality values", () => {
   assert.ok(compressToolSource.includes("Under 100 KB"));
   assert.ok(compressToolSource.includes("Under 200 KB"));
   assert.ok(compressToolSource.includes("Under 400 KB"));
+  assert.ok(compressToolSource.includes("Target achieved"));
+  assert.ok(compressToolSource.includes("Closest safe result"));
+  assert.ok(compressToolSource.includes("Compression not beneficial"));
+  assert.ok(compressToolSource.includes("Unable to process"));
+  assert.ok(compressToolSource.includes("Grayscale"));
   assert.equal(compressionProfiles.highQuality.quality, 0.86);
   assert.equal(compressionProfiles.balanced.quality, 0.74);
   assert.equal(compressionProfiles.smaller.quality, 0.58);

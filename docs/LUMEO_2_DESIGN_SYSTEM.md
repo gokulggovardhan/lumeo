@@ -284,3 +284,49 @@ New tools should compose `L2ToolPageHeader`, `L2ToolWorkspace`, `L2UploadStage`,
 ### What Remains For Run 4
 
 Run 4 should apply the same Lumeo 2 workspace primitives more deeply inside the Merge, Split and Compress component markup where safe, then extend the pattern to future tools such as JPG to PDF and PDF to JPG when their real browser-first engines exist.
+
+## Deep Workspace Implementation
+
+### Actual Component Migration
+
+Merge PDF, Split PDF and Compress PDF now use the shared Lumeo 2 workspace primitives inside their live components, not only at the route shell. Each tool composes `L2UploadStage`, `L2ToolWorkspace`, `L2ToolMainColumn`, `L2ToolSettingsPanel`, `L2ActionArea` and `L2PrivacyNote` around its existing browser-side engine.
+
+### Button Positioning
+
+Upload buttons remain inside the upload stage. Processing buttons live in the right settings panel. Result download buttons become the dominant action only after output exists. Secondary actions such as Start new, Compress again and Change target remain quieter.
+
+### Settings Positioning
+
+Settings are grouped in the right inspector on desktop and flow directly after the document area on mobile. Merge shows only real merge options. Split groups mode, page selection and output. Compress groups method, quality/target controls, advanced options and output name.
+
+### File-Card Positioning
+
+Merge keeps its ordered file stack with reorder and remove controls near each file. Split and Compress present a single document profile instead of a queue.
+
+### Toggle Positioning
+
+Compress keeps grayscale in the settings inspector as an explicit opt-in control. It remains independent in both Quality and Target Size modes.
+
+### Progress Positioning
+
+Progress and status messages stay near the document context. When exact progress is not available, the workspace uses honest status text rather than fake percentages.
+
+### Result Positioning
+
+Results live in the settings/result area with one dominant download action. Compress uses the Size Outcome language for achieved, closest-safe, not-beneficial and unable-to-process outcomes.
+
+### Mobile Order
+
+Mobile order is document area, options, primary action, progress/result and privacy note. Sticky side panels are disabled below desktop widths.
+
+### Tool-Specific Rules
+
+Merge preserves file selection, ordering, move up/down, remove, clear all, output naming and PDF creation. Split preserves modes, range parsing, ZIP creation and output naming. Compress preserves profile values, Target Size Studio, presets, custom targets, grayscale and adaptive passes.
+
+### Future Tool Checklist
+
+New browser-first tools should start with the same lifecycle, use the locked upload and privacy wording, expose one dominant action per state, keep result actions calm and avoid adding decorative previews that require extra file reading.
+
+### What Remains For Run 5
+
+Run 5 should visually QA the live tools across device widths, tune any remaining spacing or contrast issues, and migrate future real tool engines into the same workspace system when those engines exist.

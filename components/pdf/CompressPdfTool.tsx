@@ -29,6 +29,14 @@ import {
   type TargetUnit,
 } from "@/lib/compressionTarget";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import {
+  L2ActionArea,
+  L2PrivacyNote,
+  L2ToolMainColumn,
+  L2ToolSettingsPanel,
+  L2ToolWorkspace,
+  L2UploadStage,
+} from "@/components/pdf/workspace/ToolWorkspace";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
@@ -987,51 +995,33 @@ export default function CompressPdfTool() {
           setDragActive(false);
           handleFiles(event.dataTransfer.files);
         }}
-        className={`lumeo-upload-surface group relative mx-auto w-full max-w-[1040px] overflow-hidden rounded-[24px] border px-5 py-7 shadow-2xl shadow-black/32 transition-all duration-300 sm:px-8 lg:px-10 lg:py-8 ${
-          dragActive
-            ? "border-[#CBA052]/64 bg-[#CBA052]/14 shadow-[0_24px_70px_rgba(245,158,11,0.2)]"
-            : "border-[#FFFFFF]/18 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] hover:-translate-y-0.5 hover:border-[#CBA052]/36"
-        }`}
+        className="mx-auto w-full max-w-[1040px]"
       >
-        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/42 to-transparent opacity-80" />
-        <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center">
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#CBA052]/24 bg-[#0C1220]/64 text-[#CBA052] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#CBA052]/14">
-              <CompressIcon />
-            </span>
-            <div>
-              <p className="text-2xl font-semibold tracking-[-0.02em] text-[#FFFFFF]">
-                Drop PDFs here
-              </p>
-              <p className="mt-2 text-base text-[#FFFFFF]/52">
-                or choose files from your device
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex w-full items-center justify-center rounded-full bg-[#1E6B4A] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(245,158,11,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98] sm:w-auto"
-          >
-            Select PDF
-          </button>
-        </div>
+        <L2UploadStage
+          acceptedNote="PDF only · One file"
+          multiple={false}
+          icon={<CompressIcon />}
+          dragActive={dragActive}
+          privacyNote="Browser-first processing for supported live tools"
+          action={(
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-7 py-3.5 text-sm font-semibold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
+            >
+              Select PDF
+            </button>
+          )}
+        />
       </div>
     </>
   );
 
   if (!analysis) {
     return (
-      <section className="pb-4 lg:flex lg:h-full lg:flex-col lg:justify-center lg:pb-0">
+      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
         {uploadArea}
-        <div className="mt-4 text-center">
-          <p className="text-sm font-semibold text-[#FFFFFF]/68">
-            Private by design &middot; Browser-only &middot; Cleared after download
-          </p>
-          <p className="mt-1 text-xs text-[#FFFFFF]/38">
-            Files stay on your device for this tool.
-          </p>
-        </div>
+        <L2PrivacyNote />
         {error ? (
           <div role="alert" className="mt-4 rounded-lg border border-[#F0A8A8]/20 bg-[#F0A8A8]/10 p-4 text-sm font-medium text-[#F0C0C0]">
             {error}
@@ -1042,8 +1032,9 @@ export default function CompressPdfTool() {
   }
 
   return (
-    <section className="pb-28 lg:h-full lg:overflow-hidden lg:pb-0">
-      <div className="grid h-full gap-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(340px,0.72fr)] lg:overflow-hidden 2xl:grid-cols-[minmax(0,1.95fr)_minmax(360px,0.72fr)]">
+    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
+      <L2ToolWorkspace>
+        <L2ToolMainColumn>
         <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
           <section className="shrink-0">
             <div className="mb-2 flex items-center justify-between gap-3">
@@ -1155,14 +1146,15 @@ export default function CompressPdfTool() {
 
           <div className="rounded-xl border border-[#CBA052]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-semibold text-[#FFFFFF]/74">Private by design &middot; Browser-only &middot; Cleared after download</p>
+              <L2PrivacyNote compact />
               <p className="lg:hidden">Files stay on your device. No server upload.</p>
             </div>
           </div>
         </div>
+        </L2ToolMainColumn>
 
-        <aside className="lg:min-h-0">
-          <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
+        <L2ToolSettingsPanel title="Compression settings" description="Choose a quality profile or target size, then compress locally.">
+          <div className="flex h-full min-h-0 flex-col">
             <div className={result ? "hidden" : "border-b border-[#FFFFFF]/10 pb-3"}>
               <p className="text-xs font-semibold text-[#FFFFFF]/68">
                 Compression mode
@@ -1471,32 +1463,38 @@ export default function CompressPdfTool() {
 
               {result ? (
                 <div className="grid gap-2">
-                  <button type="button" onClick={handleDownload} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#CBA052] px-5 text-sm font-bold text-[#FFFFFF] shadow-[0_14px_35px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98]">
-                    Download compressed PDF
-                  </button>
-                  <div className={`grid gap-2 ${result.mode === "target" ? "grid-cols-2" : "grid-cols-1"}`}>
-                    <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); }} className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#FFFFFF]/12 px-3 text-xs font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
-                      Compress again
-                    </button>
-                    {result.mode === "target" ? (
-                      <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); window.setTimeout(() => customTargetInputRef.current?.focus(), 0); }} className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#FFFFFF]/12 px-3 text-xs font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
-                        Change target
+                  <L2ActionArea
+                    primary={(
+                      <button type="button" onClick={handleDownload} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]">
+                        Download compressed PDF
                       </button>
-                    ) : null}
-                  </div>
-                  <button type="button" onClick={resetTool} className="inline-flex h-10 w-full items-center justify-center rounded-full border border-[#FFFFFF]/12 px-5 text-sm font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
-                    Clear and start new
-                  </button>
+                    )}
+                    secondary={(
+                      <>
+                        <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); }} className="inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-3 text-xs font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
+                          Compress again
+                        </button>
+                        {result.mode === "target" ? (
+                          <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); window.setTimeout(() => customTargetInputRef.current?.focus(), 0); }} className="inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-3 text-xs font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
+                            Change target
+                          </button>
+                        ) : null}
+                        <button type="button" onClick={resetTool} className="inline-flex h-10 items-center justify-center rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 text-sm font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
+                          Clear and start new
+                        </button>
+                      </>
+                    )}
+                  />
                 </div>
               ) : (
-                <button type="button" disabled={!canCompress} onClick={handleCompress} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#CBA052] px-5 text-sm font-bold text-[#FFFFFF] shadow-[0_14px_35px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55">
+                <button type="button" disabled={!canCompress} onClick={handleCompress} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55">
                   {isCompressing ? "Compressing in your browser..." : error ? "Retry compression" : "Compress PDF"}
                 </button>
               )}
             </div>
           </div>
-        </aside>
-      </div>
+        </L2ToolSettingsPanel>
+      </L2ToolWorkspace>
     </section>
   );
 }

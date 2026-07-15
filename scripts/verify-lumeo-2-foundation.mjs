@@ -34,6 +34,9 @@ const showcase = read("app/admin/(protected)/design-system/page.tsx");
 const tokens = read("lib/design-system/tokens.ts");
 const docs = read("docs/LUMEO_2_DESIGN_SYSTEM.md");
 const packageJson = JSON.parse(read("package.json"));
+const mergeTool = read("components/pdf/MergePdfTool.tsx");
+const splitTool = read("components/pdf/SplitPdfTool.tsx");
+const compressTool = read("components/pdf/CompressPdfTool.tsx");
 
 const requiredCssTokens = [
   "--canvas-950",
@@ -148,9 +151,6 @@ const requiredUiMarkers = [
 ];
 
 const protectedFiles = [
-  "components/pdf/MergePdfTool.tsx",
-  "components/pdf/SplitPdfTool.tsx",
-  "components/pdf/CompressPdfTool.tsx",
   "components/analytics/AnalyticsProvider.tsx",
   "components/analytics/AnalyticsPageView.tsx",
   "lib/analytics/client.ts",
@@ -217,8 +217,13 @@ try {
   const modified = changedFiles();
   for (const file of modified) {
     assert(!file.startsWith("supabase/migrations/"), `Supabase migration changed in Lumeo 2 foundation run: ${file}`);
-    assert(!protectedFiles.includes(file), `Protected PDF processing, analytics, or admin-data file changed: ${file}`);
+    assert(!protectedFiles.includes(file), `Protected analytics or admin-data file changed: ${file}`);
   }
+
+  assert(mergeTool.includes("PDFDocument.create()") && mergeTool.includes("copyPages"), "Merge PDF algorithm markers changed unexpectedly.");
+  assert(splitTool.includes("JSZip") && splitTool.includes("copyPages"), "Split PDF algorithm markers changed unexpectedly.");
+  assert(compressTool.includes("Target Size Studio") && compressTool.includes("Under 100 KB") && compressTool.includes("Under 200 KB") && compressTool.includes("Under 400 KB"), "Compress Target Size Studio markers changed unexpectedly.");
+  assert(!/processing_started|processing_succeeded|processing_failed|download_started/.test([mergeTool, splitTool, compressTool].join("\n")), "Analytics lifecycle events must not be reintroduced.");
 
   const scannedSource = [ui, workspace, publicShell, footer, controlShell, sidebar, mobileNav, guidance, showcase, tokens, docs].join("\n");
   assert(!/console\.(log|info|warn|error)/.test(scannedSource), "Production debug logging must not be added.");
@@ -228,7 +233,8 @@ try {
   console.log("PASS Lumeo 2 UI, upload, file-card, result, and workspace foundations exist");
   console.log("PASS protected showcase and documentation exist");
   console.log("PASS protected dependency versions remain unchanged");
-  console.log("PASS no migrations, PDF processing files, analytics provider, or admin data files changed");
+  console.log("PASS no migrations, analytics provider, or admin data files changed");
+  console.log("PASS live PDF processing markers and Analytics V1 scope remain protected");
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Lumeo 2 foundation verification failed.");
   process.exit(1);

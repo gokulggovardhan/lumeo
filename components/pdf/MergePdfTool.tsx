@@ -3,6 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PDFDocument, rgb } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import {
+  L2ActionArea,
+  L2PrivacyNote,
+  L2ToolMainColumn,
+  L2ToolSettingsPanel,
+  L2ToolWorkspace,
+  L2UploadStage,
+} from "@/components/pdf/workspace/ToolWorkspace";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type MergeStatus = "Ready" | "Merging in your browser..." | "Download ready";
@@ -482,15 +490,7 @@ export default function MergePdfTool() {
       setDownloadName(safeName);
       setCleanupMessage("");
       setStatus("Download ready");
-    } catch (mergeError) {
-      console.error("[Lumeo PDF] Merge failed", {
-        error: mergeError,
-        fileCount: files.length,
-        totalSize,
-        totalPages,
-        pageFormat,
-        marginPreset,
-      });
+    } catch {
       setStatus("Ready");
       setError("Merge failed. Try smaller files or remove damaged PDFs.");
     }
@@ -547,7 +547,7 @@ export default function MergePdfTool() {
 
   if (files.length === 0) {
     return (
-      <section className="pb-4 lg:flex lg:h-full lg:flex-col lg:justify-center lg:pb-0">
+      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
         <input
           ref={inputRef}
           type="file"
@@ -571,48 +571,27 @@ export default function MergePdfTool() {
             setIsDragging(false);
             void addFiles(event.dataTransfer.files);
           }}
-          className={`lumeo-upload-surface group relative mx-auto w-full max-w-[1040px] overflow-hidden rounded-[24px] border px-5 py-7 shadow-2xl shadow-black/32 transition-all duration-300 sm:px-8 lg:px-10 lg:py-8 ${
-            isDragging
-              ? "border-[#CBA052]/64 bg-[#CBA052]/14 shadow-[0_24px_70px_rgba(245,158,11,0.2)]"
-              : "border-[#FFFFFF]/18 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] hover:-translate-y-0.5 hover:border-[#CBA052]/36"
-          }`}
+          className="mx-auto w-full max-w-[1040px]"
         >
-          <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/42 to-transparent opacity-80" />
-
-
-          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#CBA052]/24 bg-[#0C1220]/64 text-[#CBA052] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#CBA052]/14">
-                <MergeIcon />
-              </span>
-              <div>
-                <p className="text-2xl font-semibold tracking-[-0.02em] text-[#FFFFFF]">
-                  Drop PDFs here
-                </p>
-                <p className="mt-2 text-base text-[#FFFFFF]/52">
-                  or choose files from your device
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex w-full items-center justify-center rounded-full bg-[#1E6B4A] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(245,158,11,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98] sm:w-auto"
-            >
-              Select PDFs
-            </button>
-          </div>
+          <L2UploadStage
+            acceptedNote="PDF only · Minimum two files"
+            multiple
+            icon={<MergeIcon />}
+            dragActive={isDragging}
+            privacyNote="Browser-first processing for supported live tools"
+            action={(
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-7 py-3.5 text-sm font-semibold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
+              >
+                Select PDFs
+              </button>
+            )}
+          />
         </div>
 
-        <div className="mt-4 text-center">
-          <p className="text-sm font-semibold text-[#FFFFFF]/68">
-            Private by design &middot; Browser-only &middot; Cleared after download
-          </p>
-          <p className="mt-1 text-xs text-[#FFFFFF]/38">
-            Files stay on your device for this tool.
-          </p>
-        </div>
+        <L2PrivacyNote />
 
         {error ? (
           <div className="mt-4 rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
@@ -630,7 +609,7 @@ export default function MergePdfTool() {
   }
 
   return (
-    <section className="pb-28 lg:h-full lg:overflow-hidden lg:pb-0">
+    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
       <style>{`
         @keyframes consoleReveal {
           from { opacity: 0; transform: translateY(8px); }
@@ -649,8 +628,8 @@ export default function MergePdfTool() {
         }}
       />
 
-      <div className="grid gap-5 lg:h-full lg:grid-cols-[minmax(0,1.75fr)_minmax(340px,0.72fr)] lg:items-stretch 2xl:grid-cols-[minmax(0,1.95fr)_minmax(360px,0.72fr)]">
-        <div className="flex min-h-0 min-w-0 flex-col gap-3">
+      <L2ToolWorkspace>
+        <L2ToolMainColumn>
           <section className="animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#FFFFFF]/12 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] p-3 shadow-2xl shadow-black/28">
             <div className="mb-2.5 flex items-center justify-between gap-3">
               <div>
@@ -866,18 +845,16 @@ export default function MergePdfTool() {
 
           <div className="rounded-xl border border-[#CBA052]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-semibold text-[#FFFFFF]/74">
-                Private by design &middot; Browser-only &middot; Cleared after download
-              </p>
+              <L2PrivacyNote compact />
               <p className="lg:hidden">
                 Files stay on your device. No server upload.
               </p>
             </div>
           </div>
-        </div>
+        </L2ToolMainColumn>
 
-        <aside className="lg:min-h-0">
-          <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
+        <L2ToolSettingsPanel title="Merge options" description="One combined PDF using the file order shown.">
+          <div className="flex h-full min-h-0 flex-col">
             <div className="mb-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
                 Output
@@ -1041,20 +1018,26 @@ export default function MergePdfTool() {
                     {downloadName} - {outputStyleLabel} - {totalPages} pages
                   </p>
                   <div className="mt-3 hidden flex-col gap-2 lg:flex">
-                    <button
-                      type="button"
-                      onClick={downloadMergedPdf}
-                      className="rounded-full bg-[#CBA052] px-5 py-2.5 text-sm font-semibold text-[#F0EAD6] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98]"
-                    >
-                      Download
-                    </button>
-                    <button
-                      type="button"
-                      onClick={startNewMerge}
-                      className="rounded-full border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF]"
-                    >
-                      Start new
-                    </button>
+                    <L2ActionArea
+                      primary={(
+                        <button
+                          type="button"
+                          onClick={downloadMergedPdf}
+                          className="lumeo-primary-action rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]"
+                        >
+                          Download merged PDF
+                        </button>
+                      )}
+                      secondary={(
+                        <button
+                          type="button"
+                          onClick={startNewMerge}
+                          className="rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF]"
+                        >
+                          Start new
+                        </button>
+                      )}
+                    />
                   </div>
                 </div>
               ) : files.length >= 2 ? (
@@ -1065,21 +1048,25 @@ export default function MergePdfTool() {
                   <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">
                     {readySummary}
                   </p>
-                  <button
-                    type="button"
-                    disabled={status === "Merging in your browser..."}
-                    onClick={mergePdfs}
-                    className="mt-3 hidden w-full items-center justify-center gap-2 rounded-full bg-[#CBA052] px-5 py-2.5 text-sm font-semibold text-[#F0EAD6] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98] lg:inline-flex"
-                  >
-                    {status === "Merging in your browser..." ? (
-                      <>
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#E8DFC8]/24 border-t-white" />
-                        Merging in your browser...
-                      </>
-                    ) : (
-                      "Merge PDFs"
+                  <L2ActionArea
+                    primary={(
+                      <button
+                        type="button"
+                        disabled={status === "Merging in your browser..."}
+                        onClick={mergePdfs}
+                        className="lumeo-primary-action mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
+                      >
+                        {status === "Merging in your browser..." ? (
+                          <>
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#E8DFC8]/24 border-t-white" />
+                            Merging in your browser...
+                          </>
+                        ) : (
+                          "Merge PDFs"
+                        )}
+                      </button>
                     )}
-                  </button>
+                  />
                 </div>
               ) : (
                 <p className="mt-3 text-sm leading-6 text-[#FFFFFF]/48">
@@ -1088,62 +1075,8 @@ export default function MergePdfTool() {
               )}
             </div>
           </div>
-        </aside>
-      </div>
-
-      {files.length >= 2 || downloadUrl ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-3 lg:hidden">
-          <div className="pointer-events-auto mx-auto flex max-w-3xl flex-col gap-3 rounded-xl border border-[#CBA052]/24 bg-[#0C1220]/95 p-3 shadow-2xl shadow-black/40 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-            {downloadUrl ? (
-              <>
-                <div>
-                  <p className="text-sm font-semibold text-[#FFFFFF]">
-                    Merged PDF ready
-                  </p>
-                  <p className="mt-1 text-xs text-[#FFFFFF]/46">
-                    {downloadName} - {outputStyleLabel}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={downloadMergedPdf}
-                    className="rounded-full bg-[#CBA052] px-5 py-2.5 text-sm font-semibold text-[#F0EAD6]"
-                  >
-                    Download
-                  </button>
-                  <button
-                    type="button"
-                    onClick={startNewMerge}
-                    className="rounded-full border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62"
-                  >
-                    Start new
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <p className="text-sm font-semibold text-[#FFFFFF]">
-                    Ready to merge
-                  </p>
-                  <p className="mt-1 text-xs text-[#FFFFFF]/46">
-                    {readySummary}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={status === "Merging in your browser..."}
-                  onClick={mergePdfs}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#CBA052] px-5 py-2.5 text-sm font-semibold text-[#F0EAD6] disabled:opacity-45"
-                >
-                  {status === "Merging in your browser..." ? "Merging..." : "Merge PDFs"}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      ) : null}
+        </L2ToolSettingsPanel>
+      </L2ToolWorkspace>
     </section>
   );
 }

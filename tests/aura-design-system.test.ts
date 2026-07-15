@@ -266,6 +266,48 @@ test("Run 3 PDF workspace rules preserve algorithms and Analytics V1 scope", () 
   assert.doesNotMatch([mergeTool, splitTool, compressTool].join("\n"), /processing_started|processing_succeeded|processing_failed|download_started/);
 });
 
+test("Run 4 live PDF tools use shared workspace primitives internally", () => {
+  const tools = [
+    ["Merge", read("components/pdf/MergePdfTool.tsx")],
+    ["Split", read("components/pdf/SplitPdfTool.tsx")],
+    ["Compress", read("components/pdf/CompressPdfTool.tsx")],
+  ] as const;
+
+  for (const [name, source] of tools) {
+    for (const primitive of ["L2UploadStage", "L2ToolWorkspace", "L2ToolMainColumn", "L2ToolSettingsPanel", "L2ActionArea", "L2PrivacyNote"]) {
+      assert.ok(source.includes(primitive), `${name} should use ${primitive}`);
+    }
+    assert.ok(source.includes("l2-tool-empty-state"), `${name} should use compact empty state class`);
+    assert.ok(source.includes("l2-tool-deep-workspace"), `${name} should use deep workspace class`);
+    assert.ok(source.includes("lumeo-primary-action"), `${name} should mark its primary actions`);
+  }
+});
+
+test("Run 4 live PDF tool rules remain tool-specific and truthful", () => {
+  const mergeTool = read("components/pdf/MergePdfTool.tsx");
+  const splitTool = read("components/pdf/SplitPdfTool.tsx");
+  const compressTool = read("components/pdf/CompressPdfTool.tsx");
+
+  assert.ok(mergeTool.includes("Merge options"));
+  assert.ok(mergeTool.includes("One combined PDF using the file order shown."));
+  assert.ok(mergeTool.includes("Move ${item.file.name} up"));
+  assert.ok(mergeTool.includes("Remove ${item.file.name}"));
+  assert.doesNotMatch(mergeTool.match(/<L2ToolSettingsPanel title="Merge options"[\s\S]*?<\/L2ToolSettingsPanel>/)?.[0] ?? "", /metadata removal|archive/i);
+
+  for (const splitMode of ['"extract"', '"ranges"', '"everyPage"', '"everyN"', '"remove"']) {
+    assert.ok(splitTool.includes(splitMode), `Split should keep ${splitMode}`);
+  }
+  assert.ok(splitTool.includes("Examples: 1-3, 5, odd, even, all, or 1-end."));
+
+  assert.ok(compressTool.includes("Quality mode"));
+  assert.ok(compressTool.includes("Target size"));
+  assert.ok(compressTool.includes("Grayscale"));
+  assert.ok(compressTool.includes("Target achieved"));
+  assert.ok(compressTool.includes("Closest safe result"));
+  assert.ok(compressTool.includes("Compression not beneficial"));
+  assert.ok(compressTool.includes("Unable to process"));
+});
+
 test("Run 3 workspace documentation and verifier exist", () => {
   const workspaceVerifier = read("scripts/verify-lumeo-2-workspaces.mjs");
   assert.ok(workspaceVerifier.includes("verify:lumeo2-workspaces"));
@@ -274,7 +316,8 @@ test("Run 3 workspace documentation and verifier exist", () => {
   assert.ok(lumeo2Doc.includes("Tool Workspace Lifecycle"));
   assert.ok(lumeo2Doc.includes("Primary Action Positioning"));
   assert.ok(lumeo2Doc.includes("Target Size Studio"));
-  assert.ok(lumeo2Doc.includes("What Remains For Run 4") || lumeo2Doc.includes("What remains for Run 4"));
+  assert.ok(lumeo2Doc.includes("Deep Workspace Implementation"));
+  assert.ok(lumeo2Doc.includes("What Remains For Run 5") || lumeo2Doc.includes("What remains for Run 5"));
 });
 
 test("Run 2 admin guide documents stored-only and runtime impact states", () => {
