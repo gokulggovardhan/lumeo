@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import CompressPdfTool from "@/components/pdf/CompressPdfTool";
+import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
 
 export const metadata: Metadata = {
   title: { absolute: "Compress PDF Online Privately - Reduce PDF File Size" },
@@ -23,23 +24,16 @@ export const metadata: Metadata = {
 export default function CompressPdfPage() {
   return (
     <PublicCatalogPageShell
-      maxWidth="max-w-[1080px]"
+      maxWidth="max-w-[1240px]"
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <header className="lumeo-fade-up mb-6">
-        <p className="aura-text-label text-[var(--text-accent)]">
-          PDF tool
-        </p>
-        <h1 className="mt-2.5 font-serif text-[2.35rem] tracking-[-0.04em] text-[var(--text-primary)] sm:text-[3rem]">
-          Compress PDF
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-          Reduce PDF file size privately in your browser.
-        </p>
-      </header>
+      <L2ToolPageHeader
+        title="Compress PDF"
+        description="Reduce PDF file size privately in your browser."
+      />
 
-      <div className="lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-compress-tool"><CompressPdfTool /></div>
+      <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-compress-tool"><CompressPdfTool /></div>
     </PublicCatalogPageShell>
   );
 }

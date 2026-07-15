@@ -192,3 +192,25 @@ export const auraComponentFoundations = [
 ] as const;
 
 export type AuraComponentFoundation = (typeof auraComponentFoundations)[number];
+
+export const lumeo2WorkspaceFoundations = [
+  "L2ToolPageHeader",
+  "L2ToolWorkspace",
+  "L2ToolMainColumn",
+  "L2ToolSettingsPanel",
+  "L2ToolSectionHeader",
+  "L2UploadStage",
+  "L2FileList",
+  "L2FileCard",
+  "L2DocumentProfile",
+  "L2SettingsGroup",
+  "L2OptionRow",
+  "L2ModeSelector",
+  "L2AdvancedDisclosure",
+  "L2ActionArea",
+  "L2ProgressState",
+  "L2ResultState",
+  "L2PrivacyNote",
+] as const;
+
+export type Lumeo2WorkspaceFoundation = (typeof lumeo2WorkspaceFoundations)[number];

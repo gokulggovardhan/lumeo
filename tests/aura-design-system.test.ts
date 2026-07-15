@@ -97,6 +97,28 @@ test("tool workspace and admin guidance foundations are present", () => {
     assert.ok(workspace.includes(`export function ${name}`), `${name} should exist`);
   }
 
+  for (const name of [
+    "L2ToolPageHeader",
+    "L2ToolWorkspace",
+    "L2ToolMainColumn",
+    "L2ToolSettingsPanel",
+    "L2ToolSectionHeader",
+    "L2UploadStage",
+    "L2FileList",
+    "L2FileCard",
+    "L2DocumentProfile",
+    "L2SettingsGroup",
+    "L2OptionRow",
+    "L2ModeSelector",
+    "L2AdvancedDisclosure",
+    "L2ActionArea",
+    "L2ProgressState",
+    "L2ResultState",
+    "L2PrivacyNote",
+  ]) {
+    assert.ok(workspace.includes(`export function ${name}`), `${name} should exist`);
+  }
+
   for (const name of ["AdminWhatThisControls", "AdminImpactPreview", "AdminStoredOnlyNotice", "AdminSettingExplanation"]) {
     assert.ok(guidance.includes(`export function ${name}`), `${name} should exist`);
   }
@@ -211,8 +233,48 @@ test("live PDF tool pages use the Aura visual layer without algorithm assertions
   assert.ok(mergePage.includes("aura-live-tool aura-merge-tool"));
   assert.ok(splitPage.includes("aura-live-tool aura-split-tool"));
   assert.ok(compressPage.includes("aura-live-tool aura-compress-tool"));
+  assert.ok(mergePage.includes("L2ToolPageHeader"));
+  assert.ok(splitPage.includes("L2ToolPageHeader"));
+  assert.ok(compressPage.includes("L2ToolPageHeader"));
+  assert.ok(mergePage.includes("max-w-[1240px]"));
+  assert.ok(splitPage.includes("max-w-[1240px]"));
+  assert.ok(compressPage.includes("max-w-[1240px]"));
+  assert.ok(mergePage.includes("l2-live-tool-workspace"));
+  assert.ok(splitPage.includes("l2-live-tool-workspace"));
+  assert.ok(compressPage.includes("l2-live-tool-workspace"));
   assert.ok(css.includes(".aura-live-tool"));
+  assert.ok(css.includes(".l2-live-tool-workspace"));
+  assert.ok(css.includes(".l2-tool-settings-panel"));
+  assert.ok(css.includes("@media (max-width: 1023px)"));
+  assert.ok(workspace.includes("Private by design · Browser-only · Cleared after download"));
   assert.doesNotMatch([mergePage, splitPage, compressPage].join("\n"), /processing_started|processing_succeeded|processing_failed|download_started/);
+});
+
+test("Run 3 PDF workspace rules preserve algorithms and Analytics V1 scope", () => {
+  const mergeTool = read("components/pdf/MergePdfTool.tsx");
+  const splitTool = read("components/pdf/SplitPdfTool.tsx");
+  const compressTool = read("components/pdf/CompressPdfTool.tsx");
+
+  assert.ok(mergeTool.includes("PDFDocument.create()"));
+  assert.ok(mergeTool.includes("copyPages"));
+  assert.ok(splitTool.includes("JSZip"));
+  assert.ok(splitTool.includes("copyPages"));
+  assert.ok(compressTool.includes("Target Size Studio"));
+  assert.ok(compressTool.includes("Under 100 KB"));
+  assert.ok(compressTool.includes("Under 200 KB"));
+  assert.ok(compressTool.includes("Under 400 KB"));
+  assert.doesNotMatch([mergeTool, splitTool, compressTool].join("\n"), /processing_started|processing_succeeded|processing_failed|download_started/);
+});
+
+test("Run 3 workspace documentation and verifier exist", () => {
+  const workspaceVerifier = read("scripts/verify-lumeo-2-workspaces.mjs");
+  assert.ok(workspaceVerifier.includes("verify:lumeo2-workspaces"));
+  assert.ok(workspaceVerifier.includes("L2ToolSettingsPanel"));
+  assert.ok(workspaceVerifier.includes("PDFDocument.create()"));
+  assert.ok(lumeo2Doc.includes("Tool Workspace Lifecycle"));
+  assert.ok(lumeo2Doc.includes("Primary Action Positioning"));
+  assert.ok(lumeo2Doc.includes("Target Size Studio"));
+  assert.ok(lumeo2Doc.includes("What Remains For Run 4") || lumeo2Doc.includes("What remains for Run 4"));
 });
 
 test("Run 2 admin guide documents stored-only and runtime impact states", () => {

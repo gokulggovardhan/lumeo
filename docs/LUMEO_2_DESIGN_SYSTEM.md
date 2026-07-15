@@ -202,3 +202,85 @@ Future tools should register in the catalog, provide a concise description, use 
 ### What Remains For Run 3
 
 Run 3 should bring the internal Merge, Split and Compress workspaces onto the Lumeo 2 tool workspace primitives without changing their processing algorithms.
+
+## PDF Workspace Rollout
+
+### Tool Workspace Lifecycle
+
+Every live PDF workspace follows the same lifecycle: compact tool header, upload stage, document/file summary, relevant settings, one primary action, honest progress, result state and a single privacy note.
+
+### Pre-Upload Layout
+
+Before selection, show the tool name, one concise purpose statement and a premium upload stage. The locked upload copy remains **Drop PDFs here** and **or choose files from your device**. Settings stay hidden until they are relevant.
+
+### Post-Upload Desktop Layout
+
+Desktop uses a wide Lumeo 2 canvas with a main document column and a compact settings inspector. The main column carries files, document profile, progress and result. The right inspector carries tool options and the primary action.
+
+### Post-Upload Mobile Layout
+
+Mobile stacks document summary, settings, primary action, progress and result. Sticky side panels are disabled so no action covers content.
+
+### Primary Action Positioning
+
+The primary action belongs at the bottom of the settings panel on desktop and directly after settings on mobile. Do not duplicate the same primary action at the bottom of the page.
+
+### Secondary Action Positioning
+
+Secondary actions stay near the object they affect: Add PDFs and Clear all near the file list, Start new in the result state, and remove/reorder controls inside file cards.
+
+### File-Card Pattern
+
+File cards show real known values only: filename, size, format/status and pages only when a tool already knows page count. Merge cards may show ordering and reorder controls; Split and Compress should not pretend to manage a queue.
+
+### Settings-Panel Pattern
+
+Settings panels should be compact, sticky only on desktop, and ordered from primary mode to optional advanced controls. They should use spacing and surface depth before borders.
+
+### Sticky Behaviour
+
+Desktop inspectors use a top offset that respects navigation. Tablet and mobile fall back to normal document flow. Sticky panels must never overlap the footer or cover content.
+
+### Merge Workspace
+
+Merge uses the shared upload stage before selection. After selection, the main column emphasizes **Files to merge**, ordering and remove controls. The settings panel explains the real output: one combined PDF using the displayed file order.
+
+### Split Workspace
+
+Split uses a single-document upload stage. After selection, the main column shows the document profile and page selection surface. The settings panel groups split mode, page selection and output behaviour without adding unsupported options.
+
+### Compress Workspace
+
+Compress uses a single-document upload stage. After selection, the main column shows the document profile, real compression expectation, progress and Size Outcome. The settings panel groups compression method, quality or target controls, advanced options and the Compress PDF action.
+
+### Target Size Studio
+
+Target Size Studio keeps the existing presets of 100 KB, 200 KB and 400 KB plus custom KB/MB targets. It must describe the target as a requested maximum, never an exact guarantee.
+
+### Advanced Options
+
+Advanced controls use accessible disclosures. Grayscale remains opt-in and must never be applied automatically.
+
+### Progress
+
+Progress copy must be truthful. Use an indeterminate state when no real percentage exists. Multi-pass details are appropriate only when they come from the existing compressor.
+
+### Result States
+
+Result states use a single dominant download action, Start new as secondary, and calm outcome language. Do not use confetti, fake cloud-save wording or success colours for unsuccessful outcomes.
+
+### Privacy Note
+
+Each workspace uses the exact note: **Private by design · Browser-only · Cleared after download**. Avoid repeating the same privacy message in multiple boxes.
+
+### Accessibility
+
+Tool workspaces require visible focus, labelled controls, keyboard file actions, non-colour-only selection states, aria-live processing/result feedback where useful and touch targets around 44px.
+
+### Future Tool Contribution Rules
+
+New tools should compose `L2ToolPageHeader`, `L2ToolWorkspace`, `L2UploadStage`, `L2ToolSettingsPanel`, `L2ActionArea`, `L2ProgressState`, `L2ResultState` and `L2PrivacyNote` before adding tool-specific behaviour.
+
+### What Remains For Run 4
+
+Run 4 should apply the same Lumeo 2 workspace primitives more deeply inside the Merge, Split and Compress component markup where safe, then extend the pattern to future tools such as JPG to PDF and PDF to JPG when their real browser-first engines exist.

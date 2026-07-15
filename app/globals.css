@@ -355,6 +355,135 @@ a:active {
   background-color: rgba(var(--lumeo-paper-rgb), 0.065) !important;
 }
 
+.l2-live-tool-workspace {
+  --l2-tool-panel-bg:
+    linear-gradient(180deg, rgba(255, 253, 248, 0.07), transparent 32%),
+    linear-gradient(180deg, rgba(22, 39, 64, 0.94), rgba(8, 17, 31, 0.96));
+  margin-top: var(--space-6);
+}
+
+.l2-tool-page-header {
+  padding-bottom: var(--space-2);
+}
+
+.l2-tool-workspace-grid,
+.l2-live-tool-workspace :is(.aura-tool-workspace-layout, [class*="lg:grid-cols"]) {
+  align-items: start;
+}
+
+.l2-live-tool-workspace :is(button, a) {
+  min-height: 44px;
+}
+
+.l2-live-tool-workspace :is(input, select, textarea) {
+  border-radius: var(--radius-md);
+  border-color: var(--border-default);
+  background: var(--surface-input);
+  color: var(--text-primary);
+}
+
+.l2-live-tool-workspace :is(input, select, textarea):focus {
+  border-color: var(--border-focus);
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.l2-live-tool-workspace :is(input, select, textarea)::placeholder {
+  color: var(--text-subtle);
+}
+
+.l2-live-tool-workspace :is(label, legend) {
+  color: var(--text-primary);
+}
+
+.l2-live-tool-workspace :is(section, aside, div)[class*="rounded-3xl"],
+.l2-live-tool-workspace :is(section, aside, div)[class*="rounded-[32px]"],
+.l2-live-tool-workspace :is(section, aside, div)[class*="rounded-[28px]"] {
+  border-color: rgba(var(--paper-rgb), 0.09) !important;
+  background: var(--l2-tool-panel-bg) !important;
+  box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 253, 248, 0.08) !important;
+}
+
+.l2-live-tool-workspace :is(button, a)[class*="rounded-full"],
+.l2-live-tool-workspace :is(button, a)[class*="rounded-[999"] {
+  border-radius: var(--radius-md) !important;
+}
+
+.l2-live-tool-workspace [class*="border-dashed"] {
+  border-style: solid !important;
+}
+
+.l2-live-tool-workspace [class*="shadow-2xl"] {
+  box-shadow: var(--shadow-xl) !important;
+}
+
+.l2-file-list,
+.l2-live-tool-workspace [class*="space-y-3"],
+.l2-live-tool-workspace [class*="space-y-4"] {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--paper-rgb), 0.22) transparent;
+}
+
+.l2-file-card,
+.l2-live-tool-workspace [class*="cursor-grab"],
+.l2-live-tool-workspace [draggable="true"] {
+  border-radius: var(--radius-xl);
+  background: rgba(var(--paper-rgb), 0.055);
+  box-shadow: inset 0 1px 0 rgba(255, 253, 248, 0.06);
+}
+
+.l2-tool-settings-panel,
+.l2-live-tool-workspace :is(aside, section)[class*="sticky"] {
+  position: sticky;
+  top: 96px;
+  align-self: start;
+}
+
+.l2-tool-action-area :is(button, a),
+.l2-live-tool-workspace :is(button, a).lumeo-primary-action {
+  width: 100%;
+}
+
+.l2-privacy-note {
+  box-shadow: inset 0 1px 0 rgba(255, 253, 248, 0.06);
+}
+
+@media (max-width: 1023px) {
+  .l2-tool-settings-panel,
+  .l2-live-tool-workspace :is(aside, section)[class*="sticky"] {
+    position: static;
+  }
+
+  .l2-live-tool-workspace {
+    margin-top: var(--space-5);
+  }
+
+  .l2-live-tool-workspace :is(button, a) {
+    touch-action: manipulation;
+  }
+}
+
+@media (max-width: 640px) {
+  .l2-tool-page-header {
+    padding-bottom: 0;
+  }
+
+  .l2-live-tool-workspace :is(section, aside, div)[class*="p-8"],
+  .l2-live-tool-workspace :is(section, aside, div)[class*="p-7"],
+  .l2-live-tool-workspace :is(section, aside, div)[class*="p-6"] {
+    padding: var(--space-5) !important;
+  }
+
+  .l2-live-tool-workspace :is(button, a) {
+    width: 100%;
+  }
+
+  .l2-live-tool-workspace :is(input, select, textarea) {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
+
 .aura-text-display {
   font-family: var(--font-serif);
   font-size: var(--text-display-md);

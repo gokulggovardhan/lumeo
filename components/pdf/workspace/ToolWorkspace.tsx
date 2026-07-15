@@ -1,12 +1,16 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useState } from "react";
 import {
   AuraButton,
   AuraCard,
+  AuraFileCard,
   AuraNotice,
   AuraPanel,
+  AuraResultCard,
   AuraSectionHeader,
+  AuraSegmentedControl,
   AuraStatus,
   AuraUploadSurface,
 } from "@/components/ui/Aura";
@@ -175,6 +179,357 @@ export function ToolOptionRow({
         {description ? <p className="mt-1 text-xs leading-5 text-[var(--lumeo-paper-400)]">{description}</p> : null}
       </div>
       <div className="shrink-0">{control}</div>
+    </div>
+  );
+}
+
+export function L2ToolPageHeader({
+  title,
+  description,
+  categoryLabel = "PDF TOOL",
+  privacy = "Browser-first · Files stay on your device",
+  action,
+}: {
+  title: string;
+  description: string;
+  categoryLabel?: string;
+  privacy?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <header className="l2-tool-page-header lumeo-fade-up flex flex-col justify-between gap-5 md:flex-row md:items-end">
+      <div className="max-w-3xl">
+        <p className="aura-text-label text-[var(--text-accent)]">{categoryLabel}</p>
+        <h1 className="mt-2.5 font-serif text-[2.35rem] leading-[0.94] tracking-[-0.04em] text-[var(--text-primary)] sm:text-[3rem]">
+          {title}
+        </h1>
+        <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+          {description}
+        </p>
+        <p className="mt-3 inline-flex rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-3 py-1.5 text-xs font-extrabold text-[var(--text-subtle)]">
+          {privacy}
+        </p>
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </header>
+  );
+}
+
+export function L2ToolWorkspace({ children }: { children: ReactNode }) {
+  return (
+    <section className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] gap-6">
+      <div className="l2-tool-workspace-grid grid gap-6 lg:grid-cols-[minmax(0,1.9fr)_minmax(330px,1fr)] xl:gap-8">
+        {children}
+      </div>
+    </section>
+  );
+}
+
+export function L2ToolMainColumn({ children }: { children: ReactNode }) {
+  return <div className="l2-tool-main-column grid min-w-0 gap-5">{children}</div>;
+}
+
+export function L2ToolSettingsPanel({
+  title,
+  description,
+  children,
+  action,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  action?: ReactNode;
+}) {
+  return (
+    <aside className="l2-tool-settings-panel aura-luminous-card rounded-[var(--radius-2xl)] p-5 lg:sticky lg:top-24 lg:self-start">
+      <AuraSectionHeader title={title} description={description} />
+      <div className="mt-5 grid gap-4">{children}</div>
+      {action ? <div className="l2-tool-action-area mt-5">{action}</div> : null}
+    </aside>
+  );
+}
+
+export function L2ToolSectionHeader({
+  title,
+  detail,
+  action,
+}: {
+  title: string;
+  detail?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+      <div>
+        <h2 className="text-lg font-black text-[var(--text-primary)]">{title}</h2>
+        {detail ? <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{detail}</p> : null}
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  );
+}
+
+export function L2UploadStage({
+  title = "Drop PDFs here",
+  description = "or choose files from your device",
+  acceptedNote = "PDF documents",
+  privacyNote = "Browser-first processing for supported live tools",
+  action,
+  multiple = true,
+  loading = false,
+  error,
+  onActivate,
+}: {
+  title?: string;
+  description?: string;
+  acceptedNote?: string;
+  privacyNote?: string;
+  action?: ReactNode;
+  multiple?: boolean;
+  loading?: boolean;
+  error?: string;
+  onActivate?: () => void;
+}) {
+  return (
+    <AuraUploadSurface
+      title={title}
+      description={description}
+      supportedTypes={acceptedNote}
+      privacyNote={privacyNote}
+      action={action ?? <AuraButton>{multiple ? "Select PDFs" : "Select PDF"}</AuraButton>}
+      multiple={multiple}
+      loading={loading}
+      error={error}
+      onActivate={onActivate}
+    />
+  );
+}
+
+export function L2FileList({ children }: { children: ReactNode }) {
+  return <div className="l2-file-list grid gap-3">{children}</div>;
+}
+
+export function L2FileCard({
+  name,
+  meta,
+  status,
+  order,
+  action,
+  onRemove,
+  removeLabel,
+  onMoveUp,
+  onMoveDown,
+}: {
+  name: string;
+  meta: string;
+  status?: string;
+  order?: number;
+  action?: ReactNode;
+  onRemove?: () => void;
+  removeLabel?: string;
+  onMoveUp?: () => void;
+  onMoveDown?: () => void;
+}) {
+  return (
+    <div className="l2-file-card flex min-w-0 items-center gap-3">
+      {typeof order === "number" ? (
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[rgba(var(--champagne-rgb),0.12)] text-xs font-black text-[var(--text-accent)]">
+          {order}
+        </span>
+      ) : null}
+      <div className="min-w-0 flex-1">
+        <AuraFileCard
+          name={name}
+          meta={meta}
+          status={status}
+          action={action}
+          onRemove={onRemove}
+          removeLabel={removeLabel}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+        />
+      </div>
+    </div>
+  );
+}
+
+export function L2DocumentProfile({
+  title,
+  details,
+  status,
+}: {
+  title: string;
+  details: Array<{ label: string; value: string }>;
+  status?: string;
+}) {
+  return (
+    <AuraCard className="l2-document-profile">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="truncate text-base font-black text-[var(--text-primary)]">{title}</p>
+          {status ? <p className="mt-1 text-xs font-bold text-[var(--text-success)]">{status}</p> : null}
+        </div>
+      </div>
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2">
+        {details.map((detail) => (
+          <div key={detail.label} className="rounded-[var(--radius-lg)] bg-[rgba(var(--paper-rgb),0.055)] p-3">
+            <dt className="text-xs font-bold text-[var(--text-subtle)]">{detail.label}</dt>
+            <dd className="mt-1 text-sm font-black text-[var(--text-primary)]">{detail.value}</dd>
+          </div>
+        ))}
+      </dl>
+    </AuraCard>
+  );
+}
+
+export function L2SettingsGroup({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="l2-settings-group rounded-[var(--radius-xl)] bg-[rgba(var(--paper-rgb),0.045)] p-4">
+      <h3 className="text-sm font-black text-[var(--text-primary)]">{title}</h3>
+      {description ? <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{description}</p> : null}
+      <div className="mt-3 grid gap-3">{children}</div>
+    </section>
+  );
+}
+
+export function L2OptionRow({
+  title,
+  description,
+  control,
+}: {
+  title: string;
+  description?: string;
+  control: ReactNode;
+}) {
+  return (
+    <div className="l2-option-row flex min-h-14 flex-col justify-between gap-3 rounded-[var(--radius-lg)] bg-[rgba(var(--paper-rgb),0.045)] p-3 sm:flex-row sm:items-center">
+      <div>
+        <p className="text-sm font-black text-[var(--text-primary)]">{title}</p>
+        {description ? <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{description}</p> : null}
+      </div>
+      <div className="shrink-0">{control}</div>
+    </div>
+  );
+}
+
+export function L2ModeSelector({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: Array<{ value: string; label: string }>;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return <AuraSegmentedControl label={label} options={options} value={value} onChange={onChange} className="l2-mode-selector" />;
+}
+
+export function L2AdvancedDisclosure({
+  title,
+  description,
+  children,
+  defaultOpen = false,
+}: {
+  title: string;
+  description?: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="l2-advanced-disclosure rounded-[var(--radius-xl)] bg-[rgba(var(--paper-rgb),0.04)]">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-xl)] px-4 py-3 text-left font-black text-[var(--text-primary)] transition hover:bg-[rgba(var(--paper-rgb),0.055)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.22)]"
+      >
+        <span>
+          {title}
+          {description ? <span className="mt-1 block text-xs font-bold leading-5 text-[var(--text-secondary)]">{description}</span> : null}
+        </span>
+        <span aria-hidden="true" className={cx("transition duration-[var(--motion-standard)]", open && "rotate-180")}>⌄</span>
+      </button>
+      {open ? <div className="aura-menu-reveal px-4 pb-4">{children}</div> : null}
+    </section>
+  );
+}
+
+export function L2ActionArea({
+  primary,
+  secondary,
+  note,
+}: {
+  primary: ReactNode;
+  secondary?: ReactNode;
+  note?: string;
+}) {
+  return (
+    <div className="l2-tool-action-area grid gap-3">
+      <div className="grid gap-3">{primary}</div>
+      {secondary ? <div className="flex flex-wrap gap-3">{secondary}</div> : null}
+      {note ? <p className="text-xs font-bold leading-5 text-[var(--text-subtle)]">{note}</p> : null}
+    </div>
+  );
+}
+
+export function L2ProgressState({
+  title,
+  detail,
+}: {
+  title: string;
+  detail?: string;
+}) {
+  return (
+    <AuraNotice tone="info" title={title}>
+      <div className="grid gap-3">
+        {detail ? <p>{detail}</p> : null}
+        <div aria-hidden="true" className="h-2 overflow-hidden rounded-full bg-[rgba(var(--paper-rgb),0.08)]">
+          <span className="aura-progress-sheen block h-full w-2/5 rounded-full" />
+        </div>
+      </div>
+    </AuraNotice>
+  );
+}
+
+export function L2ResultState({
+  title,
+  details,
+  primaryAction,
+  secondaryAction,
+  note = "Private by design · Browser-only · Cleared after download",
+}: {
+  title: string;
+  details?: Array<{ label: string; value: string }>;
+  primaryAction: ReactNode;
+  secondaryAction?: ReactNode;
+  note?: string;
+}) {
+  return (
+    <AuraResultCard
+      title={title}
+      details={details}
+      localMessage={note}
+      primaryAction={primaryAction}
+      secondaryAction={secondaryAction}
+    />
+  );
+}
+
+export function L2PrivacyNote({ compact = false }: { compact?: boolean }) {
+  return (
+    <div className={cx("l2-privacy-note rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-4 py-2 text-center text-xs font-extrabold text-[var(--text-subtle)]", compact && "inline-flex")}>
+      Private by design · Browser-only · Cleared after download
     </div>
   );
 }
