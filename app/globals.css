@@ -88,8 +88,8 @@
   --text-danger: #ffc0c6;
   --text-info: var(--sky-300);
 
-  --surface-canvas: radial-gradient(circle at 18% 0%, rgba(var(--sky-rgb), 0.16), transparent 34%),
-    radial-gradient(circle at 86% 10%, rgba(var(--champagne-rgb), 0.1), transparent 28%),
+  --surface-canvas: radial-gradient(circle at 18% 0%, rgb(var(--sky-rgb) / 0.16), transparent 34%),
+    radial-gradient(circle at 86% 10%, rgb(var(--champagne-rgb) / 0.1), transparent 28%),
     linear-gradient(135deg, var(--canvas-950), var(--canvas-900) 44%, var(--canvas-850) 100%);
   --surface-base: linear-gradient(180deg, rgba(22, 39, 64, 0.96), rgba(12, 23, 40, 0.96));
   --surface-raised: linear-gradient(180deg, rgba(28, 49, 80, 0.94), rgba(16, 30, 51, 0.96));
@@ -197,10 +197,13 @@
 }
 
 html {
+  min-height: 100%;
+  background: var(--surface-canvas);
   scroll-behavior: smooth;
 }
 
 body {
+  min-height: 100%;
   margin: 0;
   background: var(--surface-canvas);
   color: var(--text-primary);

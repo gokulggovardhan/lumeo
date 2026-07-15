@@ -53,7 +53,7 @@ const structuredData = [
 
 export default function Home() {
   return (
-    <main id="main-content" className="lumeo-page-enter aura-home relative flex min-h-dvh flex-col overflow-x-hidden bg-[var(--surface-canvas)] text-[var(--lumeo-paper-100)]">
+    <main id="main-content" className="lumeo-page-enter aura-home relative flex min-h-dvh flex-col overflow-x-hidden text-[var(--lumeo-paper-100)]">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
