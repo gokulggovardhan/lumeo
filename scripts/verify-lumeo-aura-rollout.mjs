@@ -82,9 +82,9 @@ try {
     "aura-public-nav",
     "aura-public-footer",
     "aura-info-page",
-    "aura-tool-card",
+    "L2ToolCard",
     "aura-directory-section",
-    "Available soon",
+    "Coming soon",
   ];
   for (const marker of publicMarkers) {
     assert(rolloutSources.includes(marker), `Missing public Aura rollout marker: ${marker}`);
