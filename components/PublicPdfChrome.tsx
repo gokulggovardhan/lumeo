@@ -8,7 +8,7 @@ import { L2MobileNavClient } from "@/components/public/L2MobileNavClient";
 
 export function LumeoSealMark() {
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#F0EAD6] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgba(var(--atelier-brass-rgb),0.22)] bg-[var(--atelier-ivory-100)] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
       <Image
         src="/brand/lumeo-pdf-mark.png"
         alt=""
@@ -35,7 +35,7 @@ export function BrandLockup({
   return (
     <span className="flex min-w-0 items-center gap-3">
       <span
-        className={`flex shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#F0EAD6] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)] ${markSize}`}
+        className={`flex shrink-0 items-center justify-center rounded-lg border border-[rgba(var(--atelier-brass-rgb),0.22)] bg-[var(--atelier-ivory-100)] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)] ${markSize}`}
       >
         <Image
           src="/brand/lumeo-pdf-mark.png"
