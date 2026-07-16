@@ -31,12 +31,15 @@ import {
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
+  L2AdvancedDisclosure,
+  L2FileCard,
   L2PrivacyNote,
   L2ToolMainColumn,
   L2ToolSettingsPanel,
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
+import { AuraOptionCard, AuraPdfIcon, AuraStatus } from "@/components/ui/Aura";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
@@ -299,17 +302,6 @@ function CompressIcon() {
   );
 }
 
-function DocumentIcon() {
-  return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[#CBA052]/10 text-[#CBA052]">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-        <path d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z" stroke="currentColor" strokeWidth="1.7" />
-        <path d="M14.1 4v3.3h3.2M9 12h6M9 15h4.4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.55" />
-      </svg>
-    </span>
-  );
-}
-
 export default function CompressPdfTool() {
   const { availability, track } = useAnalytics();
   const openedTrackedRef = useRef(false);
@@ -327,8 +319,6 @@ export default function CompressPdfTool() {
   const [targetPreset, setTargetPreset] = useState<TargetPreset>("400");
   const [customTargetValue, setCustomTargetValue] = useState("400");
   const [targetUnit, setTargetUnit] = useState<TargetUnit>("KB");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [expertOpen, setExpertOpen] = useState(false);
   const [expertMode, setExpertMode] = useState<ExpertMode>("profile");
   const [resolution, setResolution] = useState<ResolutionPreset>("dpi150");
   const [quality, setQuality] = useState<ImageQuality>("balanced");
@@ -504,8 +494,6 @@ export default function CompressPdfTool() {
     setBlockingError("");
     setStatus("Ready");
     setProgressDetail("");
-    setAdvancedOpen(false);
-    setExpertOpen(false);
   }
 
   async function renderPreview(doc: PDFDocumentProxy, pageNumber: number, currentSession: number) {
@@ -1023,17 +1011,13 @@ export default function CompressPdfTool() {
                 Start new
               </button>
             </div>
-            <div className="grid gap-2 rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/74 px-3 py-2 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-              <DocumentIcon />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[#FFFFFF]">{analysis.name}</p>
-                <p className="mt-1 text-xs font-medium text-[#FFFFFF]/42">
-                  {analysis.pageCount} page{analysis.pageCount === 1 ? "" : "s"} · {formatFileSize(analysis.size)} · {analysis.pageSizeType}
-                </p>
-              </div>
-              <span className="rounded-full border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 py-1.5 text-xs font-semibold text-[#9FD0B5]">
-                {displayStatus}
-              </span>
+            <div className="rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/74 px-3 py-2">
+              <L2FileCard
+                name={analysis.name}
+                meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatFileSize(analysis.size)} · ${analysis.pageSizeType}`}
+                icon={<AuraPdfIcon />}
+                action={<AuraStatus tone="success" label={displayStatus} />}
+              />
             </div>
           </section>
 
@@ -1142,8 +1126,6 @@ export default function CompressPdfTool() {
                     aria-pressed={compressionMode === value}
                     onClick={() => {
                       setCompressionMode(value as CompressionMode);
-                      setAdvancedOpen(false);
-                      setExpertOpen(false);
                       setError("");
                       clearResult();
                     }}
@@ -1162,26 +1144,17 @@ export default function CompressPdfTool() {
               {compressionMode === "quality" ? (
                 <div className="mt-3 grid gap-2">
                   {(Object.keys(profiles) as CompressProfile[]).map((item) => (
-                    <button
+                    <AuraOptionCard
                       key={item}
-                      type="button"
+                      label={profiles[item].label}
+                      description={profiles[item].description}
+                      selected={profile === item}
+                      recommended={analysis.recommendation === item}
                       onClick={() => {
                         resetSettings(item, true);
                         clearResult();
                       }}
-                      aria-pressed={profile === item}
-                      className={`rounded-xl border border-l-4 px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 motion-reduce:transition-none ${
-                        profile === item
-                          ? "border-[var(--border-subtle)] border-l-[var(--atelier-sage-400)] bg-[var(--surface-selected)]"
-                          : "border-l-transparent border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.025] hover:border-[#CBA052]/28"
-                      }`}
-                    >
-                      <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#FFFFFF]">
-                        <span>{profile === item ? "✓ " : ""}{profiles[item].label}</span>
-                        {analysis.recommendation === item ? <span className="rounded-full bg-[#CBA052]/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[#CBA052]">Recommended</span> : null}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-[#FFFFFF]/42">{profiles[item].description}</span>
-                    </button>
+                    />
                   ))}
                 </div>
               ) : (
@@ -1292,76 +1265,63 @@ export default function CompressPdfTool() {
             </div>
 
             <div className={result ? "hidden" : "no-scrollbar min-h-0 flex-1 overflow-y-auto py-3"}>
-              <button
-                type="button"
-                onClick={() => setAdvancedOpen((open) => !open)}
-                aria-expanded={advancedOpen}
-                className={compressionMode === "quality" ? "flex w-full items-center justify-between rounded-xl border border-[#FFFFFF]/10 px-3 py-2 text-left text-xs font-semibold text-[#FFFFFF]/54 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]" : "hidden"}
-              >
-                Advanced options
-                <span>{advancedOpen ? "−" : "+"}</span>
-              </button>
-              {compressionMode === "quality" && advancedOpen ? (
-                <div className="mt-3 space-y-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image resolution</p>
-                    <div className="mt-2 grid gap-2">
-                      {resolutionOptions.map((item) => (
-                        <button key={item.value} type="button" onClick={() => { setResolution(item.value); clearResult(); }} className={`rounded-lg border px-3 py-2 text-left text-xs transition ${resolution === item.value ? "border-[#CBA052]/50 bg-[#CBA052]/14 text-[#FFFFFF]" : "border-[#FFFFFF]/8 text-[#FFFFFF]/52 hover:border-[#CBA052]/28"}`}>
-                          <span className="font-bold">{item.label}</span>
-                          <span className="mt-0.5 block text-[#FFFFFF]/38">{item.helper}</span>
-                        </button>
-                      ))}
+              {compressionMode === "quality" ? (
+                <L2AdvancedDisclosure title="Advanced options">
+                  <div className="space-y-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image resolution</p>
+                      <div className="mt-2 grid gap-2">
+                        {resolutionOptions.map((item) => (
+                          <button key={item.value} type="button" onClick={() => { setResolution(item.value); clearResult(); }} className={`rounded-lg border px-3 py-2 text-left text-xs transition ${resolution === item.value ? "border-[#CBA052]/50 bg-[#CBA052]/14 text-[#FFFFFF]" : "border-[#FFFFFF]/8 text-[#FFFFFF]/52 hover:border-[#CBA052]/28"}`}>
+                            <span className="font-bold">{item.label}</span>
+                            <span className="mt-0.5 block text-[#FFFFFF]/38">{item.helper}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image quality</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {qualityOptions.map((item) => (
+                          <button key={item.value} type="button" onClick={() => { setQuality(item.value); clearResult(); }} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${quality === item.value ? "border-[#CBA052]/50 bg-[#CBA052]/14 text-[#9FD0B5]" : "border-[#FFFFFF]/10 text-[#FFFFFF]/48 hover:border-[#CBA052]/30"}`}>
+                            {item.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image quality</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {qualityOptions.map((item) => (
-                        <button key={item.value} type="button" onClick={() => { setQuality(item.value); clearResult(); }} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${quality === item.value ? "border-[#CBA052]/50 bg-[#CBA052]/14 text-[#9FD0B5]" : "border-[#FFFFFF]/10 text-[#FFFFFF]/48 hover:border-[#CBA052]/30"}`}>
-                          {item.label}
-                        </button>
-                      ))}
+                </L2AdvancedDisclosure>
+              ) : null}
+
+              {compressionMode === "quality" ? (
+                <div className="mt-3">
+                  <L2AdvancedDisclosure title="Document and output details">
+                    <div className="space-y-3 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-[#FFFFFF]/68">
+                        <input type="checkbox" checked={expertMode === "custom"} onChange={(event) => setExpertMode(event.target.checked ? "custom" : "profile")} />
+                        Use custom DPI and quality
+                      </label>
+                      <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">
+                        Custom DPI
+                        <input type="number" min={72} max={240} value={customDpi} onChange={(event) => { setCustomDpi(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm text-[#FFFFFF] outline-none focus:border-[#CBA052]/45" />
+                      </label>
+                      <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">
+                        Custom quality
+                        <input type="number" min={35} max={92} value={customQuality} onChange={(event) => { setCustomQuality(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm text-[#FFFFFF] outline-none focus:border-[#CBA052]/45" />
+                      </label>
                     </div>
-                  </div>
+                    <div className="mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">Compression &amp; output summary</p>
+                      <ul className="mt-2 space-y-1.5 text-xs text-[#FFFFFF]/50">
+                        <li>Images: {selectedPlan.dpi} DPI · {Math.round(selectedPlan.quality * 100)}% quality · {selectedPlan.colour === "grayscale" ? "grayscale" : "colour preserved"}</li>
+                        <li>Text, links, forms: rebuilt as images — review output</li>
+                        <li>Output: 1 compressed PDF · {profileLabel} profile · original page order preserved</li>
+                        <li>Verified: page count and output filename checked after generation</li>
+                      </ul>
+                    </div>
+                  </L2AdvancedDisclosure>
                 </div>
               ) : null}
-
-              <button
-                type="button"
-                onClick={() => setExpertOpen((open) => !open)}
-                aria-expanded={expertOpen}
-                className={compressionMode === "quality" ? "mt-3 flex w-full items-center justify-between rounded-xl border border-[#FFFFFF]/10 px-3 py-2 text-left text-xs font-semibold text-[#FFFFFF]/54 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]" : "hidden"}
-              >
-                Document and output details
-                <span>{expertOpen ? "−" : "+"}</span>
-              </button>
-              {compressionMode === "quality" && expertOpen ? (
-                <div className="mt-3 space-y-3 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
-                  <label className="flex items-center gap-2 text-sm font-semibold text-[#FFFFFF]/68">
-                    <input type="checkbox" checked={expertMode === "custom"} onChange={(event) => setExpertMode(event.target.checked ? "custom" : "profile")} />
-                    Use custom DPI and quality
-                  </label>
-                  <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">
-                    Custom DPI
-                    <input type="number" min={72} max={240} value={customDpi} onChange={(event) => { setCustomDpi(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm text-[#FFFFFF] outline-none focus:border-[#CBA052]/45" />
-                  </label>
-                  <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">
-                    Custom quality
-                    <input type="number" min={35} max={92} value={customQuality} onChange={(event) => { setCustomQuality(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm text-[#FFFFFF] outline-none focus:border-[#CBA052]/45" />
-                  </label>
-                </div>
-              ) : null}
-
-              <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">Compression &amp; output summary</p>
-                <ul className="mt-2 space-y-1.5 text-xs text-[#FFFFFF]/50">
-                  <li>Images: {selectedPlan.dpi} DPI · {Math.round(selectedPlan.quality * 100)}% quality · {selectedPlan.colour === "grayscale" ? "grayscale" : "colour preserved"}</li>
-                  <li>Text, links, forms: rebuilt as images — review output</li>
-                  <li>Output: 1 compressed PDF · {profileLabel} profile · original page order preserved</li>
-                  <li>Verified: page count and output filename checked after generation</li>
-                </ul>
-              </div>
 
               <div className="mt-4">
                 <label className="text-xs font-bold uppercase tracking-[0.16em] text-[#FFFFFF]/42">

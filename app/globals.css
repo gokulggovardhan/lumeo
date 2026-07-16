@@ -173,7 +173,7 @@
   --surface-input: var(--atelier-surface-1);
   --surface-overlay: rgb(17 19 16 / 0.82);
   --surface-danger: rgba(var(--ruby-rgb), 0.13);
-  --surface-success: rgba(var(--emerald-rgb), 0.13);
+  --surface-success: rgb(var(--emerald-rgb) / 0.13);
   --border-hairline: rgb(242 239 230 / 0.08);
   --border-subtle: rgb(242 239 230 / 0.12);
   --border-default: rgb(242 239 230 / 0.17);

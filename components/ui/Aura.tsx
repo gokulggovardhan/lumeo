@@ -24,7 +24,7 @@ function cx(...values: Array<string | false | null | undefined>) {
 
 const toneClasses: Record<Tone, string> = {
   neutral: "border-[var(--border-default)] bg-[rgba(var(--paper-rgb),0.06)] text-[var(--text-secondary)]",
-  success: "border-[rgba(var(--emerald-rgb),0.36)] bg-[var(--surface-success)] text-[var(--text-success)]",
+  success: "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)] text-[var(--text-success)]",
   warning: "border-[rgba(var(--champagne-rgb),0.4)] bg-[rgba(var(--champagne-rgb),0.12)] text-[var(--text-warning)]",
   danger: "border-[var(--border-danger)] bg-[var(--surface-danger)] text-[var(--text-danger)]",
   info: "border-[rgba(var(--champagne-rgb),0.24)] bg-[rgba(var(--paper-rgb),0.06)] text-[var(--text-info)]",
@@ -625,6 +625,7 @@ export function AuraFileCard({
   name,
   meta,
   status,
+  icon,
   action,
   onRemove,
   removeLabel,
@@ -636,6 +637,7 @@ export function AuraFileCard({
   name: string;
   meta: string;
   status?: string;
+  icon?: ReactNode;
   action?: ReactNode;
   onRemove?: () => void;
   removeLabel?: string;
@@ -645,8 +647,10 @@ export function AuraFileCard({
   moveDownLabel?: string;
 }) {
   return (
-    <div className="lumeo2-soft-card-lift flex min-h-16 items-center justify-between gap-4 rounded-[var(--radius-xl)] bg-[rgba(var(--paper-rgb),0.06)] p-3 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)] transition hover:bg-[rgba(var(--paper-rgb),0.09)]">
-      <div aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-lg)] bg-[rgba(var(--champagne-rgb),0.11)] text-xs font-black text-[var(--text-accent)]">PDF</div>
+    <div className="lumeo2-soft-card-lift flex min-h-16 items-center justify-between gap-4 rounded-[var(--radius-xl)] bg-[rgb(var(--paper-rgb)/0.06)] p-3 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)] transition hover:bg-[rgb(var(--paper-rgb)/0.09)]">
+      {icon ?? (
+        <div aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-lg)] bg-[rgb(var(--champagne-rgb)/0.11)] text-xs font-black text-[var(--text-accent)]">PDF</div>
+      )}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black text-[var(--lumeo-paper-50)]">{name}</p>
         <p className="mt-1 text-xs text-[var(--lumeo-paper-400)]">{meta}</p>
@@ -659,6 +663,66 @@ export function AuraFileCard({
         {action ? <div>{action}</div> : null}
       </div>
     </div>
+  );
+}
+
+export function AuraPdfIcon() {
+  return (
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[#CBA052]/10 text-[#CBA052]">
+      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
+        <path
+          d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z"
+          stroke="currentColor"
+          strokeWidth="1.7"
+        />
+        <path
+          d="M14.1 4v3.3h3.2M8.8 11.2h6.4M8.8 14h4.6"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          strokeWidth="1.55"
+        />
+      </svg>
+    </span>
+  );
+}
+
+export function AuraOptionCard({
+  label,
+  description,
+  selected,
+  recommended = false,
+  onClick,
+  disabled = false,
+}: {
+  label: string;
+  description?: string;
+  selected: boolean;
+  recommended?: boolean;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      aria-pressed={selected}
+      className={cx(
+        "rounded-xl border border-l-4 px-3 py-2 text-left transition motion-reduce:transition-none disabled:cursor-not-allowed disabled:opacity-60",
+        selected
+          ? "border-[var(--border-subtle)] border-l-[var(--atelier-sage-400)] bg-[var(--surface-selected)]"
+          : "border-l-transparent border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.025] hover:border-[#CBA052]/28",
+      )}
+    >
+      <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#FFFFFF]">
+        <span>{selected ? "✓ " : ""}{label}</span>
+        {recommended ? (
+          <span className="rounded-full bg-[#CBA052]/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[#CBA052]">Recommended</span>
+        ) : null}
+      </span>
+      {description ? <span className="mt-0.5 block text-xs text-[#FFFFFF]/42">{description}</span> : null}
+    </button>
   );
 }
 

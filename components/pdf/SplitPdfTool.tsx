@@ -7,12 +7,15 @@ import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
+  L2AdvancedDisclosure,
+  L2FileCard,
   L2PrivacyNote,
   L2ToolMainColumn,
   L2ToolSettingsPanel,
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
+import { AuraOptionCard, AuraPdfIcon, AuraStatus } from "@/components/ui/Aura";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type SplitMode = "extract" | "ranges" | "everyPage" | "everyN" | "remove";
@@ -389,27 +392,6 @@ function SplitIcon() {
         strokeWidth="1.7"
       />
     </svg>
-  );
-}
-
-function PdfFileIcon() {
-  return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[#CBA052]/10 text-[#CBA052]">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-        <path
-          d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z"
-          stroke="currentColor"
-          strokeWidth="1.7"
-        />
-        <path
-          d="M14.1 4v3.3h3.2M8.8 11.2h6.4M8.8 14h4.6"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.55"
-        />
-      </svg>
-    </span>
   );
 }
 
@@ -1355,19 +1337,13 @@ export default function SplitPdfTool() {
               </div>
             </div>
 
-            <div className="grid gap-2 rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/74 px-3 py-2 transition-all duration-300 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-              <PdfFileIcon />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[#FFFFFF]">
-                  {analysis.name}
-                </p>
-                <p className="mt-1 text-xs font-medium text-[#FFFFFF]/42">
-                  {analysis.pageCount} page{analysis.pageCount === 1 ? "" : "s"} · {formatBytes(analysis.size)} · {analysis.pageSizeType}
-                </p>
-              </div>
-              <span className="rounded-full border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 py-1.5 text-xs font-semibold text-[#9FD0B5]">
-                {status}
-              </span>
+            <div className="rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/74 px-3 py-2 transition-all duration-300">
+              <L2FileCard
+                name={analysis.name}
+                meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatBytes(analysis.size)} · ${analysis.pageSizeType}`}
+                icon={<AuraPdfIcon />}
+                action={<AuraStatus tone="success" label={status} />}
+              />
             </div>
           </section>
 
@@ -1501,24 +1477,13 @@ export default function SplitPdfTool() {
               {methodDrawerOpen ? (
                 <div className="mt-2 grid gap-1 rounded-xl border border-[#FFFFFF]/10 bg-[#050914]/88 p-2">
                   {splitModes.map((item) => (
-                    <button
-                      type="button"
+                    <AuraOptionCard
                       key={item.value}
+                      label={item.label}
+                      description={item.helper}
+                      selected={mode === item.value}
                       onClick={() => setModeSafely(item.value)}
-                      className={`rounded-xl border border-l-4 px-3 py-2 text-left transition ${
-                        mode === item.value
-                          ? "border-[var(--border-subtle)] border-l-[var(--atelier-sage-400)] bg-[var(--surface-selected)]"
-                          : "border-l-transparent border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.025] hover:border-[#CBA052]/28"
-                      }`}
-                    >
-                      <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#FFFFFF]">
-                        {item.label}
-                        {mode === item.value ? <span className="text-[#9FD0B5]">✓</span> : null}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-[#FFFFFF]/42">
-                        {item.helper}
-                      </span>
-                    </button>
+                    />
                   ))}
                 </div>
               ) : null}

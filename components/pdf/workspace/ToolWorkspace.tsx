@@ -417,26 +417,32 @@ export function L2FileCard({
   meta,
   status,
   order,
+  icon,
   action,
   onRemove,
   removeLabel,
   onMoveUp,
   onMoveDown,
+  moveUpLabel,
+  moveDownLabel,
 }: {
   name: string;
   meta: string;
   status?: string;
   order?: number;
+  icon?: ReactNode;
   action?: ReactNode;
   onRemove?: () => void;
   removeLabel?: string;
   onMoveUp?: () => void;
   onMoveDown?: () => void;
+  moveUpLabel?: string;
+  moveDownLabel?: string;
 }) {
   return (
     <div className="l2-file-card flex min-w-0 items-center gap-3">
       {typeof order === "number" ? (
-        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[rgba(var(--champagne-rgb),0.12)] text-xs font-black text-[var(--text-accent)]">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[rgb(var(--champagne-rgb)/0.12)] text-xs font-black text-[var(--text-accent)]">
           {order}
         </span>
       ) : null}
@@ -445,11 +451,14 @@ export function L2FileCard({
           name={name}
           meta={meta}
           status={status}
+          icon={icon}
           action={action}
           onRemove={onRemove}
           removeLabel={removeLabel}
           onMoveUp={onMoveUp}
           onMoveDown={onMoveDown}
+          moveUpLabel={moveUpLabel}
+          moveDownLabel={moveDownLabel}
         />
       </div>
     </div>
