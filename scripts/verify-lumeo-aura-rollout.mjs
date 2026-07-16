@@ -90,8 +90,8 @@ try {
     assert(rolloutSources.includes(marker), `Missing public Aura rollout marker: ${marker}`);
   }
 
-  assert(homepage.includes("Work with PDFs beautifully."), "Homepage Run 2 heading is missing.");
-  assert(homepage.includes("Private, fast, browser-first."), "Homepage compact trust copy is missing.");
+  assert(homepage.includes("Documents, beautifully handled."), "Homepage heading is missing.");
+  assert(homepage.includes("Fast PDF tools that work privately in your browser."), "Homepage compact trust copy is missing.");
   assert(homepage.includes("text-[var(--text-primary)]"), "Homepage must use high-contrast primary text token.");
   assert(!homepage.includes("bg-[rgba(255,253,247"), "Homepage must not use a white public canvas.");
   assert(launcher.includes("getPublicHomepageTools"), "Tool launcher must continue deriving cards from the public catalog helper.");
