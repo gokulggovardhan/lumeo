@@ -301,7 +301,7 @@ function CompressIcon() {
 
 function DocumentIcon() {
   return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#CBA052]/10 text-[#CBA052]">
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[#CBA052]/10 text-[#CBA052]">
       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
         <path d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z" stroke="currentColor" strokeWidth="1.7" />
         <path d="M14.1 4v3.3h3.2M9 12h6M9 15h4.4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.55" />
@@ -1031,7 +1031,7 @@ export default function CompressPdfTool() {
                   {analysis.pageCount} page{analysis.pageCount === 1 ? "" : "s"} · {formatFileSize(analysis.size)} · {analysis.pageSizeType}
                 </p>
               </div>
-              <span className="rounded-full border border-[#CBA052]/24 bg-[#CBA052]/10 px-3 py-1.5 text-xs font-semibold text-[#9FD0B5]">
+              <span className="rounded-full border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 py-1.5 text-xs font-semibold text-[#9FD0B5]">
                 {displayStatus}
               </span>
             </div>
@@ -1170,10 +1170,10 @@ export default function CompressPdfTool() {
                         clearResult();
                       }}
                       aria-pressed={profile === item}
-                      className={`rounded-xl border px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 motion-reduce:transition-none ${
+                      className={`rounded-xl border border-l-4 px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 motion-reduce:transition-none ${
                         profile === item
-                          ? "border-[#CBA052]/55 bg-[#CBA052]/16"
-                          : "border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.025] hover:border-[#CBA052]/28"
+                          ? "border-[var(--border-subtle)] border-l-[var(--atelier-sage-400)] bg-[var(--surface-selected)]"
+                          : "border-l-transparent border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.025] hover:border-[#CBA052]/28"
                       }`}
                     >
                       <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#FFFFFF]">
@@ -1354,23 +1354,12 @@ export default function CompressPdfTool() {
               ) : null}
 
               <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">Compression plan</p>
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">Compression &amp; output summary</p>
                 <ul className="mt-2 space-y-1.5 text-xs text-[#FFFFFF]/50">
-                  <li>Images: render at {selectedPlan.dpi} DPI</li>
-                  <li>Image quality: {Math.round(selectedPlan.quality * 100)}%</li>
-                  <li>Colour: {selectedPlan.colour === "grayscale" ? "Grayscale image content" : "Preserved"}</li>
-                  <li>Text, links, forms: review output; page appearance is rebuilt as images</li>
-                </ul>
-              </div>
-
-              <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">Output manifest</p>
-                <ul className="mt-2 space-y-1.5 text-xs text-[#FFFFFF]/50">
-                  <li>1 compressed PDF</li>
-                  <li>{profileLabel} profile</li>
-                  <li>Original page order preserved</li>
-                  <li>Page count validated after generation</li>
-                  <li>Output filename verified</li>
+                  <li>Images: {selectedPlan.dpi} DPI · {Math.round(selectedPlan.quality * 100)}% quality · {selectedPlan.colour === "grayscale" ? "grayscale" : "colour preserved"}</li>
+                  <li>Text, links, forms: rebuilt as images — review output</li>
+                  <li>Output: 1 compressed PDF · {profileLabel} profile · original page order preserved</li>
+                  <li>Verified: page count and output filename checked after generation</li>
                 </ul>
               </div>
 

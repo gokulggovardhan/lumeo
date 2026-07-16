@@ -176,7 +176,7 @@ function MergeIcon() {
 
 function PdfFileIcon() {
   return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#CBA052]/10 text-[#CBA052]">
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[#CBA052]/10 text-[#CBA052]">
       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
         <path
           d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z"
@@ -872,10 +872,10 @@ export default function MergePdfTool() {
                     key={option.value}
                     type="button"
                     onClick={() => updatePageFormat(option.value)}
-                    className={`flex w-full items-center justify-between gap-3 border-b border-[#FFFFFF]/8 px-3 py-2 text-left last:border-b-0 transition ${
+                    className={`flex w-full items-center justify-between gap-3 border-b border-l-2 border-[#FFFFFF]/8 px-3 py-2 text-left last:border-b-0 transition ${
                       pageFormat === option.value
-                        ? "bg-[#CBA052]/12"
-                        : "hover:bg-[#FFFFFF]/[0.035]"
+                        ? "border-l-[var(--atelier-sage-400)] bg-[var(--surface-selected)]"
+                        : "border-l-transparent hover:bg-[#FFFFFF]/[0.035]"
                     }`}
                   >
                     <span className="min-w-0">
