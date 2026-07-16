@@ -54,13 +54,13 @@ import {
 } from "@/components/pdf/workspace/ToolWorkspace";
 
 const colourTokens = [
-  "--canvas-950",
-  "--canvas-850",
-  "--paper-50",
-  "--emerald-500",
-  "--champagne-400",
-  "--sky-400",
-  "--ruby-500",
+  "--atelier-canvas-950",
+  "--atelier-surface-2",
+  "--atelier-ivory-100",
+  "--atelier-sage-500",
+  "--atelier-brass-400",
+  "--atelier-info",
+  "--atelier-danger",
 ];
 
 export default function DesignSystemPage() {
@@ -74,14 +74,14 @@ export default function DesignSystemPage() {
   return (
     <div className="grid gap-8">
       <AuraPageHeader
-        eyebrow="Lumeo 2.0"
-        title="Lumeo Canvas"
-        description="A private document studio with warm editorial detail, precise modern controls, tactile surfaces and reusable foundations for public tools and the Control Center."
+        eyebrow="Lumeo Atelier"
+        title="Atelier theme system"
+        description="A soft premium correction of Lumeo Canvas with graphite-sage surfaces, calm sage action, restrained brass detail, and the same stable public tool behaviour."
         action={<AuraButton variant="premium" onClick={() => setDrawerOpen(true)}>Open drawer</AuraButton>}
       />
 
       <AuraPanel>
-        <AuraSectionHeader title="Colour and surfaces" description="Semantic tokens keep Lumeo 2.0 consistent without hard-coded page styling." />
+        <AuraSectionHeader title="Atelier colour and surfaces" description="Semantic tokens keep the interface soft, premium and consistent without hard-coded page styling." />
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {colourTokens.map((token) => (
             <div key={token} className="rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-4">
@@ -98,7 +98,7 @@ export default function DesignSystemPage() {
           <p className="font-serif text-[var(--text-display-md)] leading-[var(--leading-display)] text-[var(--lumeo-paper-50)]">PDF work, thoughtfully refined.</p>
           <p className="text-[var(--text-heading-lg)] font-black text-[var(--lumeo-paper-50)]">Control Center heading</p>
           <p className="max-w-3xl text-[var(--text-body-md)] leading-[var(--leading-body)] text-[var(--lumeo-paper-400)]">
-            Lumeo Aura keeps dense document operations readable at mobile sizes while preserving a premium sense of space on desktop.
+            Lumeo Atelier keeps dense document operations readable at mobile sizes while replacing the blue-oriented foundation with graphite-sage neutral depth.
           </p>
         </div>
       </AuraPanel>
@@ -111,18 +111,18 @@ export default function DesignSystemPage() {
             <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">Secondary copy remains warm and readable on dark elevated surfaces.</p>
           </AuraCard>
           <AuraCard>
-            <p className="text-sm font-black text-[var(--text-accent)]">Champagne detail</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">Gold is restrained for premium moments, not every button.</p>
+            <p className="text-sm font-black text-[var(--text-accent)]">Muted brass detail</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">Brass is restrained for premium moments, not every button.</p>
           </AuraCard>
           <AuraCard>
-            <p className="text-sm font-black text-[var(--text-info)]">Aura information</p>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-subtle)]">Cool light supports focus states and calm explanatory UI.</p>
+            <p className="text-sm font-black text-[var(--text-info)]">Atelier information</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-subtle)]">Information states use a quiet green-grey accent instead of blue glow.</p>
           </AuraCard>
         </div>
       </AuraPanel>
 
       <AuraPanel>
-        <AuraSectionHeader title="Buttons, status and feedback" description="Seal Green carries primary action. Gold is reserved for premium emphasis." />
+        <AuraSectionHeader title="Buttons, status and feedback" description="Heritage Sage carries primary action. Muted Brass is reserved for premium emphasis." />
         <div className="mt-5 flex flex-wrap gap-3">
           <AuraButton>Primary action</AuraButton>
           <AuraButton variant="secondary">Secondary</AuraButton>

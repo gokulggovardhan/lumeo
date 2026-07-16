@@ -37,7 +37,7 @@ export default function PublicFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <L2PublicFooter className="aura-public-footer bg-[linear-gradient(180deg,rgba(12,23,40,0.72),rgba(8,17,31,0.96))] px-5 text-sm text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.07)] sm:px-8">
+    <L2PublicFooter className="aura-public-footer bg-[linear-gradient(180deg,rgba(32,36,31,0.72),rgba(17,19,16,0.96))] px-5 text-sm text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.07)] sm:px-8">
       <div className="mx-auto grid max-w-[1160px] gap-8 py-9 md:grid-cols-[1.15fr_2fr]">
         <div>
           <BrandLockup markSize="h-10 w-10" />
@@ -53,7 +53,7 @@ export default function PublicFooter() {
               <ul className="mt-3 grid gap-2">
                 {group.links.map((link) => (
                   <li key={link.href}>
-                    <Link href={link.href} className="rounded-[var(--radius-sm)] text-sm font-bold text-[var(--text-muted)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">
+                    <Link href={link.href} className="rounded-[var(--radius-sm)] text-sm font-bold text-[var(--text-muted)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]">
                       {link.label}
                     </Link>
                   </li>

@@ -20,7 +20,7 @@ The goal is confidence and delight: a handcrafted product that feels serious eno
 
 ## 4. Color System
 
-Foundation tokens use Canvas, Paper, Emerald, Champagne, Sky and Ruby families. Legacy Aura variables remain available as compatibility aliases while new work should prefer semantic Lumeo 2 tokens.
+Foundation tokens now resolve to the Atelier Canvas, Ivory, Heritage Sage, Muted Brass and muted status families. Legacy Aura variables remain available as compatibility aliases while new work should prefer semantic Lumeo 2 tokens.
 
 ## 5. Semantic Tokens
 
@@ -52,7 +52,7 @@ Motion tokens cover instant, fast, standard, expressive and entrance durations. 
 
 ## 12. Buttons
 
-Primary uses Emerald. Secondary uses elevated navy. Premium uses restrained Champagne and should not replace the main action. Danger uses calm Ruby. Icon buttons require accessible names.
+Primary uses Heritage Sage. Secondary uses elevated graphite. Premium uses restrained Muted Brass and should not replace the main action. Danger uses calm ruby. Icon buttons require accessible names.
 
 ## 13. Form Controls
 
@@ -88,7 +88,7 @@ The public shell should use a compact dark satin surface, logo-left navigation, 
 
 ## 21. Public Footer
 
-The footer should remain compact, grouped and useful with a trust/privacy line and restrained Champagne detail.
+The footer should remain compact, grouped and useful with a trust/privacy line and restrained brass detail.
 
 ## 22. Tool Workspace Layout
 
@@ -330,3 +330,71 @@ New browser-first tools should start with the same lifecycle, use the locked upl
 ### What Remains For Run 5
 
 Run 5 should visually QA the live tools across device widths, tune any remaining spacing or contrast issues, and migrate future real tool engines into the same workspace system when those engines exist.
+
+## Lumeo Atelier Theme
+
+### Emotional Goals
+
+Lumeo Atelier is the final safe tone correction for Lumeo 2.0. It should feel soft, calm, elegant, refined, modern, trustworthy and easy on the eyes, while preserving the private document-studio identity and every existing interaction contract.
+
+### Palette
+
+The canonical palette is Atelier Canvas, Atelier Surface, Atelier Ivory, Heritage Sage and Muted Brass. Blue and cyan must not be public-facing accents. A quiet green-grey information tone may be used only for status semantics.
+
+### Semantic Mapping
+
+Existing shared tokens remain the implementation contract. `--canvas-*`, `--paper-*`, `--emerald-*`, `--champagne-*`, `--surface-*`, `--text-*`, `--border-*` and `--shadow-*` map to Atelier values so existing components inherit the theme without structure changes.
+
+### Action Hierarchy
+
+Primary actions use Heritage Sage with warm ivory text. Secondary actions use raised graphite surfaces. Muted Brass is for premium detail, selected accents, focus edges and small icon treatments, never long body copy or every button.
+
+### Card Treatment
+
+Cards use graphite-sage surfaces, a soft inner highlight and restrained elevation. Borders stay subtle. Hover lift remains small and reduced-motion friendly.
+
+### Control Treatment
+
+Inputs, switches, segmented controls, dropdowns and disclosures use dark graphite surfaces, readable labels and brass-neutral focus states. Switches retain a clear sage on-state and do not rely on colour alone.
+
+### Upload Treatment
+
+The shared upload stage keeps its real file input, stable ID, click forwarding, input reset and drag/drop handlers. Atelier changes only the visual treatment: soft graphite document tray, brass document icon, Heritage Sage select button and restrained sage drag-active illumination.
+
+### Privacy Note
+
+The privacy note remains exact: **Private by design · Browser-only · Cleared after download**. It should be compact, centered, quietly elevated and secondary to the main action.
+
+### Accessibility
+
+Atelier must maintain WCAG 2.2 AA contrast targets, visible focus, keyboard navigation, reduced motion, high-contrast support, labelled controls and practical touch targets.
+
+### Functional Preservation Rules
+
+Do not alter PDF Tools menu state ownership, native file input behaviour, drag/drop behaviour, PDF processing algorithms, Analytics V1, catalog data access, admin authentication or route URLs during Atelier retheme work.
+
+### Atelier Handoff
+
+Future polish may tune page-specific spacing and any remaining visual rough edges after runtime QA, but should continue to work through semantic tokens and shared components before touching page-specific JSX.
+
+## Lumeo Atelier Final Polish
+
+### Hierarchy And Spacing
+
+The final polish layer tightens the public hero, upload stages and workspace capsules without changing route structure or processing behavior. Use the semantic gap tokens (`--gap-section`, `--gap-card`, `--gap-content`, `--gap-control`, `--gap-compact`) before introducing page-specific spacing. Page and panel padding should resolve through `--padding-page`, `--padding-panel` and `--padding-mobile-page` so future tools inherit the same rhythm.
+
+### Interaction Restraint
+
+Cards, buttons and upload panels may lift subtly, but hover motion should remain under 3px and pressed states should feel tactile rather than animated. Use Heritage Sage for primary actions, Muted Brass only for labels, icons, arrows and focus accents, and keep destructive actions in muted ruby treatments.
+
+### Compact Dropdowns And Privacy Notes
+
+The public PDF Tools menu is a compact anchored panel, not a page overlay. It uses stacked categorized rows, concise tool descriptions and an internal scroll area when needed. Privacy notes use a centered capsule with the exact wording `Private by design · Browser-only · Cleared after download`; avoid page-width trust strips.
+
+### Planned Tool Pages
+
+Planned tool pages must stay clearly non-operational. Do not show upload controls, disabled fake processing buttons or placeholder workflows. Provide only concise planned capability, related live tools and safe navigation actions.
+
+### Preservation Rules
+
+Final polish must not alter PDF processing algorithms, native upload contracts, drag/drop behavior, PDF Tools menu state ownership, Analytics V1, catalog data access, admin permissions, Supabase migrations or dependency versions.

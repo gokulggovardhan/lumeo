@@ -30,7 +30,7 @@ export function BrandLockup({
 }) {
   const primaryText = tone === "dark" ? "text-[#151A22]" : "text-[var(--text-primary)]";
   const secondaryText =
-    tone === "dark" ? "text-[#1E6B4A]" : "text-[var(--text-accent)]";
+    tone === "dark" ? "text-[var(--atelier-sage-600)]" : "text-[var(--text-accent)]";
 
   return (
     <span className="flex min-w-0 items-center gap-3">
@@ -82,7 +82,7 @@ export function PublicNav({
   return (
     <L2PublicHeader className="lumeo-nav-enter aura-public-nav">
       <nav className={`mx-auto flex min-h-16 ${maxWidth} items-center justify-between gap-4`} aria-label="Public navigation">
-        <Link href="/" className="flex min-w-0 items-center rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.22)]">
+        <Link href="/" className="flex min-w-0 items-center rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]">
           <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
         </Link>
 
@@ -98,7 +98,7 @@ export function PublicNav({
             href="/"
             aria-label="Go to Lumeo PDF home"
             title="Home"
-            className="lumeo-press lumeo-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[rgba(var(--paper-rgb),0.075)] text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition hover:bg-[rgba(var(--champagne-rgb),0.12)] hover:text-[var(--text-accent)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.18)]"
+            className="lumeo-press lumeo-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[rgba(var(--paper-rgb),0.075)] text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition hover:bg-[rgba(var(--champagne-rgb),0.12)] hover:text-[var(--text-accent)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
           >
             <HomeIcon />
           </Link>
@@ -125,8 +125,8 @@ export function PublicPageShell({
   return (
     <main id="main-content" className={`lumeo-page-enter aura-page-shell relative overflow-x-hidden ${mainClassName}`}>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="lumeo-ambient absolute -left-44 -top-48 h-[32rem] w-[32rem] rounded-full bg-[rgba(var(--lumeo-aura-rgb),0.14)] blur-[150px]" />
-        <div className="lumeo-ambient absolute -right-44 top-0 [animation-delay:-4s] h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--lumeo-gold-rgb),0.08)] blur-[155px]" />
+        <div className="lumeo-ambient absolute -left-44 -top-48 h-[32rem] w-[32rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.07)] blur-[150px]" />
+        <div className="lumeo-ambient absolute -right-44 top-0 [animation-delay:-4s] h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.055)] blur-[155px]" />
       </div>
 
       <div className="relative z-10">

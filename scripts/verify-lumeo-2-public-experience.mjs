@@ -82,10 +82,19 @@ try {
   assert(menu.includes("Escape"), "PDF tools menu must close on Escape.");
   assert(menu.includes("onClick={() => {") && menu.includes("setOpen(false);"), "PDF tools menu links must close the menu.");
   assert(menu.includes("View all PDF tools"), "PDF tools menu footer action is missing.");
-  assert(menu.includes("md:grid-cols-2"), "PDF tools menu must support two-column desktop layout.");
+  assert(menu.includes("md:w-[min(21rem,calc(100vw-2rem))]"), "PDF tools menu must remain compact on desktop.");
+  assert(menu.includes("xl:right-[-20rem]"), "PDF tools menu must shift away from the homepage headline while staying within the wide desktop viewport.");
+  assert(menu.includes("Combine documents") && menu.includes("Extract pages"), "PDF tools menu must use concise row descriptions.");
+  assert(menu.includes("md:max-h-[70vh]"), "PDF tools menu must use controlled viewport-safe height.");
+  assert(!menu.includes("md:grid-cols-2"), "PDF tools menu must use stacked compact rows, not a wide two-column panel.");
+  assert(menu.includes("tool.shortDescription") && menu.includes("truncate"), "PDF tools menu rows must keep compact descriptions.");
   assert(menu.includes("aria-controls={MENU_ID}") && menu.includes("id={MENU_ID}"), "PDF tools menu trigger aria-controls must point to the real panel.");
   assert(!menu.includes("console."), "PDF tools menu must not contain debug logging.");
-  assert(ui.includes("l2-trust-rail-grid") && ui.includes("sm:grid-cols-3") && ui.includes("sm:justify-center"), "Trust rail must use equal three-column spacing on comfortable viewports.");
+  assert(css.includes("--atelier-sage-500") && css.includes("--atelier-brass-400"), "Atelier public palette is missing.");
+  assert(chrome.includes("rgba(var(--atelier-sage-rgb),0.07)") && chrome.includes("rgba(var(--atelier-brass-rgb),0.055)"), "Public chrome must use Atelier ambient accents.");
+  assert(footer.includes("rgba(32,36,31,0.72)") && footer.includes("rgba(17,19,16,0.96)"), "Public footer must use Atelier graphite surfaces.");
+  assert(![ui, chrome, menu, footer].join("\n").includes("rgba(var(--sky-rgb)"), "Public shared surfaces must not use blue/cyan focus accents.");
+  assert(ui.includes("l2-trust-rail-grid") && ui.includes("md:grid-cols-3") && ui.includes("md:justify-center"), "Trust rail must use equal three-column spacing on comfortable viewports.");
   assert(ui.includes("sm:max-w-[320px]") && css.includes("width: min(100%, 320px);"), "Upload action must be constrained on desktop.");
   assert(ui.includes("l2-directory-card-surface") && css.includes(".l2-directory-card-surface"), "Directory cards must use the shared raised surface styling.");
 

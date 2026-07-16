@@ -31,6 +31,18 @@ const compressPage = read("app/pdf/compress/page.tsx");
 
 test("Aura design tokens cover colour, surface, type, spacing, radius and motion", () => {
   for (const token of [
+    "--atelier-canvas-950",
+    "--atelier-surface-2",
+    "--atelier-ivory-100",
+    "--atelier-sage-500",
+    "--atelier-brass-400",
+    "--atelier-info",
+    "--maison-canvas-950",
+    "--maison-surface-2",
+    "--maison-ivory-50",
+    "--maison-green-500",
+    "--maison-bronze-400",
+    "--maison-info",
     "--lumeo-ink-950",
     "--lumeo-paper-50",
     "--lumeo-seal-500",
@@ -58,12 +70,43 @@ test("Aura design tokens cover colour, surface, type, spacing, radius and motion
     "--font-display-xl",
     "--space-4",
     "--space-24",
+    "--gap-section",
+    "--padding-panel",
     "--radius-pill",
     "--motion-standard",
     "--ease-emphasized",
   ]) {
     assert.ok(css.includes(token), `${token} should exist`);
   }
+});
+
+test("Lumeo Atelier retheme keeps soft semantic tokens and interaction contracts", () => {
+  assert.ok(css.includes("--atelier-canvas-950: #111310;"));
+  assert.ok(css.includes("--atelier-sage-500: #6f8b73;"));
+  assert.ok(css.includes("--atelier-brass-400: #c4aa77;"));
+  assert.ok(css.includes("--action-primary: var(--atelier-sage-500);"));
+  assert.ok(css.includes("rgb(var(--atelier-sage-rgb) / 0.08)"));
+  assert.ok(css.includes("rgb(var(--atelier-brass-rgb) / 0.06)"));
+  assert.ok(css.includes("background: var(--surface-canvas);"));
+  assert.ok(ui.includes("rgba(var(--champagne-rgb),0.2)"));
+  assert.ok(ui.includes("rgba(var(--atelier-sage-rgb),0.09)"));
+  assert.doesNotMatch(ui, /rgba\(var\(--sky-rgb\)/);
+  assert.ok(showcase.includes("Lumeo Atelier"));
+  assert.ok(showcase.includes("--atelier-sage-500"));
+  assert.ok(lumeo2Doc.includes("Lumeo Atelier Theme"));
+  assert.ok(lumeo2Doc.includes("Heritage Sage"));
+  assert.ok(publicMenu.includes("const MENU_ID = \"lumeo-pdf-tools-menu\""));
+  assert.ok(publicMenu.includes("md:w-[min(21rem,calc(100vw-2rem))]"));
+  assert.ok(publicMenu.includes("xl:right-[-20rem]"));
+  assert.ok(publicMenu.includes("Combine documents"));
+  assert.ok(publicMenu.includes("Extract pages"));
+  assert.ok(publicMenu.includes("md:max-h-[70vh]"));
+  assert.doesNotMatch(publicMenu, /md:grid-cols-2/);
+  assert.ok(workspace.includes("inputRef.current?.click()"));
+  assert.ok(workspace.includes("onFilesSelected?.(event.dataTransfer.files)"));
+  assert.ok(workspace.includes("max-w-[560px]"));
+  assert.ok(homepage.includes("text-[clamp(2.6rem,6.1vw,4.85rem)]"));
+  assert.doesNotMatch(homepage, /#0D2C6D|sky-rgb|bg-\[var\(--surface-canvas\)\]/);
 });
 
 test("Aura components expose accessible interaction foundations", () => {
@@ -126,8 +169,8 @@ test("tool workspace and admin guidance foundations are present", () => {
 
 test("protected showcase demonstrates the foundation without public exposure markers", () => {
   assert.ok(showcase.includes('"use client"'));
-  assert.ok(showcase.includes("Lumeo 2.0"));
-  assert.ok(showcase.includes("Lumeo Canvas"));
+  assert.ok(showcase.includes("Lumeo Atelier"));
+  assert.ok(showcase.includes("Atelier theme system"));
   assert.ok(showcase.includes("Tool workspace foundations"));
   assert.ok(showcase.includes("Control Center guidance"));
   assert.ok(showcase.includes("Responsive and reduced-motion notes"));
@@ -201,8 +244,8 @@ test("Lumeo 2 public interaction spacing fixes are guarded", () => {
   assert.doesNotMatch(publicMenu, /console\./);
 
   assert.ok(ui.includes("l2-trust-rail-grid"));
-  assert.ok(ui.includes("sm:grid-cols-3"));
-  assert.ok(ui.includes("sm:justify-center"));
+  assert.ok(ui.includes("md:grid-cols-3"));
+  assert.ok(ui.includes("md:justify-center"));
   assert.ok(ui.includes("sm:max-w-[320px]"));
   assert.ok(css.includes("width: min(100%, 320px);"));
   assert.ok(css.includes("width: 100%;"));

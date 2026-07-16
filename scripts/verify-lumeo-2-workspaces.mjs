@@ -76,6 +76,9 @@ try {
   assert(css.includes("@media (max-width: 1023px)") && css.includes("position: static"), "Mobile sticky reset is missing.");
   assert(css.includes("@media (prefers-reduced-motion: reduce)"), "Reduced-motion support is missing.");
   assert(workspace.includes("Private by design · Browser-only · Cleared after download"), "Exact privacy note is missing.");
+  assert(css.includes("--atelier-sage-500") && css.includes("--atelier-brass-400"), "Atelier workspace palette is missing.");
+  assert(!workspace.includes("rgba(var(--sky-rgb)"), "Workspace shared primitives must not use blue/cyan focus accents.");
+  assert(workspace.includes("max-w-[560px]") && workspace.includes("text-[var(--text-muted)]"), "Workspace privacy note must be compact and secondary.");
   assert(workspace.includes("type=\"file\""), "Shared upload primitive must render a real file input.");
   assert(workspace.includes("accept={accept}"), "Shared upload primitive must pass the configured PDF accept value.");
   assert(workspace.includes("multiple={multiple}"), "Shared upload primitive must control multiple-file behavior.");

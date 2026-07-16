@@ -28,95 +28,167 @@
   --lumeo-gold-300: #e3c983;
   --lumeo-gold-400: #cfaf5c;
   --lumeo-gold-500: #b9923e;
-  --lumeo-aura-300: #73c9e8;
-  --lumeo-aura-400: #3fafd8;
-  --lumeo-aura-500: #2387b2;
+  --lumeo-aura-300: #8c9a91;
+  --lumeo-aura-400: #7f8d84;
+  --lumeo-aura-500: #687770;
   --lumeo-success: #42a77a;
   --lumeo-warning: #e3c983;
   --lumeo-danger: #d97171;
-  --lumeo-info: #73c9e8;
-  /* Lumeo 2.0 Canvas: final semantic colour foundation. */
-  --canvas-950: #08111f;
-  --canvas-900: #0c1728;
-  --canvas-850: #101e33;
-  --canvas-800: #162740;
-  --canvas-750: #1c3150;
-  --paper-50: #fffdf8;
-  --paper-100: #f8f3e8;
-  --paper-200: #e8dfc8;
-  --paper-300: #d2c7b1;
-  --paper-500: #9e947f;
-  --paper-700: #675f52;
-  --emerald-400: #43b985;
-  --emerald-500: #2d9768;
-  --emerald-600: #237954;
-  --emerald-700: #195e41;
-  --champagne-300: #e6ce8b;
-  --champagne-400: #d2b267;
-  --champagne-500: #b99245;
-  --sky-300: #7ecbe8;
-  --sky-400: #45add5;
-  --sky-500: #2a87af;
-  --ruby-400: #e58a92;
-  --ruby-500: #c95f6b;
-  --ruby-600: #a94752;
-  --success: var(--emerald-400);
-  --warning: var(--champagne-300);
-  --danger: var(--ruby-500);
-  --info: var(--sky-300);
-  --planned: var(--champagne-400);
-  --unavailable: var(--paper-500);
-  --emerald-rgb: 45 151 104;
-  --champagne-rgb: 210 178 103;
-  --sky-rgb: 69 173 213;
-  --ruby-rgb: 201 95 107;
-  --paper-rgb: 248 243 232;
+  --lumeo-info: #8c9a91;
+  /* Lumeo Atelier: soft graphite-sage premium evolution of Lumeo 2.0. */
+  --atelier-canvas-950: #111310;
+  --atelier-canvas-900: #141614;
+  --atelier-canvas-850: #181b18;
+  --atelier-canvas-800: #1d211d;
+  --atelier-surface-1: #1a1d1a;
+  --atelier-surface-2: #20241f;
+  --atelier-surface-3: #272c26;
+  --atelier-surface-4: #2e342d;
+  --atelier-ivory-50: #fffdf8;
+  --atelier-ivory-100: #f6f2e8;
+  --atelier-ivory-200: #ded9cd;
+  --atelier-ivory-300: #c9c4b8;
+  --atelier-ivory-500: #928e85;
+  --atelier-ivory-700: #69665f;
+  --atelier-sage-300: #94aa97;
+  --atelier-sage-400: #7f9983;
+  --atelier-sage-500: #6f8b73;
+  --atelier-sage-600: #5d755f;
+  --atelier-sage-700: #495c4b;
+  --atelier-brass-300: #d2be91;
+  --atelier-brass-400: #c4aa77;
+  --atelier-brass-500: #a98d5e;
+  --atelier-brass-600: #806b47;
+  --atelier-success: #7fa884;
+  --atelier-warning: #c8a567;
+  --atelier-danger: #b86c64;
+  --atelier-info: #8d9b91;
+  --atelier-disabled: #686c66;
+
+  /* Backward-compatible aliases keep existing component contracts stable. */
+  --maison-canvas-950: var(--atelier-canvas-950);
+  --maison-canvas-900: var(--atelier-canvas-900);
+  --maison-canvas-850: var(--atelier-canvas-850);
+  --maison-canvas-800: var(--atelier-canvas-800);
+  --maison-canvas-750: var(--atelier-canvas-800);
+  --maison-surface-1: var(--atelier-surface-1);
+  --maison-surface-2: var(--atelier-surface-2);
+  --maison-surface-3: var(--atelier-surface-3);
+  --maison-surface-4: var(--atelier-surface-4);
+  --maison-ivory-50: var(--atelier-ivory-50);
+  --maison-ivory-100: var(--atelier-ivory-100);
+  --maison-ivory-200: var(--atelier-ivory-200);
+  --maison-ivory-300: var(--atelier-ivory-300);
+  --maison-ivory-500: var(--atelier-ivory-500);
+  --maison-ivory-700: var(--atelier-ivory-700);
+  --maison-green-400: var(--atelier-sage-400);
+  --maison-green-500: var(--atelier-sage-500);
+  --maison-green-600: var(--atelier-sage-600);
+  --maison-green-700: var(--atelier-sage-700);
+  --maison-bronze-300: var(--atelier-brass-300);
+  --maison-bronze-400: var(--atelier-brass-400);
+  --maison-bronze-500: var(--atelier-brass-500);
+  --maison-bronze-600: var(--atelier-brass-600);
+  --maison-success: var(--atelier-success);
+  --maison-warning: var(--atelier-warning);
+  --maison-danger: var(--atelier-danger);
+  --maison-info: var(--atelier-info);
+  --maison-planned: var(--atelier-brass-600);
+  --maison-unavailable: var(--atelier-disabled);
+
+  --canvas-950: var(--atelier-canvas-950);
+  --canvas-900: var(--atelier-canvas-900);
+  --canvas-850: var(--atelier-canvas-850);
+  --canvas-800: var(--atelier-canvas-800);
+  --canvas-750: var(--atelier-surface-4);
+  --paper-50: var(--atelier-ivory-50);
+  --paper-100: var(--atelier-ivory-100);
+  --paper-200: var(--atelier-ivory-200);
+  --paper-300: var(--atelier-ivory-300);
+  --paper-500: var(--atelier-ivory-500);
+  --paper-700: var(--atelier-ivory-700);
+  --emerald-400: var(--atelier-sage-400);
+  --emerald-500: var(--atelier-sage-500);
+  --emerald-600: var(--atelier-sage-600);
+  --emerald-700: var(--atelier-sage-700);
+  --champagne-300: var(--atelier-brass-300);
+  --champagne-400: var(--atelier-brass-400);
+  --champagne-500: var(--atelier-brass-500);
+  --sky-300: var(--atelier-info);
+  --sky-400: var(--atelier-info);
+  --sky-500: var(--atelier-disabled);
+  --ruby-400: #c9827b;
+  --ruby-500: var(--atelier-danger);
+  --ruby-600: #9e5f58;
+  --success: var(--atelier-success);
+  --warning: var(--atelier-warning);
+  --danger: var(--atelier-danger);
+  --info: var(--atelier-info);
+  --planned: var(--atelier-brass-600);
+  --unavailable: var(--atelier-disabled);
+  --emerald-rgb: 111 139 115;
+  --champagne-rgb: 196 170 119;
+  --atelier-sage-rgb: 111 139 115;
+  --atelier-brass-rgb: 196 170 119;
+  --sky-rgb: 141 155 145;
+  --ruby-rgb: 184 108 100;
+  --paper-rgb: 246 242 232;
   --lumeo-seal-rgb: var(--emerald-rgb);
   --lumeo-gold-rgb: var(--champagne-rgb);
   --lumeo-aura-rgb: var(--sky-rgb);
   --lumeo-paper-rgb: var(--paper-rgb);
 
-  --text-primary: var(--paper-50);
-  --text-secondary: var(--paper-200);
-  --text-muted: var(--paper-300);
-  --text-subtle: var(--paper-500);
+  --text-primary: var(--atelier-ivory-100);
+  --text-secondary: var(--atelier-ivory-300);
+  --text-muted: var(--atelier-ivory-500);
+  --text-subtle: var(--atelier-ivory-700);
   --text-inverse: var(--canvas-950);
-  --text-on-accent: var(--paper-50);
-  --text-accent: var(--champagne-300);
-  --text-success: #a8e8c8;
-  --text-warning: var(--champagne-300);
-  --text-danger: #ffc0c6;
-  --text-info: var(--sky-300);
+  --text-on-accent: var(--atelier-ivory-50);
+  --text-accent: var(--atelier-brass-300);
+  --text-premium: var(--atelier-brass-300);
+  --text-success: #c5d7c5;
+  --text-warning: var(--atelier-brass-300);
+  --text-danger: #f0c0bc;
+  --text-info: var(--atelier-info);
 
-  --surface-canvas: radial-gradient(circle at 18% 0%, rgb(var(--sky-rgb) / 0.16), transparent 34%),
-    radial-gradient(circle at 86% 10%, rgb(var(--champagne-rgb) / 0.1), transparent 28%),
-    linear-gradient(135deg, var(--canvas-950), var(--canvas-900) 44%, var(--canvas-850) 100%);
-  --surface-base: linear-gradient(180deg, rgba(22, 39, 64, 0.96), rgba(12, 23, 40, 0.96));
-  --surface-raised: linear-gradient(180deg, rgba(28, 49, 80, 0.94), rgba(16, 30, 51, 0.96));
-  --surface-elevated: linear-gradient(180deg, rgba(34, 60, 96, 0.9), rgba(22, 39, 64, 0.94));
-  --surface-floating: linear-gradient(180deg, rgba(28, 49, 80, 0.98), rgba(12, 23, 40, 0.98));
-  --surface-interactive: linear-gradient(180deg, rgba(255, 253, 248, 0.095), rgba(255, 253, 248, 0.045));
-  --surface-selected: linear-gradient(180deg, rgba(var(--emerald-rgb), 0.18), rgba(var(--champagne-rgb), 0.08));
-  --surface-input: rgba(255, 253, 247, 0.08);
-  --surface-overlay: rgba(8, 16, 29, 0.84);
+  --canvas-primary: var(--atelier-canvas-950);
+  --canvas-secondary: var(--atelier-canvas-900);
+  --action-primary: var(--atelier-sage-500);
+  --action-primary-hover: var(--atelier-sage-400);
+  --action-primary-active: var(--atelier-sage-600);
+  --action-secondary: var(--atelier-surface-3);
+  --action-premium: var(--atelier-brass-500);
+  --action-danger: var(--atelier-danger);
+
+  --surface-canvas: radial-gradient(circle at 15% 92%, rgb(var(--atelier-sage-rgb) / 0.08), transparent 34%),
+    radial-gradient(circle at 88% 8%, rgb(var(--atelier-brass-rgb) / 0.06), transparent 30%),
+    linear-gradient(135deg, #111310 0%, #151815 52%, #181a17 100%);
+  --surface-base: var(--atelier-surface-1);
+  --surface-raised: var(--atelier-surface-2);
+  --surface-elevated: var(--atelier-surface-3);
+  --surface-floating: var(--atelier-surface-4);
+  --surface-interactive: var(--atelier-surface-2);
+  --surface-selected: color-mix(in srgb, var(--atelier-sage-500) 16%, var(--atelier-surface-3));
+  --surface-input: var(--atelier-surface-1);
+  --surface-overlay: rgb(17 19 16 / 0.82);
   --surface-danger: rgba(var(--ruby-rgb), 0.13);
   --surface-success: rgba(var(--emerald-rgb), 0.13);
-  --border-hairline: rgba(var(--paper-rgb), 0.055);
-  --border-subtle: rgba(var(--lumeo-paper-rgb), 0.08);
-  --border-default: rgba(var(--lumeo-paper-rgb), 0.14);
-  --border-strong: rgba(var(--lumeo-paper-rgb), 0.24);
-  --border-focus: rgba(var(--lumeo-aura-rgb), 0.58);
-  --border-premium: rgba(var(--lumeo-gold-rgb), 0.36);
-  --border-selected: rgba(var(--emerald-rgb), 0.5);
+  --border-hairline: rgb(246 242 232 / 0.08);
+  --border-subtle: rgb(246 242 232 / 0.12);
+  --border-default: rgb(246 242 232 / 0.17);
+  --border-strong: rgb(246 242 232 / 0.26);
+  --border-focus: var(--atelier-brass-400);
+  --border-premium: rgb(196 170 119 / 0.34);
+  --border-selected: rgb(148 170 151 / 0.55);
   --border-danger: rgba(var(--ruby-rgb), 0.48);
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.16);
   --shadow-sm: 0 8px 24px rgba(0, 0, 0, 0.18);
   --shadow-md: 0 18px 48px rgba(0, 0, 0, 0.24);
   --shadow-lg: 0 28px 80px rgba(0, 0, 0, 0.3);
   --shadow-xl: 0 42px 120px rgba(0, 0, 0, 0.36);
-  --shadow-floating: 0 24px 70px rgba(8, 16, 29, 0.22), inset 0 1px 0 rgba(255, 253, 247, 0.4);
+  --shadow-floating: 0 24px 70px rgba(18, 17, 15, 0.26), inset 0 1px 0 rgba(255, 253, 247, 0.16);
   --shadow-interactive: 0 18px 44px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 253, 248, 0.11);
-  --shadow-focus: 0 0 0 4px rgba(var(--lumeo-aura-rgb), 0.16);
+  --shadow-focus: 0 0 0 4px rgba(var(--champagne-rgb), 0.16);
   --shadow-success: 0 18px 44px rgba(var(--lumeo-seal-rgb), 0.2);
   --shadow-danger: 0 18px 44px rgba(var(--ruby-rgb), 0.18);
 
@@ -171,6 +243,14 @@
   --container-wide: 108rem;
   --container-full: 100%;
   --page-gutter: clamp(1rem, 3vw, 2.5rem);
+  --gap-section: var(--space-12);
+  --gap-card: var(--space-4);
+  --gap-content: var(--space-6);
+  --gap-control: var(--space-3);
+  --gap-compact: var(--space-2);
+  --padding-page: var(--page-gutter);
+  --padding-panel: var(--space-5);
+  --padding-mobile-page: var(--space-4);
 
   --radius-xs: 0.375rem;
   --radius-sm: 0.55rem;
@@ -277,7 +357,7 @@ a:active {
 
 .aura-surface {
   border: 1px solid rgba(var(--lumeo-paper-rgb), 0.075);
-  background: linear-gradient(180deg, rgba(31, 58, 92, 0.92), rgba(13, 24, 41, 0.96));
+  background: var(--surface-raised);
   box-shadow: var(--shadow-md);
 }
 
@@ -285,9 +365,9 @@ a:active {
   position: relative;
   border: 1px solid rgba(var(--lumeo-paper-rgb), 0.075);
   background:
-    linear-gradient(180deg, rgba(255, 253, 247, 0.075), transparent 34%),
-    linear-gradient(180deg, rgba(31, 58, 92, 0.9), rgba(12, 22, 38, 0.96));
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 253, 247, 0.08);
+    linear-gradient(180deg, rgb(246 242 232 / 0.07), transparent 34%),
+    linear-gradient(180deg, rgb(39 44 38 / 0.92), rgb(26 29 26 / 0.96));
+  box-shadow: 0 22px 62px rgb(0 0 0 / 0.26), inset 0 1px 0 rgb(255 253 248 / 0.08);
 }
 
 .aura-luminous-card::before {
@@ -296,8 +376,8 @@ a:active {
   inset: 0;
   pointer-events: none;
   border-radius: inherit;
-  background: radial-gradient(circle at 16% 0%, rgba(var(--lumeo-aura-rgb), 0.14), transparent 36%);
-  opacity: 0.8;
+  background: radial-gradient(circle at 16% 0%, rgb(var(--atelier-brass-rgb) / 0.075), transparent 36%);
+  opacity: 0.72;
 }
 
 .aura-document-surface {
@@ -316,9 +396,9 @@ a:active {
 .aura-live-tool :is(section, div)[class*="bg-[#0C1220]"] {
   border-color: rgba(var(--lumeo-paper-rgb), 0.075) !important;
   background:
-    linear-gradient(180deg, rgba(255, 253, 247, 0.06), transparent 34%),
-    linear-gradient(180deg, rgba(31, 58, 92, 0.9), rgba(12, 22, 38, 0.96)) !important;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 253, 247, 0.08) !important;
+    linear-gradient(180deg, rgb(246 242 232 / 0.055), transparent 34%),
+    linear-gradient(180deg, rgb(39 44 38 / 0.9), rgb(26 29 26 / 0.96)) !important;
+  box-shadow: 0 22px 62px rgb(0 0 0 / 0.26), inset 0 1px 0 rgb(255 253 248 / 0.08) !important;
 }
 
 .aura-live-tool [class*="border-[#FFFFFF]"],
@@ -360,8 +440,8 @@ a:active {
 
 .l2-live-tool-workspace {
   --l2-tool-panel-bg:
-    linear-gradient(180deg, rgba(255, 253, 248, 0.07), transparent 32%),
-    linear-gradient(180deg, rgba(22, 39, 64, 0.94), rgba(8, 17, 31, 0.96));
+    linear-gradient(180deg, rgb(246 242 232 / 0.065), transparent 32%),
+    linear-gradient(180deg, rgb(39 44 38 / 0.94), rgb(26 29 26 / 0.97));
   margin-top: var(--space-6);
 }
 
@@ -558,11 +638,11 @@ a:active {
 }
 
 .lumeo-card:hover {
-  transform: translateY(-5px) scale(1.006);
+  transform: translateY(-2px) scale(1.005);
 }
 
 .lumeo-card:active {
-  transform: translateY(-1px) scale(0.992);
+  transform: translateY(0) scale(0.99);
 }
 
 .lumeo-card-icon {
@@ -575,8 +655,8 @@ a:active {
 }
 
 .lumeo-card:hover .lumeo-card-icon {
-  transform: translateY(-2px) rotate(-1.5deg) scale(1.045);
-  box-shadow: 0 14px 34px rgba(203, 160, 82, 0.11);
+  transform: translateY(-1px) rotate(-1deg) scale(1.025);
+  box-shadow: 0 12px 28px rgba(var(--champagne-rgb), 0.09);
 }
 
 .lumeo-arrow {
@@ -588,7 +668,7 @@ a:active {
 }
 
 .lumeo-card:hover .lumeo-arrow {
-  transform: translateX(4px);
+  transform: translateX(2px);
 }
 
 .lumeo-shine {
@@ -626,11 +706,11 @@ a:active {
 }
 
 .lumeo-press:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
 }
 
 .lumeo-press:active {
-  transform: translateY(0) scale(0.975);
+  transform: translateY(0) scale(0.985);
 }
 
 .lumeo-primary-action {
@@ -667,17 +747,17 @@ a:active {
 }
 
 .lumeo-upload-surface:hover {
-  transform: translateY(-2px);
+  transform: translateY(-1px);
   box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.33),
-    0 0 0 1px rgba(203, 160, 82, 0.06);
+    0 22px 58px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(var(--champagne-rgb), 0.07);
 }
 
 .lumeo-upload-surface:focus-within {
-  border-color: rgba(203, 160, 82, 0.42);
+  border-color: rgba(var(--champagne-rgb), 0.42);
   box-shadow:
-    0 30px 80px rgba(0, 0, 0, 0.33),
-    0 0 0 4px rgba(203, 160, 82, 0.08);
+    0 22px 58px rgba(0, 0, 0, 0.28),
+    0 0 0 4px rgba(var(--champagne-rgb), 0.1);
 }
 
 .lumeo-ambient {
@@ -739,7 +819,7 @@ a:active {
 }
 
 .aura-progress-sheen {
-  background-image: linear-gradient(110deg, rgba(var(--lumeo-seal-rgb), 0.95), rgba(var(--lumeo-aura-rgb), 0.72), rgba(var(--lumeo-seal-rgb), 0.95));
+  background-image: linear-gradient(110deg, rgba(var(--lumeo-seal-rgb), 0.95), rgba(var(--champagne-rgb), 0.5), rgba(var(--lumeo-seal-rgb), 0.95));
   background-size: 180% 100%;
   animation: aura-progress-sheen 1.4s var(--ease-standard) infinite;
 }
@@ -784,8 +864,8 @@ a:active {
 .lumeo-focus-ring:focus-visible {
   outline: none;
   box-shadow:
-    0 0 0 2px #0c1220,
-    0 0 0 4px rgba(203, 160, 82, 0.58);
+    0 0 0 2px var(--atelier-canvas-950),
+    0 0 0 4px rgb(var(--atelier-brass-rgb) / 0.58);
 }
 
 @keyframes lumeo-page-enter {
@@ -937,10 +1017,10 @@ a:active {
 
 @keyframes lumeo2-drag-highlight {
   from {
-    box-shadow: 0 0 0 0 rgba(var(--sky-rgb), 0);
+    box-shadow: 0 0 0 0 rgba(var(--emerald-rgb), 0);
   }
   to {
-    box-shadow: 0 0 0 4px rgba(var(--sky-rgb), 0.14);
+    box-shadow: 0 0 0 4px rgba(var(--emerald-rgb), 0.16);
   }
 }
 

@@ -39,6 +39,63 @@ const splitTool = read("components/pdf/SplitPdfTool.tsx");
 const compressTool = read("components/pdf/CompressPdfTool.tsx");
 
 const requiredCssTokens = [
+  "--atelier-canvas-950",
+  "--atelier-canvas-900",
+  "--atelier-canvas-850",
+  "--atelier-canvas-800",
+  "--atelier-surface-1",
+  "--atelier-surface-2",
+  "--atelier-surface-3",
+  "--atelier-surface-4",
+  "--atelier-ivory-50",
+  "--atelier-ivory-100",
+  "--atelier-ivory-200",
+  "--atelier-ivory-300",
+  "--atelier-ivory-500",
+  "--atelier-ivory-700",
+  "--atelier-sage-300",
+  "--atelier-sage-400",
+  "--atelier-sage-500",
+  "--atelier-sage-600",
+  "--atelier-sage-700",
+  "--atelier-brass-300",
+  "--atelier-brass-400",
+  "--atelier-brass-500",
+  "--atelier-brass-600",
+  "--atelier-success",
+  "--atelier-warning",
+  "--atelier-danger",
+  "--atelier-info",
+  "--atelier-disabled",
+  "--maison-canvas-950",
+  "--maison-canvas-900",
+  "--maison-canvas-850",
+  "--maison-canvas-800",
+  "--maison-canvas-750",
+  "--maison-surface-1",
+  "--maison-surface-2",
+  "--maison-surface-3",
+  "--maison-surface-4",
+  "--maison-ivory-50",
+  "--maison-ivory-100",
+  "--maison-ivory-200",
+  "--maison-ivory-300",
+  "--maison-ivory-500",
+  "--maison-ivory-700",
+  "--maison-green-400",
+  "--maison-green-500",
+  "--maison-green-600",
+  "--maison-green-700",
+  "--maison-bronze-300",
+  "--maison-bronze-400",
+  "--maison-bronze-500",
+  "--maison-bronze-600",
+  "--maison-success",
+  "--maison-warning",
+  "--maison-danger",
+  "--maison-info",
+  "--maison-planned",
+  "--maison-unavailable",
   "--canvas-950",
   "--canvas-900",
   "--canvas-850",
@@ -75,6 +132,7 @@ const requiredCssTokens = [
   "--text-subtle",
   "--text-on-accent",
   "--text-accent",
+  "--text-premium",
   "--text-success",
   "--text-warning",
   "--text-danger",
@@ -107,7 +165,20 @@ const requiredCssTokens = [
   "--shadow-focus",
   "--shadow-success",
   "--shadow-danger",
+  "--action-primary",
+  "--action-primary-hover",
+  "--action-primary-active",
+  "--action-secondary",
+  "--action-danger",
   "--space-24",
+  "--gap-section",
+  "--gap-card",
+  "--gap-content",
+  "--gap-control",
+  "--gap-compact",
+  "--padding-page",
+  "--padding-panel",
+  "--padding-mobile-page",
   "--radius-pill",
   "--motion-standard",
   "--ease-emphasized",
@@ -190,7 +261,7 @@ try {
   assert(sidebar.includes("ControlCenterSidebar"), "Control Center sidebar foundation is missing.");
   assert(mobileNav.includes("ControlCenterMobileNav"), "Control Center mobile nav foundation is missing.");
   assert(guidance.includes("AdminWhatThisControls"), "Admin guidance foundations are missing.");
-  assert(showcase.includes("Lumeo 2.0") && showcase.includes("Lumeo Canvas"), "Protected showcase must display Lumeo 2.");
+  assert(showcase.includes("Lumeo Atelier") && showcase.includes("Atelier theme system"), "Protected showcase must display Lumeo Atelier.");
   assert(showcase.includes("Responsive and reduced-motion notes"), "Showcase must demonstrate responsive and reduced-motion notes.");
   assert(exists("app/admin/(protected)/design-system/page.tsx"), "Protected showcase is missing.");
   assert(!exists("app/design-system/page.tsx"), "Design-system showcase must not be public.");
@@ -202,12 +273,19 @@ try {
     "lumeo2TypographyTokens",
     "lumeo2SpacingTokens",
     "lumeo2RadiusTokens",
+    "maisonActionTokens",
   ]) {
     assert(tokens.includes(registry), `Missing token registry: ${registry}`);
   }
 
   assert(docs.includes("Lumeo 2.0"), "Lumeo 2 documentation is missing its title.");
+  assert(docs.includes("Lumeo Atelier Theme"), "Atelier theme documentation is missing.");
   assert(docs.includes("Run 2 migration plan"), "Lumeo 2 documentation must include the Run 2 migration plan.");
+  assert(css.includes("--action-primary: var(--atelier-sage-500);"), "Atelier Heritage Sage must be the primary action token.");
+  assert(css.includes("--gap-section: var(--space-12);") && tokens.includes("--gap-section"), "Final Atelier semantic spacing tokens are missing.");
+  assert(css.includes("rgb(var(--atelier-sage-rgb) / 0.08)") && css.includes("rgb(var(--atelier-brass-rgb) / 0.06)") && css.includes("background: var(--surface-canvas);"), "Atelier canvas must use valid layered CSS Color 4 syntax.");
+  assert(!css.includes("#7ecbe8") && !css.includes("#45add5") && !css.includes("#2a87af"), "Blue-dominant public accent values must not remain in the semantic foundation.");
+  assert(!ui.includes("rgba(var(--sky-rgb)"), "Shared UI components must not use sky-rgb as a public focus or action accent.");
   assert(packageJson.scripts["verify:lumeo2-foundation"] === "node scripts/verify-lumeo-2-foundation.mjs", "verify:lumeo2-foundation script is missing.");
   assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");

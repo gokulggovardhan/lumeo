@@ -116,8 +116,11 @@ export function ToolResultStage({ title, children, action }: { title: string; ch
 
 export function ToolPrivacyNote({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={cx("rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] px-4 py-2 text-center text-xs font-bold text-[var(--lumeo-paper-400)]", compact && "inline-flex")}>
-      Private by design · Browser-only · Cleared after download
+    <div className={cx("mx-auto flex w-fit max-w-[560px] items-center justify-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-raised)] px-4 py-2 text-center text-xs font-bold text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.07)]", compact && "inline-flex")}>
+      <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-[var(--text-premium)]" fill="none">
+        <path d="M8 2.5 12 4v3.1c0 2.6-1.5 4.9-4 6.1-2.5-1.2-4-3.5-4-6.1V4l4-1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" />
+      </svg>
+      <span>Private by design · Browser-only · Cleared after download</span>
     </div>
   );
 }
@@ -362,7 +365,7 @@ export function L2UploadStage({
         event.stopPropagation();
         openFileChooser();
       }}
-      className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--emerald-500),var(--emerald-700))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+      className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-200 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
     >
       {buttonLabel ?? (multiple ? "Select PDFs" : "Select PDF")}
     </button>
@@ -552,7 +555,7 @@ export function L2AdvancedDisclosure({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-xl)] px-4 py-3 text-left font-black text-[var(--text-primary)] transition hover:bg-[rgba(var(--paper-rgb),0.055)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.22)]"
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-xl)] px-4 py-3 text-left font-black text-[var(--text-primary)] transition hover:bg-[rgba(var(--paper-rgb),0.055)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
       >
         <span>
           {title}
@@ -628,8 +631,11 @@ export function L2ResultState({
 
 export function L2PrivacyNote({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={cx("l2-privacy-note rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-4 py-2 text-center text-xs font-extrabold text-[var(--text-subtle)]", compact && "inline-flex")}>
-      Private by design · Browser-only · Cleared after download
+    <div className={cx("l2-privacy-note mx-auto flex w-fit max-w-[560px] items-center justify-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-raised)] px-4 py-2 text-center text-xs font-extrabold text-[var(--text-muted)]", compact && "inline-flex")}>
+      <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-[var(--text-premium)]" fill="none">
+        <path d="M8 2.5 12 4v3.1c0 2.6-1.5 4.9-4 6.1-2.5-1.2-4-3.5-4-6.1V4l4-1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" />
+      </svg>
+      <span>Private by design · Browser-only · Cleared after download</span>
     </div>
   );
 }

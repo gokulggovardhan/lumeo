@@ -7,6 +7,21 @@ import { L2MenuSurface } from "@/components/ui/Aura";
 
 const MENU_ID = "lumeo-pdf-tools-menu";
 
+const categoryLabels: Record<string, string> = {
+  "organize-pdf": "ORGANIZE",
+  "optimize-pdf": "OPTIMIZE",
+  "convert-to-pdf": "CONVERT TO PDF",
+  "convert-from-pdf": "CONVERT FROM PDF",
+};
+
+const toolDescriptions: Record<string, string> = {
+  merge: "Combine documents",
+  split: "Extract pages",
+  compress: "Reduce file size",
+  "jpg-to-pdf": "Turn images into PDF",
+  "pdf-to-jpg": "Export pages as images",
+};
+
 function Chevron({ open }: { open: boolean }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 16 16" className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none">
@@ -67,7 +82,7 @@ export function PublicPdfToolsMenuClient({
         aria-expanded={open}
         aria-controls={MENU_ID}
         onClick={() => setOpen((value) => !value)}
-        className={`lumeo-press lumeo-focus-ring inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[rgba(var(--paper-rgb),0.075)] text-sm font-extrabold text-[var(--text-secondary)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition duration-200 hover:bg-[rgba(var(--paper-rgb),0.12)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)] ${
+        className={`lumeo-press lumeo-focus-ring inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[rgba(var(--paper-rgb),0.075)] text-sm font-extrabold text-[var(--text-secondary)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition duration-200 hover:bg-[rgba(var(--paper-rgb),0.12)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] ${
           compact ? "h-10 px-3.5 sm:h-11 sm:px-4" : "px-3 py-2.5 sm:px-4"
         }`}
       >
@@ -82,12 +97,12 @@ export function PublicPdfToolsMenuClient({
             id={MENU_ID}
             role="menu"
             aria-label="PDF Tools"
-            className="aura-menu-reveal pointer-events-auto fixed inset-x-3 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto md:absolute md:inset-auto md:right-0 md:top-[calc(100%+0.65rem)] md:w-[min(46rem,calc(100vw-2rem))] md:max-h-[74vh]"
+            className="aura-menu-reveal pointer-events-auto fixed inset-x-3 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto md:absolute md:inset-auto md:right-0 md:top-[calc(100%+0.65rem)] md:w-[min(21rem,calc(100vw-2rem))] md:max-h-[70vh] xl:right-[-20rem]"
           >
-            <div className="flex items-center justify-between gap-4 px-2 pb-3">
+            <div className="flex items-start justify-between gap-4 px-1 pb-2">
               <div>
-                <p className="text-sm font-black text-[var(--lumeo-paper-50)]">PDF Tools</p>
-                <p className="mt-1 text-xs text-[var(--lumeo-paper-400)]">Choose a workspace by category.</p>
+                <p className="text-sm font-black text-[var(--text-primary)]">PDF Tools</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Choose a workspace.</p>
               </div>
               <button
                 type="button"
@@ -95,17 +110,17 @@ export function PublicPdfToolsMenuClient({
                   setOpen(false);
                   buttonRef.current?.focus();
                 }}
-                className="min-h-10 rounded-[var(--radius-md)] px-3 text-xs font-black text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.07)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)] md:hidden"
+                className="min-h-10 rounded-[var(--radius-md)] px-3 text-xs font-black text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.07)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] md:hidden"
               >
                 Close
               </button>
             </div>
 
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="mt-2 grid gap-3">
               {categories.map((category) => (
-                <section key={category.slug} className="rounded-[var(--radius-xl)] bg-[rgba(var(--paper-rgb),0.05)] p-3 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)]">
-                  <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold-300)]">{category.name}</h2>
-                  <div className="mt-2 grid gap-1.5">
+                <section key={category.slug}>
+                  <h2 className="px-1 text-[0.68rem] font-black uppercase tracking-[0.16em] text-[var(--text-premium)]">{categoryLabels[category.slug] ?? category.name}</h2>
+                  <div className="mt-1.5 grid gap-1">
                     {category.tools.map((tool) => (
                       <Link
                         key={tool.route}
@@ -114,13 +129,18 @@ export function PublicPdfToolsMenuClient({
                         onClick={() => {
                           setOpen(false);
                         }}
-                        className="group rounded-[var(--radius-lg)] px-3 py-2.5 text-left transition duration-200 hover:bg-[rgba(var(--paper-rgb),0.075)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.18)]"
+                        className="group flex items-center gap-3 rounded-[var(--radius-lg)] px-2.5 py-2.5 text-left transition duration-200 hover:bg-[rgba(var(--paper-rgb),0.075)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.16)]"
                       >
-                        <span className="flex items-center justify-between gap-3">
-                          <span className="text-sm font-semibold text-[var(--lumeo-paper-50)]">{tool.toolName}</span>
-                          <span aria-hidden="true" className="text-[var(--lumeo-gold-300)] transition group-hover:translate-x-0.5 motion-reduce:transform-none">→</span>
+                        <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[rgba(var(--champagne-rgb),0.1)] text-[0.62rem] font-black text-[var(--text-premium)]">
+                          PDF
                         </span>
-                        <span className="mt-1 block text-xs leading-5 text-[var(--lumeo-paper-400)]">{tool.shortDescription}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold text-[var(--text-primary)]">{tool.toolName}</span>
+                          <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{toolDescriptions[tool.toolSlug] ?? tool.shortDescription}</span>
+                        </span>
+                        <span aria-hidden="true" className="shrink-0 text-[var(--text-premium)] transition group-hover:translate-x-0.5 motion-reduce:transform-none">
+                          →
+                        </span>
                       </Link>
                     ))}
                   </div>
@@ -133,9 +153,10 @@ export function PublicPdfToolsMenuClient({
               onClick={() => {
                 setOpen(false);
               }}
-              className="mt-3 flex min-h-11 items-center justify-center rounded-[var(--radius-lg)] bg-[linear-gradient(180deg,var(--emerald-400),var(--emerald-600))] px-4 text-sm font-black text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]"
+              className="mt-3 flex min-h-11 items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-3 text-sm font-black text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,253,248,0.07)] transition hover:bg-[rgba(var(--paper-rgb),0.085)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
             >
-              View all PDF tools
+              <span>View all PDF tools</span>
+              <span aria-hidden="true" className="text-[var(--text-premium)]">→</span>
             </Link>
           </L2MenuSurface>
         </>

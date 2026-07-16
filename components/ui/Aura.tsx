@@ -27,13 +27,13 @@ const toneClasses: Record<Tone, string> = {
   success: "border-[rgba(var(--emerald-rgb),0.36)] bg-[var(--surface-success)] text-[var(--text-success)]",
   warning: "border-[rgba(var(--champagne-rgb),0.4)] bg-[rgba(var(--champagne-rgb),0.12)] text-[var(--text-warning)]",
   danger: "border-[var(--border-danger)] bg-[var(--surface-danger)] text-[var(--text-danger)]",
-  info: "border-[rgba(var(--sky-rgb),0.38)] bg-[rgba(var(--sky-rgb),0.12)] text-[var(--text-info)]",
+  info: "border-[rgba(var(--champagne-rgb),0.24)] bg-[rgba(var(--paper-rgb),0.06)] text-[var(--text-info)]",
   planned: "border-[rgba(var(--paper-rgb),0.16)] bg-[rgba(var(--paper-rgb),0.07)] text-[var(--text-secondary)]",
   unavailable: "border-[rgba(var(--paper-rgb),0.12)] bg-[rgba(var(--paper-rgb),0.035)] text-[var(--text-subtle)]",
 };
 
 const buttonVariants: Record<ButtonVariant, string> = {
-  primary: "border-[rgba(var(--emerald-rgb),0.58)] bg-[linear-gradient(180deg,var(--emerald-400),var(--emerald-600))] text-[var(--text-on-accent)] shadow-[0_16px_38px_rgba(var(--emerald-rgb),0.28),inset_0_1px_0_rgba(255,253,248,0.22)] hover:brightness-110",
+  primary: "border-[rgba(var(--atelier-sage-rgb),0.5)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] text-[var(--text-on-accent)] shadow-[0_12px_28px_rgba(var(--atelier-sage-rgb),0.18),inset_0_1px_0_rgba(255,253,248,0.18)] hover:brightness-105",
   secondary: "border-[var(--border-hairline)] bg-[var(--surface-interactive)] text-[var(--text-primary)] shadow-[var(--shadow-xs)] hover:border-[var(--border-default)] hover:bg-[rgba(var(--paper-rgb),0.12)]",
   ghost: "border-transparent bg-transparent text-[var(--text-secondary)] hover:border-[var(--border-subtle)] hover:bg-[rgba(var(--paper-rgb),0.06)]",
   premium: "border-[rgba(var(--champagne-rgb),0.34)] bg-[linear-gradient(180deg,rgba(var(--champagne-rgb),0.16),rgba(var(--champagne-rgb),0.075))] text-[var(--text-accent)] hover:bg-[rgba(var(--champagne-rgb),0.18)]",
@@ -66,7 +66,7 @@ export function AuraButton({
       {...props}
       disabled={disabled || loading}
       className={cx(
-        "lumeo2-button-press inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] border font-extrabold transition duration-[var(--motion-standard)] ease-[var(--ease-standard)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.22)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
+        "lumeo2-button-press inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] border font-extrabold transition duration-[var(--motion-standard)] ease-[var(--ease-standard)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60",
         buttonVariants[variant],
         sizeClasses[size],
         className,
@@ -90,7 +90,7 @@ export function AuraIconButton({
       aria-label={label}
       title={label}
       className={cx(
-        "lumeo2-button-press inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(var(--paper-rgb),0.07)] text-[var(--text-secondary)] transition duration-[var(--motion-standard)] hover:border-[var(--border-premium)] hover:bg-[rgba(var(--paper-rgb),0.12)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.22)]",
+        "lumeo2-button-press inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(var(--paper-rgb),0.07)] text-[var(--text-secondary)] transition duration-[var(--motion-standard)] hover:border-[var(--border-premium)] hover:bg-[rgba(var(--paper-rgb),0.12)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]",
         className,
       )}
     >
@@ -122,7 +122,7 @@ export function AuraPanel({ className, ...props }: HTMLAttributes<HTMLElement>) 
 
 function fieldClass(className?: string) {
   return cx(
-    "min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm font-semibold text-[var(--lumeo-paper-50)] placeholder:text-[var(--lumeo-paper-400)] transition duration-[var(--motion-standard)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-[rgba(var(--lumeo-aura-rgb),0.14)] disabled:cursor-not-allowed disabled:opacity-60",
+    "min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] transition duration-[var(--motion-standard)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.14)] disabled:cursor-not-allowed disabled:opacity-60",
     className,
   );
 }
@@ -211,14 +211,14 @@ export function AuraSwitch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onCheckedChange?.(!checked)}
-      className={cx("flex min-h-11 w-full items-center justify-between gap-4 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-3 text-left transition hover:border-[var(--border-premium)] disabled:cursor-not-allowed disabled:opacity-60", className)}
+      className={cx("flex min-h-11 w-full items-center justify-between gap-4 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.045)] p-3 text-left transition hover:border-[var(--border-premium)] disabled:cursor-not-allowed disabled:opacity-60", className)}
     >
       <span>
-        <span className="block text-sm font-extrabold text-[var(--lumeo-paper-50)]">{label}</span>
-        {description ? <span className="mt-1 block text-xs leading-5 text-[var(--lumeo-paper-400)]">{description}</span> : null}
+        <span className="block text-sm font-extrabold text-[var(--text-primary)]">{label}</span>
+        {description ? <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{description}</span> : null}
         {impact || disabledReason ? <span className="mt-1 block text-xs font-bold text-[var(--lumeo-gold-300)]">{disabledReason ?? impact}</span> : null}
       </span>
-      <span className={cx("relative h-7 w-12 shrink-0 rounded-full border transition", checked ? "border-[rgba(var(--emerald-rgb),0.62)] bg-[var(--emerald-500)]" : "border-[var(--border-default)] bg-[var(--canvas-750)]")}>
+      <span className={cx("relative h-7 w-12 shrink-0 rounded-full border transition", checked ? "border-[rgba(var(--atelier-sage-rgb),0.62)] bg-[var(--action-primary)]" : "border-[var(--border-default)] bg-[var(--surface-elevated)]")}>
         <span aria-hidden="true" className={cx("absolute left-2 top-1 text-[10px] font-black text-[var(--text-on-accent)] transition-opacity", checked ? "opacity-100" : "opacity-0")}>✓</span>
         <span className={cx("lumeo2-switch-slide absolute top-1 h-5 w-5 rounded-full bg-[var(--paper-50)] shadow-[var(--shadow-xs)]", checked ? "translate-x-6" : "translate-x-1")} />
       </span>
@@ -347,7 +347,7 @@ export function AuraPopover({ trigger, children }: { trigger: ReactNode; childre
   return (
     <div className="relative inline-flex">
       <span onClick={() => setOpen((value) => !value)}>{trigger}</span>
-      {open ? <div className="aura-menu-reveal absolute right-0 top-full z-30 mt-2 min-w-64 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--lumeo-ink-850)] p-3 shadow-[var(--shadow-lg)]">{children}</div> : null}
+      {open ? <div className="aura-menu-reveal absolute right-0 top-full z-30 mt-2 min-w-64 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--surface-floating)] p-3 shadow-[var(--shadow-lg)]">{children}</div> : null}
     </div>
   );
 }
@@ -396,7 +396,7 @@ export function AuraDialog({
   if (!open) return null;
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="aura-dialog-title" className="fixed inset-0 z-50 grid place-items-center bg-[var(--surface-overlay)] p-4">
-      <div className="aura-scale-in w-full max-w-lg rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--lumeo-ink-850)] p-6 shadow-[var(--shadow-xl)]">
+      <div className="aura-scale-in w-full max-w-lg rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-floating)] p-6 shadow-[var(--shadow-xl)]">
         <div className="flex items-center justify-between gap-4">
           <h2 id="aura-dialog-title" className="text-xl font-extrabold text-[var(--lumeo-paper-50)]">{title}</h2>
           <AuraIconButton label="Close dialog" onClick={onClose}>×</AuraIconButton>
@@ -430,7 +430,7 @@ export function AuraDrawer({
   if (!open) return null;
   return (
     <aside role="dialog" aria-modal="true" aria-labelledby="aura-drawer-title" className="fixed inset-0 z-50 bg-[var(--surface-overlay)]">
-      <div className="aura-drawer-enter ml-auto h-full w-full max-w-md border-l border-[var(--border-subtle)] bg-[var(--lumeo-ink-850)] p-6 shadow-[var(--shadow-xl)]">
+      <div className="aura-drawer-enter ml-auto h-full w-full max-w-md border-l border-[var(--border-subtle)] bg-[var(--surface-floating)] p-6 shadow-[var(--shadow-xl)]">
         <div className="flex items-center justify-between gap-4">
           <h2 id="aura-drawer-title" className="text-xl font-extrabold text-[var(--lumeo-paper-50)]">{title}</h2>
           <AuraIconButton label="Close drawer" onClick={onClose}>×</AuraIconButton>
@@ -603,20 +603,20 @@ export function AuraUploadSurface({
       onClick={onActivate}
       onKeyDown={handleKeyDown}
       className={cx(
-        "lumeo-upload-surface aura-luminous-card rounded-[var(--radius-2xl)] p-6 text-center shadow-[var(--shadow-lg)] transition duration-200 hover:shadow-[var(--shadow-xl)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)] sm:p-7",
-        dragActive && "lumeo2-drag-highlight border-[var(--border-focus)] bg-[rgba(var(--sky-rgb),0.08)]",
+        "lumeo-upload-surface aura-luminous-card rounded-[var(--radius-2xl)] p-5 text-center shadow-[var(--shadow-md)] transition duration-200 hover:shadow-[var(--shadow-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] sm:p-6",
+        dragActive && "lumeo2-drag-highlight border-[var(--border-selected)] bg-[rgba(var(--atelier-sage-rgb),0.09)]",
         onActivate && "cursor-pointer",
       )}
     >
-      <div className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-xl)] bg-[linear-gradient(145deg,rgba(var(--sky-rgb),0.18),rgba(var(--champagne-rgb),0.11))] text-[var(--text-info)] shadow-[inset_0_1px_0_rgba(255,253,248,0.16)] sm:h-14 sm:w-14">
+      <div className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-xl)] bg-[linear-gradient(145deg,rgba(var(--atelier-brass-rgb),0.14),rgba(var(--atelier-sage-rgb),0.08))] text-[var(--text-premium)] shadow-[inset_0_1px_0_rgba(255,253,248,0.14)] sm:h-14 sm:w-14">
         {loading ? <span aria-hidden="true" className="h-5 w-5 rounded-full border-2 border-current border-r-transparent motion-safe:animate-spin" /> : icon ?? "PDF"}
       </div>
-      <h3 className="mt-3 text-xl font-black text-[var(--text-primary)] sm:mt-4">{title}</h3>
+      <h3 className="mt-3 text-xl font-black text-[var(--text-primary)]">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
-      {supportedTypes ? <p className="mt-3 text-xs font-bold text-[var(--text-subtle)]">{supportedTypes}</p> : null}
+      {supportedTypes ? <p className="mt-2 text-xs font-bold text-[var(--text-subtle)]">{supportedTypes}</p> : null}
       {privacyNote ? <p className="mx-auto mt-2 max-w-md text-xs font-bold text-[var(--text-accent)]">{privacyNote}</p> : null}
       {error ? <p aria-live="polite" className="mx-auto mt-3 max-w-md text-xs font-bold text-[var(--text-danger)]">{error}</p> : null}
-      {action ? <div className="mx-auto mt-5 w-full sm:max-w-[320px]">{action}</div> : null}
+      {action ? <div className="mx-auto mt-4 w-full sm:max-w-[320px]">{action}</div> : null}
     </div>
   );
 }
@@ -726,7 +726,7 @@ function L2Arrow() {
 function L2ToolIcon({ iconKey }: { iconKey: string }) {
   const label = iconKey === "all" ? "All" : "PDF";
   return (
-    <span aria-hidden="true" className="lumeo-card-icon grid h-12 w-12 shrink-0 place-items-center rounded-[var(--radius-lg)] bg-[linear-gradient(145deg,rgba(var(--champagne-rgb),0.16),rgba(var(--sky-rgb),0.08))] text-xs font-black text-[var(--text-accent)] shadow-[inset_0_1px_0_rgba(255,253,248,0.12)]">
+    <span aria-hidden="true" className="lumeo-card-icon grid h-11 w-11 shrink-0 place-items-center rounded-[var(--radius-lg)] bg-[linear-gradient(145deg,rgba(var(--champagne-rgb),0.12),rgba(var(--emerald-rgb),0.07))] text-xs font-black text-[var(--text-accent)] shadow-[inset_0_1px_0_rgba(255,253,248,0.1)]">
       {label}
     </span>
   );
@@ -737,11 +737,11 @@ export function L2PublicHeader({ children, className, ...props }: HTMLAttributes
     <header
       {...props}
       className={cx(
-        "l2-public-header sticky top-0 z-40 px-4 py-3 sm:px-6",
+        "l2-public-header sticky top-0 z-40 px-4 py-2.5 sm:px-6",
         className,
       )}
     >
-      <div className="mx-auto max-w-[var(--container-wide)] rounded-[var(--radius-xl)] bg-[linear-gradient(180deg,rgba(22,39,64,0.88),rgba(8,17,31,0.78))] px-3 shadow-[0_18px_50px_rgba(0,0,0,0.22),inset_0_1px_0_rgba(255,253,248,0.09)] backdrop-blur-xl">
+      <div className="mx-auto max-w-[var(--container-wide)] rounded-[var(--radius-xl)] bg-[linear-gradient(180deg,rgba(39,44,38,0.88),rgba(20,22,20,0.84))] px-3 shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,253,248,0.08)] backdrop-blur-xl">
         {children}
       </div>
     </header>
@@ -758,7 +758,7 @@ export function L2PublicNavLink({
       {...props}
       aria-current={active ? "page" : props["aria-current"]}
       className={cx(
-        "inline-flex min-h-11 items-center rounded-[var(--radius-md)] px-3 text-sm font-extrabold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.075)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]",
+        "inline-flex min-h-11 items-center rounded-[var(--radius-md)] px-3 text-sm font-extrabold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.075)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]",
         active && "bg-[rgba(var(--paper-rgb),0.08)] text-[var(--text-primary)]",
         className,
       )}
@@ -817,7 +817,7 @@ export function L2FeaturedToolCard({ tool, className }: { tool: L2ToolCardData; 
       href={tool.route}
       aria-label={`Open ${tool.toolName}`}
       className={cx(
-        "l2-featured-tool-card lumeo-card aura-luminous-card group relative flex min-h-[16rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] p-6 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)] motion-reduce:transform-none sm:p-7 lg:col-span-2",
+        "l2-featured-tool-card lumeo-card aura-luminous-card group relative flex min-h-[15rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] p-6 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] motion-reduce:transform-none sm:p-6 lg:col-span-2",
         className,
       )}
     >
@@ -832,8 +832,8 @@ export function L2ToolCard({ tool, allTools = false, className }: { tool: L2Tool
       href={tool.route}
       aria-label={allTools ? "Browse all PDF tools" : `Open ${tool.toolName}`}
       className={cx(
-        "l2-tool-card lumeo-card aura-luminous-card group relative flex min-h-[13rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] p-5 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)] motion-reduce:transform-none",
-        allTools && "bg-[linear-gradient(180deg,rgba(var(--sky-rgb),0.12),rgba(var(--paper-rgb),0.045))]",
+        "l2-tool-card lumeo-card aura-luminous-card group relative flex min-h-[13rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] p-5 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] motion-reduce:transform-none",
+        allTools && "bg-[linear-gradient(180deg,rgba(var(--champagne-rgb),0.1),rgba(var(--paper-rgb),0.045))]",
         className,
       )}
     >
@@ -848,7 +848,7 @@ export function L2DirectoryToolCard({ tool, className }: { tool: L2ToolCardData;
       href={tool.route}
       aria-label={`Open ${tool.toolName}`}
       className={cx(
-        "l2-directory-tool-card l2-directory-card-surface group flex h-full min-h-40 flex-col rounded-[var(--radius-xl)] bg-[linear-gradient(180deg,rgba(var(--paper-rgb),0.075),rgba(var(--paper-rgb),0.045))] p-5 shadow-[var(--shadow-sm),inset_0_1px_0_rgba(255,253,248,0.075)] transition hover:-translate-y-[2px] hover:bg-[rgba(var(--paper-rgb),0.08)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.18)] motion-reduce:transform-none",
+        "l2-directory-tool-card l2-directory-card-surface group flex h-full min-h-40 flex-col rounded-[var(--radius-xl)] bg-[linear-gradient(180deg,rgba(var(--paper-rgb),0.075),rgba(var(--paper-rgb),0.045))] p-5 shadow-[var(--shadow-sm),inset_0_1px_0_rgba(255,253,248,0.075)] transition hover:-translate-y-[2px] hover:bg-[rgba(var(--paper-rgb),0.08)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.16)] motion-reduce:transform-none",
         className,
       )}
     >
@@ -867,11 +867,11 @@ export function L2DirectoryToolCard({ tool, className }: { tool: L2ToolCardData;
 
 export function L2TrustRail({ items, className }: { items: string[]; className?: string }) {
   return (
-    <section className={cx("l2-trust-rail rounded-[var(--radius-2xl)] bg-[rgba(var(--paper-rgb),0.045)] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)]", className)} aria-label="Lumeo trust notes">
-      <ul className="l2-trust-rail-grid grid grid-cols-1 gap-3 text-sm font-bold text-[var(--text-secondary)] sm:grid-cols-3">
+    <section className={cx("l2-trust-rail rounded-[var(--radius-2xl)] bg-[rgba(var(--paper-rgb),0.04)] px-5 py-4 shadow-[inset_0_1px_0_rgba(255,253,248,0.055)]", className)} aria-label="Lumeo trust notes">
+      <ul className="l2-trust-rail-grid grid grid-cols-1 gap-3 text-sm font-bold text-[var(--text-secondary)] md:grid-cols-3">
         {items.map((item) => (
-          <li key={item} className="flex min-w-0 items-center justify-start gap-2.5 sm:justify-center sm:text-center">
-            <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-[var(--emerald-400)]" />
+          <li key={item} className="flex min-w-0 items-center justify-start gap-2.5 md:justify-center md:text-center">
+            <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-[var(--atelier-sage-300)]" />
             <span className="min-w-0">{item}</span>
           </li>
         ))}

@@ -60,27 +60,27 @@ export default function Home() {
       />
 
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="lumeo-ambient absolute -left-44 -top-52 h-[34rem] w-[34rem] rounded-full bg-[#0D2C6D]/22 blur-[155px]" />
-        <div className="lumeo-ambient absolute -right-44 top-[-5rem] h-[32rem] w-[32rem] rounded-full bg-[#CBA052]/[0.075] blur-[155px] [animation-delay:-4s]" />
-        <div className="absolute bottom-[-18rem] left-[44%] h-[28rem] w-[28rem] rounded-full bg-[#1E6B4A]/[0.07] blur-[150px]" />
+        <div className="lumeo-ambient absolute -left-44 -top-52 h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.055)] blur-[150px]" />
+        <div className="lumeo-ambient absolute -right-44 top-[-5rem] h-[28rem] w-[28rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.05)] blur-[150px] [animation-delay:-4s]" />
+        <div className="absolute bottom-[-16rem] left-[42%] h-[26rem] w-[26rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.045)] blur-[145px]" />
       </div>
 
       <PublicNav toolsMenu={<PublicPdfToolsMenu />} />
 
       <section className="relative z-10 flex-1">
-        <div className="mx-auto w-full max-w-[1160px] px-5 pb-10 pt-7 sm:px-8 sm:pb-12 sm:pt-9 lg:pb-14">
+        <div className="mx-auto w-full max-w-[1160px] px-5 pb-10 pt-6 sm:px-8 sm:pb-12 sm:pt-8 lg:pb-14">
           <section aria-labelledby="tool-heading" className="aura-home-workspace">
-            <header className="lumeo-fade-up mx-auto mb-7 max-w-3xl text-center sm:mb-8">
+            <header className="lumeo-fade-up mx-auto mb-6 max-w-[46rem] text-center sm:mb-7">
               <p className="aura-text-label text-[var(--lumeo-gold-300)]">
                 LUMEO PDF WORKSPACE
               </p>
               <h1
                 id="tool-heading"
-                className="mt-3 font-serif text-[clamp(2.85rem,7vw,5.4rem)] leading-[var(--leading-display)] tracking-[var(--tracking-display)] text-[var(--text-primary)]"
+                className="mt-4 font-serif text-[clamp(2.6rem,6.1vw,4.85rem)] leading-[0.98] tracking-[var(--tracking-display)] text-[var(--text-primary)]"
               >
                 Documents, beautifully handled.
               </h1>
-              <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-[var(--text-secondary)] sm:text-lg">
+              <p className="mx-auto mt-5 max-w-xl text-base leading-7 text-[var(--text-secondary)] sm:text-lg">
                 Fast PDF tools that work privately in your browser.
               </p>
             </header>

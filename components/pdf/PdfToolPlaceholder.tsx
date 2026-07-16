@@ -31,10 +31,10 @@ export function PdfToolPlaceholder({ tool }: { tool: PdfToolDefinition }) {
             {tool.description}
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/pdf-tools" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-hairline)] bg-[var(--surface-interactive)] px-4 text-sm font-extrabold text-[var(--text-primary)] shadow-[var(--shadow-xs)] transition hover:bg-[rgba(var(--paper-rgb),0.12)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">
+            <Link href="/pdf-tools" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-hairline)] bg-[var(--surface-interactive)] px-4 text-sm font-extrabold text-[var(--text-primary)] shadow-[var(--shadow-xs)] transition hover:bg-[rgba(var(--paper-rgb),0.12)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]">
               Browse PDF tools
             </Link>
-            <Link href="/" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-transparent px-4 text-sm font-extrabold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.06)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--sky-rgb),0.2)]">
+            <Link href="/" className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-transparent px-4 text-sm font-extrabold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.06)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]">
               Back home
             </Link>
           </div>
