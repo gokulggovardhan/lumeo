@@ -394,7 +394,7 @@ function SplitIcon() {
 
 function PdfFileIcon() {
   return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#CBA052]/10 text-[#CBA052]">
+    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[#CBA052]/10 text-[#CBA052]">
       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
         <path
           d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z"
@@ -1365,7 +1365,7 @@ export default function SplitPdfTool() {
                   {analysis.pageCount} page{analysis.pageCount === 1 ? "" : "s"} · {formatBytes(analysis.size)} · {analysis.pageSizeType}
                 </p>
               </div>
-              <span className="rounded-full border border-[#CBA052]/24 bg-[#CBA052]/10 px-3 py-1.5 text-xs font-semibold text-[#9FD0B5]">
+              <span className="rounded-full border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 py-1.5 text-xs font-semibold text-[#9FD0B5]">
                 {status}
               </span>
             </div>
@@ -1505,10 +1505,10 @@ export default function SplitPdfTool() {
                       type="button"
                       key={item.value}
                       onClick={() => setModeSafely(item.value)}
-                      className={`rounded-xl border px-3 py-2 text-left transition ${
+                      className={`rounded-xl border border-l-4 px-3 py-2 text-left transition ${
                         mode === item.value
-                          ? "border-[#CBA052]/55 bg-[#CBA052]/16"
-                          : "border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.025] hover:border-[#CBA052]/28"
+                          ? "border-[var(--border-subtle)] border-l-[var(--atelier-sage-400)] bg-[var(--surface-selected)]"
+                          : "border-l-transparent border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.025] hover:border-[#CBA052]/28"
                       }`}
                     >
                       <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#FFFFFF]">
