@@ -5,6 +5,7 @@
   --foreground: #f0ead6;
   --font-sans: var(--font-manrope), Arial, Helvetica, sans-serif;
   --font-serif: var(--font-dm-serif), Georgia, serif;
+  --font-mono: var(--font-ibm-plex-mono), ui-monospace, "SF Mono", "Cascadia Code", Consolas, monospace;
   --lumeo-gold: #cba052;
   --lumeo-green: #1e6b4a;
   --lumeo-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -195,7 +196,7 @@
   --text-display-xl: clamp(3.25rem, 8vw, 7rem);
   --text-display-lg: clamp(2.75rem, 6vw, 5.5rem);
   --text-display-md: clamp(2.25rem, 4.5vw, 4rem);
-  --text-heading-xl: clamp(1.9rem, 3vw, 3rem);
+  --text-heading-xl: clamp(1.85rem, 3.28vw, 2.375rem);
   --text-heading-lg: clamp(1.55rem, 2.2vw, 2.25rem);
   --text-heading-md: 1.35rem;
   --text-heading-sm: 1.125rem;
@@ -220,9 +221,9 @@
   --font-body-lg: 500 var(--text-body-lg) / var(--leading-body) var(--font-sans);
   --font-body-md: 500 var(--text-body-md) / var(--leading-body) var(--font-sans);
   --font-body-sm: 500 var(--text-body-sm) / 1.55 var(--font-sans);
-  --font-label: 800 var(--text-label) / 1.2 var(--font-sans);
-  --font-caption: 700 var(--text-caption) / 1.45 var(--font-sans);
-  --font-micro: 800 var(--text-micro) / 1.35 var(--font-sans);
+  --font-label: 800 var(--text-label) / 1.2 var(--font-mono);
+  --font-caption: 700 var(--text-caption) / 1.45 var(--font-mono);
+  --font-micro: 800 var(--text-micro) / 1.35 var(--font-mono);
 
   --space-1: 4px;
   --space-2: 8px;
@@ -589,6 +590,7 @@ a:active {
 }
 
 .aura-text-label {
+  font-family: var(--font-mono);
   font-size: var(--text-label);
   font-weight: 800;
   letter-spacing: var(--tracking-label);

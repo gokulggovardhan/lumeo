@@ -76,7 +76,7 @@ export default function Home() {
               </p>
               <h1
                 id="tool-heading"
-                className="mt-4 font-serif text-[clamp(2.6rem,6.1vw,4.85rem)] leading-[0.98] tracking-[var(--tracking-display)] text-[var(--text-primary)]"
+                className="mt-4 font-serif text-[clamp(2.2rem,4.48vw,3.25rem)] leading-[0.98] tracking-[var(--tracking-display)] text-[var(--text-primary)]"
               >
                 Documents, beautifully handled.
               </h1>

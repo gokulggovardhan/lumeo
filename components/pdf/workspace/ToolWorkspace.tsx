@@ -203,7 +203,7 @@ export function L2ToolPageHeader({
     <header className="l2-tool-page-header lumeo-fade-up flex flex-col justify-between gap-5 md:flex-row md:items-end">
       <div className="max-w-3xl">
         <p className="aura-text-label text-[var(--text-accent)]">{categoryLabel}</p>
-        <h1 className="mt-2.5 font-serif text-[2.35rem] leading-[0.94] tracking-[-0.04em] text-[var(--text-primary)] sm:text-[3rem]">
+        <h1 className="mt-2.5 font-serif text-[clamp(1.4rem,2.24vw,1.625rem)] leading-[0.94] tracking-[-0.04em] text-[var(--text-primary)]">
           {title}
         </h1>
         <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
