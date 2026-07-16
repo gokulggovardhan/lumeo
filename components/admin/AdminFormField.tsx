@@ -16,17 +16,17 @@ export function AdminFormField({
   children?: ReactNode;
 }) {
   return (
-    <label className="block text-sm font-semibold text-[#F0EAD6]">
+    <label className="block text-sm font-semibold text-[var(--lumeo-paper-50)]">
       {label}
       {children ?? (
         <input
           name={name}
           type={type}
           defaultValue={defaultValue}
-          className="mt-2 min-h-11 w-full rounded-xl border border-[#E8DFC8]/12 bg-[#0C1220]/66 px-3 py-2 text-sm text-[#F0EAD6] outline-none transition duration-200 placeholder:text-[#F0EAD6]/30 focus:border-[#CBA052]/60 focus:ring-2 focus:ring-[#CBA052]/15"
+          className="mt-2 min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--lumeo-paper-50)] outline-none transition duration-200 placeholder:text-[var(--lumeo-paper-600)] focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--lumeo-aura-rgb),0.16)]"
         />
       )}
-      {help && <span className="mt-1 block text-xs font-normal text-[#F0EAD6]/45">{help}</span>}
+      {help && <span className="mt-1 block text-xs font-normal text-[var(--lumeo-paper-400)]">{help}</span>}
     </label>
   );
 }

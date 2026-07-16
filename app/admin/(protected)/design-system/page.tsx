@@ -19,6 +19,7 @@ import {
   AuraPageHeader,
   AuraPanel,
   AuraProgress,
+  AuraResultCard,
   AuraRadioGroup,
   AuraSectionHeader,
   AuraSegmentedControl,
@@ -53,12 +54,13 @@ import {
 } from "@/components/pdf/workspace/ToolWorkspace";
 
 const colourTokens = [
-  "--lumeo-ink-950",
-  "--lumeo-ink-850",
-  "--lumeo-paper-50",
-  "--lumeo-seal-500",
-  "--lumeo-gold-400",
-  "--lumeo-aura-400",
+  "--atelier-canvas-950",
+  "--atelier-surface-2",
+  "--atelier-ivory-100",
+  "--atelier-sage-500",
+  "--atelier-brass-400",
+  "--atelier-info",
+  "--atelier-danger",
 ];
 
 export default function DesignSystemPage() {
@@ -72,14 +74,14 @@ export default function DesignSystemPage() {
   return (
     <div className="grid gap-8">
       <AuraPageHeader
-        eyebrow="Lumeo Aura"
-        title="Design System"
-        description="A luminous evolution of Midnight Notary: brighter surfaces, calmer controls, tactile motion and reusable foundations for public tools and the Control Center."
+        eyebrow="Lumeo Atelier"
+        title="Atelier theme system"
+        description="A soft premium correction of Lumeo Canvas with graphite-sage surfaces, calm sage action, restrained brass detail, and the same stable public tool behaviour."
         action={<AuraButton variant="premium" onClick={() => setDrawerOpen(true)}>Open drawer</AuraButton>}
       />
 
       <AuraPanel>
-        <AuraSectionHeader title="Colour and surfaces" description="Semantic tokens keep Run 2 migration consistent without hard-coded page styling." />
+        <AuraSectionHeader title="Atelier colour and surfaces" description="Semantic tokens keep the interface soft, premium and consistent without hard-coded page styling." />
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {colourTokens.map((token) => (
             <div key={token} className="rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-4">
@@ -96,19 +98,39 @@ export default function DesignSystemPage() {
           <p className="font-serif text-[var(--text-display-md)] leading-[var(--leading-display)] text-[var(--lumeo-paper-50)]">PDF work, thoughtfully refined.</p>
           <p className="text-[var(--text-heading-lg)] font-black text-[var(--lumeo-paper-50)]">Control Center heading</p>
           <p className="max-w-3xl text-[var(--text-body-md)] leading-[var(--leading-body)] text-[var(--lumeo-paper-400)]">
-            Lumeo Aura keeps dense document operations readable at mobile sizes while preserving a premium sense of space on desktop.
+            Lumeo Atelier keeps dense document operations readable at mobile sizes while replacing the blue-oriented foundation with graphite-sage neutral depth.
           </p>
         </div>
       </AuraPanel>
 
       <AuraPanel>
-        <AuraSectionHeader title="Buttons, status and feedback" description="Seal Green carries primary action. Gold is reserved for premium emphasis." />
+        <AuraSectionHeader title="Semantic text and depth" description="Readable text tokens and layered surfaces create hierarchy before borders." />
+        <div className="mt-5 grid gap-4 md:grid-cols-3">
+          <AuraCard>
+            <p className="text-sm font-black text-[var(--text-primary)]">Primary text</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">Secondary copy remains warm and readable on dark elevated surfaces.</p>
+          </AuraCard>
+          <AuraCard>
+            <p className="text-sm font-black text-[var(--text-accent)]">Muted brass detail</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">Brass is restrained for premium moments, not every button.</p>
+          </AuraCard>
+          <AuraCard>
+            <p className="text-sm font-black text-[var(--text-info)]">Atelier information</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-subtle)]">Information states use a quiet green-grey accent instead of blue glow.</p>
+          </AuraCard>
+        </div>
+      </AuraPanel>
+
+      <AuraPanel>
+        <AuraSectionHeader title="Buttons, status and feedback" description="Heritage Sage carries primary action. Muted Brass is reserved for premium emphasis." />
         <div className="mt-5 flex flex-wrap gap-3">
           <AuraButton>Primary action</AuraButton>
           <AuraButton variant="secondary">Secondary</AuraButton>
           <AuraButton variant="premium">Premium note</AuraButton>
+          <AuraButton variant="success">Success</AuraButton>
           <AuraButton variant="ghost">Ghost</AuraButton>
           <AuraButton variant="danger">Careful action</AuraButton>
+          <AuraButton variant="icon" aria-label="Icon button">⌘</AuraButton>
           <AuraButton loading>Loading</AuraButton>
         </div>
         <div className="mt-5 flex flex-wrap gap-2">
@@ -174,13 +196,28 @@ export default function DesignSystemPage() {
           <div className="grid gap-4">
             <ToolUploadStage action={<AuraButton>Select PDFs</AuraButton>} />
             <ToolDocumentSummary title="quarterly-report.pdf" details={["18 pages", "A4", "Browser-only"]} />
-            <AuraFileCard name="document-slip.pdf" meta="2.4 MB · Custom page size" action={<AuraBadge tone="success">Ready</AuraBadge>} />
+            <AuraFileCard
+              name="document-slip.pdf"
+              meta="2.4 MB · Custom page size"
+              status="Ready"
+              onMoveUp={() => undefined}
+              onMoveDown={() => undefined}
+              onRemove={() => undefined}
+              action={<AuraBadge tone="success">Ready</AuraBadge>}
+            />
           </div>
           <ToolSettingsStage title="Output">
             <ToolModeCard title="Smart document mode" description="A future shared mode card for tool settings." selected />
             <ToolOptionRow title="Clean margin" description="Compact controls stay readable." control={<AuraBadge tone="warning">Default</AuraBadge>} />
             <ToolProcessingStage />
             <ToolResultStage title="Result ready">Created locally in your browser.</ToolResultStage>
+            <AuraResultCard
+              title="Download ready"
+              details={[{ label: "Handling", value: "Browser-only" }, { label: "State", value: "Cleared after download" }]}
+              localMessage="No fake cloud-save wording. The file is yours."
+              primaryAction={<AuraButton>Download</AuraButton>}
+              secondaryAction={<AuraButton variant="secondary">Start new</AuraButton>}
+            />
           </ToolSettingsStage>
         </div>
         <div className="mt-5">
@@ -210,6 +247,14 @@ export default function DesignSystemPage() {
           <AuraTabs tabs={[{ value: "controls", label: "Controls", content: <AuraNotice tone="info" title="Tabs">Segmented tab foundation.</AuraNotice> }, { value: "states", label: "States", content: <AuraSkeleton className="h-24" /> }]} value={tab} onChange={setTab} />
           <AuraEmptyState title="No records yet" message="Empty states are useful, calm, and honest." action={<AuraButton variant="secondary">Learn more</AuraButton>} />
           <AuraProgress value={64} label="Readiness" />
+        </div>
+      </AuraPanel>
+
+      <AuraPanel>
+        <AuraSectionHeader title="Responsive and reduced-motion notes" description="The foundation is designed for 320px mobile through wide desktop, with no continuous decorative motion." />
+        <div className="mt-5 grid gap-4 md:grid-cols-2">
+          <AuraNotice tone="info" title="Mobile-safe controls">Touch targets aim for 44px where practical. Workspaces stack files, settings, action and result in a predictable order.</AuraNotice>
+          <AuraNotice tone="planned" title="Reduced motion">Motion primitives collapse under prefers-reduced-motion while preserving state changes and focus visibility.</AuraNotice>
         </div>
       </AuraPanel>
 

@@ -3,10 +3,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { L2PublicHeader, L2PublicNavLink } from "@/components/ui/Aura";
+import { L2MobileNavClient } from "@/components/public/L2MobileNavClient";
 
 export function LumeoSealMark() {
   return (
-    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#F0EAD6] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgba(var(--atelier-brass-rgb),0.22)] bg-[var(--atelier-ivory-100)] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
       <Image
         src="/brand/lumeo-pdf-mark.png"
         alt=""
@@ -26,14 +28,14 @@ export function BrandLockup({
   tone?: "light" | "dark";
   markSize?: string;
 }) {
-  const primaryText = tone === "dark" ? "text-[#151A22]" : "text-[#F0EAD6]";
+  const primaryText = tone === "dark" ? "text-[#151A22]" : "text-[var(--text-primary)]";
   const secondaryText =
-    tone === "dark" ? "text-[#1E6B4A]" : "text-[#CBA052]/72";
+    tone === "dark" ? "text-[var(--atelier-sage-600)]" : "text-[var(--text-accent)]";
 
   return (
     <span className="flex min-w-0 items-center gap-3">
       <span
-        className={`flex shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#F0EAD6] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)] ${markSize}`}
+        className={`flex shrink-0 items-center justify-center rounded-lg border border-[rgba(var(--atelier-brass-rgb),0.22)] bg-[var(--atelier-ivory-100)] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)] ${markSize}`}
       >
         <Image
           src="/brand/lumeo-pdf-mark.png"
@@ -78,32 +80,32 @@ export function PublicNav({
   toolsMenu?: ReactNode;
 }) {
   return (
-    <nav className="lumeo-nav-enter relative z-30 border-b border-[#E8DFC8]/8 bg-[#0C1220]/92 px-5 backdrop-blur-xl sm:px-8">
-      <div className={`mx-auto flex h-[70px] ${maxWidth} items-center justify-between gap-4`}>
-        <Link href="/" className="flex min-w-0 items-center rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45">
+    <L2PublicHeader className="lumeo-nav-enter aura-public-nav">
+      <nav className={`mx-auto flex min-h-16 ${maxWidth} items-center justify-between gap-4`} aria-label="Public navigation">
+        <Link href="/" className="flex min-w-0 items-center rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]">
           <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
         </Link>
 
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="hidden shrink-0 items-center gap-2 md:flex">
           {toolsMenu ?? (
-            <Link
-              href="/pdf-tools"
-              className="lumeo-press lumeo-focus-ring inline-flex h-10 items-center justify-center rounded-full border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.02] px-3.5 text-sm font-semibold text-[#F0EAD6]/72 transition hover:border-[#CBA052]/28 hover:bg-[#F0EAD6]/[0.04] hover:text-[#F0EAD6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45 sm:h-11 sm:px-4"
-            >
+            <L2PublicNavLink href="/pdf-tools">
               PDF Tools
-            </Link>
+            </L2PublicNavLink>
           )}
+          <L2PublicNavLink href="/guides">Guides</L2PublicNavLink>
+          <L2PublicNavLink href="/privacy">Privacy</L2PublicNavLink>
           <Link
             href="/"
             aria-label="Go to Lumeo PDF home"
             title="Home"
-            className="lumeo-press lumeo-focus-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E8DFC8]/10 bg-[#F0EAD6]/[0.02] text-[#F0EAD6]/64 transition hover:border-[#CBA052]/28 hover:bg-[#CBA052]/[0.08] hover:text-[#D8BC7A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45 sm:h-11 sm:w-11"
+            className="lumeo-press lumeo-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[rgba(var(--paper-rgb),0.075)] text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition hover:bg-[rgba(var(--champagne-rgb),0.12)] hover:text-[var(--text-accent)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
           >
             <HomeIcon />
           </Link>
         </div>
-      </div>
-    </nav>
+        <L2MobileNavClient />
+      </nav>
+    </L2PublicHeader>
   );
 }
 
@@ -121,10 +123,10 @@ export function PublicPageShell({
   toolsMenu?: ReactNode;
 }) {
   return (
-    <main className={`lumeo-page-enter relative overflow-x-hidden ${mainClassName}`}>
+    <main id="main-content" className={`lumeo-page-enter aura-page-shell relative overflow-x-hidden ${mainClassName}`}>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="lumeo-ambient absolute -left-44 -top-48 h-[32rem] w-[32rem] rounded-full bg-[#0D2C6D]/20 blur-[150px]" />
-        <div className="lumeo-ambient absolute -right-44 top-0 [animation-delay:-4s] h-[30rem] w-[30rem] rounded-full bg-[#CBA052]/[0.06] blur-[155px]" />
+        <div className="lumeo-ambient absolute -left-44 -top-48 h-[32rem] w-[32rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.07)] blur-[150px]" />
+        <div className="lumeo-ambient absolute -right-44 top-0 [animation-delay:-4s] h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.055)] blur-[155px]" />
       </div>
 
       <div className="relative z-10">
@@ -146,25 +148,25 @@ export function ToolPlaceholder({
 }) {
   return (
     <PublicPageShell
-      mainClassName="min-h-dvh bg-[#0C1220] text-[#F0EAD6]"
+      mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 py-14 sm:px-8 sm:py-20"
       maxWidth="max-w-[820px]"
     >
       <section className="mx-auto text-center">
-        <p className="text-[0.64rem] font-bold uppercase tracking-[0.2em] text-[#CBA052]">
+        <p className="aura-text-label text-[var(--text-accent)]">
           Coming next
         </p>
-        <h1 className="mt-4 text-4xl font-bold tracking-[-0.04em] text-[#F0EAD6] sm:text-6xl">
+        <h1 className="mt-4 font-serif text-4xl tracking-[-0.04em] text-[var(--text-primary)] sm:text-6xl">
           {title}
         </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[#F0EAD6]/60 sm:text-lg sm:leading-8">
+        <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[var(--text-secondary)] sm:text-lg sm:leading-8">
           {description}
         </p>
 
-        <div className="mx-auto mt-10 max-w-2xl rounded-[24px] border border-[#E8DFC8]/8 bg-[#111A2B]/92 px-6 py-8 shadow-[0_30px_90px_rgba(0,0,0,0.35)] sm:px-8">
-          <p className="text-xl font-bold text-[#F0EAD6]">This workspace is being prepared.</p>
-          <p className="mt-3 text-sm leading-6 text-[#F0EAD6]/54">Accepted format: {accepted}</p>
-          <p className="mt-5 text-xs font-semibold text-[#9FD0B5]">Private by design · Browser-first where possible</p>
+        <div className="aura-luminous-card mx-auto mt-10 max-w-2xl rounded-[24px] px-6 py-8 sm:px-8">
+          <p className="relative text-xl font-bold text-[var(--text-primary)]">This workspace is being prepared.</p>
+          <p className="relative mt-3 text-sm leading-6 text-[var(--text-secondary)]">Accepted format: {accepted}</p>
+          <p className="relative mt-5 text-xs font-semibold text-[var(--text-success)]">Private by design · Browser-first where possible</p>
         </div>
       </section>
     </PublicPageShell>

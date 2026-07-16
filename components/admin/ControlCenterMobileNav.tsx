@@ -36,8 +36,8 @@ export function ControlCenterMobileNav({
 
   return (
     <header className="lg:hidden">
-      <div className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-[#E8DFC8]/10 bg-[#111A2B]/94 px-4 py-3">
-        <Link href="/admin" className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45">
+      <div className="flex items-center justify-between gap-3 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 py-3 shadow-[var(--shadow-sm)]">
+        <Link href="/admin" className="rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]">
           <BrandLockup markSize="h-9 w-9" />
         </Link>
         <button
@@ -46,17 +46,17 @@ export function ControlCenterMobileNav({
           aria-label="Open Control Center navigation"
           aria-expanded={open}
           onClick={() => setOpen((value) => !value)}
-          className="min-h-11 rounded-xl border border-[#E8DFC8]/12 bg-[#0C1220]/58 px-4 text-sm font-bold text-[#F0EAD6] transition duration-200 hover:border-[#CBA052]/36"
+          className="min-h-11 rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.055)] px-4 text-sm font-bold text-[var(--lumeo-paper-50)] transition duration-200 hover:border-[var(--border-premium)]"
         >
           Menu
         </button>
       </div>
 
       {open && (
-        <div className="mt-3 rounded-[1.2rem] border border-[#E8DFC8]/10 bg-[#111A2B] p-3 shadow-[0_24px_80px_rgba(0,0,0,0.28)]">
-          <div className="mb-3 rounded-xl border border-[#E8DFC8]/8 bg-[#0C1220]/52 p-3">
-            <p className="truncate text-sm font-bold text-[#F0EAD6]">{email || "Administrator"}</p>
-            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[#CBA052]/68">{role}</p>
+        <div className="aura-drawer-enter mt-3 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 shadow-[var(--shadow-lg)]">
+          <div className="mb-3 rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-3">
+            <p className="truncate text-sm font-bold text-[var(--lumeo-paper-50)]">{email || "Administrator"}</p>
+            <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[var(--lumeo-gold-300)]">{role}</p>
           </div>
           <nav className="grid gap-2" aria-label="Mobile Control Center navigation">
             {adminNavigation.map((item) => {
@@ -69,8 +69,8 @@ export function ControlCenterMobileNav({
                   onClick={() => setOpen(false)}
                   className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 text-sm font-semibold transition duration-200 ${
                     active
-                      ? "border-[#1E6B4A]/55 bg-[#1E6B4A]/18 text-[#F0EAD6]"
-                      : "border-[#E8DFC8]/8 bg-[#F0EAD6]/[0.025] text-[#F0EAD6]/62"
+                      ? "border-[rgba(var(--lumeo-seal-rgb),0.55)] bg-[rgba(var(--lumeo-seal-rgb),0.18)] text-[var(--lumeo-paper-50)]"
+                      : "border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] text-[var(--lumeo-paper-400)]"
                   }`}
                 >
                   <AdminIcon name={item.icon} className="h-4 w-4" />

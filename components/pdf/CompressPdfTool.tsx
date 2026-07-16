@@ -29,6 +29,17 @@ import {
   type TargetUnit,
 } from "@/lib/compressionTarget";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import {
+  L2ActionArea,
+  L2AdvancedDisclosure,
+  L2FileCard,
+  L2PrivacyNote,
+  L2ToolMainColumn,
+  L2ToolSettingsPanel,
+  L2ToolWorkspace,
+  L2UploadStage,
+} from "@/components/pdf/workspace/ToolWorkspace";
+import { AuraOptionCard, AuraPdfIcon, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
@@ -291,20 +302,8 @@ function CompressIcon() {
   );
 }
 
-function DocumentIcon() {
-  return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#CBA052]/10 text-[#CBA052]">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-        <path d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z" stroke="currentColor" strokeWidth="1.7" />
-        <path d="M14.1 4v3.3h3.2M9 12h6M9 15h4.4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.55" />
-      </svg>
-    </span>
-  );
-}
-
 export default function CompressPdfTool() {
   const { availability, track } = useAnalytics();
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
@@ -313,7 +312,6 @@ export default function CompressPdfTool() {
   const resultHeadingRef = useRef<HTMLParagraphElement | null>(null);
   const customTargetInputRef = useRef<HTMLInputElement | null>(null);
 
-  const [dragActive, setDragActive] = useState(false);
   const [analysis, setAnalysis] = useState<CompressAnalysis | null>(null);
   const [compressionMode, setCompressionMode] =
     useState<CompressionMode>("quality");
@@ -321,8 +319,6 @@ export default function CompressPdfTool() {
   const [targetPreset, setTargetPreset] = useState<TargetPreset>("400");
   const [customTargetValue, setCustomTargetValue] = useState("400");
   const [targetUnit, setTargetUnit] = useState<TargetUnit>("KB");
-  const [advancedOpen, setAdvancedOpen] = useState(false);
-  const [expertOpen, setExpertOpen] = useState(false);
   const [expertMode, setExpertMode] = useState<ExpertMode>("profile");
   const [resolution, setResolution] = useState<ResolutionPreset>("dpi150");
   const [quality, setQuality] = useState<ImageQuality>("balanced");
@@ -498,9 +494,6 @@ export default function CompressPdfTool() {
     setBlockingError("");
     setStatus("Ready");
     setProgressDetail("");
-    setAdvancedOpen(false);
-    setExpertOpen(false);
-    if (inputRef.current) inputRef.current.value = "";
   }
 
   async function renderPreview(doc: PDFDocumentProxy, pageNumber: number, currentSession: number) {
@@ -966,72 +959,26 @@ export default function CompressPdfTool() {
 
   const uploadArea = (
     <>
-      <input
-        ref={inputRef}
-        type="file"
-        accept="application/pdf,.pdf"
-        className="hidden"
-        onChange={(event) => {
-          handleFiles(event.target.files ?? []);
-          event.target.value = "";
-        }}
-      />
-      <div
-        onDragOver={(event) => {
-          event.preventDefault();
-          setDragActive(true);
-        }}
-        onDragLeave={() => setDragActive(false)}
-        onDrop={(event) => {
-          event.preventDefault();
-          setDragActive(false);
-          handleFiles(event.dataTransfer.files);
-        }}
-        className={`lumeo-upload-surface group relative mx-auto w-full max-w-[1040px] overflow-hidden rounded-[24px] border px-5 py-7 shadow-2xl shadow-black/32 transition-all duration-300 sm:px-8 lg:px-10 lg:py-8 ${
-          dragActive
-            ? "border-[#CBA052]/64 bg-[#CBA052]/14 shadow-[0_24px_70px_rgba(245,158,11,0.2)]"
-            : "border-[#FFFFFF]/18 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] hover:-translate-y-0.5 hover:border-[#CBA052]/36"
-        }`}
-      >
-        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/42 to-transparent opacity-80" />
-        <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center">
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#CBA052]/24 bg-[#0C1220]/64 text-[#CBA052] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#CBA052]/14">
-              <CompressIcon />
-            </span>
-            <div>
-              <p className="text-2xl font-semibold tracking-[-0.02em] text-[#FFFFFF]">
-                Drop PDFs here
-              </p>
-              <p className="mt-2 text-base text-[#FFFFFF]/52">
-                or choose files from your device
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex w-full items-center justify-center rounded-full bg-[#1E6B4A] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(245,158,11,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98] sm:w-auto"
-          >
-            Select PDF
-          </button>
-        </div>
+      <div className="mx-auto w-full max-w-[1040px]">
+        <L2UploadStage
+          inputId="compress-pdf-upload"
+          accept="application/pdf,.pdf"
+          acceptedNote="PDF only · One file"
+          multiple={false}
+          icon={<CompressIcon />}
+          privacyNote="Browser-first processing for supported live tools"
+          buttonLabel="Select PDF"
+          onFilesSelected={handleFiles}
+        />
       </div>
     </>
   );
 
   if (!analysis) {
     return (
-      <section className="pb-4 lg:flex lg:h-full lg:flex-col lg:justify-center lg:pb-0">
+      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
         {uploadArea}
-        <div className="mt-4 text-center">
-          <p className="text-sm font-semibold text-[#FFFFFF]/68">
-            Private by design &middot; Browser-only &middot; Cleared after download
-          </p>
-          <p className="mt-1 text-xs text-[#FFFFFF]/38">
-            Files stay on your device for this tool.
-          </p>
-        </div>
+        <L2PrivacyNote />
         {error ? (
           <div role="alert" className="mt-4 rounded-lg border border-[#F0A8A8]/20 bg-[#F0A8A8]/10 p-4 text-sm font-medium text-[#F0C0C0]">
             {error}
@@ -1042,8 +989,9 @@ export default function CompressPdfTool() {
   }
 
   return (
-    <section className="pb-28 lg:h-full lg:overflow-hidden lg:pb-0">
-      <div className="grid h-full gap-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(340px,0.72fr)] lg:overflow-hidden 2xl:grid-cols-[minmax(0,1.95fr)_minmax(360px,0.72fr)]">
+    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
+      <L2ToolWorkspace>
+        <L2ToolMainColumn>
         <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
           <section className="shrink-0">
             <div className="mb-2 flex items-center justify-between gap-3">
@@ -1063,17 +1011,13 @@ export default function CompressPdfTool() {
                 Start new
               </button>
             </div>
-            <div className="grid gap-2 rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/74 px-3 py-2 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-              <DocumentIcon />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[#FFFFFF]">{analysis.name}</p>
-                <p className="mt-1 text-xs font-medium text-[#FFFFFF]/42">
-                  {analysis.pageCount} page{analysis.pageCount === 1 ? "" : "s"} · {formatFileSize(analysis.size)} · {analysis.pageSizeType}
-                </p>
-              </div>
-              <span className="rounded-full border border-[#CBA052]/24 bg-[#CBA052]/10 px-3 py-1.5 text-xs font-semibold text-[#9FD0B5]">
-                {displayStatus}
-              </span>
+            <div className="rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/74 px-3 py-2">
+              <L2FileCard
+                name={analysis.name}
+                meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatFileSize(analysis.size)} · ${analysis.pageSizeType}`}
+                icon={<AuraPdfIcon />}
+                action={<AuraStatus tone="success" label={displayStatus} />}
+              />
             </div>
           </section>
 
@@ -1155,72 +1099,44 @@ export default function CompressPdfTool() {
 
           <div className="rounded-xl border border-[#CBA052]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-semibold text-[#FFFFFF]/74">Private by design &middot; Browser-only &middot; Cleared after download</p>
+              <L2PrivacyNote compact />
               <p className="lg:hidden">Files stay on your device. No server upload.</p>
             </div>
           </div>
         </div>
+        </L2ToolMainColumn>
 
-        <aside className="lg:min-h-0">
-          <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
+        <L2ToolSettingsPanel title="Compression settings" description="Choose a quality profile or target size, then compress locally.">
+          <div className="flex h-full min-h-0 flex-col">
             <div className={result ? "hidden" : "border-b border-[#FFFFFF]/10 pb-3"}>
-              <p className="text-xs font-semibold text-[#FFFFFF]/68">
-                Compression mode
-              </p>
-              <div
-                className="mt-2 grid grid-cols-2 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/54 p-1"
-                aria-label="Compression mode"
-              >
-                {[
-                  ["quality", "Quality mode"],
-                  ["target", "Target size"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={compressionMode === value}
-                    onClick={() => {
-                      setCompressionMode(value as CompressionMode);
-                      setAdvancedOpen(false);
-                      setExpertOpen(false);
-                      setError("");
-                      clearResult();
-                    }}
-                    className={`min-h-11 rounded-lg px-2 text-xs font-bold transition motion-reduce:transition-none ${
-                      compressionMode === value
-                        ? "bg-[#CBA052]/20 text-[#FFFFFF] ring-1 ring-[#CBA052]/55"
-                        : "text-[#FFFFFF]/46 hover:text-[#FFFFFF]"
-                    }`}
-                  >
-                    {compressionMode === value ? "✓ " : ""}
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <AuraSegmentedControl
+                label="Compression mode"
+                options={[
+                  { value: "quality", label: "Quality mode" },
+                  { value: "target", label: "Target size" },
+                ]}
+                value={compressionMode}
+                onChange={(value) => {
+                  setCompressionMode(value as CompressionMode);
+                  setError("");
+                  clearResult();
+                }}
+              />
 
               {compressionMode === "quality" ? (
                 <div className="mt-3 grid gap-2">
                   {(Object.keys(profiles) as CompressProfile[]).map((item) => (
-                    <button
+                    <AuraOptionCard
                       key={item}
-                      type="button"
+                      label={profiles[item].label}
+                      description={profiles[item].description}
+                      selected={profile === item}
+                      recommended={analysis.recommendation === item}
                       onClick={() => {
                         resetSettings(item, true);
                         clearResult();
                       }}
-                      aria-pressed={profile === item}
-                      className={`rounded-xl border px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 motion-reduce:transition-none ${
-                        profile === item
-                          ? "border-[#CBA052]/55 bg-[#CBA052]/16"
-                          : "border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.025] hover:border-[#CBA052]/28"
-                      }`}
-                    >
-                      <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#FFFFFF]">
-                        <span>{profile === item ? "✓ " : ""}{profiles[item].label}</span>
-                        {analysis.recommendation === item ? <span className="rounded-full bg-[#CBA052]/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[#CBA052]">Recommended</span> : null}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-[#FFFFFF]/42">{profiles[item].description}</span>
-                    </button>
+                    />
                   ))}
                 </div>
               ) : (
@@ -1250,7 +1166,7 @@ export default function CompressPdfTool() {
                         }}
                         className={`min-h-11 rounded-lg border px-2 text-xs font-bold transition motion-reduce:transition-none ${
                           targetPreset === value
-                            ? "border-[#CBA052]/55 bg-[#CBA052]/16 text-[#FFFFFF]"
+                            ? "border-[var(--border-subtle)] bg-[var(--surface-selected)] text-[#FFFFFF]"
                             : "border-[#FFFFFF]/9 text-[#FFFFFF]/48 hover:border-[#CBA052]/28"
                         }`}
                       >
@@ -1331,87 +1247,64 @@ export default function CompressPdfTool() {
             </div>
 
             <div className={result ? "hidden" : "no-scrollbar min-h-0 flex-1 overflow-y-auto py-3"}>
-              <button
-                type="button"
-                onClick={() => setAdvancedOpen((open) => !open)}
-                aria-expanded={advancedOpen}
-                className={compressionMode === "quality" ? "flex w-full items-center justify-between rounded-xl border border-[#FFFFFF]/10 px-3 py-2 text-left text-xs font-semibold text-[#FFFFFF]/54 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]" : "hidden"}
-              >
-                Advanced options
-                <span>{advancedOpen ? "−" : "+"}</span>
-              </button>
-              {compressionMode === "quality" && advancedOpen ? (
-                <div className="mt-3 space-y-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image resolution</p>
-                    <div className="mt-2 grid gap-2">
-                      {resolutionOptions.map((item) => (
-                        <button key={item.value} type="button" onClick={() => { setResolution(item.value); clearResult(); }} className={`rounded-lg border px-3 py-2 text-left text-xs transition ${resolution === item.value ? "border-[#CBA052]/50 bg-[#CBA052]/14 text-[#FFFFFF]" : "border-[#FFFFFF]/8 text-[#FFFFFF]/52 hover:border-[#CBA052]/28"}`}>
-                          <span className="font-bold">{item.label}</span>
-                          <span className="mt-0.5 block text-[#FFFFFF]/38">{item.helper}</span>
-                        </button>
-                      ))}
+              {compressionMode === "quality" ? (
+                <L2AdvancedDisclosure title="Advanced options">
+                  <div className="space-y-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image resolution</p>
+                      <div className="mt-2 grid gap-2">
+                        {resolutionOptions.map((item) => (
+                          <AuraOptionCard
+                            key={item.value}
+                            label={item.label}
+                            description={item.helper}
+                            selected={resolution === item.value}
+                            onClick={() => { setResolution(item.value); clearResult(); }}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <AuraSegmentedControl
+                        label="Image quality"
+                        options={qualityOptions.map((item) => ({ value: item.value, label: item.label }))}
+                        value={quality}
+                        onChange={(value) => { setQuality(value as ImageQuality); clearResult(); }}
+                      />
                     </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image quality</p>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {qualityOptions.map((item) => (
-                        <button key={item.value} type="button" onClick={() => { setQuality(item.value); clearResult(); }} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${quality === item.value ? "border-[#CBA052]/50 bg-[#CBA052]/14 text-[#9FD0B5]" : "border-[#FFFFFF]/10 text-[#FFFFFF]/48 hover:border-[#CBA052]/30"}`}>
-                          {item.label}
-                        </button>
-                      ))}
+                </L2AdvancedDisclosure>
+              ) : null}
+
+              {compressionMode === "quality" ? (
+                <div className="mt-3">
+                  <L2AdvancedDisclosure title="Document and output details">
+                    <div className="space-y-3 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
+                      <label className="flex items-center gap-2 text-sm font-semibold text-[#FFFFFF]/68">
+                        <input type="checkbox" checked={expertMode === "custom"} onChange={(event) => setExpertMode(event.target.checked ? "custom" : "profile")} />
+                        Use custom DPI and quality
+                      </label>
+                      <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">
+                        Custom DPI
+                        <input type="number" min={72} max={240} value={customDpi} onChange={(event) => { setCustomDpi(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm text-[#FFFFFF] outline-none focus:border-[#CBA052]/45" />
+                      </label>
+                      <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">
+                        Custom quality
+                        <input type="number" min={35} max={92} value={customQuality} onChange={(event) => { setCustomQuality(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm text-[#FFFFFF] outline-none focus:border-[#CBA052]/45" />
+                      </label>
                     </div>
-                  </div>
+                    <div className="mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3">
+                      <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">Compression &amp; output summary</p>
+                      <ul className="mt-2 space-y-1.5 text-xs text-[#FFFFFF]/50">
+                        <li>Images: {selectedPlan.dpi} DPI · {Math.round(selectedPlan.quality * 100)}% quality · {selectedPlan.colour === "grayscale" ? "grayscale" : "colour preserved"}</li>
+                        <li>Text, links, forms: rebuilt as images — review output</li>
+                        <li>Output: 1 compressed PDF · {profileLabel} profile · original page order preserved</li>
+                        <li>Verified: page count and output filename checked after generation</li>
+                      </ul>
+                    </div>
+                  </L2AdvancedDisclosure>
                 </div>
               ) : null}
-
-              <button
-                type="button"
-                onClick={() => setExpertOpen((open) => !open)}
-                aria-expanded={expertOpen}
-                className={compressionMode === "quality" ? "mt-3 flex w-full items-center justify-between rounded-xl border border-[#FFFFFF]/10 px-3 py-2 text-left text-xs font-semibold text-[#FFFFFF]/54 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]" : "hidden"}
-              >
-                Document and output details
-                <span>{expertOpen ? "−" : "+"}</span>
-              </button>
-              {compressionMode === "quality" && expertOpen ? (
-                <div className="mt-3 space-y-3 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
-                  <label className="flex items-center gap-2 text-sm font-semibold text-[#FFFFFF]/68">
-                    <input type="checkbox" checked={expertMode === "custom"} onChange={(event) => setExpertMode(event.target.checked ? "custom" : "profile")} />
-                    Use custom DPI and quality
-                  </label>
-                  <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">
-                    Custom DPI
-                    <input type="number" min={72} max={240} value={customDpi} onChange={(event) => { setCustomDpi(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm text-[#FFFFFF] outline-none focus:border-[#CBA052]/45" />
-                  </label>
-                  <label className="block text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">
-                    Custom quality
-                    <input type="number" min={35} max={92} value={customQuality} onChange={(event) => { setCustomQuality(Number(event.target.value)); clearResult(); }} className="mt-2 h-10 w-full rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm text-[#FFFFFF] outline-none focus:border-[#CBA052]/45" />
-                  </label>
-                </div>
-              ) : null}
-
-              <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">Compression plan</p>
-                <ul className="mt-2 space-y-1.5 text-xs text-[#FFFFFF]/50">
-                  <li>Images: render at {selectedPlan.dpi} DPI</li>
-                  <li>Image quality: {Math.round(selectedPlan.quality * 100)}%</li>
-                  <li>Colour: {selectedPlan.colour === "grayscale" ? "Grayscale image content" : "Preserved"}</li>
-                  <li>Text, links, forms: review output; page appearance is rebuilt as images</li>
-                </ul>
-              </div>
-
-              <div className={compressionMode === "quality" && expertOpen ? "mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3" : "hidden"}>
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">Output manifest</p>
-                <ul className="mt-2 space-y-1.5 text-xs text-[#FFFFFF]/50">
-                  <li>1 compressed PDF</li>
-                  <li>{profileLabel} profile</li>
-                  <li>Original page order preserved</li>
-                  <li>Page count validated after generation</li>
-                  <li>Output filename verified</li>
-                </ul>
-              </div>
 
               <div className="mt-4">
                 <label className="text-xs font-bold uppercase tracking-[0.16em] text-[#FFFFFF]/42">
@@ -1471,32 +1364,38 @@ export default function CompressPdfTool() {
 
               {result ? (
                 <div className="grid gap-2">
-                  <button type="button" onClick={handleDownload} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#CBA052] px-5 text-sm font-bold text-[#FFFFFF] shadow-[0_14px_35px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98]">
-                    Download compressed PDF
-                  </button>
-                  <div className={`grid gap-2 ${result.mode === "target" ? "grid-cols-2" : "grid-cols-1"}`}>
-                    <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); }} className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#FFFFFF]/12 px-3 text-xs font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
-                      Compress again
-                    </button>
-                    {result.mode === "target" ? (
-                      <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); window.setTimeout(() => customTargetInputRef.current?.focus(), 0); }} className="inline-flex min-h-10 items-center justify-center rounded-full border border-[#FFFFFF]/12 px-3 text-xs font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
-                        Change target
+                  <L2ActionArea
+                    primary={(
+                      <button type="button" onClick={handleDownload} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]">
+                        Download compressed PDF
                       </button>
-                    ) : null}
-                  </div>
-                  <button type="button" onClick={resetTool} className="inline-flex h-10 w-full items-center justify-center rounded-full border border-[#FFFFFF]/12 px-5 text-sm font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
-                    Clear and start new
-                  </button>
+                    )}
+                    secondary={(
+                      <>
+                        <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); }} className="inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-3 text-xs font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
+                          Compress again
+                        </button>
+                        {result.mode === "target" ? (
+                          <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); window.setTimeout(() => customTargetInputRef.current?.focus(), 0); }} className="inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-3 text-xs font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
+                            Change target
+                          </button>
+                        ) : null}
+                        <button type="button" onClick={resetTool} className="inline-flex h-10 items-center justify-center rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 text-sm font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]">
+                          Clear and start new
+                        </button>
+                      </>
+                    )}
+                  />
                 </div>
               ) : (
-                <button type="button" disabled={!canCompress} onClick={handleCompress} className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#CBA052] px-5 text-sm font-bold text-[#FFFFFF] shadow-[0_14px_35px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55">
+                <button type="button" disabled={!canCompress} onClick={handleCompress} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55">
                   {isCompressing ? "Compressing in your browser..." : error ? "Retry compression" : "Compress PDF"}
                 </button>
               )}
             </div>
           </div>
-        </aside>
-      </div>
+        </L2ToolSettingsPanel>
+      </L2ToolWorkspace>
     </section>
   );
 }

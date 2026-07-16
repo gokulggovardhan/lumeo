@@ -3,6 +3,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PDFDocument, rgb } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import {
+  L2ActionArea,
+  L2AdvancedDisclosure,
+  L2FileCard,
+  L2PrivacyNote,
+  L2ToolMainColumn,
+  L2ToolSettingsPanel,
+  L2ToolWorkspace,
+  L2UploadStage,
+} from "@/components/pdf/workspace/ToolWorkspace";
+import { AuraOptionCard, AuraPdfIcon, AuraSegmentedControl } from "@/components/ui/Aura";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type MergeStatus = "Ready" | "Merging in your browser..." | "Download ready";
@@ -166,27 +177,6 @@ function MergeIcon() {
   );
 }
 
-function PdfFileIcon() {
-  return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#CBA052]/10 text-[#CBA052]">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-        <path
-          d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z"
-          stroke="currentColor"
-          strokeWidth="1.7"
-        />
-        <path
-          d="M14.1 4v3.3h3.2M8.8 11.2h6.4M8.8 14h4.6"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.55"
-        />
-      </svg>
-    </span>
-  );
-}
-
 export default function MergePdfTool() {
   const { availability, track } = useAnalytics();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -205,7 +195,6 @@ export default function MergePdfTool() {
   const [dragOverFileId, setDragOverFileId] = useState("");
   const [cleanupMessage, setCleanupMessage] = useState<CleanupMessage>("");
   const [showOutputOptions, setShowOutputOptions] = useState(false);
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   const totalSize = useMemo(
     () => files.reduce((sum, item) => sum + item.file.size, 0),
@@ -283,7 +272,6 @@ export default function MergePdfTool() {
     setPageFormat("smartA4Portrait");
     setMarginPreset("clean");
     setShowOutputOptions(false);
-    setShowAdvancedSettings(false);
   };
 
   const clearAllFiles = () => {
@@ -482,15 +470,7 @@ export default function MergePdfTool() {
       setDownloadName(safeName);
       setCleanupMessage("");
       setStatus("Download ready");
-    } catch (mergeError) {
-      console.error("[Lumeo PDF] Merge failed", {
-        error: mergeError,
-        fileCount: files.length,
-        totalSize,
-        totalPages,
-        pageFormat,
-        marginPreset,
-      });
+    } catch {
       setStatus("Ready");
       setError("Merge failed. Try smaller files or remove damaged PDFs.");
     }
@@ -547,72 +527,23 @@ export default function MergePdfTool() {
 
   if (files.length === 0) {
     return (
-      <section className="pb-4 lg:flex lg:h-full lg:flex-col lg:justify-center lg:pb-0">
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf,.pdf"
-          multiple
-          className="hidden"
-          onChange={(event) => {
-            if (event.target.files) void addFiles(event.target.files);
-            event.target.value = "";
-          }}
-        />
-
-        <div
-          onDragOver={(event) => {
-            event.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(event) => {
-            event.preventDefault();
-            setIsDragging(false);
-            void addFiles(event.dataTransfer.files);
-          }}
-          className={`lumeo-upload-surface group relative mx-auto w-full max-w-[1040px] overflow-hidden rounded-[24px] border px-5 py-7 shadow-2xl shadow-black/32 transition-all duration-300 sm:px-8 lg:px-10 lg:py-8 ${
-            isDragging
-              ? "border-[#CBA052]/64 bg-[#CBA052]/14 shadow-[0_24px_70px_rgba(245,158,11,0.2)]"
-              : "border-[#FFFFFF]/18 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] hover:-translate-y-0.5 hover:border-[#CBA052]/36"
-          }`}
-        >
-          <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/42 to-transparent opacity-80" />
-
-
-          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#CBA052]/24 bg-[#0C1220]/64 text-[#CBA052] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#CBA052]/14">
-                <MergeIcon />
-              </span>
-              <div>
-                <p className="text-2xl font-semibold tracking-[-0.02em] text-[#FFFFFF]">
-                  Drop PDFs here
-                </p>
-                <p className="mt-2 text-base text-[#FFFFFF]/52">
-                  or choose files from your device
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex w-full items-center justify-center rounded-full bg-[#1E6B4A] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(245,158,11,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98] sm:w-auto"
-            >
-              Select PDFs
-            </button>
-          </div>
+      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
+        <div className="mx-auto w-full max-w-[1040px]">
+          <L2UploadStage
+            inputId="merge-pdf-upload"
+            accept="application/pdf,.pdf"
+            acceptedNote="PDF only · Minimum two files"
+            multiple
+            icon={<MergeIcon />}
+            privacyNote="Browser-first processing for supported live tools"
+            buttonLabel="Select PDFs"
+            onFilesSelected={(selectedFiles) => {
+              void addFiles(selectedFiles);
+            }}
+          />
         </div>
 
-        <div className="mt-4 text-center">
-          <p className="text-sm font-semibold text-[#FFFFFF]/68">
-            Private by design &middot; Browser-only &middot; Cleared after download
-          </p>
-          <p className="mt-1 text-xs text-[#FFFFFF]/38">
-            Files stay on your device for this tool.
-          </p>
-        </div>
+        <L2PrivacyNote />
 
         {error ? (
           <div className="mt-4 rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
@@ -621,7 +552,7 @@ export default function MergePdfTool() {
         ) : null}
 
         {softWarning ? (
-          <div className="mt-4 rounded-lg border border-[#CBA052]/20 bg-[#CBA052]/10 p-4 text-sm font-medium text-[#FFFFFF]">
+          <div className="mt-4 rounded-[var(--radius-md)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.1)] p-4 text-sm font-medium text-[var(--text-primary)]">
             {softWarning}
           </div>
         ) : null}
@@ -630,7 +561,7 @@ export default function MergePdfTool() {
   }
 
   return (
-    <section className="pb-28 lg:h-full lg:overflow-hidden lg:pb-0">
+    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
       <style>{`
         @keyframes consoleReveal {
           from { opacity: 0; transform: translateY(8px); }
@@ -649,8 +580,8 @@ export default function MergePdfTool() {
         }}
       />
 
-      <div className="grid gap-5 lg:h-full lg:grid-cols-[minmax(0,1.75fr)_minmax(340px,0.72fr)] lg:items-stretch 2xl:grid-cols-[minmax(0,1.95fr)_minmax(360px,0.72fr)]">
-        <div className="flex min-h-0 min-w-0 flex-col gap-3">
+      <L2ToolWorkspace>
+        <L2ToolMainColumn>
           <section className="animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#FFFFFF]/12 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] p-3 shadow-2xl shadow-black/28">
             <div className="mb-2.5 flex items-center justify-between gap-3">
               <div>
@@ -766,7 +697,7 @@ export default function MergePdfTool() {
                       setDraggingFileId("");
                       setDragOverFileId("");
                     }}
-                    className={`grid cursor-grab gap-2 rounded-lg border px-3 py-2 transition-all duration-300 active:cursor-grabbing sm:grid-cols-[auto_auto_1fr_auto] sm:items-center ${
+                    className={`flex cursor-grab items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-300 active:cursor-grabbing ${
                       draggingFileId === item.id
                         ? "scale-[0.99] border-[#CBA052]/45 bg-[#CBA052]/10 opacity-70"
                         : dragOverFileId === item.id
@@ -774,57 +705,22 @@ export default function MergePdfTool() {
                           : "border-[#FFFFFF]/10 bg-[#0A101C]/74 hover:-translate-y-0.5 hover:border-[#CBA052]/22 hover:bg-[#142034]"
                     }`}
                   >
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full border border-[#FFFFFF]/12 bg-[#FFFFFF]/[0.035] text-[11px] font-semibold text-[#FFFFFF]/58">
-                      {index + 1}
-                    </span>
                     <span className="hidden text-[#FFFFFF]/24 sm:inline" aria-hidden="true">
                       :::
                     </span>
-                    <div className="min-w-0">
-                      <div className="flex min-w-0 items-center gap-3">
-                        <PdfFileIcon />
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-semibold text-[#FFFFFF]">
-                            {item.file.name}
-                          </p>
-                          <p className="mt-1 text-xs font-medium text-[#FFFFFF]/42">
-                            {item.pageCount} page{item.pageCount === 1 ? "" : "s"} - {formatFileSize(item.file.size)} - {item.pageSizeType}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5 sm:justify-end">
-                      <button
-                        type="button"
-                        aria-label={`Move ${item.file.name} up`}
-                        disabled={index === 0 || status === "Merging in your browser..."}
-                        onClick={() => moveFile(index, -1)}
-                        className="rounded-full border border-[#FFFFFF]/10 px-2.5 py-1.5 text-xs font-semibold text-[#FFFFFF]/56 transition hover:border-[#FFFFFF]/22 hover:text-[#FFFFFF] disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        Up
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Move ${item.file.name} down`}
-                        disabled={
-                          index === files.length - 1 ||
-                          status === "Merging in your browser..."
-                        }
-                        onClick={() => moveFile(index, 1)}
-                        className="rounded-full border border-[#FFFFFF]/10 px-2.5 py-1.5 text-xs font-semibold text-[#FFFFFF]/56 transition hover:border-[#FFFFFF]/22 hover:text-[#FFFFFF] disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        Down
-                      </button>
-                      <button
-                        type="button"
-                        aria-label={`Remove ${item.file.name}`}
-                        disabled={status === "Merging in your browser..."}
-                        onClick={() => removeFile(item.id)}
-                        className="rounded-full border border-red-300/14 px-2.5 py-1.5 text-xs font-semibold text-red-100/70 transition hover:border-red-300/28 hover:text-red-50 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        Remove
-                      </button>
+                    <div className="min-w-0 flex-1">
+                      <L2FileCard
+                        order={index + 1}
+                        icon={<AuraPdfIcon />}
+                        name={item.file.name}
+                        meta={`${item.pageCount} page${item.pageCount === 1 ? "" : "s"} - ${formatFileSize(item.file.size)} - ${item.pageSizeType}`}
+                        onMoveUp={index === 0 || status === "Merging in your browser..." ? undefined : () => moveFile(index, -1)}
+                        onMoveDown={index === files.length - 1 || status === "Merging in your browser..." ? undefined : () => moveFile(index, 1)}
+                        onRemove={status === "Merging in your browser..." ? undefined : () => removeFile(item.id)}
+                        moveUpLabel={`Move ${item.file.name} up`}
+                        moveDownLabel={`Move ${item.file.name} down`}
+                        removeLabel={`Remove ${item.file.name}`}
+                      />
                     </div>
                   </div>
                 ))}
@@ -866,18 +762,16 @@ export default function MergePdfTool() {
 
           <div className="rounded-xl border border-[#CBA052]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-semibold text-[#FFFFFF]/74">
-                Private by design &middot; Browser-only &middot; Cleared after download
-              </p>
+              <L2PrivacyNote compact />
               <p className="lg:hidden">
                 Files stay on your device. No server upload.
               </p>
             </div>
           </div>
-        </div>
+        </L2ToolMainColumn>
 
-        <aside className="lg:min-h-0">
-          <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
+        <L2ToolSettingsPanel title="Merge options" description="One combined PDF using the file order shown.">
+          <div className="flex h-full min-h-0 flex-col">
             <div className="mb-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
                 Output
@@ -888,7 +782,7 @@ export default function MergePdfTool() {
             </div>
 
             <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-            <div className="rounded-lg border border-[#CBA052]/22 bg-[#0A101C]/74 p-3 shadow-inner shadow-black/20">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[#0A101C]/74 p-3 shadow-inner shadow-black/20">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
@@ -917,95 +811,30 @@ export default function MergePdfTool() {
             </div>
 
             {showOutputOptions ? (
-              <div className="mt-2 overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/74">
+              <div className="mt-2 grid gap-2 overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/74 p-2">
                 {outputFormatOptions.map((option) => (
-                  <button
+                  <AuraOptionCard
                     key={option.value}
-                    type="button"
+                    label={option.label}
+                    description={option.detail}
+                    selected={pageFormat === option.value}
+                    recommended={option.recommended}
                     onClick={() => updatePageFormat(option.value)}
-                    className={`flex w-full items-center justify-between gap-3 border-b border-[#FFFFFF]/8 px-3 py-2 text-left last:border-b-0 transition ${
-                      pageFormat === option.value
-                        ? "bg-[#CBA052]/12"
-                        : "hover:bg-[#FFFFFF]/[0.035]"
-                    }`}
-                  >
-                    <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[#FFFFFF]">
-                        {option.label}
-                        {option.recommended ? (
-                          <span className="rounded-full bg-[#CBA052]/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.14em] text-[#CBA052]">
-                            Recommended
-                          </span>
-                        ) : null}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-[#FFFFFF]/42">
-                        {option.detail}
-                      </span>
-                    </span>
-                    {pageFormat === option.value ? (
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#CBA052] text-[#F0EAD6]">
-                        <svg
-                          aria-hidden="true"
-                          viewBox="0 0 16 16"
-                          className="h-3.5 w-3.5"
-                          fill="none"
-                        >
-                          <path
-                            d="m4 8.2 2.4 2.4L12.2 5"
-                            stroke="currentColor"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth="1.8"
-                          />
-                        </svg>
-                      </span>
-                    ) : null}
-                  </button>
+                  />
                 ))}
               </div>
             ) : null}
 
             {showMarginOptions ? (
               <div className="mt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvancedSettings((current) => !current)}
-                  aria-expanded={showAdvancedSettings}
-                  className="flex w-full items-center justify-between rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/46 px-3 py-2 text-left transition hover:border-[#CBA052]/22"
-                >
-                  <span>
-                    <span className="block text-sm font-semibold text-[#FFFFFF]">
-                      Advanced settings
-                    </span>
-                    <span className="mt-0.5 block text-xs text-[#FFFFFF]/40">
-                      Margin: {selectedMarginOption.label}
-                    </span>
-                  </span>
-                  <span className="text-xs font-semibold text-[#CBA052]">
-                    {showAdvancedSettings ? "Hide" : "Open"}
-                  </span>
-                </button>
-
-                {showAdvancedSettings ? (
-                  <div className="mt-2 rounded-full border border-[#FFFFFF]/10 bg-[#0C1220]/50 p-1">
-                    <div className="grid grid-cols-3 gap-1">
-                      {marginOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => updateMarginPreset(option.value)}
-                          className={`rounded-full px-3 py-2 text-xs font-semibold transition-all duration-300 ${
-                            marginPreset === option.value
-                              ? "bg-[#CBA052] text-[#F0EAD6] shadow-[0_10px_26px_rgba(245,158,11,0.22)]"
-                              : "text-[#FFFFFF]/56 hover:text-[#FFFFFF]"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
+                <L2AdvancedDisclosure title="Advanced settings" description={`Margin: ${selectedMarginOption.label}`}>
+                  <AuraSegmentedControl
+                    label="Margin"
+                    options={marginOptions.map((option) => ({ value: option.value, label: option.label }))}
+                    value={marginPreset}
+                    onChange={(value) => updateMarginPreset(value as MarginPreset)}
+                  />
+                </L2AdvancedDisclosure>
               </div>
             ) : null}
 
@@ -1041,20 +870,26 @@ export default function MergePdfTool() {
                     {downloadName} - {outputStyleLabel} - {totalPages} pages
                   </p>
                   <div className="mt-3 hidden flex-col gap-2 lg:flex">
-                    <button
-                      type="button"
-                      onClick={downloadMergedPdf}
-                      className="rounded-full bg-[#CBA052] px-5 py-2.5 text-sm font-semibold text-[#F0EAD6] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98]"
-                    >
-                      Download
-                    </button>
-                    <button
-                      type="button"
-                      onClick={startNewMerge}
-                      className="rounded-full border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF]"
-                    >
-                      Start new
-                    </button>
+                    <L2ActionArea
+                      primary={(
+                        <button
+                          type="button"
+                          onClick={downloadMergedPdf}
+                          className="lumeo-primary-action rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]"
+                        >
+                          Download merged PDF
+                        </button>
+                      )}
+                      secondary={(
+                        <button
+                          type="button"
+                          onClick={startNewMerge}
+                          className="rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF]"
+                        >
+                          Start new
+                        </button>
+                      )}
+                    />
                   </div>
                 </div>
               ) : files.length >= 2 ? (
@@ -1065,21 +900,25 @@ export default function MergePdfTool() {
                   <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">
                     {readySummary}
                   </p>
-                  <button
-                    type="button"
-                    disabled={status === "Merging in your browser..."}
-                    onClick={mergePdfs}
-                    className="mt-3 hidden w-full items-center justify-center gap-2 rounded-full bg-[#CBA052] px-5 py-2.5 text-sm font-semibold text-[#F0EAD6] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98] lg:inline-flex"
-                  >
-                    {status === "Merging in your browser..." ? (
-                      <>
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#E8DFC8]/24 border-t-white" />
-                        Merging in your browser...
-                      </>
-                    ) : (
-                      "Merge PDFs"
+                  <L2ActionArea
+                    primary={(
+                      <button
+                        type="button"
+                        disabled={status === "Merging in your browser..."}
+                        onClick={mergePdfs}
+                        className="lumeo-primary-action mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
+                      >
+                        {status === "Merging in your browser..." ? (
+                          <>
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#E8DFC8]/24 border-t-white" />
+                            Merging in your browser...
+                          </>
+                        ) : (
+                          "Merge PDFs"
+                        )}
+                      </button>
                     )}
-                  </button>
+                  />
                 </div>
               ) : (
                 <p className="mt-3 text-sm leading-6 text-[#FFFFFF]/48">
@@ -1088,62 +927,8 @@ export default function MergePdfTool() {
               )}
             </div>
           </div>
-        </aside>
-      </div>
-
-      {files.length >= 2 || downloadUrl ? (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-3 lg:hidden">
-          <div className="pointer-events-auto mx-auto flex max-w-3xl flex-col gap-3 rounded-xl border border-[#CBA052]/24 bg-[#0C1220]/95 p-3 shadow-2xl shadow-black/40 backdrop-blur sm:flex-row sm:items-center sm:justify-between">
-            {downloadUrl ? (
-              <>
-                <div>
-                  <p className="text-sm font-semibold text-[#FFFFFF]">
-                    Merged PDF ready
-                  </p>
-                  <p className="mt-1 text-xs text-[#FFFFFF]/46">
-                    {downloadName} - {outputStyleLabel}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={downloadMergedPdf}
-                    className="rounded-full bg-[#CBA052] px-5 py-2.5 text-sm font-semibold text-[#F0EAD6]"
-                  >
-                    Download
-                  </button>
-                  <button
-                    type="button"
-                    onClick={startNewMerge}
-                    className="rounded-full border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62"
-                  >
-                    Start new
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div>
-                  <p className="text-sm font-semibold text-[#FFFFFF]">
-                    Ready to merge
-                  </p>
-                  <p className="mt-1 text-xs text-[#FFFFFF]/46">
-                    {readySummary}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  disabled={status === "Merging in your browser..."}
-                  onClick={mergePdfs}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-[#CBA052] px-5 py-2.5 text-sm font-semibold text-[#F0EAD6] disabled:opacity-45"
-                >
-                  {status === "Merging in your browser..." ? "Merging..." : "Merge PDFs"}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      ) : null}
+        </L2ToolSettingsPanel>
+      </L2ToolWorkspace>
     </section>
   );
 }

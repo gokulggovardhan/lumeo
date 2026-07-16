@@ -6,15 +6,15 @@ export function AdminStatusBadge({
   children: React.ReactNode;
 }) {
   const tones = {
-    neutral: "border-[#E8DFC8]/12 bg-[#F0EAD6]/[0.04] text-[#F0EAD6]/68",
-    success: "border-[#1E6B4A]/45 bg-[#1E6B4A]/16 text-[#DDF5E9]",
-    warning: "border-[#CBA052]/45 bg-[#CBA052]/12 text-[#F0EAD6]",
-    danger: "border-[#9B3B3B]/45 bg-[#9B3B3B]/14 text-[#FFD9D9]",
-    gold: "border-[#CBA052]/45 bg-[#CBA052]/12 text-[#F0EAD6]",
+    neutral: "border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.055)] text-[var(--lumeo-paper-200)]",
+    success: "border-[rgba(var(--lumeo-seal-rgb),0.45)] bg-[rgba(var(--lumeo-seal-rgb),0.16)] text-[#DDF5E9]",
+    warning: "border-[rgba(var(--lumeo-gold-rgb),0.45)] bg-[rgba(var(--lumeo-gold-rgb),0.12)] text-[var(--lumeo-paper-50)]",
+    danger: "border-[rgba(224,84,84,0.45)] bg-[rgba(224,84,84,0.14)] text-[#FFD9D9]",
+    gold: "border-[rgba(var(--lumeo-gold-rgb),0.45)] bg-[rgba(var(--lumeo-gold-rgb),0.12)] text-[var(--lumeo-paper-50)]",
   };
 
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${tones[tone]}`}>
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold shadow-[var(--shadow-xs)] ${tones[tone]}`}>
       {children}
     </span>
   );

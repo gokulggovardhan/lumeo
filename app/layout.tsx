@@ -1,19 +1,26 @@
 import type { Metadata } from "next";
-import { DM_Serif_Display, Manrope } from "next/font/google";
+import { Fraunces, IBM_Plex_Mono, Inter } from "next/font/google";
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
 import "./globals.css";
 
-const manrope = Manrope({
+const inter = Inter({
   variable: "--font-manrope",
   subsets: ["latin"],
   display: "swap",
 });
 
-const dmSerif = DM_Serif_Display({
+const fraunces = Fraunces({
   variable: "--font-dm-serif",
   subsets: ["latin"],
-  weight: "400",
+  weight: "500",
+  display: "swap",
+});
+
+const plexMono = IBM_Plex_Mono({
+  variable: "--font-ibm-plex-mono",
+  subsets: ["latin"],
+  weight: "500",
   display: "swap",
 });
 
@@ -86,7 +93,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${manrope.variable} ${dmSerif.variable} h-full antialiased`}
+      className={`${inter.variable} ${fraunces.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <AnalyticsProvider>

@@ -5,6 +5,17 @@ import JSZip from "jszip";
 import { degrees, PDFDocument } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import {
+  L2ActionArea,
+  L2AdvancedDisclosure,
+  L2FileCard,
+  L2PrivacyNote,
+  L2ToolMainColumn,
+  L2ToolSettingsPanel,
+  L2ToolWorkspace,
+  L2UploadStage,
+} from "@/components/pdf/workspace/ToolWorkspace";
+import { AuraOptionCard, AuraPdfIcon, AuraStatus } from "@/components/ui/Aura";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type SplitMode = "extract" | "ranges" | "everyPage" | "everyN" | "remove";
@@ -384,27 +395,6 @@ function SplitIcon() {
   );
 }
 
-function PdfFileIcon() {
-  return (
-    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/22 bg-[#CBA052]/10 text-[#CBA052]">
-      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
-        <path
-          d="M6.5 3.8h7.8l3.2 3.2v13.2h-11V3.8Z"
-          stroke="currentColor"
-          strokeWidth="1.7"
-        />
-        <path
-          d="M14.1 4v3.3h3.2M8.8 11.2h6.4M8.8 14h4.6"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="1.55"
-        />
-      </svg>
-    </span>
-  );
-}
-
 function selectedSummary(selected: number[]) {
   if (!selected.length) return "No pages selected";
   return `Selected: ${selected.length} ${selected.length === 1 ? "page" : "pages"}`;
@@ -544,7 +534,6 @@ function SplitPageThumbnail({
 
 export default function SplitPdfTool() {
   const { availability, track } = useAnalytics();
-  const inputRef = useRef<HTMLInputElement | null>(null);
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const sessionRef = useRef(0);
@@ -553,7 +542,6 @@ export default function SplitPdfTool() {
   const renderingRef = useRef<Set<number>>(new Set());
   const pendingRenderRef = useRef<Set<number>>(new Set());
 
-  const [dragActive, setDragActive] = useState(false);
   const [analysis, setAnalysis] = useState<PdfAnalysis | null>(null);
   const [mode, setMode] = useState<SplitMode>("extract");
   const [rangeInput, setRangeInput] = useState("1");
@@ -704,7 +692,6 @@ export default function SplitPdfTool() {
     setError("");
     setStatus("Ready");
     setProgressDetail("");
-    if (inputRef.current) inputRef.current.value = "";
   }
 
   const scheduleThumbnailRender = useCallback(
@@ -1283,71 +1270,21 @@ export default function SplitPdfTool() {
 
   if (!analysis) {
     return (
-      <section className="pb-4 lg:flex lg:h-full lg:flex-col lg:justify-center lg:pb-0">
-        <input
-          ref={inputRef}
-          type="file"
-          accept="application/pdf,.pdf"
-          className="hidden"
-          onChange={(event) => {
-            handleFiles(event.target.files ?? []);
-            event.target.value = "";
-          }}
-        />
-
-        <div
-          onDragOver={(event) => {
-            event.preventDefault();
-            setDragActive(true);
-          }}
-          onDragLeave={() => setDragActive(false)}
-          onDrop={(event) => {
-            event.preventDefault();
-            setDragActive(false);
-            handleFiles(event.dataTransfer.files);
-          }}
-          className={`lumeo-upload-surface group relative mx-auto w-full max-w-[1040px] overflow-hidden rounded-[24px] border px-5 py-7 shadow-2xl shadow-black/32 transition-all duration-300 sm:px-8 lg:px-10 lg:py-8 ${
-            dragActive
-              ? "border-[#CBA052]/64 bg-[#CBA052]/14 shadow-[0_24px_70px_rgba(245,158,11,0.2)]"
-              : "border-[#FFFFFF]/18 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] hover:-translate-y-0.5 hover:border-[#CBA052]/36"
-          }`}
-        >
-          <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/42 to-transparent opacity-80" />
-
-
-          <div className="relative flex flex-col gap-7 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex max-w-2xl flex-col gap-4 sm:flex-row sm:items-center">
-              <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-[#CBA052]/24 bg-[#0C1220]/64 text-[#CBA052] shadow-[0_18px_44px_rgba(0,0,0,0.24)] transition group-hover:scale-[1.02] group-hover:bg-[#CBA052]/14">
-                <SplitIcon />
-              </span>
-              <div>
-                <p className="text-2xl font-semibold tracking-[-0.02em] text-[#FFFFFF]">
-                  Drop PDFs here
-                </p>
-                <p className="mt-2 text-base text-[#FFFFFF]/52">
-                  or choose files from your device
-                </p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => inputRef.current?.click()}
-              className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex w-full items-center justify-center rounded-full bg-[#1E6B4A] px-7 py-3.5 text-sm font-semibold text-white shadow-[0_18px_50px_rgba(245,158,11,0.2)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98] sm:w-auto"
-            >
-              Select PDF
-            </button>
-          </div>
+      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
+        <div className="mx-auto w-full max-w-[1040px]">
+          <L2UploadStage
+            inputId="split-pdf-upload"
+            accept="application/pdf,.pdf"
+            acceptedNote="PDF only · One file"
+            multiple={false}
+            icon={<SplitIcon />}
+            privacyNote="Browser-first processing for supported live tools"
+            buttonLabel="Select PDF"
+            onFilesSelected={handleFiles}
+          />
         </div>
 
-        <div className="mt-4 text-center">
-          <p className="text-sm font-semibold text-[#FFFFFF]/68">
-            Private by design &middot; Browser-only &middot; Cleared after download
-          </p>
-          <p className="mt-1 text-xs text-[#FFFFFF]/38">
-            Files stay on your device for this tool.
-          </p>
-        </div>
+        <L2PrivacyNote />
 
         {error ? (
           <div role="alert" className="mt-4 rounded-lg border border-[#F0A8A8]/20 bg-[#F0A8A8]/10 p-4 text-sm font-medium text-[#F0C0C0]">
@@ -1359,8 +1296,9 @@ export default function SplitPdfTool() {
   }
 
   return (
-    <section className="pb-28 lg:h-full lg:overflow-hidden lg:pb-0">
-      <div className="grid h-full gap-4 lg:grid-cols-[minmax(0,1.75fr)_minmax(340px,0.72fr)] lg:overflow-hidden 2xl:grid-cols-[minmax(0,1.95fr)_minmax(360px,0.72fr)]">
+    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
+      <L2ToolWorkspace>
+        <L2ToolMainColumn>
         <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
           <section className="shrink-0">
             <div className="mb-2 flex items-center justify-between gap-3">
@@ -1399,19 +1337,13 @@ export default function SplitPdfTool() {
               </div>
             </div>
 
-            <div className="grid gap-2 rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/74 px-3 py-2 transition-all duration-300 sm:grid-cols-[auto_1fr_auto] sm:items-center">
-              <PdfFileIcon />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-[#FFFFFF]">
-                  {analysis.name}
-                </p>
-                <p className="mt-1 text-xs font-medium text-[#FFFFFF]/42">
-                  {analysis.pageCount} page{analysis.pageCount === 1 ? "" : "s"} · {formatBytes(analysis.size)} · {analysis.pageSizeType}
-                </p>
-              </div>
-              <span className="rounded-full border border-[#CBA052]/24 bg-[#CBA052]/10 px-3 py-1.5 text-xs font-semibold text-[#9FD0B5]">
-                {status}
-              </span>
+            <div className="rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/74 px-3 py-2 transition-all duration-300">
+              <L2FileCard
+                name={analysis.name}
+                meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatBytes(analysis.size)} · ${analysis.pageSizeType}`}
+                icon={<AuraPdfIcon />}
+                action={<AuraStatus tone="success" label={status} />}
+              />
             </div>
           </section>
 
@@ -1456,7 +1388,7 @@ export default function SplitPdfTool() {
                     }}
                     className={`rounded-full border px-3 py-1.5 text-[11px] font-bold capitalize transition ${
                       thumbnailDensity === density
-                        ? "border-[#CBA052]/48 bg-[#CBA052]/16 text-[#9FD0B5]"
+                        ? "border-[var(--border-selected)] bg-[var(--surface-selected)] text-[#9FD0B5]"
                         : "border-[#FFFFFF]/10 text-[#FFFFFF]/44 hover:border-[#CBA052]/30 hover:text-[#FFFFFF]"
                     }`}
                   >
@@ -1512,16 +1444,15 @@ export default function SplitPdfTool() {
 
           <div className="rounded-xl border border-[#CBA052]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-semibold text-[#FFFFFF]/74">
-                Private by design &middot; Browser-only &middot; Cleared after download
-              </p>
+              <L2PrivacyNote compact />
               <p className="lg:hidden">Files stay on your device. No server upload.</p>
             </div>
           </div>
         </div>
+        </L2ToolMainColumn>
 
-        <aside className="lg:min-h-0">
-          <div className="flex h-full min-h-0 flex-col rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
+        <L2ToolSettingsPanel title="Split options" description="Choose the split mode, page selection, and output name.">
+          <div className="flex h-full min-h-0 flex-col">
             <div className="border-b border-[#FFFFFF]/10 pb-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#CBA052]">
@@ -1535,7 +1466,7 @@ export default function SplitPdfTool() {
                   Change
                 </button>
               </div>
-              <div className="mt-3 rounded-xl border border-[#CBA052]/42 bg-[#CBA052]/14 px-3 py-2">
+              <div className="mt-3 rounded-xl border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 py-2">
                 <span className="block text-sm font-bold text-[#FFFFFF]">
                   {selectedMode.label}
                 </span>
@@ -1546,24 +1477,13 @@ export default function SplitPdfTool() {
               {methodDrawerOpen ? (
                 <div className="mt-2 grid gap-1 rounded-xl border border-[#FFFFFF]/10 bg-[#050914]/88 p-2">
                   {splitModes.map((item) => (
-                    <button
-                      type="button"
+                    <AuraOptionCard
                       key={item.value}
+                      label={item.label}
+                      description={item.helper}
+                      selected={mode === item.value}
                       onClick={() => setModeSafely(item.value)}
-                      className={`rounded-xl border px-3 py-2 text-left transition ${
-                        mode === item.value
-                          ? "border-[#CBA052]/55 bg-[#CBA052]/16"
-                          : "border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.025] hover:border-[#CBA052]/28"
-                      }`}
-                    >
-                      <span className="flex items-center justify-between gap-3 text-sm font-bold text-[#FFFFFF]">
-                        {item.label}
-                        {mode === item.value ? <span className="text-[#9FD0B5]">✓</span> : null}
-                      </span>
-                      <span className="mt-0.5 block text-xs text-[#FFFFFF]/42">
-                        {item.helper}
-                      </span>
-                    </button>
+                    />
                   ))}
                 </div>
               ) : null}
@@ -1807,35 +1727,41 @@ export default function SplitPdfTool() {
 
               {result ? (
                 <div className="grid gap-2">
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#CBA052] px-5 text-sm font-bold text-[#FFFFFF] shadow-[0_14px_35px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98]"
-                  >
-                    Download {result.kind === "pdf" ? "PDF" : "ZIP"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={resetTool}
-                    className="inline-flex h-10 w-full items-center justify-center rounded-full border border-[#FFFFFF]/12 px-5 text-sm font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]"
-                  >
-                    Clear and start new split
-                  </button>
+                  <L2ActionArea
+                    primary={(
+                      <button
+                        type="button"
+                        onClick={handleDownload}
+                        className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]"
+                      >
+                        Download {result.kind === "pdf" ? "PDF" : "ZIP"}
+                      </button>
+                    )}
+                    secondary={(
+                      <button
+                        type="button"
+                        onClick={resetTool}
+                        className="inline-flex h-10 w-full items-center justify-center rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 text-sm font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]"
+                      >
+                        Clear and start new split
+                      </button>
+                    )}
+                  />
                 </div>
               ) : (
                 <button
                   type="button"
                   disabled={isSplitting || !outputPreview?.valid}
                   onClick={handleSplit}
-                  className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#CBA052] px-5 text-sm font-bold text-[#FFFFFF] shadow-[0_14px_35px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5 hover:bg-[#257D58] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55"
+                  className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55"
                 >
                   {isSplitting ? "Splitting in your browser..." : "Split PDF"}
                 </button>
               )}
             </div>
           </div>
-        </aside>
-      </div>
+        </L2ToolSettingsPanel>
+      </L2ToolWorkspace>
 
       <style jsx>{`
         .preset-button {

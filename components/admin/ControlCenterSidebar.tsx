@@ -18,16 +18,16 @@ export function ControlCenterSidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-72 shrink-0 rounded-[1.4rem] border border-[#E8DFC8]/10 bg-[#111A2B] p-4 shadow-[0_24px_80px_rgba(0,0,0,0.24)] lg:flex lg:flex-col">
+    <aside className="hidden w-72 shrink-0 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[linear-gradient(180deg,rgba(25,48,77,0.9),rgba(16,29,49,0.96))] p-4 shadow-[var(--shadow-lg)] lg:flex lg:flex-col">
       <Link
         href="/admin"
-        className="rounded-xl p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45"
+        className="rounded-xl p-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]"
       >
         <BrandLockup markSize="h-10 w-10" />
       </Link>
 
       <div className="mt-7">
-        <p className="px-3 text-[0.68rem] font-bold uppercase tracking-[0.22em] text-[#CBA052]/70">
+        <p className="aura-text-label px-3 text-[var(--lumeo-gold-300)]">
           Control Center
         </p>
         <nav className="mt-3 space-y-1.5" aria-label="Control Center navigation">
@@ -38,10 +38,10 @@ export function ControlCenterSidebar({
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/35 ${
+                className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm font-semibold transition duration-200 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.18)] ${
                   active
-                    ? "border-[#1E6B4A]/55 bg-[#1E6B4A]/18 text-[#F0EAD6]"
-                    : "border-transparent text-[#F0EAD6]/58 hover:border-[#E8DFC8]/10 hover:bg-[#F0EAD6]/[0.035] hover:text-[#F0EAD6]"
+                    ? "border-[rgba(var(--lumeo-seal-rgb),0.5)] bg-[rgba(var(--lumeo-seal-rgb),0.18)] text-[var(--lumeo-paper-50)] shadow-[var(--shadow-xs)]"
+                    : "border-transparent text-[var(--lumeo-paper-400)] hover:border-[var(--border-subtle)] hover:bg-[rgba(var(--lumeo-paper-rgb),0.055)] hover:text-[var(--lumeo-paper-50)]"
                 }`}
               >
                 <AdminIcon name={item.icon} className="h-4 w-4 shrink-0" />
@@ -52,12 +52,12 @@ export function ControlCenterSidebar({
         </nav>
       </div>
 
-      <div className="mt-auto rounded-2xl border border-[#E8DFC8]/8 bg-[#0C1220]/55 p-4">
-        <p className="text-xs font-semibold text-[#F0EAD6]/52">Signed in as</p>
-        <p className="mt-1 truncate text-sm font-bold text-[#F0EAD6]">
+      <div className="mt-auto rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-4">
+        <p className="text-xs font-semibold text-[var(--lumeo-paper-400)]">Signed in as</p>
+        <p className="mt-1 truncate text-sm font-bold text-[var(--lumeo-paper-50)]">
           {email || "Administrator"}
         </p>
-        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[#CBA052]/68">
+        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[var(--lumeo-gold-300)]">
           {role}
         </p>
         <div className="mt-4">

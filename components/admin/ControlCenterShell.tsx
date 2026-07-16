@@ -14,7 +14,7 @@ export function ControlCenterShell({
   role: AdminRole;
 }) {
   return (
-    <main className="min-h-dvh bg-[var(--lumeo-ink-950)] text-[var(--lumeo-paper-100)]">
+    <main className="min-h-dvh bg-[var(--surface-canvas)] text-[var(--lumeo-paper-100)]">
       <div className="pointer-events-none fixed inset-0 opacity-70">
         <div className="absolute left-[8%] top-[10%] h-64 w-64 rounded-full bg-[rgba(var(--lumeo-aura-rgb),0.14)] blur-3xl" />
         <div className="absolute bottom-[12%] right-[8%] h-72 w-72 rounded-full bg-[rgba(var(--lumeo-seal-rgb),0.12)] blur-3xl" />
@@ -31,7 +31,7 @@ export function ControlCenterShell({
               Control Center guide
             </Link>
           </div>
-          <div id="main-content" className="mt-4 flex-1 rounded-[1.4rem] border border-[var(--border-subtle)] bg-[rgba(16,29,49,0.94)] p-4 shadow-[var(--shadow-lg)] sm:p-6 lg:mt-0 lg:p-7">
+          <div id="main-content" className="mt-4 flex-1 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-[var(--shadow-lg)] sm:p-6 lg:mt-0 lg:p-7">
             {children}
           </div>
         </section>
