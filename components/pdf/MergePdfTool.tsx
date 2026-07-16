@@ -572,7 +572,7 @@ export default function MergePdfTool() {
         ) : null}
 
         {softWarning ? (
-          <div className="mt-4 rounded-lg border border-[#CBA052]/20 bg-[#CBA052]/10 p-4 text-sm font-medium text-[#FFFFFF]">
+          <div className="mt-4 rounded-[var(--radius-md)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.1)] p-4 text-sm font-medium text-[var(--text-primary)]">
             {softWarning}
           </div>
         ) : null}
