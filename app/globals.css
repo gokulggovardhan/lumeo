@@ -413,7 +413,7 @@ a:active {
 .aura-live-tool button[class*="bg-[#CBA052]"],
 .aura-live-tool a[class*="bg-[#CBA052]"] {
   border-color: rgba(var(--lumeo-seal-rgb), 0.5) !important;
-  background: linear-gradient(180deg, var(--lumeo-seal-400), var(--lumeo-seal-600)) !important;
+  background: linear-gradient(180deg, var(--atelier-sage-400), var(--atelier-sage-600)) !important;
   color: var(--text-primary) !important;
   box-shadow: 0 16px 38px rgba(var(--lumeo-seal-rgb), 0.28), inset 0 1px 0 rgba(255, 253, 247, 0.18) !important;
 }
