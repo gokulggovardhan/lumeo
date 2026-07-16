@@ -559,12 +559,12 @@ export function L2AdvancedDisclosure({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="l2-advanced-disclosure rounded-[var(--radius-xl)] bg-[rgba(var(--paper-rgb),0.04)]">
+    <section className="l2-advanced-disclosure rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.04)]">
       <button
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-xl)] px-4 py-3 text-left font-black text-[var(--text-primary)] transition hover:bg-[rgba(var(--paper-rgb),0.055)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-xl)] px-4 py-3 text-left font-black text-[var(--text-primary)] transition hover:bg-[rgb(var(--paper-rgb)/0.055)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
       >
         <span>
           {title}

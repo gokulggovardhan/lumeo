@@ -39,7 +39,7 @@ import {
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
-import { AuraOptionCard, AuraPdfIcon, AuraStatus } from "@/components/ui/Aura";
+import { AuraOptionCard, AuraPdfIcon, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
@@ -1109,37 +1109,19 @@ export default function CompressPdfTool() {
         <L2ToolSettingsPanel title="Compression settings" description="Choose a quality profile or target size, then compress locally.">
           <div className="flex h-full min-h-0 flex-col">
             <div className={result ? "hidden" : "border-b border-[#FFFFFF]/10 pb-3"}>
-              <p className="text-xs font-semibold text-[#FFFFFF]/68">
-                Compression mode
-              </p>
-              <div
-                className="mt-2 grid grid-cols-2 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/54 p-1"
-                aria-label="Compression mode"
-              >
-                {[
-                  ["quality", "Quality mode"],
-                  ["target", "Target size"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    aria-pressed={compressionMode === value}
-                    onClick={() => {
-                      setCompressionMode(value as CompressionMode);
-                      setError("");
-                      clearResult();
-                    }}
-                    className={`min-h-11 rounded-lg px-2 text-xs font-bold transition motion-reduce:transition-none ${
-                      compressionMode === value
-                        ? "bg-[#CBA052]/20 text-[#FFFFFF] ring-1 ring-[#CBA052]/55"
-                        : "text-[#FFFFFF]/46 hover:text-[#FFFFFF]"
-                    }`}
-                  >
-                    {compressionMode === value ? "✓ " : ""}
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <AuraSegmentedControl
+                label="Compression mode"
+                options={[
+                  { value: "quality", label: "Quality mode" },
+                  { value: "target", label: "Target size" },
+                ]}
+                value={compressionMode}
+                onChange={(value) => {
+                  setCompressionMode(value as CompressionMode);
+                  setError("");
+                  clearResult();
+                }}
+              />
 
               {compressionMode === "quality" ? (
                 <div className="mt-3 grid gap-2">
@@ -1184,7 +1166,7 @@ export default function CompressPdfTool() {
                         }}
                         className={`min-h-11 rounded-lg border px-2 text-xs font-bold transition motion-reduce:transition-none ${
                           targetPreset === value
-                            ? "border-[#CBA052]/55 bg-[#CBA052]/16 text-[#FFFFFF]"
+                            ? "border-[var(--border-subtle)] bg-[var(--surface-selected)] text-[#FFFFFF]"
                             : "border-[#FFFFFF]/9 text-[#FFFFFF]/48 hover:border-[#CBA052]/28"
                         }`}
                       >
@@ -1272,22 +1254,23 @@ export default function CompressPdfTool() {
                       <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image resolution</p>
                       <div className="mt-2 grid gap-2">
                         {resolutionOptions.map((item) => (
-                          <button key={item.value} type="button" onClick={() => { setResolution(item.value); clearResult(); }} className={`rounded-lg border px-3 py-2 text-left text-xs transition ${resolution === item.value ? "border-[#CBA052]/50 bg-[#CBA052]/14 text-[#FFFFFF]" : "border-[#FFFFFF]/8 text-[#FFFFFF]/52 hover:border-[#CBA052]/28"}`}>
-                            <span className="font-bold">{item.label}</span>
-                            <span className="mt-0.5 block text-[#FFFFFF]/38">{item.helper}</span>
-                          </button>
+                          <AuraOptionCard
+                            key={item.value}
+                            label={item.label}
+                            description={item.helper}
+                            selected={resolution === item.value}
+                            onClick={() => { setResolution(item.value); clearResult(); }}
+                          />
                         ))}
                       </div>
                     </div>
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[0.14em] text-[#CBA052]">Image quality</p>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {qualityOptions.map((item) => (
-                          <button key={item.value} type="button" onClick={() => { setQuality(item.value); clearResult(); }} className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${quality === item.value ? "border-[#CBA052]/50 bg-[#CBA052]/14 text-[#9FD0B5]" : "border-[#FFFFFF]/10 text-[#FFFFFF]/48 hover:border-[#CBA052]/30"}`}>
-                            {item.label}
-                          </button>
-                        ))}
-                      </div>
+                      <AuraSegmentedControl
+                        label="Image quality"
+                        options={qualityOptions.map((item) => ({ value: item.value, label: item.label }))}
+                        value={quality}
+                        onChange={(value) => { setQuality(value as ImageQuality); clearResult(); }}
+                      />
                     </div>
                   </div>
                 </L2AdvancedDisclosure>

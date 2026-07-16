@@ -13,7 +13,7 @@ import {
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
-import { AuraOptionCard, AuraPdfIcon } from "@/components/ui/Aura";
+import { AuraOptionCard, AuraPdfIcon, AuraSegmentedControl } from "@/components/ui/Aura";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type MergeStatus = "Ready" | "Merging in your browser..." | "Download ready";
@@ -782,7 +782,7 @@ export default function MergePdfTool() {
             </div>
 
             <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-            <div className="rounded-lg border border-[#CBA052]/22 bg-[#0A101C]/74 p-3 shadow-inner shadow-black/20">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[#0A101C]/74 p-3 shadow-inner shadow-black/20">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
@@ -828,24 +828,12 @@ export default function MergePdfTool() {
             {showMarginOptions ? (
               <div className="mt-2">
                 <L2AdvancedDisclosure title="Advanced settings" description={`Margin: ${selectedMarginOption.label}`}>
-                  <div className="rounded-full border border-[#FFFFFF]/10 bg-[#0C1220]/50 p-1">
-                    <div className="grid grid-cols-3 gap-1">
-                      {marginOptions.map((option) => (
-                        <button
-                          key={option.value}
-                          type="button"
-                          onClick={() => updateMarginPreset(option.value)}
-                          className={`rounded-full px-3 py-2 text-xs font-semibold transition-all duration-300 ${
-                            marginPreset === option.value
-                              ? "bg-[#CBA052] text-[#F0EAD6] shadow-[0_10px_26px_rgba(245,158,11,0.22)]"
-                              : "text-[#FFFFFF]/56 hover:text-[#FFFFFF]"
-                          }`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                  <AuraSegmentedControl
+                    label="Margin"
+                    options={marginOptions.map((option) => ({ value: option.value, label: option.label }))}
+                    value={marginPreset}
+                    onChange={(value) => updateMarginPreset(value as MarginPreset)}
+                  />
                 </L2AdvancedDisclosure>
               </div>
             ) : null}

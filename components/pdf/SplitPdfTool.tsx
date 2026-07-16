@@ -1388,7 +1388,7 @@ export default function SplitPdfTool() {
                     }}
                     className={`rounded-full border px-3 py-1.5 text-[11px] font-bold capitalize transition ${
                       thumbnailDensity === density
-                        ? "border-[#CBA052]/48 bg-[#CBA052]/16 text-[#9FD0B5]"
+                        ? "border-[var(--border-selected)] bg-[var(--surface-selected)] text-[#9FD0B5]"
                         : "border-[#FFFFFF]/10 text-[#FFFFFF]/44 hover:border-[#CBA052]/30 hover:text-[#FFFFFF]"
                     }`}
                   >
@@ -1466,7 +1466,7 @@ export default function SplitPdfTool() {
                   Change
                 </button>
               </div>
-              <div className="mt-3 rounded-xl border border-[#CBA052]/42 bg-[#CBA052]/14 px-3 py-2">
+              <div className="mt-3 rounded-xl border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 py-2">
                 <span className="block text-sm font-bold text-[#FFFFFF]">
                   {selectedMode.label}
                 </span>
