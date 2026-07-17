@@ -233,6 +233,8 @@ Secondary actions stay near the object they affect: Add PDFs and Clear all near 
 
 File cards show real known values only: filename, size, format/status and pages only when a tool already knows page count. Merge cards may show ordering and reorder controls; Split and Compress should not pretend to manage a queue.
 
+The document/file-type icon box in any file card or document profile must render `FileIcon` from `components/ui/FileIcon.tsx` — the single shared component for this element across every PDF tool. It uses a neutral `--border-subtle` border and neutral surface/text tokens; it must never use brass, gold or champagne styling. Do not inline a local copy of this icon markup in a tool component. New tools (Rotate, Watermark, Extract, etc.) must import `FileIcon` from day one rather than copying markup from an existing tool.
+
 ### Settings-Panel Pattern
 
 Settings panels should be compact, sticky only on desktop, and ordered from primary mode to optional advanced controls. They should use spacing and surface depth before borders.
@@ -359,7 +361,7 @@ Inputs, switches, segmented controls, dropdowns and disclosures use dark graphit
 
 ### Upload Treatment
 
-The shared upload stage keeps its real file input, stable ID, click forwarding, input reset and drag/drop handlers. Atelier changes only the visual treatment: soft graphite document tray, brass document icon, Heritage Sage select button and restrained sage drag-active illumination.
+The shared upload stage keeps its real file input, stable ID, click forwarding, input reset and drag/drop handlers. Atelier changes only the visual treatment: soft graphite document tray, neutral document icon (never brass/gold — see File-Card Pattern), Heritage Sage select button and restrained sage drag-active illumination.
 
 ### Privacy Note
 
