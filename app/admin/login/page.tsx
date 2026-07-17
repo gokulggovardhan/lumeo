@@ -44,7 +44,7 @@ export default async function AdminLoginPage({
           <p className="text-[0.68rem] font-bold uppercase tracking-[0.24em] text-[#CBA052]/72">
             Administrator access
           </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#F0EAD6]">
+          <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#F0EAD6]">
             Lumeo Control Center
           </h1>
           <p className="mt-3 text-sm leading-6 text-[#F0EAD6]/58">

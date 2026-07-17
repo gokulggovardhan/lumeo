@@ -91,7 +91,7 @@ function ToolGuide({
     <div className="rounded-[var(--radius-xl)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-5 shadow-[inset_0_1px_0_rgba(255,253,247,0.06)]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h3 className="font-serif text-2xl text-[var(--text-primary)]">{title}</h3>
+          <h3 className="font-serif font-semibold text-2xl text-[var(--text-primary)]">{title}</h3>
           <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{use}</p>
           <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
             Workflow: {workflow}
@@ -114,7 +114,7 @@ function ToolGuide({
 function FaqGroup({ title, items }: { title: string; items: typeof allFaqs }) {
   return (
     <section className="pt-2">
-      <h3 className="font-serif text-2xl text-[var(--text-primary)]">{title}</h3>
+      <h3 className="font-serif font-semibold text-2xl text-[var(--text-primary)]">{title}</h3>
       <div className="mt-4 grid gap-3">
         {items.map((item) => (
           <details key={item.question} className="group rounded-[var(--radius-xl)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-4 shadow-[inset_0_1px_0_rgba(255,253,247,0.06)]">

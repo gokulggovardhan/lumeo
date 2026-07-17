@@ -474,7 +474,7 @@ export function AuraEmptyState({ title, message, action }: { title: string; mess
   return (
     <AuraCard className="grid place-items-center py-10 text-center">
       <div className="max-w-md">
-        <h3 className="text-xl font-extrabold text-[var(--lumeo-paper-50)]">{title}</h3>
+        <h3 className="font-serif font-semibold text-xl text-[var(--lumeo-paper-50)]">{title}</h3>
         <p className="mt-2 text-sm leading-6 text-[var(--lumeo-paper-400)]">{message}</p>
         {action ? <div className="mt-5">{action}</div> : null}
       </div>
@@ -525,7 +525,7 @@ export function AuraPageHeader({ eyebrow, title, description, action }: { eyebro
     <header className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
       <div>
         {eyebrow ? <p className="aura-text-label text-[var(--lumeo-gold-300)]">{eyebrow}</p> : null}
-        <h1 className="mt-2 font-serif text-[var(--text-heading-xl)] leading-[var(--leading-heading)] text-[var(--lumeo-paper-50)]">{title}</h1>
+        <h1 className="mt-2 font-serif font-semibold text-[var(--text-heading-xl)] leading-[var(--leading-heading)] text-[var(--lumeo-paper-50)]">{title}</h1>
         {description ? <p className="mt-3 max-w-3xl text-[var(--text-body-md)] leading-[var(--leading-body)] text-[var(--lumeo-paper-400)]">{description}</p> : null}
       </div>
       {action ? <div>{action}</div> : null}
@@ -537,7 +537,7 @@ export function AuraSectionHeader({ title, description, action }: { title: strin
   return (
     <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
       <div>
-        <h2 className="text-lg font-black text-[var(--lumeo-paper-50)]">{title}</h2>
+        <h2 className="font-serif font-semibold text-lg text-[var(--lumeo-paper-50)]">{title}</h2>
         {description ? <p className="mt-1 text-sm text-[var(--lumeo-paper-400)]">{description}</p> : null}
       </div>
       {action ? <div>{action}</div> : null}
@@ -612,7 +612,7 @@ export function AuraUploadSurface({
       <div className="mx-auto grid h-12 w-12 place-items-center rounded-[var(--radius-xl)] bg-[linear-gradient(145deg,rgba(var(--atelier-brass-rgb),0.14),rgba(var(--atelier-sage-rgb),0.08))] text-[var(--text-premium)] shadow-[inset_0_1px_0_rgba(255,253,248,0.14)] sm:h-14 sm:w-14">
         {loading ? <span aria-hidden="true" className="h-5 w-5 rounded-full border-2 border-current border-r-transparent motion-safe:animate-spin" /> : icon ?? "PDF"}
       </div>
-      <h3 className="mt-3 text-xl font-black text-[var(--text-primary)]">{title}</h3>
+      <h3 className="mt-3 font-serif font-semibold text-xl text-[var(--text-primary)]">{title}</h3>
       <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
       {supportedTypes ? <p className="mt-2 text-xs font-bold text-[var(--text-subtle)]">{supportedTypes}</p> : null}
       {privacyNote ? <p className="mx-auto mt-2 max-w-md text-xs font-bold text-[var(--text-accent)]">{privacyNote}</p> : null}
@@ -842,7 +842,7 @@ function L2ToolCardInner({
         {tool.status && tool.status !== "active" ? <AuraStatus tone="planned" label={tool.status === "beta" ? "Beta" : "Soon"} /> : null}
       </div>
       <div className="mt-5 flex flex-1 flex-col">
-        <h2 className={cx("font-black tracking-[-0.025em] text-[var(--text-primary)]", featured ? "text-2xl sm:text-3xl" : "text-xl")}>{tool.toolName}</h2>
+        <h2 className={cx("font-serif font-semibold tracking-[-0.025em] text-[var(--text-primary)]", featured ? "text-2xl sm:text-3xl" : "text-xl")}>{tool.toolName}</h2>
         <p className={cx("mt-2 leading-6 text-[var(--text-secondary)]", featured ? "max-w-xl text-base" : "text-sm")}>{tool.shortDescription}</p>
         <span className={cx("lumeo-arrow mt-auto inline-flex items-center gap-2 pt-6 text-sm font-black", allTools ? "text-[var(--text-info)]" : "text-[var(--text-accent)]")}>
           {action}
@@ -898,7 +898,7 @@ export function L2DirectoryToolCard({ tool, className }: { tool: L2ToolCardData;
         <L2ToolIcon iconKey={tool.iconKey} />
         {tool.status && tool.status !== "active" ? <AuraStatus tone="planned" label={tool.status === "beta" ? "Beta" : "Soon"} /> : null}
       </div>
-      <h3 className="mt-4 text-base font-black text-[var(--text-primary)]">{tool.toolName}</h3>
+      <h3 className="mt-4 font-serif font-semibold text-base text-[var(--text-primary)]">{tool.toolName}</h3>
       <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{tool.shortDescription}</p>
       <span className="mt-auto inline-flex items-center gap-2 pt-5 text-sm font-black text-[var(--text-accent)]">
         Open workspace <span className="transition group-hover:translate-x-1 motion-reduce:transform-none"><L2Arrow /></span>
@@ -934,7 +934,7 @@ export function L2PublicErrorState({ title, message, actions }: { title: string;
   return (
     <section className="l2-public-error-state aura-luminous-card mx-auto max-w-xl rounded-[var(--radius-2xl)] p-6 text-center">
       <AuraStatus tone="warning" label="Needs a refresh" />
-      <h1 className="mt-4 text-3xl font-black tracking-[-0.03em] text-[var(--text-primary)]">{title}</h1>
+      <h1 className="mt-4 font-serif font-semibold text-3xl tracking-[-0.03em] text-[var(--text-primary)]">{title}</h1>
       <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">{message}</p>
       {actions ? <div className="mt-6 flex flex-wrap justify-center gap-3">{actions}</div> : null}
     </section>

@@ -43,7 +43,7 @@ function asString(value: unknown) {
 }
 
 function asStatus(value: unknown): PublicToolStatus | null {
-  return value === "active" || value === "beta" ? value : null;
+  return value === "active" || value === "beta" || value === "coming_soon" ? value : null;
 }
 
 function asNumber(value: unknown, fallback: number) {

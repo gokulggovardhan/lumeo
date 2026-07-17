@@ -48,7 +48,7 @@ export default async function PdfToolsPage() {
         <p className="aura-text-label text-[var(--lumeo-gold-300)]">
           PDF tools
         </p>
-        <h1 className="mt-3 font-serif text-[var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[var(--text-primary)]">
+        <h1 className="mt-3 font-serif font-semibold text-[var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[var(--text-primary)]">
           PDF tools for calm document work.
         </h1>
         <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
@@ -64,7 +64,7 @@ export default async function PdfToolsPage() {
             style={{ animationDelay: `${categoryIndex * 70}ms` }}
           >
             <div className="mb-3 border-l border-[rgba(var(--champagne-rgb),0.42)] pl-4">
-              <h2 className="text-xl font-black tracking-[-0.02em] text-[var(--text-primary)]">{category.name}</h2>
+              <h2 className="font-serif font-semibold text-xl tracking-[-0.02em] text-[var(--text-primary)]">{category.name}</h2>
               {category.description ? (
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">{category.description}</p>
               ) : null}
