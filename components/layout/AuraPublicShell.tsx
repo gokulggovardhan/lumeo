@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BrandLockup } from "@/components/PublicPdfChrome";
+import { BrandLockup } from "@/components/BrandMark";
 import { AuraButton, AuraStatus } from "@/components/ui/Aura";
 
 export function AuraPublicNav({

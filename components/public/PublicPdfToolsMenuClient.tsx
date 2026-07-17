@@ -7,14 +7,14 @@ import { L2MenuSurface } from "@/components/ui/Aura";
 
 const MENU_ID = "lumeo-pdf-tools-menu";
 
-const categoryLabels: Record<string, string> = {
+export const categoryLabels: Record<string, string> = {
   "organize-pdf": "ORGANIZE",
   "optimize-pdf": "OPTIMIZE",
   "convert-to-pdf": "CONVERT TO PDF",
   "convert-from-pdf": "CONVERT FROM PDF",
 };
 
-const toolDescriptions: Record<string, string> = {
+export const toolDescriptions: Record<string, string> = {
   merge: "Combine documents",
   split: "Extract pages",
   compress: "Reduce file size",

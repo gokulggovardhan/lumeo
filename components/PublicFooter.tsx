@@ -1,7 +1,7 @@
 // components/PublicFooter.tsx
 
 import Link from "next/link";
-import { BrandLockup } from "@/components/PublicPdfChrome";
+import { BrandLockup } from "@/components/BrandMark";
 import { L2PublicFooter } from "@/components/ui/Aura";
 
 const footerGroups = [
