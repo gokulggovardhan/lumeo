@@ -18,7 +18,7 @@ export function ControlCenterSidebar({
   const pathname = usePathname();
 
   return (
-    <aside className="hidden w-72 shrink-0 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[linear-gradient(180deg,rgba(25,48,77,0.9),rgba(16,29,49,0.96))] p-4 shadow-[var(--shadow-lg)] lg:flex lg:flex-col">
+    <aside className="hidden w-72 shrink-0 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-[var(--shadow-lg)] lg:flex lg:flex-col">
       <Link
         href="/admin"
         className="rounded-xl p-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]"

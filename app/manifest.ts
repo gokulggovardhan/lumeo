@@ -7,7 +7,7 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Premium private browser-first PDF tools.",
     start_url: "/",
     display: "standalone",
-    background_color: "#0C1220",
+    background_color: "#1B1D1A",
     theme_color: "#1E6B4A",
     icons: [
       {

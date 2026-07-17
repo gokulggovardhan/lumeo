@@ -32,10 +32,10 @@ export default async function AdminLoginPage({
   const safeMessage = getSafeMessage(params?.error, params?.message);
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[#0C1220] px-5 py-10 text-[#F0EAD6]">
+    <main className="flex min-h-dvh items-center justify-center bg-[var(--surface-canvas)] px-5 py-10 text-[#F0EAD6]">
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(203,160,82,0.12),transparent_34%),radial-gradient(circle_at_82%_80%,rgba(30,107,74,0.16),transparent_32%)]" />
 
-      <section className="relative w-full max-w-[460px] rounded-2xl border border-[#E8DFC8]/12 bg-[#111A2B] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.32)] sm:p-8">
+      <section className="relative w-full max-w-[460px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.32)] sm:p-8">
         <Link href="/" className="inline-flex rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45">
           <BrandLockup markSize="h-10 w-10" />
         </Link>
@@ -72,7 +72,7 @@ export default async function AdminLoginPage({
               type="email"
               autoComplete="username"
               required
-              className="mt-2 h-12 w-full rounded-xl border border-[#E8DFC8]/12 bg-[#0C1220] px-4 text-[#F0EAD6] outline-none transition placeholder:text-[#F0EAD6]/28 focus:border-[#CBA052]/55 focus:ring-2 focus:ring-[#CBA052]/18"
+              className="mt-2 h-12 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-4 text-[#F0EAD6] outline-none transition placeholder:text-[#F0EAD6]/28 focus:border-[#CBA052]/55 focus:ring-2 focus:ring-[#CBA052]/18"
               placeholder="admin@example.com"
             />
           </div>
@@ -87,7 +87,7 @@ export default async function AdminLoginPage({
               type="password"
               autoComplete="current-password"
               required
-              className="mt-2 h-12 w-full rounded-xl border border-[#E8DFC8]/12 bg-[#0C1220] px-4 text-[#F0EAD6] outline-none transition placeholder:text-[#F0EAD6]/28 focus:border-[#CBA052]/55 focus:ring-2 focus:ring-[#CBA052]/18"
+              className="mt-2 h-12 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-4 text-[#F0EAD6] outline-none transition placeholder:text-[#F0EAD6]/28 focus:border-[#CBA052]/55 focus:ring-2 focus:ring-[#CBA052]/18"
               placeholder="Enter your password"
             />
           </div>

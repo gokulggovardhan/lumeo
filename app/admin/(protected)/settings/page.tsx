@@ -52,7 +52,7 @@ export default async function SettingsPage() {
               const current = settingMap.get(key);
               const isBoolean = key === "contact_page_enabled" || key === "maintenance_mode" || key === "public_analytics_enabled";
               return (
-                <form key={key} action={asAdminFormAction(updateSiteSetting)} className="rounded-2xl border border-[#E8DFC8]/8 bg-[#0C1220]/44 p-4">
+                <form key={key} action={asAdminFormAction(updateSiteSetting)} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
                   <input type="hidden" name="key" value={key} />
                   <input type="hidden" name="description" value={description} />
                   <p className="text-sm font-semibold text-[#F0EAD6]">{label}</p>

@@ -15,7 +15,7 @@ export function AnalyticsBarList({
   const max = Math.max(1, ...items.map((item) => item.value));
 
   return (
-    <div className="rounded-2xl border border-[#E8DFC8]/8 bg-[#0C1220]/42 p-4">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
       <h3 className="text-sm font-bold text-[#F0EAD6]">{title}</h3>
       {items.length ? (
         <div className="mt-4 space-y-3" aria-label={title}>
