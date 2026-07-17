@@ -400,3 +400,83 @@ Planned tool pages must stay clearly non-operational. Do not show upload control
 ### Preservation Rules
 
 Final polish must not alter PDF processing algorithms, native upload contracts, drag/drop behavior, PDF Tools menu state ownership, Analytics V1, catalog data access, admin permissions, Supabase migrations or dependency versions.
+
+## Verified Baseline
+
+This section records the confirmed-correct state of the design system as of the homepage launch (git tag `stable-v1-homepage-launch`). Future tool releases (Rotate, Extract, Watermark, JPG-to-PDF, PDF-to-JPG, and beyond) must match this baseline. If any item below is contradicted by code, the code is the regression — not this doc.
+
+### Typography
+
+- Headings (`h1`/`h2`/`h3` and heading-equivalent titles) use **Fraunces** loaded as a variable font (`weight: "variable"` in `app/layout.tsx`), applied with `font-serif font-semibold` for a true variable-font weight 600 — never a synthesized bold.
+- Body text, labels, buttons, badges, and small/dense UI text use **Inter** (`font-sans`).
+- Confirmed site-wide, including admin (login, Control Center section cards, page headers). Deliberate exceptions that stay on Inter: settings-subgroup labels, dropdown category eyebrows, dialog/drawer chrome titles, and chart-card titles — these are small or dense and are not treated as display headings.
+
+### File / Document Icon
+
+- `FileIcon` in `components/ui/FileIcon.tsx` is the **only** path for document/file-type icon boxes. No local copies, no re-implementations in tool components.
+- It uses a neutral `--border-subtle` border with neutral surface/text tokens — never brass, gold, or champagne.
+
+### Border Convention
+
+- Containers, cards, panels, and icon boxes: neutral `--border-subtle` by default.
+- `--border-selected` (Heritage Sage) only for genuine selected / active states (e.g. a chosen option card, an active page thumbnail).
+- Brass / champagne borders are reserved only for warning-tone messages (matching `AuraStatus`'s `warning` semantic). Do not use brass as a decorative border on static cards or containers.
+
+### Navigation
+
+- `PublicNav` in `components/PublicPdfChrome.tsx` is the single shared public nav, rendered on every public page (it builds the PDF Tools dropdown internally from the catalog). Do not create page-specific nav variants or a second nav component.
+- The sticky header (`L2PublicHeader` in `Aura.tsx`) carries a full-width solid backing (`bg-[var(--atelier-canvas-950)]`) behind the floating pill so scrolled content never bleeds through.
+
+### Homepage Tool Grid
+
+- The homepage tool grid reads from the admin-configured slots (`/admin/homepage` → `getPublicHomepageTools()` → `get_public_homepage_tools` RPC). It is **not** a hardcoded card list.
+- A tool's `coming_soon` status renders as a non-clickable card (no href, dashed "Coming soon" badge). Live tools (`active`/`beta`) link to their route. The permanent "Browse Tools" card (→ `/pdf-tools`) is always appended last.
+
+### Spacing Scale
+
+- Use only the `--space-*` tokens defined in `app/globals.css`: `4 / 8 / 12 / 16 / 20 / 24 / 32 / 40 / 48 / 64 / 80 / 96` px (the core layout rhythm is 8 through 64; 4 is for fine adjustments, 80/96 for large section breaks). No arbitrary pixel values for layout spacing.
+- Prefer the semantic gap/padding tokens (`--gap-section`, `--gap-card`, `--gap-content`, `--gap-control`, `--gap-compact`, `--padding-page`, `--padding-panel`, `--padding-mobile-page`) before reaching for raw `--space-*`.
+
+## Before Adding A New Tool
+
+Run through this checklist before merging any new tool page:
+
+- [ ] **Layout**: the tool page composes the shared `ToolWorkspace.tsx` primitives (`L2ToolPageHeader`, `L2ToolWorkspace`, `L2ToolMainColumn`, `L2ToolSettingsPanel`, `L2ActionArea`, `L2PrivacyNote`, etc.) — not a custom page structure.
+- [ ] **Icons**: any document/file icon uses `FileIcon`; any new tool-specific icon matches its neutral-border, full-opacity treatment (no brass borders, no fragment shapes).
+- [ ] **Headings**: every heading uses `font-serif font-semibold` (Fraunces 600), matching the rest of the site.
+- [ ] **Borders**: any new card/panel/container uses `--border-subtle` by default; sage only for selected states, brass only for warning messages.
+- [ ] **Catalog**: the tool is registered in the catalog and (if it should appear on the homepage) assigned a slot via `/admin/homepage` — not hardcoded into the grid. Set its status (`active` / `beta` / `coming_soon`) in `/admin/tools`.
+- [ ] **Privacy note**: exact wording `Private by design · Browser-only · Cleared after download`.
+- [ ] **Verify scripts**: run the existing verification scripts before merging:
+
+  ```bash
+  npm.cmd run verify:lumeo2-foundation
+  npm.cmd run verify:lumeo2-public-experience
+  npm.cmd run verify:lumeo2-workspaces
+  ```
+
+## Rollback Reference
+
+The homepage-launch baseline is tagged in git as `stable-v1-homepage-launch`. If a future change breaks the verified baseline and needs reverting:
+
+- **Inspect the tagged state** without changing anything:
+
+  ```bash
+  git show stable-v1-homepage-launch --stat
+  git switch --detach stable-v1-homepage-launch   # look around, then `git switch -` to return
+  ```
+
+- **Roll a single file back** to the baseline (safest, surgical):
+
+  ```bash
+  git checkout stable-v1-homepage-launch -- path/to/file.tsx
+  ```
+
+- **Roll the whole tree back** by creating a revert branch off the tag (preserves history, does not force-push `main`):
+
+  ```bash
+  git switch -c rollback/from-launch stable-v1-homepage-launch
+  # open a PR from this branch
+  ```
+
+Do not hard-reset or force-push shared branches to the tag; branch off it and open a PR so the rollback goes through normal review.
