@@ -109,8 +109,6 @@ Run focused lint checks for changed files when possible. If repository-wide lint
 - `components/PublicPdfChrome.tsx` - public navigation and PDF page shell.
 - `components/PublicFooter.tsx` - public footer links.
 - `components/InfoPage.tsx` - reusable public information-page system.
-- `app/api` - legacy and supporting API routes that must not be removed without explicit approval.
-- `app/dashboard` - parked Creator Studio routes that remain untouched unless explicitly requested.
 
 ## Privacy model
 
@@ -160,7 +158,6 @@ The public domain is https://lumeo.in. Deployment configuration should not expos
 - Do not expose secrets.
 - Do not invent legal, security, privacy, certification, or compliance claims.
 - Do not modify locked PDF tools without explicit approval.
-- Do not touch parked Studio/video/backend integrations unless the task requires it.
 - Keep public copy calm, accurate, and premium.
 
 ## License
