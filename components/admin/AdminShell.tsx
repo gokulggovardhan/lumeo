@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { BrandLockup } from "@/components/PublicPdfChrome";
+import { BrandLockup } from "@/components/BrandMark";
 import { AdminSignOutButton } from "@/components/admin/AdminSignOutButton";
 
 const navItems = [

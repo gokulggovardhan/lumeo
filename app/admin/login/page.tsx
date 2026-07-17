@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BrandLockup } from "@/components/PublicPdfChrome";
+import { BrandLockup } from "@/components/BrandMark";
 import { signInAdmin } from "@/app/admin/login/actions";
 
 const safeMessages = {

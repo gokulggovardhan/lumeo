@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BrandLockup } from "@/components/PublicPdfChrome";
+import { BrandLockup } from "@/components/BrandMark";
 import { AdminIcon } from "@/components/admin/AdminIcons";
 import { AdminSignOutButton } from "@/components/admin/AdminSignOutButton";
 import { adminNavigation, isActiveAdminRoute } from "@/lib/admin/navigation";
