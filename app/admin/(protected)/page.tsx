@@ -24,7 +24,7 @@ export default async function AdminPage() {
         title="Lumeo Control Center"
         description="A calm private workspace for managing Lumeo PDF configuration, catalog readiness, and operational foundations."
         meta={
-          <div className="rounded-2xl border border-[#E8DFC8]/10 bg-[#111A2B] p-4 text-sm">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 text-sm">
             <p className="text-[#F0EAD6]/52">Signed in</p>
             <p className="mt-1 font-bold text-[#F0EAD6]">{admin.email || "Administrator"}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[#CBA052]/70">{admin.role}</p>
@@ -60,13 +60,13 @@ export default async function AdminPage() {
           <AdminStatusBadge tone={system.data.analyticsEnabled ? "success" : "neutral"}>Analytics {system.data.analyticsEnabled ? "enabled" : "disabled"}</AdminStatusBadge>
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
-          <div className="rounded-2xl border border-[#E8DFC8]/8 bg-[#0C1220]/42 p-4">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
             <p className="text-sm font-semibold text-[#F0EAD6]">Platform configuration progress</p>
             <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">
               {data.tools.length} catalog tools and {data.homepageSlots.length} homepage slots are readable.
             </p>
           </div>
-          <div className="rounded-2xl border border-[#E8DFC8]/8 bg-[#0C1220]/42 p-4">
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
             <p className="text-sm font-semibold text-[#F0EAD6]">Deployment environment</p>
             <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">
               {system.data.deploymentEnvironment} · checked {formatDate(system.data.currentTimestamp)}
@@ -94,7 +94,7 @@ export default async function AdminPage() {
         </AdminSectionCard>
 
         <AdminSectionCard title="Analytics V1" description="Discovery analytics only. No fake charts or lifecycle placeholders.">
-          <div className="rounded-[1.2rem] border border-dashed border-[#CBA052]/20 bg-[#0C1220]/42 p-6">
+          <div className="rounded-[1.2rem] border border-dashed border-[#CBA052]/20 bg-[var(--surface-elevated)] p-6">
             <p className="text-sm font-semibold text-[#F0EAD6]">Analytics V1 measures public page visits, tool discovery, and coarse platform usage.</p>
             <p className="mt-3 text-sm leading-6 text-[#F0EAD6]/54">
               Processing lifecycle analytics will be added later through the shared browser-tool framework so every current and future PDF tool reports events consistently.
@@ -106,7 +106,7 @@ export default async function AdminPage() {
       <AdminSectionCard title="Homepage slot status" description="Five configurable slots plus one permanent All PDF Tools card.">
         <div className="grid gap-3 md:grid-cols-3">
           {data.homepageSlots.map((slot) => (
-            <div key={slot.slot_number} className="rounded-2xl border border-[#E8DFC8]/8 bg-[#0C1220]/42 p-4">
+            <div key={slot.slot_number} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]/70">Slot {slot.slot_number}</p>
               <p className="mt-2 text-sm font-semibold text-[#F0EAD6]">{slot.tool?.name ?? "Unassigned"}</p>
             </div>

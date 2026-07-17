@@ -9,7 +9,7 @@ export function AnalyticsDistribution({
   const successPercent = total > 0 ? Math.round((succeeded / total) * 100) : 0;
 
   return (
-    <div className="rounded-2xl border border-[#E8DFC8]/8 bg-[#0C1220]/42 p-4">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
       <h3 className="text-sm font-bold text-[#F0EAD6]">Success distribution</h3>
       {total > 0 ? (
         <>

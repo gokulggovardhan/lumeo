@@ -19,7 +19,7 @@ export default function OpenGraphImage() {
           display: "flex",
           position: "relative",
           overflow: "hidden",
-          background: "#0C1220",
+          background: "#1B1D1A",
           color: "#F0EAD6",
           padding: "68px 76px",
         }}
@@ -44,7 +44,7 @@ export default function OpenGraphImage() {
             display: "flex",
             borderRadius: 24,
             border: "2px solid rgba(232, 223, 200, 0.22)",
-            background: "#1A2840",
+            background: "#2F322C",
             transform: "rotate(4deg)",
           }}
         >

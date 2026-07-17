@@ -33,7 +33,7 @@ export default async function ToolsPage() {
             canEdit ? (
               <form key="category" action={asAdminFormAction(updateToolCategory)} className="flex gap-2">
                 <input type="hidden" name="id" value={tool.id} />
-                <select name="category_id" defaultValue={tool.category_id ?? ""} className="min-h-10 rounded-lg border border-[#E8DFC8]/12 bg-[#0C1220] px-2 text-xs">
+                <select name="category_id" defaultValue={tool.category_id ?? ""} className="min-h-10 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs">
                   <option value="">None</option>
                   {categories.data.map((category) => (
                     <option key={category.id} value={category.id}>{category.name}</option>
@@ -46,7 +46,7 @@ export default async function ToolsPage() {
             canEdit ? (
               <form key="status" action={asAdminFormAction(updateToolStatus)} className="flex gap-2">
                 <input type="hidden" name="id" value={tool.id} />
-                <select name="status" defaultValue={tool.status} className="min-h-10 rounded-lg border border-[#E8DFC8]/12 bg-[#0C1220] px-2 text-xs">
+                <select name="status" defaultValue={tool.status} className="min-h-10 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs">
                   {["active", "beta", "coming_soon", "hidden", "maintenance"].map((status) => (
                     <option key={status} value={status}>{status}</option>
                   ))}
@@ -64,7 +64,7 @@ export default async function ToolsPage() {
             canEdit ? (
               <form key="sort" action={asAdminFormAction(updateToolSortOrder)} className="flex gap-2">
                 <input type="hidden" name="id" value={tool.id} />
-                <input name="sort_order" type="number" defaultValue={tool.sort_order} className="min-h-10 w-20 rounded-lg border border-[#E8DFC8]/12 bg-[#0C1220] px-2 text-xs" />
+                <input name="sort_order" type="number" defaultValue={tool.sort_order} className="min-h-10 w-20 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs" />
                 <AdminSubmitButton variant="secondary" pendingLabel="...">Save</AdminSubmitButton>
               </form>
             ) : tool.sort_order,

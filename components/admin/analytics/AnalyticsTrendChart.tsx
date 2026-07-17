@@ -12,7 +12,7 @@ export function AnalyticsTrendChart({ points }: { points: TrendPoint[] }) {
   );
 
   return (
-    <div className="rounded-2xl border border-[#E8DFC8]/8 bg-[#0C1220]/42 p-4">
+    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold text-[#F0EAD6]">Seven-day activity</h3>
