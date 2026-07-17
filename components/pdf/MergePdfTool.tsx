@@ -13,7 +13,8 @@ import {
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
-import { AuraOptionCard, AuraPdfIcon, AuraSegmentedControl } from "@/components/ui/Aura";
+import { AuraOptionCard, AuraSegmentedControl } from "@/components/ui/Aura";
+import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type MergeStatus = "Ready" | "Merging in your browser..." | "Download ready";
@@ -616,14 +617,14 @@ export default function MergePdfTool() {
               }}
               className={`group relative overflow-hidden rounded-[24px] border px-4 py-2.5 transition-all duration-300 ${
                 isDragging
-                  ? "border-[#CBA052]/60 bg-[#CBA052]/14 shadow-[0_18px_50px_rgba(245,158,11,0.18)]"
-                  : "border-[#FFFFFF]/16 bg-[#0C1220]/70 hover:border-[#CBA052]/34 hover:bg-[#0C1220]/82"
+                  ? "border-[var(--border-selected)] bg-[var(--surface-selected)] shadow-[0_18px_50px_rgba(0,0,0,0.18)]"
+                  : "border-[#FFFFFF]/16 bg-[#0C1220]/70 hover:border-[var(--border-selected)] hover:bg-[#0C1220]/82"
               }`}
             >
               <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/28 to-transparent opacity-0 transition group-hover:opacity-100" />
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#CBA052]/20 bg-[#FFFFFF]/[0.045] text-[#CBA052] transition group-hover:bg-[#CBA052]/16">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[#FFFFFF]/[0.045] text-[var(--text-secondary)] transition group-hover:bg-[#FFFFFF]/[0.08]">
                     <MergeIcon />
                   </span>
                   <div>
@@ -699,10 +700,10 @@ export default function MergePdfTool() {
                     }}
                     className={`flex cursor-grab items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-300 active:cursor-grabbing ${
                       draggingFileId === item.id
-                        ? "scale-[0.99] border-[#CBA052]/45 bg-[#CBA052]/10 opacity-70"
+                        ? "scale-[0.99] border-[var(--border-selected)] bg-[var(--surface-selected)] opacity-70"
                         : dragOverFileId === item.id
-                          ? "border-[#CBA052]/45 bg-[#CBA052]/[0.08] shadow-[0_14px_38px_rgba(245,158,11,0.12)]"
-                          : "border-[#FFFFFF]/10 bg-[#0A101C]/74 hover:-translate-y-0.5 hover:border-[#CBA052]/22 hover:bg-[#142034]"
+                          ? "border-[var(--border-selected)] bg-[var(--surface-selected)] shadow-[0_14px_38px_rgba(0,0,0,0.12)]"
+                          : "border-[#FFFFFF]/10 bg-[#0A101C]/74 hover:-translate-y-0.5 hover:border-[var(--border-selected)] hover:bg-[#142034]"
                     }`}
                   >
                     <span className="hidden text-[#FFFFFF]/24 sm:inline" aria-hidden="true">
@@ -711,7 +712,7 @@ export default function MergePdfTool() {
                     <div className="min-w-0 flex-1">
                       <L2FileCard
                         order={index + 1}
-                        icon={<AuraPdfIcon />}
+                        icon={<FileIcon />}
                         name={item.file.name}
                         meta={`${item.pageCount} page${item.pageCount === 1 ? "" : "s"} - ${formatFileSize(item.file.size)} - ${item.pageSizeType}`}
                         onMoveUp={index === 0 || status === "Merging in your browser..." ? undefined : () => moveFile(index, -1)}
@@ -760,7 +761,7 @@ export default function MergePdfTool() {
             ) : null}
           </div>
 
-          <div className="rounded-xl border border-[#CBA052]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <L2PrivacyNote compact />
               <p className="lg:hidden">

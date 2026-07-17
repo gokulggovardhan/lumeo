@@ -39,7 +39,8 @@ import {
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
-import { AuraOptionCard, AuraPdfIcon, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
+import { AuraOptionCard, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
+import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
@@ -1015,7 +1016,7 @@ export default function CompressPdfTool() {
               <L2FileCard
                 name={analysis.name}
                 meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatFileSize(analysis.size)} · ${analysis.pageSizeType}`}
-                icon={<AuraPdfIcon />}
+                icon={<FileIcon />}
                 action={<AuraStatus tone="success" label={displayStatus} />}
               />
             </div>
@@ -1060,7 +1061,7 @@ export default function CompressPdfTool() {
           </div>
 
           <div className="hidden min-h-0 flex-1 gap-3 lg:grid-cols-[0.8fr_1.2fr] lg:overflow-hidden">
-            <div className="min-h-0 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
+            <div className="min-h-0 rounded-xl border border-[var(--border-subtle)] bg-[#0A101C]/62 p-3">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#CBA052]">Quality preview</p>
               <p className="mt-1 text-xs text-[#FFFFFF]/40">Representative original preview · Page {analysis.samplePage}</p>
               <div className="mt-3 flex h-64 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.04] lg:h-full lg:min-h-[16rem]">
@@ -1072,7 +1073,7 @@ export default function CompressPdfTool() {
                 )}
               </div>
             </div>
-            <div className="no-scrollbar min-h-0 overflow-y-auto rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
+            <div className="no-scrollbar min-h-0 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[#0A101C]/62 p-3">
               <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#CBA052]">Risk notes</p>
               <div className="mt-3 space-y-2">
                 <div className="rounded-lg border border-[#CBA052]/18 bg-[#CBA052]/8 p-3 text-xs leading-5 text-[#FFFFFF]/74">
@@ -1097,7 +1098,7 @@ export default function CompressPdfTool() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#CBA052]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <L2PrivacyNote compact />
               <p className="lg:hidden">Files stay on your device. No server upload.</p>
@@ -1166,8 +1167,8 @@ export default function CompressPdfTool() {
                         }}
                         className={`min-h-11 rounded-lg border px-2 text-xs font-bold transition motion-reduce:transition-none ${
                           targetPreset === value
-                            ? "border-[var(--border-subtle)] bg-[var(--surface-selected)] text-[#FFFFFF]"
-                            : "border-[#FFFFFF]/9 text-[#FFFFFF]/48 hover:border-[#CBA052]/28"
+                            ? "border-[var(--border-selected)] bg-[var(--surface-selected)] text-[#FFFFFF]"
+                            : "border-[#FFFFFF]/9 text-[#FFFFFF]/48 hover:border-[var(--border-selected)]"
                         }`}
                       >
                         {targetPreset === value ? "✓ " : ""}
@@ -1315,13 +1316,13 @@ export default function CompressPdfTool() {
 
               {error ? <div role="alert" className="mt-4 rounded-xl border border-[#F0A8A8]/20 bg-[#F0A8A8]/10 px-3 py-2 text-sm text-[#F0C0C0]">{error}</div> : null}
               {previewIssue ? <div className="mt-4 rounded-xl border border-[#CBA052]/18 bg-[#CBA052]/8 px-3 py-2 text-xs text-[#FFFFFF]/70">{previewIssue}</div> : null}
-              {cleanupMessage ? <div className="mt-4 rounded-xl border border-[#CBA052]/26 bg-[#CBA052]/12 px-3 py-2 text-sm text-[#9FD0B5]">{cleanupMessage}</div> : null}
+              {cleanupMessage ? <div className="mt-4 rounded-xl border border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)] px-3 py-2 text-sm text-[var(--text-success)]">{cleanupMessage}</div> : null}
               {progressDetail ? <div aria-live="polite" className="mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 py-2 text-xs text-[#FFFFFF]/48">{progressDetail}</div> : null}
             </div>
 
             <div className={result ? "flex min-h-0 flex-1 flex-col justify-center border-0 pt-0" : "border-t border-[#FFFFFF]/10 pt-3"}>
               {result ? (
-                <div className={`mb-4 rounded-xl border p-4 ${result.target ? result.target.outcome === "achieved" ? "border-[#CBA052]/28 bg-[#CBA052]/12" : result.target.outcome === "closest-safe" ? "border-[#CBA052]/24 bg-[#CBA052]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10" : result.tone === "success" ? "border-[#CBA052]/28 bg-[#CBA052]/12" : result.tone === "limited" ? "border-[#CBA052]/24 bg-[#CBA052]/10" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10"}`}>
+                <div className={`mb-4 rounded-xl border p-4 ${result.target ? result.target.outcome === "achieved" ? "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)]" : result.target.outcome === "closest-safe" ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10" : result.tone === "success" ? "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)]" : result.tone === "limited" ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]" : "border-[#F0A8A8]/20 bg-[#F0A8A8]/10"}`}>
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[#CBA052]">
                     Size Outcome
                   </p>

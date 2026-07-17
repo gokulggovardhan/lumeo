@@ -394,11 +394,15 @@ a:active {
 .aura-live-tool :is(section, div)[class*="bg-[#111A2B]"],
 .aura-live-tool :is(section, div)[class*="bg-[#0A101C]"],
 .aura-live-tool :is(section, div)[class*="bg-[#0C1220]"] {
-  border-color: rgba(var(--lumeo-paper-rgb), 0.075) !important;
+  border-width: 0 !important;
   background:
     linear-gradient(180deg, rgb(246 242 232 / 0.055), transparent 34%),
     linear-gradient(180deg, rgb(39 44 38 / 0.9), rgb(26 29 26 / 0.96)) !important;
   box-shadow: 0 22px 62px rgb(0 0 0 / 0.26), inset 0 1px 0 rgb(255 253 248 / 0.08) !important;
+}
+
+.aura-live-tool .aura-luminous-card {
+  border-width: 0 !important;
 }
 
 .aura-live-tool [class*="border-[#FFFFFF]"],

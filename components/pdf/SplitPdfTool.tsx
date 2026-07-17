@@ -15,7 +15,8 @@ import {
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
-import { AuraOptionCard, AuraPdfIcon, AuraStatus } from "@/components/ui/Aura";
+import { AuraOptionCard, AuraStatus } from "@/components/ui/Aura";
+import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type SplitMode = "extract" | "ranges" | "everyPage" | "everyN" | "remove";
@@ -418,7 +419,7 @@ function isTypingTarget(target: EventTarget | null) {
 
 function CompletionCheck() {
   return (
-    <span className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#CBA052]/50 bg-[#CBA052]/18 text-[#9FD0B5]">
+    <span className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)] text-[var(--text-success)]">
       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-5 w-5" fill="none">
         <path
           d="m6.5 12.4 3.3 3.3 7.7-8.1"
@@ -491,10 +492,10 @@ function SplitPageThumbnail({
       onFocus={() => onFocus(page.page)}
       className={`group rounded-xl border p-2 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 disabled:cursor-default ${
         selected
-          ? "border-[#CBA052]/68 bg-[#CBA052]/18 shadow-[0_12px_30px_rgba(245,158,11,0.12)]"
+          ? "border-[var(--border-selected)] bg-[var(--surface-selected)] shadow-[0_12px_30px_rgba(0,0,0,0.12)]"
           : focused
-            ? "border-[#CBA052]/42 bg-[#FFFFFF]/[0.055]"
-            : "border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.035] hover:-translate-y-0.5 hover:border-[#CBA052]/30"
+            ? "border-[var(--border-selected)] bg-[#FFFFFF]/[0.055]"
+            : "border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.035] hover:-translate-y-0.5 hover:border-[var(--border-selected)]"
       }`}
     >
       <div
@@ -514,12 +515,12 @@ function SplitPageThumbnail({
           </div>
         )}
         {rotation ? (
-          <span className="absolute right-1.5 top-1.5 rounded-full border border-[#CBA052]/34 bg-[#0C1220]/88 px-1.5 py-0.5 text-[10px] font-bold text-[#CBA052]">
+          <span className="absolute right-1.5 top-1.5 rounded-full border border-[var(--border-subtle)] bg-[#0C1220]/88 px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-secondary)]">
             {rotation}°
           </span>
         ) : null}
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
+      <div className="mt-2 flex flex-col gap-0.5">
         <span className="text-xs font-bold text-[#FFFFFF]">Page {page.page}</span>
         <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#FFFFFF]/36">
           {page.orientation}
@@ -1341,7 +1342,7 @@ export default function SplitPdfTool() {
               <L2FileCard
                 name={analysis.name}
                 meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatBytes(analysis.size)} · ${analysis.pageSizeType}`}
-                icon={<AuraPdfIcon />}
+                icon={<FileIcon />}
                 action={<AuraStatus tone="success" label={status} />}
               />
             </div>
@@ -1442,7 +1443,7 @@ export default function SplitPdfTool() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#CBA052]/20 bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <L2PrivacyNote compact />
               <p className="lg:hidden">Files stay on your device. No server upload.</p>
@@ -1692,7 +1693,7 @@ export default function SplitPdfTool() {
                 </div>
               ) : null}
               {cleanupMessage ? (
-                <div className="mt-4 rounded-xl border border-[#CBA052]/26 bg-[#CBA052]/12 px-3 py-2 text-sm text-[#9FD0B5]">
+                <div className="mt-4 rounded-xl border border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)] px-3 py-2 text-sm text-[var(--text-success)]">
                   {cleanupMessage}
                 </div>
               ) : null}
