@@ -779,7 +779,7 @@ export function L2PublicHeader({ children, className, ...props }: HTMLAttributes
     <header
       {...props}
       className={cx(
-        "l2-public-header sticky top-0 z-40 px-4 py-2.5 sm:px-6",
+        "l2-public-header sticky top-0 z-40 bg-[var(--atelier-canvas-950)] px-4 py-2.5 sm:px-6",
         className,
       )}
     >
