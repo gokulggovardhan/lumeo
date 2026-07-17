@@ -31,7 +31,7 @@ export default async function FeatureFlagsPage() {
             <AdminFormField label="Description" name="description" />
             <label className="block text-sm font-semibold text-[#F0EAD6]">
               Environment
-              <select name="environment" defaultValue="production" className="mt-2 min-h-11 w-full rounded-xl border border-[#E8DFC8]/12 bg-[#0C1220]/66 px-3 text-sm">
+              <select name="environment" defaultValue="production" className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm">
                 {["production", "preview", "development", "all"].map((environment) => (
                   <option key={environment} value={environment}>{environment}</option>
                 ))}

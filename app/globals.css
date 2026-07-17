@@ -1,7 +1,6 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0c1220;
   --foreground: #f0ead6;
   --font-sans: var(--font-manrope), Arial, Helvetica, sans-serif;
   --font-serif: var(--font-dm-serif), Georgia, serif;
