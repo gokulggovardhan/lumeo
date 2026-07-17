@@ -805,7 +805,7 @@ export function L2PublicHeader({ children, className, ...props }: HTMLAttributes
         className,
       )}
     >
-      <div className="mx-auto max-w-[var(--container-wide)] rounded-[var(--radius-xl)] bg-[linear-gradient(180deg,rgba(47,50,44,0.88),rgba(20,22,20,0.84))] px-3 shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,253,248,0.08)] backdrop-blur-xl">
+      <div className="mx-auto max-w-[var(--container-wide)] rounded-[var(--radius-xl)] bg-[linear-gradient(180deg,rgba(47,50,44,0.96),rgba(20,22,20,0.94))] px-3 shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,253,248,0.08)]">
         {children}
       </div>
     </header>

@@ -761,8 +761,10 @@ a:active {
     0 0 0 4px rgba(var(--champagne-rgb), 0.1);
 }
 
-.lumeo-ambient {
-  animation: lumeo-ambient 12s ease-in-out infinite alternate;
+@media (min-width: 768px) and (prefers-reduced-motion: no-preference) {
+  .lumeo-ambient {
+    animation: lumeo-ambient 12s ease-in-out infinite alternate;
+  }
 }
 
 .lumeo-nav-enter {
@@ -873,12 +875,10 @@ a:active {
   from {
     opacity: 0;
     transform: translateY(8px);
-    filter: blur(5px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
-    filter: blur(0);
   }
 }
 

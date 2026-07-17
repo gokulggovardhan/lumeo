@@ -71,8 +71,8 @@ export function PublicPageShell({
   return (
     <main id="main-content" className={`lumeo-page-enter aura-page-shell relative overflow-x-hidden ${mainClassName}`}>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="lumeo-ambient absolute -left-44 -top-48 h-[32rem] w-[32rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.07)] blur-[150px]" />
-        <div className="lumeo-ambient absolute -right-44 top-0 [animation-delay:-4s] h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.055)] blur-[155px]" />
+        <div className="lumeo-ambient absolute -left-44 -top-48 h-[32rem] w-[32rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.07)] blur-[60px] md:blur-[150px]" />
+        <div className="lumeo-ambient absolute -right-44 top-0 [animation-delay:-4s] h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.055)] blur-[60px] md:blur-[155px]" />
       </div>
 
       <div className="relative z-10">

@@ -60,9 +60,9 @@ export default function Home() {
       />
 
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="lumeo-ambient absolute -left-44 -top-52 h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.055)] blur-[150px]" />
-        <div className="lumeo-ambient absolute -right-44 top-[-5rem] h-[28rem] w-[28rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.05)] blur-[150px] [animation-delay:-4s]" />
-        <div className="absolute bottom-[-16rem] left-[42%] h-[26rem] w-[26rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.045)] blur-[145px]" />
+        <div className="lumeo-ambient absolute -left-44 -top-52 h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.055)] blur-[60px] md:blur-[150px]" />
+        <div className="lumeo-ambient absolute -right-44 top-[-5rem] h-[28rem] w-[28rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.05)] blur-[60px] md:blur-[150px] [animation-delay:-4s]" />
+        <div className="absolute bottom-[-16rem] left-[42%] h-[26rem] w-[26rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.045)] blur-[60px] md:blur-[145px]" />
       </div>
 
       <PublicNav toolsMenu={<PublicPdfToolsMenu />} />
