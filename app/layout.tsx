@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Mono, Inter } from "next/font/google";
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
+import { ResumeRecovery } from "@/components/ResumeRecovery";
 import "./globals.css";
 
 const inter = Inter({
@@ -96,6 +97,7 @@ export default function RootLayout({
       className={`${inter.variable} ${fraunces.variable} ${plexMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <ResumeRecovery />
         <AnalyticsProvider>
           <a href="#main-content" className="aura-skip-link">
             Skip to content
