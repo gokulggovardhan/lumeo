@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import { PublicPageShell } from "@/components/PublicPdfChrome";
-import { PublicPdfToolsMenu } from "@/components/public/PublicPdfToolsMenu";
 
 export function PublicCatalogPageShell({
   children,
@@ -18,7 +17,6 @@ export function PublicCatalogPageShell({
       maxWidth={maxWidth}
       contentClassName={contentClassName}
       mainClassName={mainClassName}
-      toolsMenu={<PublicPdfToolsMenu compact />}
     >
       {children}
     </PublicPageShell>

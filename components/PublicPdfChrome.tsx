@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { L2PublicHeader, L2PublicNavLink } from "@/components/ui/Aura";
-import { L2MobileNavClient } from "@/components/public/L2MobileNavClient";
+import { PublicPdfToolsMenuClient } from "@/components/public/PublicPdfToolsMenuClient";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
 import { BrandLockup } from "@/components/BrandMark";
 
@@ -18,38 +18,35 @@ function HomeIcon() {
 
 export async function PublicNav({
   maxWidth = "max-w-[1160px]",
-  toolsMenu,
 }: {
   maxWidth?: string;
-  toolsMenu?: ReactNode;
 }) {
   const catalog = await getPublicPdfCatalog();
 
   return (
     <L2PublicHeader className="lumeo-nav-enter aura-public-nav">
-      <nav className={`mx-auto flex min-h-16 ${maxWidth} items-center justify-between gap-4`} aria-label="Public navigation">
+      <nav className={`mx-auto flex min-h-16 ${maxWidth} items-center justify-between gap-2 sm:gap-4`} aria-label="Public navigation">
         <Link href="/" className="flex min-w-0 items-center rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]">
           <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
         </Link>
 
-        <div className="hidden shrink-0 items-center gap-2 md:flex">
-          {toolsMenu ?? (
-            <L2PublicNavLink href="/pdf-tools">
-              PDF Tools
-            </L2PublicNavLink>
-          )}
-          <L2PublicNavLink href="/guides">Guides</L2PublicNavLink>
-          <L2PublicNavLink href="/privacy">Privacy</L2PublicNavLink>
+        <div className="flex shrink-0 items-center gap-2">
+          <PublicPdfToolsMenuClient categories={catalog.categories} compact />
+          <span className="hidden sm:inline-flex">
+            <L2PublicNavLink href="/guides">Guides</L2PublicNavLink>
+          </span>
+          <span className="hidden sm:inline-flex">
+            <L2PublicNavLink href="/privacy">Privacy</L2PublicNavLink>
+          </span>
           <Link
             href="/"
             aria-label="Go to Lumeo PDF home"
             title="Home"
-            className="lumeo-press lumeo-focus-ring inline-flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[rgba(var(--paper-rgb),0.075)] text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition hover:bg-[rgba(var(--champagne-rgb),0.12)] hover:text-[var(--text-accent)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
+            className="lumeo-press lumeo-focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[rgba(var(--paper-rgb),0.075)] text-[var(--text-muted)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition hover:bg-[rgba(var(--champagne-rgb),0.12)] hover:text-[var(--text-accent)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
           >
             <HomeIcon />
           </Link>
         </div>
-        <L2MobileNavClient categories={catalog.categories} />
       </nav>
     </L2PublicHeader>
   );
@@ -60,13 +57,11 @@ export function PublicPageShell({
   maxWidth = "max-w-[1160px]",
   contentClassName = "px-5 py-8 sm:px-8 lg:py-10",
   mainClassName = "min-h-screen bg-[#0C1220] text-[#F0EAD6]",
-  toolsMenu,
 }: {
   children: ReactNode;
   maxWidth?: string;
   contentClassName?: string;
   mainClassName?: string;
-  toolsMenu?: ReactNode;
 }) {
   return (
     <main id="main-content" className={`lumeo-page-enter aura-page-shell relative overflow-x-hidden ${mainClassName}`}>
@@ -76,7 +71,7 @@ export function PublicPageShell({
       </div>
 
       <div className="relative z-10">
-        <PublicNav maxWidth={maxWidth} toolsMenu={toolsMenu} />
+        <PublicNav maxWidth={maxWidth} />
         <div className={`mx-auto ${maxWidth} ${contentClassName}`}>{children}</div>
       </div>
     </main>
