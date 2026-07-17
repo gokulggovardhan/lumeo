@@ -20,7 +20,7 @@ export function AdminSectionCard({
       {(title || description || action) && (
         <div className="mb-5 flex flex-col gap-3 border-b border-[var(--border-subtle)] pb-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            {title && <h2 className="text-base font-semibold text-[var(--lumeo-paper-50)]">{title}</h2>}
+            {title && <h2 className="font-serif font-semibold text-base text-[var(--lumeo-paper-50)]">{title}</h2>}
             {description && <p className="mt-1 text-sm leading-6 text-[var(--lumeo-paper-400)]">{description}</p>}
           </div>
           {action}

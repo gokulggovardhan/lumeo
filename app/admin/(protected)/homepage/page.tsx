@@ -22,7 +22,7 @@ export default async function HomepagePage() {
         title="Homepage"
         description="Configure five database-backed tool slots. The sixth card is permanently All PDF Tools and is not stored."
       />
-      <AdminSectionCard title="Homepage preview" description="This is a database preview only. The public homepage is not dynamic in this phase.">
+      <AdminSectionCard title="Homepage preview" description="This reflects what the live public homepage reads from these slots, including a tool's live/coming-soon status set on the PDF Tools page.">
         <div className="grid gap-3 md:grid-cols-3">
           {slots.data.map((slot) => (
             <div key={slot.slot_number} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">

@@ -47,7 +47,7 @@ export function InfoPageShell({
           <p className="aura-text-label text-[var(--lumeo-gold-300)]">
             {eyebrow}
           </p>
-          <h1 className="mt-4 font-serif text-[var(--text-display-md)] leading-[var(--leading-display)] tracking-[var(--tracking-display)] text-[var(--lumeo-paper-50)]">
+          <h1 className="mt-4 font-serif font-semibold text-[var(--text-display-md)] leading-[var(--leading-display)] tracking-[var(--tracking-display)] text-[var(--lumeo-paper-50)]">
             {title}
           </h1>
           <p className="mt-5 text-base leading-8 text-[var(--text-secondary)] sm:text-lg">
@@ -96,7 +96,7 @@ export function InfoPageSection({ id, eyebrow, title, children }: InfoSection) {
           {eyebrow}
         </p>
       ) : null}
-      <h2 className="relative font-serif text-2xl leading-tight text-[var(--text-primary)] sm:text-3xl">
+      <h2 className="relative font-serif font-semibold text-2xl leading-tight text-[var(--text-primary)] sm:text-3xl">
         {title}
       </h2>
       <div className="relative mt-4 space-y-4 text-sm leading-7 text-[var(--text-secondary)] sm:text-base sm:leading-8">

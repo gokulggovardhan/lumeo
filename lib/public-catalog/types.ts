@@ -1,4 +1,4 @@
-export type PublicToolStatus = "active" | "beta";
+export type PublicToolStatus = "active" | "beta" | "coming_soon";
 
 export type PublicPdfTool = {
   toolSlug: string;

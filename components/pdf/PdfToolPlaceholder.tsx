@@ -24,7 +24,7 @@ export function PdfToolPlaceholder({ tool }: { tool: PdfToolDefinition }) {
       <section className="lumeo-fade-up grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
         <div>
           <StatusBadge tool={tool} />
-          <h1 className="mt-5 font-serif text-[var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[var(--text-primary)]">
+          <h1 className="mt-5 font-serif font-semibold text-[var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[var(--text-primary)]">
             {tool.title}
           </h1>
           <p className="mt-4 max-w-2xl text-base leading-7 text-[var(--text-secondary)]">
@@ -42,7 +42,7 @@ export function PdfToolPlaceholder({ tool }: { tool: PdfToolDefinition }) {
 
         <aside className="aura-luminous-card rounded-[var(--radius-2xl)] p-6">
           <p className="aura-text-label text-[var(--text-accent)]">Coming soon</p>
-          <h2 className="mt-3 text-2xl font-black text-[var(--text-primary)]">Tool engine not active yet</h2>
+          <h2 className="mt-3 font-serif font-semibold text-2xl text-[var(--text-primary)]">Tool engine not active yet</h2>
           <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">{tool.engineNote}</p>
           <ul className="mt-5 grid gap-2 text-sm text-[var(--text-secondary)]">
             {tool.bullets.map((bullet) => (
@@ -61,7 +61,7 @@ export function PdfToolPlaceholder({ tool }: { tool: PdfToolDefinition }) {
       </section>
 
       <section className="mt-10">
-        <h2 className="text-xl font-black text-[var(--text-primary)]">Live tools you can use now</h2>
+        <h2 className="font-serif font-semibold text-xl text-[var(--text-primary)]">Live tools you can use now</h2>
         <div className="mt-4 grid gap-4 md:grid-cols-3">
           {relatedLiveTools.map((item) => (
             <L2ToolCard

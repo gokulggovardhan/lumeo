@@ -4,7 +4,12 @@ import type {
   PublicHomepageTool,
   PublicPdfTool,
   PublicToolCategory,
+  PublicToolStatus,
 } from "@/lib/public-catalog/types";
+
+function toPublicStatus(status: string): PublicToolStatus {
+  return status === "live" ? "active" : "coming_soon";
+}
 
 const categoryMap: Record<string, Omit<PublicToolCategory, "tools">> = {
   "organize-pdf": {
@@ -55,7 +60,7 @@ export function getFallbackPublicTools(): PublicPdfTool[] {
         shortDescription: local.description,
         route: local.route,
         iconKey: local.slug,
-        status: "active",
+        status: toPublicStatus(local.status),
         categorySlug: category.slug,
         categoryName: category.name,
         categoryDescription: category.description,
