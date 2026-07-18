@@ -5,6 +5,7 @@ import { PDFDocument, rgb } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
+  L2AdvancedDisclosure,
   L2FileCard,
   L2PrivacyNote,
   L2ToolMainColumn,
@@ -12,27 +13,123 @@ import {
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
-import { AuraOptionCard } from "@/components/ui/Aura";
+import { AuraIconButton, AuraOptionCard, AuraSegmentedControl } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 type ConvertStatus = "Ready" | "Converting in your browser..." | "Download ready";
 type CleanupMessage = "" | "Temporary file cleared from this session.";
 type PageSizeOption = "a4" | "letter" | "matchImage";
+type MarginPreset = "clean" | "none";
 
 type SelectedImage = {
   id: string;
   file: File;
   width: number;
   height: number;
+  userRotation: number;
 };
 
 const A4_WIDTH = 595.28;
 const A4_HEIGHT = 841.89;
 const LETTER_WIDTH = 612;
 const LETTER_HEIGHT = 792;
-const PAGE_MARGIN = 24;
 const LARGE_FILE_WARNING_BYTES = 80 * 1024 * 1024;
+
+const marginOptions: Array<{
+  value: MarginPreset;
+  label: string;
+  points: number;
+  description: string;
+}> = [
+  { value: "clean", label: "Clean", points: 24, description: "Small white border." },
+  { value: "none", label: "None", points: 0, description: "Image fills the page edge-to-edge." },
+];
+
+function normalizeRotation(value: number) {
+  return ((value % 360) + 360) % 360;
+}
+
+function readJpegExifOrientation(bytes: ArrayBuffer): number {
+  const view = new DataView(bytes);
+  if (view.byteLength < 4 || view.getUint16(0) !== 0xffd8) return 1;
+
+  let offset = 2;
+  while (offset + 4 <= view.byteLength) {
+    const marker = view.getUint16(offset);
+    if (marker === 0xffd9 || marker === 0xffda) break;
+    const segmentLength = view.getUint16(offset + 2);
+    if (marker === 0xffe1 && offset + 4 + segmentLength <= view.byteLength) {
+      const segmentStart = offset + 4;
+      if (
+        view.getUint32(segmentStart) === 0x45786966 &&
+        view.getUint16(segmentStart + 4) === 0x0000
+      ) {
+        const tiffStart = segmentStart + 6;
+        const little = view.getUint16(tiffStart) === 0x4949;
+        const firstIfdOffset = view.getUint32(tiffStart + 4, little);
+        const ifdStart = tiffStart + firstIfdOffset;
+        const entryCount = view.getUint16(ifdStart, little);
+        for (let i = 0; i < entryCount; i += 1) {
+          const entryOffset = ifdStart + 2 + i * 12;
+          const tag = view.getUint16(entryOffset, little);
+          if (tag === 0x0112) {
+            const orientation = view.getUint16(entryOffset + 8, little);
+            return orientation >= 1 && orientation <= 8 ? orientation : 1;
+          }
+        }
+      }
+      return 1;
+    }
+    offset += 2 + segmentLength;
+  }
+  return 1;
+}
+
+// Renders a File's decoded pixels onto a canvas, optionally applying an
+// additional clockwise rotation. The browser's image decode pipeline already
+// auto-applies EXIF orientation when drawing to a canvas, so re-encoding
+// through this path both bakes the EXIF correction in (pdf-lib's embedJpg
+// ignores EXIF entirely and embeds raw physical pixels otherwise) and covers
+// mirrored orientations (2/4/5/7) that a rotation-only fix cannot.
+async function renderImageToBytes(
+  file: File,
+  rotationDegrees: number,
+  mimeType: string,
+): Promise<{ bytes: Uint8Array; width: number; height: number }> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("Image could not be read."));
+      el.src = url;
+    });
+
+    const naturalWidth = img.naturalWidth;
+    const naturalHeight = img.naturalHeight;
+    const swapped = rotationDegrees === 90 || rotationDegrees === 270;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = swapped ? naturalHeight : naturalWidth;
+    canvas.height = swapped ? naturalWidth : naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas is not supported.");
+
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    if (rotationDegrees !== 0) ctx.rotate((rotationDegrees * Math.PI) / 180);
+    ctx.drawImage(img, -naturalWidth / 2, -naturalHeight / 2, naturalWidth, naturalHeight);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, mimeType, 0.92),
+    );
+    if (!blob) throw new Error("Image could not be encoded.");
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    return { bytes, width: canvas.width, height: canvas.height };
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
 
 const pageSizeOptions: Array<{
   value: PageSizeOption;
@@ -84,7 +181,7 @@ function sanitizePdfFileName(value: string) {
   return safeName.toLowerCase().endsWith(".pdf") ? safeName : `${safeName}.pdf`;
 }
 
-function getImageDimensions(file: File): Promise<{ width: number; height: number }> {
+function getDisplayDimensions(file: File): Promise<{ width: number; height: number }> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -98,6 +195,42 @@ function getImageDimensions(file: File): Promise<{ width: number; height: number
     };
     img.src = url;
   });
+}
+
+// Detects a JPEG's EXIF orientation and, if it is anything other than
+// "normal" (1), re-encodes the file through a canvas so the embedded pixel
+// data matches what the browser (and the user) sees. Returns the original
+// file untouched when no correction is needed, to avoid unnecessary
+// recompression of the common case.
+async function correctImageOrientation(file: File): Promise<File> {
+  if (file.type !== "image/jpeg") return file;
+
+  const bytes = await file.arrayBuffer();
+  const orientation = readJpegExifOrientation(bytes);
+  if (orientation === 1) return file;
+
+  const rendered = await renderImageToBytes(file, 0, file.type);
+  const blob = new Blob([rendered.bytes.slice()], { type: file.type });
+  return new File([blob], file.name, { type: file.type, lastModified: file.lastModified });
+}
+
+function ImageThumbnail({ url, rotation, name }: { url: string; rotation: number; name: string }) {
+  return (
+    <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.06)]">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt=""
+          aria-label={name}
+          className="h-full w-full object-cover transition-transform duration-200"
+          style={{ transform: `rotate(${rotation}deg)` }}
+        />
+      ) : (
+        <FileIcon />
+      )}
+    </span>
+  );
 }
 
 function JpgToPdfIcon() {
@@ -131,6 +264,9 @@ export default function JpgToPdfTool() {
   const [dragOverFileId, setDragOverFileId] = useState("");
   const [cleanupMessage, setCleanupMessage] = useState<CleanupMessage>("");
   const [showPageSizeOptions, setShowPageSizeOptions] = useState(false);
+  const [marginPreset, setMarginPreset] = useState<MarginPreset>("clean");
+  const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+  const thumbnailUrlsRef = useRef<Record<string, string>>({});
 
   const totalSize = useMemo(
     () => files.reduce((sum, item) => sum + item.file.size, 0),
@@ -139,12 +275,50 @@ export default function JpgToPdfTool() {
 
   const pageSizeLabel = getPageSizeLabel(pageSizeOption);
   const hasLargeFiles = totalSize >= LARGE_FILE_WARNING_BYTES;
+  const showMarginOptions = pageSizeOption !== "matchImage";
+  const selectedMarginOption = marginOptions.find((option) => option.value === marginPreset) ?? marginOptions[0];
 
   useEffect(() => {
     return () => {
       if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     };
   }, [downloadUrl]);
+
+  useEffect(() => {
+    const currentIds = new Set(files.map((item) => item.id));
+
+    setThumbnailUrls((current) => {
+      let changed = false;
+      const next = { ...current };
+
+      for (const id of Object.keys(next)) {
+        if (!currentIds.has(id)) {
+          URL.revokeObjectURL(next[id]);
+          delete next[id];
+          delete thumbnailUrlsRef.current[id];
+          changed = true;
+        }
+      }
+
+      for (const item of files) {
+        if (!next[item.id]) {
+          const url = URL.createObjectURL(item.file);
+          next[item.id] = url;
+          thumbnailUrlsRef.current[item.id] = url;
+          changed = true;
+        }
+      }
+
+      return changed ? next : current;
+    });
+  }, [files]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(thumbnailUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+      thumbnailUrlsRef.current = {};
+    };
+  }, []);
 
   useEffect(() => {
     const shouldAttempt = shouldAttemptOnce({
@@ -182,6 +356,7 @@ export default function JpgToPdfTool() {
     setDownloadName("lumeo-images.pdf");
     setPageSizeOption("a4");
     setShowPageSizeOptions(false);
+    setMarginPreset("clean");
   };
 
   const clearAllFiles = () => {
@@ -225,12 +400,14 @@ export default function JpgToPdfTool() {
       incomingKeys.add(duplicateKey);
 
       try {
-        const { width, height } = await getImageDimensions(file);
+        const correctedFile = await correctImageOrientation(file);
+        const { width, height } = await getDisplayDimensions(correctedFile);
         readableFiles.push({
           id: createFileId(file),
-          file,
+          file: correctedFile,
           width,
           height,
+          userRotation: 0,
         });
       } catch {
         unreadableCount += 1;
@@ -288,6 +465,22 @@ export default function JpgToPdfTool() {
     resetReadyState();
   };
 
+  const updateMarginPreset = (preset: MarginPreset) => {
+    setMarginPreset(preset);
+    resetReadyState();
+  };
+
+  const rotateFile = (id: string, direction: -1 | 1) => {
+    resetReadyState();
+    setFiles((current) =>
+      current.map((item) =>
+        item.id === id
+          ? { ...item, userRotation: normalizeRotation(item.userRotation + direction * 90) }
+          : item,
+      ),
+    );
+  };
+
   const convertToPdf = async () => {
     if (files.length < 1) {
       setError("Please add at least one image.");
@@ -300,21 +493,35 @@ export default function JpgToPdfTool() {
 
     try {
       const pdfDoc = await PDFDocument.create();
+      const marginPoints = marginOptions.find((option) => option.value === marginPreset)?.points ?? 24;
 
       for (const item of files) {
-        const bytes = await item.file.arrayBuffer();
+        const netRotation = normalizeRotation(item.userRotation);
+        let width = item.width;
+        let height = item.height;
+        let embedBytes: Uint8Array;
+
+        if (netRotation !== 0) {
+          const rendered = await renderImageToBytes(item.file, netRotation, item.file.type);
+          embedBytes = rendered.bytes;
+          width = rendered.width;
+          height = rendered.height;
+        } else {
+          embedBytes = new Uint8Array(await item.file.arrayBuffer());
+        }
+
         const image =
           item.file.type === "image/png"
-            ? await pdfDoc.embedPng(bytes)
-            : await pdfDoc.embedJpg(bytes);
+            ? await pdfDoc.embedPng(embedBytes)
+            : await pdfDoc.embedJpg(embedBytes);
 
         if (pageSizeOption === "matchImage") {
-          const page = pdfDoc.addPage([item.width, item.height]);
+          const page = pdfDoc.addPage([width, height]);
           page.drawImage(image, {
             x: 0,
             y: 0,
-            width: item.width,
-            height: item.height,
+            width,
+            height,
           });
           continue;
         }
@@ -323,11 +530,11 @@ export default function JpgToPdfTool() {
           pageSizeOption === "letter"
             ? { width: LETTER_WIDTH, height: LETTER_HEIGHT }
             : { width: A4_WIDTH, height: A4_HEIGHT };
-        const availableWidth = outputPageSize.width - PAGE_MARGIN * 2;
-        const availableHeight = outputPageSize.height - PAGE_MARGIN * 2;
-        const scale = Math.min(availableWidth / item.width, availableHeight / item.height);
-        const drawWidth = item.width * scale;
-        const drawHeight = item.height * scale;
+        const availableWidth = outputPageSize.width - marginPoints * 2;
+        const availableHeight = outputPageSize.height - marginPoints * 2;
+        const scale = Math.min(availableWidth / width, availableHeight / height);
+        const drawWidth = width * scale;
+        const drawHeight = height * scale;
         const x = (outputPageSize.width - drawWidth) / 2;
         const y = (outputPageSize.height - drawHeight) / 2;
         const page = pdfDoc.addPage([outputPageSize.width, outputPageSize.height]);
@@ -437,7 +644,7 @@ export default function JpgToPdfTool() {
 
       <L2ToolWorkspace>
         <L2ToolMainColumn>
-          <section className="animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#FFFFFF]/12 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] p-3 shadow-2xl shadow-black/28">
+          <section className="min-w-0 animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#FFFFFF]/12 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] p-3 shadow-2xl shadow-black/28">
             <div className="mb-2.5 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
@@ -501,7 +708,7 @@ export default function JpgToPdfTool() {
             </div>
           </section>
 
-          <section className="flex min-h-0 flex-1 animate-[consoleReveal_320ms_ease-out] flex-col rounded-xl border border-[#FFFFFF]/12 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] p-3.5 shadow-2xl shadow-black/24">
+          <section className="flex min-h-0 min-w-0 flex-1 animate-[consoleReveal_320ms_ease-out] flex-col rounded-xl border border-[#FFFFFF]/12 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] p-3.5 shadow-2xl shadow-black/24">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
@@ -566,15 +773,41 @@ export default function JpgToPdfTool() {
                     <div className="min-w-0 flex-1">
                       <L2FileCard
                         order={index + 1}
-                        icon={<FileIcon />}
+                        icon={
+                          <ImageThumbnail
+                            url={thumbnailUrls[item.id] ?? ""}
+                            rotation={item.userRotation}
+                            name={item.file.name}
+                          />
+                        }
                         name={item.file.name}
-                        meta={`${item.width}x${item.height} - ${formatFileSize(item.file.size)}`}
+                        meta={`${item.width}x${item.height} - ${formatFileSize(item.file.size)}${item.userRotation ? ` - Rotated ${item.userRotation}°` : ""}`}
                         onMoveUp={index === 0 || status === "Converting in your browser..." ? undefined : () => moveFile(index, -1)}
                         onMoveDown={index === files.length - 1 || status === "Converting in your browser..." ? undefined : () => moveFile(index, 1)}
                         onRemove={status === "Converting in your browser..." ? undefined : () => removeFile(item.id)}
                         moveUpLabel={`Move ${item.file.name} up`}
                         moveDownLabel={`Move ${item.file.name} down`}
                         removeLabel={`Remove ${item.file.name}`}
+                        action={(
+                          <div className="flex items-center gap-1">
+                            <AuraIconButton
+                              label={`Rotate ${item.file.name} left`}
+                              disabled={status === "Converting in your browser..."}
+                              onClick={() => rotateFile(item.id, -1)}
+                              className="min-h-9 min-w-9"
+                            >
+                              ↺
+                            </AuraIconButton>
+                            <AuraIconButton
+                              label={`Rotate ${item.file.name} right`}
+                              disabled={status === "Converting in your browser..."}
+                              onClick={() => rotateFile(item.id, 1)}
+                              className="min-h-9 min-w-9"
+                            >
+                              ↻
+                            </AuraIconButton>
+                          </div>
+                        )}
                       />
                     </div>
                   </div>
@@ -669,6 +902,19 @@ export default function JpgToPdfTool() {
                     onClick={() => updatePageSizeOption(option.value)}
                   />
                 ))}
+              </div>
+            ) : null}
+
+            {showMarginOptions ? (
+              <div className="mt-2">
+                <L2AdvancedDisclosure title="Advanced settings" description={`Margin: ${selectedMarginOption.label}`}>
+                  <AuraSegmentedControl
+                    label="Margin"
+                    options={marginOptions.map((option) => ({ value: option.value, label: option.label }))}
+                    value={marginPreset}
+                    onChange={(value) => updateMarginPreset(value as MarginPreset)}
+                  />
+                </L2AdvancedDisclosure>
               </div>
             ) : null}
 
