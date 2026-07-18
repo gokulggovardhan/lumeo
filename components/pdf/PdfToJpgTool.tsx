@@ -19,6 +19,7 @@ import { bucketFileSize } from "@/lib/analytics/size-bucket";
 
 type SelectionMode = "all" | "range" | "custom";
 type DpiPreset = "draft" | "standard" | "print";
+type OutputFormat = "jpeg" | "png";
 type ConvertStatus = "Ready" | "Preparing document" | "Converting pages" | "Download ready";
 
 type PdfAnalysis = {
@@ -41,6 +42,12 @@ const LARGE_FILE_WARNING_BYTES = 40 * 1024 * 1024;
 const VERY_LARGE_PAGE_COUNT = 150;
 const TOOL_SLUG = "pdf-to-jpg";
 const DOWNLOAD_STAGGER_MS = 300;
+const THUMBNAIL_SCALE = 0.3;
+const THUMBNAIL_JPEG_QUALITY = 0.7;
+const PNG_SIZE_FACTOR = 2.2;
+const DPI_PRESET_KEY = "lumeo.pdfToJpg.dpiPreset";
+const QUALITY_KEY = "lumeo.pdfToJpg.quality";
+const FORMAT_KEY = "lumeo.pdfToJpg.format";
 
 const dpiPresets: Array<{ value: DpiPreset; label: string; dpi: number; description: string }> = [
   { value: "draft", label: "Draft", dpi: 72, description: "Small files, quick previews." },
@@ -100,6 +107,11 @@ function copyArrayBuffer(buffer: ArrayBuffer) {
   const copy = new Uint8Array(source.byteLength);
   copy.set(source);
   return copy.buffer;
+}
+
+function normalizeRotation(value: number) {
+  const next = ((value % 360) + 360) % 360;
+  return next === 0 || next === 90 || next === 180 || next === 270 ? next : 0;
 }
 
 // PDFs always start with the 4-byte "%PDF" signature. Checking this (rather
@@ -181,6 +193,24 @@ function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function readStoredDpiPreset(): DpiPreset {
+  if (typeof window === "undefined") return "standard";
+  const stored = window.localStorage.getItem(DPI_PRESET_KEY);
+  return stored === "draft" || stored === "standard" || stored === "print" ? stored : "standard";
+}
+
+function readStoredQuality(): number {
+  if (typeof window === "undefined") return 0.85;
+  const stored = Number(window.localStorage.getItem(QUALITY_KEY));
+  return Number.isFinite(stored) && stored >= 0.5 && stored <= 1 ? stored : 0.85;
+}
+
+function readStoredFormat(): OutputFormat {
+  if (typeof window === "undefined") return "jpeg";
+  const stored = window.localStorage.getItem(FORMAT_KEY);
+  return stored === "png" ? "png" : "jpeg";
+}
+
 function PdfToJpgIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 32 32" className="h-8 w-8" fill="none">
@@ -210,9 +240,12 @@ type ThumbnailProps = {
   imageUrl?: string;
   loading: boolean;
   interactive: boolean;
+  rotation: number;
   onVisible: (page: number) => void;
   onToggle: (page: number) => void;
   onFocus: (page: number) => void;
+  onRotate: (page: number, direction: -1 | 1) => void;
+  onPreview: (page: number) => void;
   registerRef: (page: number, node: HTMLButtonElement | null) => void;
 };
 
@@ -223,9 +256,12 @@ function PdfToJpgThumbnail({
   imageUrl,
   loading,
   interactive,
+  rotation,
   onVisible,
   onToggle,
   onFocus,
+  onRotate,
+  onPreview,
   registerRef,
 }: ThumbnailProps) {
   const ref = useRef<HTMLButtonElement | null>(null);
@@ -249,20 +285,10 @@ function PdfToJpgThumbnail({
   }, [imageUrl, onVisible, page]);
 
   return (
-    <button
-      ref={(node) => {
-        ref.current = node;
-        registerRef(page, node);
-      }}
-      type="button"
+    <div
       role="gridcell"
       aria-selected={selected}
-      aria-label={`Page ${page}${interactive ? (selected ? ", selected" : ", not selected") : ""}`}
-      tabIndex={focused ? 0 : -1}
-      disabled={!interactive}
-      onClick={() => onToggle(page)}
-      onFocus={() => onFocus(page)}
-      className={`group rounded-xl border p-2 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 disabled:cursor-default ${
+      className={`group relative rounded-xl border p-2 transition-all duration-200 ${
         selected
           ? "border-[var(--border-selected)] bg-[var(--surface-selected)] shadow-[0_12px_30px_rgba(0,0,0,0.12)]"
           : focused
@@ -270,27 +296,86 @@ function PdfToJpgThumbnail({
             : "border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.035] hover:-translate-y-0.5 hover:border-[var(--border-selected)]"
       }`}
     >
-      <div className="relative flex h-24 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045]">
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={imageUrl}
-            alt={`Page ${page} preview`}
-            className="h-full max-h-full w-full object-contain transition-opacity duration-300"
-          />
-        ) : (
-          <div className="flex h-full w-full animate-pulse items-center justify-center bg-[#FFFFFF]/8 text-[10px] font-bold uppercase tracking-[0.18em] text-[#FFFFFF]/28">
-            {loading ? "Preview" : "Page"}
-          </div>
-        )}
-        {selected ? (
-          <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full border border-[var(--border-selected)] bg-[#0C1220]/88 text-[10px] font-bold text-[#CBA052]">
-            ✓
-          </span>
-        ) : null}
+      <button
+        ref={(node) => {
+          ref.current = node;
+          registerRef(page, node);
+        }}
+        type="button"
+        aria-label={`Page ${page}${interactive ? (selected ? ", selected" : ", not selected") : ""}`}
+        tabIndex={focused ? 0 : -1}
+        disabled={!interactive}
+        onClick={() => onToggle(page)}
+        onFocus={() => onFocus(page)}
+        className="block w-full text-left focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 disabled:cursor-default"
+      >
+        <div className="relative flex h-24 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045]">
+          {imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageUrl}
+              alt={`Page ${page} preview`}
+              className="h-full max-h-full w-full object-contain transition-opacity duration-300"
+            />
+          ) : (
+            <div className="flex h-full w-full animate-pulse items-center justify-center bg-[#FFFFFF]/8 text-[10px] font-bold uppercase tracking-[0.18em] text-[#FFFFFF]/28">
+              {loading ? "Preview" : "Page"}
+            </div>
+          )}
+          {selected ? (
+            <span className="absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full border border-[var(--border-selected)] bg-[#0C1220]/88 text-[10px] font-bold text-[#CBA052]">
+              ✓
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-1.5 text-xs font-bold text-[#FFFFFF]">Page {page}</p>
+      </button>
+
+      <div className="pointer-events-none absolute inset-x-2 top-2 flex h-24 flex-col justify-between opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            aria-label={`Preview page ${page}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onPreview(page);
+            }}
+            className="pointer-events-auto grid h-6 w-6 place-items-center rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 text-[11px] text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+          >
+            ⤢
+          </button>
+        </div>
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            aria-label={`Rotate page ${page} left`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRotate(page, -1);
+            }}
+            className="pointer-events-auto grid h-6 w-6 place-items-center rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 text-[11px] text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+          >
+            ↺
+          </button>
+          {rotation ? (
+            <span className="pointer-events-none rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 px-1.5 py-0.5 text-[9px] font-bold text-[#FFFFFF]/70">
+              {rotation}°
+            </span>
+          ) : null}
+          <button
+            type="button"
+            aria-label={`Rotate page ${page} right`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRotate(page, 1);
+            }}
+            className="pointer-events-auto grid h-6 w-6 place-items-center rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 text-[11px] text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+          >
+            ↻
+          </button>
+        </div>
       </div>
-      <p className="mt-2 text-xs font-bold text-[#FFFFFF]">Page {page}</p>
-    </button>
+    </div>
   );
 }
 
@@ -306,15 +391,20 @@ export default function PdfToJpgTool() {
   const gridButtonsRef = useRef<Map<number, HTMLButtonElement>>(new Map());
   const statusRegionRef = useRef<HTMLDivElement | null>(null);
   const resultsRef = useRef<JpgPageResult[]>([]);
+  const rotationsRef = useRef<Record<number, number>>({});
+  const previewUrlRef = useRef<string>("");
+  const previewSessionRef = useRef(0);
 
   const [analysis, setAnalysis] = useState<PdfAnalysis | null>(null);
   const [selectionMode, setSelectionMode] = useState<SelectionMode>("all");
   const [rangeInput, setRangeInput] = useState("1");
   const [selectedPages, setSelectedPages] = useState<number[]>([]);
   const [focusedPage, setFocusedPage] = useState<number | null>(null);
-  const [dpiPreset, setDpiPreset] = useState<DpiPreset>("standard");
-  const [quality, setQuality] = useState(0.85);
+  const [dpiPreset, setDpiPreset] = useState<DpiPreset>(readStoredDpiPreset);
+  const [quality, setQuality] = useState(readStoredQuality);
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>(readStoredFormat);
   const [outputName, setOutputName] = useState("lumeo-pages");
+  const [rotations, setRotations] = useState<Record<number, number>>({});
   const [status, setStatus] = useState<ConvertStatus>("Ready");
   const [progressDetail, setProgressDetail] = useState("");
   const [progressCurrent, setProgressCurrent] = useState(0);
@@ -326,10 +416,34 @@ export default function PdfToJpgTool() {
   const [results, setResults] = useState<JpgPageResult[]>([]);
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<number, string>>({});
   const [thumbnailLoading, setThumbnailLoading] = useState<Record<number, boolean>>({});
+  const [thumbnailSizes, setThumbnailSizes] = useState<Record<number, number>>({});
+  const [previewPage, setPreviewPage] = useState<number | null>(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
     resultsRef.current = results;
   }, [results]);
+
+  useEffect(() => {
+    rotationsRef.current = rotations;
+  }, [rotations]);
+
+  useEffect(() => {
+    previewUrlRef.current = previewUrl;
+  }, [previewUrl]);
+
+  useEffect(() => {
+    window.localStorage.setItem(DPI_PRESET_KEY, dpiPreset);
+  }, [dpiPreset]);
+
+  useEffect(() => {
+    window.localStorage.setItem(QUALITY_KEY, String(quality));
+  }, [quality]);
+
+  useEffect(() => {
+    window.localStorage.setItem(FORMAT_KEY, outputFormat);
+  }, [outputFormat]);
 
   const pageNumbers = useMemo(
     () => (analysis ? Array.from({ length: analysis.pageCount }, (_, index) => index + 1) : []),
@@ -355,6 +469,15 @@ export default function PdfToJpgTool() {
     thumbnailUrlsRef.current.clear();
     setThumbnailUrls({});
     setThumbnailLoading({});
+    setThumbnailSizes({});
+  }, []);
+
+  const closePreview = useCallback(() => {
+    previewSessionRef.current += 1;
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    setPreviewUrl("");
+    setPreviewPage(null);
+    setPreviewLoading(false);
   }, []);
 
   const destroyPdfJsDocument = useCallback(async () => {
@@ -378,6 +501,7 @@ export default function PdfToJpgTool() {
   useEffect(() => {
     return () => {
       resultsRef.current.forEach((item) => URL.revokeObjectURL(item.url));
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
       clearThumbnails();
       void destroyPdfJsDocument();
     };
@@ -402,6 +526,7 @@ export default function PdfToJpgTool() {
     sessionRef.current += 1;
     clearResults();
     clearThumbnails();
+    closePreview();
     void destroyPdfJsDocument();
     setAnalysis(null);
     setSelectionMode("all");
@@ -409,6 +534,7 @@ export default function PdfToJpgTool() {
     setSelectedPages([]);
     setFocusedPage(null);
     setOutputName("lumeo-pages");
+    setRotations({});
     setError("");
     setStatus("Ready");
     setProgressDetail("");
@@ -438,7 +564,9 @@ export default function PdfToJpgTool() {
               const page = await doc.getPage(next);
               if (currentSession !== sessionRef.current) return;
 
-              const viewport = page.getViewport({ scale: 0.3 });
+              const userRotation = rotationsRef.current[next] ?? 0;
+              const effectiveRotation = normalizeRotation(page.rotate + userRotation);
+              const viewport = page.getViewport({ scale: THUMBNAIL_SCALE, rotation: effectiveRotation });
               const canvas = document.createElement("canvas");
               const context = canvas.getContext("2d", { alpha: false });
               if (!context) return;
@@ -454,7 +582,7 @@ export default function PdfToJpgTool() {
               if (currentSession !== sessionRef.current) return;
 
               const blob = await new Promise<Blob | null>((resolve) =>
-                canvas.toBlob(resolve, "image/jpeg", 0.7),
+                canvas.toBlob(resolve, "image/jpeg", THUMBNAIL_JPEG_QUALITY),
               );
               canvas.width = 0;
               canvas.height = 0;
@@ -463,6 +591,7 @@ export default function PdfToJpgTool() {
               const url = URL.createObjectURL(blob);
               thumbnailUrlsRef.current.add(url);
               setThumbnailUrls((current) => ({ ...current, [next]: url }));
+              setThumbnailSizes((current) => ({ ...current, [next]: blob.size }));
             } catch (thumbnailError) {
               const maybeError = thumbnailError as Error;
               if (maybeError.name !== "RenderingCancelledException") {
@@ -553,6 +682,7 @@ export default function PdfToJpgTool() {
       setRangeInput(`1-${nextAnalysis.pageCount}`);
       setSelectedPages([1]);
       setFocusedPage(1);
+      setRotations({});
       setOutputName(sanitizeFileStem(file.name, "lumeo-pages"));
       setStatus("Ready");
       setProgressDetail(
@@ -578,6 +708,78 @@ export default function PdfToJpgTool() {
     const file = Array.from(files)[0];
     if (!file) return;
     void readPdfFile(file);
+  }
+
+  function rotatePage(page: number, direction: -1 | 1) {
+    const nextRotation = normalizeRotation((rotationsRef.current[page] ?? 0) + direction * 90);
+    rotationsRef.current = { ...rotationsRef.current, [page]: nextRotation };
+    setRotations((current) => {
+      const updated = { ...current };
+      if (nextRotation === 0) delete updated[page];
+      else updated[page] = nextRotation;
+      return updated;
+    });
+
+    // Invalidate the cached thumbnail so it re-renders with the new rotation
+    // the next time it scrolls into view.
+    setThumbnailUrls((current) => {
+      const url = current[page];
+      if (!url) return current;
+      URL.revokeObjectURL(url);
+      thumbnailUrlsRef.current.delete(url);
+      const next = { ...current };
+      delete next[page];
+      return next;
+    });
+
+    if (previewPage === page) void openPreview(page, nextRotation);
+    clearResults();
+  }
+
+  async function openPreview(page: number, rotationOverride?: number) {
+    const doc = pdfJsDocRef.current;
+    if (!doc) return;
+
+    const session = previewSessionRef.current + 1;
+    previewSessionRef.current = session;
+    setPreviewPage(page);
+    setPreviewLoading(true);
+
+    try {
+      const pdfPage = await doc.getPage(page);
+      if (session !== previewSessionRef.current) return;
+
+      const userRotation = rotationOverride ?? rotationsRef.current[page] ?? 0;
+      const effectiveRotation = normalizeRotation(pdfPage.rotate + userRotation);
+      const targetLongEdge = 1100;
+      const baseViewport = pdfPage.getViewport({ scale: 1, rotation: effectiveRotation });
+      const scale = targetLongEdge / Math.max(baseViewport.width, baseViewport.height);
+      const viewport = pdfPage.getViewport({ scale, rotation: effectiveRotation });
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round(viewport.width));
+      canvas.height = Math.max(1, Math.round(viewport.height));
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) return;
+      context.fillStyle = "#FFFFFF";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      await pdfPage.render({ canvas, canvasContext: context, viewport }).promise;
+      if (session !== previewSessionRef.current) return;
+
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+      canvas.width = 0;
+      canvas.height = 0;
+      if (!blob || session !== previewSessionRef.current) return;
+
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      setPreviewUrl(url);
+    } catch {
+      if (session === previewSessionRef.current) setPreviewUrl("");
+    } finally {
+      if (session === previewSessionRef.current) setPreviewLoading(false);
+    }
   }
 
   function togglePage(page: number) {
@@ -640,6 +842,24 @@ export default function PdfToJpgTool() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [analysis, rangeInput, selectedPages, selectionMode]);
 
+  // Rough live estimate from the already-rendered low-res thumbnails: scales
+  // a sample thumbnail's JPEG size by the ratio of target-to-thumbnail pixel
+  // area and quality. Approximate by nature (real compression varies with
+  // page content) — labeled "Estimated" in the UI rather than exact.
+  const estimatedOutputSize = useMemo(() => {
+    const samples = Object.values(thumbnailSizes);
+    if (!samples.length || !selectionPreview?.valid) return null;
+
+    const avgThumbnailSize = samples.reduce((sum, size) => sum + size, 0) / samples.length;
+    const thumbnailDpi = THUMBNAIL_SCALE * 72;
+    const areaRatio = (selectedPreset.dpi / thumbnailDpi) ** 2;
+    const qualityRatio = quality / THUMBNAIL_JPEG_QUALITY;
+    const formatFactor = outputFormat === "png" ? PNG_SIZE_FACTOR : 1;
+
+    const perPage = avgThumbnailSize * areaRatio * qualityRatio * formatFactor;
+    return perPage * selectionPreview.count;
+  }, [thumbnailSizes, selectionPreview, selectedPreset.dpi, quality, outputFormat]);
+
   async function convertPages() {
     if (!analysis || isConverting) {
       if (!analysis) setError("Please add one PDF file.");
@@ -673,6 +893,8 @@ export default function PdfToJpgTool() {
       const scale = selectedPreset.dpi / 72;
       const baseName = sanitizeFileStem(outputName || "lumeo-pages", "lumeo-pages");
       const digits = String(analysis.pageCount).length;
+      const extension = outputFormat === "png" ? "png" : "jpg";
+      const mimeType = outputFormat === "png" ? "image/png" : "image/jpeg";
       const nextResults: JpgPageResult[] = [];
       let totalOutputSize = 0;
 
@@ -680,11 +902,13 @@ export default function PdfToJpgTool() {
         const pageNumber = pages[index];
         setProgressDetail(`Rendering page ${index + 1} of ${pages.length}.`);
 
-        // pdfjs applies the page's own /Rotate entry by default when no
-        // explicit rotation is passed to getViewport, so rendered pages
-        // already respect the PDF's stored rotation metadata.
         const page = await doc.getPage(pageNumber);
-        const viewport = page.getViewport({ scale });
+        // Combine the PDF's own stored /Rotate metadata with any manual
+        // rotation the user applied on the picker grid, so the exported
+        // image reflects both.
+        const userRotation = rotationsRef.current[pageNumber] ?? 0;
+        const effectiveRotation = normalizeRotation(page.rotate + userRotation);
+        const viewport = page.getViewport({ scale, rotation: effectiveRotation });
         const canvas = document.createElement("canvas");
         canvas.width = Math.max(1, Math.round(viewport.width));
         canvas.height = Math.max(1, Math.round(viewport.height));
@@ -697,14 +921,16 @@ export default function PdfToJpgTool() {
         await task.promise;
 
         const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, "image/jpeg", quality),
+          outputFormat === "png" ? canvas.toBlob(resolve, mimeType) : canvas.toBlob(resolve, mimeType, quality),
         );
         canvas.width = 0;
         canvas.height = 0;
         if (!blob) throw new Error(`Page ${pageNumber} could not be exported.`);
 
         const fileName =
-          pages.length === 1 ? `${baseName}.jpg` : `${baseName}-page-${String(pageNumber).padStart(digits, "0")}.jpg`;
+          pages.length === 1
+            ? `${baseName}.${extension}`
+            : `${baseName}-page-${String(pageNumber).padStart(digits, "0")}.${extension}`;
 
         nextResults.push({
           page: pageNumber,
@@ -897,9 +1123,12 @@ export default function PdfToJpgTool() {
                     imageUrl={thumbnailUrls[page]}
                     loading={Boolean(thumbnailLoading[page])}
                     interactive={selectionMode === "custom"}
+                    rotation={rotations[page] ?? 0}
                     onVisible={scheduleThumbnailRender}
                     onToggle={togglePage}
                     onFocus={setFocusedPage}
+                    onRotate={rotatePage}
+                    onPreview={(pageNumber) => void openPreview(pageNumber)}
                     registerRef={(pageNumber, node) => {
                       if (node) gridButtonsRef.current.set(pageNumber, node);
                       else gridButtonsRef.current.delete(pageNumber);
@@ -935,9 +1164,9 @@ export default function PdfToJpgTool() {
         <L2ToolSettingsPanel title="PDF to JPG options" description="Export selected pages as JPG images.">
           <div className="flex h-full min-h-0 flex-col">
             <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[#0A101C]/74 p-3 shadow-inner shadow-black/20">
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[#0A101C]/74 p-2.5 shadow-inner shadow-black/20">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">Page selection</p>
-                <div className="mt-2">
+                <div className="mt-1.5">
                   <AuraSegmentedControl
                     label="Page selection"
                     options={selectionModeOptions}
@@ -960,19 +1189,41 @@ export default function PdfToJpgTool() {
                       clearResults();
                     }}
                     placeholder="1-3, 5, 8-end"
-                    className="mt-2.5 w-full rounded-md border border-[#FFFFFF]/12 bg-[#0C1220]/70 px-2.5 py-1.5 text-sm font-semibold text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/26 focus:border-[#CBA052]/45"
+                    className="mt-2 w-full rounded-md border border-[#FFFFFF]/12 bg-[#0C1220]/70 px-2.5 py-1.5 text-sm font-semibold text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/26 focus:border-[#CBA052]/45"
                   />
                 ) : null}
 
                 {selectionPreview && !selectionPreview.valid ? (
-                  <p className="mt-2 text-xs font-semibold text-[#F0C0C0]">{selectionPreview.message}</p>
+                  <p className="mt-1.5 text-xs font-semibold text-[#F0C0C0]">{selectionPreview.message}</p>
                 ) : null}
               </div>
 
-              <div className="mt-2.5 rounded-lg border border-[var(--border-subtle)] bg-[#0A101C]/74 p-3 shadow-inner shadow-black/20">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">Output</p>
+              <div className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[#0A101C]/74 p-2.5 shadow-inner shadow-black/20">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">Output</p>
+                  <div className="flex overflow-hidden rounded-full border border-[#FFFFFF]/12">
+                    {(["jpeg", "png"] as const).map((format) => (
+                      <button
+                        key={format}
+                        type="button"
+                        aria-pressed={outputFormat === format}
+                        onClick={() => {
+                          setOutputFormat(format);
+                          clearResults();
+                        }}
+                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition ${
+                          outputFormat === format
+                            ? "bg-[var(--surface-selected)] text-[#CBA052]"
+                            : "text-[#FFFFFF]/48 hover:text-[#FFFFFF]"
+                        }`}
+                      >
+                        {format === "jpeg" ? "JPG" : "PNG"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-                <div className="mt-2 grid grid-cols-3 gap-1.5">
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
                   {dpiPresets.map((preset) => (
                     <button
                       key={preset.value}
@@ -993,30 +1244,39 @@ export default function PdfToJpgTool() {
                     </button>
                   ))}
                 </div>
-                <p className="mt-1.5 text-[11px] text-[#FFFFFF]/40">{selectedPreset.description}</p>
+                <p className="mt-1 text-[11px] text-[#FFFFFF]/40">
+                  {selectedPreset.description}
+                  {estimatedOutputSize ? ` · Estimated ~${formatBytes(estimatedOutputSize)}` : ""}
+                </p>
 
-                <div className="mt-3 flex items-center justify-between gap-3">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
-                    Quality
-                  </span>
-                  <span className="text-xs font-bold text-[#FFFFFF]">{Math.round(quality * 100)}%</span>
-                </div>
-                <input
-                  type="range"
-                  min={0.5}
-                  max={1}
-                  step={0.05}
-                  value={quality}
-                  onChange={(event) => {
-                    setQuality(Number(event.target.value));
-                    clearResults();
-                  }}
-                  className="mt-1.5 w-full accent-[#CBA052]"
-                  aria-label="JPEG quality"
-                  aria-valuetext={`${Math.round(quality * 100)}%`}
-                />
+                {outputFormat === "jpeg" ? (
+                  <>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+                        Quality
+                      </span>
+                      <span className="text-xs font-bold text-[#FFFFFF]">{Math.round(quality * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.5}
+                      max={1}
+                      step={0.05}
+                      value={quality}
+                      onChange={(event) => {
+                        setQuality(Number(event.target.value));
+                        clearResults();
+                      }}
+                      className="mt-1 w-full accent-[#CBA052]"
+                      aria-label="JPEG quality"
+                      aria-valuetext={`${Math.round(quality * 100)}%`}
+                    />
+                  </>
+                ) : (
+                  <p className="mt-2 text-[11px] text-[#FFFFFF]/40">PNG is lossless — no quality setting.</p>
+                )}
 
-                <label className="mt-3 block">
+                <label className="mt-2 block">
                   <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
                     File name
                   </span>
@@ -1026,19 +1286,19 @@ export default function PdfToJpgTool() {
                       setOutputName(event.target.value);
                       clearResults();
                     }}
-                    className="mt-1.5 w-full rounded-md border border-[#FFFFFF]/12 bg-[#0C1220]/70 px-2.5 py-1.5 text-sm font-semibold text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/26 focus:border-[#CBA052]/45"
+                    className="mt-1 w-full rounded-md border border-[#FFFFFF]/12 bg-[#0C1220]/70 px-2.5 py-1.5 text-sm font-semibold text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/26 focus:border-[#CBA052]/45"
                     placeholder="lumeo-pages"
                   />
                 </label>
               </div>
             </div>
 
-            <div className="mt-2.5 border-t border-[#FFFFFF]/10 pt-2.5">
+            <div className="mt-2 border-t border-[#FFFFFF]/10 pt-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">Finish</p>
 
               <div ref={statusRegionRef} tabIndex={-1} aria-live="polite" className="outline-none">
                 {isConverting ? (
-                  <div className="mt-3">
+                  <div className="mt-2">
                     <p className="text-base font-semibold text-[#FFFFFF]">{status}</p>
                     <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">{progressDetail}</p>
                     <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#FFFFFF]/10">
@@ -1053,15 +1313,16 @@ export default function PdfToJpgTool() {
                     </div>
                   </div>
                 ) : results.length ? (
-                  <div className="mt-3">
+                  <div className="mt-2">
                     <p className="text-base font-semibold text-[#FFFFFF]">
-                      {results.length} JPG{results.length === 1 ? "" : "s"} ready
+                      {results.length} {outputFormat === "png" ? "PNG" : "JPG"}
+                      {results.length === 1 ? "" : "s"} ready
                     </p>
                     <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">
                       {formatBytes(totalResultSize)} total
                     </p>
 
-                    <div className="mt-2.5 flex flex-col gap-2">
+                    <div className="mt-2 flex flex-col gap-2">
                       <L2ActionArea
                         primary={(
                           <button
@@ -1075,7 +1336,7 @@ export default function PdfToJpgTool() {
                               : allDownloaded
                                 ? "All downloaded"
                                 : results.length === 1
-                                  ? "Download JPG"
+                                  ? `Download ${outputFormat === "png" ? "PNG" : "JPG"}`
                                   : "Download all"}
                           </button>
                         )}
@@ -1092,7 +1353,7 @@ export default function PdfToJpgTool() {
                     </div>
 
                     {results.length > 1 ? (
-                      <div className="no-scrollbar mt-3 max-h-[220px] space-y-1.5 overflow-y-auto pr-1">
+                      <div className="no-scrollbar mt-2 max-h-[180px] space-y-1.5 overflow-y-auto pr-1">
                         {results.map((item) => (
                           <div
                             key={item.page}
@@ -1127,7 +1388,7 @@ export default function PdfToJpgTool() {
                     ) : null}
                   </div>
                 ) : (
-                  <div className="mt-3">
+                  <div className="mt-2">
                     <p className="text-base font-semibold text-[#FFFFFF]">Ready to convert</p>
                     <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">
                       {selectionPreview?.valid
@@ -1140,9 +1401,9 @@ export default function PdfToJpgTool() {
                           type="button"
                           disabled={!selectionPreview?.valid}
                           onClick={() => void convertPages()}
-                          className="lumeo-primary-action mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
+                          className="lumeo-primary-action mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
                         >
-                          Convert to JPG
+                          Convert to {outputFormat === "png" ? "PNG" : "JPG"}
                         </button>
                       )}
                     />
@@ -1153,6 +1414,68 @@ export default function PdfToJpgTool() {
           </div>
         </L2ToolSettingsPanel>
       </L2ToolWorkspace>
+
+      {previewPage ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Page ${previewPage} preview`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+          onClick={closePreview}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") closePreview();
+          }}
+        >
+          <div
+            className="relative flex max-h-full max-w-full flex-col items-center gap-3"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex max-h-[80dvh] max-w-[90vw] items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/14 bg-[#0A101C]">
+              {previewLoading && !previewUrl ? (
+                <div className="flex h-64 w-48 animate-pulse items-center justify-center text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/40">
+                  Rendering…
+                </div>
+              ) : previewUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={previewUrl}
+                  alt={`Page ${previewPage} full preview`}
+                  className="max-h-[80dvh] max-w-[90vw] object-contain"
+                />
+              ) : (
+                <div className="flex h-64 w-48 items-center justify-center text-xs font-semibold text-[#F0C0C0]">
+                  Preview failed.
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label={`Rotate page ${previewPage} left`}
+                onClick={() => rotatePage(previewPage, -1)}
+                className="grid h-9 w-9 place-items-center rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 text-sm text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+              >
+                ↺
+              </button>
+              <button
+                type="button"
+                onClick={closePreview}
+                className="rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 px-4 py-2 text-xs font-semibold text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                aria-label={`Rotate page ${previewPage} right`}
+                onClick={() => rotatePage(previewPage, 1)}
+                className="grid h-9 w-9 place-items-center rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 text-sm text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+              >
+                ↻
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
