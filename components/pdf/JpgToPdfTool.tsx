@@ -12,7 +12,7 @@ import {
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
-import { AuraIconButton, AuraSegmentedControl } from "@/components/ui/Aura";
+import { AuraSegmentedControl } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
@@ -257,38 +257,71 @@ function ImageThumbnail({
   rotation,
   name,
   onPreview,
+  onRotate,
+  disabled,
 }: {
   url: string;
   rotation: number;
   name: string;
   onPreview?: () => void;
+  onRotate?: (direction: -1 | 1) => void;
+  disabled?: boolean;
 }) {
   if (!url) {
     return (
-      <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.06)]">
+      <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.06)]">
         <FileIcon />
       </span>
     );
   }
 
   return (
-    <button
-      type="button"
-      aria-label={`Preview ${name}`}
-      onClick={(event) => {
-        event.stopPropagation();
-        onPreview?.();
-      }}
-      className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.06)] transition hover:border-[#CBA052]/50 focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45"
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={url}
-        alt={`${name} preview`}
-        className="h-full w-full object-cover transition-transform duration-200"
-        style={{ transform: `rotate(${rotation}deg)` }}
-      />
-    </button>
+    <div className="group relative h-14 w-14 shrink-0">
+      <button
+        type="button"
+        aria-label={`Preview ${name}`}
+        onClick={(event) => {
+          event.stopPropagation();
+          onPreview?.();
+        }}
+        className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.06)] transition hover:border-[#CBA052]/50 focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={url}
+          alt={`${name} preview`}
+          className="h-full w-full object-cover transition-transform duration-200"
+          style={{ transform: `rotate(${rotation}deg)` }}
+        />
+      </button>
+
+      {onRotate && !disabled ? (
+        <div className="pointer-events-none absolute inset-0 flex items-end justify-between p-0.5 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+          <button
+            type="button"
+            aria-label={`Rotate ${name} left`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRotate(-1);
+            }}
+            className="pointer-events-auto grid h-5 w-5 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/92 text-[10px] text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+          >
+            ↺
+          </button>
+          <button
+            type="button"
+            aria-label={`Rotate ${name} right`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onRotate(1);
+            }}
+            className="pointer-events-auto grid h-5 w-5 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/92 text-[10px] text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+          >
+            ↻
+          </button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -702,6 +735,8 @@ export default function JpgToPdfTool() {
         <div className="mx-auto w-full max-w-[1040px]">
           <L2UploadStage
             inputId="jpg-to-pdf-upload"
+            title="Drop images here"
+            description="or choose files from your device"
             accept="image/jpeg,image/png,.jpg,.jpeg,.png"
             acceptedNote="JPG or PNG images"
             multiple
@@ -829,7 +864,7 @@ export default function JpgToPdfTool() {
               </div>
               {files.length > 0 ? (
                 <p className="text-xs font-semibold text-[#FFFFFF]/44">
-                  {files.length} images - {formatFileSize(totalSize)}
+                  {files.length} image{files.length === 1 ? "" : "s"} - {formatFileSize(totalSize)}
                 </p>
               ) : null}
             </div>
@@ -888,6 +923,8 @@ export default function JpgToPdfTool() {
                             rotation={item.userRotation}
                             name={item.file.name}
                             onPreview={() => setPreviewFileId(item.id)}
+                            onRotate={(direction) => rotateFile(item.id, direction)}
+                            disabled={status === "Converting in your browser..."}
                           />
                         }
                         name={item.file.name}
@@ -898,26 +935,6 @@ export default function JpgToPdfTool() {
                         moveUpLabel={`Move ${item.file.name} up`}
                         moveDownLabel={`Move ${item.file.name} down`}
                         removeLabel={`Remove ${item.file.name}`}
-                        action={(
-                          <div className="flex items-center gap-1">
-                            <AuraIconButton
-                              label={`Rotate ${item.file.name} left`}
-                              disabled={status === "Converting in your browser..."}
-                              onClick={() => rotateFile(item.id, -1)}
-                              className="min-h-9 min-w-9"
-                            >
-                              ↺
-                            </AuraIconButton>
-                            <AuraIconButton
-                              label={`Rotate ${item.file.name} right`}
-                              disabled={status === "Converting in your browser..."}
-                              onClick={() => rotateFile(item.id, 1)}
-                              className="min-h-9 min-w-9"
-                            >
-                              ↻
-                            </AuraIconButton>
-                          </div>
-                        )}
                       />
                     </div>
                   </div>
