@@ -5,7 +5,6 @@ import { PDFDocument, rgb } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
-  L2AdvancedDisclosure,
   L2FileCard,
   L2PrivacyNote,
   L2ToolMainColumn,
@@ -13,7 +12,7 @@ import {
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
-import { AuraIconButton, AuraOptionCard, AuraSegmentedControl } from "@/components/ui/Aura";
+import { AuraIconButton, AuraSegmentedControl } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
@@ -35,6 +34,21 @@ const A4_HEIGHT = 841.89;
 const LETTER_WIDTH = 612;
 const LETTER_HEIGHT = 792;
 const LARGE_FILE_WARNING_BYTES = 80 * 1024 * 1024;
+const DEFAULT_COMPRESS_QUALITY = 0.8;
+const SOURCE_JPEG_QUALITY_ASSUMPTION = 0.92;
+const PDF_OVERHEAD_BYTES = 2048;
+const PDF_PAGE_OVERHEAD_BYTES = 220;
+
+const PAGE_SIZE_KEY = "lumeo.jpgToPdf.pageSize";
+const MARGIN_KEY = "lumeo.jpgToPdf.margin";
+const COMPRESS_KEY = "lumeo.jpgToPdf.compress";
+const COMPRESS_QUALITY_KEY = "lumeo.jpgToPdf.compressQuality";
+
+const pageSizeButtons: Array<{ value: PageSizeOption; label: string; dpi: string }> = [
+  { value: "a4", label: "A4", dpi: "Standard" },
+  { value: "letter", label: "Letter", dpi: "US Letter" },
+  { value: "matchImage", label: "Match image", dpi: "Per image" },
+];
 
 const marginOptions: Array<{
   value: MarginPreset;
@@ -48,6 +62,53 @@ const marginOptions: Array<{
 
 function normalizeRotation(value: number) {
   return ((value % 360) + 360) % 360;
+}
+
+function readStoredPageSize(): PageSizeOption {
+  if (typeof window === "undefined") return "a4";
+  const stored = window.localStorage.getItem(PAGE_SIZE_KEY);
+  return stored === "a4" || stored === "letter" || stored === "matchImage" ? stored : "a4";
+}
+
+function readStoredMargin(): MarginPreset {
+  if (typeof window === "undefined") return "clean";
+  const stored = window.localStorage.getItem(MARGIN_KEY);
+  return stored === "none" ? "none" : "clean";
+}
+
+function readStoredCompress(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(COMPRESS_KEY) === "true";
+}
+
+function readStoredCompressQuality(): number {
+  if (typeof window === "undefined") return DEFAULT_COMPRESS_QUALITY;
+  const stored = Number(window.localStorage.getItem(COMPRESS_QUALITY_KEY));
+  return Number.isFinite(stored) && stored >= 0.4 && stored <= 1 ? stored : DEFAULT_COMPRESS_QUALITY;
+}
+
+// JPEGs always start with FF D8 FF, PNGs with an 8-byte signature. Checking
+// this (rather than trusting the file extension or the browser-reported
+// MIME type, both spoofable) catches renamed non-image files before they
+// reach the canvas decode pipeline.
+function hasImageMagicBytes(buffer: ArrayBuffer, mimeType: string): boolean {
+  const bytes = new Uint8Array(buffer);
+  if (mimeType === "image/jpeg") {
+    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+  }
+  if (mimeType === "image/png") {
+    const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+    return bytes.length >= 8 && pngSignature.every((byte, index) => bytes[index] === byte);
+  }
+  return false;
+}
+
+function formatEstimatedSize(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
+  const units = ["B", "KB", "MB", "GB"];
+  const power = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  const value = bytes / 1024 ** power;
+  return `${value >= 10 || power === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[power]}`;
 }
 
 function readJpegExifOrientation(bytes: ArrayBuffer): number {
@@ -96,6 +157,7 @@ async function renderImageToBytes(
   file: File,
   rotationDegrees: number,
   mimeType: string,
+  quality = 0.92,
 ): Promise<{ bytes: Uint8Array; width: number; height: number }> {
   const url = URL.createObjectURL(file);
   try {
@@ -121,7 +183,7 @@ async function renderImageToBytes(
     ctx.drawImage(img, -naturalWidth / 2, -naturalHeight / 2, naturalWidth, naturalHeight);
 
     const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, mimeType, 0.92),
+      canvas.toBlob(resolve, mimeType, quality),
     );
     if (!blob) throw new Error("Image could not be encoded.");
     const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -130,30 +192,6 @@ async function renderImageToBytes(
     URL.revokeObjectURL(url);
   }
 }
-
-const pageSizeOptions: Array<{
-  value: PageSizeOption;
-  label: string;
-  detail: string;
-  recommended?: boolean;
-}> = [
-  {
-    value: "a4",
-    label: "A4",
-    detail: "Clean, same-size PDF output.",
-    recommended: true,
-  },
-  {
-    value: "letter",
-    label: "Letter",
-    detail: "US Letter page size for every image.",
-  },
-  {
-    value: "matchImage",
-    label: "Match image size",
-    detail: "Each page matches its own image size.",
-  },
-];
 
 function getPageSizeLabel(option: PageSizeOption) {
   if (option === "letter") return "Letter";
@@ -214,22 +252,43 @@ async function correctImageOrientation(file: File): Promise<File> {
   return new File([blob], file.name, { type: file.type, lastModified: file.lastModified });
 }
 
-function ImageThumbnail({ url, rotation, name }: { url: string; rotation: number; name: string }) {
-  return (
-    <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.06)]">
-      {url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={url}
-          alt=""
-          aria-label={name}
-          className="h-full w-full object-cover transition-transform duration-200"
-          style={{ transform: `rotate(${rotation}deg)` }}
-        />
-      ) : (
+function ImageThumbnail({
+  url,
+  rotation,
+  name,
+  onPreview,
+}: {
+  url: string;
+  rotation: number;
+  name: string;
+  onPreview?: () => void;
+}) {
+  if (!url) {
+    return (
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.06)]">
         <FileIcon />
-      )}
-    </span>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={`Preview ${name}`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onPreview?.();
+      }}
+      className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.06)] transition hover:border-[#CBA052]/50 focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt={`${name} preview`}
+        className="h-full w-full object-cover transition-transform duration-200"
+        style={{ transform: `rotate(${rotation}deg)` }}
+      />
+    </button>
   );
 }
 
@@ -252,7 +311,7 @@ export default function JpgToPdfTool() {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const openedTrackedRef = useRef(false);
   const [files, setFiles] = useState<SelectedImage[]>([]);
-  const [pageSizeOption, setPageSizeOption] = useState<PageSizeOption>("a4");
+  const [pageSizeOption, setPageSizeOption] = useState<PageSizeOption>(readStoredPageSize);
   const [status, setStatus] = useState<ConvertStatus>("Ready");
   const [error, setError] = useState("");
   const [softWarning, setSoftWarning] = useState("");
@@ -263,9 +322,11 @@ export default function JpgToPdfTool() {
   const [draggingFileId, setDraggingFileId] = useState("");
   const [dragOverFileId, setDragOverFileId] = useState("");
   const [cleanupMessage, setCleanupMessage] = useState<CleanupMessage>("");
-  const [showPageSizeOptions, setShowPageSizeOptions] = useState(false);
-  const [marginPreset, setMarginPreset] = useState<MarginPreset>("clean");
+  const [marginPreset, setMarginPreset] = useState<MarginPreset>(readStoredMargin);
+  const [compressImages, setCompressImages] = useState(readStoredCompress);
+  const [compressQuality, setCompressQuality] = useState(readStoredCompressQuality);
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const thumbnailUrlsRef = useRef<Record<string, string>>({});
 
   const totalSize = useMemo(
@@ -276,13 +337,40 @@ export default function JpgToPdfTool() {
   const pageSizeLabel = getPageSizeLabel(pageSizeOption);
   const hasLargeFiles = totalSize >= LARGE_FILE_WARNING_BYTES;
   const showMarginOptions = pageSizeOption !== "matchImage";
-  const selectedMarginOption = marginOptions.find((option) => option.value === marginPreset) ?? marginOptions[0];
+  const previewFile = files.find((item) => item.id === previewFileId) ?? null;
+
+  const estimatedPdfSize = useMemo(() => {
+    if (!files.length) return 0;
+    const imageBytes = files.reduce((sum, item) => {
+      if (compressImages && item.file.type === "image/jpeg") {
+        return sum + item.file.size * (compressQuality / SOURCE_JPEG_QUALITY_ASSUMPTION);
+      }
+      return sum + item.file.size;
+    }, 0);
+    return imageBytes + PDF_OVERHEAD_BYTES + files.length * PDF_PAGE_OVERHEAD_BYTES;
+  }, [files, compressImages, compressQuality]);
 
   useEffect(() => {
     return () => {
       if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     };
   }, [downloadUrl]);
+
+  useEffect(() => {
+    window.localStorage.setItem(PAGE_SIZE_KEY, pageSizeOption);
+  }, [pageSizeOption]);
+
+  useEffect(() => {
+    window.localStorage.setItem(MARGIN_KEY, marginPreset);
+  }, [marginPreset]);
+
+  useEffect(() => {
+    window.localStorage.setItem(COMPRESS_KEY, String(compressImages));
+  }, [compressImages]);
+
+  useEffect(() => {
+    window.localStorage.setItem(COMPRESS_QUALITY_KEY, String(compressQuality));
+  }, [compressQuality]);
 
   useEffect(() => {
     const currentIds = new Set(files.map((item) => item.id));
@@ -354,9 +442,7 @@ export default function JpgToPdfTool() {
     setCleanupMessage("");
     setOutputName("lumeo-images.pdf");
     setDownloadName("lumeo-images.pdf");
-    setPageSizeOption("a4");
-    setShowPageSizeOptions(false);
-    setMarginPreset("clean");
+    setPreviewFileId(null);
   };
 
   const clearAllFiles = () => {
@@ -366,6 +452,7 @@ export default function JpgToPdfTool() {
     setSoftWarning("");
     setStatus("Ready");
     setCleanupMessage("");
+    setPreviewFileId(null);
   };
 
   const addFiles = async (incomingFiles: FileList | File[]) => {
@@ -392,6 +479,8 @@ export default function JpgToPdfTool() {
     );
     const incomingKeys = new Set<string>();
 
+    let invalidSignatureCount = 0;
+
     for (const file of nextFiles) {
       const duplicateKey = `${file.name}-${file.size}`;
       if (existingKeys.has(duplicateKey) || incomingKeys.has(duplicateKey)) {
@@ -400,6 +489,12 @@ export default function JpgToPdfTool() {
       incomingKeys.add(duplicateKey);
 
       try {
+        const headerBytes = await file.slice(0, 16).arrayBuffer();
+        if (!hasImageMagicBytes(headerBytes, file.type)) {
+          invalidSignatureCount += 1;
+          continue;
+        }
+
         const correctedFile = await correctImageOrientation(file);
         const { width, height } = await getDisplayDimensions(correctedFile);
         readableFiles.push({
@@ -412,6 +507,14 @@ export default function JpgToPdfTool() {
       } catch {
         unreadableCount += 1;
       }
+    }
+
+    if (invalidSignatureCount > 0) {
+      setError(
+        invalidSignatureCount === nextFiles.length
+          ? "These files don't look like valid JPG or PNG images."
+          : "Some files don't look like valid JPG or PNG images and were skipped.",
+      );
     }
 
     if (readableFiles.length > 0) {
@@ -430,6 +533,7 @@ export default function JpgToPdfTool() {
   const removeFile = (id: string) => {
     resetReadyState();
     setFiles((current) => current.filter((item) => item.id !== id));
+    setPreviewFileId((current) => (current === id ? null : current));
   };
 
   const moveFile = (index: number, direction: -1 | 1) => {
@@ -461,7 +565,6 @@ export default function JpgToPdfTool() {
 
   const updatePageSizeOption = (option: PageSizeOption) => {
     setPageSizeOption(option);
-    setShowPageSizeOptions(false);
     resetReadyState();
   };
 
@@ -497,12 +600,18 @@ export default function JpgToPdfTool() {
 
       for (const item of files) {
         const netRotation = normalizeRotation(item.userRotation);
+        const shouldCompress = compressImages && item.file.type === "image/jpeg";
         let width = item.width;
         let height = item.height;
         let embedBytes: Uint8Array;
 
-        if (netRotation !== 0) {
-          const rendered = await renderImageToBytes(item.file, netRotation, item.file.type);
+        if (netRotation !== 0 || shouldCompress) {
+          const rendered = await renderImageToBytes(
+            item.file,
+            netRotation,
+            item.file.type,
+            shouldCompress ? compressQuality : 0.92,
+          );
           embedBytes = rendered.bytes;
           width = rendered.width;
           height = rendered.height;
@@ -778,6 +887,7 @@ export default function JpgToPdfTool() {
                             url={thumbnailUrls[item.id] ?? ""}
                             rotation={item.userRotation}
                             name={item.file.name}
+                            onPreview={() => setPreviewFileId(item.id)}
                           />
                         }
                         name={item.file.name}
@@ -854,102 +964,139 @@ export default function JpgToPdfTool() {
 
         <L2ToolSettingsPanel title="JPG to PDF options" description="One combined PDF using the image order shown.">
           <div className="flex h-full min-h-0 flex-col">
-            <div className="mb-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
-                Output
-              </p>
-              <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
-                Choose page size.
-              </p>
-            </div>
-
             <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-            <div className="rounded-lg border border-[var(--border-subtle)] bg-[#0A101C]/74 p-3 shadow-inner shadow-black/20">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
-                    Page size
-                  </p>
-                  <p className="mt-1.5 text-sm font-semibold text-[#FFFFFF]">
-                    {pageSizeLabel}
-                  </p>
-                  <p className="mt-0.5 text-xs leading-4 text-[#FFFFFF]/42">
-                    {pageSizeOption === "matchImage"
-                      ? "Each page matches its own image size."
-                      : "Clean, same-size PDF output."}
-                  </p>
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[#0A101C]/74 p-2.5 shadow-inner shadow-black/20">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">Output</p>
+
+                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                  {pageSizeButtons.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      aria-pressed={pageSizeOption === option.value}
+                      onClick={() => updatePageSizeOption(option.value)}
+                      className={`rounded-lg border px-2 py-1.5 text-center transition ${
+                        pageSizeOption === option.value
+                          ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
+                          : "border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.03] hover:border-[var(--border-selected)]"
+                      }`}
+                    >
+                      <span className="block text-xs font-bold text-[#FFFFFF]">{option.label}</span>
+                      <span className="block text-[10px] text-[#FFFFFF]/44">{option.dpi}</span>
+                    </button>
+                  ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowPageSizeOptions((current) => !current)}
-                  aria-expanded={showPageSizeOptions}
-                  className="rounded-full border border-[#FFFFFF]/14 bg-[#FFFFFF]/[0.025] px-3 py-1.5 text-xs font-semibold text-[#FFFFFF]/70 transition hover:border-[#CBA052]/32 hover:text-[#FFFFFF]"
-                >
-                  Change
-                </button>
+                <p className="mt-1 text-[11px] text-[#FFFFFF]/40">
+                  {pageSizeOption === "matchImage"
+                    ? "Each page matches its own image size."
+                    : "Clean, same-size PDF output."}
+                  {estimatedPdfSize ? ` · Estimated ~${formatEstimatedSize(estimatedPdfSize)}` : ""}
+                </p>
+
+                {showMarginOptions ? (
+                  <div className="mt-2">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+                      Margin
+                    </span>
+                    <div className="mt-1.5">
+                      <AuraSegmentedControl
+                        label="Margin"
+                        options={marginOptions.map((option) => ({ value: option.value, label: option.label }))}
+                        value={marginPreset}
+                        onChange={(value) => updateMarginPreset(value as MarginPreset)}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="mt-2.5 flex items-center justify-between gap-3">
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+                      Compress JPGs
+                    </span>
+                    <p className="mt-0.5 text-[11px] text-[#FFFFFF]/40">
+                      Recompresses JPG images to shrink the PDF. PNGs stay lossless.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={compressImages}
+                    onClick={() => {
+                      setCompressImages((current) => !current);
+                      resetReadyState();
+                    }}
+                    className={`relative h-6 w-11 shrink-0 rounded-full border transition ${
+                      compressImages
+                        ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
+                        : "border-[#FFFFFF]/16 bg-[#FFFFFF]/[0.05]"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-[#CBA052] transition-all ${
+                        compressImages ? "left-6" : "left-0.5"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {compressImages ? (
+                  <>
+                    <div className="mt-2 flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+                        Quality
+                      </span>
+                      <span className="text-xs font-bold text-[#FFFFFF]">{Math.round(compressQuality * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0.4}
+                      max={1}
+                      step={0.05}
+                      value={compressQuality}
+                      onChange={(event) => {
+                        setCompressQuality(Number(event.target.value));
+                        resetReadyState();
+                      }}
+                      className="mt-1 w-full accent-[#CBA052]"
+                      aria-label="JPG compression quality"
+                      aria-valuetext={`${Math.round(compressQuality * 100)}%`}
+                    />
+                  </>
+                ) : null}
+
+                <label className="mt-2.5 block">
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+                    File name
+                  </span>
+                  <input
+                    value={outputName}
+                    onChange={(event) => {
+                      setOutputName(event.target.value);
+                      setStatus("Ready");
+                      clearDownload();
+                    }}
+                    className="mt-1 w-full rounded-md border border-[#FFFFFF]/12 bg-[#0C1220]/70 px-2.5 py-1.5 text-sm font-semibold text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/26 focus:border-[#CBA052]/45"
+                    placeholder="lumeo-images.pdf"
+                  />
+                </label>
               </div>
             </div>
 
-            {showPageSizeOptions ? (
-              <div className="mt-2 grid gap-2 overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/74 p-2">
-                {pageSizeOptions.map((option) => (
-                  <AuraOptionCard
-                    key={option.value}
-                    label={option.label}
-                    description={option.detail}
-                    selected={pageSizeOption === option.value}
-                    recommended={option.recommended}
-                    onClick={() => updatePageSizeOption(option.value)}
-                  />
-                ))}
-              </div>
-            ) : null}
-
-            {showMarginOptions ? (
-              <div className="mt-2">
-                <L2AdvancedDisclosure title="Advanced settings" description={`Margin: ${selectedMarginOption.label}`}>
-                  <AuraSegmentedControl
-                    label="Margin"
-                    options={marginOptions.map((option) => ({ value: option.value, label: option.label }))}
-                    value={marginPreset}
-                    onChange={(value) => updateMarginPreset(value as MarginPreset)}
-                  />
-                </L2AdvancedDisclosure>
-              </div>
-            ) : null}
-
-            <label className="mt-2.5 block rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/50 p-2.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
-                File name
-              </span>
-              <input
-                value={outputName}
-                onChange={(event) => {
-                  setOutputName(event.target.value);
-                  setStatus("Ready");
-                  clearDownload();
-                }}
-                className="mt-1.5 w-full rounded-md border border-transparent bg-transparent px-0 py-1 text-sm font-semibold text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/26 focus:border-b-[#CBA052]/45"
-                placeholder="lumeo-images.pdf"
-              />
-            </label>
-
-            </div>
-
-            <div className="mt-2.5 border-t border-[#FFFFFF]/10 pt-2.5">
+            <div className="mt-2 border-t border-[#FFFFFF]/10 pt-2">
               <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
                 Finish
               </p>
 
               {downloadUrl ? (
-                <div className="mt-3">
+                <div className="mt-2">
                   <p className="text-base font-semibold text-[#FFFFFF]">
                     PDF ready
                   </p>
                   <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">
                     {downloadName} - {pageSizeLabel} - {files.length} image{files.length === 1 ? "" : "s"}
                   </p>
-                  <div className="mt-3 hidden flex-col gap-2 lg:flex">
+                  <div className="mt-2 hidden flex-col gap-2 lg:flex">
                     <L2ActionArea
                       primary={(
                         <button
@@ -973,7 +1120,7 @@ export default function JpgToPdfTool() {
                   </div>
                 </div>
               ) : files.length >= 1 ? (
-                <div className="mt-3">
+                <div className="mt-2">
                   <p className="text-base font-semibold text-[#FFFFFF]">
                     Ready to convert
                   </p>
@@ -986,7 +1133,7 @@ export default function JpgToPdfTool() {
                         type="button"
                         disabled={status === "Converting in your browser..."}
                         onClick={convertToPdf}
-                        className="lumeo-primary-action mt-3 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
+                        className="lumeo-primary-action mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
                       >
                         {status === "Converting in your browser..." ? (
                           <>
@@ -1001,7 +1148,7 @@ export default function JpgToPdfTool() {
                   />
                 </div>
               ) : (
-                <p className="mt-3 text-sm leading-6 text-[#FFFFFF]/48">
+                <p className="mt-2 text-sm leading-6 text-[#FFFFFF]/48">
                   Add an image to convert.
                 </p>
               )}
@@ -1009,6 +1156,65 @@ export default function JpgToPdfTool() {
           </div>
         </L2ToolSettingsPanel>
       </L2ToolWorkspace>
+
+      {previewFile ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${previewFile.file.name} preview`}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+          onClick={() => setPreviewFileId(null)}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") setPreviewFileId(null);
+          }}
+        >
+          <div
+            className="relative flex max-h-full max-w-full flex-col items-center gap-3"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex max-h-[80dvh] max-w-[90vw] items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/14 bg-[#0A101C]">
+              {thumbnailUrls[previewFile.id] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={thumbnailUrls[previewFile.id]}
+                  alt={`${previewFile.file.name} full preview`}
+                  className="max-h-[80dvh] max-w-[90vw] object-contain transition-transform duration-200"
+                  style={{ transform: `rotate(${previewFile.userRotation}deg)` }}
+                />
+              ) : (
+                <div className="flex h-64 w-48 items-center justify-center text-xs font-semibold text-[#F0C0C0]">
+                  Preview unavailable.
+                </div>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label={`Rotate ${previewFile.file.name} left`}
+                onClick={() => rotateFile(previewFile.id, -1)}
+                className="grid h-9 w-9 place-items-center rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 text-sm text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+              >
+                ↺
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreviewFileId(null)}
+                className="rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 px-4 py-2 text-xs font-semibold text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                aria-label={`Rotate ${previewFile.file.name} right`}
+                onClick={() => rotateFile(previewFile.id, 1)}
+                className="grid h-9 w-9 place-items-center rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 text-sm text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+              >
+                ↻
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }
