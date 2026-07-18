@@ -78,9 +78,9 @@ export const pdfTools: PdfToolDefinition[] = [
     shortTitle: "JPG to PDF",
     description: "Convert images into a clean PDF document.",
     route: "/pdf/jpg-to-pdf",
-    status: "planned",
-    browserNote: "Browser-first generation planned",
-    engineNote: "Tool engine coming later.",
+    status: "live",
+    browserNote: "Browser-first generation",
+    engineNote: "Live now",
     accepted: "JPG and image files",
     bullets: [
       "Add multiple images",
