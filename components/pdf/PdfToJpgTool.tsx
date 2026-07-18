@@ -422,6 +422,7 @@ export default function PdfToJpgTool() {
   const [thumbnailSizes, setThumbnailSizes] = useState<Record<number, number>>({});
   const [previewPage, setPreviewPage] = useState<number | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [previewSize, setPreviewSize] = useState<{ width: number; height: number } | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
 
   useEffect(() => {
@@ -479,6 +480,7 @@ export default function PdfToJpgTool() {
     previewSessionRef.current += 1;
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     setPreviewUrl("");
+    setPreviewSize(null);
     setPreviewPage(null);
     setPreviewLoading(false);
   }, []);
@@ -771,6 +773,7 @@ export default function PdfToJpgTool() {
       if (session !== previewSessionRef.current) return;
 
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+      const renderedSize = { width: canvas.width, height: canvas.height };
       canvas.width = 0;
       canvas.height = 0;
       if (!blob || session !== previewSessionRef.current) return;
@@ -778,6 +781,7 @@ export default function PdfToJpgTool() {
       if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
       const url = URL.createObjectURL(blob);
       setPreviewUrl(url);
+      setPreviewSize(renderedSize);
     } catch {
       if (session === previewSessionRef.current) setPreviewUrl("");
     } finally {
@@ -1481,6 +1485,7 @@ export default function PdfToJpgTool() {
                 <img
                   src={previewUrl}
                   alt={`Page ${previewPage} full preview`}
+                  style={previewSize ? { aspectRatio: `${previewSize.width} / ${previewSize.height}` } : undefined}
                   className="max-h-[80dvh] max-w-[90vw] object-contain"
                 />
               ) : (

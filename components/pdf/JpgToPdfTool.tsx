@@ -880,7 +880,7 @@ export default function JpgToPdfTool() {
                   Arrange
                 </p>
                 <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
-                  Drag to reorder.
+                  Drag, or focus a row and use ↑ / ↓.
                 </p>
               </div>
               {files.length > 0 ? (
@@ -900,6 +900,19 @@ export default function JpgToPdfTool() {
                   <div
                     key={item.id}
                     draggable={status !== "Converting in your browser..."}
+                    tabIndex={0}
+                    role="group"
+                    aria-label={`${item.file.name}, position ${index + 1} of ${files.length}. Press arrow up or down to reorder.`}
+                    onKeyDown={(event) => {
+                      if (status === "Converting in your browser...") return;
+                      if (event.key === "ArrowUp" && index > 0) {
+                        event.preventDefault();
+                        moveFile(index, -1);
+                      } else if (event.key === "ArrowDown" && index < files.length - 1) {
+                        event.preventDefault();
+                        moveFile(index, 1);
+                      }
+                    }}
                     onDragStart={(event) => {
                       setDraggingFileId(item.id);
                       event.dataTransfer.effectAllowed = "move";
@@ -924,7 +937,7 @@ export default function JpgToPdfTool() {
                       setDraggingFileId("");
                       setDragOverFileId("");
                     }}
-                    className={`flex cursor-grab items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-200 active:cursor-grabbing ${
+                    className={`flex cursor-grab items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45 active:cursor-grabbing ${
                       draggingFileId === item.id
                         ? "scale-[0.99] border-[var(--border-selected)] bg-[var(--surface-selected)] opacity-70"
                         : dragOverFileId === item.id
@@ -950,11 +963,7 @@ export default function JpgToPdfTool() {
                         }
                         name={item.file.name}
                         meta={`${item.width}x${item.height} - ${formatFileSize(item.file.size)}${item.userRotation ? ` - Rotated ${item.userRotation}°` : ""}`}
-                        onMoveUp={index === 0 || status === "Converting in your browser..." ? undefined : () => moveFile(index, -1)}
-                        onMoveDown={index === files.length - 1 || status === "Converting in your browser..." ? undefined : () => moveFile(index, 1)}
                         onRemove={status === "Converting in your browser..." ? undefined : () => removeFile(item.id)}
-                        moveUpLabel={`Move ${item.file.name} up`}
-                        moveDownLabel={`Move ${item.file.name} down`}
                         removeLabel={`Remove ${item.file.name}`}
                       />
                     </div>
@@ -1239,7 +1248,10 @@ export default function JpgToPdfTool() {
                   src={thumbnailUrls[previewFile.id]}
                   alt={`${previewFile.file.name} full preview`}
                   className="max-h-[80dvh] max-w-[90vw] object-contain transition-transform duration-200"
-                  style={{ transform: `rotate(${previewFile.userRotation}deg)` }}
+                  style={{
+                    aspectRatio: `${previewFile.width} / ${previewFile.height}`,
+                    transform: `rotate(${previewFile.userRotation}deg)`,
+                  }}
                 />
               ) : (
                 <div className="flex h-64 w-48 items-center justify-center text-xs font-semibold text-[#F0C0C0]">
