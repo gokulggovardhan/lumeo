@@ -269,14 +269,14 @@ function ImageThumbnail({
 }) {
   if (!url) {
     return (
-      <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.06)]">
+      <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045]">
         <FileIcon />
       </span>
     );
   }
 
   return (
-    <div className="group relative h-14 w-14 shrink-0">
+    <div className="group relative h-16 w-16 shrink-0">
       <button
         type="button"
         aria-label={`Preview ${name}`}
@@ -284,7 +284,7 @@ function ImageThumbnail({
           event.stopPropagation();
           onPreview?.();
         }}
-        className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-[var(--border-subtle)] bg-[rgb(var(--paper-rgb)/0.06)] transition hover:border-[#CBA052]/50 focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45"
+        className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045] transition hover:border-[var(--border-selected)] focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -293,10 +293,13 @@ function ImageThumbnail({
           className="h-full w-full object-cover transition-transform duration-200"
           style={{ transform: `rotate(${rotation}deg)` }}
         />
+        <span className="pointer-events-none absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/85 text-[9px] text-[#FFFFFF]/80">
+          ⤢
+        </span>
       </button>
 
       {onRotate && !disabled ? (
-        <div className="pointer-events-none absolute inset-0 flex items-end justify-between p-0.5 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between p-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
           <button
             type="button"
             aria-label={`Rotate ${name} left`}
@@ -1039,19 +1042,18 @@ export default function JpgToPdfTool() {
                     type="button"
                     role="switch"
                     aria-checked={compressImages}
+                    aria-label="Compress JPGs"
                     onClick={() => {
                       setCompressImages((current) => !current);
                       resetReadyState();
                     }}
-                    className={`relative h-6 w-11 shrink-0 rounded-full border transition ${
-                      compressImages
-                        ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
-                        : "border-[#FFFFFF]/16 bg-[#FFFFFF]/[0.05]"
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 ${
+                      compressImages ? "bg-[#CBA052]" : "bg-[#FFFFFF]/14"
                     }`}
                   >
                     <span
-                      className={`absolute top-0.5 h-4 w-4 rounded-full bg-[#CBA052] transition-all ${
-                        compressImages ? "left-6" : "left-0.5"
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
+                        compressImages ? "translate-x-6" : "translate-x-1"
                       }`}
                     />
                   </button>
