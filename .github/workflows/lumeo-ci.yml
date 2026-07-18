@@ -68,3 +68,28 @@ jobs:
 
       - name: Verify public routes
         run: npm run verify:public
+
+  migrate:
+    name: Apply Supabase migrations
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Push pending migrations to Supabase
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: npm run db:migrate
