@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import JSZip from "jszip";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
@@ -31,6 +32,7 @@ type PdfAnalysis = {
 type JpgPageResult = {
   page: number;
   url: string;
+  blob: Blob;
   fileName: string;
   size: number;
   downloaded: boolean;
@@ -413,6 +415,7 @@ export default function PdfToJpgTool() {
   const [cleanupMessage, setCleanupMessage] = useState("");
   const [isConverting, setIsConverting] = useState(false);
   const [isDownloadingAll, setIsDownloadingAll] = useState(false);
+  const [isZipping, setIsZipping] = useState(false);
   const [results, setResults] = useState<JpgPageResult[]>([]);
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<number, string>>({});
   const [thumbnailLoading, setThumbnailLoading] = useState<Record<number, boolean>>({});
@@ -935,6 +938,7 @@ export default function PdfToJpgTool() {
         nextResults.push({
           page: pageNumber,
           url: URL.createObjectURL(blob),
+          blob,
           fileName,
           size: blob.size,
           downloaded: false,
@@ -998,6 +1002,31 @@ export default function PdfToJpgTool() {
     }
 
     setIsDownloadingAll(false);
+  }
+
+  async function handleDownloadZip() {
+    if (!results.length || isZipping) return;
+    setIsZipping(true);
+
+    try {
+      const zip = new JSZip();
+      results.forEach((item) => zip.file(item.fileName, item.blob));
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const zipUrl = URL.createObjectURL(zipBlob);
+      const baseName = sanitizeFileStem(outputName || "lumeo-pages", "lumeo-pages");
+
+      track({
+        eventName: "download_started",
+        toolSlug: TOOL_SLUG,
+        outputSizeBucket: bucketFileSize(zipBlob.size),
+      });
+      downloadBlobUrl(zipUrl, `${baseName}.zip`);
+      setResults((current) => current.map((entry) => ({ ...entry, downloaded: true })));
+
+      window.setTimeout(() => URL.revokeObjectURL(zipUrl), 800);
+    } finally {
+      setIsZipping(false);
+    }
   }
 
   const allDownloaded = results.length > 0 && results.every((item) => item.downloaded);
@@ -1341,13 +1370,25 @@ export default function PdfToJpgTool() {
                           </button>
                         )}
                         secondary={(
-                          <button
-                            type="button"
-                            onClick={resetTool}
-                            className="rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF]"
-                          >
-                            Start new
-                          </button>
+                          <>
+                            {results.length > 1 ? (
+                              <button
+                                type="button"
+                                disabled={isZipping}
+                                onClick={() => void handleDownloadZip()}
+                                className="rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF] disabled:cursor-not-allowed disabled:opacity-45"
+                              >
+                                {isZipping ? "Zipping…" : "Download as ZIP"}
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              onClick={resetTool}
+                              className="rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF]"
+                            >
+                              Start new
+                            </button>
+                          </>
                         )}
                       />
                     </div>
@@ -1430,7 +1471,7 @@ export default function PdfToJpgTool() {
             className="relative flex max-h-full max-w-full flex-col items-center gap-3"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex max-h-[80dvh] max-w-[90vw] items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/14 bg-[#0A101C]">
+            <div className="inline-flex max-h-[80dvh] max-w-[90vw] items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/14 bg-[#0A101C]">
               {previewLoading && !previewUrl ? (
                 <div className="flex h-64 w-48 animate-pulse items-center justify-center text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/40">
                   Rendering…

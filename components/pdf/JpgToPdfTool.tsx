@@ -43,6 +43,8 @@ const PAGE_SIZE_KEY = "lumeo.jpgToPdf.pageSize";
 const MARGIN_KEY = "lumeo.jpgToPdf.margin";
 const COMPRESS_KEY = "lumeo.jpgToPdf.compress";
 const COMPRESS_QUALITY_KEY = "lumeo.jpgToPdf.compressQuality";
+const PNG_TO_JPEG_KEY = "lumeo.jpgToPdf.pngToJpeg";
+const PNG_TO_JPEG_ESTIMATE_FACTOR = 0.5;
 
 const pageSizeButtons: Array<{ value: PageSizeOption; label: string; dpi: string }> = [
   { value: "a4", label: "A4", dpi: "Standard" },
@@ -85,6 +87,11 @@ function readStoredCompressQuality(): number {
   if (typeof window === "undefined") return DEFAULT_COMPRESS_QUALITY;
   const stored = Number(window.localStorage.getItem(COMPRESS_QUALITY_KEY));
   return Number.isFinite(stored) && stored >= 0.4 && stored <= 1 ? stored : DEFAULT_COMPRESS_QUALITY;
+}
+
+function readStoredPngToJpeg(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(PNG_TO_JPEG_KEY) === "true";
 }
 
 // JPEGs always start with FF D8 FF, PNGs with an 8-byte signature. Checking
@@ -361,6 +368,7 @@ export default function JpgToPdfTool() {
   const [marginPreset, setMarginPreset] = useState<MarginPreset>(readStoredMargin);
   const [compressImages, setCompressImages] = useState(readStoredCompress);
   const [compressQuality, setCompressQuality] = useState(readStoredCompressQuality);
+  const [convertPngToJpeg, setConvertPngToJpeg] = useState(readStoredPngToJpeg);
   const [thumbnailUrls, setThumbnailUrls] = useState<Record<string, string>>({});
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const thumbnailUrlsRef = useRef<Record<string, string>>({});
@@ -373,6 +381,7 @@ export default function JpgToPdfTool() {
   const pageSizeLabel = getPageSizeLabel(pageSizeOption);
   const hasLargeFiles = totalSize >= LARGE_FILE_WARNING_BYTES;
   const showMarginOptions = pageSizeOption !== "matchImage";
+  const hasPngFiles = files.some((item) => item.file.type === "image/png");
   const previewFile = files.find((item) => item.id === previewFileId) ?? null;
 
   const estimatedPdfSize = useMemo(() => {
@@ -381,10 +390,13 @@ export default function JpgToPdfTool() {
       if (compressImages && item.file.type === "image/jpeg") {
         return sum + item.file.size * (compressQuality / SOURCE_JPEG_QUALITY_ASSUMPTION);
       }
+      if (compressImages && convertPngToJpeg && item.file.type === "image/png") {
+        return sum + item.file.size * compressQuality * PNG_TO_JPEG_ESTIMATE_FACTOR;
+      }
       return sum + item.file.size;
     }, 0);
     return imageBytes + PDF_OVERHEAD_BYTES + files.length * PDF_PAGE_OVERHEAD_BYTES;
-  }, [files, compressImages, compressQuality]);
+  }, [files, compressImages, compressQuality, convertPngToJpeg]);
 
   useEffect(() => {
     return () => {
@@ -407,6 +419,10 @@ export default function JpgToPdfTool() {
   useEffect(() => {
     window.localStorage.setItem(COMPRESS_QUALITY_KEY, String(compressQuality));
   }, [compressQuality]);
+
+  useEffect(() => {
+    window.localStorage.setItem(PNG_TO_JPEG_KEY, String(convertPngToJpeg));
+  }, [convertPngToJpeg]);
 
   useEffect(() => {
     const currentIds = new Set(files.map((item) => item.id));
@@ -636,17 +652,19 @@ export default function JpgToPdfTool() {
 
       for (const item of files) {
         const netRotation = normalizeRotation(item.userRotation);
-        const shouldCompress = compressImages && item.file.type === "image/jpeg";
+        const shouldCompressJpeg = compressImages && item.file.type === "image/jpeg";
+        const shouldConvertPng = compressImages && convertPngToJpeg && item.file.type === "image/png";
+        const targetMimeType = shouldConvertPng ? "image/jpeg" : item.file.type;
         let width = item.width;
         let height = item.height;
         let embedBytes: Uint8Array;
 
-        if (netRotation !== 0 || shouldCompress) {
+        if (netRotation !== 0 || shouldCompressJpeg || shouldConvertPng) {
           const rendered = await renderImageToBytes(
             item.file,
             netRotation,
-            item.file.type,
-            shouldCompress ? compressQuality : 0.92,
+            targetMimeType,
+            shouldCompressJpeg || shouldConvertPng ? compressQuality : 0.92,
           );
           embedBytes = rendered.bytes;
           width = rendered.width;
@@ -656,7 +674,7 @@ export default function JpgToPdfTool() {
         }
 
         const image =
-          item.file.type === "image/png"
+          targetMimeType === "image/png"
             ? await pdfDoc.embedPng(embedBytes)
             : await pdfDoc.embedJpg(embedBytes);
 
@@ -1032,23 +1050,23 @@ export default function JpgToPdfTool() {
                 <div className="mt-2.5 flex items-center justify-between gap-3">
                   <div>
                     <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
-                      Compress JPGs
+                      Compress images
                     </span>
                     <p className="mt-0.5 text-[11px] text-[#FFFFFF]/40">
-                      Recompresses JPG images to shrink the PDF. PNGs stay lossless.
+                      Recompresses JPG images to shrink the PDF.
                     </p>
                   </div>
                   <button
                     type="button"
                     role="switch"
                     aria-checked={compressImages}
-                    aria-label="Compress JPGs"
+                    aria-label="Compress images"
                     onClick={() => {
                       setCompressImages((current) => !current);
                       resetReadyState();
                     }}
-                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 ${
-                      compressImages ? "bg-[#CBA052]" : "bg-[#FFFFFF]/14"
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 ${
+                      compressImages ? "border-[#CBA052] bg-[#CBA052]" : "border-[#FFFFFF]/25 bg-[#FFFFFF]/10"
                     }`}
                   >
                     <span
@@ -1081,6 +1099,23 @@ export default function JpgToPdfTool() {
                       aria-label="JPG compression quality"
                       aria-valuetext={`${Math.round(compressQuality * 100)}%`}
                     />
+
+                    {hasPngFiles ? (
+                      <label className="mt-2 flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={convertPngToJpeg}
+                          onChange={(event) => {
+                            setConvertPngToJpeg(event.target.checked);
+                            resetReadyState();
+                          }}
+                          className="h-3.5 w-3.5 accent-[#CBA052]"
+                        />
+                        <span className="text-[11px] text-[#FFFFFF]/56">
+                          Also convert PNGs to JPEG (smaller, no longer lossless)
+                        </span>
+                      </label>
+                    ) : null}
                   </>
                 ) : null}
 
@@ -1191,7 +1226,7 @@ export default function JpgToPdfTool() {
             className="relative flex max-h-full max-w-full flex-col items-center gap-3"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="flex max-h-[80dvh] max-w-[90vw] items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/14 bg-[#0A101C]">
+            <div className="inline-flex max-h-[80dvh] max-w-[90vw] items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/14 bg-[#0A101C]">
               {thumbnailUrls[previewFile.id] ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
