@@ -648,7 +648,7 @@ export function AuraFileCard({
   moveDownLabel?: string;
 }) {
   return (
-    <div className="lumeo2-soft-card-lift flex min-h-16 items-center justify-between gap-4 rounded-[var(--radius-xl)] bg-[rgb(var(--paper-rgb)/0.06)] p-3 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)] transition hover:bg-[rgb(var(--paper-rgb)/0.09)]">
+    <div className="lumeo2-soft-card-lift group flex min-h-16 items-center justify-between gap-4 rounded-[var(--radius-xl)] bg-[rgb(var(--paper-rgb)/0.06)] p-3 shadow-[inset_0_1px_0_rgba(255,253,248,0.06)] transition hover:bg-[rgb(var(--paper-rgb)/0.09)]">
       {icon ?? <FileIcon />}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black text-[var(--lumeo-paper-50)]">{name}</p>
@@ -656,8 +656,12 @@ export function AuraFileCard({
         {status ? <p className="mt-1 text-xs font-bold text-[var(--text-success)]">{status}</p> : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        {onMoveUp ? <AuraIconButton label={moveUpLabel ?? `Move ${name} up`} onClick={onMoveUp}>↑</AuraIconButton> : null}
-        {onMoveDown ? <AuraIconButton label={moveDownLabel ?? `Move ${name} down`} onClick={onMoveDown}>↓</AuraIconButton> : null}
+        {onMoveUp || onMoveDown ? (
+          <div className="lumeo-reveal-on-interact flex items-center gap-2">
+            {onMoveUp ? <AuraIconButton label={moveUpLabel ?? `Move ${name} up`} onClick={onMoveUp}>↑</AuraIconButton> : null}
+            {onMoveDown ? <AuraIconButton label={moveDownLabel ?? `Move ${name} down`} onClick={onMoveDown}>↓</AuraIconButton> : null}
+          </div>
+        ) : null}
         {onRemove ? <AuraIconButton label={removeLabel ?? `Remove ${name}`} onClick={onRemove}>×</AuraIconButton> : null}
         {action ? <div>{action}</div> : null}
       </div>

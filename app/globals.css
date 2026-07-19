@@ -1076,3 +1076,25 @@ a:active {
   --lumeo-mint-subtle: #9FD0B5;
   --lumeo-sage-accent: #8FBF9F;
 }
+
+/* Reveal-on-interact: visible by default (touch has no hover), hidden until
+   hover/focus on wider screens. Hand-written and !important because the build
+   pipeline (Tailwind v4 + Lightning CSS) reorders/deprioritizes plain rules
+   here in a way that silently loses to Tailwind's own utility layer even
+   though the selectors themselves are correct -- verified directly: the same
+   rule without !important, added to this same file, still lost the cascade. */
+.lumeo-reveal-on-interact {
+  opacity: 1 !important;
+  transition: opacity var(--motion-standard) var(--ease-standard);
+}
+
+@media (min-width: 40rem) {
+  .lumeo-reveal-on-interact {
+    opacity: 0 !important;
+  }
+
+  .group:hover .lumeo-reveal-on-interact,
+  .group:focus-within .lumeo-reveal-on-interact {
+    opacity: 1 !important;
+  }
+}
