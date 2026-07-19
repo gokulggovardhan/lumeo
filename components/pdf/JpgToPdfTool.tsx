@@ -66,6 +66,31 @@ function normalizeRotation(value: number) {
   return ((value % 360) + 360) % 360;
 }
 
+// Rotating a box via CSS transform spins its content in place without
+// changing the box's own layout dimensions - so a tall portrait image
+// rotated 90deg to look landscape still occupies a tall narrow box,
+// clipping most of the now-sideways content. Computing the container at
+// the swapped (post-rotation) aspect ratio, then sizing the image to the
+// dimensions that become that swapped box once rotated, keeps the full
+// image visible in every orientation.
+function computeRotatedPreviewBox(naturalWidth: number, naturalHeight: number, rotationDeg: number) {
+  const maxWidth = typeof window === "undefined" ? naturalWidth : window.innerWidth * 0.9;
+  const maxHeight = typeof window === "undefined" ? naturalHeight : window.innerHeight * 0.72;
+  const swapped = rotationDeg === 90 || rotationDeg === 270;
+  const effectiveWidth = swapped ? naturalHeight : naturalWidth;
+  const effectiveHeight = swapped ? naturalWidth : naturalHeight;
+  const scale = Math.min(maxWidth / effectiveWidth, maxHeight / effectiveHeight);
+  const containerWidth = effectiveWidth * scale;
+  const containerHeight = effectiveHeight * scale;
+
+  return {
+    containerWidth,
+    containerHeight,
+    imgWidth: swapped ? containerHeight : containerWidth,
+    imgHeight: swapped ? containerWidth : containerHeight,
+  };
+}
+
 function readStoredPageSize(): PageSizeOption {
   if (typeof window === "undefined") return "a4";
   const stored = window.localStorage.getItem(PAGE_SIZE_KEY);
@@ -276,14 +301,14 @@ function ImageThumbnail({
 }) {
   if (!url) {
     return (
-      <span className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045]">
+      <span className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045]">
         <FileIcon />
       </span>
     );
   }
 
   return (
-    <div className="group relative h-16 w-16 shrink-0">
+    <div className="group relative h-24 w-24 shrink-0">
       <button
         type="button"
         aria-label={`Preview ${name}`}
@@ -291,7 +316,7 @@ function ImageThumbnail({
           event.stopPropagation();
           onPreview?.();
         }}
-        className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045] transition hover:border-[var(--border-selected)] focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45"
+        className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045] transition hover:border-[var(--border-selected)] focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -300,13 +325,13 @@ function ImageThumbnail({
           className="h-full w-full object-cover transition-transform duration-200"
           style={{ transform: `rotate(${rotation}deg)` }}
         />
-        <span className="pointer-events-none absolute right-1 top-1 grid h-4 w-4 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/85 text-[9px] text-[#FFFFFF]/80">
+        <span className="pointer-events-none absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/85 text-[10px] text-[#FFFFFF]/80">
           ⤢
         </span>
       </button>
 
       {onRotate && !disabled ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between p-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between p-1.5 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
           <button
             type="button"
             aria-label={`Rotate ${name} left`}
@@ -314,7 +339,7 @@ function ImageThumbnail({
               event.stopPropagation();
               onRotate(-1);
             }}
-            className="pointer-events-auto grid h-5 w-5 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/92 text-[10px] text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+            className="pointer-events-auto grid h-6 w-6 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/92 text-xs text-[#FFFFFF] transition hover:border-[#CBA052]/60"
           >
             ↺
           </button>
@@ -325,7 +350,7 @@ function ImageThumbnail({
               event.stopPropagation();
               onRotate(1);
             }}
-            className="pointer-events-auto grid h-5 w-5 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/92 text-[10px] text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+            className="pointer-events-auto grid h-6 w-6 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/92 text-xs text-[#FFFFFF] transition hover:border-[#CBA052]/60"
           >
             ↻
           </button>
@@ -1241,24 +1266,33 @@ export default function JpgToPdfTool() {
             className="relative flex max-h-full max-w-full flex-col items-center gap-3"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="inline-flex max-h-[80dvh] max-w-[90vw] items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/14 bg-[#0A101C]">
-              {thumbnailUrls[previewFile.id] ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={thumbnailUrls[previewFile.id]}
-                  alt={`${previewFile.file.name} full preview`}
-                  className="max-h-[80dvh] max-w-[90vw] object-contain transition-transform duration-200"
-                  style={{
-                    aspectRatio: `${previewFile.width} / ${previewFile.height}`,
-                    transform: `rotate(${previewFile.userRotation}deg)`,
-                  }}
-                />
-              ) : (
-                <div className="flex h-64 w-48 items-center justify-center text-xs font-semibold text-[#F0C0C0]">
-                  Preview unavailable.
+            {(() => {
+              const box = computeRotatedPreviewBox(previewFile.width, previewFile.height, previewFile.userRotation);
+              return (
+                <div
+                  className="flex items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/14 bg-[#0A101C]"
+                  style={{ width: box.containerWidth, height: box.containerHeight }}
+                >
+                  {thumbnailUrls[previewFile.id] ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={thumbnailUrls[previewFile.id]}
+                      alt={`${previewFile.file.name} full preview`}
+                      className="object-contain transition-transform duration-200"
+                      style={{
+                        width: box.imgWidth,
+                        height: box.imgHeight,
+                        transform: `rotate(${previewFile.userRotation}deg)`,
+                      }}
+                    />
+                  ) : (
+                    <div className="flex h-64 w-48 items-center justify-center text-xs font-semibold text-[#F0C0C0]">
+                      Preview unavailable.
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
             <div className="flex items-center gap-2">
               <button
                 type="button"
