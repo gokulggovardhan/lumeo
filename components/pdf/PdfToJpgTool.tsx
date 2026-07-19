@@ -333,7 +333,7 @@ function PdfToJpgThumbnail({
         <p className="mt-1.5 text-xs font-bold text-[var(--text-primary)]">Page {page}</p>
       </button>
 
-      <div className="pointer-events-none absolute inset-x-2 top-2 flex h-24 flex-col justify-between opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+      <div className="lumeo-reveal-on-interact pointer-events-none absolute inset-x-2 top-2 flex h-24 flex-col justify-between">
         <div className="flex justify-end">
           <button
             type="button"

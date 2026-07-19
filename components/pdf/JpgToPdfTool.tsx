@@ -331,7 +331,7 @@ function ImageThumbnail({
       </button>
 
       {onRotate && !disabled ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between p-1.5 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
+        <div className="lumeo-reveal-on-interact pointer-events-none absolute inset-x-0 bottom-0 flex justify-between p-1.5">
           <button
             type="button"
             aria-label={`Rotate ${name} left`}
