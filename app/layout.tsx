@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Fraunces, IBM_Plex_Mono, Inter } from "next/font/google";
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import "./globals.css";
 
 const inter = Inter({
@@ -100,6 +101,7 @@ export default function RootLayout({
           <a href="#main-content" className="aura-skip-link">
             Skip to content
           </a>
+          <AnnouncementBanner />
           <AnalyticsPageView />
           {children}
         </AnalyticsProvider>
