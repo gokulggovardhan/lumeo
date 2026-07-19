@@ -490,16 +490,16 @@ function SplitPageThumbnail({
       disabled={disabled}
       onClick={(event) => onClick(event, page.page)}
       onFocus={() => onFocus(page.page)}
-      className={`group rounded-xl border p-2 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45 disabled:cursor-default ${
+      className={`group rounded-xl border p-2 text-left transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--lumeo-gold)]/45 disabled:cursor-default ${
         selected
           ? "border-[var(--border-selected)] bg-[var(--surface-selected)] shadow-[0_12px_30px_rgba(0,0,0,0.12)]"
           : focused
-            ? "border-[var(--border-selected)] bg-[#FFFFFF]/[0.055]"
-            : "border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.035] hover:-translate-y-0.5 hover:border-[var(--border-selected)]"
+            ? "border-[var(--border-selected)] bg-[var(--text-primary)]/[0.055]"
+            : "border-[var(--text-primary)]/8 bg-[var(--text-primary)]/[0.035] hover:-translate-y-0.5 hover:border-[var(--border-selected)]"
       }`}
     >
       <div
-        className={`${densityPreviewClasses[density]} relative flex items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045]`}
+        className={`${densityPreviewClasses[density]} relative flex items-center justify-center overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.045]`}
       >
         {imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -510,23 +510,23 @@ function SplitPageThumbnail({
             style={{ transform: `rotate(${rotation}deg)` }}
           />
         ) : (
-          <div className="flex h-full w-full animate-pulse items-center justify-center bg-[#FFFFFF]/8 text-[10px] font-bold uppercase tracking-[0.18em] text-[#FFFFFF]/28">
+          <div className="flex h-full w-full animate-pulse items-center justify-center bg-[var(--text-primary)]/8 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--text-primary)]/28">
             {loading ? "Preview" : "Page"}
           </div>
         )}
         {rotation ? (
-          <span className="absolute right-1.5 top-1.5 rounded-full border border-[var(--border-subtle)] bg-[#0C1220]/88 px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-secondary)]">
+          <span className="absolute right-1.5 top-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--atelier-surface-1)]/88 px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-secondary)]">
             {rotation}°
           </span>
         ) : null}
       </div>
       <div className="mt-2 flex flex-col gap-0.5">
-        <span className="text-xs font-bold text-[#FFFFFF]">Page {page.page}</span>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#FFFFFF]/36">
+        <span className="text-xs font-bold text-[var(--text-primary)]">Page {page.page}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-primary)]/36">
           {page.orientation}
         </span>
       </div>
-      <p className="mt-0.5 text-[10px] font-medium text-[#FFFFFF]/32">
+      <p className="mt-0.5 text-[10px] font-medium text-[var(--text-primary)]/32">
         {page.label} · {Math.round(page.width)}×{Math.round(page.height)}
       </p>
     </button>
@@ -1288,7 +1288,7 @@ export default function SplitPdfTool() {
         <L2PrivacyNote />
 
         {error ? (
-          <div role="alert" className="mt-4 rounded-lg border border-[#F0A8A8]/20 bg-[#F0A8A8]/10 p-4 text-sm font-medium text-[#F0C0C0]">
+          <div role="alert" className="mt-4 rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
@@ -1300,14 +1300,14 @@ export default function SplitPdfTool() {
     <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
       <L2ToolWorkspace>
         <L2ToolMainColumn>
-        <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[#FFFFFF]/14 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0A101C] p-3 shadow-2xl shadow-black/32">
+        <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[var(--text-primary)]/14 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-2)] p-3 shadow-2xl shadow-black/32">
           <section className="shrink-0">
             <div className="mb-2 flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
                   Document tray
                 </p>
-                <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
+                <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
                   Source PDF.
                 </p>
               </div>
@@ -1316,7 +1316,7 @@ export default function SplitPdfTool() {
                   type="button"
                   onClick={handleUndo}
                   disabled={!undoStack.length}
-                  className="rounded-full border border-[#FFFFFF]/12 px-3 py-1.5 text-xs font-semibold text-[#FFFFFF]/56 transition hover:border-[#FFFFFF]/22 hover:text-[#FFFFFF] disabled:opacity-35"
+                  className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/56 transition hover:border-[var(--text-primary)]/22 hover:text-[var(--text-primary)] disabled:opacity-35"
                 >
                   Undo
                 </button>
@@ -1324,21 +1324,21 @@ export default function SplitPdfTool() {
                   type="button"
                   onClick={handleRedo}
                   disabled={!redoStack.length}
-                  className="rounded-full border border-[#FFFFFF]/12 px-3 py-1.5 text-xs font-semibold text-[#FFFFFF]/56 transition hover:border-[#FFFFFF]/22 hover:text-[#FFFFFF] disabled:opacity-35"
+                  className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/56 transition hover:border-[var(--text-primary)]/22 hover:text-[var(--text-primary)] disabled:opacity-35"
                 >
                   Redo
                 </button>
                 <button
                   type="button"
                   onClick={resetTool}
-                  className="rounded-full border border-[#FFFFFF]/12 px-3 py-1.5 text-xs font-semibold text-[#FFFFFF]/56 transition hover:border-[#FFFFFF]/22 hover:text-[#FFFFFF]"
+                  className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/56 transition hover:border-[var(--text-primary)]/22 hover:text-[var(--text-primary)]"
                 >
                   Start new
                 </button>
               </div>
             </div>
 
-            <div className="rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/74 px-3 py-2 transition-all duration-300">
+            <div className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/74 px-3 py-2 transition-all duration-300">
               <L2FileCard
                 name={analysis.name}
                 meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatBytes(analysis.size)} · ${analysis.pageSizeType}`}
@@ -1351,30 +1351,30 @@ export default function SplitPdfTool() {
           {largeFile || veryLargeDocument || analysis.pageSizeType === "Mixed" ? (
             <div className="grid gap-2 sm:grid-cols-3">
               {largeFile ? (
-                <div className="rounded-xl border border-[#CBA052]/20 bg-[#CBA052]/8 px-3 py-2 text-xs text-[#FFFFFF]/72">
+                <div className="rounded-xl border border-[var(--lumeo-gold)]/20 bg-[var(--lumeo-gold)]/8 px-3 py-2 text-xs text-[var(--text-primary)]/72">
                   Large files may take longer because splitting happens in your browser.
                 </div>
               ) : null}
               {veryLargeDocument ? (
-                <div className="rounded-xl border border-[#CBA052]/20 bg-[#CBA052]/8 px-3 py-2 text-xs text-[#FFFFFF]/72">
+                <div className="rounded-xl border border-[var(--lumeo-gold)]/20 bg-[var(--lumeo-gold)]/8 px-3 py-2 text-xs text-[var(--text-primary)]/72">
                   Previews render progressively for this document.
                 </div>
               ) : null}
               {analysis.pageSizeType === "Mixed" ? (
-                <div className="rounded-xl border border-[#CBA052]/20 bg-[#CBA052]/8 px-3 py-2 text-xs text-[#FFFFFF]/72">
+                <div className="rounded-xl border border-[var(--lumeo-gold)]/20 bg-[var(--lumeo-gold)]/8 px-3 py-2 text-xs text-[var(--text-primary)]/72">
                   Mixed page sizes detected.
                 </div>
               ) : null}
             </div>
           ) : null}
 
-          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#0A101C]/62 p-3">
+          <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/62 p-3">
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#CBA052]">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">
                   Pages
                 </p>
-                <p className="text-xs text-[#FFFFFF]/38">
+                <p className="text-xs text-[var(--text-primary)]/38">
                   {usesPageSelection ? selectedSummary(selectedPages) : `${analysis.pageCount} pages in this PDF`}
                 </p>
               </div>
@@ -1389,8 +1389,8 @@ export default function SplitPdfTool() {
                     }}
                     className={`rounded-full border px-3 py-1.5 text-[11px] font-bold capitalize transition ${
                       thumbnailDensity === density
-                        ? "border-[var(--border-selected)] bg-[var(--surface-selected)] text-[#9FD0B5]"
-                        : "border-[#FFFFFF]/10 text-[#FFFFFF]/44 hover:border-[#CBA052]/30 hover:text-[#FFFFFF]"
+                        ? "border-[var(--border-selected)] bg-[var(--surface-selected)] text-[var(--lumeo-mint-subtle)]"
+                        : "border-[var(--text-primary)]/10 text-[var(--text-primary)]/44 hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]"
                     }`}
                   >
                     {density}
@@ -1406,7 +1406,7 @@ export default function SplitPdfTool() {
                 <button className="preset-button lumeo-press lumeo-focus-ring" type="button" onClick={invertSelection}>Invert</button>
                 <button className="preset-button lumeo-press lumeo-focus-ring" type="button" onClick={() => applyPreset("odd")}>Odd</button>
                 <button className="preset-button lumeo-press lumeo-focus-ring" type="button" onClick={() => applyPreset("even")}>Even</button>
-                <span className="mx-1 h-5 w-px bg-[#FFFFFF]/10" />
+                <span className="mx-1 h-5 w-px bg-[var(--text-primary)]/10" />
                 <button className="preset-button lumeo-press lumeo-focus-ring" type="button" onClick={() => rotatePages("left")}>Rotate left</button>
                 <button className="preset-button lumeo-press lumeo-focus-ring" type="button" onClick={() => rotatePages("right")}>Rotate right</button>
                 <button className="preset-button lumeo-press lumeo-focus-ring" type="button" onClick={() => rotatePages("reset")}>Reset rotation</button>
@@ -1443,7 +1443,7 @@ export default function SplitPdfTool() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/70 px-4 py-2 text-xs text-[var(--text-primary)]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <L2PrivacyNote compact />
               <p className="lg:hidden">Files stay on your device. No server upload.</p>
@@ -1454,29 +1454,29 @@ export default function SplitPdfTool() {
 
         <L2ToolSettingsPanel title="Split options" description="Choose the split mode, page selection, and output name.">
           <div className="flex h-full min-h-0 flex-col">
-            <div className="border-b border-[#FFFFFF]/10 pb-3">
+            <div className="border-b border-[var(--text-primary)]/10 pb-3">
               <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#CBA052]">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">
                   Split method
                 </p>
                 <button
                   type="button"
                   onClick={() => setMethodDrawerOpen((open) => !open)}
-                  className="rounded-full border border-[#FFFFFF]/12 px-3 py-1.5 text-xs font-bold text-[#FFFFFF]/60 transition hover:border-[#CBA052]/34 hover:text-[#FFFFFF]"
+                  className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/34 hover:text-[var(--text-primary)]"
                 >
                   Change
                 </button>
               </div>
               <div className="mt-3 rounded-xl border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 py-2">
-                <span className="block text-sm font-bold text-[#FFFFFF]">
+                <span className="block text-sm font-bold text-[var(--text-primary)]">
                   {selectedMode.label}
                 </span>
-                <span className="mt-0.5 block text-xs text-[#FFFFFF]/46">
+                <span className="mt-0.5 block text-xs text-[var(--text-primary)]/46">
                   {selectedMode.helper}
                 </span>
               </div>
               {methodDrawerOpen ? (
-                <div className="mt-2 grid gap-1 rounded-xl border border-[#FFFFFF]/10 bg-[#050914]/88 p-2">
+                <div className="mt-2 grid gap-1 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/88 p-2">
                   {splitModes.map((item) => (
                     <AuraOptionCard
                       key={item.value}
@@ -1493,7 +1493,7 @@ export default function SplitPdfTool() {
             <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto py-3">
               {mode !== "everyPage" && mode !== "everyN" ? (
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-[0.16em] text-[#FFFFFF]/42">
+                  <label className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/42">
                     {mode === "ranges" ? "Range groups" : mode === "remove" ? "Pages to remove" : "Pages"}
                   </label>
                   <input
@@ -1511,7 +1511,7 @@ export default function SplitPdfTool() {
                       }
                       clearResult();
                     }}
-                    className="mt-2 h-11 w-full rounded-xl border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm font-semibold text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/25 focus:border-[#CBA052]/45"
+                    className="mt-2 h-11 w-full rounded-xl border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.035] px-3 text-sm font-semibold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-primary)]/25 focus:border-[var(--lumeo-gold)]/45"
                     placeholder={mode === "ranges" ? "1-3 | 4-6" : "1-3,5"}
                   />
                   {rangeSuggestions.length ? (
@@ -1531,14 +1531,14 @@ export default function SplitPdfTool() {
                               }
                             }
                           }}
-                          className="rounded-full border border-[#CBA052]/18 px-2.5 py-1 text-[11px] font-bold text-[#CBA052]/78 transition hover:border-[#CBA052]/40 hover:text-[#CBA052]"
+                          className="rounded-full border border-[var(--lumeo-gold)]/18 px-2.5 py-1 text-[11px] font-bold text-[var(--lumeo-gold)]/78 transition hover:border-[var(--lumeo-gold)]/40 hover:text-[var(--lumeo-gold)]"
                         >
                           {suggestion}
                         </button>
                       ))}
                     </div>
                   ) : null}
-                  <p className="mt-2 text-xs text-[#FFFFFF]/38">
+                  <p className="mt-2 text-xs text-[var(--text-primary)]/38">
                     Examples: 1-3, 5, odd, even, all, or 1-end.
                   </p>
                 </div>
@@ -1546,7 +1546,7 @@ export default function SplitPdfTool() {
 
               {mode === "everyN" ? (
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-[0.16em] text-[#FFFFFF]/42">
+                  <label className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/42">
                     Pages per file
                   </label>
                   <input
@@ -1560,14 +1560,14 @@ export default function SplitPdfTool() {
                       setChunkSize(Number(event.target.value));
                       clearResult();
                     }}
-                    className="mt-2 h-11 w-full rounded-xl border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm font-semibold text-[#FFFFFF] outline-none transition focus:border-[#CBA052]/45"
+                    className="mt-2 h-11 w-full rounded-xl border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.035] px-3 text-sm font-semibold text-[var(--text-primary)] outline-none transition focus:border-[var(--lumeo-gold)]/45"
                   />
                 </div>
               ) : null}
 
               {mode !== "everyPage" ? (
                 <div className="mt-4">
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#FFFFFF]/42">
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/42">
                     Quick presets
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -1593,59 +1593,59 @@ export default function SplitPdfTool() {
                 </div>
               ) : null}
 
-              <div className="mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3" aria-live="polite">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">
+              <div className="mt-4 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/66 p-3" aria-live="polite">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">
                   Live output
                 </p>
                 {outputPreview?.valid ? (
-                  <div className="mt-2 grid gap-2 text-xs text-[#FFFFFF]/52">
+                  <div className="mt-2 grid gap-2 text-xs text-[var(--text-primary)]/52">
                     <div className="flex justify-between gap-3">
                       <span>Output</span>
-                      <span className="font-bold text-[#FFFFFF]/82">
+                      <span className="font-bold text-[var(--text-primary)]/82">
                         {outputPreview.outputCount} {outputPreview.outputCount === 1 ? "PDF" : "PDFs"}
                       </span>
                     </div>
                     <div className="flex justify-between gap-3">
                       <span>Pages</span>
-                      <span className="font-bold text-[#FFFFFF]/82">{outputPreview.totalPages}</span>
+                      <span className="font-bold text-[var(--text-primary)]/82">{outputPreview.totalPages}</span>
                     </div>
                     <div className="flex justify-between gap-3">
                       <span>Type</span>
-                      <span className="font-bold text-[#FFFFFF]/82">
+                      <span className="font-bold text-[var(--text-primary)]/82">
                         {outputPreview.zipRequired ? "ZIP download" : "PDF download"}
                       </span>
                     </div>
                     {outputPreview.rangeLabel ? (
-                      <p className="truncate text-[#FFFFFF]/42">Ranges: {outputPreview.rangeLabel}</p>
+                      <p className="truncate text-[var(--text-primary)]/42">Ranges: {outputPreview.rangeLabel}</p>
                     ) : null}
                   </div>
                 ) : (
-                  <p className="mt-2 text-xs text-[#F0A8A8]/78">
+                  <p className="mt-2 text-xs text-[var(--text-danger)]/78">
                     {outputPreview?.message ?? "Check your split settings."}
                   </p>
                 )}
               </div>
 
-              <div className="mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#0A101C]/66 p-3">
-                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]">
+              <div className="mt-4 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/66 p-3">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">
                   Inspector
                 </p>
                 <div className="mt-2 grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-lg border border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.035] px-2 py-2">
-                    <p className="text-sm font-bold text-[#FFFFFF]">{selectedPages.length}</p>
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-[#FFFFFF]/34">
+                  <div className="rounded-lg border border-[var(--text-primary)]/8 bg-[var(--text-primary)]/[0.035] px-2 py-2">
+                    <p className="text-sm font-bold text-[var(--text-primary)]">{selectedPages.length}</p>
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-primary)]/34">
                       Selected
                     </p>
                   </div>
-                  <div className="rounded-lg border border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.035] px-2 py-2">
-                    <p className="text-sm font-bold text-[#FFFFFF]">{selectedShare}%</p>
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-[#FFFFFF]/34">
+                  <div className="rounded-lg border border-[var(--text-primary)]/8 bg-[var(--text-primary)]/[0.035] px-2 py-2">
+                    <p className="text-sm font-bold text-[var(--text-primary)]">{selectedShare}%</p>
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-primary)]/34">
                       Share
                     </p>
                   </div>
-                  <div className="rounded-lg border border-[#FFFFFF]/8 bg-[#FFFFFF]/[0.035] px-2 py-2">
-                    <p className="text-sm font-bold text-[#FFFFFF]">{rotatedCount}</p>
-                    <p className="text-[10px] uppercase tracking-[0.12em] text-[#FFFFFF]/34">
+                  <div className="rounded-lg border border-[var(--text-primary)]/8 bg-[var(--text-primary)]/[0.035] px-2 py-2">
+                    <p className="text-sm font-bold text-[var(--text-primary)]">{rotatedCount}</p>
+                    <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-primary)]/34">
                       Rotated
                     </p>
                   </div>
@@ -1653,7 +1653,7 @@ export default function SplitPdfTool() {
               </div>
 
               <div className="mt-4">
-                <label className="text-xs font-bold uppercase tracking-[0.16em] text-[#FFFFFF]/42">
+                <label className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/42">
                   {resultType === "pdf" ? "Output file name" : "ZIP file name"}
                 </label>
                 <input
@@ -1662,7 +1662,7 @@ export default function SplitPdfTool() {
                     setOutputName(event.target.value);
                     clearResult();
                   }}
-                  className="mt-2 h-11 w-full rounded-xl border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 text-sm font-semibold text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/25 focus:border-[#CBA052]/45"
+                  className="mt-2 h-11 w-full rounded-xl border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.035] px-3 text-sm font-semibold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-primary)]/25 focus:border-[var(--lumeo-gold)]/45"
                   placeholder={resultType === "pdf" ? "lumeo-split.pdf" : "lumeo-split.zip"}
                 />
               </div>
@@ -1671,24 +1671,24 @@ export default function SplitPdfTool() {
                 <button
                   type="button"
                   onClick={() => setShortcutOpen((open) => !open)}
-                  className="text-xs font-bold text-[#FFFFFF]/44 underline decoration-[#CBA052]/24 underline-offset-4 transition hover:text-[#FFFFFF]/80"
+                  className="text-xs font-bold text-[var(--text-primary)]/44 underline decoration-[var(--lumeo-gold)]/24 underline-offset-4 transition hover:text-[var(--text-primary)]/80"
                 >
                   Keyboard shortcuts
                 </button>
                 {shortcutOpen ? (
-                  <div className="mt-2 rounded-xl border border-[#FFFFFF]/10 bg-[#050914]/72 p-3 text-xs text-[#FFFFFF]/48">
+                  <div className="mt-2 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/72 p-3 text-xs text-[var(--text-primary)]/48">
                     Ctrl/Cmd+A selects pages. Shift+Arrow extends selection. Ctrl/Cmd+Z undoes. Escape closes panels or clears selection.
                   </div>
                 ) : null}
               </div>
 
               {parserNotice ? (
-                <div role="alert" className="mt-4 rounded-xl border border-[#CBA052]/22 bg-[#CBA052]/10 px-3 py-2 text-sm text-[#FFFFFF]/78">
+                <div role="alert" className="mt-4 rounded-xl border border-[var(--lumeo-gold)]/22 bg-[var(--lumeo-gold)]/10 px-3 py-2 text-sm text-[var(--text-primary)]/78">
                   {parserNotice}
                 </div>
               ) : null}
               {error ? (
-                <div role="alert" className="mt-4 rounded-xl border border-[#F0A8A8]/20 bg-[#F0A8A8]/10 px-3 py-2 text-sm text-[#F0C0C0]">
+                <div role="alert" className="mt-4 rounded-xl border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 px-3 py-2 text-sm text-[var(--text-danger)]">
                   {error}
                 </div>
               ) : null}
@@ -1698,30 +1698,30 @@ export default function SplitPdfTool() {
                 </div>
               ) : null}
               {progressDetail ? (
-                <div className="mt-4 rounded-xl border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.035] px-3 py-2 text-xs text-[#FFFFFF]/48">
+                <div className="mt-4 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.035] px-3 py-2 text-xs text-[var(--text-primary)]/48">
                   {progressDetail}
                 </div>
               ) : null}
             </div>
 
-            <div className="border-t border-[#FFFFFF]/10 pt-3">
+            <div className="border-t border-[var(--text-primary)]/10 pt-3">
               {result ? (
-                <div className="mb-3 rounded-xl border border-[#CBA052]/28 bg-[#CBA052]/12 p-3">
+                <div className="mb-3 rounded-xl border border-[var(--lumeo-gold)]/28 bg-[var(--lumeo-gold)]/12 p-3">
                   <div className="flex items-start gap-3">
                     <CompletionCheck />
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-[#FFFFFF]">Split complete</p>
-                      <p className="mt-1 text-xs text-[#FFFFFF]/45">
+                      <p className="text-sm font-bold text-[var(--text-primary)]">Split complete</p>
+                      <p className="mt-1 text-xs text-[var(--text-primary)]/45">
                         {result.outputCount} {result.outputCount === 1 ? "PDF" : "PDFs"} created · {result.pageCount} pages processed · {formatBytes(result.size)} total
                       </p>
-                      <p className="mt-1 truncate text-xs text-[#FFFFFF]/38">
+                      <p className="mt-1 truncate text-xs text-[var(--text-primary)]/38">
                         {result.fileName} · Created in your browser
                       </p>
                     </div>
                   </div>
                 </div>
               ) : (
-                <p className="mb-3 text-xs text-[#FFFFFF]/42">
+                <p className="mb-3 text-xs text-[var(--text-primary)]/42">
                   {outputPreview?.valid ? `Ready to split · ${outputPreview.label}` : "Choose pages to split"}
                 </p>
               )}
@@ -1742,7 +1742,7 @@ export default function SplitPdfTool() {
                       <button
                         type="button"
                         onClick={resetTool}
-                        className="inline-flex h-10 w-full items-center justify-center rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 text-sm font-bold text-[#FFFFFF]/62 transition hover:border-[#CBA052]/30 hover:text-[#FFFFFF]"
+                        className="inline-flex h-10 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]"
                       >
                         Clear and start new split
                       </button>

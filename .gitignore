@@ -43,3 +43,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code local-only config (skills/ and launch.json are shared, committed)
+.claude/settings.local.json
+__pycache__/
+*.pyc

@@ -301,7 +301,7 @@ function ImageThumbnail({
 }) {
   if (!url) {
     return (
-      <span className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045]">
+      <span className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.045]">
         <FileIcon />
       </span>
     );
@@ -316,7 +316,7 @@ function ImageThumbnail({
           event.stopPropagation();
           onPreview?.();
         }}
-        className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.045] transition hover:border-[var(--border-selected)] focus:outline-none focus:ring-2 focus:ring-[#CBA052]/45"
+        className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.045] transition hover:border-[var(--border-selected)] focus:outline-none focus:ring-2 focus:ring-[var(--lumeo-gold)]/45"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -325,13 +325,13 @@ function ImageThumbnail({
           className="h-full w-full object-cover transition-transform duration-200"
           style={{ transform: `rotate(${rotation}deg)` }}
         />
-        <span className="pointer-events-none absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/85 text-[10px] text-[#FFFFFF]/80">
+        <span className="pointer-events-none absolute right-1.5 top-1.5 grid h-5 w-5 place-items-center rounded-full border border-[var(--text-primary)]/25 bg-[var(--atelier-surface-1)]/85 text-[10px] text-[var(--text-primary)]/80">
           ⤢
         </span>
       </button>
 
       {onRotate && !disabled ? (
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between p-1.5 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-between p-1.5 opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
           <button
             type="button"
             aria-label={`Rotate ${name} left`}
@@ -339,7 +339,7 @@ function ImageThumbnail({
               event.stopPropagation();
               onRotate(-1);
             }}
-            className="pointer-events-auto grid h-6 w-6 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/92 text-xs text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+            className="pointer-events-auto grid h-11 w-11 place-items-center rounded-full border border-[var(--text-primary)]/25 bg-[var(--atelier-surface-1)]/92 text-xs text-[var(--text-primary)] transition hover:border-[var(--lumeo-gold)]/60"
           >
             ↺
           </button>
@@ -350,7 +350,7 @@ function ImageThumbnail({
               event.stopPropagation();
               onRotate(1);
             }}
-            className="pointer-events-auto grid h-6 w-6 place-items-center rounded-full border border-[#FFFFFF]/25 bg-[#0C1220]/92 text-xs text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+            className="pointer-events-auto grid h-11 w-11 place-items-center rounded-full border border-[var(--text-primary)]/25 bg-[var(--atelier-surface-1)]/92 text-xs text-[var(--text-primary)] transition hover:border-[var(--lumeo-gold)]/60"
           >
             ↻
           </button>
@@ -798,7 +798,7 @@ export default function JpgToPdfTool() {
         <L2PrivacyNote />
 
         {error ? (
-          <div className="mt-4 rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
+          <div className="mt-4 rounded-lg border border-[var(--border-danger)] bg-[var(--surface-danger)] p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
@@ -834,13 +834,13 @@ export default function JpgToPdfTool() {
 
       <L2ToolWorkspace>
         <L2ToolMainColumn>
-          <section className="min-w-0 animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#FFFFFF]/12 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] p-3 shadow-2xl shadow-black/28">
+          <section className="min-w-0 animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3 shadow-2xl shadow-black/28">
             <div className="mb-2.5 flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
                   Image tray
                 </p>
-                <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
+                <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
                   Add more images to the deck.
                 </p>
               </div>
@@ -848,7 +848,7 @@ export default function JpgToPdfTool() {
                 <button
                   type="button"
                   onClick={clearAllFiles}
-                  className="rounded-full border border-[#FFFFFF]/12 px-3 py-1.5 text-xs font-semibold text-[#FFFFFF]/58 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF]"
+                  className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)]"
                 >
                   Clear all
                 </button>
@@ -869,20 +869,20 @@ export default function JpgToPdfTool() {
               className={`group relative overflow-hidden rounded-[24px] border px-4 py-2.5 transition-all duration-200 ${
                 isDragging
                   ? "border-[var(--border-selected)] bg-[var(--surface-selected)] shadow-[0_18px_50px_rgba(0,0,0,0.18)]"
-                  : "border-[#FFFFFF]/16 bg-[#0C1220]/70 hover:border-[var(--border-selected)] hover:bg-[#0C1220]/82"
+                  : "border-[var(--text-primary)]/16 bg-[var(--atelier-surface-1)]/70 hover:border-[var(--border-selected)] hover:bg-[var(--atelier-surface-1)]/82"
               }`}
             >
-              <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/28 to-transparent opacity-0 transition group-hover:opacity-100" />
+              <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[var(--lumeo-gold)]/28 to-transparent opacity-0 transition group-hover:opacity-100" />
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[#FFFFFF]/[0.045] text-[var(--text-secondary)] transition group-hover:bg-[#FFFFFF]/[0.08]">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--text-primary)]/[0.045] text-[var(--text-secondary)] transition group-hover:bg-[var(--text-primary)]/[0.08]">
                     <JpgToPdfIcon />
                   </span>
                   <div>
-                    <p className="text-base font-semibold text-[#FFFFFF]">
+                    <p className="text-base font-semibold text-[var(--text-primary)]">
                       Drop images here
                     </p>
-                    <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
+                    <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
                       Choose files from your device
                     </p>
                   </div>
@@ -890,7 +890,7 @@ export default function JpgToPdfTool() {
                 <button
                   type="button"
                   onClick={() => inputRef.current?.click()}
-                  className="inline-flex items-center justify-center rounded-full bg-[#CBA052] px-4 py-2 text-xs font-semibold text-[#F0EAD6] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98]"
+                  className="inline-flex items-center justify-center rounded-full bg-[var(--lumeo-gold)] px-4 py-2 text-xs font-semibold text-[var(--foreground)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--lumeo-seal-500)] active:scale-[0.98]"
                 >
                   Select images
                 </button>
@@ -898,25 +898,25 @@ export default function JpgToPdfTool() {
             </div>
           </section>
 
-          <section className="flex min-h-0 min-w-0 flex-1 animate-[consoleReveal_320ms_ease-out] flex-col rounded-xl border border-[#FFFFFF]/12 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] p-3.5 shadow-2xl shadow-black/24">
+          <section className="flex min-h-0 min-w-0 flex-1 animate-[consoleReveal_320ms_ease-out] flex-col rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3.5 shadow-2xl shadow-black/24">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
                   Arrange
                 </p>
-                <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
+                <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
                   Drag, or focus a row and use ↑ / ↓.
                 </p>
               </div>
               {files.length > 0 ? (
-                <p className="text-xs font-semibold text-[#FFFFFF]/44">
+                <p className="text-xs font-semibold text-[var(--text-primary)]/44">
                   {files.length} image{files.length === 1 ? "" : "s"} - {formatFileSize(totalSize)}
                 </p>
               ) : null}
             </div>
 
             {files.length === 0 ? (
-              <div className="rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/48 p-5 text-sm text-[#FFFFFF]/46">
+              <div className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/48 p-5 text-sm text-[var(--text-primary)]/46">
                 Add at least one image to begin arranging your PDF.
               </div>
             ) : (
@@ -962,15 +962,15 @@ export default function JpgToPdfTool() {
                       setDraggingFileId("");
                       setDragOverFileId("");
                     }}
-                    className={`flex cursor-grab items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45 active:cursor-grabbing ${
+                    className={`flex cursor-grab items-center gap-2 rounded-lg border px-3 py-2 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]/45 active:cursor-grabbing ${
                       draggingFileId === item.id
                         ? "scale-[0.99] border-[var(--border-selected)] bg-[var(--surface-selected)] opacity-70"
                         : dragOverFileId === item.id
                           ? "border-[var(--border-selected)] bg-[var(--surface-selected)] shadow-[0_14px_38px_rgba(0,0,0,0.12)]"
-                          : "border-[#FFFFFF]/10 bg-[#0A101C]/74 hover:-translate-y-0.5 hover:border-[var(--border-selected)] hover:bg-[#142034]"
+                          : "border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/74 hover:-translate-y-0.5 hover:border-[var(--border-selected)] hover:bg-[var(--atelier-surface-3)]"
                     }`}
                   >
-                    <span className="hidden text-[#FFFFFF]/24 sm:inline" aria-hidden="true">
+                    <span className="hidden text-[var(--text-primary)]/24 sm:inline" aria-hidden="true">
                       :::
                     </span>
                     <div className="min-w-0 flex-1">
@@ -1000,31 +1000,31 @@ export default function JpgToPdfTool() {
 
           <div className="no-scrollbar space-y-2 lg:max-h-[74px] lg:overflow-y-auto">
             {error ? (
-              <div className="rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
+              <div className="rounded-lg border border-[var(--border-danger)] bg-[var(--surface-danger)] p-4 text-sm font-medium text-[var(--text-danger)]">
                 {error}
               </div>
             ) : null}
 
             {softWarning ? (
-              <div className="rounded-lg border border-[#CBA052]/20 bg-[#CBA052]/10 p-4 text-sm font-medium text-[#FFFFFF]">
+              <div className="rounded-lg border border-[var(--lumeo-gold)]/20 bg-[var(--lumeo-gold)]/10 p-4 text-sm font-medium text-[var(--text-primary)]">
                 {softWarning}
               </div>
             ) : null}
 
             {hasLargeFiles ? (
-              <div className="rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/50 p-4 text-sm font-medium text-[#FFFFFF]/56">
+              <div className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/50 p-4 text-sm font-medium text-[var(--text-primary)]/56">
                 Large images may take longer because conversion happens in your browser.
               </div>
             ) : null}
 
             {cleanupMessage ? (
-              <div className="rounded-lg border border-[#CBA052]/18 bg-[#CBA052]/[0.06] p-4 text-sm font-medium text-[#FFFFFF]">
+              <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/[0.06] p-4 text-sm font-medium text-[var(--text-primary)]">
                 {cleanupMessage}
               </div>
             ) : null}
           </div>
 
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/70 px-4 py-2 text-xs text-[var(--text-primary)]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <L2PrivacyNote compact />
               <p className="lg:hidden">
@@ -1037,8 +1037,8 @@ export default function JpgToPdfTool() {
         <L2ToolSettingsPanel title="JPG to PDF options" description="One combined PDF using the image order shown.">
           <div className="flex h-full min-h-0 flex-col">
             <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[#0A101C]/74 p-2.5 shadow-inner shadow-black/20">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">Output</p>
+              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/74 p-2.5 shadow-inner shadow-black/20">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">Output</p>
 
                 <div className="mt-1.5 grid grid-cols-3 gap-1.5">
                   {pageSizeButtons.map((option) => (
@@ -1050,15 +1050,15 @@ export default function JpgToPdfTool() {
                       className={`rounded-lg border px-2 py-1.5 text-center transition ${
                         pageSizeOption === option.value
                           ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
-                          : "border-[#FFFFFF]/10 bg-[#FFFFFF]/[0.03] hover:border-[var(--border-selected)]"
+                          : "border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.03] hover:border-[var(--border-selected)]"
                       }`}
                     >
-                      <span className="block text-xs font-bold text-[#FFFFFF]">{option.label}</span>
-                      <span className="block text-[10px] text-[#FFFFFF]/44">{option.dpi}</span>
+                      <span className="block text-xs font-bold text-[var(--text-primary)]">{option.label}</span>
+                      <span className="block text-[10px] text-[var(--text-primary)]/44">{option.dpi}</span>
                     </button>
                   ))}
                 </div>
-                <p className="mt-1 text-[11px] text-[#FFFFFF]/40">
+                <p className="mt-1 text-[11px] text-[var(--text-primary)]/40">
                   {pageSizeOption === "matchImage"
                     ? "Each page matches its own image size."
                     : "Clean, same-size PDF output."}
@@ -1067,7 +1067,7 @@ export default function JpgToPdfTool() {
 
                 {showMarginOptions ? (
                   <div className="mt-2">
-                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
                       Margin
                     </span>
                     <div className="mt-1.5">
@@ -1083,10 +1083,10 @@ export default function JpgToPdfTool() {
 
                 <div className="mt-2.5 flex items-center justify-between gap-3">
                   <div>
-                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
                       Compress images
                     </span>
-                    <p className="mt-0.5 text-[11px] text-[#FFFFFF]/40">
+                    <p className="mt-0.5 text-[11px] text-[var(--text-primary)]/40">
                       Recompresses JPG images to shrink the PDF.
                     </p>
                   </div>
@@ -1099,7 +1099,7 @@ export default function JpgToPdfTool() {
                       setCompressImages((current) => !current);
                       resetReadyState();
                     }}
-                    className="relative inline-flex shrink-0 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A101C] focus-visible:ring-[#CBA052]/60"
+                    className="relative inline-flex shrink-0 items-center justify-center rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--atelier-surface-2)] focus-visible:ring-[var(--lumeo-gold)]/60"
                   >
                     <span
                       aria-hidden="true"
@@ -1120,10 +1120,10 @@ export default function JpgToPdfTool() {
                 {compressImages ? (
                   <>
                     <div className="mt-2 flex items-center justify-between gap-3">
-                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
                         Quality
                       </span>
-                      <span className="text-xs font-bold text-[#FFFFFF]">{Math.round(compressQuality * 100)}%</span>
+                      <span className="text-xs font-bold text-[var(--text-primary)]">{Math.round(compressQuality * 100)}%</span>
                     </div>
                     <input
                       type="range"
@@ -1135,7 +1135,7 @@ export default function JpgToPdfTool() {
                         setCompressQuality(Number(event.target.value));
                         resetReadyState();
                       }}
-                      className="mt-1 w-full accent-[#CBA052]"
+                      className="mt-1 w-full accent-[var(--lumeo-gold)]"
                       aria-label="JPG compression quality"
                       aria-valuetext={`${Math.round(compressQuality * 100)}%`}
                     />
@@ -1149,9 +1149,9 @@ export default function JpgToPdfTool() {
                             setConvertPngToJpeg(event.target.checked);
                             resetReadyState();
                           }}
-                          className="h-3.5 w-3.5 accent-[#CBA052]"
+                          className="h-3.5 w-3.5 accent-[var(--lumeo-gold)]"
                         />
-                        <span className="text-[11px] text-[#FFFFFF]/56">
+                        <span className="text-[11px] text-[var(--text-primary)]/56">
                           Also convert PNGs to JPEG (smaller, no longer lossless)
                         </span>
                       </label>
@@ -1160,7 +1160,7 @@ export default function JpgToPdfTool() {
                 ) : null}
 
                 <label className="mt-2.5 block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
                     File name
                   </span>
                   <input
@@ -1170,24 +1170,24 @@ export default function JpgToPdfTool() {
                       setStatus("Ready");
                       clearDownload();
                     }}
-                    className="mt-1 w-full rounded-md border border-[#FFFFFF]/12 bg-[#0C1220]/70 px-2.5 py-1.5 text-sm font-semibold text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/26 focus:border-[#CBA052]/45"
+                    className="mt-1 w-full rounded-md border border-[var(--text-primary)]/12 bg-[var(--atelier-surface-1)]/70 px-2.5 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-primary)]/26 focus:border-[var(--lumeo-gold)]/45"
                     placeholder="lumeo-images.pdf"
                   />
                 </label>
               </div>
             </div>
 
-            <div className="mt-2 border-t border-[#FFFFFF]/10 pt-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
+            <div className="mt-2 border-t border-[var(--text-primary)]/10 pt-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
                 Finish
               </p>
 
               {downloadUrl ? (
                 <div className="mt-2">
-                  <p className="text-base font-semibold text-[#FFFFFF]">
+                  <p className="text-base font-semibold text-[var(--text-primary)]">
                     PDF ready
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">
                     {downloadName} - {pageSizeLabel} - {files.length} image{files.length === 1 ? "" : "s"}
                   </p>
                   <div className="mt-2 hidden flex-col gap-2 lg:flex">
@@ -1196,7 +1196,7 @@ export default function JpgToPdfTool() {
                         <button
                           type="button"
                           onClick={downloadPdf}
-                          className="lumeo-primary-action rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]"
+                          className="lumeo-primary-action min-h-[44px] rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]"
                         >
                           Download PDF
                         </button>
@@ -1205,7 +1205,7 @@ export default function JpgToPdfTool() {
                         <button
                           type="button"
                           onClick={startNewConversion}
-                          className="rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF]"
+                          className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)]/62 transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)]"
                         >
                           Start new
                         </button>
@@ -1215,10 +1215,10 @@ export default function JpgToPdfTool() {
                 </div>
               ) : files.length >= 1 ? (
                 <div className="mt-2">
-                  <p className="text-base font-semibold text-[#FFFFFF]">
+                  <p className="text-base font-semibold text-[var(--text-primary)]">
                     Ready to convert
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">
                     {readySummary}
                   </p>
                   <L2ActionArea
@@ -1227,11 +1227,11 @@ export default function JpgToPdfTool() {
                         type="button"
                         disabled={status === "Converting in your browser..."}
                         onClick={convertToPdf}
-                        className="lumeo-primary-action mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
+                        className="lumeo-primary-action mt-2.5 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
                       >
                         {status === "Converting in your browser..." ? (
                           <>
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#E8DFC8]/24 border-t-white" />
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--lumeo-paper-200)]/24 border-t-white" />
                             Converting in your browser...
                           </>
                         ) : (
@@ -1242,7 +1242,7 @@ export default function JpgToPdfTool() {
                   />
                 </div>
               ) : (
-                <p className="mt-2 text-sm leading-6 text-[#FFFFFF]/48">
+                <p className="mt-2 text-sm leading-6 text-[var(--text-primary)]/48">
                   Add an image to convert.
                 </p>
               )}
@@ -1270,7 +1270,7 @@ export default function JpgToPdfTool() {
               const box = computeRotatedPreviewBox(previewFile.width, previewFile.height, previewFile.userRotation);
               return (
                 <div
-                  className="flex items-center justify-center overflow-hidden rounded-lg border border-[#FFFFFF]/14 bg-[#0A101C]"
+                  className="flex items-center justify-center overflow-hidden rounded-lg border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-2)]"
                   style={{ width: box.containerWidth, height: box.containerHeight }}
                 >
                   {thumbnailUrls[previewFile.id] ? (
@@ -1286,7 +1286,7 @@ export default function JpgToPdfTool() {
                       }}
                     />
                   ) : (
-                    <div className="flex h-64 w-48 items-center justify-center text-xs font-semibold text-[#F0C0C0]">
+                    <div className="flex h-64 w-48 items-center justify-center text-xs font-semibold text-[var(--text-danger)]">
                       Preview unavailable.
                     </div>
                   )}
@@ -1298,14 +1298,14 @@ export default function JpgToPdfTool() {
                 type="button"
                 aria-label={`Rotate ${previewFile.file.name} left`}
                 onClick={() => rotateFile(previewFile.id, -1)}
-                className="grid h-9 w-9 place-items-center rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 text-sm text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+                className="grid h-11 w-11 place-items-center rounded-full border border-[var(--text-primary)]/20 bg-[var(--atelier-surface-1)]/90 text-sm text-[var(--text-primary)] transition hover:border-[var(--lumeo-gold)]/60"
               >
                 ↺
               </button>
               <button
                 type="button"
                 onClick={() => setPreviewFileId(null)}
-                className="rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 px-4 py-2 text-xs font-semibold text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+                className="rounded-full border border-[var(--text-primary)]/20 bg-[var(--atelier-surface-1)]/90 px-4 py-2 text-xs font-semibold text-[var(--text-primary)] transition hover:border-[var(--lumeo-gold)]/60"
               >
                 Close
               </button>
@@ -1313,7 +1313,7 @@ export default function JpgToPdfTool() {
                 type="button"
                 aria-label={`Rotate ${previewFile.file.name} right`}
                 onClick={() => rotateFile(previewFile.id, 1)}
-                className="grid h-9 w-9 place-items-center rounded-full border border-[#FFFFFF]/20 bg-[#0C1220]/90 text-sm text-[#FFFFFF] transition hover:border-[#CBA052]/60"
+                className="grid h-11 w-11 place-items-center rounded-full border border-[var(--text-primary)]/20 bg-[var(--atelier-surface-1)]/90 text-sm text-[var(--text-primary)] transition hover:border-[var(--lumeo-gold)]/60"
               >
                 ↻
               </button>
