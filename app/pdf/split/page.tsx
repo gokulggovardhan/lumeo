@@ -2,24 +2,27 @@ import type { Metadata } from "next";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import SplitPdfTool from "@/components/pdf/SplitPdfTool";
 import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
-export const metadata: Metadata = {
-  title: { absolute: "Split PDF Online Privately - Extract or Remove Pages" },
-  description: "Split PDF files privately in your browser. Extract pages, remove pages, create ranges, or separate every page without uploading documents.",
-  alternates: { canonical: "/pdf/split" },
-  openGraph: {
-    title: "Split PDF Online Privately - Lumeo PDF",
-    description: "Extract, remove, and separate PDF pages in a calm browser-first workspace.",
-    url: "https://lumeo.in/pdf/split",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Split PDF Online Privately - Lumeo PDF",
-    description: "Split and extract PDF pages directly on your device using Lumeo PDF Workspace.",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/pdf/split", {
+    title: { absolute: "Split PDF Online Privately - Extract or Remove Pages" },
+    description: "Split PDF files privately in your browser. Extract pages, remove pages, create ranges, or separate every page without uploading documents.",
+    alternates: { canonical: "/pdf/split" },
+    openGraph: {
+      title: "Split PDF Online Privately - Lumeo PDF",
+      description: "Extract, remove, and separate PDF pages in a calm browser-first workspace.",
+      url: "https://lumeo.in/pdf/split",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Split PDF Online Privately - Lumeo PDF",
+      description: "Split and extract PDF pages directly on your device using Lumeo PDF Workspace.",
+    },
+  });
+}
 
 export default function SplitPdfPage() {
   return (

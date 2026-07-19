@@ -7,29 +7,32 @@ import {
   InfoPageShell,
   InfoStructuredData,
 } from "@/components/InfoPage";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
-export const metadata: Metadata = {
-  title: "About Lumeo PDF Workspace - Private Browser PDF Tools",
-  description:
-    "Learn how Lumeo PDF Workspace is building a premium browser-first environment for private, professional PDF handling.",
-  alternates: {
-    canonical: "https://lumeo.in/about",
-  },
-  openGraph: {
-    title: "About Lumeo PDF Workspace",
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/about", {
+    title: "About Lumeo PDF Workspace - Private Browser PDF Tools",
     description:
-      "A premium browser-first workspace for private, professional PDF handling.",
-    url: "https://lumeo.in/about",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "About Lumeo PDF Workspace",
-    description:
-      "Learn how Lumeo PDF is building a calm, private document workspace.",
-  },
-};
+      "Learn how Lumeo PDF Workspace is building a premium browser-first environment for private, professional PDF handling.",
+    alternates: {
+      canonical: "https://lumeo.in/about",
+    },
+    openGraph: {
+      title: "About Lumeo PDF Workspace",
+      description:
+        "A premium browser-first workspace for private, professional PDF handling.",
+      url: "https://lumeo.in/about",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "About Lumeo PDF Workspace",
+      description:
+        "Learn how Lumeo PDF is building a calm, private document workspace.",
+    },
+  });
+}
 
 const aboutSchema = {
   "@context": "https://schema.org",

@@ -7,28 +7,31 @@ import {
   InfoPageShell,
   InfoStructuredData,
 } from "@/components/InfoPage";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
-export const metadata: Metadata = {
-  title: "Contact Lumeo PDF Workspace",
-  description:
-    "Contact Lumeo PDF Workspace about product feedback, accessibility, privacy, or security concerns.",
-  alternates: {
-    canonical: "https://lumeo.in/contact",
-  },
-  openGraph: {
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/contact", {
     title: "Contact Lumeo PDF Workspace",
     description:
-      "Contact guidance for product feedback, privacy questions, accessibility concerns, and security reports.",
-    url: "https://lumeo.in/contact",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Contact Lumeo PDF Workspace",
-    description: "Contact guidance for Lumeo PDF Workspace.",
-  },
-};
+      "Contact Lumeo PDF Workspace about product feedback, accessibility, privacy, or security concerns.",
+    alternates: {
+      canonical: "https://lumeo.in/contact",
+    },
+    openGraph: {
+      title: "Contact Lumeo PDF Workspace",
+      description:
+        "Contact guidance for product feedback, privacy questions, accessibility concerns, and security reports.",
+      url: "https://lumeo.in/contact",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Contact Lumeo PDF Workspace",
+      description: "Contact guidance for Lumeo PDF Workspace.",
+    },
+  });
+}
 
 const contactSchema = {
   "@context": "https://schema.org",

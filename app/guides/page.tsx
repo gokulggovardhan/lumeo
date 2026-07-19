@@ -6,6 +6,7 @@ import {
   InfoStructuredData,
 } from "@/components/InfoPage";
 import { mergeFaqs, splitFaqs } from "@/components/pdf/PdfSeoContent";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
 const compressFaqs = [
   {
@@ -50,29 +51,31 @@ const allFaqs = [
   ...privacyFaqs,
 ];
 
-export const metadata: Metadata = {
-  title: {
-    absolute: "Lumeo PDF Guides",
-  },
-  description:
-    "Concise guides for Merge PDF, Split PDF, Compress PDF, browser-first privacy, and choosing the right Lumeo PDF tool.",
-  alternates: {
-    canonical: "/guides",
-  },
-  openGraph: {
-    title: "Lumeo PDF Guides",
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/guides", {
+    title: {
+      absolute: "Lumeo PDF Guides",
+    },
     description:
-      "A refined help handbook for using Lumeo PDF Workspace tools.",
-    url: "https://lumeo.in/guides",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Lumeo PDF Guides",
-    description: "Concise help for private browser-first PDF tools.",
-  },
-};
+      "Concise guides for Merge PDF, Split PDF, Compress PDF, browser-first privacy, and choosing the right Lumeo PDF tool.",
+    alternates: {
+      canonical: "/guides",
+    },
+    openGraph: {
+      title: "Lumeo PDF Guides",
+      description:
+        "A refined help handbook for using Lumeo PDF Workspace tools.",
+      url: "https://lumeo.in/guides",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Lumeo PDF Guides",
+      description: "Concise help for private browser-first PDF tools.",
+    },
+  });
+}
 
 function ToolGuide({
   title,

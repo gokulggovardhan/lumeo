@@ -254,6 +254,18 @@ export type ControlCenterDatabase = {
         Args: Record<string, never>;
         Returns: { enabled: boolean; title: string | null; message: string | null };
       };
+      get_public_seo_setting: {
+        Args: { p_route: string };
+        Returns: {
+          title: string;
+          description: string;
+          canonical_path: string | null;
+          robots_index: boolean;
+          robots_follow: boolean;
+          open_graph_title: string | null;
+          open_graph_description: string | null;
+        } | null;
+      };
       list_admin_members: {
         Args: Record<string, never>;
         Returns: Array<{
