@@ -19,6 +19,29 @@ export function ControlCenterMobileNav({
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const items = visibleAdminNavigation(role);
+  const mainItems = items.filter((item) => !item.group);
+  const referenceItems = items.filter((item) => item.group === "reference");
+
+  function renderLink(item: (typeof items)[number]) {
+    const active = isActiveAdminRoute(pathname, item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        aria-current={active ? "page" : undefined}
+        onClick={() => setOpen(false)}
+        className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 text-sm font-semibold transition duration-200 ${
+          active
+            ? "border-[rgba(var(--lumeo-seal-rgb),0.55)] bg-[rgba(var(--lumeo-seal-rgb),0.18)] text-[var(--lumeo-paper-50)]"
+            : "border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] text-[var(--lumeo-paper-400)]"
+        }`}
+      >
+        <AdminIcon name={item.icon} className="h-4 w-4" />
+        {item.label}
+      </Link>
+    );
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -59,26 +82,18 @@ export function ControlCenterMobileNav({
             <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[var(--lumeo-gold-300)]">{role}</p>
           </div>
           <nav className="grid gap-2" aria-label="Mobile Control Center navigation">
-            {visibleAdminNavigation(role).map((item) => {
-              const active = isActiveAdminRoute(pathname, item.href);
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  aria-current={active ? "page" : undefined}
-                  onClick={() => setOpen(false)}
-                  className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 text-sm font-semibold transition duration-200 ${
-                    active
-                      ? "border-[rgba(var(--lumeo-seal-rgb),0.55)] bg-[rgba(var(--lumeo-seal-rgb),0.18)] text-[var(--lumeo-paper-50)]"
-                      : "border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] text-[var(--lumeo-paper-400)]"
-                  }`}
-                >
-                  <AdminIcon name={item.icon} className="h-4 w-4" />
-                  {item.label}
-                </Link>
-              );
-            })}
+            {mainItems.map(renderLink)}
           </nav>
+          {referenceItems.length > 0 && (
+            <>
+              <p className="aura-text-label mt-3 px-3 text-[var(--lumeo-paper-400)]/70">
+                Reference
+              </p>
+              <nav className="mt-2 grid gap-2" aria-label="Reference navigation">
+                {referenceItems.map(renderLink)}
+              </nav>
+            </>
+          )}
           <div className="mt-3">
             <AdminSignOutButton />
           </div>
