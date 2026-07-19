@@ -76,6 +76,7 @@ export type AnalyticsSummary = {
   deviceSummary: Array<{ label: string; count: number }>;
   browserSummary: Array<{ label: string; count: number }>;
   osSummary: Array<{ label: string; count: number }>;
+  locationSummary: Array<{ label: string; count: number }>;
 };
 
 export type SystemStatus = {
@@ -289,6 +290,7 @@ function unavailableAnalyticsSummary(): AnalyticsSummary {
     deviceSummary: [],
     browserSummary: [],
     osSummary: [],
+    locationSummary: [],
   };
 }
 
@@ -329,6 +331,22 @@ function parseCategoryRows(value: unknown, key: string) {
     const label = stringValue(row[key]);
     const count = numberValue(row.event_count);
     if (!label || count === null) return null;
+    rows.push({ label, count });
+  }
+  return rows;
+}
+
+function parseLocationRows(value: unknown) {
+  if (!Array.isArray(value)) return null;
+  const rows: Array<{ label: string; count: number }> = [];
+  for (const row of value) {
+    if (!isRecord(row)) return null;
+    const count = numberValue(row.visitor_count);
+    if (count === null) return null;
+    const city = stringValue(row.city);
+    const region = stringValue(row.region);
+    const country = stringValue(row.country_code);
+    const label = [city, region, country].filter(Boolean).join(", ") || "Unknown";
     rows.push({ label, count });
   }
   return rows;
@@ -404,6 +422,10 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
   const deviceSummary = parseCategoryRows(value.device_summary, "device_class");
   const browserSummary = parseCategoryRows(value.browser_summary, "browser_family");
   const osSummary = parseCategoryRows(value.operating_system_summary, "operating_system");
+  // Falls back to [] rather than failing the whole parse: this field only
+  // exists after 20260719_017 is applied, and an unrelated-but-unmigrated
+  // database shouldn't take the rest of a working analytics page down.
+  const locationSummary = parseLocationRows(value.location_summary) ?? [];
 
   if (
     !dailyRows ||
@@ -489,6 +511,10 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
       count: row.count,
     })),
     osSummary: osSummary.map((row) => ({
+      label: row.label,
+      count: row.count,
+    })),
+    locationSummary: locationSummary.map((row) => ({
       label: row.label,
       count: row.count,
     })),
@@ -685,7 +711,7 @@ export async function getFeedbackQueries(limit = 25, offset = 0): Promise<DataRe
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("feedback_queries")
-    .select("id, type, name, email, phone, subject, message, is_read, created_at")
+    .select("id, type, name, email, phone, subject, message, location, is_read, created_at")
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

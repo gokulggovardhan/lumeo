@@ -7,6 +7,7 @@ import {
   getOperatingSystem,
 } from "@/lib/analytics/device";
 import { getAnonymousSessionId } from "@/lib/analytics/session";
+import { readGeoCookie } from "@/lib/analytics/geo";
 import type { AnalyticsEventInput, AnalyticsRemoteTrackResult } from "@/lib/analytics/types";
 
 const REQUEST_TIMEOUT_MS = 2500;
@@ -50,6 +51,7 @@ export async function trackPublicAnalyticsEvent(
 ): Promise<AnalyticsRemoteTrackResult> {
   try {
     const supabase = createClient();
+    const geo = readGeoCookie();
     const { data, error } = await withTimeout(
       supabase.rpc("record_public_analytics_event", {
         event_name: input.eventName,
@@ -63,6 +65,9 @@ export async function trackPublicAnalyticsEvent(
         operating_system: getOperatingSystem(),
         success: input.success ?? null,
         error_code: input.errorCode ?? null,
+        country_code: geo?.country ?? null,
+        region: geo?.region ?? null,
+        city: geo?.city ?? null,
       }) as unknown as Promise<RpcResult<number>>,
       REQUEST_TIMEOUT_MS,
     );
