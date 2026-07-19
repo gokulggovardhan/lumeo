@@ -1,8 +1,7 @@
 import type { Metadata } from "next";
 import PublicFooter from "@/components/PublicFooter";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
-import { L2DirectoryToolCard, L2TrustRail } from "@/components/ui/Aura";
-import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
+import { ToolsExplorer } from "@/components/tools/ToolsExplorer";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -34,9 +33,7 @@ const structuredData = {
   description: "A categorized directory of available Lumeo PDF tools.",
 };
 
-export default async function PdfToolsPage() {
-  const catalog = await getPublicPdfCatalog();
-
+export default function PdfToolsPage() {
   return (
     <PublicCatalogPageShell
       maxWidth="max-w-[1160px]"
@@ -47,43 +44,19 @@ export default async function PdfToolsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <section className="lumeo-fade-up">
-        <p className="aura-text-label text-[var(--lumeo-gold-300)]">
-          PDF tools
-        </p>
-        <h1 className="mt-3 font-serif font-semibold text-[var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[var(--text-primary)]">
-          PDF tools for calm document work.
+      <section className="lumeo-fade-up mb-7 max-w-2xl">
+        <p className="aura-text-label text-[var(--lumeo-gold-300)]">PDF tools</p>
+        <h1 className="mt-3 font-serif font-medium text-[var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[var(--text-primary)]">
+          Everything a PDF needs. <em className="not-italic text-[var(--atelier-sage-300)]">Most of it never leaves your browser.</em>
         </h1>
-        <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-          Browse available Lumeo workspaces by category. Tools remain private by design and browser-first where supported.
+        <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+          The everyday work lives here — and where it can, it runs entirely on your device, so the file never leaves it.
         </p>
       </section>
 
-      <div className="mt-7 space-y-7">
-        {catalog.categories.map((category, categoryIndex) => (
-          <section
-            key={category.slug}
-            className="lumeo-fade-up aura-directory-section"
-            style={{ animationDelay: `${categoryIndex * 70}ms` }}
-          >
-            <div className="mb-3 border-l border-[rgba(var(--champagne-rgb),0.42)] pl-4">
-              <h2 className="font-serif font-semibold text-xl tracking-[-0.02em] text-[var(--text-primary)]">{category.name}</h2>
-              {category.description ? (
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">{category.description}</p>
-              ) : null}
-            </div>
-            <div className="grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {category.tools.map((tool) => (
-                <L2DirectoryToolCard key={tool.route} tool={tool} />
-              ))}
-            </div>
-          </section>
-        ))}
-      </div>
+      <ToolsExplorer />
 
-      <L2TrustRail className="mt-7" items={["Catalog-driven tools", "Browser-first where supported", "No fake usage counts"]} />
-
-      <div className="mt-8">
+      <div className="mt-10">
         <PublicFooter />
       </div>
     </PublicCatalogPageShell>

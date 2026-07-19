@@ -1098,3 +1098,80 @@ a:active {
     opacity: 1 !important;
   }
 }
+
+/* ============================================================
+   Lumeo tool glyphs — bespoke animated icons for the dual-named
+   tool catalog. Motion is hover-only (calm at rest); the global
+   prefers-reduced-motion block above already neutralizes it.
+   ============================================================ */
+.lumeo-glyph { overflow: visible; }
+.lumeo-glyph * { transition: none; }
+
+/* Compose — pages settle into a stack */
+@keyframes lg-cmp1 { 0% { transform: translate(-2px, 1px) rotate(-4deg); } 100% { transform: none; } }
+@keyframes lg-cmp2 { 0% { transform: translate(2px, 2px) rotate(4deg); } 100% { transform: none; } }
+.lumeo-tool-card:hover .ic-compose .pg1,
+.lumeo-tool-menuitem:hover .ic-compose .pg1 { animation: lg-cmp1 0.6s var(--lumeo-spring); transform-origin: center; }
+.lumeo-tool-card:hover .ic-compose .pg2,
+.lumeo-tool-menuitem:hover .ic-compose .pg2 { animation: lg-cmp2 0.6s var(--lumeo-spring); transform-origin: center; }
+
+/* Distill — squeeze inward */
+@keyframes lg-cndT { 0%, 100% { transform: none; } 50% { transform: translateY(2.5px); } }
+@keyframes lg-cndB { 0%, 100% { transform: none; } 50% { transform: translateY(-2.5px); } }
+.lumeo-tool-card:hover .ic-distill .barT,
+.lumeo-tool-menuitem:hover .ic-distill .barT { animation: lg-cndT 0.6s var(--lumeo-ease); }
+.lumeo-tool-card:hover .ic-distill .barB,
+.lumeo-tool-menuitem:hover .ic-distill .barB { animation: lg-cndB 0.6s var(--lumeo-ease); }
+
+/* Capture — shards converge */
+@keyframes lg-frg { 0% { transform: translate(var(--fx), var(--fy)) scale(0.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
+.lumeo-tool-card:hover .ic-capture .sh,
+.lumeo-tool-menuitem:hover .ic-capture .sh { animation: lg-frg 0.6s var(--lumeo-spring); }
+
+/* Render — pages fan out */
+@keyframes lg-rel1 { 0% { transform: rotate(-8deg) translate(-1px, 0); } 55% { transform: rotate(-15deg) translate(-2px, 0); } 100% { transform: rotate(-8deg) translate(-1px, 0); } }
+@keyframes lg-rel2 { 0% { transform: rotate(8deg) translate(1px, 0); } 55% { transform: rotate(15deg) translate(2px, 0); } 100% { transform: rotate(8deg) translate(1px, 0); } }
+.ic-render .fan1 { transform: rotate(-8deg) translate(-1px, 0); transform-origin: 12px 20px; }
+.ic-render .fan2 { transform: rotate(8deg) translate(1px, 0); transform-origin: 12px 20px; }
+.lumeo-tool-card:hover .ic-render .fan1,
+.lumeo-tool-menuitem:hover .ic-render .fan1 { animation: lg-rel1 0.6s var(--lumeo-spring); transform-origin: 12px 20px; }
+.lumeo-tool-card:hover .ic-render .fan2,
+.lumeo-tool-menuitem:hover .ic-render .fan2 { animation: lg-rel2 0.6s var(--lumeo-spring); transform-origin: 12px 20px; }
+
+/* Inscribe — nib draws a stroke */
+.ic-inscribe .stroke { stroke-dasharray: 20; }
+@keyframes lg-draw { 0% { stroke-dashoffset: 20; } 100% { stroke-dashoffset: 0; } }
+@keyframes lg-nib { 0% { transform: translate(-4px, 2px); } 100% { transform: none; } }
+.lumeo-tool-card:hover .ic-inscribe .stroke,
+.lumeo-tool-menuitem:hover .ic-inscribe .stroke { animation: lg-draw 0.7s var(--lumeo-ease); }
+.lumeo-tool-card:hover .ic-inscribe .nib,
+.lumeo-tool-menuitem:hover .ic-inscribe .nib { animation: lg-nib 0.7s var(--lumeo-ease); }
+
+/* Seal — press + ripple */
+@keyframes lg-press { 0% { transform: scale(1); } 40% { transform: scale(0.85); } 100% { transform: scale(1); } }
+@keyframes lg-ripple { 0% { transform: scale(0.7); opacity: 0.6; } 100% { transform: scale(1.4); opacity: 0; } }
+.ic-seal .ring2 { opacity: 0; transform-origin: center; }
+.lumeo-tool-card:hover .ic-seal .core,
+.lumeo-tool-menuitem:hover .ic-seal .core { animation: lg-press 0.6s var(--lumeo-spring); transform-origin: center; }
+.lumeo-tool-card:hover .ic-seal .ring2,
+.lumeo-tool-menuitem:hover .ic-seal .ring2 { animation: lg-ripple 0.7s var(--lumeo-ease); }
+
+/* Secure — lock shackle clicks */
+@keyframes lg-shackle { 0% { transform: none; } 45% { transform: rotate(-18deg); } 100% { transform: none; } }
+.ic-secure .shackle { transform-origin: 15px 9px; }
+.lumeo-tool-card:hover .ic-secure .shackle,
+.lumeo-tool-menuitem:hover .ic-secure .shackle { animation: lg-shackle 0.6s var(--lumeo-spring); }
+
+/* Convert — arrows swap */
+@keyframes lg-conv { 0% { transform: rotate(0); } 100% { transform: rotate(180deg); } }
+.lumeo-tool-card:hover .ic-convert .arrows,
+.lumeo-tool-menuitem:hover .ic-convert .arrows { animation: lg-conv 0.7s var(--lumeo-spring); transform-origin: center; }
+
+/* Recognize — scan sweep */
+@keyframes lg-scan { 0% { transform: translateY(-1px); } 55% { transform: translateY(8px); } 100% { transform: translateY(-1px); } }
+.lumeo-tool-card:hover .ic-recognize .scan,
+.lumeo-tool-menuitem:hover .ic-recognize .scan { animation: lg-scan 0.9s var(--lumeo-ease); }
+
+/* Quick-jump target flash */
+@keyframes lg-flash { 0%, 100% { box-shadow: none; } 30% { box-shadow: 0 0 0 3px rgba(var(--atelier-sage-rgb), 0.45); } }
+.lumeo-tool-flash { animation: lg-flash 1.2s var(--lumeo-ease); border-color: var(--atelier-sage-500) !important; }
