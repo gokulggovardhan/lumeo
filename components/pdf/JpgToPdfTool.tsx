@@ -671,6 +671,9 @@ export default function JpgToPdfTool() {
     setStatus("Converting in your browser...");
     clearDownload();
 
+    const startedAt = performance.now();
+    track({ eventName: "processing_started", toolSlug: "jpg-to-pdf" });
+
     try {
       const pdfDoc = await PDFDocument.create();
       const marginPoints = marginOptions.find((option) => option.value === marginPreset)?.points ?? 24;
@@ -749,15 +752,29 @@ export default function JpgToPdfTool() {
       setDownloadName(safeName);
       setCleanupMessage("");
       setStatus("Download ready");
+      track({
+        eventName: "processing_succeeded",
+        toolSlug: "jpg-to-pdf",
+        durationMs: performance.now() - startedAt,
+        success: true,
+      });
     } catch {
       setStatus("Ready");
       setError("Conversion failed. Try smaller images or remove damaged files.");
+      track({
+        eventName: "processing_failed",
+        toolSlug: "jpg-to-pdf",
+        durationMs: performance.now() - startedAt,
+        success: false,
+        errorCode: "processing_error",
+      });
     }
   };
 
   const downloadPdf = () => {
     if (!downloadUrl) return;
 
+    track({ eventName: "download_started", toolSlug: "jpg-to-pdf" });
     const link = document.createElement("a");
     link.href = downloadUrl;
     link.download = downloadName;

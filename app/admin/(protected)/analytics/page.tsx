@@ -28,8 +28,8 @@ export default async function AnalyticsPage() {
     <div className="space-y-7">
       <AdminPageHeader
         eyebrow="Analytics V1"
-        title="Discovery analytics"
-        description="Privacy-preserving public signals for page visits, tool discovery, and coarse platform usage. Processing lifecycle reporting is intentionally postponed until the shared browser-tool framework is introduced."
+        title="Discovery & operation analytics"
+        description="Privacy-preserving public signals for page visits, tool discovery, and processing outcomes across every PDF tool."
       />
       <AnalyticsPrivacyNotice />
 
@@ -77,14 +77,46 @@ export default async function AnalyticsPage() {
 
           <AdminSectionCard
             title="Operation analytics"
-            description="Processing lifecycle metrics are intentionally excluded from Analytics V1."
+            description="Processing lifecycle metrics from every PDF tool, today."
           >
-            <p className="max-w-3xl text-sm leading-6 text-[#F0EAD6]/62">
-              Processing, success, failure, download, and duration metrics will
-              be enabled after Lumeo&apos;s shared browser-tool lifecycle
-              framework is introduced. These values are intentionally excluded
-              from Analytics V1 to avoid incomplete or misleading reporting.
-            </p>
+            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <AdminMetricCard
+                label="Processing Started"
+                value={data.processingStarted}
+                detail="Conversions started today."
+              />
+              <AdminMetricCard
+                label="Processing Succeeded"
+                value={data.processingSucceeded}
+                detail="Conversions completed successfully."
+                tone="success"
+              />
+              <AdminMetricCard
+                label="Processing Failed"
+                value={data.processingFailed}
+                detail="Conversions that errored."
+                tone={data.processingFailed > 0 ? "warning" : "neutral"}
+              />
+              <AdminMetricCard
+                label="Success Rate"
+                value={data.successRate === null ? "N/A" : `${data.successRate}%`}
+                detail="Succeeded ÷ (succeeded + failed)."
+                tone="gold"
+              />
+              <AdminMetricCard
+                label="Downloads Started"
+                value={data.downloadsStarted}
+                detail="Output files saved today."
+              />
+            </section>
+            {data.averageDurationMs !== null ? (
+              <p className="mt-4 text-sm leading-6 text-[#F0EAD6]/62">
+                Average successful processing time:{" "}
+                <span className="font-semibold text-[#F0EAD6]">
+                  {(data.averageDurationMs / 1000).toFixed(1)}s
+                </span>
+              </p>
+            ) : null}
           </AdminSectionCard>
         </>
       )}
@@ -102,7 +134,7 @@ export default async function AnalyticsPage() {
             <AnalyticsTrendChart points={data.sevenDayTotals} />
             <AdminSectionCard
               title="Collection status"
-              description="Analytics V1 reports discovery signals only."
+              description="Analytics V1 reports discovery and operation signals."
             >
               <div className="space-y-3 text-sm leading-6 text-[#F0EAD6]/62">
                 <p>
@@ -112,9 +144,10 @@ export default async function AnalyticsPage() {
                   </span>
                 </p>
                 <p>
-                  Active metrics: unique visitors, page views, tool opens, top
-                  tools, device class, browser family, operating-system
-                  family, and seven-day discovery trend.
+                  Active metrics: unique visitors, page views, tool opens,
+                  processing lifecycle, top tools, device class, browser
+                  family, operating-system family, and seven-day discovery
+                  trend.
                 </p>
               </div>
             </AdminSectionCard>

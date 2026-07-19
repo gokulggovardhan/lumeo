@@ -750,6 +750,9 @@ export default function CompressPdfTool() {
     setStatus("Preparing compression plan");
     setProgressDetail("Preparing compression plan.");
 
+    const startedAt = performance.now();
+    track({ eventName: "processing_started", toolSlug: "compress" });
+
     const currentSession = sessionRef.current;
     let processingDoc: PDFDocumentProxy | null = null;
     try {
@@ -921,6 +924,12 @@ export default function CompressPdfTool() {
       setProgressDetail(
         compressionMode === "target" ? "Target analysis complete." : "Compression complete.",
       );
+      track({
+        eventName: "processing_succeeded",
+        toolSlug: "compress",
+        durationMs: performance.now() - startedAt,
+        success: true,
+      });
     } catch (compressError) {
       if (currentSession !== sessionRef.current) return;
       const message =
@@ -936,6 +945,13 @@ export default function CompressPdfTool() {
       );
       setStatus("Ready");
       setProgressDetail("");
+      track({
+        eventName: "processing_failed",
+        toolSlug: "compress",
+        durationMs: performance.now() - startedAt,
+        success: false,
+        errorCode: "processing_error",
+      });
     } finally {
       if (processingDoc) {
         try {
@@ -950,6 +966,7 @@ export default function CompressPdfTool() {
 
   function handleDownload() {
     if (!result) return;
+    track({ eventName: "download_started", toolSlug: "compress" });
     downloadUrl(result.url, result.fileName);
     const timer = window.setTimeout(() => {
       clearResult("Temporary file cleared from this session.");

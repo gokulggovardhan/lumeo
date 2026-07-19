@@ -677,6 +677,8 @@ export default function MergePdfTool() {
     clearDownload();
 
     const RASTER_SCALE = 2;
+    const startedAt = performance.now();
+    track({ eventName: "processing_started", toolSlug: "merge" });
 
     try {
       const mergedPdf = await PDFDocument.create();
@@ -779,15 +781,29 @@ export default function MergePdfTool() {
       setDownloadName(safeName);
       setCleanupMessage("");
       setStatus("Download ready");
+      track({
+        eventName: "processing_succeeded",
+        toolSlug: "merge",
+        durationMs: performance.now() - startedAt,
+        success: true,
+      });
     } catch {
       setStatus("Ready");
       setError("Merge failed. Try smaller files or remove damaged PDFs.");
+      track({
+        eventName: "processing_failed",
+        toolSlug: "merge",
+        durationMs: performance.now() - startedAt,
+        success: false,
+        errorCode: "processing_error",
+      });
     }
   };
 
   const downloadMergedPdf = () => {
     if (!downloadUrl) return;
 
+    track({ eventName: "download_started", toolSlug: "merge" });
     const link = document.createElement("a");
     link.href = downloadUrl;
     link.download = downloadName;
