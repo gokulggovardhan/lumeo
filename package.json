@@ -20,6 +20,7 @@
     "test:compression-target": "node --no-warnings --test --experimental-strip-types tests/compression-target.test.ts",
     "copy-ffmpeg-core": "node scripts/copy-ffmpeg-core.mjs",
     "postinstall": "npm run copy-ffmpeg-core",
+    "db:migrate": "node scripts/db-migrate.mjs",
     "start": "next start",
     "lint": "eslint"
   },
@@ -46,6 +47,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.2.10",
+    "supabase": "^2.109.1",
     "tailwindcss": "^4.3.2",
     "typescript": "^5"
   }
