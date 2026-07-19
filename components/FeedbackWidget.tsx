@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Loader2, MessageSquarePlus, X } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import type { FeedbackQueryType } from "@/lib/supabase/database.types";
 
 type FormState = {
@@ -96,23 +95,30 @@ export function FeedbackWidget() {
 
     setSubmitting(true);
     try {
-      const supabase = createClient();
-      const { error: insertError } = await supabase.from("feedback_queries").insert({
-        type: form.type,
-        name,
-        email: email || null,
-        phone: phone || null,
-        subject,
-        message,
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: form.type,
+          name,
+          email,
+          phone,
+          subject,
+          message,
+          companyWebsite: form.companyWebsite,
+        }),
       });
+      const result = (await response.json().catch(() => null)) as { ok?: boolean } | null;
 
-      if (insertError) {
+      if (!response.ok || !result?.ok) {
         setToast({ tone: "error", message: "Could not send your message. Please try again." });
         return;
       }
 
       setToast({ tone: "success", message: "Thanks — your message was sent." });
       closeModal();
+    } catch {
+      setToast({ tone: "error", message: "Could not send your message. Please try again." });
     } finally {
       setSubmitting(false);
     }

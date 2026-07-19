@@ -8,7 +8,6 @@ import { createClient } from "@/lib/supabase/client";
 import type { FeedbackQuery, FeedbackQueryType } from "@/lib/supabase/database.types";
 
 type TypeFilter = "all" | FeedbackQueryType;
-type ReadFilter = "all" | "unread" | "read";
 
 function relativeTime(iso: string) {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -41,7 +40,6 @@ export function InboxClient({
   const [items, setItems] = useState<FeedbackQuery[]>(initialItems);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [readFilter, setReadFilter] = useState<ReadFilter>("all");
   const [search, setSearch] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(initialItems.length === pageSize);
@@ -75,15 +73,13 @@ export function InboxClient({
     const query = search.trim().toLowerCase();
     return items.filter((item) => {
       if (typeFilter !== "all" && item.type !== typeFilter) return false;
-      if (readFilter === "unread" && item.is_read) return false;
-      if (readFilter === "read" && !item.is_read) return false;
       if (query) {
         const haystack = `${item.name} ${item.subject} ${item.message}`.toLowerCase();
         if (!haystack.includes(query)) return false;
       }
       return true;
     });
-  }, [items, typeFilter, readFilter, search]);
+  }, [items, typeFilter, search]);
 
   const selected = items.find((item) => item.id === selectedId) ?? null;
 
@@ -109,7 +105,7 @@ export function InboxClient({
       const supabase = supabaseRef.current;
       const { data, error } = await supabase
         .from("feedback_queries")
-        .select("id, type, name, email, phone, subject, message, is_read, created_at")
+        .select("id, type, name, email, phone, subject, message, location, is_read, created_at")
         .order("created_at", { ascending: false })
         .range(items.length, items.length + pageSize - 1);
 
@@ -164,26 +160,15 @@ export function InboxClient({
               className="min-h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] py-2 pl-9 pr-3 text-sm text-[var(--lumeo-paper-50)] outline-none placeholder:text-[var(--lumeo-paper-600)] focus:border-[var(--border-focus)]"
             />
           </div>
-          <div className="flex gap-2">
-            <select
-              value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value as TypeFilter)}
-              className="min-h-9 flex-1 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs font-semibold text-[var(--lumeo-paper-50)]"
-            >
-              <option value="all">All types</option>
-              <option value="Query">Query</option>
-              <option value="Feedback">Feedback</option>
-            </select>
-            <select
-              value={readFilter}
-              onChange={(event) => setReadFilter(event.target.value as ReadFilter)}
-              className="min-h-9 flex-1 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs font-semibold text-[var(--lumeo-paper-50)]"
-            >
-              <option value="all">All</option>
-              <option value="unread">Unread only</option>
-              <option value="read">Read only</option>
-            </select>
-          </div>
+          <select
+            value={typeFilter}
+            onChange={(event) => setTypeFilter(event.target.value as TypeFilter)}
+            className="min-h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs font-semibold text-[var(--lumeo-paper-50)]"
+          >
+            <option value="all">All messages</option>
+            <option value="Query">Queries</option>
+            <option value="Feedback">Feedback</option>
+          </select>
         </div>
 
         {banner ? (
@@ -231,6 +216,7 @@ export function InboxClient({
                         <span className={`truncate text-sm ${item.is_read ? "text-[var(--lumeo-paper-400)]" : "font-semibold text-[var(--lumeo-paper-100)]"}`}>{item.subject}</span>
                       </div>
                       <p className="truncate text-xs text-[var(--lumeo-paper-500)]">{item.message}</p>
+                      {item.location ? <p className="truncate text-xs text-[var(--lumeo-paper-600)]">{item.location}</p> : null}
                     </button>
                   </li>
                 );
@@ -300,7 +286,10 @@ export function InboxClient({
                   {selected.type}
                 </span>
                 <h2 className="mt-3 font-serif text-xl font-semibold text-[var(--lumeo-paper-50)]">{selected.subject}</h2>
-                <p className="mt-1 text-xs text-[var(--lumeo-paper-500)]">{absoluteTime(selected.created_at)}</p>
+                <p className="mt-1 text-xs text-[var(--lumeo-paper-500)]">
+                  {absoluteTime(selected.created_at)}
+                  {selected.location ? ` · ${selected.location}` : ""}
+                </p>
               </div>
 
               <div className="grid gap-3 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.03)] p-4 sm:grid-cols-2">

@@ -1,6 +1,23 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { geolocation } from "@vercel/functions";
+import { GEO_COOKIE_NAME } from "@/lib/analytics/geo-cookie-name";
 import { getSupabaseEnv } from "@/lib/supabase/env";
+
+function buildGeoCookieValue(request: NextRequest) {
+  const { city, countryRegion, country } = geolocation(request);
+  if (!city && !countryRegion && !country) return null;
+  return [city, countryRegion, country].map((part) => encodeURIComponent(part ?? "")).join("|");
+}
+
+function applyGeoCookie(response: NextResponse, value: string | null) {
+  if (!value) return;
+  response.cookies.set(GEO_COOKIE_NAME, value, {
+    path: "/",
+    maxAge: 60 * 60 * 24,
+    sameSite: "lax",
+  });
+}
 
 function isMissingSupabaseEnv(error: unknown) {
   if (!(error instanceof Error)) return false;
@@ -62,6 +79,8 @@ export async function updateSession(request: NextRequest) {
 
   await supabase.auth.getClaims();
 
+  const geoCookieValue = buildGeoCookieValue(request);
+
   if (!bypassesMaintenanceMode(request.nextUrl.pathname)) {
     // Fails open: any RPC error (migration not yet applied, DB unreachable)
     // must never take the whole public site down on its own -- only an
@@ -80,9 +99,11 @@ export async function updateSession(request: NextRequest) {
       });
       // Keep search engines from indexing the maintenance page while it's up.
       maintenanceResponse.headers.set("X-Robots-Tag", "noindex");
+      applyGeoCookie(maintenanceResponse, geoCookieValue);
       return maintenanceResponse;
     }
   }
 
+  applyGeoCookie(response, geoCookieValue);
   return response;
 }

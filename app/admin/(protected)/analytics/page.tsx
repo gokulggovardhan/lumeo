@@ -198,6 +198,17 @@ export default async function AnalyticsPage() {
               }))}
             />
           </section>
+
+          <section className="grid gap-4 lg:grid-cols-1">
+            <AnalyticsBarList
+              title="Top locations"
+              items={data.locationSummary.map((item) => ({
+                label: item.label,
+                value: item.count,
+              }))}
+              emptyText="No location data yet. Run migration 20260719_017_analytics_location.sql to enable."
+            />
+          </section>
         </>
       ) : null}
     </div>

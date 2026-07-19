@@ -49,6 +49,7 @@ export type AdminAnalyticsSummaryResult = {
   device_summary: Array<{ device_class: DeviceClass; event_count: number }>;
   browser_summary: Array<{ browser_family: string; event_count: number }>;
   operating_system_summary: Array<{ operating_system: string; event_count: number }>;
+  location_summary: Array<{ city: string | null; region: string | null; country_code: string | null; visitor_count: number }>;
 };
 
 export type ToolCategory = {
@@ -161,6 +162,7 @@ export type FeedbackQuery = {
   phone: string | null;
   subject: string;
   message: string;
+  location: string | null;
   is_read: boolean;
   created_at: string;
 };
