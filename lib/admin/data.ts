@@ -555,6 +555,10 @@ export async function getAnalyticsSummary(): Promise<DataResult<AnalyticsSummary
       ...parsedToday,
       sevenDayTotals: parsedTrend?.sevenDayTotals ?? parsedToday.sevenDayTotals,
       dailyMetrics: parsedTrend?.dailyMetrics ?? parsedToday.dailyMetrics,
+      // Locations are sparse per-day -- scope this to the same 7-day window
+      // as the trend, not the single "today" range, or the panel reads empty
+      // on any day with little UTC-day traffic yet.
+      locationSummary: parsedTrend?.locationSummary ?? parsedToday.locationSummary,
     },
     null,
   );
