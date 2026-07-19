@@ -12,14 +12,9 @@ import { canManageSettings } from "@/lib/admin/permissions";
 import { updateSiteSetting } from "@/app/admin/(protected)/settings/actions";
 
 const approvedSettings = [
-  ["workspace_display_name", "Workspace display name", "Public-facing workspace label.", false],
-  ["support_email", "Support email", "Contact email shown where approved.", false],
-  ["contact_page_enabled", "Contact page enabled", "Database setting only in this phase.", false],
-  ["maintenance_mode", "Maintenance mode", "When enabled, every public route shows the maintenance page. /admin stays reachable so you can turn it back off.", true],
-  ["public_analytics_enabled", "Public analytics enabled", "Enables optional anonymous product-use events. Do Not Track is still respected.", true],
-  ["homepage_privacy_message", "Homepage privacy message", "Future homepage copy foundation.", false],
-  ["default_seo_suffix", "Default SEO suffix", "Future SEO helper text.", false],
-] as const satisfies ReadonlyArray<readonly [string, string, string, boolean]>;
+  ["maintenance_mode", "Maintenance mode", "When enabled, every public route shows the maintenance page. /admin stays reachable so you can turn it back off."],
+  ["public_analytics_enabled", "Public analytics enabled", "Enables optional anonymous product-use events. Do Not Track is still respected."],
+] as const satisfies ReadonlyArray<readonly [string, string, string]>;
 
 function settingMessageValue(value: unknown, field: "title" | "message") {
   if (value && typeof value === "object" && field in value) {
@@ -56,9 +51,9 @@ export default async function SettingsPage() {
       {canEdit && (
         <AdminSectionCard title="Approved settings" description="Owner-only controls. Maintenance mode takes effect on the public site immediately after saving.">
           <div className="grid gap-4 lg:grid-cols-2">
-            {approvedSettings.map(([key, label, description, wired]) => {
+            {approvedSettings.map(([key, label, description]) => {
               const current = settingMap.get(key);
-              const isBoolean = key === "contact_page_enabled" || key === "maintenance_mode" || key === "public_analytics_enabled";
+              const isBoolean = key === "maintenance_mode" || key === "public_analytics_enabled";
               const isMaintenanceMode = key === "maintenance_mode";
               const isCurrentlyEnabled = isMaintenanceMode && settingDisplay(current?.value) === "Enabled";
               return (
@@ -78,10 +73,6 @@ export default async function SettingsPage() {
                     {isCurrentlyEnabled ? (
                       <span className="rounded-full bg-[var(--surface-danger)] px-2.5 py-1 text-xs font-bold text-[var(--text-danger)]">
                         Live: site is down for visitors
-                      </span>
-                    ) : !wired ? (
-                      <span className="rounded-full border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.06)] px-2.5 py-1 text-xs font-semibold text-[#F0EAD6]/56">
-                        Not yet active
                       </span>
                     ) : null}
                   </div>

@@ -97,6 +97,14 @@ export default async function AdminPage() {
               {system.data.deploymentEnvironment} · checked {formatDate(system.data.currentTimestamp)}
             </p>
           </div>
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+            <p className="text-sm font-semibold text-[#F0EAD6]">Latest admin action</p>
+            <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">{formatDate(system.data.latestAuditAt)}</p>
+          </div>
+          <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+            <p className="text-sm font-semibold text-[#F0EAD6]">Latest analytics event</p>
+            <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">{formatDate(system.data.latestAnalyticsEventAt)}</p>
+          </div>
         </div>
       </AdminSectionCard>
 
