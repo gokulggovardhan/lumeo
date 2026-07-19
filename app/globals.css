@@ -1070,3 +1070,9 @@ a:active {
     outline: 2px solid CanvasText;
   }
 }
+
+/* Unified UI/UX Accent Extensions */
+:root {
+  --lumeo-mint-subtle: #9FD0B5;
+  --lumeo-sage-accent: #8FBF9F;
+}
