@@ -547,7 +547,7 @@ export default function MergePdfTool() {
         <L2PrivacyNote />
 
         {error ? (
-          <div className="mt-4 rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
+          <div className="mt-4 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
@@ -583,13 +583,13 @@ export default function MergePdfTool() {
 
       <L2ToolWorkspace>
         <L2ToolMainColumn>
-          <section className="animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[#FFFFFF]/12 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] p-3 shadow-2xl shadow-black/28">
+          <section className="animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3 shadow-2xl shadow-black/28">
             <div className="mb-2.5 flex items-center justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
                   Document tray
                 </p>
-                <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
+                <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
                   Add more PDFs to the deck.
                 </p>
               </div>
@@ -597,7 +597,7 @@ export default function MergePdfTool() {
                 <button
                   type="button"
                   onClick={clearAllFiles}
-                  className="rounded-full border border-[#FFFFFF]/12 px-3 py-1.5 text-xs font-semibold text-[#FFFFFF]/58 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF]"
+                  className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)]"
                 >
                   Clear all
                 </button>
@@ -618,20 +618,20 @@ export default function MergePdfTool() {
               className={`group relative overflow-hidden rounded-[24px] border px-4 py-2.5 transition-all duration-300 ${
                 isDragging
                   ? "border-[var(--border-selected)] bg-[var(--surface-selected)] shadow-[0_18px_50px_rgba(0,0,0,0.18)]"
-                  : "border-[#FFFFFF]/16 bg-[#0C1220]/70 hover:border-[var(--border-selected)] hover:bg-[#0C1220]/82"
+                  : "border-[var(--text-primary)]/16 bg-[var(--atelier-surface-1)]/70 hover:border-[var(--border-selected)] hover:bg-[var(--atelier-surface-1)]/82"
               }`}
             >
-              <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[#CBA052]/28 to-transparent opacity-0 transition group-hover:opacity-100" />
+              <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[var(--lumeo-gold)]/28 to-transparent opacity-0 transition group-hover:opacity-100" />
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[#FFFFFF]/[0.045] text-[var(--text-secondary)] transition group-hover:bg-[#FFFFFF]/[0.08]">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--text-primary)]/[0.045] text-[var(--text-secondary)] transition group-hover:bg-[var(--text-primary)]/[0.08]">
                     <MergeIcon />
                   </span>
                   <div>
-                    <p className="text-base font-semibold text-[#FFFFFF]">
+                    <p className="text-base font-semibold text-[var(--text-primary)]">
                       Drop PDFs here
                     </p>
-                    <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
+                    <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
                       Choose files from your device
                     </p>
                   </div>
@@ -639,7 +639,7 @@ export default function MergePdfTool() {
                 <button
                   type="button"
                   onClick={() => inputRef.current?.click()}
-                  className="inline-flex items-center justify-center rounded-full bg-[#CBA052] px-4 py-2 text-xs font-semibold text-[#F0EAD6] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#257B56] active:scale-[0.98]"
+                  className="inline-flex items-center justify-center rounded-full bg-[var(--lumeo-gold)] px-4 py-2 text-xs font-semibold text-[var(--foreground)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[var(--lumeo-seal-500)] active:scale-[0.98]"
                 >
                   Select PDFs
                 </button>
@@ -647,25 +647,25 @@ export default function MergePdfTool() {
             </div>
           </section>
 
-          <section className="flex min-h-0 flex-1 animate-[consoleReveal_320ms_ease-out] flex-col rounded-xl border border-[#FFFFFF]/12 bg-gradient-to-br from-[#111A2B] via-[#0F1727] to-[#0C1220] p-3.5 shadow-2xl shadow-black/24">
+          <section className="flex min-h-0 flex-1 animate-[consoleReveal_320ms_ease-out] flex-col rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3.5 shadow-2xl shadow-black/24">
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
                   Arrange
                 </p>
-                <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
+                <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
                   Drag to reorder.
                 </p>
               </div>
               {files.length > 0 ? (
-                <p className="text-xs font-semibold text-[#FFFFFF]/44">
+                <p className="text-xs font-semibold text-[var(--text-primary)]/44">
                   {files.length} files - {totalPages} pages - {formatFileSize(totalSize)}
                 </p>
               ) : null}
             </div>
 
             {files.length === 0 ? (
-              <div className="rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/48 p-5 text-sm text-[#FFFFFF]/46">
+              <div className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/48 p-5 text-sm text-[var(--text-primary)]/46">
                 Add at least two PDFs to begin arranging your merge.
               </div>
             ) : (
@@ -703,10 +703,10 @@ export default function MergePdfTool() {
                         ? "scale-[0.99] border-[var(--border-selected)] bg-[var(--surface-selected)] opacity-70"
                         : dragOverFileId === item.id
                           ? "border-[var(--border-selected)] bg-[var(--surface-selected)] shadow-[0_14px_38px_rgba(0,0,0,0.12)]"
-                          : "border-[#FFFFFF]/10 bg-[#0A101C]/74 hover:-translate-y-0.5 hover:border-[var(--border-selected)] hover:bg-[#142034]"
+                          : "border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/74 hover:-translate-y-0.5 hover:border-[var(--border-selected)] hover:bg-[var(--atelier-surface-3)]"
                     }`}
                   >
-                    <span className="hidden text-[#FFFFFF]/24 sm:inline" aria-hidden="true">
+                    <span className="hidden text-[var(--text-primary)]/24 sm:inline" aria-hidden="true">
                       :::
                     </span>
                     <div className="min-w-0 flex-1">
@@ -731,37 +731,37 @@ export default function MergePdfTool() {
 
           <div className="no-scrollbar space-y-2 lg:max-h-[74px] lg:overflow-y-auto">
             {error ? (
-              <div className="rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
+              <div className="rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
                 {error}
               </div>
             ) : null}
 
             {softWarning ? (
-              <div className="rounded-lg border border-[#CBA052]/20 bg-[#CBA052]/10 p-4 text-sm font-medium text-[#FFFFFF]">
+              <div className="rounded-lg border border-[var(--lumeo-gold)]/20 bg-[var(--lumeo-gold)]/10 p-4 text-sm font-medium text-[var(--text-primary)]">
                 {softWarning}
               </div>
             ) : null}
 
             {hasLargeFiles ? (
-              <div className="rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/50 p-4 text-sm font-medium text-[#FFFFFF]/56">
+              <div className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/50 p-4 text-sm font-medium text-[var(--text-primary)]/56">
                 Large files may take longer because merging happens in your browser.
               </div>
             ) : null}
 
             {mixedPageSizesDetected ? (
-              <div className="rounded-lg border border-[#CBA052]/18 bg-[#CBA052]/[0.055] p-4 text-sm font-medium text-[#FFFFFF]">
+              <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/[0.055] p-4 text-sm font-medium text-[var(--text-primary)]">
                 Mixed page sizes detected - Smart fit recommended.
               </div>
             ) : null}
 
             {cleanupMessage ? (
-              <div className="rounded-lg border border-[#CBA052]/18 bg-[#CBA052]/[0.06] p-4 text-sm font-medium text-[#FFFFFF]">
+              <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/[0.06] p-4 text-sm font-medium text-[var(--text-primary)]">
                 {cleanupMessage}
               </div>
             ) : null}
           </div>
 
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[#0A101C]/70 px-4 py-2 text-xs text-[#FFFFFF]/54 shadow-inner shadow-black/20">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/70 px-4 py-2 text-xs text-[var(--text-primary)]/54 shadow-inner shadow-black/20">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <L2PrivacyNote compact />
               <p className="lg:hidden">
@@ -774,25 +774,25 @@ export default function MergePdfTool() {
         <L2ToolSettingsPanel title="Merge options" description="One combined PDF using the file order shown.">
           <div className="flex h-full min-h-0 flex-col">
             <div className="mb-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
                 Output
               </p>
-              <p className="mt-0.5 text-xs text-[#FFFFFF]/48">
+              <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
                 Choose finish.
               </p>
             </div>
 
             <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-            <div className="rounded-lg border border-[var(--border-subtle)] bg-[#0A101C]/74 p-3 shadow-inner shadow-black/20">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/74 p-3 shadow-inner shadow-black/20">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
                     Output style
                   </p>
-                  <p className="mt-1.5 text-sm font-semibold text-[#FFFFFF]">
+                  <p className="mt-1.5 text-sm font-semibold text-[var(--text-primary)]">
                     {outputStyleLabel}
                   </p>
-                  <p className="mt-0.5 text-xs leading-4 text-[#FFFFFF]/42">
+                  <p className="mt-0.5 text-xs leading-4 text-[var(--text-primary)]/42">
                     {pageFormat === "original"
                       ? "Preserves every source page size."
                       : pageFormat === "matchFirst"
@@ -804,7 +804,7 @@ export default function MergePdfTool() {
                   type="button"
                   onClick={() => setShowOutputOptions((current) => !current)}
                   aria-expanded={showOutputOptions}
-                  className="rounded-full border border-[#FFFFFF]/14 bg-[#FFFFFF]/[0.025] px-3 py-1.5 text-xs font-semibold text-[#FFFFFF]/70 transition hover:border-[#CBA052]/32 hover:text-[#FFFFFF]"
+                  className="rounded-full border border-[var(--text-primary)]/14 bg-[var(--text-primary)]/[0.025] px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/32 hover:text-[var(--text-primary)]"
                 >
                   Change
                 </button>
@@ -812,7 +812,7 @@ export default function MergePdfTool() {
             </div>
 
             {showOutputOptions ? (
-              <div className="mt-2 grid gap-2 overflow-hidden rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/74 p-2">
+              <div className="mt-2 grid gap-2 overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/74 p-2">
                 {outputFormatOptions.map((option) => (
                   <AuraOptionCard
                     key={option.value}
@@ -839,8 +839,8 @@ export default function MergePdfTool() {
               </div>
             ) : null}
 
-            <label className="mt-2.5 block rounded-lg border border-[#FFFFFF]/10 bg-[#0C1220]/50 p-2.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[#FFFFFF]/34">
+            <label className="mt-2.5 block rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/50 p-2.5">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
                 File name
               </span>
               <input
@@ -850,24 +850,24 @@ export default function MergePdfTool() {
                   setStatus("Ready");
                   clearDownload();
                 }}
-                className="mt-1.5 w-full rounded-md border border-transparent bg-transparent px-0 py-1 text-sm font-semibold text-[#FFFFFF] outline-none transition placeholder:text-[#FFFFFF]/26 focus:border-b-[#CBA052]/45"
+                className="mt-1.5 w-full rounded-md border border-transparent bg-transparent px-0 py-1 text-sm font-semibold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-primary)]/26 focus:border-b-[var(--lumeo-gold)]/45"
                 placeholder="lumeo-merged.pdf"
               />
             </label>
 
             </div>
 
-            <div className="mt-2.5 border-t border-[#FFFFFF]/10 pt-2.5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#CBA052]">
+            <div className="mt-2.5 border-t border-[var(--text-primary)]/10 pt-2.5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
                 Finish
               </p>
 
               {downloadUrl ? (
                 <div className="mt-3">
-                  <p className="text-base font-semibold text-[#FFFFFF]">
+                  <p className="text-base font-semibold text-[var(--text-primary)]">
                     Merged PDF ready
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">
                     {downloadName} - {outputStyleLabel} - {totalPages} pages
                   </p>
                   <div className="mt-3 hidden flex-col gap-2 lg:flex">
@@ -885,7 +885,7 @@ export default function MergePdfTool() {
                         <button
                           type="button"
                           onClick={startNewMerge}
-                          className="rounded-[var(--radius-md)] border border-[#FFFFFF]/12 px-5 py-2.5 text-sm font-semibold text-[#FFFFFF]/62 transition hover:border-[#FFFFFF]/24 hover:text-[#FFFFFF]"
+                          className="rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)]/62 transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)]"
                         >
                           Start new
                         </button>
@@ -895,10 +895,10 @@ export default function MergePdfTool() {
                 </div>
               ) : files.length >= 2 ? (
                 <div className="mt-3">
-                  <p className="text-base font-semibold text-[#FFFFFF]">
+                  <p className="text-base font-semibold text-[var(--text-primary)]">
                     Ready to merge
                   </p>
-                  <p className="mt-1 text-xs leading-5 text-[#FFFFFF]/46">
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">
                     {readySummary}
                   </p>
                   <L2ActionArea
@@ -911,7 +911,7 @@ export default function MergePdfTool() {
                       >
                         {status === "Merging in your browser..." ? (
                           <>
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#E8DFC8]/24 border-t-white" />
+                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--lumeo-paper-200)]/24 border-t-white" />
                             Merging in your browser...
                           </>
                         ) : (
@@ -922,7 +922,7 @@ export default function MergePdfTool() {
                   />
                 </div>
               ) : (
-                <p className="mt-3 text-sm leading-6 text-[#FFFFFF]/48">
+                <p className="mt-3 text-sm leading-6 text-[var(--text-primary)]/48">
                   Add one more PDF to merge.
                 </p>
               )}
