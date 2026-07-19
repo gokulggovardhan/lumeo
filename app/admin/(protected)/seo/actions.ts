@@ -59,3 +59,26 @@ export async function saveSeoSetting(formData: FormData) {
   revalidatePath("/admin/seo");
   return successState("SEO record saved.");
 }
+
+export async function deleteSeoSetting(formData: FormData) {
+  const admin = await requireAdmin();
+  if (!canManageSeo(admin.role)) return errorState("You do not have permission to manage SEO records.");
+
+  const route = formString(formData, "route", 160);
+  if (!route) return errorState("Choose a valid route.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("seo_settings").delete().eq("route", route);
+
+  if (error) return errorState("SEO record could not be deleted.");
+
+  await writeAuditLog({
+    action: "seo.delete",
+    entityType: "seo_setting",
+    entityId: route,
+    summary: `Deleted SEO settings for ${route}.`,
+    changes: { route },
+  });
+  revalidatePath("/admin/seo");
+  return successState("SEO record deleted.");
+}

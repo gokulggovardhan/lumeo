@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { BrandLockup } from "@/components/BrandMark";
 import { AdminIcon } from "@/components/admin/AdminIcons";
 import { AdminSignOutButton } from "@/components/admin/AdminSignOutButton";
-import { adminNavigation, isActiveAdminRoute } from "@/lib/admin/navigation";
+import { isActiveAdminRoute, visibleAdminNavigation } from "@/lib/admin/navigation";
 import type { AdminRole } from "@/lib/admin/types";
 
 export function ControlCenterMobileNav({
@@ -59,7 +59,7 @@ export function ControlCenterMobileNav({
             <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[var(--lumeo-gold-300)]">{role}</p>
           </div>
           <nav className="grid gap-2" aria-label="Mobile Control Center navigation">
-            {adminNavigation.map((item) => {
+            {visibleAdminNavigation(role).map((item) => {
               const active = isActiveAdminRoute(pathname, item.href);
               return (
                 <Link

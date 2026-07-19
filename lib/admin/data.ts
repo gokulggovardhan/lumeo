@@ -1,13 +1,14 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { AdminContext } from "@/lib/admin/types";
+import type { AdminContext, AdminRole } from "@/lib/admin/types";
 import type {
   Announcement,
   AdminAnalyticsSummaryResult,
   AuditLog,
   DailyToolMetric,
   FeatureFlag,
+  FeedbackQuery,
   HomepageToolSlot,
   PdfTool,
   SeoSetting,
@@ -49,6 +50,7 @@ export type OverviewData = {
 export type AnalyticsSummary = {
   dataStatus: "available" | "unavailable";
   eventsToday: number;
+  uniqueVisitorsToday: number;
   pageViewsToday: number;
   toolOpens: number;
   processingStarted: number;
@@ -62,6 +64,7 @@ export type AnalyticsSummary = {
   sevenDayTotals: Array<{
     date: string;
     events: number;
+    uniqueVisitors: number;
     pageViews: number;
     toolOpens: number;
     succeeded: number;
@@ -106,6 +109,10 @@ function todayIsoDate() {
 
 function yesterdayIso() {
   return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+}
+
+function sixDaysAgoIsoDate() {
+  return new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 function isPublicAnalyticsEnabled(setting: SiteSetting | null | undefined) {
@@ -212,21 +219,59 @@ export async function getSiteSettings(): Promise<DataResult<SiteSetting[]>> {
   return safe((data ?? []) as SiteSetting[], error);
 }
 
-export async function getAuditLogs(limit = 50, offset = 0): Promise<DataResult<AuditLog[]>> {
+export type AuditLogFilters = {
+  action?: string;
+  entityType?: string;
+  startDate?: string;
+  endDate?: string;
+};
+
+export async function getAuditLogs(
+  limit = 50,
+  offset = 0,
+  filters: AuditLogFilters = {},
+): Promise<DataResult<AuditLog[]>> {
   const supabase = await createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("audit_logs")
     .select("id, actor_user_id, actor_role, action, entity_type, entity_id, summary, changes, created_at")
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
+  if (filters.action) query = query.ilike("action", `%${filters.action}%`);
+  if (filters.entityType) query = query.eq("entity_type", filters.entityType);
+  if (filters.startDate) query = query.gte("created_at", filters.startDate);
+  if (filters.endDate) query = query.lt("created_at", filters.endDate);
+
+  const { data, error } = await query;
+
   return safe((data ?? []) as AuditLog[], error);
+}
+
+export async function resolveAdminEmails(userIds: string[]): Promise<Record<string, string>> {
+  const uniqueIds = [...new Set(userIds.filter(Boolean))];
+  if (uniqueIds.length === 0) return {};
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("resolve_admin_emails", { p_user_ids: uniqueIds });
+  if (error || !Array.isArray(data)) return {};
+
+  const map: Record<string, string> = {};
+  for (const row of data) {
+    if (isRecord(row)) {
+      const userId = stringValue(row.user_id);
+      const email = stringValue(row.email);
+      if (userId && email) map[userId] = email;
+    }
+  }
+  return map;
 }
 
 function unavailableAnalyticsSummary(): AnalyticsSummary {
   return {
     dataStatus: "unavailable",
     eventsToday: 0,
+    uniqueVisitorsToday: 0,
     pageViewsToday: 0,
     toolOpens: 0,
     processingStarted: 0,
@@ -307,6 +352,7 @@ function parseDailyRows(value: unknown) {
   const rows: Array<{
     date: string;
     events: number;
+    uniqueVisitors: number;
     succeeded: number;
     failed: number;
     toolOpens: number;
@@ -319,6 +365,7 @@ function parseDailyRows(value: unknown) {
     const date = stringValue(row.date);
     if (!date) return null;
     const events = parseCount(row.total_events);
+    const uniqueVisitors = parseCount(row.unique_visitors);
     const toolOpens = parseCount(row.tool_opens);
     const processingStarted = parseCount(row.processing_started);
     const succeeded = parseCount(row.processing_succeeded);
@@ -327,6 +374,7 @@ function parseDailyRows(value: unknown) {
     rows.push({
       date,
       events,
+      uniqueVisitors,
       succeeded,
       failed,
       toolOpens,
@@ -372,6 +420,7 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
   const processingSucceeded = parseCount(value.summary.processing_succeeded);
   const processingFailed = parseCount(value.summary.processing_failed);
   const eventsToday = parseCount(value.summary.total_events);
+  const uniqueVisitorsToday = parseCount(value.summary.unique_visitors);
   const toolOpens = parseCount(value.summary.tool_opens);
   const processingStarted = parseCount(value.summary.processing_started);
   const downloadsStarted = parseCount(value.summary.downloads_started);
@@ -391,6 +440,7 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
   return {
     dataStatus: "available",
     eventsToday,
+    uniqueVisitorsToday,
     pageViewsToday,
     toolOpens,
     processingStarted,
@@ -412,6 +462,7 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
     sevenDayTotals: dailyRows.map((row) => ({
       date: row.date,
       events: row.events,
+      uniqueVisitors: row.uniqueVisitors,
       pageViews: row.pageViews,
       toolOpens: row.toolOpens,
       succeeded: row.succeeded,
@@ -447,21 +498,40 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
 export async function getAnalyticsSummary(): Promise<DataResult<AnalyticsSummary>> {
   const supabase = await createClient();
   const today = todayIsoDate();
-  const { data, error } = await supabase.rpc("get_admin_analytics_summary", {
-    p_start_date: today,
-    p_end_date: today,
-  });
+  const sevenDaysAgo = sixDaysAgoIsoDate();
 
-  if (error) {
-    return safe(unavailableAnalyticsSummary(), error);
+  // Two calls, not one: the RPC scopes both its "today" summary numbers and its
+  // daily_trend array off the same start/end range. A single 7-day-wide call
+  // would silently turn "Events Today" into a 7-day sum; a single today-only
+  // call (the prior behavior) silently turned "seven-day trend" into one day.
+  const [todayResult, trendResult] = await Promise.all([
+    supabase.rpc("get_admin_analytics_summary", { p_start_date: today, p_end_date: today }),
+    supabase.rpc("get_admin_analytics_summary", { p_start_date: sevenDaysAgo, p_end_date: today }),
+  ]);
+
+  if (todayResult.error) {
+    return safe(unavailableAnalyticsSummary(), todayResult.error);
   }
 
-  const parsed = parseAdminAnalyticsSummary(data as AdminAnalyticsSummaryResult | unknown);
-  if (!parsed) {
+  const parsedToday = parseAdminAnalyticsSummary(todayResult.data as AdminAnalyticsSummaryResult | unknown);
+  if (!parsedToday) {
     return safe(unavailableAnalyticsSummary(), new Error("Malformed admin analytics aggregate."));
   }
 
-  return safe(parsed, null);
+  // The trend call is best-effort: if it fails or is malformed, still return
+  // today's real numbers rather than hiding the whole dashboard behind it.
+  const parsedTrend = trendResult.error
+    ? null
+    : parseAdminAnalyticsSummary(trendResult.data as AdminAnalyticsSummaryResult | unknown);
+
+  return safe(
+    {
+      ...parsedToday,
+      sevenDayTotals: parsedTrend?.sevenDayTotals ?? parsedToday.sevenDayTotals,
+      dailyMetrics: parsedTrend?.dailyMetrics ?? parsedToday.dailyMetrics,
+    },
+    null,
+  );
 }
 
 export async function getOverviewData(): Promise<DataResult<OverviewData>> {
@@ -570,4 +640,54 @@ export async function getSystemStatus(admin: AdminContext): Promise<DataResult<S
       dailyMetricResult.error ??
       analyticsSettingResult.error,
   );
+}
+
+export type AdminMemberView = {
+  userId: string;
+  email: string | null;
+  role: AdminRole;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastSignInAt: string | null;
+};
+
+function parseAdminMembers(value: unknown): AdminMemberView[] {
+  if (!Array.isArray(value)) return [];
+  const rows: AdminMemberView[] = [];
+  for (const row of value) {
+    if (!isRecord(row)) continue;
+    const userId = stringValue(row.user_id);
+    const role = row.role;
+    if (!userId || (role !== "owner" && role !== "admin" && role !== "analyst")) continue;
+    rows.push({
+      userId,
+      email: stringValue(row.email),
+      role,
+      isActive: row.is_active === true,
+      createdAt: stringValue(row.created_at) ?? "",
+      updatedAt: stringValue(row.updated_at) ?? "",
+      lastSignInAt: stringValue(row.last_sign_in_at),
+    });
+  }
+  return rows;
+}
+
+export async function getAdminMembers(): Promise<DataResult<AdminMemberView[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("list_admin_members");
+
+  if (error) return safe([], error);
+  return safe(parseAdminMembers(data), null);
+}
+
+export async function getFeedbackQueries(limit = 25, offset = 0): Promise<DataResult<FeedbackQuery[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("feedback_queries")
+    .select("id, type, name, email, phone, subject, message, is_read, created_at")
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  return safe((data ?? []) as FeedbackQuery[], error);
 }

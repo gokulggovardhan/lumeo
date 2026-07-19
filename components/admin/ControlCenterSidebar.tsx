@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { BrandLockup } from "@/components/BrandMark";
 import { AdminIcon } from "@/components/admin/AdminIcons";
 import { AdminSignOutButton } from "@/components/admin/AdminSignOutButton";
-import { adminNavigation, isActiveAdminRoute } from "@/lib/admin/navigation";
+import { isActiveAdminRoute, visibleAdminNavigation } from "@/lib/admin/navigation";
 import type { AdminRole } from "@/lib/admin/types";
 
 export function ControlCenterSidebar({
@@ -31,7 +31,7 @@ export function ControlCenterSidebar({
           Control Center
         </p>
         <nav className="mt-3 space-y-1.5" aria-label="Control Center navigation">
-          {adminNavigation.map((item) => {
+          {visibleAdminNavigation(role).map((item) => {
             const active = isActiveAdminRoute(pathname, item.href);
             return (
               <Link

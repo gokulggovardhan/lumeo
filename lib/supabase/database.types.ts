@@ -23,6 +23,7 @@ export type DeviceClass = "desktop" | "tablet" | "mobile" | "unknown";
 export type AdminAnalyticsSummaryResult = {
   summary: {
     total_events: number;
+    unique_visitors: number;
     tool_opens: number;
     processing_started: number;
     processing_succeeded: number;
@@ -35,6 +36,7 @@ export type AdminAnalyticsSummaryResult = {
   daily_trend: Array<{
     date: string;
     total_events: number;
+    unique_visitors: number;
     tool_opens: number;
     processing_started: number;
     processing_succeeded: number;
@@ -91,6 +93,9 @@ export type FeatureFlag = {
   is_enabled: boolean;
   environment: FeatureEnvironment;
   config: Json;
+  rollout_percentage: number;
+  activate_at: string | null;
+  deactivate_at: string | null;
   updated_by: string | null;
   created_at: string;
   updated_at: string;
@@ -146,6 +151,20 @@ export type AuditLog = {
   created_at: string;
 };
 
+export type FeedbackQueryType = "Query" | "Feedback";
+
+export type FeedbackQuery = {
+  id: string;
+  type: FeedbackQueryType;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  subject: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+};
+
 export type AnalyticsEvent = {
   id: number;
   event_name: string;
@@ -185,6 +204,7 @@ export type ControlCenterDatabase = {
       announcements: { Row: Announcement };
       seo_settings: { Row: SeoSetting };
       audit_logs: { Row: AuditLog };
+      feedback_queries: { Row: FeedbackQuery };
       analytics_events: { Row: AnalyticsEvent };
       daily_tool_metrics: { Row: DailyToolMetric };
     };
@@ -227,6 +247,34 @@ export type ControlCenterDatabase = {
       get_admin_analytics_summary: {
         Args: { p_start_date: string; p_end_date: string };
         Returns: AdminAnalyticsSummaryResult;
+      };
+      get_public_maintenance_status: {
+        Args: Record<string, never>;
+        Returns: { enabled: boolean; title: string | null; message: string | null };
+      };
+      list_admin_members: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          user_id: string;
+          email: string | null;
+          role: AdminRole;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          last_sign_in_at: string | null;
+        }>;
+      };
+      add_admin_member: {
+        Args: { p_email: string; p_role: string };
+        Returns: { user_id: string; email: string; role: AdminRole };
+      };
+      update_admin_member: {
+        Args: { p_user_id: string; p_role: string; p_is_active: boolean };
+        Returns: undefined;
+      };
+      resolve_admin_emails: {
+        Args: { p_user_ids: string[] };
+        Returns: Array<{ user_id: string; email: string | null }>;
       };
     };
   };

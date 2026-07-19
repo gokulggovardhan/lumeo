@@ -48,7 +48,7 @@ export default async function HomepagePage() {
               <form key={slot.slot_number} action={asAdminFormAction(assignHomepageSlot)} className="flex flex-wrap gap-2">
                 <input type="hidden" name="slot_number" value={slot.slot_number} />
                 <select name="tool_id" defaultValue={slot.tool_id ?? ""} className="min-h-11 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm">
-                  <option value="">Choose tool</option>
+                  <option value="">Unassign</option>
                   {eligibleTools.map((tool) => (
                     <option key={tool.id} value={tool.id}>{tool.name}</option>
                   ))}

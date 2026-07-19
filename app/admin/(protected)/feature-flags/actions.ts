@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/server";
 import {
   errorState,
   formBoolean,
+  formNumber,
   formString,
   parseJsonConfig,
   successState,
@@ -26,11 +27,17 @@ export async function saveFeatureFlag(formData: FormData) {
   const environment = formString(formData, "environment", 40);
   const isEnabled = formBoolean(formData, "is_enabled");
   const config = parseJsonConfig(formString(formData, "config", 2000));
+  const rolloutPercentage = Math.min(100, Math.max(0, formNumber(formData, "rollout_percentage", 100)));
+  const activateAt = formString(formData, "activate_at", 80) || null;
+  const deactivateAt = formString(formData, "deactivate_at", 80) || null;
 
   if (!validateSlug(key) || !name || !validateEnvironment(environment)) {
     return errorState("Enter a valid key, name, and environment.");
   }
   if (!config.ok) return errorState(config.message);
+  if (activateAt && deactivateAt && new Date(deactivateAt).getTime() <= new Date(activateAt).getTime()) {
+    return errorState("Deactivate time must be after activate time.");
+  }
 
   const supabase = await createClient();
   const payload = {
@@ -40,6 +47,9 @@ export async function saveFeatureFlag(formData: FormData) {
     environment,
     is_enabled: isEnabled,
     config: config.value,
+    rollout_percentage: rolloutPercentage,
+    activate_at: activateAt,
+    deactivate_at: deactivateAt,
     updated_by: admin.userId,
   };
   const { error } = id
@@ -53,7 +63,7 @@ export async function saveFeatureFlag(formData: FormData) {
     entityType: "feature_flag",
     entityId: id || key,
     summary: id ? "Updated a feature flag." : "Created a feature flag.",
-    changes: { key, environment, is_enabled: isEnabled },
+    changes: { key, environment, is_enabled: isEnabled, rollout_percentage: rolloutPercentage },
   });
   revalidatePath("/admin/feature-flags");
   return successState("Feature flag saved.");

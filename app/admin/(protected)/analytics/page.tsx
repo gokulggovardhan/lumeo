@@ -40,7 +40,13 @@ export default async function AnalyticsPage() {
         />
       ) : (
         <>
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <AdminMetricCard
+              label="Unique Visitors Today"
+              value={data.uniqueVisitorsToday}
+              detail="Distinct anonymous sessions seen today."
+              tone="success"
+            />
             <AdminMetricCard
               label="Events Today"
               value={data.eventsToday}
@@ -106,15 +112,22 @@ export default async function AnalyticsPage() {
                   </span>
                 </p>
                 <p>
-                  Active metrics: page views, tool opens, top tools, device
-                  class, browser family, operating-system family, and seven-day
-                  discovery trend.
+                  Active metrics: unique visitors, page views, tool opens, top
+                  tools, device class, browser family, operating-system
+                  family, and seven-day discovery trend.
                 </p>
               </div>
             </AdminSectionCard>
           </section>
 
-          <section className="grid gap-4 lg:grid-cols-2">
+          <section className="grid gap-4 lg:grid-cols-3">
+            <AnalyticsBarList
+              title="Unique visitors by day"
+              items={data.sevenDayTotals.map((item) => ({
+                label: item.date,
+                value: item.uniqueVisitors,
+              }))}
+            />
             <AnalyticsBarList
               title="Page views by day"
               items={data.sevenDayTotals.map((item) => ({
@@ -144,9 +157,10 @@ export default async function AnalyticsPage() {
               description="Discovery events only. Operation lifecycle metrics are planned."
             >
               <AdminDataTable
-                columns={["Date", "Page Views", "Tool Opens", "Events"]}
+                columns={["Date", "Unique Visitors", "Page Views", "Tool Opens", "Events"]}
                 rows={data.sevenDayTotals.map((metric) => [
                   metric.date,
+                  metric.uniqueVisitors,
                   metric.pageViews,
                   metric.toolOpens,
                   metric.events,

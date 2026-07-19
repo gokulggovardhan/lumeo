@@ -12,10 +12,29 @@ export async function assignHomepageSlot(formData: FormData) {
   if (!canManageHomepage(admin.role)) return errorState("You do not have permission to update homepage slots.");
 
   const slotNumber = formNumber(formData, "slot_number", 0);
-  const toolId = formString(formData, "tool_id", 80);
-  if (slotNumber < 1 || slotNumber > 5 || !toolId) return errorState("Choose a valid slot and tool.");
+  const toolId = formString(formData, "tool_id", 80) || null;
+  if (slotNumber < 1 || slotNumber > 5) return errorState("Choose a valid slot.");
 
   const supabase = await createClient();
+
+  if (toolId === null) {
+    const { error } = await supabase
+      .from("homepage_tool_slots")
+      .upsert({ slot_number: slotNumber, tool_id: null, updated_by: admin.userId, updated_at: new Date().toISOString() });
+
+    if (error) return errorState("Homepage slot could not be unassigned.");
+
+    await writeAuditLog({
+      action: "homepage.slot.unassign",
+      entityType: "homepage_tool_slot",
+      entityId: String(slotNumber),
+      summary: `Unassigned homepage slot ${slotNumber}.`,
+      changes: { slot_number: slotNumber, tool_id: null },
+    });
+    revalidatePath("/admin/homepage");
+    return successState("Homepage slot unassigned.");
+  }
+
   const { data: tool, error: toolError } = await supabase
     .from("pdf_tools")
     .select("id, is_enabled, is_homepage_eligible")

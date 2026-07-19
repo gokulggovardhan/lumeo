@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
@@ -6,6 +7,14 @@ import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getOverviewData, getSystemStatus } from "@/lib/admin/data";
+
+function MetricLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="block rounded-[var(--radius-xl)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]">
+      {children}
+    </Link>
+  );
+}
 
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }) : "Unavailable";
@@ -40,16 +49,32 @@ export default async function AdminPage() {
       )}
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <AdminMetricCard label="Enabled PDF Tools" value={data.enabledTools} detail="Real enabled tools in the catalog." tone="success" />
-        <AdminMetricCard label="Active Announcements" value={data.activeAnnouncements} detail="Announcements currently marked active." tone="neutral" />
-        <AdminMetricCard label="Enabled Feature Flags" value={data.enabledFeatureFlags} detail="Flags currently enabled in the database." tone="gold" />
-        <AdminMetricCard label="Events Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsEventsToday} detail="Privacy-preserving analytics events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
+        <MetricLink href="/admin/tools">
+          <AdminMetricCard label="Enabled PDF Tools" value={data.enabledTools} detail="Real enabled tools in the catalog." tone="success" />
+        </MetricLink>
+        <MetricLink href="/admin/announcements">
+          <AdminMetricCard label="Active Announcements" value={data.activeAnnouncements} detail="Announcements currently marked active." tone="neutral" />
+        </MetricLink>
+        <MetricLink href="/admin/feature-flags">
+          <AdminMetricCard label="Enabled Feature Flags" value={data.enabledFeatureFlags} detail="Flags currently enabled in the database." tone="gold" />
+        </MetricLink>
+        <MetricLink href="/admin/analytics">
+          <AdminMetricCard label="Events Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsEventsToday} detail="Privacy-preserving analytics events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
+        </MetricLink>
       </section>
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <AdminMetricCard label="Public Page Views" value={analyticsUnavailable ? "Unavailable" : data.analyticsPageViewsToday} detail="Public page-view events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
-        <AdminMetricCard label="Most Opened Tool" value={analyticsUnavailable ? "Unavailable" : data.mostUsedTool ?? "N/A"} detail="Based on tool-open events." tone={analyticsUnavailable ? "warning" : "neutral"} />
-        <AdminMetricCard label="Analytics Status" value={system.data.adminAnalyticsRpcStatus === "unavailable" ? "Read unavailable" : system.data.analyticsEnabled ? "Enabled" : "Disabled"} detail="Controlled by public_analytics_enabled." tone={system.data.adminAnalyticsRpcStatus === "unavailable" ? "warning" : system.data.analyticsEnabled ? "success" : "neutral"} />
-        <AdminMetricCard label="Tool Opens Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsToolOpensToday} detail="PDF tool workspaces opened today." tone={analyticsUnavailable ? "warning" : "gold"} />
+        <MetricLink href="/admin/analytics">
+          <AdminMetricCard label="Public Page Views" value={analyticsUnavailable ? "Unavailable" : data.analyticsPageViewsToday} detail="Public page-view events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
+        </MetricLink>
+        <MetricLink href="/admin/analytics">
+          <AdminMetricCard label="Most Opened Tool" value={analyticsUnavailable ? "Unavailable" : data.mostUsedTool ?? "N/A"} detail="Based on tool-open events." tone={analyticsUnavailable ? "warning" : "neutral"} />
+        </MetricLink>
+        <MetricLink href="/admin/settings">
+          <AdminMetricCard label="Analytics Status" value={system.data.adminAnalyticsRpcStatus === "unavailable" ? "Read unavailable" : system.data.analyticsEnabled ? "Enabled" : "Disabled"} detail="Controlled by public_analytics_enabled." tone={system.data.adminAnalyticsRpcStatus === "unavailable" ? "warning" : system.data.analyticsEnabled ? "success" : "neutral"} />
+        </MetricLink>
+        <MetricLink href="/admin/analytics">
+          <AdminMetricCard label="Tool Opens Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsToolOpensToday} detail="PDF tool workspaces opened today." tone={analyticsUnavailable ? "warning" : "gold"} />
+        </MetricLink>
       </section>
 
       <AdminSectionCard title="System readiness" description="Truthful checks from the current request and database foundation.">
@@ -76,7 +101,11 @@ export default async function AdminPage() {
       </AdminSectionCard>
 
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <AdminSectionCard title="Most recent administrative actions" description="Latest audit records, when administrators begin making changes.">
+        <AdminSectionCard
+          title="Most recent administrative actions"
+          description="Latest audit records, when administrators begin making changes."
+          action={<Link href="/admin/audit" className="text-sm font-semibold text-[var(--text-accent)] hover:underline">View all</Link>}
+        >
           <AdminDataTable
             columns={["Time", "Action", "Summary"]}
             rows={data.recentAuditLogs.map((log) => [
@@ -103,7 +132,11 @@ export default async function AdminPage() {
         </AdminSectionCard>
       </div>
 
-      <AdminSectionCard title="Homepage slot status" description="Five configurable slots plus one permanent All PDF Tools card.">
+      <AdminSectionCard
+        title="Homepage slot status"
+        description="Five configurable slots plus one permanent All PDF Tools card."
+        action={<Link href="/admin/homepage" className="text-sm font-semibold text-[var(--text-accent)] hover:underline">Manage slots</Link>}
+      >
         <div className="grid gap-3 md:grid-cols-3">
           {data.homepageSlots.map((slot) => (
             <div key={slot.slot_number} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
