@@ -47,7 +47,7 @@ export function InboxClient({
   const [hasMore, setHasMore] = useState(initialItems.length === pageSize);
   const [deleting, setDeleting] = useState(false);
   const [banner, setBanner] = useState<{ tone: "error" | "success"; message: string } | null>(
-    initialError ? { tone: "error", message: "Some inbox data could not be loaded." } : null,
+    initialError ? { tone: "error", message: "We couldn't load your messages. Try refreshing the page." } : null,
   );
   const supabaseRef = useRef(createClient());
 
@@ -114,7 +114,7 @@ export function InboxClient({
         .range(items.length, items.length + pageSize - 1);
 
       if (error) {
-        setBanner({ tone: "error", message: "Could not load more messages." });
+        setBanner({ tone: "error", message: "Couldn't load more messages. Try again." });
         return;
       }
 
@@ -179,7 +179,7 @@ export function InboxClient({
               onChange={(event) => setReadFilter(event.target.value as ReadFilter)}
               className="min-h-9 flex-1 rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs font-semibold text-[var(--lumeo-paper-50)]"
             >
-              <option value="all">Read + unread</option>
+              <option value="all">All</option>
               <option value="unread">Unread only</option>
               <option value="read">Read only</option>
             </select>
@@ -197,7 +197,7 @@ export function InboxClient({
             <div className="p-4">
               <AdminEmptyState
                 title="No messages"
-                description={items.length === 0 ? "Submissions from the homepage widget will appear here." : "No messages match your filters."}
+                description={items.length === 0 ? "Messages from your website will show up here." : "No messages match your filters."}
               />
             </div>
           ) : (

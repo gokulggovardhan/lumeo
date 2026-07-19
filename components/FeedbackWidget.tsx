@@ -185,7 +185,11 @@ export function FeedbackWidget() {
                   ref={firstFieldRef}
                   required
                   value={form.type}
-                  onChange={(event) => updateField("type", event.target.value as FeedbackQueryType)}
+                  onChange={(event) =>
+                    // Switching type starts the rest of the form fresh -- a
+                    // half-filled Feedback shouldn't leak into a Query.
+                    setForm({ ...emptyForm, type: event.target.value as FeedbackQueryType })
+                  }
                   className="mt-1.5 min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
                 >
                   <option value="Query">Query</option>

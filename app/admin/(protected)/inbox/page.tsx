@@ -13,8 +13,8 @@ export default async function InboxPage() {
   if (!canViewInbox(admin.role)) {
     return (
       <div className="space-y-7">
-        <AdminPageHeader eyebrow="Messaging" title="Inbox" description="Feedback and query submissions from the public site." />
-        <AdminEmptyState title="Access restricted" description="Your role does not have inbox access." />
+        <AdminPageHeader eyebrow="Messaging" title="Inbox" description="Messages people send from your website." />
+        <AdminEmptyState title="You don't have access to this page" description="Ask an owner to give you access if you need it." />
       </div>
     );
   }
@@ -26,7 +26,7 @@ export default async function InboxPage() {
       <AdminPageHeader
         eyebrow="Messaging"
         title="Inbox"
-        description="Feedback and query submissions from the public site widget. Private — no public read access."
+        description="Messages people send from your website. Only you and your team can see them."
       />
       <div className="min-h-0 flex-1">
         <InboxClient
