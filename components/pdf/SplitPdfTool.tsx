@@ -1109,6 +1109,9 @@ export default function SplitPdfTool() {
     setStatus("Validating pages");
     setProgressDetail("Checking split settings.");
 
+    const startedAt = performance.now();
+    track({ eventName: "processing_started", toolSlug: "split" });
+
     try {
       const groups = getGroupsForMode();
       const usedNames = new Set<string>();
@@ -1156,6 +1159,12 @@ export default function SplitPdfTool() {
       });
       setStatus("Download ready");
       setProgressDetail("Split complete.");
+      track({
+        eventName: "processing_succeeded",
+        toolSlug: "split",
+        durationMs: performance.now() - startedAt,
+        success: true,
+      });
     } catch (splitError) {
       const message =
         splitError instanceof Error
@@ -1164,6 +1173,13 @@ export default function SplitPdfTool() {
       setError(message || "Split failed. Try a smaller or valid PDF.");
       setStatus("Ready");
       setProgressDetail("");
+      track({
+        eventName: "processing_failed",
+        toolSlug: "split",
+        durationMs: performance.now() - startedAt,
+        success: false,
+        errorCode: "processing_error",
+      });
     } finally {
       setIsSplitting(false);
     }
@@ -1171,6 +1187,7 @@ export default function SplitPdfTool() {
 
   function handleDownload() {
     if (!result) return;
+    track({ eventName: "download_started", toolSlug: "split" });
     downloadUrl(result.url, result.fileName);
     window.setTimeout(() => {
       clearResult("Temporary file cleared from this session.");
