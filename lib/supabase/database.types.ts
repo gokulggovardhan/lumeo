@@ -254,6 +254,16 @@ export type ControlCenterDatabase = {
         Args: Record<string, never>;
         Returns: { enabled: boolean; title: string | null; message: string | null };
       };
+      get_public_announcements: {
+        Args: Record<string, never>;
+        Returns: Array<{
+          title: string;
+          message: string;
+          tone: AnnouncementTone;
+          link_label: string | null;
+          link_url: string | null;
+        }>;
+      };
       list_admin_members: {
         Args: Record<string, never>;
         Returns: Array<{
