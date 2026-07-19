@@ -2,31 +2,34 @@ import type { Metadata } from "next";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import PdfToJpgTool from "@/components/pdf/PdfToJpgTool";
 import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
-export const metadata: Metadata = {
-  title: {
-    absolute: "PDF to JPG Converter Online | Lumeo PDF",
-  },
-  description:
-    "Export PDF pages as JPG images privately in your browser with Lumeo PDF Workspace. Choose pages, resolution, and quality without uploading files.",
-  alternates: {
-    canonical: "/pdf/pdf-to-jpg",
-  },
-  openGraph: {
-    title: "PDF to JPG Converter Online | Lumeo PDF",
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/pdf/pdf-to-jpg", {
+    title: {
+      absolute: "PDF to JPG Converter Online | Lumeo PDF",
+    },
     description:
-      "Turn PDF pages into JPG images in a calm browser-first workspace where files stay on your device.",
-    url: "https://lumeo.in/pdf/pdf-to-jpg",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "PDF to JPG Converter Online | Lumeo PDF",
-    description:
-      "Convert PDF pages to JPG images directly in your browser with no server upload.",
-  },
-};
+      "Export PDF pages as JPG images privately in your browser with Lumeo PDF Workspace. Choose pages, resolution, and quality without uploading files.",
+    alternates: {
+      canonical: "/pdf/pdf-to-jpg",
+    },
+    openGraph: {
+      title: "PDF to JPG Converter Online | Lumeo PDF",
+      description:
+        "Turn PDF pages into JPG images in a calm browser-first workspace where files stay on your device.",
+      url: "https://lumeo.in/pdf/pdf-to-jpg",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "PDF to JPG Converter Online | Lumeo PDF",
+      description:
+        "Convert PDF pages to JPG images directly in your browser with no server upload.",
+    },
+  });
+}
 
 export default function PdfToJpgPage() {
   return (

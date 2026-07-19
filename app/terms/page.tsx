@@ -7,30 +7,33 @@ import {
   InfoPageShell,
   InfoStructuredData,
 } from "@/components/InfoPage";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
 const lastUpdated = "July 11, 2026";
 
-export const metadata: Metadata = {
-  title: "Terms of Use - Lumeo PDF Workspace",
-  description:
-    "Review the terms governing access to and use of Lumeo PDF Workspace and its browser-first PDF tools.",
-  alternates: {
-    canonical: "https://lumeo.in/terms",
-  },
-  openGraph: {
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/terms", {
     title: "Terms of Use - Lumeo PDF Workspace",
     description:
-      "Plain-language terms for using Lumeo PDF Workspace and its browser-first PDF tools.",
-    url: "https://lumeo.in/terms",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Terms of Use - Lumeo PDF Workspace",
-    description: "Terms for accessing and using Lumeo PDF Workspace.",
-  },
-};
+      "Review the terms governing access to and use of Lumeo PDF Workspace and its browser-first PDF tools.",
+    alternates: {
+      canonical: "https://lumeo.in/terms",
+    },
+    openGraph: {
+      title: "Terms of Use - Lumeo PDF Workspace",
+      description:
+        "Plain-language terms for using Lumeo PDF Workspace and its browser-first PDF tools.",
+      url: "https://lumeo.in/terms",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Terms of Use - Lumeo PDF Workspace",
+      description: "Terms for accessing and using Lumeo PDF Workspace.",
+    },
+  });
+}
 
 const termsSchema = {
   "@context": "https://schema.org",
