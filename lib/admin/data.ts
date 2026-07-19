@@ -689,5 +689,12 @@ export async function getFeedbackQueries(limit = 25, offset = 0): Promise<DataRe
     .order("created_at", { ascending: false })
     .range(offset, offset + limit - 1);
 
+  if (error) {
+    // The client only ever sees a generic "unavailable" message (safe() below
+    // strips detail by design); the real cause -- most commonly the table
+    // missing because a migration didn't apply -- goes to server logs only.
+    console.error("getFeedbackQueries failed:", error.message);
+  }
+
   return safe((data ?? []) as FeedbackQuery[], error);
 }
