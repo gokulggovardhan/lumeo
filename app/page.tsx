@@ -6,6 +6,7 @@ import PublicFooter from "@/components/PublicFooter";
 import { PublicNav } from "@/components/PublicPdfChrome";
 import { PdfToolLauncher } from "@/components/pdf/PdfToolLauncher";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
 
 export const metadata: Metadata = {
   title: {
@@ -197,6 +198,8 @@ export default function Home() {
       <div className="relative z-10">
         <PublicFooter />
       </div>
+
+      <FeedbackWidget />
     </main>
   );
 }

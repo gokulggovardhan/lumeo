@@ -10,6 +10,19 @@ import { getFeatureFlags } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageFeatureFlags } from "@/lib/admin/permissions";
 import { saveFeatureFlag, toggleFeatureFlag } from "@/app/admin/(protected)/feature-flags/actions";
+import type { FeatureFlag } from "@/lib/supabase/database.types";
+
+function effectiveStatus(flag: FeatureFlag): { label: string; tone: "success" | "neutral" | "warning" | "danger" } {
+  if (!flag.is_enabled) return { label: "Disabled", tone: "neutral" };
+  const now = Date.now();
+  if (flag.activate_at && new Date(flag.activate_at).getTime() > now) {
+    return { label: "Scheduled", tone: "warning" };
+  }
+  if (flag.deactivate_at && new Date(flag.deactivate_at).getTime() <= now) {
+    return { label: "Expired", tone: "danger" };
+  }
+  return { label: flag.rollout_percentage < 100 ? `Enabled (${flag.rollout_percentage}%)` : "Enabled", tone: "success" };
+}
 
 export default async function FeatureFlagsPage() {
   const admin = await requireAdmin();
@@ -38,6 +51,20 @@ export default async function FeatureFlagsPage() {
               </select>
             </label>
             <AdminFormField label="Config JSON" name="config" defaultValue="{}" help="JSON object only." />
+            <label className="block text-sm font-semibold text-[#F0EAD6]">
+              Rollout percentage
+              <input
+                type="number"
+                name="rollout_percentage"
+                min={0}
+                max={100}
+                defaultValue={100}
+                className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)]"
+              />
+              <span className="mt-1 block text-xs font-normal text-[var(--lumeo-paper-400)]">Informational until application code reads flags.</span>
+            </label>
+            <AdminFormField label="Activate at (optional)" name="activate_at" type="datetime-local" help="Shows as “Scheduled” before this time." />
+            <AdminFormField label="Deactivate at (optional)" name="deactivate_at" type="datetime-local" help="Shows as “Expired” after this time." />
             <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-[#F0EAD6]">
               <input type="checkbox" name="is_enabled" className="h-4 w-4" />
               Enabled
@@ -51,11 +78,13 @@ export default async function FeatureFlagsPage() {
       <AdminSectionCard title="Flags by environment" description={canEdit ? "Owner and admin roles can toggle flags." : "Analyst access is read-only."}>
         <AdminDataTable
           columns={["Key", "Name", "Environment", "State", "Updated", "Action"]}
-          rows={flags.data.map((flag) => [
+          rows={flags.data.map((flag) => {
+            const status = effectiveStatus(flag);
+            return [
             flag.key,
             <div key="name"><p className="font-semibold text-[#F0EAD6]">{flag.name}</p><p className="text-xs text-[#F0EAD6]/46">{flag.description ?? "No description"}</p></div>,
             flag.environment,
-            <AdminStatusBadge key="state" tone={flag.is_enabled ? "success" : "neutral"}>{flag.is_enabled ? "Enabled" : "Disabled"}</AdminStatusBadge>,
+            <AdminStatusBadge key="state" tone={status.tone}>{status.label}</AdminStatusBadge>,
             new Date(flag.updated_at).toLocaleDateString(),
             canEdit ? (
               <form key="toggle" action={asAdminFormAction(toggleFeatureFlag)}>
@@ -64,7 +93,8 @@ export default async function FeatureFlagsPage() {
                 <AdminSubmitButton variant="secondary" pendingLabel="Updating...">{flag.is_enabled ? "Disable" : "Enable"}</AdminSubmitButton>
               </form>
             ) : "Read-only",
-          ])}
+          ];
+          })}
           empty={<AdminEmptyState title="No feature flags yet" description="Create flags when a real operational switch is needed." />}
         />
       </AdminSectionCard>

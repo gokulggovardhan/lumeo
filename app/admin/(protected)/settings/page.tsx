@@ -12,14 +12,22 @@ import { canManageSettings } from "@/lib/admin/permissions";
 import { updateSiteSetting } from "@/app/admin/(protected)/settings/actions";
 
 const approvedSettings = [
-  ["workspace_display_name", "Workspace display name", "Public-facing workspace label."],
-  ["support_email", "Support email", "Contact email shown where approved."],
-  ["contact_page_enabled", "Contact page enabled", "Database setting only in this phase."],
-  ["maintenance_mode", "Maintenance mode", "Stored only; no public behavior yet."],
-  ["public_analytics_enabled", "Public analytics enabled", "Enables optional anonymous product-use events. Do Not Track is still respected."],
-  ["homepage_privacy_message", "Homepage privacy message", "Future homepage copy foundation."],
-  ["default_seo_suffix", "Default SEO suffix", "Future SEO helper text."],
-] as const;
+  ["workspace_display_name", "Workspace display name", "Public-facing workspace label.", false],
+  ["support_email", "Support email", "Contact email shown where approved.", false],
+  ["contact_page_enabled", "Contact page enabled", "Database setting only in this phase.", false],
+  ["maintenance_mode", "Maintenance mode", "When enabled, every public route shows the maintenance page. /admin stays reachable so you can turn it back off.", true],
+  ["public_analytics_enabled", "Public analytics enabled", "Enables optional anonymous product-use events. Do Not Track is still respected.", true],
+  ["homepage_privacy_message", "Homepage privacy message", "Future homepage copy foundation.", false],
+  ["default_seo_suffix", "Default SEO suffix", "Future SEO helper text.", false],
+] as const satisfies ReadonlyArray<readonly [string, string, string, boolean]>;
+
+function settingMessageValue(value: unknown, field: "title" | "message") {
+  if (value && typeof value === "object" && field in value) {
+    const text = (value as { title?: unknown; message?: unknown })[field];
+    return typeof text === "string" ? text : "";
+  }
+  return "";
+}
 
 function settingDisplay(value: unknown) {
   if (value && typeof value === "object" && "text" in value) {
@@ -46,16 +54,37 @@ export default async function SettingsPage() {
         description="Approved workspace settings only. Secrets and arbitrary values are intentionally blocked."
       />
       {canEdit && (
-        <AdminSectionCard title="Approved settings" description="Owner-only controls. Maintenance mode is stored but not applied publicly in this phase.">
+        <AdminSectionCard title="Approved settings" description="Owner-only controls. Maintenance mode takes effect on the public site immediately after saving.">
           <div className="grid gap-4 lg:grid-cols-2">
-            {approvedSettings.map(([key, label, description]) => {
+            {approvedSettings.map(([key, label, description, wired]) => {
               const current = settingMap.get(key);
               const isBoolean = key === "contact_page_enabled" || key === "maintenance_mode" || key === "public_analytics_enabled";
+              const isMaintenanceMode = key === "maintenance_mode";
+              const isCurrentlyEnabled = isMaintenanceMode && settingDisplay(current?.value) === "Enabled";
               return (
-                <form key={key} action={asAdminFormAction(updateSiteSetting)} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+                <form
+                  key={key}
+                  action={asAdminFormAction(updateSiteSetting)}
+                  className={`rounded-2xl border p-4 ${
+                    isMaintenanceMode
+                      ? `lg:col-span-2 ${isCurrentlyEnabled ? "border-[var(--border-danger)] bg-[var(--surface-danger)]/10" : "border-[var(--border-subtle)] bg-[var(--surface-elevated)]"}`
+                      : "border-[var(--border-subtle)] bg-[var(--surface-elevated)]"
+                  }`}
+                >
                   <input type="hidden" name="key" value={key} />
                   <input type="hidden" name="description" value={description} />
-                  <p className="text-sm font-semibold text-[#F0EAD6]">{label}</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-semibold text-[#F0EAD6]">{label}</p>
+                    {isCurrentlyEnabled ? (
+                      <span className="rounded-full bg-[var(--surface-danger)] px-2.5 py-1 text-xs font-bold text-[var(--text-danger)]">
+                        Live: site is down for visitors
+                      </span>
+                    ) : !wired ? (
+                      <span className="rounded-full border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.06)] px-2.5 py-1 text-xs font-semibold text-[#F0EAD6]/56">
+                        Not yet active
+                      </span>
+                    ) : null}
+                  </div>
                   <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/48">{description}</p>
                   {isBoolean ? (
                     <label className="mt-3 flex min-h-11 items-center gap-3 text-sm font-semibold text-[#F0EAD6]">
@@ -65,10 +94,32 @@ export default async function SettingsPage() {
                   ) : (
                     <AdminFormField label="Value" name="value" defaultValue={settingDisplay(current?.value)} />
                   )}
-                  <label className="mt-3 flex min-h-11 items-center gap-3 text-sm font-semibold text-[#F0EAD6]">
-                    <input type="checkbox" name="is_public" defaultChecked={current?.is_public ?? false} className="h-4 w-4" />
-                    Public setting flag
-                  </label>
+                  {isMaintenanceMode ? (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <AdminFormField
+                        label="Title (optional)"
+                        name="maintenance_title"
+                        defaultValue={settingMessageValue(current?.value, "title")}
+                        help="Defaults to “Under maintenance” if left blank."
+                      />
+                      <AdminFormField
+                        label="Message (optional)"
+                        name="maintenance_message"
+                        defaultValue={settingMessageValue(current?.value, "message")}
+                        help="Defaults to a short standard message if left blank."
+                      />
+                    </div>
+                  ) : null}
+                  {isMaintenanceMode ? (
+                    <p className="mt-3 text-xs leading-5 text-[#F0EAD6]/48">
+                      Always public by design — this is the only way visitors see the maintenance page.
+                    </p>
+                  ) : (
+                    <label className="mt-3 flex min-h-11 items-center gap-3 text-sm font-semibold text-[#F0EAD6]">
+                      <input type="checkbox" name="is_public" defaultChecked={current?.is_public ?? false} className="h-4 w-4" />
+                      Public setting flag
+                    </label>
+                  )}
                   <AdminSubmitButton pendingLabel="Saving...">Save setting</AdminSubmitButton>
                 </form>
               );

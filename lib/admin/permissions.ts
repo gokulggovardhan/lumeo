@@ -28,6 +28,18 @@ export function canManageSettings(role: AdminRole | null) {
   return role === "owner";
 }
 
+export function canManageMembers(role: AdminRole | null) {
+  return role === "owner";
+}
+
+export function canViewInbox(role: AdminRole | null) {
+  return role === "owner" || role === "admin" || role === "analyst";
+}
+
+export function canManageInbox(role: AdminRole | null) {
+  return role === "owner" || role === "admin";
+}
+
 export function canViewAudit(role: AdminRole | null) {
   return role === "owner" || role === "admin" || role === "analyst";
 }
