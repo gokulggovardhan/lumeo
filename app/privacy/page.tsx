@@ -8,31 +8,34 @@ import {
   InfoPageShell,
   InfoStructuredData,
 } from "@/components/InfoPage";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
 const lastUpdated = "July 11, 2026";
 
-export const metadata: Metadata = {
-  title: "Privacy Policy - Lumeo PDF Workspace",
-  description:
-    "Understand how Lumeo PDF Workspace handles browser-first document processing, local preferences, analytics, and privacy.",
-  alternates: {
-    canonical: "https://lumeo.in/privacy",
-  },
-  openGraph: {
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/privacy", {
     title: "Privacy Policy - Lumeo PDF Workspace",
     description:
-      "How Lumeo PDF approaches browser-first document processing, local preferences, and privacy.",
-    url: "https://lumeo.in/privacy",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Privacy Policy - Lumeo PDF Workspace",
-    description:
-      "Understand Lumeo PDF's browser-first privacy approach.",
-  },
-};
+      "Understand how Lumeo PDF Workspace handles browser-first document processing, local preferences, analytics, and privacy.",
+    alternates: {
+      canonical: "https://lumeo.in/privacy",
+    },
+    openGraph: {
+      title: "Privacy Policy - Lumeo PDF Workspace",
+      description:
+        "How Lumeo PDF approaches browser-first document processing, local preferences, and privacy.",
+      url: "https://lumeo.in/privacy",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Privacy Policy - Lumeo PDF Workspace",
+      description:
+        "Understand Lumeo PDF's browser-first privacy approach.",
+    },
+  });
+}
 
 const privacySchema = {
   "@context": "https://schema.org",

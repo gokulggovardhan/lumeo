@@ -2,24 +2,27 @@ import type { Metadata } from "next";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import CompressPdfTool from "@/components/pdf/CompressPdfTool";
 import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
-export const metadata: Metadata = {
-  title: { absolute: "Compress PDF Online Privately - Reduce PDF File Size" },
-  description: "Compress PDF files privately with Lumeo PDF Workspace. Reduce document size using browser-first processing while keeping files on your device.",
-  alternates: { canonical: "/pdf/compress" },
-  openGraph: {
-    title: "Compress PDF Online Privately - Lumeo PDF",
-    description: "Reduce PDF file size in a calm browser-first workspace that keeps files on your device.",
-    url: "https://lumeo.in/pdf/compress",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Compress PDF Online Privately - Lumeo PDF",
-    description: "Compress PDF files privately in your browser with Lumeo PDF Workspace.",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/pdf/compress", {
+    title: { absolute: "Compress PDF Online Privately - Reduce PDF File Size" },
+    description: "Compress PDF files privately with Lumeo PDF Workspace. Reduce document size using browser-first processing while keeping files on your device.",
+    alternates: { canonical: "/pdf/compress" },
+    openGraph: {
+      title: "Compress PDF Online Privately - Lumeo PDF",
+      description: "Reduce PDF file size in a calm browser-first workspace that keeps files on your device.",
+      url: "https://lumeo.in/pdf/compress",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Compress PDF Online Privately - Lumeo PDF",
+      description: "Compress PDF files privately in your browser with Lumeo PDF Workspace.",
+    },
+  });
+}
 
 export default function CompressPdfPage() {
   return (

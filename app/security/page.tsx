@@ -7,29 +7,32 @@ import {
   InfoPageShell,
   InfoStructuredData,
 } from "@/components/InfoPage";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
-export const metadata: Metadata = {
-  title: "Security and Browser-First Processing - Lumeo PDF",
-  description:
-    "Learn how Lumeo PDF Workspace uses browser-first processing, local cleanup, dependency controls, and careful document handling.",
-  alternates: {
-    canonical: "https://lumeo.in/security",
-  },
-  openGraph: {
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/security", {
     title: "Security and Browser-First Processing - Lumeo PDF",
     description:
-      "How Lumeo PDF approaches local document processing, cleanup, and security limitations.",
-    url: "https://lumeo.in/security",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Security and Browser-First Processing - Lumeo PDF",
-    description:
-      "Learn about Lumeo PDF's browser-first security approach.",
-  },
-};
+      "Learn how Lumeo PDF Workspace uses browser-first processing, local cleanup, dependency controls, and careful document handling.",
+    alternates: {
+      canonical: "https://lumeo.in/security",
+    },
+    openGraph: {
+      title: "Security and Browser-First Processing - Lumeo PDF",
+      description:
+        "How Lumeo PDF approaches local document processing, cleanup, and security limitations.",
+      url: "https://lumeo.in/security",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Security and Browser-First Processing - Lumeo PDF",
+      description:
+        "Learn about Lumeo PDF's browser-first security approach.",
+    },
+  });
+}
 
 const securitySchema = {
   "@context": "https://schema.org",

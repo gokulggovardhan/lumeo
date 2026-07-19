@@ -2,31 +2,34 @@ import type { Metadata } from "next";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import JpgToPdfTool from "@/components/pdf/JpgToPdfTool";
 import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
-export const metadata: Metadata = {
-  title: {
-    absolute: "JPG to PDF Converter Online | Lumeo PDF",
-  },
-  description:
-    "Convert JPG and PNG images into a polished PDF privately in your browser with Lumeo PDF Workspace. Reorder images, choose a page size, and combine them without uploading files.",
-  alternates: {
-    canonical: "/pdf/jpg-to-pdf",
-  },
-  openGraph: {
-    title: "JPG to PDF Converter Online | Lumeo PDF",
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/pdf/jpg-to-pdf", {
+    title: {
+      absolute: "JPG to PDF Converter Online | Lumeo PDF",
+    },
     description:
-      "Turn images into a polished PDF in a calm browser-first workspace where supported files stay on your device.",
-    url: "https://lumeo.in/pdf/jpg-to-pdf",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "JPG to PDF Converter Online | Lumeo PDF",
-    description:
-      "Convert and reorder images into one PDF directly in your browser with no server upload for supported processing.",
-  },
-};
+      "Convert JPG and PNG images into a polished PDF privately in your browser with Lumeo PDF Workspace. Reorder images, choose a page size, and combine them without uploading files.",
+    alternates: {
+      canonical: "/pdf/jpg-to-pdf",
+    },
+    openGraph: {
+      title: "JPG to PDF Converter Online | Lumeo PDF",
+      description:
+        "Turn images into a polished PDF in a calm browser-first workspace where supported files stay on your device.",
+      url: "https://lumeo.in/pdf/jpg-to-pdf",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "JPG to PDF Converter Online | Lumeo PDF",
+      description:
+        "Convert and reorder images into one PDF directly in your browser with no server upload for supported processing.",
+    },
+  });
+}
 
 export default function JpgToPdfPage() {
   return (

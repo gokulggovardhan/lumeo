@@ -3,25 +3,28 @@ import PublicFooter from "@/components/PublicFooter";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import { L2DirectoryToolCard, L2TrustRail } from "@/components/ui/Aura";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
-export const metadata: Metadata = {
-  title: { absolute: "PDF Tools - Private Browser PDF Workspace | Lumeo PDF" },
-  description:
-    "Browse available Lumeo PDF tools by category. Choose a private browser-first workspace for merging, splitting, compressing, and converting PDFs.",
-  alternates: { canonical: "/pdf-tools" },
-  openGraph: {
-    title: "PDF Tools - Lumeo PDF Workspace",
-    description: "Browse available private browser-first PDF tools by category.",
-    url: "https://lumeo.in/pdf-tools",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "PDF Tools - Lumeo PDF Workspace",
-    description: "Choose a private browser-first PDF workspace by category.",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/pdf-tools", {
+    title: { absolute: "PDF Tools - Private Browser PDF Workspace | Lumeo PDF" },
+    description:
+      "Browse available Lumeo PDF tools by category. Choose a private browser-first workspace for merging, splitting, compressing, and converting PDFs.",
+    alternates: { canonical: "/pdf-tools" },
+    openGraph: {
+      title: "PDF Tools - Lumeo PDF Workspace",
+      description: "Browse available private browser-first PDF tools by category.",
+      url: "https://lumeo.in/pdf-tools",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "PDF Tools - Lumeo PDF Workspace",
+      description: "Choose a private browser-first PDF workspace by category.",
+    },
+  });
+}
 
 const structuredData = {
   "@context": "https://schema.org",

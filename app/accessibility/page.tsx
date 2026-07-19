@@ -7,30 +7,33 @@ import {
   InfoPageShell,
   InfoStructuredData,
 } from "@/components/InfoPage";
+import { withSeoOverride } from "@/lib/public-site/seo";
 
 const lastUpdated = "July 11, 2026";
 
-export const metadata: Metadata = {
-  title: "Accessibility - Lumeo PDF Workspace",
-  description:
-    "Learn how Lumeo PDF Workspace approaches keyboard access, readable interfaces, responsive design, and inclusive PDF tools.",
-  alternates: {
-    canonical: "https://lumeo.in/accessibility",
-  },
-  openGraph: {
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/accessibility", {
     title: "Accessibility - Lumeo PDF Workspace",
     description:
-      "How Lumeo PDF approaches keyboard access, readable interfaces, and inclusive PDF workflows.",
-    url: "https://lumeo.in/accessibility",
-    siteName: "Lumeo PDF",
-    type: "website",
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: "Accessibility - Lumeo PDF Workspace",
-    description: "Lumeo PDF's accessibility approach for document tools.",
-  },
-};
+      "Learn how Lumeo PDF Workspace approaches keyboard access, readable interfaces, responsive design, and inclusive PDF tools.",
+    alternates: {
+      canonical: "https://lumeo.in/accessibility",
+    },
+    openGraph: {
+      title: "Accessibility - Lumeo PDF Workspace",
+      description:
+        "How Lumeo PDF approaches keyboard access, readable interfaces, and inclusive PDF workflows.",
+      url: "https://lumeo.in/accessibility",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Accessibility - Lumeo PDF Workspace",
+      description: "Lumeo PDF's accessibility approach for document tools.",
+    },
+  });
+}
 
 const accessibilitySchema = {
   "@context": "https://schema.org",
