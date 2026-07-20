@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import PublicFooter from "@/components/PublicFooter";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import { ToolsExplorer } from "@/components/tools/ToolsExplorer";
+import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
+import { resolveLumeoTools } from "@/lib/tools/resolve";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -33,7 +35,10 @@ const structuredData = {
   description: "A directory of available Lumeo PDF tools.",
 };
 
-export default function PdfToolsPage() {
+export default async function PdfToolsPage() {
+  const catalog = await getPublicPdfCatalog();
+  const tools = resolveLumeoTools(catalog.tools);
+
   return (
     <PublicCatalogPageShell
       maxWidth="max-w-[1160px]"
@@ -54,7 +59,7 @@ export default function PdfToolsPage() {
         </p>
       </section>
 
-      <ToolsExplorer />
+      <ToolsExplorer tools={tools} />
 
       <div className="mt-10">
         <PublicFooter />

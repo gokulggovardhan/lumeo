@@ -2,25 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import type { PublicToolCategory } from "@/lib/public-catalog/types";
+import { ToolGlyph } from "@/components/pdf/ToolGlyph";
 import { L2MenuSurface } from "@/components/ui/Aura";
+import type { ResolvedTool } from "@/lib/tools/resolve";
 
 const MENU_ID = "lumeo-pdf-tools-menu";
-
-export const categoryLabels: Record<string, string> = {
-  "organize-pdf": "ORGANIZE",
-  "optimize-pdf": "OPTIMIZE",
-  "convert-to-pdf": "CONVERT TO PDF",
-  "convert-from-pdf": "CONVERT FROM PDF",
-};
-
-export const toolDescriptions: Record<string, string> = {
-  merge: "Combine documents",
-  split: "Extract pages",
-  compress: "Reduce file size",
-  "jpg-to-pdf": "Turn images into PDF",
-  "pdf-to-jpg": "Export pages as images",
-};
 
 function Chevron({ open }: { open: boolean }) {
   return (
@@ -31,10 +17,10 @@ function Chevron({ open }: { open: boolean }) {
 }
 
 export function PublicPdfToolsMenuClient({
-  categories,
+  tools,
   compact = false,
 }: {
-  categories: PublicToolCategory[];
+  tools: ResolvedTool[];
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -73,6 +59,9 @@ export function PublicPdfToolsMenuClient({
     };
   }, [open]);
 
+  const available = tools.filter((tool) => tool.availability === "available" && tool.effectivePrimaryRoute);
+  const hasSoon = tools.length > available.length;
+
   return (
     <div ref={wrapperRef} className="relative z-50">
       <button
@@ -86,7 +75,7 @@ export function PublicPdfToolsMenuClient({
           compact ? "h-10 px-3.5 sm:h-11 sm:px-4" : "px-3 py-2.5 sm:px-4"
         }`}
       >
-        <span>{compact ? "PDF Tools" : "PDF Tools"}</span>
+        <span>PDF Tools</span>
         <Chevron open={open} />
       </button>
 
@@ -97,12 +86,12 @@ export function PublicPdfToolsMenuClient({
             id={MENU_ID}
             role="menu"
             aria-label="PDF Tools"
-            className="aura-menu-reveal pointer-events-auto fixed inset-x-3 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto md:absolute md:inset-auto md:right-0 md:top-[calc(100%+0.65rem)] md:w-[min(21rem,calc(100vw-2rem))] md:max-h-[70vh] xl:right-[-20rem]"
+            className="aura-menu-reveal pointer-events-auto fixed inset-x-3 top-20 z-50 max-h-[calc(100dvh-6rem)] overflow-y-auto md:absolute md:inset-auto md:right-0 md:top-[calc(100%+0.65rem)] md:w-[min(23rem,calc(100vw-2rem))] md:max-h-[70vh] xl:right-[-20rem]"
           >
             <div className="flex items-start justify-between gap-4 px-1 pb-2">
               <div>
                 <p className="text-sm font-black text-[var(--text-primary)]">PDF Tools</p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">Choose a workspace.</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Each tool bundles several tasks.</p>
               </div>
               <button
                 type="button"
@@ -116,43 +105,37 @@ export function PublicPdfToolsMenuClient({
               </button>
             </div>
 
-            <div className="mt-2 grid gap-3">
-              {categories.map((category) => (
-                <section key={category.slug}>
-                  <h2 className="px-1 text-[0.68rem] font-black uppercase tracking-[0.16em] text-[var(--text-premium)]">{categoryLabels[category.slug] ?? category.name}</h2>
-                  <div className="mt-1.5 grid gap-1">
-                    {category.tools.map((tool) => (
-                      <Link
-                        key={tool.route}
-                        href={tool.route}
-                        role="menuitem"
-                        onClick={() => {
-                          setOpen(false);
-                        }}
-                        className="group flex items-center gap-3 rounded-[var(--radius-lg)] px-2.5 py-2.5 text-left transition duration-200 hover:bg-[rgba(var(--paper-rgb),0.075)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.16)]"
-                      >
-                        <span aria-hidden="true" className="grid h-8 w-8 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[rgba(var(--champagne-rgb),0.1)] text-[0.62rem] font-black text-[var(--text-premium)]">
-                          PDF
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-bold text-[var(--text-primary)]">{tool.toolName}</span>
-                          <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{toolDescriptions[tool.toolSlug] ?? tool.shortDescription}</span>
-                        </span>
-                        <span aria-hidden="true" className="shrink-0 text-[var(--text-premium)] transition group-hover:translate-x-0.5 motion-reduce:transform-none">
-                          →
-                        </span>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
+            <div className="mt-1 grid gap-1">
+              {available.map((tool) => (
+                <Link
+                  key={tool.key}
+                  href={tool.effectivePrimaryRoute as string}
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className="lumeo-tool-menuitem group flex items-center gap-3 rounded-[var(--radius-lg)] px-2.5 py-2.5 text-left transition duration-200 hover:bg-[rgba(var(--paper-rgb),0.075)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.16)]"
+                >
+                  <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[rgba(var(--champagne-rgb),0.1)] text-[var(--text-premium)]">
+                    <ToolGlyph name={tool.key} className="h-[19px] w-[19px]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-serif text-[0.95rem] font-medium leading-tight text-[var(--text-primary)]">{tool.name}</span>
+                    <span className="mt-0.5 block truncate font-mono text-[10.5px] text-[var(--text-muted)]">{tool.plain}</span>
+                  </span>
+                  <span aria-hidden="true" className="shrink-0 text-[var(--text-premium)] transition group-hover:translate-x-0.5 motion-reduce:transform-none">
+                    →
+                  </span>
+                </Link>
               ))}
             </div>
+
+            {hasSoon ? (
+              <p className="mt-2 px-2.5 text-[11px] text-[var(--text-subtle)]">More tools are in development.</p>
+            ) : null}
+
             <Link
               href="/pdf-tools"
               role="menuitem"
-              onClick={() => {
-                setOpen(false);
-              }}
+              onClick={() => setOpen(false)}
               className="mt-3 flex min-h-11 items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-3 text-sm font-black text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,253,248,0.07)] transition hover:bg-[rgba(var(--paper-rgb),0.085)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
             >
               <span>View all PDF tools</span>

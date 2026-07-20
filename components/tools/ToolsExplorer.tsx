@@ -3,14 +3,8 @@
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { ToolGlyph } from "@/components/pdf/ToolGlyph";
-import {
-  availableTools,
-  comingSoonTools,
-  lumeoTools,
-  type LumeoTool,
-  type ToolAction,
-  type ToolProcessing,
-} from "@/lib/tools/catalog";
+import type { ToolAction, ToolProcessing } from "@/lib/tools/catalog";
+import type { ResolvedTool } from "@/lib/tools/resolve";
 
 const PROCESSING_TAG: Record<ToolProcessing, string> = {
   browser: "Private",
@@ -22,7 +16,7 @@ function actionMatches(action: ToolAction, q: string) {
   return action.label.toLowerCase().includes(q);
 }
 
-function toolMatches(tool: LumeoTool, q: string) {
+function toolMatches(tool: ResolvedTool, q: string) {
   if (!q) return true;
   return (
     tool.name.toLowerCase().includes(q) ||
@@ -32,7 +26,7 @@ function toolMatches(tool: LumeoTool, q: string) {
   );
 }
 
-function ProcessingLine({ tool }: { tool: LumeoTool }) {
+function ProcessingLine({ tool }: { tool: ResolvedTool }) {
   const dotColor =
     tool.processing === "browser"
       ? "var(--atelier-sage-300)"
@@ -53,12 +47,13 @@ function ToolCard({
   animate,
   index,
 }: {
-  tool: LumeoTool;
+  tool: ResolvedTool;
   query: string;
   animate: boolean;
   index: number;
 }) {
-  const soon = tool.availability === "soon";
+  const openable = Boolean(tool.effectivePrimaryRoute);
+  const soon = tool.availability === "soon" || !openable;
 
   const inner = (
     <>
@@ -117,16 +112,16 @@ function ToolCard({
 
   const style = animate ? { animationDelay: `${Math.min(index, 7) * 45}ms` } : undefined;
 
-  if (soon || !tool.primaryRoute) {
+  if (soon || !tool.effectivePrimaryRoute) {
     return (
-      <div id={`tool-${tool.key}`} className={shell} style={style} aria-disabled={soon ? "true" : undefined}>
+      <div id={`tool-${tool.key}`} className={shell} style={style} aria-disabled="true">
         {inner}
       </div>
     );
   }
 
   return (
-    <Link id={`tool-${tool.key}`} href={tool.primaryRoute} aria-label={`Open ${tool.name}`} className={shell} style={style}>
+    <Link id={`tool-${tool.key}`} href={tool.effectivePrimaryRoute} aria-label={`Open ${tool.name}`} className={shell} style={style}>
       {inner}
     </Link>
   );
@@ -146,7 +141,7 @@ function SectionHead({ label, soon = false }: { label: string; soon?: boolean })
   );
 }
 
-export function ToolsExplorer() {
+export function ToolsExplorer({ tools }: { tools: ResolvedTool[] }) {
   const [query, setQuery] = useState("");
   const [touched, setTouched] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -155,17 +150,25 @@ export function ToolsExplorer() {
 
   const jumps = useMemo(() => {
     if (!q) return [];
-    const out: { action: ToolAction; tool: LumeoTool }[] = [];
-    for (const tool of lumeoTools) {
+    const out: { action: ToolAction; tool: ResolvedTool }[] = [];
+    for (const tool of tools) {
       for (const action of tool.actions) {
         if (actionMatches(action, q)) out.push({ action, tool });
       }
     }
     return out.slice(0, 8);
-  }, [q]);
+  }, [q, tools]);
 
-  const shownAvailable = availableTools.filter((tool) => toolMatches(tool, q));
-  const shownSoon = comingSoonTools.filter((tool) => toolMatches(tool, q));
+  // A tool only counts as "available" once it both carries the design's
+  // available flag AND actually has somewhere live to send someone --
+  // otherwise an admin disabling every action underneath it would leave a
+  // dead-looking card sitting in the wrong section.
+  const shownAvailable = tools
+    .filter((tool) => tool.availability === "available" && tool.effectivePrimaryRoute)
+    .filter((tool) => toolMatches(tool, q));
+  const shownSoon = tools
+    .filter((tool) => tool.availability === "soon" || !tool.effectivePrimaryRoute)
+    .filter((tool) => toolMatches(tool, q));
   const nothing = shownAvailable.length === 0 && shownSoon.length === 0;
 
   function scrollToTool(key: string) {
@@ -206,7 +209,7 @@ export function ToolsExplorer() {
             <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-subtle)]">Jump to</p>
             <div className="flex flex-wrap gap-2">
               {jumps.map(({ action, tool }) =>
-                action.route ? (
+                action.route && action.live ? (
                   <Link
                     key={`${tool.key}-${action.slug}`}
                     href={action.route}
