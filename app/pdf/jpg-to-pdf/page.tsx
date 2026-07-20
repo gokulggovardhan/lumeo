@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
-import JpgToPdfTool from "@/components/pdf/JpgToPdfTool";
-import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
+import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
 import { withSeoOverride } from "@/lib/public-site/seo";
+
+const JpgToPdfTool = dynamic(() => import("@/components/pdf/JpgToPdfTool"), {
+  loading: () => <ToolWorkspaceLoading />,
+});
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf/jpg-to-pdf", {

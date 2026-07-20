@@ -81,26 +81,17 @@ function TrustUserIcon() {
   );
 }
 
-function TrustClearIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[15px] w-[15px] text-[var(--atelier-sage-300)]">
-      <path d="M3 6h18M8 6V4h8v2M6 6l1 14a2 2 0 002 2h6a2 2 0 002-2l1-14" />
-    </svg>
-  );
-}
-
 const trustItems = [
-  { icon: TrustShieldIcon, label: "Zero server uploads" },
   { icon: TrustUserIcon, label: "No account needed" },
   { icon: TrustCheckIcon, label: "Free, always" },
-  { icon: TrustClearIcon, label: "Cleared after download" },
+  { icon: TrustShieldIcon, label: "No installs" },
 ];
 
 const whyItems = [
   {
     icon: TrustShieldIcon,
-    title: "Nothing leaves your device",
-    description: "Every merge, split, and compression happens locally in your browser.",
+    title: "Nothing is stored",
+    description: "Each file is processed for the task at hand, then cleared — no drafts, no cached copies.",
   },
   {
     icon: () => (
@@ -108,8 +99,8 @@ const whyItems = [
         <path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" />
       </svg>
     ),
-    title: "No account, no friction",
-    description: "Open a tool and start working. No sign-up, no waiting.",
+    title: "Open and go",
+    description: "Drop a file, get the result. No menus to learn, no setup.",
   },
   {
     icon: () => (
@@ -118,8 +109,8 @@ const whyItems = [
         <path d="M12 7v5l3 3" />
       </svg>
     ),
-    title: "Fast, on any device",
-    description: "Optimized to feel instant — on desktop, Android, and iPhone alike.",
+    title: "Fast, without the wait",
+    description: "No queues, no upload bars — results are ready right away.",
   },
 ];
 
@@ -150,7 +141,7 @@ export default function Home() {
               id="tool-heading"
               className="mt-2.5 font-serif font-semibold text-[clamp(1.75rem,3.6vw,2.5rem)] leading-[1.1] tracking-[-0.015em] text-[var(--text-primary)]"
             >
-              Every PDF tool, right <em className="not-italic text-[var(--atelier-sage-300)]">where you need it.</em>
+              The PDF tool you need, right <em className="not-italic text-[var(--atelier-sage-300)]">where you need it.</em>
             </h1>
           </header>
 
@@ -187,7 +178,7 @@ export default function Home() {
 
           <div className="my-16 rounded-[22px] border border-[var(--border-hairline)] bg-[linear-gradient(135deg,var(--surface-raised),var(--surface-base))] p-10 text-center sm:p-12">
             <h2 className="font-serif font-semibold text-2xl text-[var(--text-primary)] sm:text-[1.7rem]">Your next PDF task, sorted in seconds.</h2>
-            <p className="mx-auto mt-3 max-w-md text-[var(--text-secondary)]">No downloads to install, no forms to fill out. Just drop a file in.</p>
+            <p className="mx-auto mt-3 max-w-md text-[var(--text-secondary)]">No forms, no waiting. Drop a file in and get your result.</p>
             <Link
               href="/pdf-tools"
               className="mt-7 inline-flex items-center justify-center rounded-xl border border-[rgba(var(--atelier-sage-rgb),0.5)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-8 py-3.5 text-sm font-bold text-[var(--text-on-accent)] shadow-[0_12px_28px_rgba(var(--atelier-sage-rgb),0.18)] transition hover:-translate-y-0.5 hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]"

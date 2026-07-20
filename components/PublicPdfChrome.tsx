@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { L2PublicHeader, L2PublicNavLink } from "@/components/ui/Aura";
 import { PublicPdfToolsMenuClient } from "@/components/public/PublicPdfToolsMenuClient";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
+import { resolveLumeoTools } from "@/lib/tools/resolve";
 import { BrandLockup } from "@/components/BrandMark";
 
 function HomeIcon() {
@@ -22,6 +23,7 @@ export async function PublicNav({
   maxWidth?: string;
 }) {
   const catalog = await getPublicPdfCatalog();
+  const tools = resolveLumeoTools(catalog.tools);
 
   return (
     <L2PublicHeader className="lumeo-nav-enter aura-public-nav">
@@ -31,7 +33,7 @@ export async function PublicNav({
         </Link>
 
         <div className="flex shrink-0 items-center gap-2">
-          <PublicPdfToolsMenuClient categories={catalog.categories} compact />
+          <PublicPdfToolsMenuClient tools={tools} compact />
           <span className="hidden sm:inline-flex">
             <L2PublicNavLink href="/guides">Guides</L2PublicNavLink>
           </span>

@@ -11,6 +11,7 @@ import {
   AuraResultCard,
   AuraSectionHeader,
   AuraSegmentedControl,
+  AuraSkeleton,
   AuraStatus,
   AuraUploadSurface,
 } from "@/components/ui/Aura";
@@ -190,12 +191,15 @@ export function L2ToolPageHeader({
   title,
   description,
   categoryLabel = "PDF TOOL",
-  privacy = "Browser-first · Files stay on your device",
+  privacy,
   action,
 }: {
   title: string;
   description: string;
   categoryLabel?: string;
+  // Omit on pages that already state this via L2PrivacyNote in the
+  // workspace below -- the header pill and that note said the same thing
+  // in slightly different words on every one of the 5 live tool pages.
   privacy?: string;
   action?: ReactNode;
 }) {
@@ -209,9 +213,11 @@ export function L2ToolPageHeader({
         <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
           {description}
         </p>
-        <p className="mt-3 inline-flex rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-3 py-1.5 text-xs font-extrabold text-[var(--text-subtle)]">
-          {privacy}
-        </p>
+        {privacy ? (
+          <p className="mt-3 inline-flex rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-3 py-1.5 text-xs font-extrabold text-[var(--text-subtle)]">
+            {privacy}
+          </p>
+        ) : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </header>
@@ -276,7 +282,10 @@ export function L2UploadStage({
   title = "Drop PDFs here",
   description = "or choose files from your device",
   acceptedNote = "PDF documents",
-  privacyNote = "Browser-first processing for supported live tools",
+  // No default: L2PrivacyNote already states this once, right below the
+  // upload stage on every tool page -- pass an explicit privacyNote only
+  // if a specific page genuinely needs a distinct disclosure here.
+  privacyNote,
   action,
   inputId,
   accept = "application/pdf,.pdf",
@@ -646,5 +655,20 @@ export function L2PrivacyNote({ compact = false }: { compact?: boolean }) {
       </svg>
       <span>Private by design · Browser-only · Cleared after download</span>
     </div>
+  );
+}
+
+// Shown while a tool's own JS chunk (and the pdf-lib/pdfjs-dist libraries it
+// needs) loads on demand -- see the next/dynamic wrapper in each /pdf/*
+// page.tsx. Sized to roughly match the real workspace grid so the layout
+// doesn't jump once the tool mounts.
+export function ToolWorkspaceLoading() {
+  return (
+    <section aria-hidden="true" aria-label="Loading tool" className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] gap-5">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.9fr)_minmax(330px,1fr)] xl:gap-7">
+        <AuraSkeleton className="min-h-[22rem] rounded-[var(--radius-2xl)]" />
+        <AuraSkeleton className="min-h-[22rem] rounded-[var(--radius-2xl)]" />
+      </div>
+    </section>
   );
 }

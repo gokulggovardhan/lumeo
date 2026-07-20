@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Fraunces, IBM_Plex_Mono, Inter } from "next/font/google";
 import { AnalyticsPageView } from "@/components/analytics/AnalyticsPageView";
 import { AnalyticsProvider } from "@/components/analytics/AnalyticsProvider";
@@ -84,6 +84,18 @@ export const metadata: Metadata = {
     title: "Lumeo PDF Workspace",
     description: "Private PDF tools that run in your browser.",
   },
+};
+
+// viewportFit "cover" lets iOS content extend under the notch/home-indicator
+// area, using env(safe-area-inset-*) in CSS to stay clear of it; themeColor
+// tints the Android/Chrome address bar to match the brand outside of the
+// installed-PWA context (the manifest's theme_color only applies once
+// installed).
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#1E6B4A",
 };
 
 export default function RootLayout({

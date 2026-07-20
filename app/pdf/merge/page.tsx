@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
-import MergePdfTool from "@/components/pdf/MergePdfTool";
-import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
+import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
 import { withSeoOverride } from "@/lib/public-site/seo";
+
+// Defers pdf-lib (and pdfjs-dist for the preview) until this page is
+// actually visited and hydrates client-side, instead of shipping them in
+// every route that happens to reference this page. The tool's own logic is
+// untouched -- only when its JS loads changes.
+const MergePdfTool = dynamic(() => import("@/components/pdf/MergePdfTool"), {
+  loading: () => <ToolWorkspaceLoading />,
+});
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf/merge", {

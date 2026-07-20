@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
+import dynamic from "next/dynamic";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
-import CompressPdfTool from "@/components/pdf/CompressPdfTool";
-import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
+import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
 import { withSeoOverride } from "@/lib/public-site/seo";
+
+const CompressPdfTool = dynamic(() => import("@/components/pdf/CompressPdfTool"), {
+  loading: () => <ToolWorkspaceLoading />,
+});
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf/compress", {
