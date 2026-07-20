@@ -152,13 +152,12 @@ export const lumeoTools: LumeoTool[] = [
     plain: "Sign & fill",
     tag: "Complete forms and sign — privately, in the browser.",
     processing: "browser",
-    availability: "soon",
+    availability: "available",
+    primaryRoute: "/pdf/sign",
     actions: [
+      { label: "Sign PDF", slug: "sign", route: "/pdf/sign", live: true },
       { label: "Fill forms", slug: "fill-forms", live: false },
-      { label: "Draw signature", slug: "draw-signature", live: false },
-      { label: "Type signature", slug: "type-signature", live: false },
       { label: "Initials & date", slug: "initials-date", live: false },
-      { label: "Flatten", slug: "flatten-signature", live: false },
     ],
   },
   {

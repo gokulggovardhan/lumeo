@@ -5,7 +5,8 @@ export type PdfToolSlug =
   | "split"
   | "compress"
   | "jpg-to-pdf"
-  | "pdf-to-jpg";
+  | "pdf-to-jpg"
+  | "sign";
 
 export type PdfToolDefinition = {
   slug: PdfToolSlug;
@@ -107,6 +108,24 @@ export const pdfTools: PdfToolDefinition[] = [
       "Quality control",
       "DPI presets",
       "ZIP download for multiple pages",
+    ],
+  },
+  {
+    slug: "sign",
+    title: "Sign PDF",
+    shortTitle: "Sign",
+    description: "Draw or type your signature and place it on any page.",
+    route: "/pdf/sign",
+    status: "live",
+    browserNote: "Browser-first signing",
+    engineNote: "Live now",
+    accepted: "one PDF file",
+    bullets: [
+      "Draw signature",
+      "Type signature",
+      "Drag to position",
+      "Resize signature",
+      "Any page",
     ],
   },
 ];
