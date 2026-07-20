@@ -1,64 +1,55 @@
-import { AdminDataTable } from "@/components/admin/AdminDataTable";
-import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
-import { AdminSubmitButton } from "@/components/admin/AdminSubmitButton";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getHomepageSlots, getPdfTools } from "@/lib/admin/data";
-import { asAdminFormAction } from "@/lib/admin/form-action";
-import { canManageHomepage } from "@/lib/admin/permissions";
-import { assignHomepageSlot } from "@/app/admin/(protected)/homepage/actions";
+import { lumeoTools } from "@/lib/tools/catalog";
 
+// The homepage_tool_slots table and its assign form were retired once the
+// public homepage moved to a fixed, curated set of dual-named tools (see
+// lib/tools/catalog.ts) instead of five admin-picked flat actions. Keeping a
+// working "Assign" button here would have quietly done nothing on the live
+// site -- worse than removing it. What still controls the live homepage is
+// each action's status/enabled state on the Tools page.
 export default async function HomepagePage() {
-  const admin = await requireAdmin();
-  const [slots, tools] = await Promise.all([getHomepageSlots(), getPdfTools()]);
-  const canEdit = canManageHomepage(admin.role);
-  const eligibleTools = tools.data.filter((tool) => tool.is_enabled && tool.is_homepage_eligible);
+  await requireAdmin();
+
+  const previewTools = lumeoTools.filter((tool) => tool.availability === "available");
 
   return (
     <div className="space-y-7">
       <AdminPageHeader
-        eyebrow="Public launcher foundation"
+        eyebrow="Public launcher"
         title="Homepage"
-        description="Configure five database-backed tool slots. The sixth card is permanently All PDF Tools and is not stored."
+        description="The homepage now shows a fixed, curated set of tools defined in code rather than five admin-assigned slots. This page is read-only; use PDF Tools to control which underlying actions are live."
       />
-      <AdminSectionCard title="Homepage preview" description="This reflects what the live public homepage reads from these slots, including a tool's live/coming-soon status set on the PDF Tools page.">
+      <AdminSectionCard title="Live homepage tools" description="What actually renders on the public homepage right now, in order.">
         <div className="grid gap-3 md:grid-cols-3">
-          {slots.data.map((slot) => (
-            <div key={slot.slot_number} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]/72">Slot {slot.slot_number}</p>
-              <p className="mt-3 text-base font-semibold text-[#F0EAD6]">{slot.tool?.name ?? "Unassigned"}</p>
-              <p className="mt-1 text-sm text-[#F0EAD6]/48">{slot.tool?.short_description ?? "Choose an eligible tool."}</p>
+          {previewTools.map((tool) => (
+            <div key={tool.key} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]/72">{tool.plain}</p>
+              <p className="mt-3 text-base font-semibold text-[#F0EAD6]">{tool.name}</p>
+              <p className="mt-1 text-sm text-[#F0EAD6]/48">{tool.tag}</p>
             </div>
           ))}
           <div className="rounded-2xl border border-[#1E6B4A]/40 bg-[#1E6B4A]/12 p-4">
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]/72">Permanent</p>
             <p className="mt-3 text-base font-semibold text-[#F0EAD6]">All PDF Tools</p>
-            <p className="mt-1 text-sm text-[#F0EAD6]/48">Always shown as the sixth card.</p>
+            <p className="mt-1 text-sm text-[#F0EAD6]/48">Always shown as the closing card, linking to the full catalog.</p>
           </div>
         </div>
       </AdminSectionCard>
-      <AdminSectionCard title="Slot assignments" description={canEdit ? "Assign enabled homepage-eligible tools to slots 1-5." : "Analyst access is read-only."}>
-        <AdminDataTable
-          columns={["Slot", "Current tool", "Assign"]}
-          rows={slots.data.map((slot) => [
-            `Slot ${slot.slot_number}`,
-            slot.tool?.name ?? "Unassigned",
-            canEdit ? (
-              <form key={slot.slot_number} action={asAdminFormAction(assignHomepageSlot)} className="flex flex-wrap gap-2">
-                <input type="hidden" name="slot_number" value={slot.slot_number} />
-                <select name="tool_id" defaultValue={slot.tool_id ?? ""} className="min-h-11 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm">
-                  <option value="">Unassign</option>
-                  {eligibleTools.map((tool) => (
-                    <option key={tool.id} value={tool.id}>{tool.name}</option>
-                  ))}
-                </select>
-                <AdminSubmitButton pendingLabel="Assigning...">Assign</AdminSubmitButton>
-              </form>
-            ) : "Read-only",
-          ])}
-          empty={<AdminEmptyState title="No homepage slots found" description="Run the Control Center migration to seed five homepage slots." />}
-        />
+      <AdminSectionCard title="Changing what's shown" description="Two different things determine what a visitor actually sees.">
+        <ul className="grid gap-2 text-sm leading-6 text-[#F0EAD6]/72">
+          <li>
+            <span className="font-semibold text-[#F0EAD6]">Which underlying action is live</span> — set on the{" "}
+            <a href="/admin/tools" className="text-[#CBA052] underline underline-offset-2">PDF Tools</a> page (status, enabled). This
+            still governs the whole site: nav, homepage, and the tools catalog.
+          </li>
+          <li>
+            <span className="font-semibold text-[#F0EAD6]">The tool names, grouping, and order shown above</span> — a design decision
+            defined in code (<code className="font-mono text-xs text-[#F0EAD6]/60">lib/tools/catalog.ts</code>), reviewed and changed via a
+            pull request rather than this page.
+          </li>
+        </ul>
       </AdminSectionCard>
     </div>
   );

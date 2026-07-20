@@ -20,7 +20,7 @@ export default async function ToolsPage() {
       <AdminPageHeader
         eyebrow="Catalog"
         title="PDF Tools"
-        description="Manage the database catalog for Lumeo PDF tools. Status and homepage-slot assignment here drive the live public homepage and catalog."
+        description="Manage the database catalog for Lumeo PDF tools. An action's status and enabled state here control whether it shows as live in the nav, homepage, and tools catalog. Tool grouping and naming (Compose, Distill, and the rest) are defined in code — see lib/tools/catalog.ts."
       />
       <AdminSectionCard title="Tool catalog" description={canEdit ? "Owner and admin roles can update catalog controls." : "Analyst access is read-only."}>
         <AdminDataTable
