@@ -23,11 +23,14 @@ const HANDWRITING_FONTS = [
 
 export type CreatedSignature = { dataUrl: string; aspectRatio: number; source: SignatureSourceKind };
 
-async function canvasToSignature(canvas: HTMLCanvasElement, source: SignatureSourceKind): Promise<CreatedSignature | null> {
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-  if (!blob) return null;
+// A real base64 data: URL, not a blob: object URL -- signatures get saved
+// into the library (localStorage) for reuse across sessions, and blob URLs
+// are torn down the moment the page that created them unloads. A saved
+// signature with a blob: dataUrl would render fine this session and then
+// silently break on the very next reload.
+function canvasToSignature(canvas: HTMLCanvasElement, source: SignatureSourceKind): CreatedSignature {
   return {
-    dataUrl: URL.createObjectURL(blob),
+    dataUrl: canvas.toDataURL("image/png"),
     aspectRatio: canvas.width / canvas.height,
     source,
   };
@@ -145,7 +148,7 @@ function DrawTab({ onCreate }: { onCreate: (signature: CreatedSignature) => void
           onClick={() => {
             const canvas = canvasRef.current;
             if (!canvas) return;
-            void canvasToSignature(canvas, "draw").then((result) => result && onCreate(result));
+            onCreate(canvasToSignature(canvas, "draw"));
           }}
           className="ml-auto rounded-full bg-[var(--lumeo-gold)] px-3 py-1.5 text-xs font-semibold text-[var(--foreground)] transition hover:bg-[var(--lumeo-seal-500)] disabled:opacity-40"
         >
@@ -162,7 +165,7 @@ function TypeTab({ onCreate }: { onCreate: (signature: CreatedSignature) => void
   const [fontSize, setFontSize] = useState(52);
   const fontStack = HANDWRITING_FONTS.find((item) => item.value === font)?.stack ?? "cursive";
 
-  async function use() {
+  function use() {
     const trimmed = text.trim();
     if (!trimmed) return;
     const canvas = document.createElement("canvas");
@@ -180,8 +183,7 @@ function TypeTab({ onCreate }: { onCreate: (signature: CreatedSignature) => void
       context.font = `italic ${size}px ${fontStack}`;
     }
     context.fillText(trimmed, 10, canvas.height / 2 + 4);
-    const result = await canvasToSignature(canvas, "type");
-    if (result) onCreate(result);
+    onCreate(canvasToSignature(canvas, "type"));
   }
 
   return (
@@ -237,15 +239,26 @@ function UploadTab({ onCreate }: { onCreate: (signature: CreatedSignature) => vo
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
   const imgElRef = useRef<HTMLImageElement | null>(null);
 
+  const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg", "image/webp"];
+
   function handleFile(file: File) {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      setImageSize({ width: img.width, height: img.height });
-      setImageUrl(url);
-      setCrop(null);
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return;
+    // A data: URL (not a blob: object URL) -- no revocation to track, and it
+    // sidesteps rendering an unvalidated file's raw bytes through a bare
+    // object-URL sink.
+    const reader = new FileReader();
+    reader.onload = () => {
+      const url = typeof reader.result === "string" ? reader.result : "";
+      if (!url) return;
+      const img = new Image();
+      img.onload = () => {
+        setImageSize({ width: img.width, height: img.height });
+        setImageUrl(url);
+        setCrop(null);
+      };
+      img.src = url;
     };
-    img.src = url;
+    reader.readAsDataURL(file);
   }
 
   function handleContainerPointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -275,7 +288,7 @@ function UploadTab({ onCreate }: { onCreate: (signature: CreatedSignature) => vo
 
   const canUse = Boolean(imageUrl);
 
-  async function use() {
+  function use() {
     const img = imgElRef.current;
     const container = containerRef.current;
     if (!img || !container || !imageSize) return;
@@ -294,8 +307,7 @@ function UploadTab({ onCreate }: { onCreate: (signature: CreatedSignature) => vo
     const context = canvas.getContext("2d");
     if (!context) return;
     context.drawImage(img, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height);
-    const result = await canvasToSignature(canvas, "upload");
-    if (result) onCreate(result);
+    onCreate(canvasToSignature(canvas, "upload"));
   }
 
   return (
