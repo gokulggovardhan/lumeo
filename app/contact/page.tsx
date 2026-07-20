@@ -7,6 +7,7 @@ import {
   InfoPageShell,
   InfoStructuredData,
 } from "@/components/InfoPage";
+import { ContactForm } from "@/components/ContactForm";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -51,11 +52,13 @@ export default function ContactPage() {
         title="Let's improve document work together"
         description="Use the guidance below for product feedback, privacy questions, accessibility concerns, or responsible security reports."
       >
-        <InfoCallout>
-          A public contact mailbox has not been verified in the repository, so
-          this page does not publish an email address yet. Do not send
-          confidential PDF files through informal channels.
-        </InfoCallout>
+        <InfoPageSection title="Send us a message">
+          <ContactForm />
+          <InfoCallout>
+            Do not send confidential PDF files through this form — describe
+            the issue in words instead.
+          </InfoCallout>
+        </InfoPageSection>
 
         <InfoPageSection title="Contact categories">
           <InfoDefinitionList
@@ -120,7 +123,7 @@ export default function ContactPage() {
               "Clear reproduction steps.",
               "Potential impact.",
               "Non-destructive proof.",
-              "Contact details for follow-up when a verified mailbox is available.",
+              "Contact details for follow-up, using the form above.",
             ]}
           />
           <p>

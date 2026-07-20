@@ -57,23 +57,23 @@ function ToolCard({
 
   const inner = (
     <>
-      <div className="flex items-center gap-4">
-        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-[13px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)]">
-          <ToolGlyph name={tool.key} className="h-[26px] w-[26px]" />
+      <div className="flex items-center gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)]">
+          <ToolGlyph name={tool.key} className="h-[19px] w-[19px]" />
         </span>
         <span className="min-w-0">
-          <span className="block font-serif text-[1.35rem] font-medium leading-none tracking-[-0.015em] text-[var(--text-primary)]">
+          <span className="block font-serif text-[1.05rem] font-medium leading-none tracking-[-0.01em] text-[var(--text-primary)]">
             {tool.name}
           </span>
-          <span className="mt-1.5 block font-mono text-[11px] tracking-[0.01em] text-[var(--text-muted)]">
+          <span className="mt-1 block font-mono text-[10px] tracking-[0.01em] text-[var(--text-muted)]">
             {tool.plain}
           </span>
         </span>
       </div>
 
-      <p className="text-[13.5px] leading-relaxed text-[var(--text-secondary)]">{tool.tag}</p>
+      <p className="text-[12.5px] leading-relaxed text-[var(--text-secondary)]">{tool.tag}</p>
 
-      <div className="mt-auto flex flex-wrap gap-x-3 gap-y-1 text-[12px] leading-6 text-[var(--text-muted)]">
+      <div className="mt-auto flex flex-wrap gap-x-2.5 gap-y-1 text-[11.5px] leading-6 text-[var(--text-muted)]">
         {tool.actions.map((action) => {
           const hit = query.length > 0 && actionMatches(action, query);
           return (
@@ -91,9 +91,9 @@ function ToolCard({
         })}
       </div>
 
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex items-center justify-between pt-0.5">
         {soon ? <span /> : <ProcessingLine tool={tool} />}
-        <span className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--text-muted)] transition-colors duration-200 group-hover:text-[var(--text-premium)]">
+        <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-muted)] transition-colors duration-200 group-hover:text-[var(--text-premium)]">
           {soon ? "Notify me" : "Open"}
           <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none">
             →
@@ -104,7 +104,7 @@ function ToolCard({
   );
 
   const shell =
-    "lumeo-tool-card group relative flex flex-col gap-3.5 rounded-[16px] border p-5 " +
+    "lumeo-tool-card group relative flex flex-col gap-2.5 rounded-[14px] border p-4 " +
     (soon
       ? "border-dashed border-[var(--border-subtle)] bg-transparent"
       : "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-300 [transition-timing-function:var(--lumeo-spring)] hover:-translate-y-1 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-base)]") +
@@ -247,7 +247,7 @@ export function ToolsExplorer({ tools }: { tools: ResolvedTool[] }) {
       {shownAvailable.length > 0 ? (
         <>
           <SectionHead label="Available now" />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {shownAvailable.map((tool, index) => (
               <ToolCard key={tool.key} tool={tool} query={q} animate={!touched} index={index} />
             ))}
@@ -258,7 +258,7 @@ export function ToolsExplorer({ tools }: { tools: ResolvedTool[] }) {
       {shownSoon.length > 0 ? (
         <>
           <SectionHead label="Coming soon" soon />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {shownSoon.map((tool, index) => (
               <ToolCard key={tool.key} tool={tool} query={q} animate={!touched} index={shownAvailable.length + index} />
             ))}

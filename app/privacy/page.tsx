@@ -94,7 +94,7 @@ export default function PrivacyPage() {
               {
                 term: "May be stored",
                 description:
-                  "Non-document UI preferences such as thumbnail density for Split PDF.",
+                  "Non-document UI preferences such as layout choices within Compose.",
               },
               {
                 term: "Not stored",
@@ -130,8 +130,9 @@ export default function PrivacyPage() {
           <p>
             Lumeo uses web hosting and deployment infrastructure to serve the
             public site. Fonts are loaded through the framework&apos;s font system.
-            Current Merge and Split workflows do not require remote PDF
-            processing services.
+            Current Compose, Distill, Capture, and Render workflows run
+            entirely in the browser and do not require remote PDF processing
+            services.
           </p>
         </InfoPageSection>
 

@@ -6,22 +6,21 @@ import PublicFooter from "@/components/PublicFooter";
 import { PublicNav } from "@/components/PublicPdfChrome";
 import { PdfToolLauncher } from "@/components/pdf/PdfToolLauncher";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
-import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/", {
     title: {
       absolute:
-        "Lumeo PDF - Merge, Split & Compress PDFs Privately in Your Browser",
+        "Lumeo PDF - Merge, Split, Compress & Convert PDFs Privately in Your Browser",
     },
     description:
-      "Merge, split, and compress PDFs privately in your browser. Lumeo is a calm, professional document workspace with no account required.",
+      "Merge, split, compress, and convert PDFs and images privately in your browser. Lumeo is a calm, professional document workspace with no account required.",
     alternates: { canonical: "/" },
     openGraph: {
       title: "Lumeo PDF - Private Browser PDF Tools",
       description:
-        "Merge, split, and compress PDFs in a private browser-first workspace.",
+        "Merge, split, compress, and convert PDFs and images in a private browser-first workspace.",
       url: "https://lumeo.in",
       siteName: "Lumeo PDF",
       type: "website",
@@ -50,8 +49,8 @@ const structuredData = [
     applicationCategory: "BusinessApplication",
     operatingSystem: "Any modern browser",
     description:
-      "A browser-first PDF workspace for private document merging, splitting, and compression.",
-    featureList: ["Merge PDF", "Split PDF", "Compress PDF"],
+      "A browser-first PDF workspace for private document merging, splitting, compression, and image conversion.",
+    featureList: ["Merge PDF", "Split PDF", "Compress PDF", "JPG to PDF", "PDF to JPG"],
   },
 ];
 
@@ -192,8 +191,6 @@ export default function Home() {
       <div className="relative z-10">
         <PublicFooter />
       </div>
-
-      <FeedbackWidget />
     </main>
   );
 }

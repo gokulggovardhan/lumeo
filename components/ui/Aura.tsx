@@ -525,8 +525,8 @@ export function AuraPageHeader({ eyebrow, title, description, action }: { eyebro
     <header className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
       <div>
         {eyebrow ? <p className="aura-text-label text-[var(--lumeo-gold-300)]">{eyebrow}</p> : null}
-        <h1 className="mt-2 font-serif font-semibold text-[var(--text-heading-xl)] leading-[var(--leading-heading)] text-[var(--lumeo-paper-50)]">{title}</h1>
-        {description ? <p className="mt-3 max-w-3xl text-[var(--text-body-md)] leading-[var(--leading-body)] text-[var(--lumeo-paper-400)]">{description}</p> : null}
+        <h1 className="mt-2 font-serif font-semibold text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] text-[color:var(--lumeo-paper-50)]">{title}</h1>
+        {description ? <p className="mt-3 max-w-3xl text-[length:var(--text-body-md)] leading-[var(--leading-body)] text-[color:var(--lumeo-paper-400)]">{description}</p> : null}
       </div>
       {action ? <div>{action}</div> : null}
     </header>
