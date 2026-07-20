@@ -174,7 +174,7 @@ export default function OpenGraphImage() {
               letterSpacing: 2,
             }}
           >
-            Merge &middot; Split &middot; Compress
+            Merge &middot; Split &middot; Compress &middot; Images &harr; PDF
           </div>
         </div>
       </div>

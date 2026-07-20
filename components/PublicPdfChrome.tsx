@@ -17,6 +17,15 @@ function HomeIcon() {
   );
 }
 
+function ContactIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[1.05rem] w-[1.05rem]" fill="none">
+      <path d="M4 6.5a1.5 1.5 0 0 1 1.5-1.5h13a1.5 1.5 0 0 1 1.5 1.5v11a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 17.5z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
+      <path d="m4.8 6.2 7.2 6 7.2-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75" />
+    </svg>
+  );
+}
+
 export async function PublicNav({
   maxWidth = "max-w-[1160px]",
 }: {
@@ -40,6 +49,14 @@ export async function PublicNav({
           <span className="hidden sm:inline-flex">
             <L2PublicNavLink href="/privacy">Privacy</L2PublicNavLink>
           </span>
+          <Link
+            href="/contact"
+            aria-label="Contact Lumeo"
+            title="Contact"
+            className="lumeo-press lumeo-focus-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-[rgba(var(--champagne-rgb),0.12)] text-[var(--text-accent)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition hover:bg-[rgba(var(--champagne-rgb),0.2)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
+          >
+            <ContactIcon />
+          </Link>
           <Link
             href="/"
             aria-label="Go to Lumeo PDF home"
