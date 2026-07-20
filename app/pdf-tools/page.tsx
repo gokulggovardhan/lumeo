@@ -50,7 +50,7 @@ export default function PdfToolsPage() {
           Everything a PDF needs. <em className="not-italic text-[var(--atelier-sage-300)]">Most of it never leaves your browser.</em>
         </h1>
         <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-          The everyday work lives here — and where it can, it runs entirely on your device, so the file never leaves it.
+          Every tool below groups the tasks people actually need — no hunting through a hundred one-off links.
         </p>
       </section>
 

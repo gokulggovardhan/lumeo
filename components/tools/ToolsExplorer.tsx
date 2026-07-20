@@ -7,10 +7,16 @@ import {
   availableTools,
   comingSoonTools,
   lumeoTools,
-  PROCESSING_LABEL,
   type LumeoTool,
   type ToolAction,
+  type ToolProcessing,
 } from "@/lib/tools/catalog";
+
+const PROCESSING_TAG: Record<ToolProcessing, string> = {
+  browser: "Private",
+  server: "Server",
+  hybrid: "Adaptive",
+};
 
 function actionMatches(action: ToolAction, q: string) {
   return action.label.toLowerCase().includes(q);
@@ -36,7 +42,7 @@ function ProcessingLine({ tool }: { tool: LumeoTool }) {
   return (
     <span className="inline-flex items-center gap-2 text-[11.5px] text-[var(--text-muted)]">
       <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: dotColor }} />
-      {PROCESSING_LABEL[tool.processing]}
+      {PROCESSING_TAG[tool.processing]}
     </span>
   );
 }
@@ -91,11 +97,7 @@ function ToolCard({
       </div>
 
       <div className="flex items-center justify-between pt-1">
-        {soon ? (
-          <span className="text-[11.5px] text-[var(--text-subtle)]">In development</span>
-        ) : (
-          <ProcessingLine tool={tool} />
-        )}
+        {soon ? <span /> : <ProcessingLine tool={tool} />}
         <span className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--text-muted)] transition-colors duration-200 group-hover:text-[var(--text-premium)]">
           {soon ? "Notify me" : "Open"}
           <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none">
