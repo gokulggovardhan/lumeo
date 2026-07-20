@@ -191,12 +191,15 @@ export function L2ToolPageHeader({
   title,
   description,
   categoryLabel = "PDF TOOL",
-  privacy = "Browser-first · Files stay on your device",
+  privacy,
   action,
 }: {
   title: string;
   description: string;
   categoryLabel?: string;
+  // Omit on pages that already state this via L2PrivacyNote in the
+  // workspace below -- the header pill and that note said the same thing
+  // in slightly different words on every one of the 5 live tool pages.
   privacy?: string;
   action?: ReactNode;
 }) {
@@ -210,9 +213,11 @@ export function L2ToolPageHeader({
         <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
           {description}
         </p>
-        <p className="mt-3 inline-flex rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-3 py-1.5 text-xs font-extrabold text-[var(--text-subtle)]">
-          {privacy}
-        </p>
+        {privacy ? (
+          <p className="mt-3 inline-flex rounded-[var(--radius-pill)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-3 py-1.5 text-xs font-extrabold text-[var(--text-subtle)]">
+            {privacy}
+          </p>
+        ) : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </header>
@@ -277,7 +282,10 @@ export function L2UploadStage({
   title = "Drop PDFs here",
   description = "or choose files from your device",
   acceptedNote = "PDF documents",
-  privacyNote = "Browser-first processing for supported live tools",
+  // No default: L2PrivacyNote already states this once, right below the
+  // upload stage on every tool page -- pass an explicit privacyNote only
+  // if a specific page genuinely needs a distinct disclosure here.
+  privacyNote,
   action,
   inputId,
   accept = "application/pdf,.pdf",

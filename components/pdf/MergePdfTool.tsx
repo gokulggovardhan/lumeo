@@ -860,7 +860,6 @@ export default function MergePdfTool() {
             acceptedNote="PDF only · Minimum two files"
             multiple
             icon={<MergeIcon />}
-            privacyNote="Browser-first processing for supported live tools"
             buttonLabel="Select PDFs"
             onFilesSelected={(selectedFiles) => {
               void addFiles(selectedFiles);
@@ -1091,15 +1090,6 @@ export default function MergePdfTool() {
                 {cleanupMessage}
               </div>
             ) : null}
-          </div>
-
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/70 px-4 py-2 text-xs text-[var(--text-primary)]/54 shadow-inner shadow-black/20">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-              <L2PrivacyNote compact />
-              <p className="lg:hidden">
-                Files stay on your device. No server upload.
-              </p>
-            </div>
           </div>
         </L2ToolMainColumn>
 
