@@ -55,6 +55,26 @@ function ToolCard({
   const openable = Boolean(tool.effectivePrimaryRoute);
   const soon = tool.availability === "soon" || !openable;
 
+  // A tool can bundle several genuinely separate destinations (Compose is
+  // both Merge and Split -- two different routes, two different jobs).
+  // Picking one as "the" primaryRoute and burying the other behind a search
+  // was the actual bug: clicking the card always opened Merge, and Split was
+  // only reachable by typing its name into the search box first. Instead,
+  // every distinct live route gets its own equal-weight button up front --
+  // first action pointing at a given route names that button (so "Split",
+  // not one of its later sub-modes like "Split by range").
+  const destinations: ToolAction[] = [];
+  const seenRoutes = new Set<string>();
+  for (const action of tool.actions) {
+    if (!action.live || !action.route || seenRoutes.has(action.route)) continue;
+    seenRoutes.add(action.route);
+    destinations.push(action);
+  }
+
+  const extraActions = tool.actions.filter(
+    (action) => !destinations.some((dest) => dest.slug === action.slug),
+  );
+
   const inner = (
     <>
       <div className="flex items-center gap-3">
@@ -73,47 +93,62 @@ function ToolCard({
 
       <p className="text-[12.5px] leading-relaxed text-[var(--text-secondary)]">{tool.tag}</p>
 
-      <div className="mt-auto flex flex-wrap gap-x-2.5 gap-y-1 text-[11.5px] leading-6 text-[var(--text-muted)]">
-        {tool.actions.map((action) => {
-          const hit = query.length > 0 && actionMatches(action, query);
-          const style = hit ? { color: "var(--atelier-sage-300)" } : undefined;
-
-          // A live action with its own route is independently openable -- it
-          // gets a real link, sitting above the card's stretched primary-route
-          // link (see `shell` below) so it isn't shadowed by it. Every other
-          // tool with several live actions (not just Compose) had this same
-          // gap: only the card's one primaryRoute was ever reachable by click.
-          if (action.live && action.route) {
+      {destinations.length > 0 ? (
+        <div className="flex flex-wrap gap-1.5">
+          {destinations.map((action) => {
+            const hit = query.length > 0 && actionMatches(action, query);
             return (
               <Link
                 key={action.slug}
-                href={action.route}
-                className="relative z-10 inline-flex items-center rounded-full text-[var(--text-secondary)] underline decoration-transparent underline-offset-2 transition hover:text-[var(--text-primary)] hover:decoration-[var(--atelier-sage-400)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--atelier-sage-500)]"
-                style={style}
+                href={action.route as string}
+                className={`inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border px-3 py-1.5 text-[12.5px] font-semibold transition ${
+                  hit
+                    ? "border-[var(--atelier-sage-500)] bg-[rgba(var(--atelier-sage-rgb),0.14)] text-[var(--text-primary)]"
+                    : "border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--atelier-sage-500)] hover:text-[var(--text-primary)]"
+                }`}
               >
-                <span aria-hidden="true" className="mr-1.5 h-1 w-1 rounded-full bg-[var(--atelier-sage-400)]" />
                 {action.label}
+                <span aria-hidden="true" className="text-[var(--text-subtle)] transition-transform group-hover:translate-x-0.5">→</span>
               </Link>
             );
-          }
+          })}
+        </div>
+      ) : null}
 
-          return (
-            <span key={action.slug} className="inline-flex items-center" style={style}>
-              {action.label}
-            </span>
-          );
-        })}
-      </div>
+      {extraActions.length > 0 ? (
+        <div className="mt-auto flex flex-wrap gap-x-2.5 gap-y-1 text-[11px] leading-6 text-[var(--text-muted)]">
+          {extraActions.map((action) => {
+            const hit = query.length > 0 && actionMatches(action, query);
+            const style = hit ? { color: "var(--atelier-sage-300)" } : undefined;
 
-      <div className="flex items-center justify-between pt-0.5">
-        {soon ? <span /> : <ProcessingLine tool={tool} />}
-        <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-muted)] transition-colors duration-200 group-hover:text-[var(--text-premium)]">
-          {soon ? "Notify me" : "Open"}
-          <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none">
-            →
-          </span>
-        </span>
-      </div>
+            if (action.live && action.route) {
+              return (
+                <Link
+                  key={action.slug}
+                  href={action.route}
+                  className="inline-flex items-center rounded-full text-[var(--text-secondary)] underline decoration-transparent underline-offset-2 transition hover:text-[var(--text-primary)] hover:decoration-[var(--atelier-sage-400)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--atelier-sage-500)]"
+                  style={style}
+                >
+                  <span aria-hidden="true" className="mr-1.5 h-1 w-1 rounded-full bg-[var(--atelier-sage-400)]" />
+                  {action.label}
+                </Link>
+              );
+            }
+
+            return (
+              <span key={action.slug} className="inline-flex items-center" style={style}>
+                {action.label}
+              </span>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {!soon ? (
+        <div className="flex items-center justify-between pt-0.5">
+          <ProcessingLine tool={tool} />
+        </div>
+      ) : null}
     </>
   );
 
@@ -121,27 +156,20 @@ function ToolCard({
     "lumeo-tool-card group relative flex flex-col gap-2.5 rounded-[14px] border p-4 " +
     (soon
       ? "border-dashed border-[var(--border-subtle)] bg-transparent"
-      : "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-300 [transition-timing-function:var(--lumeo-spring)] hover:-translate-y-1 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-base)]") +
+      : "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-300 [transition-timing-function:var(--lumeo-spring)]") +
     (animate ? " lumeo-fade-up" : "");
 
   const style = animate ? { animationDelay: `${Math.min(index, 7) * 45}ms` } : undefined;
 
-  if (soon || !tool.effectivePrimaryRoute) {
-    return (
-      <div id={`tool-${tool.key}`} className={shell} style={style} aria-disabled="true">
-        {inner}
-      </div>
-    );
-  }
-
   return (
-    <div id={`tool-${tool.key}`} className={shell} style={style}>
-      <Link
-        href={tool.effectivePrimaryRoute}
-        aria-label={`Open ${tool.name}`}
-        className="absolute inset-0 z-0 rounded-[14px]"
-      />
+    <div id={`tool-${tool.key}`} className={shell} style={style} aria-disabled={soon ? "true" : undefined}>
       {inner}
+      {soon ? (
+        <span className="inline-flex items-center gap-1.5 self-start text-[12px] text-[var(--text-muted)]">
+          Notify me
+          <span aria-hidden="true">→</span>
+        </span>
+      ) : null}
     </div>
   );
 }
