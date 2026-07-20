@@ -11,6 +11,7 @@ import {
   AuraResultCard,
   AuraSectionHeader,
   AuraSegmentedControl,
+  AuraSkeleton,
   AuraStatus,
   AuraUploadSurface,
 } from "@/components/ui/Aura";
@@ -646,5 +647,20 @@ export function L2PrivacyNote({ compact = false }: { compact?: boolean }) {
       </svg>
       <span>Private by design · Browser-only · Cleared after download</span>
     </div>
+  );
+}
+
+// Shown while a tool's own JS chunk (and the pdf-lib/pdfjs-dist libraries it
+// needs) loads on demand -- see the next/dynamic wrapper in each /pdf/*
+// page.tsx. Sized to roughly match the real workspace grid so the layout
+// doesn't jump once the tool mounts.
+export function ToolWorkspaceLoading() {
+  return (
+    <section aria-hidden="true" aria-label="Loading tool" className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] gap-5">
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.9fr)_minmax(330px,1fr)] xl:gap-7">
+        <AuraSkeleton className="min-h-[22rem] rounded-[var(--radius-2xl)]" />
+        <AuraSkeleton className="min-h-[22rem] rounded-[var(--radius-2xl)]" />
+      </div>
+    </section>
   );
 }
