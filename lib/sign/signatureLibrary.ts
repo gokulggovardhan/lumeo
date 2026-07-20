@@ -13,10 +13,24 @@ const MAX_SIGNATURES = 12;
 // localStorage is writable by anything with script access to this origin
 // (another extension, a future bug elsewhere on the page) -- a value read
 // back from it and handed straight to an <img src> is not provably safe
-// just because our own writer only ever puts safe values there. Validating
-// the exact shape at the read boundary is what actually closes that gap,
-// not just the good behavior of saveSignature().
-const SAFE_DATA_URL_PATTERN = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
+// just because our own writer only ever puts safe values there.
+//
+// A boolean .test() gate in a .filter() predicate lets the *original*
+// unmodified string continue flowing to that sink -- static analysis
+// doesn't credit a filter for "cleaning" the values it lets through, it
+// only cares about the value's own construction. Rebuilding the dataUrl
+// from regex capture groups (rather than passing the input straight
+// through) is what actually breaks that flow: the string handed to the
+// sink is a freshly-constructed literal, not the localStorage value.
+const SAFE_DATA_URL_PATTERN = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+=*)$/;
+
+export function sanitizeDataUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const match = SAFE_DATA_URL_PATTERN.exec(value);
+  if (!match) return null;
+  const [, format, payload] = match;
+  return `data:image/${format};base64,${payload}`;
+}
 
 function readAll(): SavedSignature[] {
   if (typeof window === "undefined") return [];
@@ -25,14 +39,14 @@ function readAll(): SavedSignature[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (item): item is SavedSignature =>
-        item &&
-        typeof item === "object" &&
-        typeof item.id === "string" &&
-        typeof item.dataUrl === "string" &&
-        SAFE_DATA_URL_PATTERN.test(item.dataUrl),
-    );
+    const result: SavedSignature[] = [];
+    for (const item of parsed) {
+      if (!item || typeof item !== "object" || typeof item.id !== "string") continue;
+      const safeDataUrl = sanitizeDataUrl(item.dataUrl);
+      if (!safeDataUrl) continue;
+      result.push({ ...item, dataUrl: safeDataUrl } as SavedSignature);
+    }
+    return result;
   } catch {
     return [];
   }

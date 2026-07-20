@@ -8,6 +8,7 @@
 // a simple, easily-testable list view.
 
 import { useState } from "react";
+import { sanitizeDataUrl } from "@/lib/sign/signatureLibrary";
 import type { SavedSignature } from "@/lib/sign/types";
 
 export function SignatureLibraryPanel({
@@ -61,7 +62,7 @@ export function SignatureLibraryPanel({
                 className="flex h-12 w-full items-center justify-center overflow-hidden rounded"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={signature.dataUrl} alt={signature.name} className="max-h-full max-w-full object-contain" />
+                <img src={sanitizeDataUrl(signature.dataUrl) ?? ""} alt={signature.name} className="max-h-full max-w-full object-contain" />
               </button>
 
               {signature.isDefault ? (
