@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PublicFooter from "@/components/PublicFooter";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
+import { PdfHeroVisual } from "@/components/pdf/PdfHeroVisual";
 import { ToolsExplorer } from "@/components/tools/ToolsExplorer";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
 import { resolveLumeoTools } from "@/lib/tools/resolve";
@@ -49,14 +50,17 @@ export default async function PdfToolsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <section className="lumeo-fade-up mb-7 max-w-2xl">
-        <p className="aura-text-label text-[var(--lumeo-gold-300)]">PDF tools</p>
-        <h1 className="mt-3 font-serif font-medium text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[color:var(--text-primary)]">
-          The PDF tools that matter. <em className="not-italic text-[var(--atelier-sage-300)]">They run entirely in your browser.</em>
-        </h1>
-        <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-          Each tool below groups related tasks in one place. More arrive as they&rsquo;re ready.
-        </p>
+      <section className="lumeo-fade-up mb-7 flex items-center justify-between gap-8">
+        <div className="max-w-2xl">
+          <p className="aura-text-label text-[var(--lumeo-gold-300)]">PDF tools</p>
+          <h1 className="mt-3 font-serif font-medium text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[color:var(--text-primary)]">
+            The PDF tools that matter. <em className="not-italic text-[var(--atelier-sage-300)]">They run entirely in your browser.</em>
+          </h1>
+          <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+            Each tool below groups related tasks in one place. More arrive as they&rsquo;re ready.
+          </p>
+        </div>
+        <PdfHeroVisual />
       </section>
 
       <ToolsExplorer tools={tools} />

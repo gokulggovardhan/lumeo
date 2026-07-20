@@ -19,7 +19,7 @@ import { AuraOptionCard, AuraStatus } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
-type SplitMode = "extract" | "ranges" | "everyPage" | "everyN" | "remove";
+type SplitMode = "extract" | "ranges" | "everyPage" | "everyN" | "remove" | "reorder";
 type ResultKind = "pdf" | "zip";
 type ThumbnailDensity = "compact" | "comfortable" | "large";
 type ProgressStage =
@@ -74,6 +74,7 @@ type UiHistoryState = {
   chunkSize: number;
   outputName: string;
   rotations: Record<number, number>;
+  pageOrder: number[];
 };
 
 const splitModes: Array<{ value: SplitMode; label: string; helper: string }> = [
@@ -82,6 +83,7 @@ const splitModes: Array<{ value: SplitMode; label: string; helper: string }> = [
   { value: "everyPage", label: "Every page", helper: "Create one PDF per page." },
   { value: "everyN", label: "Every N pages", helper: "Create equal document chunks." },
   { value: "remove", label: "Remove pages", helper: "Create one PDF without selected pages." },
+  { value: "reorder", label: "Reorder pages", helper: "Drag pages into a new order." },
 ];
 
 const densityClasses: Record<ThumbnailDensity, string> = {
@@ -559,6 +561,9 @@ export default function SplitPdfTool() {
   const [isSplitting, setIsSplitting] = useState(false);
   const [result, setResult] = useState<SplitResult | null>(null);
   const [rotations, setRotations] = useState<Record<number, number>>({});
+  const [pageOrder, setPageOrder] = useState<number[]>([]);
+  const [draggingPage, setDraggingPage] = useState<number | null>(null);
+  const [dragOverPage, setDragOverPage] = useState<number | null>(null);
   const [thumbnailDensity, setThumbnailDensity] = useState<ThumbnailDensity>(() => {
     if (typeof window === "undefined") return "comfortable";
     const stored = window.localStorage.getItem(THUMBNAIL_DENSITY_KEY);
@@ -576,7 +581,8 @@ export default function SplitPdfTool() {
     [analysis?.name],
   );
 
-  const resultType: ResultKind = mode === "extract" || mode === "remove" ? "pdf" : "zip";
+  const resultType: ResultKind =
+    mode === "extract" || mode === "remove" || mode === "reorder" ? "pdf" : "zip";
   const pageCount = analysis?.pageCount ?? 0;
   const largeFile = Boolean(analysis && analysis.size > 75 * 1024 * 1024);
   const veryLargeDocument = Boolean(analysis && analysis.pageCount > 150);
@@ -592,8 +598,9 @@ export default function SplitPdfTool() {
       chunkSize,
       outputName,
       rotations,
+      pageOrder,
     }),
-    [chunkSize, focusedPage, mode, outputName, rangeInput, rotations, selectedPages],
+    [chunkSize, focusedPage, mode, outputName, pageOrder, rangeInput, rotations, selectedPages],
   );
 
   const restoreUiState = useCallback((state: UiHistoryState) => {
@@ -604,6 +611,7 @@ export default function SplitPdfTool() {
     setChunkSize(state.chunkSize);
     setOutputName(state.outputName);
     setRotations(state.rotations);
+    setPageOrder(state.pageOrder);
     setError("");
     setCleanupMessage("");
     setMethodDrawerOpen(false);
@@ -677,6 +685,7 @@ export default function SplitPdfTool() {
     setChunkSize(Math.min(2, total));
     setOutputName("lumeo-split");
     setRotations({});
+    setPageOrder(Array.from({ length: total }, (_, index) => index + 1));
     setUndoStack([]);
     setRedoStack([]);
     setMethodDrawerOpen(false);
@@ -923,6 +932,26 @@ export default function SplitPdfTool() {
       setSelectedPages([]);
       setFocusedPage(null);
     }
+    if (nextMode === "reorder") {
+      setSelectedPages([]);
+      setFocusedPage(null);
+      setPageOrder(Array.from({ length: total }, (_, index) => index + 1));
+    }
+  }
+
+  function reorderPages(draggedPage: number, targetPage: number) {
+    if (draggedPage === targetPage) return;
+    pushHistory();
+    setPageOrder((current) => {
+      const draggedIndex = current.indexOf(draggedPage);
+      const targetIndex = current.indexOf(targetPage);
+      if (draggedIndex < 0 || targetIndex < 0) return current;
+      const next = [...current];
+      const [draggedItem] = next.splice(draggedIndex, 1);
+      next.splice(targetIndex, 0, draggedItem);
+      return next;
+    });
+    clearResult();
   }
 
   function togglePage(event: React.MouseEvent<HTMLButtonElement>, page: number) {
@@ -1008,6 +1037,10 @@ export default function SplitPdfTool() {
     }
     if (mode === "ranges") return parseRangeGroups(rangeInput, total).map((group) => group.pages);
     if (mode === "everyPage") return Array.from({ length: total }, (_, index) => [index + 1]);
+    if (mode === "reorder") {
+      if (pageOrder.length !== total) throw new Error("Page order is out of sync. Reload the document.");
+      return [pageOrder];
+    }
     if (mode === "everyN") {
       if (!Number.isInteger(chunkSize)) throw new Error("Pages per file must be a whole number.");
       if (chunkSize < 1) throw new Error("Pages per file must be at least 1.");
@@ -1050,11 +1083,13 @@ export default function SplitPdfTool() {
             ? `${totalPages} selected ${totalPages === 1 ? "page" : "pages"}`
             : mode === "remove"
               ? `${totalPages} pages remaining`
-              : mode === "ranges"
-                ? `${outputCount} PDFs from ranges`
-                : mode === "everyPage"
-                  ? `${outputCount} PDFs`
-                  : `${outputCount} PDFs · ${chunkSize} pages each`,
+              : mode === "reorder"
+                ? `${totalPages} pages reordered`
+                : mode === "ranges"
+                  ? `${outputCount} PDFs from ranges`
+                  : mode === "everyPage"
+                    ? `${outputCount} PDFs`
+                    : `${outputCount} PDFs · ${chunkSize} pages each`,
         rangeLabel:
           mode === "ranges"
             ? groups
@@ -1283,6 +1318,10 @@ export default function SplitPdfTool() {
   ]);
 
   const pageChips = analysis?.pages ?? [];
+  const orderedPageChips =
+    mode === "reorder"
+      ? (pageOrder.map((page) => pageChips.find((chip) => chip.page === page)).filter(Boolean) as PageInfo[])
+      : pageChips;
   const rangeSuggestions = getSuggestions(rangeInput);
   const rotatedCount = Object.keys(rotations).length;
 
@@ -1391,7 +1430,11 @@ export default function SplitPdfTool() {
                   Pages
                 </p>
                 <p className="text-xs text-[var(--text-primary)]/38">
-                  {usesPageSelection ? selectedSummary(selectedPages) : `${analysis.pageCount} pages in this PDF`}
+                  {usesPageSelection
+                    ? selectedSummary(selectedPages)
+                    : mode === "reorder"
+                      ? "Drag a page onto another to swap its place."
+                      : `${analysis.pageCount} pages in this PDF`}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -1440,22 +1483,74 @@ export default function SplitPdfTool() {
               aria-label="PDF pages"
               className={`no-scrollbar grid max-h-[18rem] gap-2 overflow-y-auto pr-1 lg:max-h-full ${densityClasses[thumbnailDensity]}`}
             >
-              {pageChips.map((page) => (
-                <SplitPageThumbnail
-                  key={page.page}
-                  page={page}
-                  selected={selectedPages.includes(page.page)}
-                  focused={focusedPage === page.page}
-                  disabled={!usesPageSelection}
-                  rotation={rotations[page.page] ?? 0}
-                  density={thumbnailDensity}
-                  imageUrl={thumbnailUrls[page.page]}
-                  loading={thumbnailLoading[page.page] ?? false}
-                  onVisible={scheduleThumbnailRender}
-                  onClick={togglePage}
-                  onFocus={setFocusedPage}
-                />
-              ))}
+              {orderedPageChips.map((page) =>
+                mode === "reorder" ? (
+                  <div
+                    key={page.page}
+                    draggable
+                    onDragStart={(event) => {
+                      setDraggingPage(page.page);
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("text/plain", String(page.page));
+                    }}
+                    onDragOver={(event) => {
+                      event.preventDefault();
+                      if (dragOverPage !== page.page) setDragOverPage(page.page);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverPage === page.page) setDragOverPage(null);
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const draggedFromData = Number(event.dataTransfer.getData("text/plain"));
+                      const draggedPage = draggedFromData || draggingPage;
+                      if (draggedPage) reorderPages(draggedPage, page.page);
+                      setDraggingPage(null);
+                      setDragOverPage(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggingPage(null);
+                      setDragOverPage(null);
+                    }}
+                    className={`cursor-grab rounded-xl transition active:cursor-grabbing ${
+                      draggingPage === page.page
+                        ? "scale-[0.97] opacity-60"
+                        : dragOverPage === page.page
+                          ? "ring-2 ring-[var(--border-selected)]"
+                          : ""
+                    }`}
+                  >
+                    <SplitPageThumbnail
+                      page={page}
+                      selected={false}
+                      focused={focusedPage === page.page}
+                      disabled
+                      rotation={rotations[page.page] ?? 0}
+                      density={thumbnailDensity}
+                      imageUrl={thumbnailUrls[page.page]}
+                      loading={thumbnailLoading[page.page] ?? false}
+                      onVisible={scheduleThumbnailRender}
+                      onClick={() => {}}
+                      onFocus={setFocusedPage}
+                    />
+                  </div>
+                ) : (
+                  <SplitPageThumbnail
+                    key={page.page}
+                    page={page}
+                    selected={selectedPages.includes(page.page)}
+                    focused={focusedPage === page.page}
+                    disabled={!usesPageSelection}
+                    rotation={rotations[page.page] ?? 0}
+                    density={thumbnailDensity}
+                    imageUrl={thumbnailUrls[page.page]}
+                    loading={thumbnailLoading[page.page] ?? false}
+                    onVisible={scheduleThumbnailRender}
+                    onClick={togglePage}
+                    onFocus={setFocusedPage}
+                  />
+                ),
+              )}
             </div>
           </div>
         </div>
@@ -1500,7 +1595,7 @@ export default function SplitPdfTool() {
             </div>
 
             <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto py-3">
-              {mode !== "everyPage" && mode !== "everyN" ? (
+              {mode !== "everyPage" && mode !== "everyN" && mode !== "reorder" ? (
                 <div>
                   <label className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/42">
                     {mode === "ranges" ? "Range groups" : mode === "remove" ? "Pages to remove" : "Pages"}
@@ -1574,7 +1669,7 @@ export default function SplitPdfTool() {
                 </div>
               ) : null}
 
-              {mode !== "everyPage" ? (
+              {mode !== "everyPage" && mode !== "reorder" ? (
                 <div className="mt-4">
                   <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/42">
                     Quick presets
@@ -1765,7 +1860,11 @@ export default function SplitPdfTool() {
                   onClick={handleSplit}
                   className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55"
                 >
-                  {isSplitting ? "Splitting in your browser..." : "Split PDF"}
+                  {isSplitting
+                    ? "Working in your browser..."
+                    : mode === "reorder"
+                      ? "Save reordered PDF"
+                      : "Split PDF"}
                 </button>
               )}
             </div>

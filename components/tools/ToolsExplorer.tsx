@@ -76,15 +76,29 @@ function ToolCard({
       <div className="mt-auto flex flex-wrap gap-x-2.5 gap-y-1 text-[11.5px] leading-6 text-[var(--text-muted)]">
         {tool.actions.map((action) => {
           const hit = query.length > 0 && actionMatches(action, query);
-          return (
-            <span
-              key={action.slug}
-              className={`inline-flex items-center ${action.live ? "text-[var(--text-secondary)]" : ""}`}
-              style={hit ? { color: "var(--atelier-sage-300)" } : undefined}
-            >
-              {action.live ? (
+          const style = hit ? { color: "var(--atelier-sage-300)" } : undefined;
+
+          // A live action with its own route is independently openable -- it
+          // gets a real link, sitting above the card's stretched primary-route
+          // link (see `shell` below) so it isn't shadowed by it. Every other
+          // tool with several live actions (not just Compose) had this same
+          // gap: only the card's one primaryRoute was ever reachable by click.
+          if (action.live && action.route) {
+            return (
+              <Link
+                key={action.slug}
+                href={action.route}
+                className="relative z-10 inline-flex items-center rounded-full text-[var(--text-secondary)] underline decoration-transparent underline-offset-2 transition hover:text-[var(--text-primary)] hover:decoration-[var(--atelier-sage-400)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--atelier-sage-500)]"
+                style={style}
+              >
                 <span aria-hidden="true" className="mr-1.5 h-1 w-1 rounded-full bg-[var(--atelier-sage-400)]" />
-              ) : null}
+                {action.label}
+              </Link>
+            );
+          }
+
+          return (
+            <span key={action.slug} className="inline-flex items-center" style={style}>
               {action.label}
             </span>
           );
@@ -121,9 +135,14 @@ function ToolCard({
   }
 
   return (
-    <Link id={`tool-${tool.key}`} href={tool.effectivePrimaryRoute} aria-label={`Open ${tool.name}`} className={shell} style={style}>
+    <div id={`tool-${tool.key}`} className={shell} style={style}>
+      <Link
+        href={tool.effectivePrimaryRoute}
+        aria-label={`Open ${tool.name}`}
+        className="absolute inset-0 z-0 rounded-[14px]"
+      />
       {inner}
-    </Link>
+    </div>
   );
 }
 
