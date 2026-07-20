@@ -52,29 +52,16 @@ function ToolCard({
   animate: boolean;
   index: number;
 }) {
-  const openable = Boolean(tool.effectivePrimaryRoute);
-  const soon = tool.availability === "soon" || !openable;
+  const soon = tool.availability === "soon";
 
-  // A tool can bundle several genuinely separate destinations (Compose is
-  // both Merge and Split -- two different routes, two different jobs).
-  // Picking one as "the" primaryRoute and burying the other behind a search
-  // was the actual bug: clicking the card always opened Merge, and Split was
-  // only reachable by typing its name into the search box first. Instead,
-  // every distinct live route gets its own equal-weight button up front --
-  // first action pointing at a given route names that button (so "Split",
-  // not one of its later sub-modes like "Split by range").
-  const destinations: ToolAction[] = [];
-  const seenRoutes = new Set<string>();
-  for (const action of tool.actions) {
-    if (!action.live || !action.route || seenRoutes.has(action.route)) continue;
-    seenRoutes.add(action.route);
-    destinations.push(action);
-  }
-
-  const extraActions = tool.actions.filter(
-    (action) => !destinations.some((dest) => dest.slug === action.slug),
-  );
-
+  // A tool bundles several actions -- some genuinely separate destinations
+  // (Compose is both Merge and Split), some sub-modes of one workspace
+  // (Rotate/Remove/Extract are all inside Split). Neither "pick one action as
+  // the card's default click" nor "list every action as its own button on a
+  // compact grid card" scales as more actions ship. Every card instead links
+  // to that tool's own category page (/pdf-tools/{key}), which is where the
+  // real per-destination navigation and route grouping lives -- see
+  // ToolCategoryDetail. The action list here is just a preview.
   const inner = (
     <>
       <div className="flex items-center gap-3">
@@ -93,62 +80,34 @@ function ToolCard({
 
       <p className="text-[12.5px] leading-relaxed text-[var(--text-secondary)]">{tool.tag}</p>
 
-      {destinations.length > 0 ? (
-        <div className="flex flex-wrap gap-1.5">
-          {destinations.map((action) => {
-            const hit = query.length > 0 && actionMatches(action, query);
-            return (
-              <Link
-                key={action.slug}
-                href={action.route as string}
-                className={`inline-flex items-center gap-1.5 rounded-[var(--radius-md)] border px-3 py-1.5 text-[12.5px] font-semibold transition ${
-                  hit
-                    ? "border-[var(--atelier-sage-500)] bg-[rgba(var(--atelier-sage-rgb),0.14)] text-[var(--text-primary)]"
-                    : "border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--atelier-sage-500)] hover:text-[var(--text-primary)]"
-                }`}
-              >
-                {action.label}
-                <span aria-hidden="true" className="text-[var(--text-subtle)] transition-transform group-hover:translate-x-0.5">→</span>
-              </Link>
-            );
-          })}
-        </div>
-      ) : null}
+      <div className="mt-auto flex flex-wrap gap-x-2.5 gap-y-1 text-[11.5px] leading-6 text-[var(--text-muted)]">
+        {tool.actions.map((action) => {
+          const hit = query.length > 0 && actionMatches(action, query);
+          const style = hit ? { color: "var(--atelier-sage-300)" } : undefined;
+          return (
+            <span
+              key={action.slug}
+              className={`inline-flex items-center ${action.live ? "text-[var(--text-secondary)]" : ""}`}
+              style={style}
+            >
+              {action.live ? (
+                <span aria-hidden="true" className="mr-1.5 h-1 w-1 rounded-full bg-[var(--atelier-sage-400)]" />
+              ) : null}
+              {action.label}
+            </span>
+          );
+        })}
+      </div>
 
-      {extraActions.length > 0 ? (
-        <div className="mt-auto flex flex-wrap gap-x-2.5 gap-y-1 text-[11px] leading-6 text-[var(--text-muted)]">
-          {extraActions.map((action) => {
-            const hit = query.length > 0 && actionMatches(action, query);
-            const style = hit ? { color: "var(--atelier-sage-300)" } : undefined;
-
-            if (action.live && action.route) {
-              return (
-                <Link
-                  key={action.slug}
-                  href={action.route}
-                  className="inline-flex items-center rounded-full text-[var(--text-secondary)] underline decoration-transparent underline-offset-2 transition hover:text-[var(--text-primary)] hover:decoration-[var(--atelier-sage-400)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--atelier-sage-500)]"
-                  style={style}
-                >
-                  <span aria-hidden="true" className="mr-1.5 h-1 w-1 rounded-full bg-[var(--atelier-sage-400)]" />
-                  {action.label}
-                </Link>
-              );
-            }
-
-            return (
-              <span key={action.slug} className="inline-flex items-center" style={style}>
-                {action.label}
-              </span>
-            );
-          })}
-        </div>
-      ) : null}
-
-      {!soon ? (
-        <div className="flex items-center justify-between pt-0.5">
-          <ProcessingLine tool={tool} />
-        </div>
-      ) : null}
+      <div className="flex items-center justify-between pt-0.5">
+        {soon ? <span /> : <ProcessingLine tool={tool} />}
+        <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-muted)] transition-colors duration-200 group-hover:text-[var(--text-premium)]">
+          {soon ? "Notify me" : "Open"}
+          <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none">
+            →
+          </span>
+        </span>
+      </div>
     </>
   );
 
@@ -156,21 +115,15 @@ function ToolCard({
     "lumeo-tool-card group relative flex flex-col gap-2.5 rounded-[14px] border p-4 " +
     (soon
       ? "border-dashed border-[var(--border-subtle)] bg-transparent"
-      : "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-300 [transition-timing-function:var(--lumeo-spring)]") +
+      : "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-300 [transition-timing-function:var(--lumeo-spring)] hover:-translate-y-1 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-base)]") +
     (animate ? " lumeo-fade-up" : "");
 
   const style = animate ? { animationDelay: `${Math.min(index, 7) * 45}ms` } : undefined;
 
   return (
-    <div id={`tool-${tool.key}`} className={shell} style={style} aria-disabled={soon ? "true" : undefined}>
+    <Link id={`tool-${tool.key}`} href={`/pdf-tools/${tool.key}`} aria-label={`View ${tool.name} tools`} className={shell} style={style}>
       {inner}
-      {soon ? (
-        <span className="inline-flex items-center gap-1.5 self-start text-[12px] text-[var(--text-muted)]">
-          Notify me
-          <span aria-hidden="true">→</span>
-        </span>
-      ) : null}
-    </div>
+    </Link>
   );
 }
 
