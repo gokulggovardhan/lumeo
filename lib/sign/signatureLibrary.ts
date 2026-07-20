@@ -10,6 +10,14 @@ import type { SavedSignature, SignatureSourceKind } from "@/lib/sign/types";
 const STORAGE_KEY = "lumeo.sign.signatures.v1";
 const MAX_SIGNATURES = 12;
 
+// localStorage is writable by anything with script access to this origin
+// (another extension, a future bug elsewhere on the page) -- a value read
+// back from it and handed straight to an <img src> is not provably safe
+// just because our own writer only ever puts safe values there. Validating
+// the exact shape at the read boundary is what actually closes that gap,
+// not just the good behavior of saveSignature().
+const SAFE_DATA_URL_PATTERN = /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/;
+
 function readAll(): SavedSignature[] {
   if (typeof window === "undefined") return [];
   try {
@@ -19,7 +27,11 @@ function readAll(): SavedSignature[] {
     if (!Array.isArray(parsed)) return [];
     return parsed.filter(
       (item): item is SavedSignature =>
-        item && typeof item === "object" && typeof item.id === "string" && typeof item.dataUrl === "string",
+        item &&
+        typeof item === "object" &&
+        typeof item.id === "string" &&
+        typeof item.dataUrl === "string" &&
+        SAFE_DATA_URL_PATTERN.test(item.dataUrl),
     );
   } catch {
     return [];
