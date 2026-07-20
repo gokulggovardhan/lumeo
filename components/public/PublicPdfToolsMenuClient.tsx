@@ -109,7 +109,7 @@ export function PublicPdfToolsMenuClient({
               {available.map((tool) => (
                 <Link
                   key={tool.key}
-                  href={tool.effectivePrimaryRoute as string}
+                  href={`/pdf-tools/${tool.key}`}
                   role="menuitem"
                   onClick={() => setOpen(false)}
                   className="lumeo-tool-menuitem group flex items-center gap-3 rounded-[var(--radius-lg)] px-2.5 py-2.5 text-left transition duration-200 hover:bg-[rgba(var(--paper-rgb),0.075)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.16)]"
