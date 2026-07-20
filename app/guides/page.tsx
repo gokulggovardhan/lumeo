@@ -57,7 +57,7 @@ export async function generateMetadata(): Promise<Metadata> {
       absolute: "Lumeo PDF Guides",
     },
     description:
-      "Concise guides for Merge PDF, Split PDF, Compress PDF, browser-first privacy, and choosing the right Lumeo PDF tool.",
+      "Concise guides for Compose, Distill, Capture, and Render — Lumeo's browser-first PDF tools — plus how to choose the right one.",
     alternates: {
       canonical: "/guides",
     },
@@ -146,8 +146,8 @@ export default function GuidesPage() {
       title="Lumeo PDF Guides"
       description="A concise handbook for choosing and using Lumeo PDF Workspace tools."
       actions={[
-        { label: "Open PDF tools", href: "/pdf" },
-        { label: "Start with Merge PDF", href: "/pdf/merge" },
+        { label: "Open PDF tools", href: "/pdf-tools" },
+        { label: "Start with Compose", href: "/pdf/merge" },
       ]}
     >
       <InfoStructuredData
@@ -197,34 +197,50 @@ export default function GuidesPage() {
 
       <InfoPageSection title="Choosing the right tool">
         <p>
-          Use Merge PDF when separate documents need to become one file. Use
-          Split PDF when one file needs selected pages, smaller ranges, or page
-          cleanup. Use Compress PDF when a file is too large for sharing or
-          uploading.
+          Use Compose when separate documents need to become one file, or one
+          file needs selected pages, smaller ranges, or page cleanup — it
+          bundles merge, split, and related organizing actions in one place.
+          Use Distill when a file is too large for sharing or uploading. Use
+          Capture to turn photos or scans into a PDF, and Render to export PDF
+          pages as images or pull the text out.
         </p>
       </InfoPageSection>
 
       <InfoPageSection title="Current PDF tools">
         <ToolGuide
-          title="Merge PDF"
+          title="Compose — Merge PDF"
           href="/pdf/merge"
           use="Combine multiple documents into one polished PDF."
           workflow="Add PDFs, arrange them, choose output style, merge, download."
           limitation="Very large or damaged PDFs may need a smaller batch."
         />
         <ToolGuide
-          title="Split PDF"
+          title="Compose — Split PDF"
           href="/pdf/split"
           use="Extract pages, remove pages, or create smaller PDFs from one file."
           workflow="Add one PDF, choose a split method, select pages or ranges, download."
           limitation="Password-protected or damaged PDFs may not open in the browser."
         />
         <ToolGuide
-          title="Compress PDF"
+          title="Distill — Compress PDF"
           href="/pdf/compress"
           use="Reduce file size for sharing, forms, and upload limits."
           workflow="Add one PDF, choose a compression profile, compress, review the result."
           limitation="Compression rebuilds pages as images, so review the output before replacing the original."
+        />
+        <ToolGuide
+          title="Capture — JPG to PDF"
+          href="/pdf/jpg-to-pdf"
+          use="Turn photos or scanned images into a clean PDF document."
+          workflow="Add JPG or PNG images, arrange them, choose a page size, combine, download."
+          limitation="Very large batches of high-resolution images may need a smaller batch."
+        />
+        <ToolGuide
+          title="Render — PDF to JPG"
+          href="/pdf/pdf-to-jpg"
+          use="Export PDF pages as image files, or pull the page content out."
+          workflow="Add one PDF, choose the pages and quality, export, download."
+          limitation="Scanned pages without selectable text export as images only."
         />
       </InfoPageSection>
 
@@ -236,9 +252,9 @@ export default function GuidesPage() {
         </p>
       </InfoPageSection>
 
-      <FaqGroup title="Merge PDF questions" items={mergeFaqs} />
-      <FaqGroup title="Split PDF questions" items={splitFaqs} />
-      <FaqGroup title="Compress PDF questions" items={compressFaqs} />
+      <FaqGroup title="Compose — Merge PDF questions" items={mergeFaqs} />
+      <FaqGroup title="Compose — Split PDF questions" items={splitFaqs} />
+      <FaqGroup title="Distill — Compress PDF questions" items={compressFaqs} />
       <FaqGroup title="Privacy questions" items={privacyFaqs} />
     </InfoPageShell>
   );

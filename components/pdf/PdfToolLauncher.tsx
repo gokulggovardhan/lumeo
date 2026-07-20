@@ -90,7 +90,7 @@ export async function PdfToolLauncher({ showHeading = true }: { showHeading?: bo
           <p className="aura-text-label text-[var(--lumeo-gold-300)]">
             Lumeo PDF Workspace
           </p>
-          <h1 className="mt-3 font-serif text-[var(--text-heading-xl)] leading-[var(--leading-heading)] text-[var(--lumeo-paper-50)]">
+          <h1 className="mt-3 font-serif text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] text-[color:var(--lumeo-paper-50)]">
             Choose a tool. Get it done.
           </h1>
         </header>

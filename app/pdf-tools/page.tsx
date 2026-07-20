@@ -51,7 +51,7 @@ export default async function PdfToolsPage() {
       />
       <section className="lumeo-fade-up mb-7 max-w-2xl">
         <p className="aura-text-label text-[var(--lumeo-gold-300)]">PDF tools</p>
-        <h1 className="mt-3 font-serif font-medium text-[var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[var(--text-primary)]">
+        <h1 className="mt-3 font-serif font-medium text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[color:var(--text-primary)]">
           The PDF tools that matter. <em className="not-italic text-[var(--atelier-sage-300)]">They run entirely in your browser.</em>
         </h1>
         <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">

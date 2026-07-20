@@ -95,9 +95,9 @@ export default function DesignSystemPage() {
       <AuraPanel>
         <AuraSectionHeader title="Typography" description="Editorial display meets precise interface copy." />
         <div className="mt-5 grid gap-4">
-          <p className="font-serif text-[var(--text-display-md)] leading-[var(--leading-display)] text-[var(--lumeo-paper-50)]">PDF work, thoughtfully refined.</p>
-          <p className="text-[var(--text-heading-lg)] font-black text-[var(--lumeo-paper-50)]">Control Center heading</p>
-          <p className="max-w-3xl text-[var(--text-body-md)] leading-[var(--leading-body)] text-[var(--lumeo-paper-400)]">
+          <p className="font-serif text-[length:var(--text-display-md)] leading-[var(--leading-display)] text-[color:var(--lumeo-paper-50)]">PDF work, thoughtfully refined.</p>
+          <p className="text-[length:var(--text-heading-lg)] font-black text-[color:var(--lumeo-paper-50)]">Control Center heading</p>
+          <p className="max-w-3xl text-[length:var(--text-body-md)] leading-[var(--leading-body)] text-[color:var(--lumeo-paper-400)]">
             Lumeo Atelier keeps dense document operations readable at mobile sizes while replacing the blue-oriented foundation with graphite-sage neutral depth.
           </p>
         </div>

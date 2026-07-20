@@ -109,12 +109,12 @@ export default function SecurityPage() {
         <InfoPageSection title="What current tools do not do">
           <InfoList
             items={[
-              "No required server upload for current Merge and Split workflows.",
-              "No remote PDF processing for current Merge and Split workflows.",
+              "No required server upload for current Compose, Distill, Capture, or Render workflows.",
+              "No remote PDF processing for current Compose, Distill, Capture, or Render workflows.",
               "No cloud document storage for current supported workflows.",
               "No forced account.",
               "No document-content analytics.",
-              "No external OCR for current Merge and Split workflows.",
+              "No external OCR for current supported workflows.",
             ]}
           />
         </InfoPageSection>

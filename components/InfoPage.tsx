@@ -47,7 +47,7 @@ export function InfoPageShell({
           <p className="aura-text-label text-[var(--lumeo-gold-300)]">
             {eyebrow}
           </p>
-          <h1 className="mt-4 font-serif font-semibold text-[var(--text-display-md)] leading-[var(--leading-display)] tracking-[var(--tracking-display)] text-[var(--lumeo-paper-50)]">
+          <h1 className="mt-4 font-serif font-semibold text-[length:var(--text-heading-xl)] leading-[var(--leading-display)] tracking-[var(--tracking-display)] text-[color:var(--lumeo-paper-50)]">
             {title}
           </h1>
           <p className="mt-5 text-base leading-8 text-[var(--text-secondary)] sm:text-lg">

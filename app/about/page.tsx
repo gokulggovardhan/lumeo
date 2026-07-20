@@ -119,14 +119,16 @@ export default function AboutPage() {
 
         <InfoPageSection title="Current tools">
           <p>
-            Available now: Merge PDF and Split PDF. In development or planned:
-            Compress PDF, JPG to PDF, PDF to JPG, Protect PDF, and Unlock PDF.
+            Available now: Compose (organize — merge, split, reorder), Distill
+            (compress and optimize), Capture (images to PDF), and Render (PDF
+            to images and text). Editing, signing, protection, and Office
+            conversion are in development.
           </p>
           <InfoInlineLinks
             links={[
-              { label: "Merge PDF", href: "/pdf/merge" },
-              { label: "Split PDF", href: "/pdf/split" },
-              { label: "All PDF tools", href: "/pdf" },
+              { label: "Compose", href: "/pdf/merge" },
+              { label: "Distill", href: "/pdf/compress" },
+              { label: "All PDF tools", href: "/pdf-tools" },
             ]}
           />
         </InfoPageSection>

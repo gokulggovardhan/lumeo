@@ -19,7 +19,7 @@ export function AdminPageHeader({
             {eyebrow}
           </p>
         )}
-        <h1 className="mt-2 font-serif text-[length:var(--text-heading-xl)] font-semibold tracking-tight text-[var(--lumeo-paper-50)] sm:text-[length:var(--text-display-md)]">
+        <h1 className="mt-2 font-serif text-[length:var(--text-heading-lg)] font-semibold tracking-tight text-[var(--lumeo-paper-50)] sm:text-[length:var(--text-heading-xl)]">
           {title}
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--lumeo-paper-400)]">{description}</p>
