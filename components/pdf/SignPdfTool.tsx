@@ -7,10 +7,14 @@
 // multi-element placement across pages (PlacedElementView +
 // lib/sign/useHistoryState for undo/redo), and export (pdf-lib).
 //
-// Deliberately NOT built: page-thumbnail rail, fullscreen viewer,
-// pinch-zoom, and PDF-text "sign here" detection -- each is a
-// substantial feature of its own; shipping them half-done would cost
-// more in bugs than the polish is worth in one pass.
+// Also covers: zoom in/out/fit-width, a page-thumbnail rail, pinch-zoom
+// on touch, and PDF-text "sign here" detection (regex over pdfjs's text
+// layer, no AI/network call).
+//
+// Deliberately NOT built: a fullscreen viewer mode and a dark/light theme
+// toggle -- the latter is a site-wide design-system change (every surface
+// today assumes the one dark "atelier" palette), not something one tool
+// should introduce on its own.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { degrees, PDFDocument, StandardFonts, rgb } from "pdf-lib";
@@ -80,6 +84,13 @@ const DEFAULT_FONT_SIZE_PT = 20;
 
 type Toast = { id: string; message: string; tone: "success" | "error" };
 
+type SignHereRegion = { id: string; xPct: number; yPct: number; widthPct: number; heightPct: number };
+
+const SIGN_HERE_PATTERN = /(sign\s*here|signature|authorized\s*signature|applicant\s*signature|signed\s*by)/i;
+const MIN_ZOOM_PCT = 50;
+const MAX_ZOOM_PCT = 200;
+const THUMBNAIL_SCALE = 0.2;
+
 function copyArrayBuffer(buffer: ArrayBuffer) {
   const source = new Uint8Array(buffer);
   const copy = new Uint8Array(source.byteLength);
@@ -128,6 +139,7 @@ export default function SignPdfTool() {
 
   const { state: elements, set: setElements, setLive: setElementsLive, commit: commitElements, undo, redo, canUndo, canRedo, reset: resetElements } = useHistoryState<PlacedElement[]>([]);
   const dragSnapshotRef = useRef<PlacedElement[] | null>(null);
+  const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [armedSignature, setArmedSignature] = useState<CreatedSignature | SavedSignature | null>(null);
 
@@ -140,9 +152,17 @@ export default function SignPdfTool() {
   const [outputName, setOutputName] = useState("lumeo-signed.pdf");
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  const [zoomPct, setZoomPct] = useState(100);
+  const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
+  const [signHereRegions, setSignHereRegions] = useState<SignHereRegion[]>([]);
+
   const stageRef = useRef<HTMLDivElement | null>(null);
+  const stageScrollRef = useRef<HTMLDivElement | null>(null);
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
+  const thumbnailUrlsRef = useRef<Record<number, string>>({});
+  const pinchPointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const pinchStartRef = useRef<{ distance: number; zoomPct: number } | null>(null);
 
   const pushToast = useCallback((message: string, tone: Toast["tone"] = "success") => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
@@ -161,8 +181,55 @@ export default function SignPdfTool() {
     return () => {
       if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
+      Object.values(thumbnailUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
+
+  // Low-res thumbnail for every page, rendered once per uploaded file so the
+  // rail can jump to any page without re-rendering the full-size preview.
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      Object.values(thumbnailUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+      thumbnailUrlsRef.current = {};
+      setThumbnails({});
+      if (!pdf) return;
+      try {
+        const pdfjs = await loadPdfJsModule();
+        const doc = await pdfjs.getDocument({ data: new Uint8Array(copyArrayBuffer(pdf.bytes)) }).promise;
+        try {
+          for (let index = 0; index < pdf.pageCount; index += 1) {
+            if (cancelled) break;
+            const page = await doc.getPage(index + 1);
+            const viewport = page.getViewport({ scale: THUMBNAIL_SCALE });
+            const canvas = document.createElement("canvas");
+            const context = canvas.getContext("2d", { alpha: false });
+            if (!context) continue;
+            canvas.width = Math.max(1, Math.floor(viewport.width));
+            canvas.height = Math.max(1, Math.floor(viewport.height));
+            context.fillStyle = "#FFFFFF";
+            context.fillRect(0, 0, canvas.width, canvas.height);
+            await page.render({ canvas, canvasContext: context, viewport }).promise;
+            const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.7));
+            if (cancelled || !blob) continue;
+            const url = URL.createObjectURL(blob);
+            thumbnailUrlsRef.current[index] = url;
+            setThumbnails((current) => ({ ...current, [index]: url }));
+          }
+        } finally {
+          void (doc as typeof doc & { destroy?: () => Promise<void> | void }).destroy?.();
+        }
+      } catch {
+        // Thumbnails are a navigation convenience -- a failed render just
+        // leaves that slot blank, the main preview and export still work.
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pdf]);
 
   // Renders the current page to a background image for the placement stage.
   useEffect(() => {
@@ -185,6 +252,40 @@ export default function SignPdfTool() {
           context.fillStyle = "#FFFFFF";
           context.fillRect(0, 0, canvas.width, canvas.height);
           await page.render({ canvas, canvasContext: context, viewport }).promise;
+
+          // "Sign here" detection: plain text-layer matching, no AI/network
+          // call. pdfjs's Util.applyTransform maps each matching item's PDF-
+          // space box through the same viewport used for the render, so the
+          // highlight lines up with the pixels the user actually sees.
+          try {
+            const textContent = await page.getTextContent();
+            const regions: SignHereRegion[] = [];
+            for (const item of textContent.items) {
+              if (!("str" in item) || !item.str || !SIGN_HERE_PATTERN.test(item.str)) continue;
+              // pdfjs-dist's own Util.applyTransform is mistyped as returning
+              // void (it doesn't at runtime), so the 2x3 matrix math is done
+              // by hand here instead of trusting that signature.
+              const [a, b, c, d, e, f] = viewport.transform;
+              const applyTransform = (px: number, py: number): [number, number] => [a * px + c * py + e, b * px + d * py + f];
+              const [x1, y1] = applyTransform(item.transform[4], item.transform[5]);
+              const [x2, y2] = applyTransform(item.transform[4] + item.width, item.transform[5] + item.height);
+              const left = Math.min(x1, x2);
+              const top = Math.min(y1, y2);
+              const width = Math.abs(x2 - x1);
+              const height = Math.abs(y2 - y1);
+              regions.push({
+                id: `sh-${pageIndex}-${regions.length}`,
+                xPct: (left / canvas.width) * 100,
+                yPct: (top / canvas.height) * 100,
+                widthPct: (width / canvas.width) * 100,
+                heightPct: Math.max(3, (height / canvas.height) * 100),
+              });
+            }
+            if (!cancelled) setSignHereRegions(regions);
+          } catch {
+            if (!cancelled) setSignHereRegions([]);
+          }
+
           const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
           if (cancelled || !blob) return;
           if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
@@ -254,6 +355,8 @@ export default function SignPdfTool() {
       resetElements([]);
       setSelectedId(null);
       setDownloadUrl("");
+      setZoomPct(100);
+      setSignHereRegions([]);
     } catch {
       setError("This file could not be read. It may be damaged or password-protected.");
     }
@@ -271,6 +374,9 @@ export default function SignPdfTool() {
     setDownloadUrl("");
     setError("");
     setOutputName("lumeo-signed.pdf");
+    setZoomPct(100);
+    setSignHereRegions([]);
+    setArmedSignature(null);
   };
 
   function refreshLibrary() {
@@ -296,29 +402,87 @@ export default function SignPdfTool() {
     const rect = stageRef.current.getBoundingClientRect();
     const xPct = ((event.clientX - rect.left) / rect.width) * 100;
     const yPct = ((event.clientY - rect.top) / rect.height) * 100;
-    const widthPct = DEFAULT_SIGNATURE_WIDTH_PCT;
-    const heightPct = widthPct / armedSignature.aspectRatio;
+    placeSignatureAt(xPct, yPct);
+  }
 
-    const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+  function nextElementId() {
+    elementIdCounterRef.current += 1;
+    return `el-${elementIdCounterRef.current}`;
+  }
+
+  function placeSignatureAt(centerXPct: number, centerYPct: number) {
+    const active = armedSignature ?? signatures.find((item) => item.isDefault) ?? signatures[0];
+    if (!active) {
+      pushToast("Create a signature first", "error");
+      return;
+    }
+    const widthPct = DEFAULT_SIGNATURE_WIDTH_PCT;
+    const heightPct = widthPct / active.aspectRatio;
+    const id = nextElementId();
+    const isFromLibrary = "id" in active;
+    const signatureId = isFromLibrary ? (active as SavedSignature).id : "";
     setElements((current) => [
       ...current,
       {
         id,
         type: "signature",
         pageIndex,
-        xPct: Math.min(100 - widthPct, Math.max(0, xPct - widthPct / 2)),
-        yPct: Math.min(100 - heightPct, Math.max(0, yPct - heightPct / 2)),
+        xPct: Math.min(100 - widthPct, Math.max(0, centerXPct - widthPct / 2)),
+        yPct: Math.min(100 - heightPct, Math.max(0, centerYPct - heightPct / 2)),
         widthPct,
         heightPct,
         rotationDeg: 0,
-        signatureId: "id" in armedSignature ? armedSignature.id : "",
-        dataUrl: armedSignature.dataUrl,
-        aspectRatio: armedSignature.aspectRatio,
+        signatureId,
+        dataUrl: active.dataUrl,
+        aspectRatio: active.aspectRatio,
       },
     ]);
     setSelectedId(id);
-    if ("id" in armedSignature) markSignatureUsed(armedSignature.id);
+    if (isFromLibrary) markSignatureUsed(signatureId);
     setArmedSignature(null);
+  }
+
+  function handleSignHereClick(region: SignHereRegion) {
+    placeSignatureAt(region.xPct + region.widthPct / 2, region.yPct + region.heightPct / 2);
+  }
+
+  function zoomIn() {
+    setZoomPct((current) => Math.min(MAX_ZOOM_PCT, current + 25));
+  }
+
+  function zoomOut() {
+    setZoomPct((current) => Math.max(MIN_ZOOM_PCT, current - 25));
+  }
+
+  function fitWidth() {
+    setZoomPct(100);
+  }
+
+  // Pinch-to-zoom on touch: tracked independently of the per-element
+  // pointer capture in PlacedElementView -- this only ever acts once two
+  // pointers are down, so a single-finger drag on a placed element is
+  // untouched.
+  function handleScrollPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    pinchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pinchPointersRef.current.size === 2) {
+      const [a, b] = Array.from(pinchPointersRef.current.values());
+      pinchStartRef.current = { distance: Math.hypot(a.x - b.x, a.y - b.y), zoomPct };
+    }
+  }
+
+  function handleScrollPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    if (!pinchPointersRef.current.has(event.pointerId)) return;
+    pinchPointersRef.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pinchPointersRef.current.size !== 2 || !pinchStartRef.current) return;
+    const [a, b] = Array.from(pinchPointersRef.current.values());
+    const distance = Math.hypot(a.x - b.x, a.y - b.y);
+    const ratio = distance / pinchStartRef.current.distance;
+    setZoomPct(Math.round(Math.min(MAX_ZOOM_PCT, Math.max(MIN_ZOOM_PCT, pinchStartRef.current.zoomPct * ratio))));
+  }
+
+  function handleScrollPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    pinchPointersRef.current.delete(event.pointerId);
+    if (pinchPointersRef.current.size < 2) pinchStartRef.current = null;
   }
 
   function addTextElement(type: Exclude<PlacedElementType, "signature">) {
@@ -533,56 +697,126 @@ export default function SignPdfTool() {
           </section>
 
           <section className="mt-3 rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3.5 shadow-2xl shadow-black/24">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
-              {armedSignature ? "Click anywhere on the page to place it" : "Place your signature"}
-            </p>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
+                {armedSignature ? "Click anywhere on the page to place it" : "Place your signature"}
+              </p>
+              <div className="flex items-center gap-1">
+                <button type="button" onClick={zoomOut} disabled={zoomPct <= MIN_ZOOM_PCT} aria-label="Zoom out" className="grid h-7 w-7 place-items-center rounded-full border border-[var(--text-primary)]/12 text-sm font-semibold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40 disabled:opacity-30">
+                  −
+                </button>
+                <button type="button" onClick={fitWidth} className="rounded-full border border-[var(--text-primary)]/12 px-2.5 py-1 text-[11px] font-semibold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40" title="Fit width">
+                  {zoomPct}%
+                </button>
+                <button type="button" onClick={zoomIn} disabled={zoomPct >= MAX_ZOOM_PCT} aria-label="Zoom in" className="grid h-7 w-7 place-items-center rounded-full border border-[var(--text-primary)]/12 text-sm font-semibold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40 disabled:opacity-30">
+                  +
+                </button>
+              </div>
+            </div>
             <p className="mb-3 text-xs text-[var(--text-primary)]/48">
               🔒 Your PDF stays on your device. Drag to move, use the corner handle to resize.
             </p>
 
-            {pageLoading || !pageImageUrl || !pageDisplaySize ? (
-              <div className="flex h-64 animate-pulse items-center justify-center rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/40 text-sm text-[var(--text-primary)]/40">
-                Loading page preview...
-              </div>
-            ) : (
-              <div
-                ref={stageRef}
-                onClick={handleStageClick}
-                className={`relative mx-auto overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${armedSignature ? "cursor-crosshair" : ""}`}
-                style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}`, maxWidth: "100%" }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={pageImageUrl} alt={`Page ${pageIndex + 1} preview`} className="pointer-events-none block h-full w-full select-none" />
-                {currentPageElements.map((element) => (
-                  <PlacedElementView
-                    key={element.id}
-                    element={element}
-                    selected={selectedId === element.id}
-                    stageRef={stageRef}
-                    onSelect={() => setSelectedId(element.id)}
-                    onChange={(patch) => patchElement(element.id, patch)}
-                    onCommit={commitElement}
-                    onDelete={() => {
-                      setElements((current) => current.filter((item) => item.id !== element.id));
-                      setSelectedId(null);
-                    }}
-                    onDuplicate={() => {
-                      const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
-                      setElements((current) => [
-                        ...current,
-                        { ...element, id, xPct: Math.min(94 - element.widthPct, element.xPct + 3), yPct: Math.min(94 - element.heightPct, element.yPct + 3) },
-                      ]);
-                      setSelectedId(id);
-                    }}
-                    onEditText={
-                      element.type !== "signature"
-                        ? (text) => setElements((current) => current.map((item) => (item.id === element.id ? ({ ...item, text } as PlacedElement) : item)))
-                        : undefined
-                    }
-                  />
-                ))}
-              </div>
-            )}
+            <div className="flex gap-3">
+              {pdf.pageCount > 1 ? (
+                <div className="no-scrollbar flex max-h-[26rem] w-16 shrink-0 flex-col gap-2 overflow-y-auto" aria-label="Page thumbnails">
+                  {Array.from({ length: pdf.pageCount }, (_, index) => (
+                    <button
+                      key={index}
+                      type="button"
+                      onClick={() => setPageIndex(index)}
+                      aria-label={`Go to page ${index + 1}`}
+                      aria-current={pageIndex === index}
+                      className={`shrink-0 overflow-hidden rounded-md border-2 transition ${
+                        pageIndex === index ? "border-[var(--lumeo-gold)]" : "border-[var(--text-primary)]/12 hover:border-[var(--text-primary)]/30"
+                      }`}
+                    >
+                      {thumbnails[index] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumbnails[index]} alt={`Page ${index + 1}`} className="block w-full select-none" />
+                      ) : (
+                        <div className="flex aspect-[3/4] w-full animate-pulse items-center justify-center bg-[var(--text-primary)]/10 text-[9px] text-[var(--text-primary)]/40">
+                          {index + 1}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {pageLoading || !pageImageUrl || !pageDisplaySize ? (
+                <div className="flex h-64 flex-1 animate-pulse items-center justify-center rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/40 text-sm text-[var(--text-primary)]/40">
+                  Loading page preview...
+                </div>
+              ) : (
+                <div
+                  ref={stageScrollRef}
+                  onPointerDown={handleScrollPointerDown}
+                  onPointerMove={handleScrollPointerMove}
+                  onPointerUp={handleScrollPointerUp}
+                  onPointerCancel={handleScrollPointerUp}
+                  className="max-h-[32rem] flex-1 overflow-auto rounded-lg border border-[var(--text-primary)]/12 bg-[var(--atelier-surface-1)]/40 p-2 touch-pan-y"
+                >
+                  <div
+                    ref={stageRef}
+                    onClick={handleStageClick}
+                    className={`relative mx-auto overflow-hidden rounded-lg bg-white ${armedSignature ? "cursor-crosshair" : ""}`}
+                    style={{ width: `${zoomPct}%`, aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={pageImageUrl} alt={`Page ${pageIndex + 1} preview`} className="pointer-events-none block h-full w-full select-none" />
+
+                    {signHereRegions.map((region) => (
+                      <div
+                        key={region.id}
+                        className="group absolute z-[5] rounded border-2 border-dashed border-[var(--atelier-sage-400)]/70 bg-[var(--atelier-sage-rgb)]/10 transition hover:bg-[var(--atelier-sage-rgb)]/20"
+                        style={{ left: `${region.xPct}%`, top: `${region.yPct}%`, width: `${region.widthPct}%`, height: `${region.heightPct}%` }}
+                      >
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleSignHereClick(region);
+                          }}
+                          className="pointer-events-auto absolute -top-8 left-0 whitespace-nowrap rounded-full bg-[var(--atelier-sage-500)] px-2.5 py-1 text-[11px] font-semibold text-white opacity-0 shadow transition group-hover:opacity-100 focus-visible:opacity-100"
+                        >
+                          Place signature here
+                        </button>
+                      </div>
+                    ))}
+
+                    {currentPageElements.map((element) => (
+                      <PlacedElementView
+                        key={element.id}
+                        element={element}
+                        selected={selectedId === element.id}
+                        stageRef={stageRef}
+                        onSelect={() => setSelectedId(element.id)}
+                        onChange={(patch) => patchElement(element.id, patch)}
+                        onCommit={commitElement}
+                        onDelete={() => {
+                          setElements((current) => current.filter((item) => item.id !== element.id));
+                          setSelectedId(null);
+                        }}
+                        onDuplicate={() => {
+                          const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                          setElements((current) => [
+                            ...current,
+                            { ...element, id, xPct: Math.min(94 - element.widthPct, element.xPct + 3), yPct: Math.min(94 - element.heightPct, element.yPct + 3) },
+                          ]);
+                          setSelectedId(id);
+                        }}
+                        onEditText={
+                          element.type !== "signature"
+                            ? (text) => setElements((current) => current.map((item) => (item.id === element.id ? ({ ...item, text } as PlacedElement) : item)))
+                            : undefined
+                        }
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </section>
 
           {error ? (
