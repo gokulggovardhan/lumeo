@@ -8,7 +8,6 @@ type FormState = {
   type: FeedbackQueryType;
   name: string;
   email: string;
-  phone: string;
   subject: string;
   message: string;
   // Honeypot: real users never see or fill this field. Any bot that
@@ -21,14 +20,12 @@ const emptyForm: FormState = {
   type: "Query",
   name: "",
   email: "",
-  phone: "",
   subject: "",
   message: "",
   companyWebsite: "",
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const phonePattern = /^[+]?[\d\s().-]{7,20}$/;
 
 type Toast = { tone: "success" | "error"; message: string };
 
@@ -72,7 +69,6 @@ export function ContactForm() {
     const subject = form.subject.trim();
     const message = form.message.trim();
     const email = form.email.trim();
-    const phone = form.phone.trim();
 
     if (!name) return setError("Name is required.");
     if (!subject) return setError("Subject is required.");
@@ -80,7 +76,6 @@ export function ContactForm() {
     if (!message) return setError("Message is required.");
     if (message.length > 2000) return setError("Message must be 2000 characters or fewer.");
     if (email && !emailPattern.test(email)) return setError("Enter a valid email address, or leave it blank.");
-    if (phone && !phonePattern.test(phone)) return setError("Enter a valid phone number, or leave it blank.");
 
     setSubmitting(true);
     try {
@@ -91,7 +86,6 @@ export function ContactForm() {
           type: form.type,
           name,
           email,
-          phone,
           subject,
           message,
           companyWebsite: form.companyWebsite,
@@ -145,33 +139,23 @@ export function ContactForm() {
           </select>
         </label>
 
-        <label className="block text-sm font-semibold text-[var(--text-primary)]">
-          Name
-          <input
-            type="text"
-            required
-            value={form.name}
-            onChange={(event) => updateField("name", event.target.value)}
-            className="mt-1 h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-subtle)] focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
-          />
-        </label>
-
         <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-sm font-semibold text-[var(--text-primary)]">
+            Name
+            <input
+              type="text"
+              required
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              className="mt-1 h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-subtle)] focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
+            />
+          </label>
           <label className="block text-sm font-semibold text-[var(--text-primary)]">
             Email <span className="font-normal text-[var(--text-subtle)]">(optional)</span>
             <input
               type="email"
               value={form.email}
               onChange={(event) => updateField("email", event.target.value)}
-              className="mt-1 h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
-            />
-          </label>
-          <label className="block text-sm font-semibold text-[var(--text-primary)]">
-            Phone <span className="font-normal text-[var(--text-subtle)]">(optional)</span>
-            <input
-              type="tel"
-              value={form.phone}
-              onChange={(event) => updateField("phone", event.target.value)}
               className="mt-1 h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
             />
           </label>
@@ -187,20 +171,18 @@ export function ContactForm() {
             onChange={(event) => updateField("subject", event.target.value)}
             className="mt-1 h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
           />
-          <span className="mt-0.5 block text-right text-xs text-[var(--text-subtle)]">{form.subject.length}/150</span>
         </label>
 
         <label className="block text-sm font-semibold text-[var(--text-primary)]">
           Message
           <textarea
             required
-            rows={4}
+            rows={3}
             maxLength={2000}
             value={form.message}
             onChange={(event) => updateField("message", event.target.value)}
             className="mt-1 w-full resize-y rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
           />
-          <span className="mt-0.5 block text-right text-xs text-[var(--text-subtle)]">{form.message.length}/2000</span>
         </label>
 
         {error ? (
@@ -209,7 +191,10 @@ export function ContactForm() {
           </p>
         ) : null}
 
-        <div className="flex items-center justify-end pt-0.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-0.5">
+          <p className="text-xs leading-4 text-[var(--text-subtle)]">
+            Don&rsquo;t send confidential PDF files — describe the issue in words.
+          </p>
           <button
             type="submit"
             disabled={submitting}
