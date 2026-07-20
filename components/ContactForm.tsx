@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Mail, MessageCircle, Send, Sparkles, Tag, User } from "lucide-react";
 import type { FeedbackQueryType } from "@/lib/supabase/database.types";
 
 type FormState = {
@@ -31,12 +31,16 @@ type Toast = { tone: "success" | "error"; message: string };
 
 // Same "feedback_queries" table and /api/feedback contract as before (the
 // database's type column is a strict Query/Feedback enum) -- only the
-// labels shown to a visitor changed, to read naturally on a Contact page
-// rather than as an internal ticket-triage category.
-const TYPE_OPTIONS: { value: FeedbackQueryType; label: string }[] = [
-  { value: "Query", label: "General query" },
-  { value: "Feedback", label: "Feedback or suggestion" },
+// labels and framing shown to a visitor changed.
+const TYPE_OPTIONS: { value: FeedbackQueryType; label: string; icon: typeof MessageCircle }[] = [
+  { value: "Query", label: "Ask something", icon: MessageCircle },
+  { value: "Feedback", label: "Share feedback", icon: Sparkles },
 ];
+
+function autoGrow(element: HTMLTextAreaElement) {
+  element.style.height = "auto";
+  element.style.height = `${Math.min(element.scrollHeight, 152)}px`;
+}
 
 export function ContactForm() {
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -107,8 +111,12 @@ export function ContactForm() {
     }
   }
 
+  const fieldClass =
+    "peer h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] pl-9 pr-3 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-subtle)] focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]";
+  const iconClass = "pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-subtle)] transition-colors peer-focus:text-[var(--text-accent)]";
+
   return (
-    <div className="rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-4 shadow-[inset_0_1px_0_rgba(255,253,247,0.06)] sm:p-5">
+    <div className="rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[linear-gradient(160deg,rgba(var(--champagne-rgb),0.05),rgba(var(--lumeo-paper-rgb),0.03))] p-4 shadow-[inset_0_1px_0_rgba(255,253,247,0.06)] sm:p-5">
       <form onSubmit={handleSubmit} noValidate className="space-y-3">
         {/* Honeypot: visually hidden, off the tab order, never presented to a real user. */}
         <div aria-hidden="true" className="absolute -left-[9999px] top-auto h-px w-px overflow-hidden">
@@ -124,66 +132,88 @@ export function ContactForm() {
           />
         </div>
 
-        <label className="block text-sm font-semibold text-[var(--text-primary)]">
-          Feedback or queries
-          <select
-            value={form.type}
-            onChange={(event) => updateField("type", event.target.value as FeedbackQueryType)}
-            className="mt-1 h-11 w-full appearance-none rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] bg-[image:linear-gradient(45deg,transparent_50%,currentColor_50%),linear-gradient(135deg,currentColor_50%,transparent_50%)] bg-[position:calc(100%-18px)_center,calc(100%-13px)_center] bg-[size:5px_5px,5px_5px] bg-no-repeat px-3 pr-9 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
-          >
-            {TYPE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
+        <div role="radiogroup" aria-label="What's this about" className="grid grid-cols-2 gap-1.5 rounded-full border border-[var(--border-subtle)] bg-[var(--surface-input)] p-1">
+          {TYPE_OPTIONS.map((option) => {
+            const selected = form.type === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => updateField("type", option.value)}
+                className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-full text-[13px] font-semibold transition-all duration-200 ${
+                  selected
+                    ? "bg-[rgba(var(--champagne-rgb),0.18)] text-[var(--text-primary)] shadow-[inset_0_0_0_1px_rgba(var(--champagne-rgb),0.4)]"
+                    : "text-[var(--text-subtle)] hover:text-[var(--text-secondary)]"
+                }`}
+              >
+                <option.icon className="h-3.5 w-3.5" aria-hidden="true" />
                 {option.label}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block text-sm font-semibold text-[var(--text-primary)]">
-            Name
-            <input
-              type="text"
-              required
-              value={form.name}
-              onChange={(event) => updateField("name", event.target.value)}
-              className="mt-1 h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-subtle)] focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
-            />
-          </label>
-          <label className="block text-sm font-semibold text-[var(--text-primary)]">
-            Email <span className="font-normal text-[var(--text-subtle)]">(optional)</span>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(event) => updateField("email", event.target.value)}
-              className="mt-1 h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
-            />
-          </label>
+              </button>
+            );
+          })}
         </div>
 
-        <label className="block text-sm font-semibold text-[var(--text-primary)]">
-          Subject
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="relative">
+            <User aria-hidden="true" className={iconClass} />
+            <label htmlFor="contact-name" className="sr-only">Name</label>
+            <input
+              id="contact-name"
+              type="text"
+              required
+              placeholder="Your name"
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              className={fieldClass}
+            />
+          </div>
+          <div className="relative">
+            <Mail aria-hidden="true" className={iconClass} />
+            <label htmlFor="contact-email" className="sr-only">Email (optional)</label>
+            <input
+              id="contact-email"
+              type="email"
+              placeholder="Email (optional)"
+              value={form.email}
+              onChange={(event) => updateField("email", event.target.value)}
+              className={fieldClass}
+            />
+          </div>
+        </div>
+
+        <div className="relative">
+          <Tag aria-hidden="true" className={iconClass} />
+          <label htmlFor="contact-subject" className="sr-only">Subject</label>
           <input
+            id="contact-subject"
             type="text"
             required
             maxLength={150}
+            placeholder="Subject"
             value={form.subject}
             onChange={(event) => updateField("subject", event.target.value)}
-            className="mt-1 h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
+            className={fieldClass}
           />
-        </label>
+        </div>
 
-        <label className="block text-sm font-semibold text-[var(--text-primary)]">
-          Message
+        <div>
+          <label htmlFor="contact-message" className="sr-only">Message</label>
           <textarea
+            id="contact-message"
             required
-            rows={3}
+            rows={2}
             maxLength={2000}
+            placeholder="Tell us what's on your mind..."
             value={form.message}
-            onChange={(event) => updateField("message", event.target.value)}
-            className="mt-1 w-full resize-y rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
+            onChange={(event) => {
+              updateField("message", event.target.value);
+              autoGrow(event.target);
+            }}
+            className="max-h-[152px] min-h-[76px] w-full resize-none overflow-y-auto rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3.5 py-2.5 text-sm text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-subtle)] focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.16)]"
           />
-        </label>
+        </div>
 
         {error ? (
           <p role="alert" className="rounded-[var(--radius-md)] border border-[var(--border-danger)] bg-[var(--surface-danger)] px-3 py-2 text-sm font-medium text-[var(--text-danger)]">
@@ -198,7 +228,7 @@ export function ContactForm() {
           <button
             type="submit"
             disabled={submitting}
-            className="inline-flex h-11 min-w-32 items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-semibold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
+            className="inline-flex h-11 min-w-32 items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[linear-gradient(135deg,var(--emerald-500),var(--emerald-600))] px-5 text-sm font-semibold text-[var(--text-on-accent)] shadow-[0_10px_24px_rgba(var(--emerald-rgb),0.28)] transition hover:-translate-y-0.5 hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
           >
             {submitting ? (
               <>
@@ -206,7 +236,10 @@ export function ContactForm() {
                 Sending...
               </>
             ) : (
-              "Send message"
+              <>
+                <Send className="h-4 w-4" aria-hidden="true" />
+                Send message
+              </>
             )}
           </button>
         </div>
