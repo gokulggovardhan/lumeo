@@ -67,7 +67,16 @@ export default function ContactPage() {
           <ContactForm />
         </section>
 
-        <article className="mx-auto w-full max-w-[820px] space-y-9 px-5 pb-10 pt-2 sm:px-8">
+        {/* Collapsed by default -- the message form is the whole page on
+            open, professional and uncluttered. Reference material is one
+            deliberate click away, not a peek at the bottom of the viewport. */}
+        <details className="group mx-auto w-full max-w-[820px] px-5 pb-10 sm:px-8">
+          <summary className="mx-auto flex w-fit cursor-pointer list-none items-center gap-2 rounded-full border border-[var(--border-subtle)] px-4 py-2 text-sm font-semibold text-[var(--text-muted)] transition hover:border-[var(--border-premium)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] [&::-webkit-details-marker]:hidden">
+            More contact guidance
+            <span aria-hidden="true" className="transition-transform duration-200 group-open:rotate-180">↓</span>
+          </summary>
+
+          <article className="mt-8 space-y-9">
         <InfoPageSection title="Contact categories">
           <InfoDefinitionList
             items={[
@@ -147,7 +156,8 @@ export default function ContactPage() {
             is not currently published.
           </p>
         </InfoPageSection>
-        </article>
+          </article>
+        </details>
 
         <PublicFooter />
       </main>
