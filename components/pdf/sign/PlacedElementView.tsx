@@ -22,6 +22,15 @@ import type { PlacedElement } from "@/lib/sign/types";
 
 const MIN_WIDTH_PCT = 4;
 const MIN_TEXT_HEIGHT_PCT = 2;
+const NUDGE_STEP_PCT = 0.5;
+const NUDGE_STEP_LARGE_PCT = 2;
+
+const ARROW_DELTAS: Record<string, { dx: number; dy: number }> = {
+  ArrowUp: { dx: 0, dy: -1 },
+  ArrowDown: { dx: 0, dy: 1 },
+  ArrowLeft: { dx: -1, dy: 0 },
+  ArrowRight: { dx: 1, dy: 0 },
+};
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -213,7 +222,8 @@ export function PlacedElementView({
       ref={nodeRef}
       role="button"
       tabIndex={0}
-      aria-label={`${element.type} element`}
+      aria-label={`${element.type} element, use arrow keys to move, Delete to remove`}
+      onFocus={onSelect}
       onPointerDown={handleBodyPointerDown}
       onPointerMove={(event) => {
         handleBodyPointerMove(event);
@@ -229,7 +239,19 @@ export function PlacedElementView({
         if (event.key === "Delete" || event.key === "Backspace") {
           event.preventDefault();
           onDelete();
+          return;
         }
+        // Arrow-key nudge -- the only way a keyboard/switch-device user can
+        // fine-tune placement without a mouse or touch drag. Small step per
+        // press, larger with Shift, same as Figma/design-tool convention.
+        const delta = ARROW_DELTAS[event.key];
+        if (!delta) return;
+        event.preventDefault();
+        const step = event.shiftKey ? NUDGE_STEP_LARGE_PCT : NUDGE_STEP_PCT;
+        onChange({
+          xPct: clamp(element.xPct + delta.dx * step, 0, 100 - element.widthPct),
+          yPct: clamp(element.yPct + delta.dy * step, 0, 100 - element.heightPct),
+        });
       }}
       className={`absolute touch-none select-none ${selected ? "z-20" : "z-10"} ${element.type === "signature" ? "cursor-grab active:cursor-grabbing" : ""}`}
       style={{
