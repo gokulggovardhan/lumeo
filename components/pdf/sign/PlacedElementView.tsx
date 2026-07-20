@@ -5,6 +5,17 @@
 // One placed element on the placement stage -- a signature stamp or a
 // date/text/initials box. Owns its own drag/resize/rotate pointer math;
 // the parent just hands it percent-based geometry and gets patches back.
+//
+// Perf note: drag/resize/rotate write straight to the DOM node's style
+// on every pointermove and only call onChange once, at gesture end.
+// Calling onChange per pointermove (as this used to do)
+// pushes a React state update for every mouse-move event -- 60-100+
+// times a second while dragging -- which re-renders this component
+// and, since the parent's `elements` array gets a new reference each
+// time, every *other* placed element too. That's the actual "lag" a
+// premium signing tool can't have; committing once at gesture end
+// keeps dragging perfectly smooth regardless of how many elements are
+// on the page.
 
 import { useRef } from "react";
 import type { PlacedElement } from "@/lib/sign/types";
@@ -16,13 +27,14 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+type LiveGeometry = { xPct: number; yPct: number; widthPct: number; heightPct: number; rotationDeg: number };
+
 export function PlacedElementView({
   element,
   selected,
   stageRef,
   onSelect,
   onChange,
-  onCommit,
   onDelete,
   onDuplicate,
   onEditText,
@@ -32,11 +44,12 @@ export function PlacedElementView({
   stageRef: React.RefObject<HTMLDivElement | null>;
   onSelect: () => void;
   onChange: (patch: Partial<PlacedElement>) => void;
-  onCommit: () => void;
   onDelete: () => void;
   onDuplicate: () => void;
   onEditText?: (text: string) => void;
 }) {
+  const nodeRef = useRef<HTMLDivElement | null>(null);
+  const liveRef = useRef<LiveGeometry | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; originXPct: number; originYPct: number } | null>(null);
   const resizeRef = useRef<{
     startX: number;
@@ -51,6 +64,39 @@ export function PlacedElementView({
 
   function getStageRect() {
     return stageRef.current?.getBoundingClientRect() ?? null;
+  }
+
+  function ensureLive(): LiveGeometry {
+    if (!liveRef.current) {
+      liveRef.current = {
+        xPct: element.xPct,
+        yPct: element.yPct,
+        widthPct: element.widthPct,
+        heightPct: element.heightPct,
+        rotationDeg: element.rotationDeg,
+      };
+    }
+    return liveRef.current;
+  }
+
+  function applyLiveStyle(live: LiveGeometry) {
+    const node = nodeRef.current;
+    if (!node) return;
+    node.style.left = `${live.xPct}%`;
+    node.style.top = `${live.yPct}%`;
+    node.style.width = `${live.widthPct}%`;
+    node.style.height = `${live.heightPct}%`;
+    node.style.transform = `rotate(${live.rotationDeg}deg)`;
+  }
+
+  function commitLive() {
+    const live = liveRef.current;
+    liveRef.current = null;
+    if (!live) return;
+    // onChange fires exactly once per completed gesture, with the final
+    // geometry -- the parent can push it straight to undo history like any
+    // other discrete action, no separate "commit" phase needed.
+    onChange(live);
   }
 
   function handleBodyPointerDown(event: React.PointerEvent<HTMLDivElement>) {
@@ -71,16 +117,16 @@ export function PlacedElementView({
     if (!drag || !rect) return;
     const deltaXPct = ((event.clientX - drag.startX) / rect.width) * 100;
     const deltaYPct = ((event.clientY - drag.startY) / rect.height) * 100;
-    onChange({
-      xPct: clamp(drag.originXPct + deltaXPct, 0, 100 - element.widthPct),
-      yPct: clamp(drag.originYPct + deltaYPct, 0, 100 - element.heightPct),
-    });
+    const live = ensureLive();
+    live.xPct = clamp(drag.originXPct + deltaXPct, 0, 100 - live.widthPct);
+    live.yPct = clamp(drag.originYPct + deltaYPct, 0, 100 - live.heightPct);
+    applyLiveStyle(live);
   }
 
   function handleBodyPointerUp(event: React.PointerEvent<HTMLDivElement>) {
     if (dragRef.current) {
       dragRef.current = null;
-      onCommit();
+      commitLive();
     }
     (event.target as HTMLElement).releasePointerCapture(event.pointerId);
   }
@@ -104,23 +150,25 @@ export function PlacedElementView({
     const rect = getStageRect();
     if (!resize || !rect) return;
     const deltaXPct = ((event.clientX - resize.startX) / rect.width) * 100;
+    const live = ensureLive();
 
     if (element.type === "signature") {
       const nextWidthPct = clamp(resize.originWidthPct + deltaXPct, MIN_WIDTH_PCT, 100 - resize.originXPct);
       const widthPx = (nextWidthPct / 100) * rect.width;
       const heightPx = widthPx / resize.aspectRatio;
-      const nextHeightPct = (heightPx / rect.height) * 100;
-      onChange({ widthPct: nextWidthPct, heightPct: nextHeightPct });
+      live.widthPct = nextWidthPct;
+      live.heightPct = (heightPx / rect.height) * 100;
     } else {
-      const nextWidthPct = clamp(resize.originWidthPct + deltaXPct, MIN_WIDTH_PCT, 100 - resize.originXPct);
-      onChange({ widthPct: nextWidthPct, heightPct: Math.max(MIN_TEXT_HEIGHT_PCT, resize.originHeightPct) });
+      live.widthPct = clamp(resize.originWidthPct + deltaXPct, MIN_WIDTH_PCT, 100 - resize.originXPct);
+      live.heightPct = Math.max(MIN_TEXT_HEIGHT_PCT, resize.originHeightPct);
     }
+    applyLiveStyle(live);
   }
 
   function handleResizeEnd(event: React.PointerEvent<HTMLDivElement>) {
     if (resizeRef.current) {
       resizeRef.current = null;
-      onCommit();
+      commitLive();
     }
     (event.target as HTMLElement).releasePointerCapture(event.pointerId);
   }
@@ -145,13 +193,15 @@ export function PlacedElementView({
     if (!rotate) return;
     const currentAngle = Math.atan2(event.clientY - rotate.centerY, event.clientX - rotate.centerX);
     const deltaDeg = ((currentAngle - rotate.startAngle) * 180) / Math.PI;
-    onChange({ rotationDeg: Math.round(rotate.originRotation + deltaDeg) });
+    const live = ensureLive();
+    live.rotationDeg = Math.round(rotate.originRotation + deltaDeg);
+    applyLiveStyle(live);
   }
 
   function handleRotateEnd(event: React.PointerEvent<HTMLDivElement>) {
     if (rotateRef.current) {
       rotateRef.current = null;
-      onCommit();
+      commitLive();
     }
     (event.target as HTMLElement).releasePointerCapture(event.pointerId);
   }
@@ -160,6 +210,7 @@ export function PlacedElementView({
 
   return (
     <div
+      ref={nodeRef}
       role="button"
       tabIndex={0}
       aria-label={`${element.type} element`}
