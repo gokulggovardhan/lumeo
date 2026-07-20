@@ -8,11 +8,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf-tools", {
     title: { absolute: "PDF Tools - Private Browser PDF Workspace | Lumeo PDF" },
     description:
-      "Browse available Lumeo PDF tools by category. Choose a private browser-first workspace for merging, splitting, compressing, and converting PDFs.",
+      "Browse Lumeo's available PDF tools — merging, splitting, compressing, and converting, handled privately in your browser.",
     alternates: { canonical: "/pdf-tools" },
     openGraph: {
       title: "PDF Tools - Lumeo PDF Workspace",
-      description: "Browse available private browser-first PDF tools by category.",
+      description: "Browse Lumeo's available private, browser-first PDF tools.",
       url: "https://lumeo.in/pdf-tools",
       siteName: "Lumeo PDF",
       type: "website",
@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "PDF Tools - Lumeo PDF Workspace",
-      description: "Choose a private browser-first PDF workspace by category.",
+      description: "Lumeo's available private, browser-first PDF tools.",
     },
   });
 }
@@ -30,7 +30,7 @@ const structuredData = {
   "@type": "CollectionPage",
   name: "Lumeo PDF Tools",
   url: "https://lumeo.in/pdf-tools",
-  description: "A categorized directory of available Lumeo PDF tools.",
+  description: "A directory of available Lumeo PDF tools.",
 };
 
 export default function PdfToolsPage() {
@@ -47,10 +47,10 @@ export default function PdfToolsPage() {
       <section className="lumeo-fade-up mb-7 max-w-2xl">
         <p className="aura-text-label text-[var(--lumeo-gold-300)]">PDF tools</p>
         <h1 className="mt-3 font-serif font-medium text-[var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[var(--text-primary)]">
-          Everything a PDF needs. <em className="not-italic text-[var(--atelier-sage-300)]">Most of it never leaves your browser.</em>
+          The PDF tools that matter. <em className="not-italic text-[var(--atelier-sage-300)]">They run entirely in your browser.</em>
         </h1>
         <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-          Every tool below groups the tasks people actually need — no hunting through a hundred one-off links.
+          Each tool below groups related tasks in one place. More arrive as they&rsquo;re ready.
         </p>
       </section>
 

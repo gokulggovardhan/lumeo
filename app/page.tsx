@@ -81,20 +81,10 @@ function TrustUserIcon() {
   );
 }
 
-function TrustGlobeIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[15px] w-[15px] text-[var(--atelier-sage-300)]">
-      <circle cx="12" cy="12" r="9" />
-      <path d="M3 12h18M12 3c2.5 2.5 3.8 5.7 3.8 9s-1.3 6.5-3.8 9c-2.5-2.5-3.8-5.7-3.8-9S9.5 5.5 12 3z" />
-    </svg>
-  );
-}
-
 const trustItems = [
   { icon: TrustUserIcon, label: "No account needed" },
   { icon: TrustCheckIcon, label: "Free, always" },
   { icon: TrustShieldIcon, label: "No installs" },
-  { icon: TrustGlobeIcon, label: "Every browser" },
 ];
 
 const whyItems = [
@@ -151,7 +141,7 @@ export default function Home() {
               id="tool-heading"
               className="mt-2.5 font-serif font-semibold text-[clamp(1.75rem,3.6vw,2.5rem)] leading-[1.1] tracking-[-0.015em] text-[var(--text-primary)]"
             >
-              Every PDF tool, right <em className="not-italic text-[var(--atelier-sage-300)]">where you need it.</em>
+              The PDF tool you need, right <em className="not-italic text-[var(--atelier-sage-300)]">where you need it.</em>
             </h1>
           </header>
 

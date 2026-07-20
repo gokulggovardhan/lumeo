@@ -92,7 +92,10 @@ export const lumeoTools: LumeoTool[] = [
     name: "Capture",
     plain: "Images to PDF",
     tag: "Turn photos and scans into a clean PDF.",
-    processing: "hybrid",
+    // Verified browser-only today (its one live action, JPG to PDF, has zero
+    // network calls). Revisit to "hybrid" only once a genuinely
+    // server-backed action (e.g. HEIC decode) actually ships live.
+    processing: "browser",
     availability: "available",
     primaryRoute: "/pdf/jpg-to-pdf",
     actions: [
@@ -109,7 +112,10 @@ export const lumeoTools: LumeoTool[] = [
     name: "Render",
     plain: "PDF to images & text",
     tag: "Export pages as images, or pull the content out.",
-    processing: "hybrid",
+    // Verified browser-only today (its one live action, PDF to JPG, has zero
+    // network calls). Revisit to "hybrid" only once a genuinely
+    // server-backed action actually ships live.
+    processing: "browser",
     availability: "available",
     primaryRoute: "/pdf/pdf-to-jpg",
     actions: [

@@ -187,7 +187,7 @@ export async function PdfToolLauncher({ showHeading = true }: { showHeading?: bo
           <li className="min-w-0">
             <ToolCard
               name="Browse Tools"
-              description="Browse every available PDF tool by category."
+              description="See every available PDF tool in one place."
               Icon={AllToolsIcon}
               href="/pdf-tools"
               index={tools.length}
