@@ -55,7 +55,7 @@ function CardShell({
 }
 
 function ToolCard({ tool, index }: { tool: ResolvedTool; index: number }) {
-  const href = tool.effectivePrimaryRoute;
+  const href = tool.effectivePrimaryRoute ? `/pdf-tools/${tool.key}` : undefined;
 
   return (
     <li className="min-w-0">
