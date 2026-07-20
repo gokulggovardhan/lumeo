@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
+import PublicFooter from "@/components/PublicFooter";
+import { PublicNav } from "@/components/PublicPdfChrome";
 import {
-  InfoCallout,
   InfoDefinitionList,
   InfoList,
   InfoPageSection,
-  InfoPageShell,
+  InfoCallout,
   InfoStructuredData,
 } from "@/components/InfoPage";
 import { ContactForm } from "@/components/ContactForm";
@@ -47,19 +48,26 @@ export default function ContactPage() {
   return (
     <>
       <InfoStructuredData data={contactSchema} />
-      <InfoPageShell
-        eyebrow="Contact"
-        title="Let's improve document work together"
-        description="Use the guidance below for product feedback, privacy questions, accessibility concerns, or responsible security reports."
-      >
-        <InfoPageSection title="Send us a message">
-          <ContactForm />
-          <InfoCallout>
-            Do not send confidential PDF files through this form — describe
-            the issue in words instead.
-          </InfoCallout>
-        </InfoPageSection>
+      <main id="main-content" className="aura-info-page flex min-h-dvh flex-col bg-[var(--surface-canvas)] text-[var(--text-primary)]">
+        <PublicNav />
 
+        {/* Sized to land fully in view on open -- no scroll needed to reach
+            or use the form itself. Everything below it is reference
+            material for people who want it, not required to send a message. */}
+        <section className="mx-auto flex w-full max-w-[640px] flex-1 flex-col justify-center px-5 py-5 sm:px-8">
+          <div className="mb-4">
+            <p className="aura-text-label text-[var(--lumeo-gold-300)]">Contact</p>
+            <h1 className="mt-1.5 font-serif font-semibold text-[length:var(--text-heading-md)] leading-tight text-[color:var(--lumeo-paper-50)]">
+              Send us a message
+            </h1>
+            <p className="mt-1.5 text-sm leading-6 text-[var(--text-secondary)]">
+              Feedback, privacy questions, accessibility concerns, or security reports — all welcome.
+            </p>
+          </div>
+          <ContactForm />
+        </section>
+
+        <article className="mx-auto w-full max-w-[820px] space-y-9 px-5 pb-10 pt-2 sm:px-8">
         <InfoPageSection title="Contact categories">
           <InfoDefinitionList
             items={[
@@ -139,7 +147,10 @@ export default function ContactPage() {
             is not currently published.
           </p>
         </InfoPageSection>
-      </InfoPageShell>
+        </article>
+
+        <PublicFooter />
+      </main>
     </>
   );
 }
