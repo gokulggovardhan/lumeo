@@ -136,8 +136,7 @@ export default function SignPdfTool() {
   const [error, setError] = useState("");
   const [pageLoading, setPageLoading] = useState(false);
 
-  const { state: elements, set: setElements, setLive: setElementsLive, commit: commitElements, undo, redo, canUndo, canRedo, reset: resetElements } = useHistoryState<PlacedElement[]>([]);
-  const dragSnapshotRef = useRef<PlacedElement[] | null>(null);
+  const { state: elements, set: setElements, undo, redo, canUndo, canRedo, reset: resetElements } = useHistoryState<PlacedElement[]>([]);
   const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [armedSignature, setArmedSignature] = useState<CreatedSignature | SavedSignature | null>(null);
@@ -420,22 +419,11 @@ export default function SignPdfTool() {
     setSelectedId(id);
   }
 
-  // Continuous drag/resize/rotate frames update live state only -- pushing
-  // an undo entry per pointermove would flood the stack. The pre-gesture
-  // snapshot is captured lazily on the first patch of a gesture, then
-  // committed as one undo step when the gesture ends (see commitElement).
+  // PlacedElementView now only calls this once per completed gesture (drag,
+  // resize, or rotate ends) -- not per pointermove -- so it can push
+  // straight to undo history like any other discrete action.
   function patchElement(id: string, patch: Partial<PlacedElement>) {
-    setElementsLive((current) => {
-      if (dragSnapshotRef.current === null) dragSnapshotRef.current = current;
-      return current.map((item) => (item.id === id ? ({ ...item, ...patch } as PlacedElement) : item));
-    });
-  }
-
-  function commitElement() {
-    if (dragSnapshotRef.current) {
-      commitElements(dragSnapshotRef.current);
-      dragSnapshotRef.current = null;
-    }
+    setElements((current) => current.map((item) => (item.id === id ? ({ ...item, ...patch } as PlacedElement) : item)));
   }
 
   const currentPageElements = useMemo(() => elements.filter((item) => item.pageIndex === pageIndex), [elements, pageIndex]);
@@ -667,7 +655,6 @@ export default function SignPdfTool() {
                       stageRef={stageRef}
                       onSelect={() => setSelectedId(element.id)}
                       onChange={(patch) => patchElement(element.id, patch)}
-                      onCommit={commitElement}
                       onDelete={() => {
                         setElements((current) => current.filter((item) => item.id !== element.id));
                         setSelectedId(null);
