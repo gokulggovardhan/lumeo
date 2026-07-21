@@ -24,15 +24,24 @@ const CONVERT_SECRET = process.env.CONVERT_SECRET || "";
 const LIBREOFFICE_BINARY = process.env.LIBREOFFICE_BINARY || "soffice";
 const CONVERSION_TIMEOUT_MS = 90_000;
 const MAX_BODY_BYTES = 10 * 1024;
-// The shared secret authenticates the *caller* (our own Next.js API route),
-// but fileUrl is still a value from that request body -- a leaked secret
-// or a bug upstream could otherwise turn this into an SSRF proxy into
-// Render's internal network. This allowlist is the actual boundary: only
-// URLs on a Supabase storage host are ever fetched, regardless of auth.
-const ALLOWED_FILE_HOST_SUFFIX = process.env.ALLOWED_FILE_HOST_SUFFIX || "supabase.co";
 
 if (!CONVERT_SECRET) {
   console.error("CONVERT_SECRET is not set. Refusing to start: every request would be unauthenticated.");
+  process.exit(1);
+}
+
+// The shared secret authenticates the *caller* (our own Next.js API route),
+// but fileUrl is still a value from that request body -- a leaked secret
+// or a bug upstream could otherwise turn this into an SSRF proxy into
+// this host's internal network. ALLOWED_FILE_HOST is the actual boundary:
+// only this exact, operator-configured hostname is ever fetched, regardless
+// of auth. Set it to your Supabase project's hostname (from SUPABASE_URL,
+// e.g. "abcxyz.supabase.co") -- not a wildcard, so a compromised or
+// misconfigured request can never widen it.
+const ALLOWED_FILE_HOST = process.env.ALLOWED_FILE_HOST || "";
+
+if (!ALLOWED_FILE_HOST) {
+  console.error("ALLOWED_FILE_HOST is not set. Refusing to start: fileUrl fetches would have no host restriction.");
   process.exit(1);
 }
 
@@ -87,17 +96,8 @@ async function convertWordToPdf({ fileUrl, fileName }) {
   const outputPath = join(workDir, "input.pdf");
 
   try {
-    // The shared secret authenticates the *caller* (our own Next.js API
-    // route), but fileUrl is still a value from that request body -- a
-    // leaked secret or a bug upstream could otherwise turn this into an
-    // SSRF proxy into the host's internal network. This allowlist, checked
-    // right before the fetch it guards, is the actual boundary.
     const parsedFileUrl = new URL(fileUrl);
-    const isAllowedHost =
-      parsedFileUrl.protocol === "https:" &&
-      (parsedFileUrl.hostname === ALLOWED_FILE_HOST_SUFFIX ||
-        parsedFileUrl.hostname.endsWith(`.${ALLOWED_FILE_HOST_SUFFIX}`));
-    if (!isAllowedHost) {
+    if (parsedFileUrl.protocol !== "https:" || parsedFileUrl.hostname !== ALLOWED_FILE_HOST) {
       throw new Error("File URL is not from an allowed host.");
     }
 

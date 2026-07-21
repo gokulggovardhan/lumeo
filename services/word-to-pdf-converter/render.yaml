@@ -9,3 +9,5 @@ services:
     envVars:
       - key: CONVERT_SECRET
         sync: false
+      - key: ALLOWED_FILE_HOST
+        sync: false
