@@ -43,6 +43,7 @@ const PUBLIC_ANALYTICS_ROUTES = new Set([
   "/pdf/compress",
   "/pdf/jpg-to-pdf",
   "/pdf/pdf-to-jpg",
+  "/pdf/word-to-pdf",
 ]);
 
 function doNotTrackEnabled() {

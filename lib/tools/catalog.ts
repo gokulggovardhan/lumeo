@@ -177,9 +177,10 @@ export const lumeoTools: LumeoTool[] = [
     plain: "Office ↔ PDF",
     tag: "Word, Excel, PowerPoint and more — via free, self-hosted LibreOffice.",
     processing: "server",
-    availability: "soon",
+    availability: "available",
+    primaryRoute: "/pdf/word-to-pdf",
     actions: [
-      { label: "Word to PDF", slug: "word-to-pdf", live: false },
+      { label: "Word to PDF", slug: "word-to-pdf", route: "/pdf/word-to-pdf", live: true },
       { label: "Excel to PDF", slug: "excel-to-pdf", live: false },
       { label: "PowerPoint to PDF", slug: "powerpoint-to-pdf", live: false },
       { label: "PDF to Word", slug: "pdf-to-word", live: false },

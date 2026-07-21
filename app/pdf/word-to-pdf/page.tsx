@@ -1,0 +1,46 @@
+import type { Metadata } from "next";
+import dynamic from "next/dynamic";
+import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
+import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
+import { withSeoOverride } from "@/lib/public-site/seo";
+
+const WordToPdfTool = dynamic(() => import("@/components/pdf/WordToPdfTool"), {
+  loading: () => <ToolWorkspaceLoading />,
+});
+
+export async function generateMetadata(): Promise<Metadata> {
+  return withSeoOverride("/pdf/word-to-pdf", {
+    title: { absolute: "Word to PDF Converter Online - Free & Private" },
+    description: "Convert Word documents (.docx, .doc) to PDF online with Lumeo. Powered by free, self-hosted LibreOffice -- uploads are deleted immediately after conversion.",
+    alternates: { canonical: "/pdf/word-to-pdf" },
+    openGraph: {
+      title: "Word to PDF Converter Online - Lumeo PDF",
+      description: "Convert Word documents to PDF with accurate layout, fonts, and tables.",
+      url: "https://lumeo.in/pdf/word-to-pdf",
+      siteName: "Lumeo PDF",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: "Word to PDF Converter Online - Lumeo PDF",
+      description: "Convert Word documents to PDF online with Lumeo, powered by free, self-hosted LibreOffice.",
+    },
+  });
+}
+
+export default function WordToPdfPage() {
+  return (
+    <PublicCatalogPageShell
+      maxWidth="max-w-[1240px]"
+      mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
+      contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
+    >
+      <L2ToolPageHeader
+        title="Word to PDF"
+        description="Convert Word documents to PDF. Uploaded securely, converted on our server, deleted immediately after."
+      />
+
+      <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-word-to-pdf-tool"><WordToPdfTool /></div>
+    </PublicCatalogPageShell>
+  );
+}
