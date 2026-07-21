@@ -235,6 +235,15 @@ export function PlacedElementView({
         handleResizeEnd(event);
         handleRotateEnd(event);
       }}
+      // Mobile browsers can fire pointercancel mid-gesture (e.g. the OS
+      // hands the touch off to a scroll gesture) without ever firing
+      // pointerup. Without this, the drag/resize/rotate ref stays set and
+      // silently hijacks the element's *next* unrelated pointer gesture.
+      onPointerCancel={(event) => {
+        handleBodyPointerUp(event);
+        handleResizeEnd(event);
+        handleRotateEnd(event);
+      }}
       onKeyDown={(event) => {
         if (event.key === "Delete" || event.key === "Backspace") {
           event.preventDefault();

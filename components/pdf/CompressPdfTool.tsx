@@ -42,7 +42,7 @@ import {
 import { AuraOptionCard, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
-import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { loadPdfJsModule, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
@@ -457,6 +457,11 @@ export default function CompressPdfTool() {
     setProgressDetail("");
   }
 
+  // Renders one representative page for the sidebar preview, then destroys
+  // the pdfjs document -- it's only ever used for this single render.
+  // handleCompress opens its own separate document for the actual
+  // compression pass, so keeping this one alive afterward just holds a full
+  // decoded PDF in memory for the rest of the session for no reason.
   async function renderPreview(doc: PDFDocumentProxy, pageNumber: number, currentSession: number) {
     try {
       setPreviewIssue("");
@@ -484,6 +489,15 @@ export default function CompressPdfTool() {
       setPreviewUrl(url);
     } catch {
       setPreviewIssue("Preview could not be rendered. Compression can still be attempted.");
+    } finally {
+      if (currentSession === sessionRef.current && pdfJsDocRef.current === doc) {
+        pdfJsDocRef.current = null;
+      }
+      try {
+        await (doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
+      } catch {
+        // PDF.js may already be cleaning itself up.
+      }
     }
   }
 
@@ -674,7 +688,7 @@ export default function CompressPdfTool() {
 
       const task = page.render({ canvas, canvasContext: context, viewport });
       renderTaskRef.current = task;
-      await task.promise;
+      await renderPageWithTimeout(task, pageIndex);
       renderTaskRef.current = null;
       if (colourMode === "grayscale") applyGrayscale(canvas);
 
@@ -683,7 +697,6 @@ export default function CompressPdfTool() {
       );
       canvas.width = 0;
       canvas.height = 0;
-      page.cleanup();
       if (!blob) throw new Error("Compression failed while rebuilding a page.");
       const imageBytes = await blob.arrayBuffer();
       const image = await output.embedJpg(imageBytes);

@@ -22,6 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { degrees, PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
@@ -46,7 +47,7 @@ import {
 } from "@/lib/sign/signatureLibrary";
 import type { PlacedElement, PlacedElementType, SavedSignature } from "@/lib/sign/types";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
-import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
@@ -131,11 +132,21 @@ export default function SignPdfTool() {
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const thumbnailUrlsRef = useRef<Record<number, string>>({});
+  // The source PDF is decoded via pdfjs once per uploaded file and kept open
+  // here -- both the thumbnail rail and the current-page preview reuse this
+  // same document, so paging through Prev/Next never re-parses the file.
+  const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
+  const [docReady, setDocReady] = useState(0);
+  const toastTimersRef = useRef<Set<number>>(new Set());
 
   const pushToast = useCallback((message: string, tone: Toast["tone"] = "success") => {
     const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setToasts((current) => [...current, { id, message, tone }]);
-    window.setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== id)), 2600);
+    const timer = window.setTimeout(() => {
+      toastTimersRef.current.delete(timer);
+      setToasts((current) => current.filter((toast) => toast.id !== id));
+    }, 2600);
+    toastTimersRef.current.add(timer);
   }, []);
 
   useEffect(() => {
@@ -146,15 +157,21 @@ export default function SignPdfTool() {
   }, [availability, track]);
 
   useEffect(() => {
+    const toastTimers = toastTimersRef.current;
     return () => {
       if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       Object.values(thumbnailUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
+      void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
+      toastTimers.forEach((timer) => window.clearTimeout(timer));
+      toastTimers.clear();
     };
   }, []);
 
-  // Low-res thumbnail for every page, rendered once per uploaded file so the
-  // rail can jump to any page without re-rendering the full-size preview.
+  // Opens the source PDF via pdfjs once per uploaded file, keeps it open in
+  // pdfJsDocRef for the current-page preview effect below to reuse, and
+  // renders a low-res thumbnail for every page so the rail can jump to any
+  // page without re-rendering the full-size preview.
   useEffect(() => {
     let cancelled = false;
 
@@ -162,31 +179,41 @@ export default function SignPdfTool() {
       Object.values(thumbnailUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
       thumbnailUrlsRef.current = {};
       setThumbnails({});
+
+      const previousDoc = pdfJsDocRef.current;
+      pdfJsDocRef.current = null;
+      setDocReady(0);
+      if (previousDoc) {
+        void (previousDoc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
+      }
+
       if (!pdf) return;
       try {
-        const pdfjs = await loadPdfJsModule();
-        const doc = await pdfjs.getDocument({ data: new Uint8Array(copyArrayBuffer(pdf.bytes)) }).promise;
-        try {
-          for (let index = 0; index < pdf.pageCount; index += 1) {
-            if (cancelled) break;
-            const page = await doc.getPage(index + 1);
-            const viewport = page.getViewport({ scale: THUMBNAIL_SCALE });
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d", { alpha: false });
-            if (!context) continue;
-            canvas.width = Math.max(1, Math.floor(viewport.width));
-            canvas.height = Math.max(1, Math.floor(viewport.height));
-            context.fillStyle = "#FFFFFF";
-            context.fillRect(0, 0, canvas.width, canvas.height);
-            await page.render({ canvas, canvasContext: context, viewport }).promise;
-            const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.7));
-            if (cancelled || !blob) continue;
-            const url = URL.createObjectURL(blob);
-            thumbnailUrlsRef.current[index] = url;
-            setThumbnails((current) => ({ ...current, [index]: url }));
-          }
-        } finally {
-          void (doc as typeof doc & { destroy?: () => Promise<void> | void }).destroy?.();
+        const doc = await openPdfJsDocument(new Uint8Array(copyArrayBuffer(pdf.bytes)));
+        if (cancelled) {
+          void (doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
+          return;
+        }
+        pdfJsDocRef.current = doc;
+        setDocReady((current) => current + 1);
+
+        for (let index = 0; index < pdf.pageCount; index += 1) {
+          if (cancelled) break;
+          const page = await doc.getPage(index + 1);
+          const viewport = page.getViewport({ scale: THUMBNAIL_SCALE });
+          const canvas = document.createElement("canvas");
+          const context = canvas.getContext("2d", { alpha: false });
+          if (!context) continue;
+          canvas.width = Math.max(1, Math.floor(viewport.width));
+          canvas.height = Math.max(1, Math.floor(viewport.height));
+          context.fillStyle = "#FFFFFF";
+          context.fillRect(0, 0, canvas.width, canvas.height);
+          await page.render({ canvas, canvasContext: context, viewport }).promise;
+          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.7));
+          if (cancelled || !blob) continue;
+          const url = URL.createObjectURL(blob);
+          thumbnailUrlsRef.current[index] = url;
+          setThumbnails((current) => ({ ...current, [index]: url }));
         }
       } catch {
         // Thumbnails are a navigation convenience -- a failed render just
@@ -199,38 +226,35 @@ export default function SignPdfTool() {
     };
   }, [pdf]);
 
-  // Renders the current page to a background image for the placement stage.
+  // Renders the current page to a background image for the placement stage,
+  // reusing the already-open pdfjs document from the effect above instead of
+  // re-parsing the file on every page turn.
   useEffect(() => {
-    if (!pdf) return;
+    if (!pdf || !pdfJsDocRef.current) return;
+    const doc = pdfJsDocRef.current;
     let cancelled = false;
 
     void (async () => {
       setPageLoading(true);
       try {
-        const pdfjs = await loadPdfJsModule();
-        const doc = await pdfjs.getDocument({ data: new Uint8Array(copyArrayBuffer(pdf.bytes)) }).promise;
-        try {
-          const page = await doc.getPage(pageIndex + 1);
-          const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
-          const canvas = document.createElement("canvas");
-          const context = canvas.getContext("2d", { alpha: false });
-          if (!context) return;
-          canvas.width = Math.max(1, Math.floor(viewport.width));
-          canvas.height = Math.max(1, Math.floor(viewport.height));
-          context.fillStyle = "#FFFFFF";
-          context.fillRect(0, 0, canvas.width, canvas.height);
-          await page.render({ canvas, canvasContext: context, viewport }).promise;
+        const page = await doc.getPage(pageIndex + 1);
+        const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d", { alpha: false });
+        if (!context) return;
+        canvas.width = Math.max(1, Math.floor(viewport.width));
+        canvas.height = Math.max(1, Math.floor(viewport.height));
+        context.fillStyle = "#FFFFFF";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        await page.render({ canvas, canvasContext: context, viewport }).promise;
 
-          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-          if (cancelled || !blob) return;
-          if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
-          const url = URL.createObjectURL(blob);
-          pageImageUrlRef.current = url;
-          setPageImageUrl(url);
-          setPageDisplaySize({ width: canvas.width, height: canvas.height });
-        } finally {
-          void (doc as typeof doc & { destroy?: () => Promise<void> | void }).destroy?.();
-        }
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+        if (cancelled || !blob) return;
+        if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        pageImageUrlRef.current = url;
+        setPageImageUrl(url);
+        setPageDisplaySize({ width: canvas.width, height: canvas.height });
       } catch {
         setError("This page could not be previewed. Try a different page.");
       } finally {
@@ -241,7 +265,7 @@ export default function SignPdfTool() {
     return () => {
       cancelled = true;
     };
-  }, [pdf, pageIndex]);
+  }, [pdf, pageIndex, docReady]);
 
   // Keyboard shortcuts: Ctrl/Cmd+Z undo, Ctrl/Cmd+Y or Ctrl/Cmd+Shift+Z
   // redo, Delete/Backspace removes the selected element.

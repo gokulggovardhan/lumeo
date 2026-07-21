@@ -54,6 +54,12 @@ const COMPRESS_KEY = "lumeo.jpgToPdf.compress";
 const COMPRESS_QUALITY_KEY = "lumeo.jpgToPdf.compressQuality";
 const PNG_TO_JPEG_KEY = "lumeo.jpgToPdf.pngToJpeg";
 const PNG_TO_JPEG_ESTIMATE_FACTOR = 0.5;
+// WEBP is always re-encoded to PNG before embedding (pdf-lib only embeds
+// JPEG/PNG pixel data), regardless of the compress toggle. A lossless PNG of
+// decoded pixels typically lands well above the original, well-compressed
+// WEBP -- this rough multiplier keeps the size estimate from understating
+// the real output for WEBP-heavy uploads.
+const WEBP_TO_PNG_ESTIMATE_FACTOR = 3;
 
 const pageSizeButtons: Array<{ value: PageSizeOption; label: string; dpi: string }> = [
   { value: "a4", label: "A4", dpi: "Standard" },
@@ -382,6 +388,9 @@ export default function JpgToPdfTool() {
   const estimatedPdfSize = useMemo(() => {
     if (!files.length) return 0;
     const imageBytes = files.reduce((sum, item) => {
+      if (item.file.type === "image/webp") {
+        return sum + item.file.size * WEBP_TO_PNG_ESTIMATE_FACTOR;
+      }
       if (compressImages && item.file.type === "image/jpeg") {
         return sum + item.file.size * (compressQuality / SOURCE_JPEG_QUALITY_ASSUMPTION);
       }
@@ -510,11 +519,12 @@ export default function JpgToPdfTool() {
     if (nextFiles.length === 0) return;
 
     const invalidType = nextFiles.find(
-      (file) => file.type !== "image/jpeg" && file.type !== "image/png",
+      (file) =>
+        file.type !== "image/jpeg" && file.type !== "image/png" && file.type !== "image/webp",
     );
 
     if (invalidType) {
-      setError("Please choose JPG or PNG image files only.");
+      setError("Please choose JPG, PNG, or WEBP image files only.");
       return;
     }
 
@@ -578,8 +588,8 @@ export default function JpgToPdfTool() {
     if (invalidSignatureCount > 0) {
       setError(
         invalidSignatureCount === nextFiles.length
-          ? "These files don't look like valid JPG or PNG images."
-          : "Some files don't look like valid JPG or PNG images and were skipped.",
+          ? "These files don't look like valid JPG, PNG, or WEBP images."
+          : "Some files don't look like valid JPG, PNG, or WEBP images and were skipped.",
       );
     }
 
@@ -670,14 +680,17 @@ export default function JpgToPdfTool() {
       for (const item of files) {
         try {
         const netRotation = normalizeRotation(item.userRotation);
+        const isWebp = item.file.type === "image/webp";
         const shouldCompressJpeg = compressImages && item.file.type === "image/jpeg";
         const shouldConvertPng = compressImages && convertPngToJpeg && item.file.type === "image/png";
-        const targetMimeType = shouldConvertPng ? "image/jpeg" : item.file.type;
+        // pdf-lib can only embed JPEG or PNG pixel data, so WEBP sources are
+        // always re-encoded to PNG via canvas before embedding.
+        const targetMimeType = shouldConvertPng ? "image/jpeg" : isWebp ? "image/png" : item.file.type;
         let width = item.width;
         let height = item.height;
         let embedBytes: Uint8Array;
 
-        if (netRotation !== 0 || shouldCompressJpeg || shouldConvertPng) {
+        if (netRotation !== 0 || shouldCompressJpeg || shouldConvertPng || isWebp) {
           const rendered = await renderImageToBytes(
             item.file,
             netRotation,
@@ -799,8 +812,8 @@ export default function JpgToPdfTool() {
             inputId="jpg-to-pdf-upload"
             title="Drop images here"
             description="or choose files from your device"
-            accept="image/jpeg,image/png,.jpg,.jpeg,.png"
-            acceptedNote="JPG or PNG images"
+            accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+            acceptedNote="JPG, PNG, or WEBP images"
             multiple
             icon={<JpgToPdfIcon />}
             buttonLabel="Select images"
@@ -838,7 +851,7 @@ export default function JpgToPdfTool() {
       <input
         ref={inputRef}
         type="file"
-        accept="image/jpeg,image/png,.jpg,.jpeg,.png"
+        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
         multiple
         className="hidden"
         onChange={(event) => {

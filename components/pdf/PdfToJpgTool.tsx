@@ -17,7 +17,7 @@ import { AuraIconButton, AuraSegmentedControl, AuraStatus } from "@/components/u
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { bucketFileSize } from "@/lib/analytics/size-bucket";
-import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { loadPdfJsModule, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
 import { formatBytes } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
@@ -31,7 +31,7 @@ import {
 
 type SelectionMode = "all" | "range" | "custom";
 type DpiPreset = "draft" | "standard" | "print";
-type OutputFormat = "jpeg" | "png";
+type OutputFormat = "jpeg" | "png" | "webp";
 type ConvertStatus = "Ready" | "Preparing document" | "Converting pages" | "Download ready";
 
 type PdfAnalysis = {
@@ -56,6 +56,7 @@ const DOWNLOAD_STAGGER_MS = 300;
 const THUMBNAIL_SCALE = 0.3;
 const THUMBNAIL_JPEG_QUALITY = 0.7;
 const PNG_SIZE_FACTOR = 2.2;
+const WEBP_SIZE_FACTOR = 0.75;
 const DPI_PRESET_KEY = "lumeo.pdfToJpg.dpiPreset";
 const QUALITY_KEY = "lumeo.pdfToJpg.quality";
 const FORMAT_KEY = "lumeo.pdfToJpg.format";
@@ -156,7 +157,7 @@ function readStoredQuality(): number {
 function readStoredFormat(): OutputFormat {
   if (typeof window === "undefined") return "jpeg";
   const stored = window.localStorage.getItem(FORMAT_KEY);
-  return stored === "png" ? "png" : "jpeg";
+  return stored === "png" || stored === "webp" ? stored : "jpeg";
 }
 
 function PdfToJpgIcon() {
@@ -528,7 +529,7 @@ export default function PdfToJpgTool() {
 
               const task = page.render({ canvas, canvasContext: context, viewport });
               thumbnailTasksRef.current.set(next, task);
-              await task.promise;
+              await renderPageWithTimeout(task, next);
               thumbnailTasksRef.current.delete(next);
               if (currentSession !== sessionRef.current) return;
 
@@ -809,7 +810,8 @@ export default function PdfToJpgTool() {
     const thumbnailDpi = THUMBNAIL_SCALE * 72;
     const areaRatio = (selectedPreset.dpi / thumbnailDpi) ** 2;
     const qualityRatio = quality / THUMBNAIL_JPEG_QUALITY;
-    const formatFactor = outputFormat === "png" ? PNG_SIZE_FACTOR : 1;
+    const formatFactor =
+      outputFormat === "png" ? PNG_SIZE_FACTOR : outputFormat === "webp" ? WEBP_SIZE_FACTOR : 1;
 
     const perPage = avgThumbnailSize * areaRatio * qualityRatio * formatFactor;
     return perPage * selectionPreview.count;
@@ -841,6 +843,12 @@ export default function PdfToJpgTool() {
     const inputSizeBucket = bucketFileSize(analysis.size);
     track({ eventName: "processing_started", toolSlug: TOOL_SLUG, inputSizeBucket });
 
+    // Declared outside the try block so the catch handler can revoke any
+    // blob URLs already created for earlier pages if a later page in this
+    // same batch fails -- those pages never reach setResults, so nothing
+    // else would ever revoke them.
+    const nextResults: JpgPageResult[] = [];
+
     try {
       const doc = pdfJsDocRef.current;
       if (!doc) throw new Error("Document is not ready. Please add the PDF again.");
@@ -848,9 +856,9 @@ export default function PdfToJpgTool() {
       const scale = selectedPreset.dpi / 72;
       const baseName = sanitizeFileStem(outputName || "lumeo-pages", "lumeo-pages");
       const digits = String(analysis.pageCount).length;
-      const extension = outputFormat === "png" ? "png" : "jpg";
-      const mimeType = outputFormat === "png" ? "image/png" : "image/jpeg";
-      const nextResults: JpgPageResult[] = [];
+      const extension = outputFormat === "png" ? "png" : outputFormat === "webp" ? "webp" : "jpg";
+      const mimeType =
+        outputFormat === "png" ? "image/png" : outputFormat === "webp" ? "image/webp" : "image/jpeg";
       let totalOutputSize = 0;
 
       for (let index = 0; index < pages.length; index += 1) {
@@ -873,11 +881,14 @@ export default function PdfToJpgTool() {
         context.fillRect(0, 0, canvas.width, canvas.height);
 
         const task = page.render({ canvas, canvasContext: context, viewport });
-        await task.promise;
+        await renderPageWithTimeout(task, pageNumber);
 
         const blob = await new Promise<Blob | null>((resolve) =>
           outputFormat === "png" ? canvas.toBlob(resolve, mimeType) : canvas.toBlob(resolve, mimeType, quality),
         );
+        if (blob && outputFormat === "webp" && blob.type !== "image/webp") {
+          throw new Error("WEBP export is not supported in this browser. Try JPG or PNG instead.");
+        }
         canvas.width = 0;
         canvas.height = 0;
         if (!blob) throw new Error(`Page ${pageNumber} could not be exported.`);
@@ -912,6 +923,9 @@ export default function PdfToJpgTool() {
         success: true,
       });
     } catch (convertError) {
+      // Any pages already converted in this failed batch never reached
+      // setResults, so revoke their blob URLs here instead of leaking them.
+      nextResults.forEach((item) => URL.revokeObjectURL(item.url));
       const message =
         convertError instanceof Error
           ? convertError.message
@@ -1175,7 +1189,7 @@ export default function PdfToJpgTool() {
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">Output</p>
                   <div className="flex overflow-hidden rounded-full border border-[var(--text-primary)]/12">
-                    {(["jpeg", "png"] as const).map((format) => (
+                    {(["jpeg", "png", "webp"] as const).map((format) => (
                       <button
                         key={format}
                         type="button"
@@ -1190,7 +1204,7 @@ export default function PdfToJpgTool() {
                             : "text-[var(--text-primary)]/48 hover:text-[var(--text-primary)]"
                         }`}
                       >
-                        {format === "jpeg" ? "JPG" : "PNG"}
+                        {format === "jpeg" ? "JPG" : format === "png" ? "PNG" : "WEBP"}
                       </button>
                     ))}
                   </div>
@@ -1222,7 +1236,7 @@ export default function PdfToJpgTool() {
                   {estimatedOutputSize ? ` · Estimated ~${formatBytes(estimatedOutputSize)}` : ""}
                 </p>
 
-                {outputFormat === "jpeg" ? (
+                {outputFormat === "jpeg" || outputFormat === "webp" ? (
                   <>
                     <div className="mt-2 flex items-center justify-between gap-3">
                       <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
@@ -1241,7 +1255,7 @@ export default function PdfToJpgTool() {
                         clearResults();
                       }}
                       className="mt-1 w-full accent-[var(--lumeo-gold)]"
-                      aria-label="JPEG quality"
+                      aria-label={outputFormat === "webp" ? "WEBP quality" : "JPEG quality"}
                       aria-valuetext={`${Math.round(quality * 100)}%`}
                     />
                   </>
@@ -1288,7 +1302,7 @@ export default function PdfToJpgTool() {
                 ) : results.length ? (
                   <div className="aura-success-reveal mt-2">
                     <p className="text-base font-semibold text-[var(--text-primary)]">
-                      {results.length} {outputFormat === "png" ? "PNG" : "JPG"}
+                      {results.length} {outputFormat === "png" ? "PNG" : outputFormat === "webp" ? "WEBP" : "JPG"}
                       {results.length === 1 ? "" : "s"} ready
                     </p>
                     <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">
@@ -1309,7 +1323,7 @@ export default function PdfToJpgTool() {
                               : allDownloaded
                                 ? "All downloaded"
                                 : results.length === 1
-                                  ? `Download ${outputFormat === "png" ? "PNG" : "JPG"}`
+                                  ? `Download ${outputFormat === "png" ? "PNG" : outputFormat === "webp" ? "WEBP" : "JPG"}`
                                   : "Download all"}
                           </button>
                         )}
@@ -1388,7 +1402,7 @@ export default function PdfToJpgTool() {
                           onClick={() => void convertPages()}
                           className="lumeo-primary-action mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
                         >
-                          Convert to {outputFormat === "png" ? "PNG" : "JPG"}
+                          Convert to {outputFormat === "png" ? "PNG" : outputFormat === "webp" ? "WEBP" : "JPG"}
                         </button>
                       )}
                     />
