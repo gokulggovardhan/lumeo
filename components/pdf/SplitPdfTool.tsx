@@ -28,7 +28,7 @@ import {
   checkPdfFileSize,
 } from "@/lib/pdf/uploadValidation";
 
-type SplitMode = "extract" | "ranges" | "everyPage" | "everyN" | "remove" | "reorder";
+type SplitMode = "extract" | "ranges" | "everyPage" | "everyN" | "remove" | "reorder" | "duplicate";
 type ResultKind = "pdf" | "zip";
 type ThumbnailDensity = "compact" | "comfortable" | "large";
 type ProgressStage =
@@ -93,6 +93,7 @@ const splitModes: Array<{ value: SplitMode; label: string; helper: string }> = [
   { value: "everyN", label: "Every N pages", helper: "Create equal document chunks." },
   { value: "remove", label: "Remove pages", helper: "Create one PDF without selected pages." },
   { value: "reorder", label: "Reorder pages", helper: "Drag pages into a new order." },
+  { value: "duplicate", label: "Duplicate pages", helper: "Insert a copy of each selected page right after it." },
 ];
 
 const densityClasses: Record<ThumbnailDensity, string> = {
@@ -534,12 +535,14 @@ export default function SplitPdfTool() {
   );
 
   const resultType: ResultKind =
-    mode === "extract" || mode === "remove" || mode === "reorder" ? "pdf" : "zip";
+    mode === "extract" || mode === "remove" || mode === "reorder" || mode === "duplicate"
+      ? "pdf"
+      : "zip";
   const pageCount = analysis?.pageCount ?? 0;
   const largeFile = Boolean(analysis && analysis.size > 75 * 1024 * 1024);
   const veryLargeDocument = Boolean(analysis && analysis.pageCount > 150);
   const selectedMode = splitModes.find((item) => item.value === mode) ?? splitModes[0];
-  const usesPageSelection = mode === "extract" || mode === "remove";
+  const usesPageSelection = mode === "extract" || mode === "remove" || mode === "duplicate";
 
   const captureUiState = useCallback(
     (): UiHistoryState => ({
@@ -891,7 +894,7 @@ export default function SplitPdfTool() {
       setFocusedPage(null);
       setRangeInput(`1-${Math.min(3, total)} | ${Math.min(4, total)}-end`);
     }
-    if (nextMode === "remove") {
+    if (nextMode === "remove" || nextMode === "duplicate") {
       updateSelection([1], 1, "1");
     }
     if (nextMode === "everyPage" || nextMode === "everyN") {
@@ -1023,6 +1026,20 @@ export default function SplitPdfTool() {
       return groups;
     }
 
+    if (mode === "duplicate") {
+      const pagesToDuplicate = selectedPages.length
+        ? selectedPages
+        : parsePageList(rangeInput, total).pages;
+      if (!pagesToDuplicate.length) throw new Error("Choose at least one page to duplicate.");
+      const duplicateSet = new Set(pagesToDuplicate);
+      const withDuplicates: number[] = [];
+      for (let page = 1; page <= total; page += 1) {
+        withDuplicates.push(page);
+        if (duplicateSet.has(page)) withDuplicates.push(page);
+      }
+      return [withDuplicates];
+    }
+
     const pagesToRemove = selectedPages.length ? selectedPages : parsePageList(rangeInput, total).pages;
     const removePages = new Set(pagesToRemove);
     const remaining = Array.from({ length: total }, (_, index) => index + 1).filter(
@@ -1049,8 +1066,10 @@ export default function SplitPdfTool() {
             ? `${totalPages} selected ${totalPages === 1 ? "page" : "pages"}`
             : mode === "remove"
               ? `${totalPages} pages remaining`
-              : mode === "reorder"
-                ? `${totalPages} pages reordered`
+              : mode === "duplicate"
+                ? `${totalPages} pages total after duplicating`
+                : mode === "reorder"
+                  ? `${totalPages} pages reordered`
                 : mode === "ranges"
                   ? `${outputCount} PDFs from ranges`
                   : mode === "everyPage"
@@ -1564,7 +1583,13 @@ export default function SplitPdfTool() {
               {mode !== "everyPage" && mode !== "everyN" && mode !== "reorder" ? (
                 <div>
                   <label className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/42">
-                    {mode === "ranges" ? "Range groups" : mode === "remove" ? "Pages to remove" : "Pages"}
+                    {mode === "ranges"
+                      ? "Range groups"
+                      : mode === "remove"
+                        ? "Pages to remove"
+                        : mode === "duplicate"
+                          ? "Pages to duplicate"
+                          : "Pages"}
                   </label>
                   <input
                     value={rangeInput}
@@ -1641,7 +1666,7 @@ export default function SplitPdfTool() {
                     Quick presets
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {mode === "extract" || mode === "remove" ? (
+                    {mode === "extract" || mode === "remove" || mode === "duplicate" ? (
                       <>
                         <button className="preset-button lumeo-press lumeo-focus-ring" type="button" onClick={() => applyPreset("all")}>All</button>
                         <button className="preset-button lumeo-press lumeo-focus-ring" type="button" onClick={() => applyPreset("first")}>First</button>
@@ -1830,7 +1855,9 @@ export default function SplitPdfTool() {
                     ? "Working in your browser..."
                     : mode === "reorder"
                       ? "Save reordered PDF"
-                      : "Split PDF"}
+                      : mode === "duplicate"
+                        ? "Save PDF with duplicates"
+                        : "Split PDF"}
                 </button>
               )}
             </div>

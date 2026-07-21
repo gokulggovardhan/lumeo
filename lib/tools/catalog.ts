@@ -66,7 +66,7 @@ export const lumeoTools: LumeoTool[] = [
       { label: "Rotate pages (in Split)", slug: "rotate", route: "/pdf/split", live: true },
       { label: "Remove pages", slug: "remove-pages", route: "/pdf/split", live: true },
       { label: "Extract pages", slug: "extract-pages", route: "/pdf/split", live: true },
-      { label: "Duplicate page", slug: "duplicate-page", live: false },
+      { label: "Duplicate page", slug: "duplicate-page", route: "/pdf/split", live: true },
     ],
   },
   {
@@ -79,9 +79,9 @@ export const lumeoTools: LumeoTool[] = [
     primaryRoute: "/pdf/compress",
     actions: [
       { label: "Compress", slug: "compress", route: "/pdf/compress", live: true },
-      { label: "Deep compress", slug: "deep-compress", live: false },
-      { label: "Grayscale", slug: "grayscale", live: false },
-      { label: "Flatten", slug: "flatten", live: false },
+      { label: "Deep compress", slug: "deep-compress", route: "/pdf/compress", live: true },
+      { label: "Grayscale", slug: "grayscale", route: "/pdf/compress", live: true },
+      { label: "Flatten", slug: "flatten", route: "/pdf/compress", live: true },
       { label: "Web-optimize", slug: "web-optimize", live: false },
       { label: "Repair", slug: "repair", live: false },
       { label: "PDF/A", slug: "pdf-a", live: false },
@@ -100,8 +100,8 @@ export const lumeoTools: LumeoTool[] = [
     primaryRoute: "/pdf/jpg-to-pdf",
     actions: [
       { label: "JPG to PDF", slug: "jpg-to-pdf", route: "/pdf/jpg-to-pdf", live: true },
-      { label: "PNG to PDF", slug: "png-to-pdf", live: false },
-      { label: "WEBP to PDF", slug: "webp-to-pdf", live: false },
+      { label: "PNG to PDF", slug: "png-to-pdf", route: "/pdf/jpg-to-pdf", live: true },
+      { label: "WEBP to PDF", slug: "webp-to-pdf", route: "/pdf/jpg-to-pdf", live: true },
       { label: "TIFF to PDF", slug: "tiff-to-pdf", live: false },
       { label: "HEIC to PDF", slug: "heic-to-pdf", live: false },
       { label: "Scan to PDF", slug: "scan-to-pdf", live: false },
@@ -120,8 +120,8 @@ export const lumeoTools: LumeoTool[] = [
     primaryRoute: "/pdf/pdf-to-jpg",
     actions: [
       { label: "PDF to JPG", slug: "pdf-to-jpg", route: "/pdf/pdf-to-jpg", live: true },
-      { label: "PDF to PNG", slug: "pdf-to-png", live: false },
-      { label: "PDF to WEBP", slug: "pdf-to-webp", live: false },
+      { label: "PDF to PNG", slug: "pdf-to-png", route: "/pdf/pdf-to-jpg", live: true },
+      { label: "PDF to WEBP", slug: "pdf-to-webp", route: "/pdf/pdf-to-jpg", live: true },
       { label: "PDF to TIFF", slug: "pdf-to-tiff", live: false },
       { label: "Extract text", slug: "extract-text", live: false },
       { label: "PDF to HTML", slug: "pdf-to-html", live: false },
@@ -157,7 +157,7 @@ export const lumeoTools: LumeoTool[] = [
     actions: [
       { label: "Sign PDF", slug: "sign", route: "/pdf/sign", live: true },
       { label: "Fill forms", slug: "fill-forms", live: false },
-      { label: "Initials & date", slug: "initials-date", live: false },
+      { label: "Initials & date", slug: "initials-date", route: "/pdf/sign", live: true },
     ],
   },
   {
