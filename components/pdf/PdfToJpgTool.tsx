@@ -17,6 +17,17 @@ import { AuraIconButton, AuraSegmentedControl, AuraStatus } from "@/components/u
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { bucketFileSize } from "@/lib/analytics/size-bucket";
+import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { formatBytes } from "@/lib/pdf/formatBytes";
+import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
+import { normalizeRotation } from "@/lib/pdf/rotation";
+import {
+  hasPdfMagicBytes,
+  isPdfNamedFile,
+  checkPdfFileSize,
+  checkPdfPageCount,
+} from "@/lib/pdf/uploadValidation";
 
 type SelectionMode = "all" | "range" | "custom";
 type DpiPreset = "draft" | "standard" | "print";
@@ -38,8 +49,6 @@ type JpgPageResult = {
   downloaded: boolean;
 };
 
-const MAX_FILE_SIZE_BYTES = 150 * 1024 * 1024;
-const MAX_PAGE_COUNT = 500;
 const LARGE_FILE_WARNING_BYTES = 40 * 1024 * 1024;
 const VERY_LARGE_PAGE_COUNT = 150;
 const TOOL_SLUG = "pdf-to-jpg";
@@ -62,69 +71,6 @@ const selectionModeOptions: Array<{ value: SelectionMode; label: string }> = [
   { value: "range", label: "Page range" },
   { value: "custom", label: "Pick pages" },
 ];
-
-type PdfJsModule = typeof import("pdfjs-dist");
-
-let pdfJsModulePromise: Promise<PdfJsModule> | null = null;
-
-async function loadPdfJsModule() {
-  if (!pdfJsModulePromise) {
-    pdfJsModulePromise = import("pdfjs-dist").then((module) => {
-      if (!module.GlobalWorkerOptions.workerSrc) {
-        module.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.mjs",
-          import.meta.url,
-        ).toString();
-      }
-      return module;
-    });
-  }
-
-  return pdfJsModulePromise;
-}
-
-function formatBytes(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
-  const units = ["B", "KB", "MB", "GB"];
-  const power = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / 1024 ** power;
-  return `${value >= 10 || power === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[power]}`;
-}
-
-function sanitizeFileStem(name: string, fallback: string) {
-  const clean = name
-    .replace(/\.[^/.]+$/, "")
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/[. ]+$/g, "")
-    .replace(/^-|-$/g, "")
-    .toLowerCase();
-
-  return clean || fallback;
-}
-
-function copyArrayBuffer(buffer: ArrayBuffer) {
-  const source = new Uint8Array(buffer);
-  const copy = new Uint8Array(source.byteLength);
-  copy.set(source);
-  return copy.buffer;
-}
-
-function normalizeRotation(value: number) {
-  const next = ((value % 360) + 360) % 360;
-  return next === 0 || next === 90 || next === 180 || next === 270 ? next : 0;
-}
-
-// PDFs always start with the 4-byte "%PDF" signature. Checking this (rather
-// than trusting the file extension or the browser-reported MIME type, both
-// of which are trivially spoofable) catches renamed non-PDF files before
-// they reach pdfjs.
-function hasPdfMagicBytes(buffer: ArrayBuffer): boolean {
-  if (buffer.byteLength < 4) return false;
-  const bytes = new Uint8Array(buffer, 0, 4);
-  return bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46;
-}
 
 function parsePageToken(token: string, totalPages: number): number | null {
   const trimmed = token.trim().toLowerCase();
@@ -627,15 +573,16 @@ export default function PdfToJpgTool() {
     clearThumbnails();
     await destroyPdfJsDocument();
 
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    if (!isPdfNamedFile(file)) {
       setStatus("Ready");
       setError("Please add one PDF file.");
       return;
     }
 
-    if (file.size > MAX_FILE_SIZE_BYTES) {
+    const sizeError = checkPdfFileSize(file);
+    if (sizeError) {
       setStatus("Ready");
-      setError(`This file is too large. The limit is ${formatBytes(MAX_FILE_SIZE_BYTES)}.`);
+      setError(sizeError);
       return;
     }
 
@@ -667,10 +614,11 @@ export default function PdfToJpgTool() {
         return;
       }
 
-      if (pdfJsDoc.numPages > MAX_PAGE_COUNT) {
+      const pageCountError = checkPdfPageCount(pdfJsDoc.numPages);
+      if (pageCountError) {
         await (pdfJsDoc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
         setStatus("Ready");
-        setError(`This PDF has too many pages. The limit is ${MAX_PAGE_COUNT} pages.`);
+        setError(pageCountError);
         return;
       }
 
@@ -1338,7 +1286,7 @@ export default function PdfToJpgTool() {
                     </div>
                   </div>
                 ) : results.length ? (
-                  <div className="mt-2">
+                  <div className="aura-success-reveal mt-2">
                     <p className="text-base font-semibold text-[var(--text-primary)]">
                       {results.length} {outputFormat === "png" ? "PNG" : "JPG"}
                       {results.length === 1 ? "" : "s"} ready

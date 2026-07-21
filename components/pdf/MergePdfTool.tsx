@@ -16,30 +16,15 @@ import {
 import { AuraOptionCard, AuraSegmentedControl } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
-
-type PdfJsModule = typeof import("pdfjs-dist");
-
-let pdfJsModulePromise: Promise<PdfJsModule> | null = null;
-
-async function loadPdfJsModule() {
-  if (!pdfJsModulePromise) {
-    pdfJsModulePromise = import("pdfjs-dist").then((module) => {
-      if (!module.GlobalWorkerOptions.workerSrc) {
-        module.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.mjs",
-          import.meta.url,
-        ).toString();
-      }
-      return module;
-    });
-  }
-
-  return pdfJsModulePromise;
-}
-
-function normalizeRotation(value: number) {
-  return ((value % 360) + 360) % 360;
-}
+import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
+import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { normalizeRotation } from "@/lib/pdf/rotation";
+import {
+  hasPdfMagicBytes,
+  isPdfNamedFile,
+  checkPdfFileSize,
+} from "@/lib/pdf/uploadValidation";
 
 function destroyPdfJsDoc(doc: unknown) {
   void (doc as { destroy?: () => Promise<void> | void }).destroy?.();
@@ -165,24 +150,13 @@ const marginOptions: Array<{
   },
 ];
 
-function formatFileSize(size: number) {
-  if (size < 1024) return `${size} B`;
-  const kb = size / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  return `${(kb / 1024).toFixed(1)} MB`;
-}
-
 function createFileId(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`;
 }
 
-function sanitizePdfFileName(value: string) {
-  const cleanName = value
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
-    .replace(/\s+/g, " ")
-    .trim();
-  const safeName = cleanName || "lumeo-merged.pdf";
-  return safeName.toLowerCase().endsWith(".pdf") ? safeName : `${safeName}.pdf`;
+function sanitizePdfFileName(value: string, fallback = "lumeo-merged") {
+  const stem = sanitizeFileStem(value.replace(/\.pdf$/i, ""), fallback);
+  return `${stem}.pdf`;
 }
 
 function sizesMatch(a: PageSize, b: PageSize, tolerance = 8) {
@@ -355,6 +329,7 @@ export default function MergePdfTool() {
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
   const thumbnailUrlsRef = useRef<Record<string, string>>({});
+  const thumbnailSignatureRef = useRef<Record<string, string>>({});
   const previewUrlRef = useRef("");
   const previewSessionRef = useRef(0);
 
@@ -409,6 +384,7 @@ export default function MergePdfTool() {
       if (!currentIds.has(id)) {
         URL.revokeObjectURL(thumbnailUrlsRef.current[id]);
         delete thumbnailUrlsRef.current[id];
+        delete thumbnailSignatureRef.current[id];
         setThumbnailUrls((current) => {
           const next = { ...current };
           delete next[id];
@@ -417,7 +393,13 @@ export default function MergePdfTool() {
       }
     }
 
+    // Only re-render a file's thumbnail when that file's own id:rotation
+    // signature changed, not whenever any file in the list changes rotation.
     for (const item of files) {
+      const signature = `${item.id}:${item.rotation}`;
+      if (thumbnailSignatureRef.current[item.id] === signature) continue;
+      thumbnailSignatureRef.current[item.id] = signature;
+
       void (async () => {
         try {
           const url = await renderPdfPageToBlobUrl(item.file, 0.24, item.rotation);
@@ -435,8 +417,7 @@ export default function MergePdfTool() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [files.map((item) => `${item.id}:${item.rotation}`).join(",")]);
+  }, [files]);
 
   useEffect(() => {
     return () => {
@@ -549,19 +530,21 @@ export default function MergePdfTool() {
     const nextFiles = Array.from(incomingFiles);
     if (nextFiles.length === 0) return;
 
-    const invalidType = nextFiles.find(
-      (file) =>
-        file.type !== "application/pdf" &&
-        !file.name.toLowerCase().endsWith(".pdf"),
-    );
+    const invalidType = nextFiles.find((file) => !isPdfNamedFile(file));
 
     if (invalidType) {
       setError("Please choose PDF files only.");
       return;
     }
 
+    const oversized = nextFiles.find((file) => checkPdfFileSize(file) !== null);
+    if (oversized) {
+      setError(checkPdfFileSize(oversized) ?? "One of these files is too large.");
+      return;
+    }
+
     const readableFiles: SelectedPdf[] = [];
-    let unreadableCount = 0;
+    const problemFileNames: string[] = [];
     let duplicateDetected = false;
     const existingKeys = new Set(
       files.map((item) => `${item.file.name}-${item.file.size}`),
@@ -577,6 +560,12 @@ export default function MergePdfTool() {
 
       try {
         const bytes = await file.arrayBuffer();
+
+        if (!hasPdfMagicBytes(bytes)) {
+          problemFileNames.push(file.name);
+          continue;
+        }
+
         const pdf = await PDFDocument.load(bytes, { ignoreEncryption: false });
         const pageSizes = pdf.getPages().map((page) => {
           const { width, height } = page.getSize();
@@ -592,7 +581,7 @@ export default function MergePdfTool() {
           rotation: 0,
         });
       } catch {
-        unreadableCount += 1;
+        problemFileNames.push(file.name);
       }
     }
 
@@ -600,9 +589,11 @@ export default function MergePdfTool() {
       setFiles((current) => [...current, ...readableFiles]);
     }
 
-    if (unreadableCount > 0) {
+    if (problemFileNames.length > 0) {
       setError(
-        "This file could not be read. It may be damaged or password-protected.",
+        problemFileNames.length === 1
+          ? `"${problemFileNames[0]}" could not be read. It may be damaged, password-protected, or not a valid PDF.`
+          : `${problemFileNames.length} files could not be read (damaged, password-protected, or not valid PDFs): ${problemFileNames.join(", ")}`,
       );
     }
 
@@ -684,6 +675,7 @@ export default function MergePdfTool() {
       const mergedPdf = await PDFDocument.create();
 
       for (const item of files) {
+        try {
         const outputPageSize = getOutputPageSize(pageFormat, firstPageSize);
         const rotation = normalizeRotation(item.rotation);
 
@@ -767,6 +759,11 @@ export default function MergePdfTool() {
           });
           page.drawImage(image, { x, y, width: drawWidth, height: drawHeight });
         }
+        } catch (itemError) {
+          throw new Error(
+            `"${item.file.name}" could not be merged. ${itemError instanceof Error ? itemError.message : "It may be damaged or password-protected."}`,
+          );
+        }
       }
 
       const mergedBytes = await mergedPdf.save();
@@ -787,9 +784,13 @@ export default function MergePdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
-    } catch {
+    } catch (mergeError) {
       setStatus("Ready");
-      setError("Merge failed. Try smaller files or remove damaged PDFs.");
+      setError(
+        mergeError instanceof Error
+          ? mergeError.message
+          : "Merge failed. Try smaller files or remove damaged PDFs.",
+      );
       track({
         eventName: "processing_failed",
         toolSlug: "merge",
@@ -1185,7 +1186,7 @@ export default function MergePdfTool() {
               </p>
 
               {downloadUrl ? (
-                <div className="mt-3">
+                <div className="aura-success-reveal mt-3">
                   <p className="text-base font-semibold text-[var(--text-primary)]">
                     Merged PDF ready
                   </p>

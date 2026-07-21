@@ -87,7 +87,13 @@ export default async function MembersPage() {
                         <input type="checkbox" name="is_active" defaultChecked={member.isActive} className="h-3.5 w-3.5" />
                         Active
                       </label>
-                      <AdminSubmitButton variant="secondary" pendingLabel="Saving...">Save</AdminSubmitButton>
+                      <AdminSubmitButton
+                        variant="secondary"
+                        pendingLabel="Saving..."
+                        confirmMessage={`Update role and active status for ${member.email ?? member.userId}? This changes their access immediately.`}
+                      >
+                        Save
+                      </AdminSubmitButton>
                     </form>
                   ),
                 ];

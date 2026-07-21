@@ -58,7 +58,13 @@ export default async function ToolsPage() {
               <form key="enabled" action={asAdminFormAction(updateToolEnabled)} className="flex items-center gap-2">
                 <input type="hidden" name="id" value={tool.id} />
                 <input type="checkbox" name="is_enabled" defaultChecked={tool.is_enabled} className="h-4 w-4" />
-                <AdminSubmitButton variant="secondary" pendingLabel="...">Save</AdminSubmitButton>
+                <AdminSubmitButton
+                  variant="secondary"
+                  pendingLabel="..."
+                  confirmMessage={`Change "${tool.name}"'s enabled state? Disabling removes it from the live site, homepage, and nav immediately.`}
+                >
+                  Save
+                </AdminSubmitButton>
               </form>
             ) : tool.is_enabled ? "Yes" : "No",
             canEdit ? (
