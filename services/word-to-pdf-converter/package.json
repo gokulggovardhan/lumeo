@@ -1,0 +1,13 @@
+{
+  "name": "lumeo-word-to-pdf-converter",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Standalone LibreOffice-backed Word-to-PDF converter, called by the main Lumeo app over HTTP.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

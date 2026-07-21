@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: lumeo-word-to-pdf-converter
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    rootDir: services/word-to-pdf-converter
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: CONVERT_SECRET
+        sync: false
+      - key: ALLOWED_FILE_HOST
+        sync: false

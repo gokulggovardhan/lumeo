@@ -1,13 +1,9 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
-
-const execFileAsync = promisify(execFile);
-
-const LIBREOFFICE_BINARY = process.env.LIBREOFFICE_BINARY || "soffice";
-const CONVERSION_TIMEOUT_MS = 90_000;
+// Delegates to a standalone LibreOffice-backed converter service (see
+// services/word-to-pdf-converter/) instead of running soffice in-process.
+// Vercel's standard Next.js deployment does not build a Dockerfile for this
+// app, so there is no LibreOffice binary available in this runtime -- the
+// conversion has to happen on a real container host that this function
+// calls over HTTP.
 
 export class WordToPdfConversionError extends Error {}
 
@@ -21,12 +17,6 @@ function pdfFileNameFor(originalName: string) {
   return `${stem}.pdf`;
 }
 
-// Downloads the .docx from the Supabase signed URL and runs it through
-// headless LibreOffice. Every call gets its own UUID, temp input path, and
-// LibreOffice user profile (-env:UserInstallation) so concurrent conversions
-// on the same container instance can never collide or corrupt each other's
-// state -- LibreOffice's user profile is not safe to share across
-// simultaneously running processes.
 export async function convertWordToPdf({
   fileUrl,
   fileName,
@@ -34,49 +24,40 @@ export async function convertWordToPdf({
   fileUrl: string;
   fileName: string;
 }): Promise<WordToPdfResult> {
-  const jobId = crypto.randomUUID();
-  const workDir = await mkdtemp(join(tmpdir(), `lumeo-word2pdf-${jobId}-`));
-  const profileDir = join(tmpdir(), `lo-profile-${jobId}`);
-  const extension = fileName.toLowerCase().endsWith(".doc") ? "doc" : "docx";
-  const inputPath = join(workDir, `input.${extension}`);
-  const outputPath = join(workDir, "input.pdf");
+  const converterUrl = process.env.WORD_TO_PDF_CONVERTER_URL;
+  const converterSecret = process.env.WORD_TO_PDF_CONVERTER_SECRET;
 
-  try {
-    const response = await fetch(fileUrl);
-    if (!response.ok) {
-      throw new WordToPdfConversionError("Could not download the uploaded file for conversion.");
-    }
-    const inputBytes = Buffer.from(await response.arrayBuffer());
-    await writeFile(inputPath, inputBytes);
-
-    try {
-      await execFileAsync(
-        LIBREOFFICE_BINARY,
-        [
-          "--headless",
-          "--norestore",
-          `-env:UserInstallation=file://${profileDir}`,
-          "--convert-to",
-          "pdf",
-          "--outdir",
-          workDir,
-          inputPath,
-        ],
-        { timeout: CONVERSION_TIMEOUT_MS },
-      );
-    } catch {
-      throw new WordToPdfConversionError(
-        "Conversion failed. The document may be corrupted, password-protected, or in an unsupported format.",
-      );
-    }
-
-    const buffer = await readFile(outputPath).catch(() => {
-      throw new WordToPdfConversionError("Conversion did not produce a PDF file.");
-    });
-
-    return { buffer, fileName: pdfFileNameFor(fileName) };
-  } finally {
-    await rm(workDir, { recursive: true, force: true });
-    await rm(profileDir, { recursive: true, force: true });
+  if (!converterUrl || !converterSecret) {
+    throw new WordToPdfConversionError(
+      "The conversion service is not configured yet. Please try again shortly.",
+    );
   }
+
+  let response: Response;
+  try {
+    response = await fetch(`${converterUrl.replace(/\/$/, "")}/convert`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-convert-secret": converterSecret,
+      },
+      body: JSON.stringify({ fileUrl, fileName }),
+      // Cold starts on a free-tier host plus a real LibreOffice pass can
+      // legitimately take a while -- longer than this app's own default
+      // fetch timeout would otherwise allow.
+      signal: AbortSignal.timeout(100_000),
+    });
+  } catch {
+    throw new WordToPdfConversionError("Could not reach the conversion service. Please try again.");
+  }
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new WordToPdfConversionError(
+      payload?.message || "Conversion failed. The document may be corrupted, password-protected, or in an unsupported format.",
+    );
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  return { buffer, fileName: pdfFileNameFor(fileName) };
 }
