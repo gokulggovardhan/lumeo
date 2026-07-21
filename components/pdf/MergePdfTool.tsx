@@ -17,7 +17,7 @@ import {
 import { AuraOptionCard, AuraSegmentedControl } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
-import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { normalizeRotation } from "@/lib/pdf/rotation";
@@ -32,9 +32,8 @@ function destroyPdfJsDoc(doc: unknown) {
 }
 
 async function renderPdfPageToBlobUrl(file: File, scale: number, rotation: number): Promise<string | null> {
-  const pdfjs = await loadPdfJsModule();
   const bytes = await file.arrayBuffer();
-  const doc = await pdfjs.getDocument({ data: bytes }).promise;
+  const doc = await openPdfJsDocument(bytes);
   try {
     const page = await doc.getPage(1);
     const viewport = page.getViewport({ scale, rotation });
@@ -325,6 +324,7 @@ export default function MergePdfTool() {
   const [previewUrl, setPreviewUrl] = useState("");
   const thumbnailUrlsRef = useRef<Record<string, string>>({});
   const thumbnailSignatureRef = useRef<Record<string, string>>({});
+  const renderingThumbnailIdsRef = useRef<Set<string>>(new Set());
   const previewUrlRef = useRef("");
   const previewSessionRef = useRef(0);
 
@@ -372,7 +372,6 @@ export default function MergePdfTool() {
   // Generates a page-1 thumbnail for every file (regenerated when its rotation
   // changes) and drops thumbnails for files no longer selected.
   useEffect(() => {
-    let cancelled = false;
     const currentIds = new Set(files.map((item) => item.id));
 
     for (const id of Object.keys(thumbnailUrlsRef.current)) {
@@ -380,6 +379,7 @@ export default function MergePdfTool() {
         URL.revokeObjectURL(thumbnailUrlsRef.current[id]);
         delete thumbnailUrlsRef.current[id];
         delete thumbnailSignatureRef.current[id];
+        renderingThumbnailIdsRef.current.delete(id);
         setThumbnailUrls((current) => {
           const next = { ...current };
           delete next[id];
@@ -390,28 +390,38 @@ export default function MergePdfTool() {
 
     // Only re-render a file's thumbnail when that file's own id:rotation
     // signature changed, not whenever any file in the list changes rotation.
+    // File ids are globally unique (createFileId mixes in a random UUID), so
+    // a render that resolves after this effect's cleanup has already fired
+    // (React Strict Mode intentionally does mount-cleanup-mount in dev, and
+    // concurrent rendering can do similar re-runs in production) is still
+    // valid to apply -- there is no "stale" id it could clobber. The
+    // signature is recorded only on success, so a render that never
+    // completes (StrictMode's discarded first pass, or a thrown error)
+    // simply gets retried on the next effect run instead of being silently
+    // marked "done" while no thumbnail was ever produced.
     for (const item of files) {
       const signature = `${item.id}:${item.rotation}`;
       if (thumbnailSignatureRef.current[item.id] === signature) continue;
-      thumbnailSignatureRef.current[item.id] = signature;
+      if (renderingThumbnailIdsRef.current.has(item.id)) continue;
+      renderingThumbnailIdsRef.current.add(item.id);
 
       void (async () => {
         try {
           const url = await renderPdfPageToBlobUrl(item.file, 0.24, item.rotation);
-          if (cancelled || !url) return;
+          if (!url) return;
           const previous = thumbnailUrlsRef.current[item.id];
           if (previous) URL.revokeObjectURL(previous);
           thumbnailUrlsRef.current[item.id] = url;
+          thumbnailSignatureRef.current[item.id] = signature;
           setThumbnailUrls((current) => ({ ...current, [item.id]: url }));
         } catch {
-          // Thumbnail is a convenience preview; leave the file usable without one.
+          // Thumbnail is a convenience preview; leave the file usable without
+          // one -- signature stays unmarked so it's retried next effect run.
+        } finally {
+          renderingThumbnailIdsRef.current.delete(item.id);
         }
       })();
     }
-
-    return () => {
-      cancelled = true;
-    };
   }, [files]);
 
   useEffect(() => {
@@ -722,9 +732,8 @@ export default function MergePdfTool() {
         // don't compose cleanly with the existing scale-to-fit-and-center math.
         // The source document is decoded once and reused across every page,
         // not re-parsed per page.
-        const pdfjs = await loadPdfJsModule();
         const sourceBytes = await item.file.arrayBuffer();
-        const openDoc = await pdfjs.getDocument({ data: sourceBytes }).promise;
+        const openDoc = await openPdfJsDocument(sourceBytes);
         try {
           for (let pageNumber = 1; pageNumber <= item.pageCount; pageNumber += 1) {
             const rendered = await renderOpenDocPageToImageBytes(openDoc, pageNumber, rotation, RASTER_SCALE);

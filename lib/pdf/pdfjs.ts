@@ -17,3 +17,15 @@ export async function loadPdfJsModule() {
 
   return pdfJsModulePromise;
 }
+
+// Opens a pdf.js document from already-in-memory bytes. Always disables
+// useWorkerFetch -- without it, one call site (Merge) silently hung forever
+// on every getDocument() call: no error, no thumbnail, no page render, just
+// an unresolved promise, because the worker never fetches the data itself
+// when it's already been handed over from the main thread. Every other tool
+// had already discovered this the hard way and set the flag inline; this
+// wrapper makes it impossible for a new call site to forget it.
+export async function openPdfJsDocument(data: ArrayBuffer | Uint8Array) {
+  const pdfjs = await loadPdfJsModule();
+  return pdfjs.getDocument({ data, useWorkerFetch: false }).promise;
+}

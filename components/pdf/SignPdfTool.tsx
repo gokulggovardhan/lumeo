@@ -47,7 +47,7 @@ import {
 } from "@/lib/sign/signatureLibrary";
 import type { PlacedElement, PlacedElementType, SavedSignature } from "@/lib/sign/types";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
-import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
@@ -189,8 +189,7 @@ export default function SignPdfTool() {
 
       if (!pdf) return;
       try {
-        const pdfjs = await loadPdfJsModule();
-        const doc = await pdfjs.getDocument({ data: new Uint8Array(copyArrayBuffer(pdf.bytes)) }).promise;
+        const doc = await openPdfJsDocument(new Uint8Array(copyArrayBuffer(pdf.bytes)));
         if (cancelled) {
           void (doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
           return;
