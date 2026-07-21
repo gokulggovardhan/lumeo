@@ -1,0 +1,68 @@
+name: Lumeo Converter Keep-Warm
+
+# Render's free tier spins the Word-to-PDF converter down after ~15 minutes
+# of no inbound traffic; the next request then pays a 30-50s cold-start tax.
+# This workflow pings the public /healthz endpoint every ~10 minutes so the
+# idle timer keeps resetting and the container stays warm.
+#
+# Notes:
+# - GitHub cron is best-effort: scheduled runs can drift or occasionally be
+#   skipped under load. 10 min against a 15 min idle window leaves margin.
+#   For strict punctuality, an external pinger (e.g. cron-job.org -> the same
+#   /healthz URL, every 10 min) is a fine belt-and-braces addition.
+# - /healthz is a public, unauthenticated GET -- no secret involved.
+# - Keeping one free service always-warm stays within Render's 750
+#   instance-hours/month.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumeo-converter-keep-warm
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Ping converter /healthz
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Wake the converter
+        shell: bash
+        run: |
+          set -uo pipefail
+
+          url="https://lumeo-word-to-pdf-converter.onrender.com/healthz"
+
+          # Best-effort: even a slow/cold response has already reached Render
+          # and reset its idle timer, which is the whole point. Retry a few
+          # times to ride out a cold start, but never fail the run over a
+          # transient blip -- alerting on real production is handled by the
+          # separate production-health workflow.
+          status_code="$(
+            curl \
+              --silent \
+              --show-error \
+              --output /dev/null \
+              --write-out "%{http_code}" \
+              --max-time 90 \
+              --retry 3 \
+              --retry-delay 10 \
+              --retry-all-errors \
+              "$url" || true
+          )"
+
+          echo "Converter /healthz responded with HTTP ${status_code:-none}"
+
+          if [ "${status_code}" = "200" ]; then
+            echo "Converter is warm."
+          else
+            echo "Ping did not return 200 (service may be cold-starting); idle timer still reset."
+          fi
