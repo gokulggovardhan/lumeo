@@ -12,11 +12,22 @@ RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula sele
 # has "no installation candidate" and the build fails at this exact step.
 RUN sed -i 's/^\(deb .*main\)$/\1 contrib/' /etc/apt/sources.list
 
+# Fonts matter for fidelity: LibreOffice keeps text as vector, so the only
+# way a converted PDF drifts from the Word original is font substitution.
+# - ttf-mscorefonts-installer: Arial, Times New Roman, Courier (classic Office)
+# - fonts-crosextra-carlito: metric-identical stand-in for Calibri
+# - fonts-crosextra-caladea:  metric-identical stand-in for Cambria
+#   (Calibri/Cambria are the *default* fonts in modern Word and are NOT in
+#    mscorefonts -- without these, every default-font doc gets re-flowed.)
+# - fonts-liberation + fonts-dejavu-core: broad Latin/Unicode fallback.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-core \
     libreoffice-writer \
     ttf-mscorefonts-installer \
     fonts-liberation \
+    fonts-crosextra-carlito \
+    fonts-crosextra-caladea \
+    fonts-dejavu-core \
     ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 

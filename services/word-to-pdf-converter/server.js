@@ -25,6 +25,17 @@ const LIBREOFFICE_BINARY = process.env.LIBREOFFICE_BINARY || "soffice";
 const CONVERSION_TIMEOUT_MS = 90_000;
 const MAX_BODY_BYTES = 10 * 1024;
 
+// Each conversion spawns a full LibreOffice process (~150-250MB peak). On a
+// small instance, letting every inbound request spawn one at once is a
+// straight path to OOM -- the box crashes and takes every in-flight request
+// with it. Instead: cap how many convert concurrently, hold a bounded queue
+// of waiters, and reject anything past that with 503 so callers back off and
+// retry rather than knocking the instance over. All tunable via env so a
+// bigger instance can raise the ceiling without a code change.
+const MAX_CONCURRENT = Math.max(1, Number(process.env.MAX_CONCURRENT_CONVERSIONS) || 1);
+const MAX_QUEUE = Math.max(0, Number(process.env.MAX_CONVERT_QUEUE) || 6);
+const QUEUE_WAIT_MS = Math.max(1_000, Number(process.env.CONVERT_QUEUE_WAIT_MS) || 30_000);
+
 if (!CONVERT_SECRET) {
   console.error("CONVERT_SECRET is not set. Refusing to start: every request would be unauthenticated.");
   process.exit(1);
@@ -85,6 +96,49 @@ function secretsMatch(a, b) {
   const bufB = Buffer.from(b);
   if (bufA.length !== bufB.length) return false;
   return crypto.timingSafeEqual(bufA, bufB);
+}
+
+// --- Conversion concurrency gate -------------------------------------------
+// `active` counts running conversions; `waiters` holds queued requests. A
+// released slot is handed directly to the next waiter (active stays put),
+// so the count never dips and re-rises under contention.
+let active = 0;
+const waiters = [];
+
+function busyError() {
+  const error = new Error("The converter is busy right now. Please try again in a moment.");
+  error.code = "BUSY";
+  return error;
+}
+
+function acquireSlot() {
+  return new Promise((resolve, reject) => {
+    if (active < MAX_CONCURRENT) {
+      active += 1;
+      resolve();
+      return;
+    }
+    if (waiters.length >= MAX_QUEUE) {
+      reject(busyError());
+      return;
+    }
+    const timer = setTimeout(() => {
+      const index = waiters.findIndex((w) => w.timer === timer);
+      if (index !== -1) waiters.splice(index, 1);
+      reject(busyError());
+    }, QUEUE_WAIT_MS);
+    waiters.push({ resolve, timer });
+  });
+}
+
+function releaseSlot() {
+  const next = waiters.shift();
+  if (next) {
+    clearTimeout(next.timer);
+    next.resolve(); // hand our slot straight to the waiter; active unchanged
+  } else {
+    active = Math.max(0, active - 1);
+  }
 }
 
 async function convertWordToPdf({ fileUrl, fileName }) {
@@ -185,6 +239,23 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    await acquireSlot();
+  } catch {
+    // Over capacity: tell the caller to back off instead of piling on.
+    const payload = JSON.stringify({
+      ok: false,
+      message: "The converter is busy right now. Please try again in a moment.",
+    });
+    res.writeHead(503, {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(payload),
+      "Retry-After": "5",
+    });
+    res.end(payload);
+    return;
+  }
+
+  try {
     const pdfBuffer = await convertWordToPdf({ fileUrl, fileName });
     res.writeHead(200, {
       "Content-Type": "application/pdf",
@@ -194,6 +265,8 @@ const server = http.createServer(async (req, res) => {
   } catch (conversionError) {
     console.error("conversion failed:", conversionError);
     sendJson(res, 502, { ok: false, message: conversionError.message || "Conversion failed." });
+  } finally {
+    releaseSlot();
   }
 });
 
