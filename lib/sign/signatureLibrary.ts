@@ -52,14 +52,18 @@ function readAll(): SavedSignature[] {
   }
 }
 
-function writeAll(signatures: SavedSignature[]) {
-  if (typeof window === "undefined") return;
+function writeAll(signatures: SavedSignature[]): boolean {
+  if (typeof window === "undefined") return false;
   try {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(signatures));
+    return true;
   } catch {
-    // Storage full or blocked (private browsing) -- the library just won't
-    // persist this session; the signature the user is actively using still
-    // works, it just won't be saved for next time.
+    // Storage full or blocked (private browsing) -- the signature the user
+    // is actively using still works this session, it just won't persist.
+    // Callers that tell the user "saved" (SignPdfTool's toast) need this
+    // return value -- a swallowed failure here previously meant a false
+    // "Signature saved" toast for a write that never actually landed.
+    return false;
   }
 }
 
@@ -77,7 +81,7 @@ export function saveSignature(input: {
   dataUrl: string;
   aspectRatio: number;
   source: SignatureSourceKind;
-}): SavedSignature {
+}): { signature: SavedSignature; persisted: boolean } {
   const all = readAll();
   const isFirst = all.length === 0;
   const next: SavedSignature = {
@@ -91,8 +95,8 @@ export function saveSignature(input: {
     lastUsedAt: Date.now(),
   };
   const trimmed = [...all, next].slice(-MAX_SIGNATURES);
-  writeAll(trimmed);
-  return next;
+  const persisted = writeAll(trimmed);
+  return { signature: next, persisted };
 }
 
 export function renameSignature(id: string, name: string) {
