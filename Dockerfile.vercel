@@ -1,0 +1,35 @@
+# Vercel Docker Function image for Lumeo.
+#
+# Vercel auto-detects this file, builds it during the platform build step,
+# and routes all incoming traffic to the container's HTTP server. Instances
+# scale to zero after ~5 minutes idle, so nothing here may assume state
+# survives between requests -- see lib/converters/word-to-pdf.ts for the
+# per-request temp-file and profile-dir cleanup that depends on this.
+FROM node:18-bullseye-slim
+
+# Accept the Microsoft EULA non-interactively before installing
+# ttf-mscorefonts-installer -- without this the apt step blocks on a
+# debconf prompt and the build hangs forever.
+RUN echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" | debconf-set-selections
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreoffice-core \
+    libreoffice-writer \
+    ttf-mscorefonts-installer \
+    fonts-liberation \
+    ca-certificates \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+RUN npm run build
+
+ENV NODE_ENV=production
+ENV PORT=3000
+EXPOSE 3000
+
+CMD ["npm", "start"]

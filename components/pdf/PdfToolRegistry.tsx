@@ -6,7 +6,8 @@ export type PdfToolSlug =
   | "compress"
   | "jpg-to-pdf"
   | "pdf-to-jpg"
-  | "sign";
+  | "sign"
+  | "word-to-pdf";
 
 export type PdfToolDefinition = {
   slug: PdfToolSlug;
@@ -126,6 +127,23 @@ export const pdfTools: PdfToolDefinition[] = [
       "Drag to position",
       "Resize signature",
       "Any page",
+    ],
+  },
+  {
+    slug: "word-to-pdf",
+    title: "Word to PDF",
+    shortTitle: "Word to PDF",
+    description: "Convert Word documents to PDF using free, self-hosted LibreOffice.",
+    route: "/pdf/word-to-pdf",
+    status: "live",
+    browserNote: "Server-side conversion",
+    engineNote: "Live now",
+    accepted: "DOCX and DOC files",
+    bullets: [
+      "Preserves layout and fonts",
+      "Handles tables and images",
+      "Private, uploaded temporarily",
+      "Cleared immediately after conversion",
     ],
   },
 ];
