@@ -135,9 +135,9 @@ export const pdfTools: PdfToolDefinition[] = [
     shortTitle: "Word to PDF",
     description: "Convert Word documents to PDF using free, self-hosted LibreOffice.",
     route: "/pdf/word-to-pdf",
-    status: "live",
+    status: "coming-next",
     browserNote: "Server-side conversion",
-    engineNote: "Live now",
+    engineNote: "Coming soon",
     accepted: "DOCX and DOC files",
     bullets: [
       "Preserves layout and fonts",
