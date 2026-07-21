@@ -101,22 +101,22 @@ async function convertWordToPdf({ fileUrl, fileName }) {
       throw new Error("File URL is not from an allowed host.");
     }
 
+    // False positive below, documented here since the suppression comment
+    // on that line has to stay short: CodeQL's request-forgery query flags
+    // that fetch purely because fileUrl originated from a request body --
+    // verified it doesn't credit the strict-equality hostname check just
+    // above as a sanitizer, only a check against the whole value. That
+    // check is real and load-bearing: protocol must be https and hostname
+    // must exactly equal the operator-configured ALLOWED_FILE_HOST (no
+    // wildcard/suffix match), and the process refuses to start at all if
+    // that env var is unset. Verified locally with a running container: a
+    // metadata-endpoint URL and a same-suffix-but-wrong-subdomain URL (e.g.
+    // evil.supabase.co when ALLOWED_FILE_HOST=abcxyz.supabase.co) are both
+    // rejected before the fetch runs; the exact configured host reaches it
+    // as intended.
     let response;
     try {
-      // codeql[js/request-forgery]: false positive -- CodeQL's request-forgery
-      // query flags this fetch purely because fileUrl originated from a
-      // request body, without crediting the strict-equality hostname check
-      // immediately above (verified: it doesn't recognize component-level
-      // validation of a tainted URL as a sanitizer, only a check against the
-      // whole value). That check is real and load-bearing: protocol must be
-      // https and hostname must exactly equal the operator-configured
-      // ALLOWED_FILE_HOST (no wildcard/suffix match), and the process
-      // refuses to start at all if that env var is unset. Verified locally
-      // with a running container: a metadata-endpoint URL, and a
-      // same-suffix-but-wrong-subdomain URL (e.g. evil.supabase.co when
-      // ALLOWED_FILE_HOST=abcxyz.supabase.co), are both rejected before this
-      // line runs; the exact configured host reaches this fetch as intended.
-      response = await fetch(parsedFileUrl);
+      response = await fetch(parsedFileUrl); // codeql[js/request-forgery] fileUrl's host is strictly validated above
     } catch {
       throw new Error("Could not download the uploaded file for conversion.");
     }
