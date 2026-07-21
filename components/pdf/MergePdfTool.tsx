@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PDFDocument, rgb } from "pdf-lib";
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
@@ -54,42 +55,36 @@ async function renderPdfPageToBlobUrl(file: File, scale: number, rotation: numbe
   }
 }
 
-// Rasterizes page 1 of a rotated source file so it can be embedded as an image
-// on the merged page -- pdf-lib's own page-rotation mechanisms (setRotation's
-// /Rotate entry vs. drawPage's content-matrix rotate) use different angle
-// conventions and don't compose cleanly with the scale-to-fit-and-center math
-// already used for unrotated pages. Rasterizing only when rotated keeps
-// unrotated files (the common case) fully vector via embedPage/copyPages.
-async function renderPdfPageToImageBytes(
-  file: File,
+// Rasterizes a single page of an already-open pdfjs document so it can be
+// embedded as an image on the merged page -- pdf-lib's own page-rotation
+// mechanisms (setRotation's /Rotate entry vs. drawPage's content-matrix
+// rotate) use different angle conventions and don't compose cleanly with the
+// scale-to-fit-and-center math already used for unrotated pages. Takes an
+// open document rather than a File so a multi-page rotated source is parsed
+// once and reused across all of its pages, not re-decoded per page.
+async function renderOpenDocPageToImageBytes(
+  doc: PDFDocumentProxy,
   pageNumber: number,
   rotation: number,
   scale: number,
 ): Promise<{ bytes: Uint8Array; width: number; height: number } | null> {
-  const pdfjs = await loadPdfJsModule();
-  const bytes = await file.arrayBuffer();
-  const doc = await pdfjs.getDocument({ data: bytes }).promise;
-  try {
-    const page = await doc.getPage(pageNumber);
-    const viewport = page.getViewport({ scale, rotation });
-    const canvas = document.createElement("canvas");
-    const context = canvas.getContext("2d", { alpha: false });
-    if (!context) return null;
-    canvas.width = Math.max(1, Math.floor(viewport.width));
-    canvas.height = Math.max(1, Math.floor(viewport.height));
-    context.fillStyle = "#FFFFFF";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    await page.render({ canvas, canvasContext: context, viewport }).promise;
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-    const width = canvas.width;
-    const height = canvas.height;
-    canvas.width = 0;
-    canvas.height = 0;
-    if (!blob) return null;
-    return { bytes: new Uint8Array(await blob.arrayBuffer()), width, height };
-  } finally {
-    destroyPdfJsDoc(doc);
-  }
+  const page = await doc.getPage(pageNumber);
+  const viewport = page.getViewport({ scale, rotation });
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) return null;
+  canvas.width = Math.max(1, Math.floor(viewport.width));
+  canvas.height = Math.max(1, Math.floor(viewport.height));
+  context.fillStyle = "#FFFFFF";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  await page.render({ canvas, canvasContext: context, viewport }).promise;
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
+  const width = canvas.width;
+  const height = canvas.height;
+  canvas.width = 0;
+  canvas.height = 0;
+  if (!blob) return null;
+  return { bytes: new Uint8Array(await blob.arrayBuffer()), width, height };
 }
 
 type MergeStatus = "Ready" | "Merging in your browser..." | "Download ready";
@@ -725,39 +720,48 @@ export default function MergePdfTool() {
         // viewport rotation already swaps width/height correctly) and embed as
         // an image. Sidesteps pdf-lib's page-rotation angle conventions, which
         // don't compose cleanly with the existing scale-to-fit-and-center math.
-        for (let pageNumber = 1; pageNumber <= item.pageCount; pageNumber += 1) {
-          const rendered = await renderPdfPageToImageBytes(item.file, pageNumber, rotation, RASTER_SCALE);
-          if (!rendered) continue;
-          const image = await mergedPdf.embedJpg(rendered.bytes);
-          const sourceWidth = rendered.width / RASTER_SCALE;
-          const sourceHeight = rendered.height / RASTER_SCALE;
+        // The source document is decoded once and reused across every page,
+        // not re-parsed per page.
+        const pdfjs = await loadPdfJsModule();
+        const sourceBytes = await item.file.arrayBuffer();
+        const openDoc = await pdfjs.getDocument({ data: sourceBytes }).promise;
+        try {
+          for (let pageNumber = 1; pageNumber <= item.pageCount; pageNumber += 1) {
+            const rendered = await renderOpenDocPageToImageBytes(openDoc, pageNumber, rotation, RASTER_SCALE);
+            if (!rendered) continue;
+            const image = await mergedPdf.embedJpg(rendered.bytes);
+            const sourceWidth = rendered.width / RASTER_SCALE;
+            const sourceHeight = rendered.height / RASTER_SCALE;
 
-          if (pageFormat === "original") {
-            const page = mergedPdf.addPage([sourceWidth, sourceHeight]);
-            page.drawImage(image, { x: 0, y: 0, width: sourceWidth, height: sourceHeight });
-            continue;
+            if (pageFormat === "original") {
+              const page = mergedPdf.addPage([sourceWidth, sourceHeight]);
+              page.drawImage(image, { x: 0, y: 0, width: sourceWidth, height: sourceHeight });
+              continue;
+            }
+
+            const availableWidth = outputPageSize.width - selectedMargin * 2;
+            const availableHeight = outputPageSize.height - selectedMargin * 2;
+            const scale = Math.min(
+              availableWidth / sourceWidth,
+              availableHeight / sourceHeight,
+            );
+            const drawWidth = sourceWidth * scale;
+            const drawHeight = sourceHeight * scale;
+            const x = (outputPageSize.width - drawWidth) / 2;
+            const y = (outputPageSize.height - drawHeight) / 2;
+            const page = mergedPdf.addPage([outputPageSize.width, outputPageSize.height]);
+
+            page.drawRectangle({
+              x: 0,
+              y: 0,
+              width: outputPageSize.width,
+              height: outputPageSize.height,
+              color: rgb(1, 1, 1),
+            });
+            page.drawImage(image, { x, y, width: drawWidth, height: drawHeight });
           }
-
-          const availableWidth = outputPageSize.width - selectedMargin * 2;
-          const availableHeight = outputPageSize.height - selectedMargin * 2;
-          const scale = Math.min(
-            availableWidth / sourceWidth,
-            availableHeight / sourceHeight,
-          );
-          const drawWidth = sourceWidth * scale;
-          const drawHeight = sourceHeight * scale;
-          const x = (outputPageSize.width - drawWidth) / 2;
-          const y = (outputPageSize.height - drawHeight) / 2;
-          const page = mergedPdf.addPage([outputPageSize.width, outputPageSize.height]);
-
-          page.drawRectangle({
-            x: 0,
-            y: 0,
-            width: outputPageSize.width,
-            height: outputPageSize.height,
-            color: rgb(1, 1, 1),
-          });
-          page.drawImage(image, { x, y, width: drawWidth, height: drawHeight });
+        } finally {
+          destroyPdfJsDoc(openDoc);
         }
         } catch (itemError) {
           throw new Error(
