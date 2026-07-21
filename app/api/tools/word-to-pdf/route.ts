@@ -1,14 +1,28 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { convertWordToPdf, WordToPdfConversionError } from "@/lib/converters/word-to-pdf";
+import {
+  convertWordToPdf,
+  warmConverter,
+  WordToPdfConversionError,
+} from "@/lib/converters/word-to-pdf";
 import { createStorageServerClient } from "@/lib/supabase/storageServerClient";
 import { WORD_TO_PDF_BUCKET, WORD_UPLOAD_PATH_PATTERN } from "@/lib/supabase/wordToPdfStorage";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 
-// LibreOffice conversion needs a real Node process (child_process, fs) and
-// can run past the edge runtime's execution budget, so this route stays on
-// the Node runtime backed by the Docker function image (Dockerfile.vercel).
+// This route brokers the conversion: it talks to the external LibreOffice
+// service (see lib/converters/word-to-pdf.ts) over HTTP. It stays on the
+// Node runtime (not edge) so the fetch budget and env access behave like a
+// normal server, and raises maxDuration so a cold-start conversion isn't
+// hard-killed before the converter answers.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+// Fired by the client the moment a file is selected -- wakes the (possibly
+// asleep) converter during the user's think-time so the real POST is fast.
+export async function GET() {
+  await warmConverter();
+  return new NextResponse(null, { status: 204 });
+}
 
 function trimmed(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";

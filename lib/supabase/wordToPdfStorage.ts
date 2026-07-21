@@ -8,6 +8,14 @@ export const WORD_TO_PDF_BUCKET = "lumeo-temp";
 
 export const MAX_WORD_FILE_SIZE_BYTES = 45 * 1024 * 1024;
 
+// Storage uploads can fail transiently (a dropped connection, a Supabase
+// 5xx, a rate-limit blip). Those used to surface as a single opaque
+// "upload failed" with no retry -- so one hiccup ended the whole flow. We
+// now retry the transient ones a couple of times with a short linear
+// backoff before giving up.
+const UPLOAD_MAX_ATTEMPTS = 3;
+const UPLOAD_RETRY_BASE_MS = 400;
+
 export function isWordNamedFile(file: File): boolean {
   const name = file.name.toLowerCase();
   return (
@@ -35,6 +43,47 @@ export type WordUploadResult = {
 // so keep the shape here and there in sync.
 export const WORD_UPLOAD_PATH_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.docx?$/i;
 
+// The subset of Supabase's StorageError shape we actually branch on. Network
+// failures may instead arrive as a thrown TypeError, which we normalise into
+// this same shape before classifying.
+type UploadFailure = { status?: number; statusCode?: string; message?: string };
+
+function failureStatus(error: UploadFailure): number | undefined {
+  const status = error.status ?? (error.statusCode ? Number(error.statusCode) : undefined);
+  return status !== undefined && !Number.isNaN(status) ? status : undefined;
+}
+
+// Retry only failures that a second attempt could plausibly clear: network
+// drops (no status), rate limits (429), and server errors (5xx). A 4xx like
+// 413 (too large) or a MIME rejection is permanent -- retrying just wastes
+// the user's time.
+function isTransientFailure(error: UploadFailure): boolean {
+  const status = failureStatus(error);
+  if (status === undefined) return true;
+  if (status === 429) return true;
+  return status >= 500;
+}
+
+// Turn a raw storage failure into one actionable sentence for the UI. The
+// real error is always logged separately (see below) for diagnosis.
+function uploadFailureMessage(error: UploadFailure): string {
+  const raw = (error.message ?? "").toLowerCase();
+  const status = failureStatus(error);
+
+  if (status === 413 || /maximum allowed size|payload too large|entity too large/.test(raw)) {
+    return "This file is too large to upload. Try a smaller document.";
+  }
+  if (/mime type|not supported/.test(raw)) {
+    return "This file type can't be uploaded. Use a .docx or .doc file.";
+  }
+  if (/quota|storage limit|exceeded/.test(raw)) {
+    return "Storage is temporarily unavailable. Please try again shortly.";
+  }
+  return "Upload to secure storage failed. Please check your connection and try again.";
+}
+
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Uploads under a random UUID prefix so two concurrent uploads (or a user
 // re-uploading the same filename) never collide in the shared bucket. The
 // API route derives its own signed URL from this path server-side -- it
@@ -42,20 +91,40 @@ export const WORD_UPLOAD_PATH_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0
 export async function uploadWordFileForConversion(file: File): Promise<WordUploadResult> {
   const supabase = createClient();
   const extension = file.name.toLowerCase().endsWith(".doc") ? "doc" : "docx";
-  const path = `${crypto.randomUUID()}.${extension}`;
+  const contentType = file.type || "application/octet-stream";
 
-  const { error: uploadError } = await supabase.storage
-    .from(WORD_TO_PDF_BUCKET)
-    .upload(path, file, {
-      contentType: file.type || "application/octet-stream",
-      upsert: false,
-    });
+  let lastFailure: UploadFailure = {};
 
-  if (uploadError) {
-    throw new Error("Upload to secure storage failed. Please try again.");
+  for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS; attempt += 1) {
+    // A fresh UUID per attempt: if a prior attempt half-wrote the object
+    // before failing, reusing its path with upsert:false would 409.
+    const path = `${crypto.randomUUID()}.${extension}`;
+
+    try {
+      const { error } = await supabase.storage
+        .from(WORD_TO_PDF_BUCKET)
+        .upload(path, file, { contentType, upsert: false });
+
+      if (!error) return { path };
+      lastFailure = error as UploadFailure;
+    } catch (thrown) {
+      // Hard network errors reject rather than resolving with { error }.
+      lastFailure = { message: thrown instanceof Error ? thrown.message : "Network error" };
+    }
+
+    console.error(
+      `Word to PDF upload attempt ${attempt}/${UPLOAD_MAX_ATTEMPTS} failed:`,
+      lastFailure,
+    );
+
+    if (attempt < UPLOAD_MAX_ATTEMPTS && isTransientFailure(lastFailure)) {
+      await wait(UPLOAD_RETRY_BASE_MS * attempt);
+      continue;
+    }
+    break;
   }
 
-  return { path };
+  throw new Error(uploadFailureMessage(lastFailure));
 }
 
 export async function removeWordUpload(path: string): Promise<void> {
