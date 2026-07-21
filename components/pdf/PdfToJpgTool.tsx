@@ -56,6 +56,7 @@ const DOWNLOAD_STAGGER_MS = 300;
 const THUMBNAIL_SCALE = 0.3;
 const THUMBNAIL_JPEG_QUALITY = 0.7;
 const PNG_SIZE_FACTOR = 2.2;
+const WEBP_SIZE_FACTOR = 0.75;
 const DPI_PRESET_KEY = "lumeo.pdfToJpg.dpiPreset";
 const QUALITY_KEY = "lumeo.pdfToJpg.quality";
 const FORMAT_KEY = "lumeo.pdfToJpg.format";
@@ -809,7 +810,8 @@ export default function PdfToJpgTool() {
     const thumbnailDpi = THUMBNAIL_SCALE * 72;
     const areaRatio = (selectedPreset.dpi / thumbnailDpi) ** 2;
     const qualityRatio = quality / THUMBNAIL_JPEG_QUALITY;
-    const formatFactor = outputFormat === "png" ? PNG_SIZE_FACTOR : 1;
+    const formatFactor =
+      outputFormat === "png" ? PNG_SIZE_FACTOR : outputFormat === "webp" ? WEBP_SIZE_FACTOR : 1;
 
     const perPage = avgThumbnailSize * areaRatio * qualityRatio * formatFactor;
     return perPage * selectionPreview.count;
@@ -841,6 +843,12 @@ export default function PdfToJpgTool() {
     const inputSizeBucket = bucketFileSize(analysis.size);
     track({ eventName: "processing_started", toolSlug: TOOL_SLUG, inputSizeBucket });
 
+    // Declared outside the try block so the catch handler can revoke any
+    // blob URLs already created for earlier pages if a later page in this
+    // same batch fails -- those pages never reach setResults, so nothing
+    // else would ever revoke them.
+    const nextResults: JpgPageResult[] = [];
+
     try {
       const doc = pdfJsDocRef.current;
       if (!doc) throw new Error("Document is not ready. Please add the PDF again.");
@@ -851,7 +859,6 @@ export default function PdfToJpgTool() {
       const extension = outputFormat === "png" ? "png" : outputFormat === "webp" ? "webp" : "jpg";
       const mimeType =
         outputFormat === "png" ? "image/png" : outputFormat === "webp" ? "image/webp" : "image/jpeg";
-      const nextResults: JpgPageResult[] = [];
       let totalOutputSize = 0;
 
       for (let index = 0; index < pages.length; index += 1) {
@@ -916,6 +923,9 @@ export default function PdfToJpgTool() {
         success: true,
       });
     } catch (convertError) {
+      // Any pages already converted in this failed batch never reached
+      // setResults, so revoke their blob URLs here instead of leaking them.
+      nextResults.forEach((item) => URL.revokeObjectURL(item.url));
       const message =
         convertError instanceof Error
           ? convertError.message
