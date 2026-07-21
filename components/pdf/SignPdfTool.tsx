@@ -342,9 +342,17 @@ export default function SignPdfTool() {
   function handleSaveToLibrary(signature: CreatedSignature) {
     const name = window.prompt("Name this signature", "My signature");
     if (name === null) return;
-    saveSignature({ name, dataUrl: signature.dataUrl, aspectRatio: signature.aspectRatio, source: signature.source });
+    const { persisted } = saveSignature({ name, dataUrl: signature.dataUrl, aspectRatio: signature.aspectRatio, source: signature.source });
     refreshLibrary();
-    pushToast("Signature saved");
+    // Report what actually happened -- a swallowed localStorage write
+    // failure (quota exceeded, private browsing) used to still show
+    // "Signature saved" even though listSignatures() wouldn't have it on
+    // the next reload.
+    if (persisted) {
+      pushToast("Signature saved");
+    } else {
+      pushToast("Signature ready to use, but couldn't be saved for next time (storage full or unavailable)", "error");
+    }
   }
 
   function armSignature(signature: CreatedSignature | SavedSignature) {
@@ -400,7 +408,7 @@ export default function SignPdfTool() {
 
   function addTextElement(type: Exclude<PlacedElementType, "signature">) {
     const defaultText = type === "date" ? new Date().toLocaleDateString() : type === "initials" ? "" : "";
-    const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const id = nextElementId();
     setElements((current) => [
       ...current,
       {
@@ -440,6 +448,11 @@ export default function SignPdfTool() {
       const helvetica = await doc.embedFont(StandardFonts.Helvetica);
       const helveticaBold = await doc.embedFont(StandardFonts.HelveticaBold);
       const pngCache = new Map<string, Uint8Array>();
+      // Empty Date/Text/Initials boxes are skipped below -- if every placed
+      // element turns out to be one of those, the export would otherwise
+      // silently produce a PDF identical to the original with a false
+      // "success" toast. Counting what actually got drawn catches that.
+      let elementsDrawn = 0;
 
       for (const element of elements) {
         const page = doc.getPages()[element.pageIndex];
@@ -458,13 +471,32 @@ export default function SignPdfTool() {
           const heightPt = (element.heightPct / 100) * pageHeight;
           const centerXPt = ((element.xPct + element.widthPct / 2) / 100) * pageWidth;
           const centerYPt = pageHeight - ((element.yPct + element.heightPct / 2) / 100) * pageHeight;
+
+          // pdf-lib's drawImage rotates the image around the (x, y) anchor
+          // passed below -- the corner, not the center -- while the on-screen
+          // stage rotates around the element's center (CSS transform default).
+          // Passing centerXPt/centerYPt-derived corner coordinates straight
+          // through with a rotation would visibly shift the signature away
+          // from where the user placed it for any non-zero rotation. Solving
+          // for the anchor that keeps the rotated box centered on
+          // (centerXPt, centerYPt) instead -- verified against the standard
+          // 2D rotation-composition identity for angles including 0/90/180/
+          // -90/45/-37 before wiring this in.
+          const angleDeg = -element.rotationDeg;
+          const angleRad = (angleDeg * Math.PI) / 180;
+          const cosA = Math.cos(angleRad);
+          const sinA = Math.sin(angleRad);
+          const x = centerXPt - ((widthPt / 2) * cosA - (heightPt / 2) * sinA);
+          const y = centerYPt - ((widthPt / 2) * sinA + (heightPt / 2) * cosA);
+
           page.drawImage(embedded, {
-            x: centerXPt - widthPt / 2,
-            y: centerYPt - heightPt / 2,
+            x,
+            y,
             width: widthPt,
             height: heightPt,
-            rotate: degrees(-element.rotationDeg),
+            rotate: degrees(angleDeg),
           });
+          elementsDrawn += 1;
         } else if (element.text.trim()) {
           const fontSizePt = element.fontSizePt / PAGE_RENDER_SCALE;
           const xPt = (element.xPct / 100) * pageWidth;
@@ -477,7 +509,18 @@ export default function SignPdfTool() {
             font,
             color: rgb(0.07, 0.08, 0.1),
           });
+          elementsDrawn += 1;
         }
+      }
+
+      if (elementsDrawn === 0) {
+        // Not a processing failure -- nothing broke, there was just nothing
+        // to draw, so this doesn't go through the processing_failed
+        // analytics event (its errorCode enum has no slot for "user hasn't
+        // filled anything in yet").
+        setError("Every text, date, or initials box is empty. Fill one in, or add a signature, before signing.");
+        pushToast("Nothing to sign yet -- fill in your text boxes first", "error");
+        return;
       }
 
       const bytes = await doc.save();
@@ -660,7 +703,7 @@ export default function SignPdfTool() {
                         setSelectedId(null);
                       }}
                       onDuplicate={() => {
-                        const id = `el-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+                        const id = nextElementId();
                         setElements((current) => [
                           ...current,
                           { ...element, id, xPct: Math.min(94 - element.widthPct, element.xPct + 3), yPct: Math.min(94 - element.heightPct, element.yPct + 3) },

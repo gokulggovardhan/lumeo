@@ -238,6 +238,12 @@ export function PlacedElementView({
       onKeyDown={(event) => {
         if (event.key === "Delete" || event.key === "Backspace") {
           event.preventDefault();
+          // Stop this from also reaching SignPdfTool's window-level
+          // Delete/Backspace listener (used for the case where an element is
+          // selected but not DOM-focused) -- without it, one keypress would
+          // call onDelete twice. Harmless in practice (deleting an
+          // already-deleted id is a no-op filter), but doing it once is correct.
+          event.stopPropagation();
           onDelete();
           return;
         }

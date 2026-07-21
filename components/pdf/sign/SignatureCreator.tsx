@@ -12,6 +12,13 @@ import type { SignatureSourceKind } from "@/lib/sign/types";
 
 const CANVAS_WIDTH = 360;
 const CANVAS_HEIGHT = 140;
+// A signature is a small stamp, not a photo -- capping the longest edge
+// keeps an uploaded phone photo (often 3000-4000px+) from becoming a
+// multi-megabyte base64 string. Uncapped, that bloats localStorage (the
+// library's ~12-signature cap could blow past the quota and fail to save
+// silently), slows every export down, and inflates the downloaded PDF's
+// file size for no visual benefit -- a stamp doesn't need photo resolution.
+const MAX_SIGNATURE_DIMENSION = 800;
 
 type Stroke = { points: { x: number; y: number }[]; width: number };
 
@@ -301,12 +308,13 @@ function UploadTab({ onCreate }: { onCreate: (signature: CreatedSignature) => vo
         ? { x: crop.x * scaleX, y: crop.y * scaleY, width: crop.width * scaleX, height: crop.height * scaleY }
         : { x: 0, y: 0, width: imageSize.width, height: imageSize.height };
 
+    const downscale = Math.min(1, MAX_SIGNATURE_DIMENSION / Math.max(region.width, region.height));
     const canvas = document.createElement("canvas");
-    canvas.width = region.width;
-    canvas.height = region.height;
+    canvas.width = Math.round(region.width * downscale);
+    canvas.height = Math.round(region.height * downscale);
     const context = canvas.getContext("2d");
     if (!context) return;
-    context.drawImage(img, region.x, region.y, region.width, region.height, 0, 0, region.width, region.height);
+    context.drawImage(img, region.x, region.y, region.width, region.height, 0, 0, canvas.width, canvas.height);
     onCreate(canvasToSignature(canvas, "upload"));
   }
 
