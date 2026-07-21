@@ -136,7 +136,6 @@ export default function WordToPdfTool() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fileUrl: upload.signedUrl,
           fileName: file.name,
           filePathInSupabase: upload.path,
         }),

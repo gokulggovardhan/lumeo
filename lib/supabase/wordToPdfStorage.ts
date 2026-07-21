@@ -27,11 +27,18 @@ export function checkWordFileSize(file: File): string | null {
 
 export type WordUploadResult = {
   path: string;
-  signedUrl: string;
 };
 
+// Matches the path format this module generates -- a bare UUID plus
+// extension, nothing else. The API route re-checks this server-side before
+// trusting a client-supplied path (see app/api/tools/word-to-pdf/route.ts),
+// so keep the shape here and there in sync.
+export const WORD_UPLOAD_PATH_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.docx?$/i;
+
 // Uploads under a random UUID prefix so two concurrent uploads (or a user
-// re-uploading the same filename) never collide in the shared bucket.
+// re-uploading the same filename) never collide in the shared bucket. The
+// API route derives its own signed URL from this path server-side -- it
+// never fetches a URL supplied by the client, which would be an SSRF vector.
 export async function uploadWordFileForConversion(file: File): Promise<WordUploadResult> {
   const supabase = createClient();
   const extension = file.name.toLowerCase().endsWith(".doc") ? "doc" : "docx";
@@ -48,16 +55,7 @@ export async function uploadWordFileForConversion(file: File): Promise<WordUploa
     throw new Error("Upload to secure storage failed. Please try again.");
   }
 
-  const { data: signedData, error: signedError } = await supabase.storage
-    .from(WORD_TO_PDF_BUCKET)
-    .createSignedUrl(path, 300);
-
-  if (signedError || !signedData?.signedUrl) {
-    await supabase.storage.from(WORD_TO_PDF_BUCKET).remove([path]);
-    throw new Error("Could not prepare the uploaded file for conversion.");
-  }
-
-  return { path, signedUrl: signedData.signedUrl };
+  return { path };
 }
 
 export async function removeWordUpload(path: string): Promise<void> {
