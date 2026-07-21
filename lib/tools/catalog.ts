@@ -177,13 +177,10 @@ export const lumeoTools: LumeoTool[] = [
     plain: "Office ↔ PDF",
     tag: "Word, Excel, PowerPoint and more — via free, self-hosted LibreOffice.",
     processing: "server",
-    // Back to "soon" until the standalone converter service (see
-    // services/word-to-pdf-converter/) is deployed and WORD_TO_PDF_CONVERTER_URL
-    // / WORD_TO_PDF_CONVERTER_SECRET are set -- Vercel's own deployment has
-    // no LibreOffice binary, so conversion cannot succeed without it.
-    availability: "soon",
+    availability: "available",
+    primaryRoute: "/pdf/word-to-pdf",
     actions: [
-      { label: "Word to PDF", slug: "word-to-pdf", live: false },
+      { label: "Word to PDF", slug: "word-to-pdf", route: "/pdf/word-to-pdf", live: true },
       { label: "Excel to PDF", slug: "excel-to-pdf", live: false },
       { label: "PowerPoint to PDF", slug: "powerpoint-to-pdf", live: false },
       { label: "PDF to Word", slug: "pdf-to-word", live: false },
