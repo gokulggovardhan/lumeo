@@ -48,6 +48,13 @@ function WordIcon() {
   return <FileText aria-hidden="true" className="h-8 w-8" />;
 }
 
+// Ping the API's warm-up handler (GET) so the sleepy converter starts
+// booting while the user reads the confirmation and reaches for "Convert".
+// Fire-and-forget: it must never block or surface an error in the UI.
+function warmConverter() {
+  void fetch("/api/tools/word-to-pdf", { method: "GET" }).catch(() => {});
+}
+
 // This tool uploads to Supabase and converts server-side (LibreOffice), so
 // the shared L2PrivacyNote's "Browser-only" claim would be false here --
 // this states the real, still-private handling instead.
@@ -108,6 +115,7 @@ export default function WordToPdfTool() {
     setStatusLabel("Ready to convert");
     setError("");
     setResult(null);
+    warmConverter();
   }
 
   async function handleConvert() {
