@@ -31,19 +31,6 @@ const MAX_BODY_BYTES = 10 * 1024;
 // URLs on a Supabase storage host are ever fetched, regardless of auth.
 const ALLOWED_FILE_HOST_SUFFIX = process.env.ALLOWED_FILE_HOST_SUFFIX || "supabase.co";
 
-function isAllowedFileUrl(fileUrl) {
-  let parsed;
-  try {
-    parsed = new URL(fileUrl);
-  } catch {
-    return false;
-  }
-  return (
-    parsed.protocol === "https:" &&
-    (parsed.hostname === ALLOWED_FILE_HOST_SUFFIX || parsed.hostname.endsWith(`.${ALLOWED_FILE_HOST_SUFFIX}`))
-  );
-}
-
 if (!CONVERT_SECRET) {
   console.error("CONVERT_SECRET is not set. Refusing to start: every request would be unauthenticated.");
   process.exit(1);
@@ -92,10 +79,6 @@ function secretsMatch(a, b) {
 }
 
 async function convertWordToPdf({ fileUrl, fileName }) {
-  if (!isAllowedFileUrl(fileUrl)) {
-    throw new Error("File URL is not from an allowed host.");
-  }
-
   const jobId = crypto.randomUUID();
   const workDir = await mkdtemp(join(tmpdir(), `word2pdf-${jobId}-`));
   const profileDir = join(tmpdir(), `lo-profile-${jobId}`);
@@ -104,9 +87,23 @@ async function convertWordToPdf({ fileUrl, fileName }) {
   const outputPath = join(workDir, "input.pdf");
 
   try {
+    // The shared secret authenticates the *caller* (our own Next.js API
+    // route), but fileUrl is still a value from that request body -- a
+    // leaked secret or a bug upstream could otherwise turn this into an
+    // SSRF proxy into the host's internal network. This allowlist, checked
+    // right before the fetch it guards, is the actual boundary.
+    const parsedFileUrl = new URL(fileUrl);
+    const isAllowedHost =
+      parsedFileUrl.protocol === "https:" &&
+      (parsedFileUrl.hostname === ALLOWED_FILE_HOST_SUFFIX ||
+        parsedFileUrl.hostname.endsWith(`.${ALLOWED_FILE_HOST_SUFFIX}`));
+    if (!isAllowedHost) {
+      throw new Error("File URL is not from an allowed host.");
+    }
+
     let response;
     try {
-      response = await fetch(fileUrl);
+      response = await fetch(parsedFileUrl);
     } catch {
       throw new Error("Could not download the uploaded file for conversion.");
     }
