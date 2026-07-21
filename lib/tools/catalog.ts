@@ -63,7 +63,7 @@ export const lumeoTools: LumeoTool[] = [
       { label: "Split", slug: "split", route: "/pdf/split", live: true },
       { label: "Split by range", slug: "split-range", route: "/pdf/split", live: true },
       { label: "Reorder pages", slug: "reorder", route: "/pdf/split", live: true },
-      { label: "Rotate pages", slug: "rotate", route: "/pdf/split", live: true },
+      { label: "Rotate pages (in Split)", slug: "rotate", route: "/pdf/split", live: true },
       { label: "Remove pages", slug: "remove-pages", route: "/pdf/split", live: true },
       { label: "Extract pages", slug: "extract-pages", route: "/pdf/split", live: true },
       { label: "Duplicate page", slug: "duplicate-page", live: false },

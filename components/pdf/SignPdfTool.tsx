@@ -46,25 +46,15 @@ import {
 } from "@/lib/sign/signatureLibrary";
 import type { PlacedElement, PlacedElementType, SavedSignature } from "@/lib/sign/types";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
-
-type PdfJsModule = typeof import("pdfjs-dist");
-
-let pdfJsModulePromise: Promise<PdfJsModule> | null = null;
-
-async function loadPdfJsModule() {
-  if (!pdfJsModulePromise) {
-    pdfJsModulePromise = import("pdfjs-dist").then((module) => {
-      if (!module.GlobalWorkerOptions.workerSrc) {
-        module.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.mjs",
-          import.meta.url,
-        ).toString();
-      }
-      return module;
-    });
-  }
-  return pdfJsModulePromise;
-}
+import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
+import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
+import {
+  hasPdfMagicBytes,
+  isPdfNamedFile,
+  checkPdfFileSize,
+} from "@/lib/pdf/uploadValidation";
 
 type PageSize = { width: number; height: number };
 
@@ -90,24 +80,9 @@ type Toast = { id: string; message: string; tone: "success" | "error" };
 
 const THUMBNAIL_SCALE = 0.2;
 
-function copyArrayBuffer(buffer: ArrayBuffer) {
-  const source = new Uint8Array(buffer);
-  const copy = new Uint8Array(source.byteLength);
-  copy.set(source);
-  return copy.buffer;
-}
-
-function formatFileSize(size: number) {
-  if (size < 1024) return `${size} B`;
-  const kb = size / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  return `${(kb / 1024).toFixed(1)} MB`;
-}
-
-function sanitizePdfFileName(value: string) {
-  const cleanName = value.replace(/[<>:"/\\|?*\x00-\x1F]/g, "-").replace(/\s+/g, " ").trim();
-  const safeName = cleanName || "lumeo-signed.pdf";
-  return safeName.toLowerCase().endsWith(".pdf") ? safeName : `${safeName}.pdf`;
+function sanitizePdfFileName(value: string, fallback = "lumeo-signed") {
+  const stem = sanitizeFileStem(value.replace(/\.pdf$/i, ""), fallback);
+  return `${stem}.pdf`;
 }
 
 function isTypingTarget(target: EventTarget | null) {
@@ -298,13 +273,25 @@ export default function SignPdfTool() {
     const file = Array.from(files)[0];
     if (!file) return;
 
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    if (!isPdfNamedFile(file)) {
       setError("Please choose a PDF file.");
+      return;
+    }
+
+    const sizeError = checkPdfFileSize(file);
+    if (sizeError) {
+      setError(sizeError);
       return;
     }
 
     try {
       const bytes = await file.arrayBuffer();
+
+      if (!hasPdfMagicBytes(bytes)) {
+        setError("This doesn't look like a valid PDF file.");
+        return;
+      }
+
       const doc = await PDFDocument.load(copyArrayBuffer(bytes), { ignoreEncryption: false });
       const pageSizes = doc.getPages().map((page) => {
         const { width, height } = page.getSize();
@@ -789,7 +776,7 @@ export default function SignPdfTool() {
                 />
               </label>
 
-              <div className="mt-3">
+              <div className={`mt-3${downloadUrl ? " aura-success-reveal" : ""}`}>
                 {downloadUrl ? (
                   <L2ActionArea
                     primary={

@@ -15,6 +15,15 @@ import {
 import { AuraSegmentedControl } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
+import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
+import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { normalizeRotation } from "@/lib/pdf/rotation";
+import {
+  hasImageMagicBytes,
+  checkImageFileSize,
+  checkImageCount,
+  checkTotalImagesSize,
+} from "@/lib/pdf/uploadValidation";
 
 type ConvertStatus = "Ready" | "Converting in your browser..." | "Download ready";
 type CleanupMessage = "" | "Temporary file cleared from this session.";
@@ -61,10 +70,6 @@ const marginOptions: Array<{
   { value: "clean", label: "Clean", points: 24, description: "Small white border." },
   { value: "none", label: "None", points: 0, description: "Image fills the page edge-to-edge." },
 ];
-
-function normalizeRotation(value: number) {
-  return ((value % 360) + 360) % 360;
-}
 
 // Rotating a box via CSS transform spins its content in place without
 // changing the box's own layout dimensions - so a tall portrait image
@@ -117,30 +122,6 @@ function readStoredCompressQuality(): number {
 function readStoredPngToJpeg(): boolean {
   if (typeof window === "undefined") return false;
   return window.localStorage.getItem(PNG_TO_JPEG_KEY) === "true";
-}
-
-// JPEGs always start with FF D8 FF, PNGs with an 8-byte signature. Checking
-// this (rather than trusting the file extension or the browser-reported
-// MIME type, both spoofable) catches renamed non-image files before they
-// reach the canvas decode pipeline.
-function hasImageMagicBytes(buffer: ArrayBuffer, mimeType: string): boolean {
-  const bytes = new Uint8Array(buffer);
-  if (mimeType === "image/jpeg") {
-    return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-  }
-  if (mimeType === "image/png") {
-    const pngSignature = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
-    return bytes.length >= 8 && pngSignature.every((byte, index) => bytes[index] === byte);
-  }
-  return false;
-}
-
-function formatEstimatedSize(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
-  const units = ["B", "KB", "MB", "GB"];
-  const power = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / 1024 ** power;
-  return `${value >= 10 || power === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[power]}`;
 }
 
 function readJpegExifOrientation(bytes: ArrayBuffer): number {
@@ -231,24 +212,13 @@ function getPageSizeLabel(option: PageSizeOption) {
   return "A4";
 }
 
-function formatFileSize(size: number) {
-  if (size < 1024) return `${size} B`;
-  const kb = size / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  return `${(kb / 1024).toFixed(1)} MB`;
-}
-
 function createFileId(file: File) {
   return `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`;
 }
 
-function sanitizePdfFileName(value: string) {
-  const cleanName = value
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
-    .replace(/\s+/g, " ")
-    .trim();
-  const safeName = cleanName || "lumeo-images.pdf";
-  return safeName.toLowerCase().endsWith(".pdf") ? safeName : `${safeName}.pdf`;
+function sanitizePdfFileName(value: string, fallback = "lumeo-images") {
+  const stem = sanitizeFileStem(value.replace(/\.pdf$/i, ""), fallback);
+  return `${stem}.pdf`;
 }
 
 function getDisplayDimensions(file: File): Promise<{ width: number; height: number }> {
@@ -548,6 +518,25 @@ export default function JpgToPdfTool() {
       return;
     }
 
+    const countError = checkImageCount(files.length + nextFiles.length);
+    if (countError) {
+      setError(countError);
+      return;
+    }
+
+    const oversizedFile = nextFiles.find((file) => checkImageFileSize(file) !== null);
+    if (oversizedFile) {
+      setError(checkImageFileSize(oversizedFile) ?? "One of these images is too large.");
+      return;
+    }
+
+    const incomingTotal = nextFiles.reduce((sum, file) => sum + file.size, 0);
+    const totalSizeError = checkTotalImagesSize(totalSize + incomingTotal);
+    if (totalSizeError) {
+      setError(totalSizeError);
+      return;
+    }
+
     const readableFiles: SelectedImage[] = [];
     let unreadableCount = 0;
     let duplicateDetected = false;
@@ -679,6 +668,7 @@ export default function JpgToPdfTool() {
       const marginPoints = marginOptions.find((option) => option.value === marginPreset)?.points ?? 24;
 
       for (const item of files) {
+        try {
         const netRotation = normalizeRotation(item.userRotation);
         const shouldCompressJpeg = compressImages && item.file.type === "image/jpeg";
         const shouldConvertPng = compressImages && convertPngToJpeg && item.file.type === "image/png";
@@ -738,6 +728,11 @@ export default function JpgToPdfTool() {
           color: rgb(1, 1, 1),
         });
         page.drawImage(image, { x, y, width: drawWidth, height: drawHeight });
+        } catch (itemError) {
+          throw new Error(
+            `"${item.file.name}" could not be added. ${itemError instanceof Error ? itemError.message : "It may be damaged or an unsupported format."}`,
+          );
+        }
       }
 
       const pdfBytes = await pdfDoc.save();
@@ -758,9 +753,13 @@ export default function JpgToPdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
-    } catch {
+    } catch (convertError) {
       setStatus("Ready");
-      setError("Conversion failed. Try smaller images or remove damaged files.");
+      setError(
+        convertError instanceof Error
+          ? convertError.message
+          : "Conversion failed. Try smaller images or remove damaged files.",
+      );
       track({
         eventName: "processing_failed",
         toolSlug: "jpg-to-pdf",
@@ -1069,7 +1068,7 @@ export default function JpgToPdfTool() {
                   {pageSizeOption === "matchImage"
                     ? "Each page matches its own image size."
                     : "Clean, same-size PDF output."}
-                  {estimatedPdfSize ? ` · Estimated ~${formatEstimatedSize(estimatedPdfSize)}` : ""}
+                  {estimatedPdfSize ? ` · Estimated ~${formatFileSize(estimatedPdfSize)}` : ""}
                 </p>
 
                 {showMarginOptions ? (
@@ -1190,7 +1189,7 @@ export default function JpgToPdfTool() {
               </p>
 
               {downloadUrl ? (
-                <div className="mt-2">
+                <div className="aura-success-reveal mt-2">
                   <p className="text-base font-semibold text-[var(--text-primary)]">
                     PDF ready
                   </p>

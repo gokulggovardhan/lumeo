@@ -42,6 +42,15 @@ import {
 import { AuraOptionCard, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
+import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
+import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
+import {
+  hasPdfMagicBytes,
+  isPdfNamedFile,
+  checkPdfFileSize,
+} from "@/lib/pdf/uploadValidation";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
 type ExpertMode = "profile" | "custom";
@@ -106,29 +115,9 @@ type CompressResult = {
   };
 };
 
-type PdfJsModule = typeof import("pdfjs-dist");
-
 const LARGE_FILE_WARNING_BYTES = 80 * 1024 * 1024;
 const MAX_RENDER_SCALE = 2.35;
 const MIN_RENDER_SCALE = 0.75;
-
-let pdfJsModulePromise: Promise<PdfJsModule> | null = null;
-
-async function loadPdfJsModule() {
-  if (!pdfJsModulePromise) {
-    pdfJsModulePromise = import("pdfjs-dist").then((module) => {
-      if (!module.GlobalWorkerOptions.workerSrc) {
-        module.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.mjs",
-          import.meta.url,
-        ).toString();
-      }
-      return module;
-    });
-  }
-
-  return pdfJsModulePromise;
-}
 
 const resolutionOptions: Array<{ value: ResolutionPreset; label: string; dpi: number; helper: string }> = [
   { value: "dpi220", label: "Print quality", dpi: 220, helper: "Sharper output for detailed review." },
@@ -142,42 +131,13 @@ const qualityOptions: Array<{ value: ImageQuality; label: string; quality: numbe
   { value: "compact", label: "Smaller output", quality: 0.58 },
 ];
 
-function formatFileSize(size: number) {
-  if (!Number.isFinite(size) || size <= 0) return "0 KB";
-  const units = ["B", "KB", "MB", "GB"];
-  const power = Math.min(Math.floor(Math.log(size) / Math.log(1024)), units.length - 1);
-  const value = size / 1024 ** power;
-  return `${value >= 10 || power === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[power]}`;
-}
-
-function sanitizePdfFileName(value: string, fallback = "lumeo-compressed.pdf") {
-  const cleanName = value
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")
-    .replace(/\s+/g, " ")
-    .replace(/[. ]+$/g, "")
-    .trim()
-    .slice(0, 120);
-  const safeName = cleanName || fallback;
-  return safeName.toLowerCase().endsWith(".pdf") ? safeName : `${safeName}.pdf`;
+function sanitizePdfFileName(value: string, fallback = "lumeo-compressed") {
+  const stem = sanitizeFileStem(value.replace(/\.pdf$/i, ""), fallback);
+  return `${stem}.pdf`;
 }
 
 function sourceOutputName(name: string) {
-  return sanitizePdfFileName(
-    `${name.replace(/\.[^/.]+$/, "").replace(/[<>:"/\\|?*\x00-\x1F]/g, "-")}-compressed.pdf`,
-  );
-}
-
-function copyArrayBuffer(buffer: ArrayBuffer) {
-  const source = new Uint8Array(buffer);
-  const copy = new Uint8Array(source.byteLength);
-  copy.set(source);
-  return copy.buffer;
-}
-
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const copy = new Uint8Array(bytes.byteLength);
-  copy.set(bytes);
-  return copy.buffer;
+  return sanitizePdfFileName(`${name.replace(/\.[^/.]+$/, "")}-compressed`, "lumeo-compressed");
 }
 
 function classifyPageSize(width: number, height: number): PageInfo["label"] {
@@ -540,14 +500,28 @@ export default function CompressPdfTool() {
     clearPreview();
     await cleanupTasks();
 
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    if (!isPdfNamedFile(file)) {
       setStatus("Ready");
       setError("Please add one PDF file.");
       return;
     }
 
+    const sizeError = checkPdfFileSize(file);
+    if (sizeError) {
+      setStatus("Ready");
+      setError(sizeError);
+      return;
+    }
+
     try {
       const bytes = await file.arrayBuffer();
+
+      if (!hasPdfMagicBytes(bytes)) {
+        setStatus("Ready");
+        setError("This doesn't look like a valid PDF file.");
+        return;
+      }
+
       const sourcePdf = await PDFDocument.load(copyArrayBuffer(bytes));
       const pages = sourcePdf.getPages().map((page, index) => {
         const { width, height } = page.getSize();
@@ -804,6 +778,11 @@ export default function CompressPdfTool() {
             passLabel: `Building pass ${pass} of ${MAX_TARGET_PASSES}`,
           });
           const candidateBytes = candidate.byteLength;
+          setProgressDetail(
+            `Pass ${pass} of ${MAX_TARGET_PASSES} · ${formatFileSize(candidateBytes)} so far${
+              candidateBytes <= request.targetBytes ? " · under target" : ""
+            }`,
+          );
           attempts.push({
             pass,
             dpi: parameters.dpi,
@@ -1331,7 +1310,7 @@ export default function CompressPdfTool() {
 
             <div className={result ? "flex min-h-0 flex-1 flex-col justify-center border-0 pt-0" : "border-t border-[var(--text-primary)]/10 pt-3"}>
               {result ? (
-                <div className={`mb-4 rounded-xl border p-4 ${result.target ? result.target.outcome === "achieved" ? "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)]" : result.target.outcome === "closest-safe" ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]" : "border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10" : result.tone === "success" ? "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)]" : result.tone === "limited" ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]" : "border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10"}`}>
+                <div className={`aura-success-reveal mb-4 rounded-xl border p-4 ${result.target ? result.target.outcome === "achieved" ? "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)]" : result.target.outcome === "closest-safe" ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]" : "border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10" : result.tone === "success" ? "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)]" : result.tone === "limited" ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]" : "border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10"}`}>
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">
                     Size Outcome
                   </p>

@@ -53,7 +53,11 @@ export function SignatureLibraryPanel({
           {signatures.map((signature) => (
             <div
               key={signature.id}
-              className="group relative rounded-lg border border-[var(--text-primary)]/10 bg-white p-1.5"
+              className={`group relative rounded-lg border bg-white p-1.5 transition-all duration-200 hover:-translate-y-0.5 ${
+                signature.isDefault
+                  ? "border-[var(--lumeo-seal-500)]/50 shadow-[0_0_0_1px_rgba(var(--lumeo-seal-rgb),0.18)]"
+                  : "border-[var(--text-primary)]/10 hover:border-[var(--lumeo-gold)]/35"
+              }`}
             >
               <button
                 type="button"
@@ -66,7 +70,11 @@ export function SignatureLibraryPanel({
               </button>
 
               {signature.isDefault ? (
-                <span aria-label="Default signature" className="absolute left-1.5 top-1.5 text-[10px] text-[var(--lumeo-gold-300)]">
+                <span
+                  aria-label="Default signature"
+                  title="Default signature"
+                  className="absolute left-1.5 top-1.5 grid h-4 w-4 place-items-center rounded-full bg-[var(--lumeo-seal-500)] text-[9px] leading-none text-white shadow-[0_2px_6px_rgba(var(--lumeo-seal-rgb),0.45)]"
+                >
                   ★
                 </span>
               ) : null}

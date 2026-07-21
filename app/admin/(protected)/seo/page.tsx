@@ -121,7 +121,13 @@ export default async function SeoPage({
                 </Link>
                 <form action={asAdminFormAction(deleteSeoSetting)}>
                   <input type="hidden" name="route" value={record.route} />
-                  <AdminSubmitButton variant="secondary" pendingLabel="Deleting...">Delete</AdminSubmitButton>
+                  <AdminSubmitButton
+                    variant="secondary"
+                    pendingLabel="Deleting..."
+                    confirmMessage={`Delete the SEO record for "${record.route}"? This removes its title, description, and robots directives from the live site.`}
+                  >
+                    Delete
+                  </AdminSubmitButton>
                 </form>
               </div>
             ) : "Read-only",

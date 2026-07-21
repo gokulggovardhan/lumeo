@@ -7,7 +7,6 @@ import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
-  L2AdvancedDisclosure,
   L2FileCard,
   L2PrivacyNote,
   L2ToolMainColumn,
@@ -18,6 +17,16 @@ import {
 import { AuraOptionCard, AuraStatus } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
+import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { formatBytes } from "@/lib/pdf/formatBytes";
+import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
+import { normalizeRotation } from "@/lib/pdf/rotation";
+import {
+  hasPdfMagicBytes,
+  isPdfNamedFile,
+  checkPdfFileSize,
+} from "@/lib/pdf/uploadValidation";
 
 type SplitMode = "extract" | "ranges" | "everyPage" | "everyN" | "remove" | "reorder";
 type ResultKind = "pdf" | "zip";
@@ -101,46 +110,7 @@ const densityPreviewClasses: Record<ThumbnailDensity, string> = {
 const THUMBNAIL_DENSITY_KEY = "lumeo.split.thumbnailDensity";
 const MAX_HISTORY = 30;
 
-type PdfJsModule = typeof import("pdfjs-dist");
 
-let pdfJsModulePromise: Promise<PdfJsModule> | null = null;
-
-async function loadPdfJsModule() {
-  if (!pdfJsModulePromise) {
-    pdfJsModulePromise = import("pdfjs-dist").then((module) => {
-      if (!module.GlobalWorkerOptions.workerSrc) {
-        module.GlobalWorkerOptions.workerSrc = new URL(
-          "pdfjs-dist/build/pdf.worker.mjs",
-          import.meta.url,
-        ).toString();
-      }
-      return module;
-    });
-  }
-
-  return pdfJsModulePromise;
-}
-
-function formatBytes(bytes: number) {
-  if (!Number.isFinite(bytes) || bytes <= 0) return "0 KB";
-  const units = ["B", "KB", "MB", "GB"];
-  const power = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / 1024 ** power;
-  return `${value >= 10 || power === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[power]}`;
-}
-
-function sanitizeFileStem(name: string, fallback: string) {
-  const clean = name
-    .replace(/\.[^/.]+$/, "")
-    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "-")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/[. ]+$/g, "")
-    .replace(/^-|-$/g, "")
-    .toLowerCase();
-
-  return clean || fallback;
-}
 
 function ensureExtension(name: string, extension: ".pdf" | ".zip") {
   const safe = sanitizeFileStem(name.replace(/\.(pdf|zip)$/i, ""), "lumeo-split");
@@ -320,24 +290,6 @@ function parseRangeGroups(input: string, totalPages: number) {
 function describePages(pages: number[]) {
   if (pages.length === 1) return `page-${pages[0]}`;
   return `pages-${pages[0]}-${pages[pages.length - 1]}`;
-}
-
-function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
-  const copy = new Uint8Array(bytes.byteLength);
-  copy.set(bytes);
-  return copy.buffer;
-}
-
-function copyArrayBuffer(buffer: ArrayBuffer) {
-  const source = new Uint8Array(buffer);
-  const copy = new Uint8Array(source.byteLength);
-  copy.set(source);
-  return copy.buffer;
-}
-
-function normalizeRotation(value: number) {
-  const next = ((value % 360) + 360) % 360;
-  return next === 0 || next === 90 || next === 180 || next === 270 ? next : 0;
 }
 
 async function createPdfFromPages(
@@ -781,14 +733,28 @@ export default function SplitPdfTool() {
     clearThumbnails();
     await destroyPdfJsDocument();
 
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
+    if (!isPdfNamedFile(file)) {
       setStatus("Ready");
       setError("Please add one PDF file.");
       return;
     }
 
+    const sizeError = checkPdfFileSize(file);
+    if (sizeError) {
+      setStatus("Ready");
+      setError(sizeError);
+      return;
+    }
+
     try {
       const bytes = await file.arrayBuffer();
+
+      if (!hasPdfMagicBytes(bytes)) {
+        setStatus("Ready");
+        setError("This doesn't look like a valid PDF file.");
+        return;
+      }
+
       const pdf = await PDFDocument.load(copyArrayBuffer(bytes));
       const pages = pdf.getPages().map((page, index) => {
         const { width, height } = page.getSize();
@@ -1810,7 +1776,7 @@ export default function SplitPdfTool() {
 
             <div className="border-t border-[var(--text-primary)]/10 pt-3">
               {result ? (
-                <div className="mb-3 rounded-xl border border-[var(--lumeo-gold)]/28 bg-[var(--lumeo-gold)]/12 p-3">
+                <div className="aura-success-reveal mb-3 rounded-xl border border-[var(--lumeo-gold)]/28 bg-[var(--lumeo-gold)]/12 p-3">
                   <div className="flex items-start gap-3">
                     <CompletionCheck />
                     <div className="min-w-0">
