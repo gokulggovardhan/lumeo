@@ -547,25 +547,6 @@ export default function JpgToPdfTool() {
       return;
     }
 
-    const countError = checkImageCount(files.length + nextFiles.length);
-    if (countError) {
-      setError(countError);
-      return;
-    }
-
-    const oversizedFile = nextFiles.find((file) => checkImageFileSize(file) !== null);
-    if (oversizedFile) {
-      setError(checkImageFileSize(oversizedFile) ?? "One of these images is too large.");
-      return;
-    }
-
-    const incomingTotal = nextFiles.reduce((sum, file) => sum + file.size, 0);
-    const totalSizeError = checkTotalImagesSize(totalSize + incomingTotal);
-    if (totalSizeError) {
-      setError(totalSizeError);
-      return;
-    }
-
     const readableFiles: SelectedImage[] = [];
     let unreadableCount = 0;
     let duplicateDetected = false;
