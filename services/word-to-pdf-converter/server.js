@@ -24,6 +24,25 @@ const CONVERT_SECRET = process.env.CONVERT_SECRET || "";
 const LIBREOFFICE_BINARY = process.env.LIBREOFFICE_BINARY || "soffice";
 const CONVERSION_TIMEOUT_MS = 90_000;
 const MAX_BODY_BYTES = 10 * 1024;
+// The shared secret authenticates the *caller* (our own Next.js API route),
+// but fileUrl is still a value from that request body -- a leaked secret
+// or a bug upstream could otherwise turn this into an SSRF proxy into
+// Render's internal network. This allowlist is the actual boundary: only
+// URLs on a Supabase storage host are ever fetched, regardless of auth.
+const ALLOWED_FILE_HOST_SUFFIX = process.env.ALLOWED_FILE_HOST_SUFFIX || "supabase.co";
+
+function isAllowedFileUrl(fileUrl) {
+  let parsed;
+  try {
+    parsed = new URL(fileUrl);
+  } catch {
+    return false;
+  }
+  return (
+    parsed.protocol === "https:" &&
+    (parsed.hostname === ALLOWED_FILE_HOST_SUFFIX || parsed.hostname.endsWith(`.${ALLOWED_FILE_HOST_SUFFIX}`))
+  );
+}
 
 if (!CONVERT_SECRET) {
   console.error("CONVERT_SECRET is not set. Refusing to start: every request would be unauthenticated.");
@@ -73,6 +92,10 @@ function secretsMatch(a, b) {
 }
 
 async function convertWordToPdf({ fileUrl, fileName }) {
+  if (!isAllowedFileUrl(fileUrl)) {
+    throw new Error("File URL is not from an allowed host.");
+  }
+
   const jobId = crypto.randomUUID();
   const workDir = await mkdtemp(join(tmpdir(), `word2pdf-${jobId}-`));
   const profileDir = join(tmpdir(), `lo-profile-${jobId}`);
@@ -81,7 +104,12 @@ async function convertWordToPdf({ fileUrl, fileName }) {
   const outputPath = join(workDir, "input.pdf");
 
   try {
-    const response = await fetch(fileUrl);
+    let response;
+    try {
+      response = await fetch(fileUrl);
+    } catch {
+      throw new Error("Could not download the uploaded file for conversion.");
+    }
     if (!response.ok) {
       throw new Error("Could not download the uploaded file for conversion.");
     }
