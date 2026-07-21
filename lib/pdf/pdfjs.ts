@@ -29,3 +29,44 @@ export async function openPdfJsDocument(data: ArrayBuffer | Uint8Array) {
   const pdfjs = await loadPdfJsModule();
   return pdfjs.getDocument({ data, useWorkerFetch: false }).promise;
 }
+
+// A single page's canvas render should never take this long. Real-world PDFs
+// with a non-embedded symbol font (e.g. ZapfDingbats bullet glyphs from
+// ReportLab-generated documents) have been observed to stall pdf.js's
+// RenderTask indefinitely -- no error, no rejection, just an unresolved
+// promise, reproducing across every render-based tool (Compress, PDF to JPG)
+// regardless of render scale. Without this timeout that hang is silent and
+// unrecoverable short of closing the tab; with it, the page fails loudly and
+// the user gets an actionable error instead of a frozen progress indicator.
+export const PAGE_RENDER_TIMEOUT_MS = 20_000;
+
+type MinimalRenderTask = { promise: Promise<void>; cancel: () => void };
+
+export async function renderPageWithTimeout(task: MinimalRenderTask, pageNumber: number) {
+  let timeoutId: number | undefined;
+  try {
+    await Promise.race([
+      task.promise,
+      new Promise((_resolve, reject) => {
+        timeoutId = window.setTimeout(() => {
+          // Reject with the descriptive message before calling cancel() --
+          // cancel() rejects task.promise too (with a generic
+          // RenderingCancelledException), and since both are racing here,
+          // whichever settles first wins the message the user sees.
+          reject(
+            new Error(
+              `Page ${pageNumber} took too long to render. It may use an uncommon font or complex graphics -- try a lower quality profile, or fewer pages at once.`,
+            ),
+          );
+          try {
+            task.cancel();
+          } catch {
+            // Best-effort -- the render may already be past cancellation.
+          }
+        }, PAGE_RENDER_TIMEOUT_MS);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+}

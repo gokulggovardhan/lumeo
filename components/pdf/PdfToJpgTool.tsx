@@ -17,7 +17,7 @@ import { AuraIconButton, AuraSegmentedControl, AuraStatus } from "@/components/u
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { bucketFileSize } from "@/lib/analytics/size-bucket";
-import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { loadPdfJsModule, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
 import { formatBytes } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
@@ -529,7 +529,7 @@ export default function PdfToJpgTool() {
 
               const task = page.render({ canvas, canvasContext: context, viewport });
               thumbnailTasksRef.current.set(next, task);
-              await task.promise;
+              await renderPageWithTimeout(task, next);
               thumbnailTasksRef.current.delete(next);
               if (currentSession !== sessionRef.current) return;
 
@@ -881,7 +881,7 @@ export default function PdfToJpgTool() {
         context.fillRect(0, 0, canvas.width, canvas.height);
 
         const task = page.render({ canvas, canvasContext: context, viewport });
-        await task.promise;
+        await renderPageWithTimeout(task, pageNumber);
 
         const blob = await new Promise<Blob | null>((resolve) =>
           outputFormat === "png" ? canvas.toBlob(resolve, mimeType) : canvas.toBlob(resolve, mimeType, quality),

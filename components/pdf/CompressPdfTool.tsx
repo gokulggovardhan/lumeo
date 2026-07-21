@@ -42,7 +42,7 @@ import {
 import { AuraOptionCard, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
-import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { loadPdfJsModule, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
@@ -688,7 +688,7 @@ export default function CompressPdfTool() {
 
       const task = page.render({ canvas, canvasContext: context, viewport });
       renderTaskRef.current = task;
-      await task.promise;
+      await renderPageWithTimeout(task, pageIndex);
       renderTaskRef.current = null;
       if (colourMode === "grayscale") applyGrayscale(canvas);
 
@@ -697,7 +697,6 @@ export default function CompressPdfTool() {
       );
       canvas.width = 0;
       canvas.height = 0;
-      page.cleanup();
       if (!blob) throw new Error("Compression failed while rebuilding a page.");
       const imageBytes = await blob.arrayBuffer();
       const image = await output.embedJpg(imageBytes);
