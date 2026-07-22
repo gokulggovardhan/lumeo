@@ -31,11 +31,30 @@ In the Lumeo Vercel project, set:
 `app/api/tools/word-to-pdf/route.ts` calls `${WORD_TO_PDF_CONVERTER_URL}/convert`
 with that secret in the `x-convert-secret` header.
 
+## Keep it warm (optional but recommended)
+
+Render's free tier spins the service down after ~15 min idle; the first
+request after that pays a 30-50s cold-start tax (container boot + LibreOffice
+init). Two pingers cover this, and it's fine to run both:
+
+1. **`.github/workflows/converter-keep-warm.yml`** (already in this repo) --
+   pings `/healthz` every ~10 min via GitHub Actions cron. No setup needed,
+   but GitHub cron can drift or occasionally skip a run under load.
+2. **cron-job.org backup** (belt-and-braces, for stricter punctuality):
+   1. Create a free account at [cron-job.org](https://cron-job.org).
+   2. Dashboard -> **Create cronjob**.
+   3. Title: `Lumeo Render Keeper`.
+   4. URL: `https://lumeo-word-to-pdf-converter.onrender.com/healthz`
+      (swap in your own Render URL if it differs).
+   5. Schedule: **every 10 minutes**.
+   6. Save.
+
+`/healthz` is a public, unauthenticated GET -- no secret needed for either
+pinger. Keeping one free service warm this way stays within Render's 750
+instance-hours/month.
+
 ## Notes
 
-- Render's free tier spins the service down after idle periods; the first
-  request after a cold start will be slow (LibreOffice + a cold container).
-  `/healthz` exists so you can wire an uptime ping if that matters to you.
 - The service only ever fetches URLs the main app hands it (short-lived
   Supabase signed URLs derived server-side) -- never a client-supplied URL --
   and additionally refuses any host other than `ALLOWED_FILE_HOST`.
