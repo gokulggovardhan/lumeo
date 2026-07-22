@@ -141,24 +141,6 @@ function releaseSlot() {
   }
 }
 
-async function downloadToFile({ fileUrl, destPath }) {
-  const parsedFileUrl = new URL(fileUrl);
-  if (parsedFileUrl.protocol !== "https:" || parsedFileUrl.hostname !== ALLOWED_FILE_HOST) {
-    throw new Error("File URL is not from an allowed host.");
-  }
-
-  let response;
-  try {
-    response = await fetch(parsedFileUrl); // codeql[js/request-forgery] fileUrl's host is strictly validated above
-  } catch {
-    throw new Error("Could not download the uploaded file for conversion.");
-  }
-  if (!response.ok) {
-    throw new Error("Could not download the uploaded file for conversion.");
-  }
-  await writeFile(destPath, Buffer.from(await response.arrayBuffer()));
-}
-
 async function convertWordToPdf({ fileUrl, fileName }) {
   const jobId = crypto.randomUUID();
   const workDir = await mkdtemp(join(tmpdir(), `word2pdf-${jobId}-`));
@@ -168,18 +150,34 @@ async function convertWordToPdf({ fileUrl, fileName }) {
   const outputPath = join(workDir, "input.pdf");
 
   try {
-    // The CodeQL request-forgery query flags this fetch purely because
-    // fileUrl originated from a request body -- it doesn't credit
-    // downloadToFile's strict protocol+hostname check as a sanitizer.
-    // That check is real and load-bearing: protocol must be https and
-    // hostname must exactly equal the operator-configured ALLOWED_FILE_HOST
-    // (no wildcard/suffix match), and the process refuses to start at all if
+    const parsedFileUrl = new URL(fileUrl);
+    if (parsedFileUrl.protocol !== "https:" || parsedFileUrl.hostname !== ALLOWED_FILE_HOST) {
+      throw new Error("File URL is not from an allowed host.");
+    }
+
+    // False positive below, documented here since the suppression comment
+    // on that line has to stay short: CodeQL's request-forgery query flags
+    // that fetch purely because fileUrl originated from a request body --
+    // verified it doesn't credit the strict-equality hostname check just
+    // above as a sanitizer, only a check against the whole value. That
+    // check is real and load-bearing: protocol must be https and hostname
+    // must exactly equal the operator-configured ALLOWED_FILE_HOST (no
+    // wildcard/suffix match), and the process refuses to start at all if
     // that env var is unset. Verified locally with a running container: a
     // metadata-endpoint URL and a same-suffix-but-wrong-subdomain URL (e.g.
     // evil.supabase.co when ALLOWED_FILE_HOST=abcxyz.supabase.co) are both
     // rejected before the fetch runs; the exact configured host reaches it
     // as intended.
-    await downloadToFile({ fileUrl, destPath: inputPath }); // codeql[js/request-forgery]
+    let response;
+    try {
+      response = await fetch(parsedFileUrl); // codeql[js/request-forgery] fileUrl's host is strictly validated above
+    } catch {
+      throw new Error("Could not download the uploaded file for conversion.");
+    }
+    if (!response.ok) {
+      throw new Error("Could not download the uploaded file for conversion.");
+    }
+    await writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
 
     try {
       await execFileAsync(
@@ -215,7 +213,29 @@ async function convertPdfToWord({ fileUrl }) {
   const outputPath = join(workDir, "input.docx");
 
   try {
-    await downloadToFile({ fileUrl, destPath: inputPath }); // codeql[js/request-forgery] see convertWordToPdf's downloadToFile call for the sanitizer note
+    const parsedFileUrl = new URL(fileUrl);
+    if (parsedFileUrl.protocol !== "https:" || parsedFileUrl.hostname !== ALLOWED_FILE_HOST) {
+      throw new Error("File URL is not from an allowed host.");
+    }
+
+    // See convertWordToPdf's identical check above for the full false-positive
+    // note -- same sanitizer, same suppression, duplicated intentionally so
+    // each function keeps its own self-contained, independently-verifiable
+    // validated-fetch block rather than a shared helper (CodeQL's data-flow
+    // tracking reported a shared fetch() reached from two call sites as a
+    // structurally distinct/unsuppressed alert even with the identical
+    // inline suppression comment in place -- verified by testing that exact
+    // refactor in CI).
+    let response;
+    try {
+      response = await fetch(parsedFileUrl); // codeql[js/request-forgery] fileUrl's host is strictly validated above
+    } catch {
+      throw new Error("Could not download the uploaded file for conversion.");
+    }
+    if (!response.ok) {
+      throw new Error("Could not download the uploaded file for conversion.");
+    }
+    await writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
 
     try {
       await execFileAsync(
