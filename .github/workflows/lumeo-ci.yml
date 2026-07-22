@@ -72,7 +72,7 @@ jobs:
   migrate:
     name: Apply Supabase migrations
     needs: validate
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -88,6 +88,18 @@ jobs:
 
       - name: Install exact dependencies
         run: npm ci
+
+      # ONE-TIME FIX -- remove this step once it has run successfully once.
+      # Migration files were renamed (see PR #61) to fix a version collision,
+      # but the remote schema_migrations table still has a bookkeeping row
+      # for the old, no-longer-existing "20260712" version, which makes every
+      # subsequent `db push` refuse to run at all ("Remote migration versions
+      # not found in local migrations directory"). `migration repair` only
+      # edits that bookkeeping table -- it does not touch schema or data.
+      - name: One-time repair of orphaned migration version
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: npx supabase migration repair --status reverted 20260712 --db-url "$SUPABASE_DB_URL"
 
       - name: Push pending migrations to Supabase
         env:
