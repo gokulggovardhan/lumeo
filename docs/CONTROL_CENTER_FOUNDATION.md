@@ -120,7 +120,7 @@ Every Control Center action must:
 
 Do not run SQL automatically from the application task.
 
-1. Review `supabase/migrations/20260712_002_control_center_foundation.sql`.
+1. Review `supabase/migrations/20260712002_control_center_foundation.sql`.
 2. Open the Supabase Dashboard.
 3. Open SQL Editor.
 4. Paste the migration SQL.

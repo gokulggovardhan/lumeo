@@ -136,11 +136,11 @@ try {
   assert(read("docs/LUMEO_AURA_DESIGN_SYSTEM.md").includes("Run 2 Rollout"), "Aura design-system documentation must include Run 2 notes.");
 
   const migrationFiles = [
-    "supabase/migrations/20260712_001_admin_members.sql",
-    "supabase/migrations/20260712_002_control_center_foundation.sql",
-    "supabase/migrations/20260712_003_public_tool_catalog.sql",
-    "supabase/migrations/20260712_004_privacy_analytics.sql",
-    "supabase/migrations/20260714_005_admin_analytics_reads.sql",
+    "supabase/migrations/20260712001_admin_members.sql",
+    "supabase/migrations/20260712002_control_center_foundation.sql",
+    "supabase/migrations/20260712003_public_tool_catalog.sql",
+    "supabase/migrations/20260712004_privacy_analytics.sql",
+    "supabase/migrations/20260714005_admin_analytics_reads.sql",
   ];
   for (const file of migrationFiles) {
     assert(exists(file), `Expected migration missing: ${file}`);

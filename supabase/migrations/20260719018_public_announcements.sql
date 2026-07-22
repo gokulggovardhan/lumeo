@@ -3,7 +3,7 @@ begin;
 do $$
 begin
   if to_regclass('public.announcements') is null then
-    raise exception 'Missing required table public.announcements. Run 20260712_002_control_center_foundation.sql before 20260719_018_public_announcements.sql.';
+    raise exception 'Missing required table public.announcements. Run 20260712002_control_center_foundation.sql before 20260719018_public_announcements.sql.';
   end if;
 end;
 $$;

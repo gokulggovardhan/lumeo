@@ -3,7 +3,7 @@ begin;
 do $$
 begin
   if to_regclass('public.admin_members') is null then
-    raise exception 'Missing required table public.admin_members. Run 20260712_001_admin_members.sql before this migration.';
+    raise exception 'Missing required table public.admin_members. Run 20260712001_admin_members.sql before this migration.';
   end if;
 end;
 $$;

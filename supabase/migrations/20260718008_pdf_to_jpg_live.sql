@@ -3,7 +3,7 @@ begin;
 do $$
 begin
   if to_regclass('public.pdf_tools') is null then
-    raise exception 'Missing required table public.pdf_tools. Run 20260712_002_control_center_foundation.sql before this migration.';
+    raise exception 'Missing required table public.pdf_tools. Run 20260712002_control_center_foundation.sql before this migration.';
   end if;
 end;
 $$;

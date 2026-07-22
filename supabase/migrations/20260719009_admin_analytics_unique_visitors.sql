@@ -3,35 +3,18 @@ begin;
 do $$
 begin
   if to_regclass('public.analytics_events') is null then
-    raise exception 'Missing required table public.analytics_events. Run prior analytics migrations before 20260714_005_admin_analytics_reads.sql.';
+    raise exception 'Missing required table public.analytics_events. Run prior analytics migrations before 20260719009_admin_analytics_unique_visitors.sql.';
   end if;
 
-  if to_regclass('public.daily_tool_metrics') is null then
-    raise exception 'Missing required table public.daily_tool_metrics. Run prior analytics migrations before 20260714_005_admin_analytics_reads.sql.';
-  end if;
-
-  if to_regclass('public.pdf_tools') is null then
-    raise exception 'Missing required table public.pdf_tools. Run prior catalog migrations before 20260714_005_admin_analytics_reads.sql.';
-  end if;
-
-  if to_regclass('public.site_settings') is null then
-    raise exception 'Missing required table public.site_settings. Run Control Center migrations before 20260714_005_admin_analytics_reads.sql.';
-  end if;
-
-  if to_regclass('public.admin_members') is null then
-    raise exception 'Missing required table public.admin_members. Run admin authentication migration before 20260714_005_admin_analytics_reads.sql.';
-  end if;
-
-  if to_regprocedure('public.current_admin_role()') is null then
-    raise exception 'Missing required function public.current_admin_role(). Run Control Center foundation migration before 20260714_005_admin_analytics_reads.sql.';
-  end if;
-
-  if to_regprocedure('public.is_active_admin()') is null then
-    raise exception 'Missing required function public.is_active_admin(). Run Control Center foundation migration before 20260714_005_admin_analytics_reads.sql.';
+  if to_regprocedure('public.get_admin_analytics_summary(date, date)') is null then
+    raise exception 'Missing required function public.get_admin_analytics_summary(date, date). Run 20260714005_admin_analytics_reads.sql before 20260719009_admin_analytics_unique_visitors.sql.';
   end if;
 end;
 $$;
 
+-- Adds unique-visitor counts (distinct anonymous_session_id, aggregate-only --
+-- no individual session id is ever returned) to the existing admin analytics
+-- summary, both as a total for the range and per day in the daily trend.
 create or replace function public.get_admin_analytics_summary(
   p_start_date date,
   p_end_date date
@@ -87,13 +70,15 @@ begin
       events.device_class,
       events.browser_family,
       events.operating_system,
-      events.error_code
+      events.error_code,
+      events.anonymous_session_id
     from public.analytics_events as events
     where events.occurred_at >= range_start
       and events.occurred_at < range_end
   )
   select jsonb_build_object(
     'total_events', count(*)::bigint,
+    'unique_visitors', count(distinct scoped_events.anonymous_session_id)::bigint,
     'tool_opens', count(*) filter (where scoped_events.event_name = 'tool_opened')::bigint,
     'processing_started', count(*) filter (where scoped_events.event_name = 'processing_started')::bigint,
     'processing_succeeded', count(*) filter (where scoped_events.event_name = 'processing_succeeded')::bigint,
@@ -115,7 +100,7 @@ begin
     select generate_series(p_start_date, p_end_date, interval '1 day')::date as metric_date
   ),
   scoped_events as (
-    select events.event_name, events.occurred_at::date as event_date
+    select events.event_name, events.occurred_at::date as event_date, events.anonymous_session_id
     from public.analytics_events as events
     where events.occurred_at >= range_start
       and events.occurred_at < range_end
@@ -124,6 +109,7 @@ begin
     select
       days.metric_date,
       coalesce(count(scoped_events.event_name), 0)::bigint as total_events,
+      coalesce(count(distinct scoped_events.anonymous_session_id), 0)::bigint as unique_visitors,
       coalesce(count(scoped_events.event_name) filter (where scoped_events.event_name = 'tool_opened'), 0)::bigint as tool_opens,
       coalesce(count(scoped_events.event_name) filter (where scoped_events.event_name = 'processing_started'), 0)::bigint as processing_started,
       coalesce(count(scoped_events.event_name) filter (where scoped_events.event_name = 'processing_succeeded'), 0)::bigint as processing_succeeded,
@@ -136,6 +122,7 @@ begin
   select coalesce(jsonb_agg(jsonb_build_object(
     'date', daily_rows.metric_date,
     'total_events', daily_rows.total_events,
+    'unique_visitors', daily_rows.unique_visitors,
     'tool_opens', daily_rows.tool_opens,
     'processing_started', daily_rows.processing_started,
     'processing_succeeded', daily_rows.processing_succeeded,
@@ -239,7 +226,7 @@ end;
 $$;
 
 comment on function public.get_admin_analytics_summary(date, date) is
-  'Returns aggregate-only analytics for active owners, admins, and analysts. It prevents direct access to individual events, anonymous sessions, exact sizes, filenames, IPs, user agents, metadata, and document information.';
+  'Returns aggregate-only analytics for active owners, admins, and analysts, including a distinct-session unique-visitor count. It prevents direct access to individual events, anonymous sessions, exact sizes, filenames, IPs, user agents, metadata, and document information.';
 
 revoke all on function public.get_admin_analytics_summary(date, date) from public;
 revoke all on function public.get_admin_analytics_summary(date, date) from anon;

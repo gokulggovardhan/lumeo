@@ -3,11 +3,11 @@ begin;
 do $$
 begin
   if to_regclass('public.analytics_events') is null then
-    raise exception 'Missing required table public.analytics_events. Run 20260712_004_privacy_analytics.sql first.';
+    raise exception 'Missing required table public.analytics_events. Run 20260712004_privacy_analytics.sql first.';
   end if;
 
   if to_regprocedure('public.record_public_analytics_event(text, text, uuid, integer, text, text, text, text, text, boolean, text)') is null then
-    raise exception 'Missing expected signature of public.record_public_analytics_event(). Run 20260712_004_privacy_analytics.sql first.';
+    raise exception 'Missing expected signature of public.record_public_analytics_event(). Run 20260712004_privacy_analytics.sql first.';
   end if;
 end;
 $$;

@@ -13,7 +13,7 @@ without exposing administrative tables directly.
 
 ## RPC Security Model
 
-Migration `20260712_003_public_tool_catalog.sql` creates:
+Migration `20260712003_public_tool_catalog.sql` creates:
 
 - `public.get_public_pdf_catalog()`
 - `public.get_public_homepage_tools()`
@@ -88,7 +88,7 @@ locking while the drawer is open.
 
 Do not execute SQL from the application task.
 
-1. Review `supabase/migrations/20260712_003_public_tool_catalog.sql`.
+1. Review `supabase/migrations/20260712003_public_tool_catalog.sql`.
 2. Open Supabase SQL Editor.
 3. Paste migration 003.
 4. Run it.

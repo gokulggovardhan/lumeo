@@ -3,7 +3,7 @@ begin;
 do $$
 begin
   if to_regclass('public.seo_settings') is null then
-    raise exception 'Missing required table public.seo_settings. Run 20260712_002_control_center_foundation.sql before 20260719_019_public_seo_settings.sql.';
+    raise exception 'Missing required table public.seo_settings. Run 20260712002_control_center_foundation.sql before 20260719019_public_seo_settings.sql.';
   end if;
 end;
 $$;

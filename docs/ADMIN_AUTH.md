@@ -110,7 +110,7 @@ protected layout calls server authorization through `requireAdmin()`.
 ## Manual Supabase Setup
 
 1. Open the Supabase Dashboard.
-2. Run `supabase/migrations/20260712_001_admin_members.sql` in the SQL editor or
+2. Run `supabase/migrations/20260712001_admin_members.sql` in the SQL editor or
    through your approved migration workflow.
 3. Confirm Row Level Security is enabled for `public.admin_members`.
 4. Add the required public environment variables in local and Vercel

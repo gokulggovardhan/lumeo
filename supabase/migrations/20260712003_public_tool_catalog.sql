@@ -3,21 +3,14 @@ begin;
 do $$
 begin
   if to_regclass('public.pdf_tools') is null then
-    raise exception 'Missing required table public.pdf_tools. Run 20260712_002_control_center_foundation.sql before this migration.';
+    raise exception 'Missing required table public.pdf_tools. Run 20260712002_control_center_foundation.sql before this migration.';
   end if;
 
   if to_regclass('public.homepage_tool_slots') is null then
-    raise exception 'Missing required table public.homepage_tool_slots. Run 20260712_002_control_center_foundation.sql before this migration.';
+    raise exception 'Missing required table public.homepage_tool_slots. Run 20260712002_control_center_foundation.sql before this migration.';
   end if;
 end;
 $$;
-
--- Widen both public RPCs to also surface 'coming_soon' tools. Previously
--- both filtered to status in ('active', 'beta') only, so any tool an
--- admin marked 'coming_soon' (e.g. JPG to PDF, PDF to JPG) silently
--- vanished from the public catalog and the homepage slot grid, even
--- though it was correctly seeded and assigned. 'hidden' and
--- 'maintenance' remain excluded intentionally.
 
 create or replace function public.get_public_pdf_catalog()
 returns table (
@@ -54,7 +47,7 @@ as $$
   left join public.tool_categories as categories
     on categories.id = tools.category_id
   where tools.is_enabled = true
-    and tools.status in ('active', 'beta', 'coming_soon')
+    and tools.status in ('active', 'beta')
     and (categories.id is null or categories.is_active = true)
   order by
     coalesce(categories.sort_order, 9999),
@@ -94,12 +87,12 @@ as $$
   where slots.slot_number between 1 and 5
     and tools.is_enabled = true
     and tools.is_homepage_eligible = true
-    and tools.status in ('active', 'beta', 'coming_soon')
+    and tools.status in ('active', 'beta')
   order by slots.slot_number;
 $$;
 
 comment on function public.get_public_homepage_tools() is
-  'Returns only safe public homepage tool slot fields for slots 1 through 5, including coming_soon tools (rendered as non-clickable on the public homepage). The permanent All PDF Tools card is not stored in homepage_tool_slots.';
+  'Returns only safe public homepage tool slot fields for slots 1 through 5. The permanent All PDF Tools card is not stored in homepage_tool_slots.';
 
 revoke all on function public.get_public_pdf_catalog() from public;
 revoke all on function public.get_public_homepage_tools() from public;
