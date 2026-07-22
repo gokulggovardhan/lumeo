@@ -193,6 +193,33 @@ async function runSoffice({ jobId, profileDir, workDir, inputPath, outputPath, e
   // was tried as a defensive measure and instead broke every conversion --
   // soffice exited 0 but failed internally with "source file could not be
   // loaded", 100% reproducible. Confirmed by reverting this one line.
+
+  // TEMPORARY diagnostics: "source file could not be loaded" is soffice's
+  // own stderr message, printed even though it exits 0 (well-documented
+  // --convert-to limitation -- it doesn't reliably return non-zero on a
+  // per-file failure). Logging disk/memory state and the actual input file
+  // as soffice is about to see it, to distinguish "input never got written
+  // correctly" from "container is out of disk/memory" from "soffice itself
+  // is broken on this box". Remove once the real cause is confirmed.
+  try {
+    const inputStat = await stat(inputPath);
+    console.log(`[${jobId}] input file before soffice: ${inputPath} size=${inputStat.size}`);
+  } catch (statError) {
+    console.error(`[${jobId}] input file missing before soffice ran: ${statError.message}`);
+  }
+  try {
+    const df = await execFileAsync("df", ["-h", "/tmp"]);
+    console.log(`[${jobId}] disk: ${df.stdout.trim()}`);
+  } catch (dfError) {
+    console.error(`[${jobId}] df failed: ${dfError.message}`);
+  }
+  try {
+    const free = await execFileAsync("free", ["-m"]);
+    console.log(`[${jobId}] memory: ${free.stdout.trim()}`);
+  } catch (freeError) {
+    console.error(`[${jobId}] free failed: ${freeError.message}`);
+  }
+
   let stdout = "";
   let stderr = "";
   try {
