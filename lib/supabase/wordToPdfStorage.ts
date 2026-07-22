@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { createStorageBrowserClient } from "@/lib/supabase/storageBrowserClient";
 
 // Vercel's Docker functions reject request bodies over 4.5MB, so the
 // Next.js API route never receives the .docx directly -- the browser
@@ -89,7 +89,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // API route derives its own signed URL from this path server-side -- it
 // never fetches a URL supplied by the client, which would be an SSRF vector.
 export async function uploadWordFileForConversion(file: File): Promise<WordUploadResult> {
-  const supabase = createClient();
+  const supabase = createStorageBrowserClient();
   const extension = file.name.toLowerCase().endsWith(".doc") ? "doc" : "docx";
   const contentType = file.type || "application/octet-stream";
 
@@ -128,6 +128,6 @@ export async function uploadWordFileForConversion(file: File): Promise<WordUploa
 }
 
 export async function removeWordUpload(path: string): Promise<void> {
-  const supabase = createClient();
+  const supabase = createStorageBrowserClient();
   await supabase.storage.from(WORD_TO_PDF_BUCKET).remove([path]);
 }

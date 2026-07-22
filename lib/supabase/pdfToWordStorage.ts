@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/client";
+import { createStorageBrowserClient } from "@/lib/supabase/storageBrowserClient";
 
 // Same scratch bucket as Word->PDF -- both are short-lived, deleted right
 // after conversion, no reason to fragment storage per tool direction.
@@ -77,7 +77,7 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // API route derives its own signed URL from this path server-side -- it
 // never fetches a URL supplied by the client, which would be an SSRF vector.
 export async function uploadPdfFileForConversion(file: File): Promise<PdfUploadResult> {
-  const supabase = createClient();
+  const supabase = createStorageBrowserClient();
   const contentType = file.type || "application/pdf";
 
   let lastFailure: UploadFailure = {};
@@ -115,6 +115,6 @@ export async function uploadPdfFileForConversion(file: File): Promise<PdfUploadR
 }
 
 export async function removePdfUpload(path: string): Promise<void> {
-  const supabase = createClient();
+  const supabase = createStorageBrowserClient();
   await supabase.storage.from(PDF_TO_WORD_BUCKET).remove([path]);
 }
