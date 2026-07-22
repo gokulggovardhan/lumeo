@@ -183,7 +183,7 @@ export const lumeoTools: LumeoTool[] = [
       { label: "Word to PDF", slug: "word-to-pdf", route: "/pdf/word-to-pdf", live: true },
       { label: "Excel to PDF", slug: "excel-to-pdf", live: false },
       { label: "PowerPoint to PDF", slug: "powerpoint-to-pdf", live: false },
-      { label: "PDF to Word", slug: "pdf-to-word", live: false },
+      { label: "PDF to Word", slug: "pdf-to-word", route: "/pdf/pdf-to-word", live: true },
       { label: "HTML to PDF", slug: "html-to-pdf", live: false },
     ],
   },
