@@ -158,7 +158,7 @@ test("Merge, Split, and Compress use only tool_opened analytics in V1", () => {
 test("future lifecycle event schema remains available", () => {
   const types = readFileSync("lib/analytics/types.ts", "utf8");
   const migration = readFileSync(
-    "supabase/migrations/20260712_004_privacy_analytics.sql",
+    "supabase/migrations/20260712004_privacy_analytics.sql",
     "utf8",
   );
 

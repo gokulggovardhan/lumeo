@@ -1,4 +1,4 @@
--- Fixes 20260719_014_feedback_queries.sql: that migration bundled the core
+-- Fixes 20260719014_feedback_queries.sql: that migration bundled the core
 -- table/RLS setup and `alter publication supabase_realtime add table ...`
 -- into a single transaction. If realtime isn't enabled for a project, or the
 -- table was already added to the publication, that statement fails and rolls
@@ -13,7 +13,7 @@ begin;
 do $$
 begin
   if to_regprocedure('public.is_active_admin()') is null then
-    raise exception 'Missing required function public.is_active_admin(). Run 20260712_002_control_center_foundation.sql first.';
+    raise exception 'Missing required function public.is_active_admin(). Run 20260712002_control_center_foundation.sql first.';
   end if;
 end;
 $$;

@@ -3,7 +3,7 @@ begin;
 do $$
 begin
   if to_regclass('public.feature_flags') is null then
-    raise exception 'Missing required table public.feature_flags. Run 20260712_002_control_center_foundation.sql before 20260719_013_feature_flags_scheduling.sql.';
+    raise exception 'Missing required table public.feature_flags. Run 20260712002_control_center_foundation.sql before 20260719013_feature_flags_scheduling.sql.';
   end if;
 end;
 $$;

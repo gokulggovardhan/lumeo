@@ -239,7 +239,7 @@ export default async function AnalyticsPage() {
                 label: item.label,
                 value: item.count,
               }))}
-              emptyText="No location data yet. Run migration 20260719_017_analytics_location.sql to enable."
+              emptyText="No location data yet. Run migration 20260719017_analytics_location.sql to enable."
             />
           </section>
         </>

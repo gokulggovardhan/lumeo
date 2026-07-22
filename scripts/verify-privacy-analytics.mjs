@@ -2,8 +2,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
-const migrationPath = "supabase/migrations/20260712_004_privacy_analytics.sql";
-const adminMigrationPath = "supabase/migrations/20260714_005_admin_analytics_reads.sql";
+const migrationPath = "supabase/migrations/20260712004_privacy_analytics.sql";
+const adminMigrationPath = "supabase/migrations/20260714005_admin_analytics_reads.sql";
 const files = [
   migrationPath,
   adminMigrationPath,

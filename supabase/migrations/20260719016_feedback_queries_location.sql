@@ -10,7 +10,7 @@ begin;
 do $$
 begin
   if to_regprocedure('public.is_active_admin()') is null then
-    raise exception 'Missing required function public.is_active_admin(). Run 20260712_002_control_center_foundation.sql first.';
+    raise exception 'Missing required function public.is_active_admin(). Run 20260712002_control_center_foundation.sql first.';
   end if;
 end;
 $$;

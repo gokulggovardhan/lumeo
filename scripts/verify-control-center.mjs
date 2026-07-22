@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
-const migrationPath = "supabase/migrations/20260712_002_control_center_foundation.sql";
+const migrationPath = "supabase/migrations/20260712002_control_center_foundation.sql";
 const tables = [
   "tool_categories",
   "pdf_tools",

@@ -111,7 +111,7 @@ IDs, or a persistent browser fingerprint.
 
 ## Public RPC Security
 
-Migration `20260712_004_privacy_analytics.sql` creates:
+Migration `20260712004_privacy_analytics.sql` creates:
 
 - `public.get_public_analytics_setting()`
 - `public.record_public_analytics_event(...)`
@@ -271,7 +271,7 @@ text, thumbnails, PDF metadata, stack traces, and raw error messages.
 
 Do not execute SQL from the application task.
 
-1. Review `supabase/migrations/20260712_004_privacy_analytics.sql`.
+1. Review `supabase/migrations/20260712004_privacy_analytics.sql`.
 2. Open Supabase SQL Editor.
 3. Paste migration 004.
 4. Run it.
@@ -288,7 +288,7 @@ Do not execute SQL from the application task.
 
 Do not execute SQL from the application task.
 
-1. Review `supabase/migrations/20260714_005_admin_analytics_reads.sql`.
+1. Review `supabase/migrations/20260714005_admin_analytics_reads.sql`.
 2. Open Supabase SQL Editor.
 3. Paste migration 005.
 4. Run it.

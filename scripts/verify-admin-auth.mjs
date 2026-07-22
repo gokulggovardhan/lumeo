@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 const root = process.cwd();
 const requiredFiles = [
-  "supabase/migrations/20260712_001_admin_members.sql",
+  "supabase/migrations/20260712001_admin_members.sql",
   "lib/admin/auth.ts",
   "lib/admin/types.ts",
   "app/admin/login/page.tsx",
@@ -48,7 +48,7 @@ try {
     );
   }
 
-  const migration = read("supabase/migrations/20260712_001_admin_members.sql");
+  const migration = read("supabase/migrations/20260712001_admin_members.sql");
   assert(/create table if not exists public\.admin_members/i.test(migration), "admin_members table migration is missing.");
   assert(/references auth\.users\(id\) on delete cascade/i.test(migration), "admin_members must cascade with auth.users.");
   assert(/constraint admin_members_role_check check \(role in \('owner', 'admin', 'analyst'\)\)/i.test(migration), "admin_members role check is missing.");

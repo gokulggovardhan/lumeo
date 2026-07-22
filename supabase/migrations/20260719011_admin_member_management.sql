@@ -3,11 +3,11 @@ begin;
 do $$
 begin
   if to_regclass('public.admin_members') is null then
-    raise exception 'Missing required table public.admin_members. Run 20260712_001_admin_members.sql before 20260719_011_admin_member_management.sql.';
+    raise exception 'Missing required table public.admin_members. Run 20260712001_admin_members.sql before 20260719011_admin_member_management.sql.';
   end if;
 
   if to_regprocedure('public.is_owner()') is null then
-    raise exception 'Missing required function public.is_owner(). Run 20260712_002_control_center_foundation.sql before 20260719_011_admin_member_management.sql.';
+    raise exception 'Missing required function public.is_owner(). Run 20260712002_control_center_foundation.sql before 20260719011_admin_member_management.sql.';
   end if;
 end;
 $$;
