@@ -12,7 +12,7 @@
 const http = require("node:http");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
-const { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } = require("node:fs/promises");
+const { mkdtemp, readdir, readFile, rm, stat, writeFile } = require("node:fs/promises");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const crypto = require("node:crypto");
@@ -187,8 +187,12 @@ function releaseSlot() {
 // process). stdout/stderr are always logged on failure so a silent no-op
 // is diagnosable instead of surfacing as a bare ENOENT.
 async function runSoffice({ jobId, profileDir, workDir, inputPath, outputPath, extraArgs = [] }) {
-  await mkdir(profileDir, { recursive: true });
-
+  // Deliberately NOT pre-created: soffice's -env:UserInstallation performs
+  // its own first-run profile bootstrap (config, cache, lock files) when
+  // that directory doesn't already exist. Pre-creating it here (even empty)
+  // was tried as a defensive measure and instead broke every conversion --
+  // soffice exited 0 but failed internally with "source file could not be
+  // loaded", 100% reproducible. Confirmed by reverting this one line.
   let stdout = "";
   let stderr = "";
   try {
