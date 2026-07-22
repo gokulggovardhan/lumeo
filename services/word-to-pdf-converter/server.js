@@ -265,7 +265,14 @@ async function convertWordToPdf({ fileUrl, fileName }) {
   const profileDir = join(tmpdir(), `lo-profile-${jobId}`);
   const extension = fileName.toLowerCase().endsWith(".doc") ? "doc" : "docx";
   const inputPath = join(workDir, `input.${extension}`);
-  const outputPath = join(workDir, "input.pdf");
+  // Temporary root-cause isolation switch: DIAG_CONVERT_TARGET lets us swap
+  // the export format at runtime (no redeploy of logic) to tell apart a
+  // broken DOCX *import* filter from a broken PDF *export* filter -- the
+  // working PDF->Word direction already proves DOCX export and PDF import
+  // both work, so only these two are still unverified. Remove once the
+  // real fix lands.
+  const diagTarget = process.env.DIAG_CONVERT_TARGET || "pdf";
+  const outputPath = join(workDir, `input.${diagTarget}`);
 
   try {
     const parsedFileUrl = new URL(fileUrl);
@@ -313,7 +320,7 @@ async function convertWordToPdf({ fileUrl, fileName }) {
         extraArgs: [
           `--infilter=${extension === "doc" ? "MS Word 97" : "MS Word 2007 XML"}`,
           "--convert-to",
-          "pdf",
+          diagTarget,
         ],
       });
     } catch {
