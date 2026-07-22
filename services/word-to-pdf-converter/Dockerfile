@@ -20,9 +20,22 @@ RUN sed -i 's/^\(deb .*main\)$/\1 contrib/' /etc/apt/sources.list
 #   (Calibri/Cambria are the *default* fonts in modern Word and are NOT in
 #    mscorefonts -- without these, every default-font doc gets re-flowed.)
 # - fonts-liberation + fonts-dejavu-core: broad Latin/Unicode fallback.
+# libreoffice-gtk3 matters beyond fonts: --no-install-recommends above skips
+# apt's "Recommends" dependencies, and on this Debian base that excludes the
+# common-UI libraries (libcui and friends) that Writer's own --convert-to
+# path needs internally -- even though nothing here touches an actual GUI.
+# Without it, `soffice --headless --convert-to pdf some.docx` exits 0 but
+# writes nothing, logging "Error: source file could not be loaded" to
+# stderr: a known upstream LibreOffice regression (convert-to for Writer
+# documents needs libcui, excluded from headless/no-GUI package splits),
+# fixed upstream in 7.6.5+/24.2.1+ but still present in what this Debian
+# base's repo currently serves. Reproduced live, confirmed via this exact
+# stderr message, and confirmed PDF->Word (Draw/Writer-PDF-import path,
+# unaffected) kept working the entire time on the same container.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-core \
     libreoffice-writer \
+    libreoffice-gtk3 \
     ttf-mscorefonts-installer \
     fonts-liberation \
     fonts-crosextra-carlito \
