@@ -37,7 +37,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-crosextra-caladea \
     fonts-dejavu-core \
     ca-certificates \
-    curl \
     libxinerama1 \
     libx11-6 \
     libxrender1 \
@@ -62,23 +61,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN ln -sf /usr/lib/x86_64-linux-gnu/libssl.so.3 /usr/lib/x86_64-linux-gnu/libssl3.so \
   && ln -sf /usr/lib/x86_64-linux-gnu/libcrypto.so.3 /usr/lib/x86_64-linux-gnu/libcrypto3.so
 
-# Root cause (confirmed live via a startup `soffice --version` log): this
-# Debian bullseye base's apt repo only serves LibreOffice 7.0.4.2. That
+# Root cause (confirmed live via a startup `soffice --version` log): the
+# original bullseye base's apt repo only served LibreOffice 7.0.4.2. That
 # version has a known upstream regression where headless Writer
 # --convert-to exits 0 but writes nothing, logging "Error: source file
 # could not be loaded" to stderr -- fixed upstream in 7.6.5+/24.2.1+, but
 # 7.0.4.2 predates the fix. Installing libreoffice-gtk3 (previous attempt)
 # did not change the version and did not fix it. PDF->Word kept working
 # throughout because it doesn't exercise the broken Writer convert-to path.
-# Fix: skip the stale apt package entirely and install a current stable
-# release straight from The Document Foundation's official deb bundle.
+# Fix: install a current stable release straight from The Document
+# Foundation's official deb bundle instead of any distro's apt package.
+# curl is purged again at the end of this layer -- it's only needed to
+# fetch the bundle, not at runtime, and keeping it out of this RUN's final
+# layer keeps the image smaller.
 ARG LO_VERSION=26.2.4
-RUN curl -fsSL -o /tmp/lo.tar.gz \
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+  && curl -fsSL -o /tmp/lo.tar.gz \
       "https://download.documentfoundation.org/libreoffice/stable/${LO_VERSION}/deb/x86_64/LibreOffice_${LO_VERSION}_Linux_x86-64_deb.tar.gz" \
   && mkdir /tmp/lo && tar -xzf /tmp/lo.tar.gz -C /tmp/lo --strip-components=1 \
   && (dpkg -i /tmp/lo/DEBS/*.deb || true) \
-  && apt-get update && apt-get install -y -f --no-install-recommends \
+  && apt-get install -y -f --no-install-recommends \
   && ln -sf /opt/libreoffice*/program/soffice /usr/bin/soffice \
+  && apt-get purge -y curl && apt-get autoremove -y \
   && rm -rf /tmp/lo /tmp/lo.tar.gz /var/lib/apt/lists/*
 
 WORKDIR /app
