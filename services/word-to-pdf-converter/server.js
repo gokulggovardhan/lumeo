@@ -470,4 +470,7 @@ server.listen(PORT, () => {
   console.log(`word-to-pdf / pdf-to-word converter listening on :${PORT}`);
   sweepStaleTempDirs();
   setInterval(sweepStaleTempDirs, SWEEP_INTERVAL_MS).unref();
+  execFileAsync(LIBREOFFICE_BINARY, ["--version"])
+    .then((result) => console.log(`soffice version: ${result.stdout.trim()}`))
+    .catch((error) => console.error(`soffice --version failed: ${error.message}`));
 });
