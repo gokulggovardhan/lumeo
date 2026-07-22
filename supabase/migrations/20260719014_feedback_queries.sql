@@ -71,6 +71,10 @@ grant insert on table public.feedback_queries to anon;
 revoke all on table public.feedback_queries from authenticated;
 grant insert, select, update, delete on table public.feedback_queries to authenticated;
 
-alter publication supabase_realtime add table public.feedback_queries;
+-- Realtime enablement deliberately omitted here: adding an already-member
+-- table to a publication errors and would roll back this entire migration
+-- (table included). See 20260719015_fix_feedback_queries_realtime.sql,
+-- which enables it afterward in its own transaction, guarded and tolerant
+-- of every prior state.
 
 commit;
