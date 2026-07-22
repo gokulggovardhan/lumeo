@@ -304,7 +304,17 @@ async function convertWordToPdf({ fileUrl, fileName }) {
         workDir,
         inputPath,
         outputPath,
-        extraArgs: ["--convert-to", "pdf"],
+        // Forces the exact import filter instead of relying on soffice's
+        // extension-based auto-detection, which was silently failing on
+        // every .docx here ("source file could not be loaded", exit 0) --
+        // the same class of fix already proven on the PDF->Word direction
+        // (--infilter=writer_pdf_import). Filter names per LibreOffice's
+        // own registry: "MS Word 2007 XML" for .docx, "MS Word 97" for .doc.
+        extraArgs: [
+          `--infilter=${extension === "doc" ? "MS Word 97" : "MS Word 2007 XML"}`,
+          "--convert-to",
+          "pdf",
+        ],
       });
     } catch {
       throw new Error("Conversion failed. The document may be corrupted, password-protected, or in an unsupported format.");
