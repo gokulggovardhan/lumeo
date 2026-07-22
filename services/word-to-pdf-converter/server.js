@@ -141,6 +141,24 @@ function releaseSlot() {
   }
 }
 
+async function downloadToFile({ fileUrl, destPath }) {
+  const parsedFileUrl = new URL(fileUrl);
+  if (parsedFileUrl.protocol !== "https:" || parsedFileUrl.hostname !== ALLOWED_FILE_HOST) {
+    throw new Error("File URL is not from an allowed host.");
+  }
+
+  let response;
+  try {
+    response = await fetch(parsedFileUrl); // codeql[js/request-forgery] fileUrl's host is strictly validated above
+  } catch {
+    throw new Error("Could not download the uploaded file for conversion.");
+  }
+  if (!response.ok) {
+    throw new Error("Could not download the uploaded file for conversion.");
+  }
+  await writeFile(destPath, Buffer.from(await response.arrayBuffer()));
+}
+
 async function convertWordToPdf({ fileUrl, fileName }) {
   const jobId = crypto.randomUUID();
   const workDir = await mkdtemp(join(tmpdir(), `word2pdf-${jobId}-`));
@@ -150,34 +168,18 @@ async function convertWordToPdf({ fileUrl, fileName }) {
   const outputPath = join(workDir, "input.pdf");
 
   try {
-    const parsedFileUrl = new URL(fileUrl);
-    if (parsedFileUrl.protocol !== "https:" || parsedFileUrl.hostname !== ALLOWED_FILE_HOST) {
-      throw new Error("File URL is not from an allowed host.");
-    }
-
-    // False positive below, documented here since the suppression comment
-    // on that line has to stay short: CodeQL's request-forgery query flags
-    // that fetch purely because fileUrl originated from a request body --
-    // verified it doesn't credit the strict-equality hostname check just
-    // above as a sanitizer, only a check against the whole value. That
-    // check is real and load-bearing: protocol must be https and hostname
-    // must exactly equal the operator-configured ALLOWED_FILE_HOST (no
-    // wildcard/suffix match), and the process refuses to start at all if
+    // The CodeQL request-forgery query flags this fetch purely because
+    // fileUrl originated from a request body -- it doesn't credit
+    // downloadToFile's strict protocol+hostname check as a sanitizer.
+    // That check is real and load-bearing: protocol must be https and
+    // hostname must exactly equal the operator-configured ALLOWED_FILE_HOST
+    // (no wildcard/suffix match), and the process refuses to start at all if
     // that env var is unset. Verified locally with a running container: a
     // metadata-endpoint URL and a same-suffix-but-wrong-subdomain URL (e.g.
     // evil.supabase.co when ALLOWED_FILE_HOST=abcxyz.supabase.co) are both
     // rejected before the fetch runs; the exact configured host reaches it
     // as intended.
-    let response;
-    try {
-      response = await fetch(parsedFileUrl); // codeql[js/request-forgery] fileUrl's host is strictly validated above
-    } catch {
-      throw new Error("Could not download the uploaded file for conversion.");
-    }
-    if (!response.ok) {
-      throw new Error("Could not download the uploaded file for conversion.");
-    }
-    await writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
+    await downloadToFile({ fileUrl, destPath: inputPath }); // codeql[js/request-forgery]
 
     try {
       await execFileAsync(
@@ -205,13 +207,59 @@ async function convertWordToPdf({ fileUrl, fileName }) {
   }
 }
 
+async function convertPdfToWord({ fileUrl }) {
+  const jobId = crypto.randomUUID();
+  const workDir = await mkdtemp(join(tmpdir(), `pdf2word-${jobId}-`));
+  const profileDir = join(tmpdir(), `lo-profile-${jobId}`);
+  const inputPath = join(workDir, "input.pdf");
+  const outputPath = join(workDir, "input.docx");
+
+  try {
+    await downloadToFile({ fileUrl, destPath: inputPath }); // codeql[js/request-forgery] see convertWordToPdf's downloadToFile call for the sanitizer note
+
+    try {
+      await execFileAsync(
+        LIBREOFFICE_BINARY,
+        [
+          "--headless",
+          "--norestore",
+          `-env:UserInstallation=file://${profileDir}`,
+          // Forces LibreOffice to hand the PDF to Writer's text/layout
+          // importer instead of Draw -- without this, --convert-to docx on
+          // a .pdf can silently produce a docx containing one embedded
+          // image per page instead of editable text.
+          "--infilter=writer_pdf_import",
+          "--convert-to",
+          "docx",
+          "--outdir",
+          workDir,
+          inputPath,
+        ],
+        { timeout: CONVERSION_TIMEOUT_MS },
+      );
+    } catch {
+      throw new Error(
+        "Conversion failed. The document may be corrupted, password-protected, image-only, or in an unsupported format.",
+      );
+    }
+
+    return await readFile(outputPath);
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+    await rm(profileDir, { recursive: true, force: true });
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   if (req.method === "GET" && req.url === "/healthz") {
     sendJson(res, 200, { ok: true });
     return;
   }
 
-  if (req.method !== "POST" || req.url !== "/convert") {
+  const isWordToPdf = req.method === "POST" && req.url === "/convert";
+  const isPdfToWord = req.method === "POST" && req.url === "/convert-pdf-to-word";
+
+  if (!isWordToPdf && !isPdfToWord) {
     sendJson(res, 404, { ok: false, message: "Not found." });
     return;
   }
@@ -231,13 +279,21 @@ const server = http.createServer(async (req, res) => {
   }
 
   const fileUrl = typeof body.fileUrl === "string" ? body.fileUrl.trim() : "";
-  const fileName = typeof body.fileName === "string" ? body.fileName.trim() : "";
-
-  if (!fileUrl || !fileName) {
-    sendJson(res, 400, { ok: false, message: "Missing fileUrl or fileName." });
+  if (!fileUrl) {
+    sendJson(res, 400, { ok: false, message: "Missing fileUrl." });
     return;
   }
 
+  const fileName = typeof body.fileName === "string" ? body.fileName.trim() : "";
+  if (isWordToPdf && !fileName) {
+    sendJson(res, 400, { ok: false, message: "Missing fileName." });
+    return;
+  }
+
+  // One gate shared by both conversion directions: each conversion spawns a
+  // full LibreOffice process regardless of which way it's converting, so
+  // letting word-to-pdf and pdf-to-word run under separate counters would
+  // let two heavy processes run at once on this box and double peak RAM.
   try {
     await acquireSlot();
   } catch {
@@ -256,12 +312,21 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    const pdfBuffer = await convertWordToPdf({ fileUrl, fileName });
-    res.writeHead(200, {
-      "Content-Type": "application/pdf",
-      "Content-Length": pdfBuffer.byteLength,
-    });
-    res.end(pdfBuffer);
+    if (isWordToPdf) {
+      const pdfBuffer = await convertWordToPdf({ fileUrl, fileName });
+      res.writeHead(200, {
+        "Content-Type": "application/pdf",
+        "Content-Length": pdfBuffer.byteLength,
+      });
+      res.end(pdfBuffer);
+    } else {
+      const docxBuffer = await convertPdfToWord({ fileUrl });
+      res.writeHead(200, {
+        "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "Content-Length": docxBuffer.byteLength,
+      });
+      res.end(docxBuffer);
+    }
   } catch (conversionError) {
     console.error("conversion failed:", conversionError);
     sendJson(res, 502, { ok: false, message: conversionError.message || "Conversion failed." });
@@ -271,5 +336,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`word-to-pdf converter listening on :${PORT}`);
+  console.log(`word-to-pdf / pdf-to-word converter listening on :${PORT}`);
 });
