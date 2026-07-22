@@ -12,7 +12,7 @@
 const http = require("node:http");
 const { execFile } = require("node:child_process");
 const { promisify } = require("node:util");
-const { mkdtemp, readFile, rm, writeFile } = require("node:fs/promises");
+const { mkdtemp, readdir, readFile, rm, stat, writeFile } = require("node:fs/promises");
 const { tmpdir } = require("node:os");
 const { join } = require("node:path");
 const crypto = require("node:crypto");
@@ -98,6 +98,44 @@ function secretsMatch(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
+// --- Stale temp-dir sweep ---------------------------------------------------
+// Each conversion cleans up its own workDir/profileDir in a `finally`, but a
+// killed/restarted process mid-conversion skips that. Left unchecked across
+// a long-lived container (this box stays warm for hours via the keep-warm
+// ping), orphaned LibreOffice profile dirs accumulate in /tmp and can
+// eventually starve disk space, which makes soffice exit 0 while silently
+// failing to write its output -- the exact failure mode this sweep prevents
+// from ever building up. Runs at startup and every 10 minutes; anything
+// matching our own prefixes and older than 15 minutes is safe to remove
+// (no legitimate conversion runs anywhere near that long).
+const SWEEP_INTERVAL_MS = 10 * 60 * 1000;
+const SWEEP_MAX_AGE_MS = 15 * 60 * 1000;
+const SWEEP_PREFIXES = ["word2pdf-", "pdf2word-", "lo-profile-"];
+
+async function sweepStaleTempDirs() {
+  let entries;
+  try {
+    entries = await readdir(tmpdir());
+  } catch (error) {
+    console.error("sweep: could not read tmpdir:", error.message);
+    return;
+  }
+
+  const now = Date.now();
+  for (const entry of entries) {
+    if (!SWEEP_PREFIXES.some((prefix) => entry.startsWith(prefix))) continue;
+    const entryPath = join(tmpdir(), entry);
+    try {
+      const info = await stat(entryPath);
+      if (now - info.mtimeMs < SWEEP_MAX_AGE_MS) continue;
+      await rm(entryPath, { recursive: true, force: true });
+      console.log(`sweep: removed stale temp dir ${entry}`);
+    } catch (error) {
+      console.error(`sweep: could not remove ${entry}:`, error.message);
+    }
+  }
+}
+
 // --- Conversion concurrency gate -------------------------------------------
 // `active` counts running conversions; `waiters` holds queued requests. A
 // released slot is handed directly to the next waiter (active stays put),
@@ -141,13 +179,100 @@ function releaseSlot() {
   }
 }
 
+// Runs soffice and returns its parsed output path, or throws a
+// conversion-failure error. Centralizes the "did it actually produce the
+// file it claims to" check: soffice can exit 0 while writing nothing (seen
+// in practice under low-resource containers -- a starved/killed rendering
+// subprocess doesn't always propagate as a non-zero exit from the wrapper
+// process). stdout/stderr are always logged on failure so a silent no-op
+// is diagnosable instead of surfacing as a bare ENOENT.
+async function runSoffice({ jobId, profileDir, workDir, inputPath, outputPath, extraArgs = [] }) {
+  // Deliberately NOT pre-created: soffice's -env:UserInstallation performs
+  // its own first-run profile bootstrap (config, cache, lock files) when
+  // that directory doesn't already exist. Pre-creating it here (even empty)
+  // was tried as a defensive measure and instead broke every conversion --
+  // soffice exited 0 but failed internally with "source file could not be
+  // loaded", 100% reproducible. Confirmed by reverting this one line.
+
+  // TEMPORARY diagnostics: "source file could not be loaded" is soffice's
+  // own stderr message, printed even though it exits 0 (well-documented
+  // --convert-to limitation -- it doesn't reliably return non-zero on a
+  // per-file failure). Logging disk/memory state and the actual input file
+  // as soffice is about to see it, to distinguish "input never got written
+  // correctly" from "container is out of disk/memory" from "soffice itself
+  // is broken on this box". Remove once the real cause is confirmed.
+  try {
+    const inputStat = await stat(inputPath);
+    console.log(`[${jobId}] input file before soffice: ${inputPath} size=${inputStat.size}`);
+  } catch (statError) {
+    console.error(`[${jobId}] input file missing before soffice ran: ${statError.message}`);
+  }
+  try {
+    const df = await execFileAsync("df", ["-h", "/tmp"]);
+    console.log(`[${jobId}] disk: ${df.stdout.trim()}`);
+  } catch (dfError) {
+    console.error(`[${jobId}] df failed: ${dfError.message}`);
+  }
+  try {
+    const free = await execFileAsync("free", ["-m"]);
+    console.log(`[${jobId}] memory: ${free.stdout.trim()}`);
+  } catch (freeError) {
+    console.error(`[${jobId}] free failed: ${freeError.message}`);
+  }
+
+  let stdout = "";
+  let stderr = "";
+  try {
+    const result = await execFileAsync(
+      LIBREOFFICE_BINARY,
+      [
+        "--headless",
+        "--norestore",
+        `-env:UserInstallation=file://${profileDir}`,
+        ...extraArgs,
+        "--outdir",
+        workDir,
+        inputPath,
+      ],
+      { timeout: CONVERSION_TIMEOUT_MS },
+    );
+    stdout = result.stdout || "";
+    stderr = result.stderr || "";
+  } catch (execError) {
+    console.error(
+      `[${jobId}] soffice exited with an error. stdout: ${execError.stdout || ""} stderr: ${execError.stderr || ""}`,
+    );
+    throw new Error("CONVERSION_FAILED");
+  }
+
+  try {
+    return await readFile(outputPath);
+  } catch (readError) {
+    // soffice reported success (exit 0) but the expected output never
+    // showed up. Log everything soffice said -- this is the case a bare
+    // "Conversion failed" message can't diagnose after the fact, since
+    // the temp dirs are gone by the time anyone looks.
+    console.error(
+      `[${jobId}] soffice exited 0 but produced no output at ${outputPath}. stdout: ${stdout} stderr: ${stderr} readError: ${readError.message}`,
+    );
+    throw new Error("CONVERSION_FAILED");
+  }
+}
+
 async function convertWordToPdf({ fileUrl, fileName }) {
   const jobId = crypto.randomUUID();
   const workDir = await mkdtemp(join(tmpdir(), `word2pdf-${jobId}-`));
   const profileDir = join(tmpdir(), `lo-profile-${jobId}`);
   const extension = fileName.toLowerCase().endsWith(".doc") ? "doc" : "docx";
   const inputPath = join(workDir, `input.${extension}`);
-  const outputPath = join(workDir, "input.pdf");
+  // Temporary root-cause isolation switch: DIAG_CONVERT_TARGET lets us swap
+  // the export format at runtime (no redeploy of logic) to tell apart a
+  // broken DOCX *import* filter from a broken PDF *export* filter -- the
+  // working PDF->Word direction already proves DOCX export and PDF import
+  // both work, so only these two are still unverified. Remove once the
+  // real fix lands.
+  const diagTarget = process.env.DIAG_CONVERT_TARGET || "pdf";
+  const outputPath = join(workDir, `input.${diagTarget}`);
 
   try {
     const parsedFileUrl = new URL(fileUrl);
@@ -180,25 +305,27 @@ async function convertWordToPdf({ fileUrl, fileName }) {
     await writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
 
     try {
-      await execFileAsync(
-        LIBREOFFICE_BINARY,
-        [
-          "--headless",
-          "--norestore",
-          `-env:UserInstallation=file://${profileDir}`,
+      return await runSoffice({
+        jobId,
+        profileDir,
+        workDir,
+        inputPath,
+        outputPath,
+        // Forces the exact import filter instead of relying on soffice's
+        // extension-based auto-detection, which was silently failing on
+        // every .docx here ("source file could not be loaded", exit 0) --
+        // the same class of fix already proven on the PDF->Word direction
+        // (--infilter=writer_pdf_import). Filter names per LibreOffice's
+        // own registry: "MS Word 2007 XML" for .docx, "MS Word 97" for .doc.
+        extraArgs: [
+          `--infilter=${extension === "doc" ? "MS Word 97" : "MS Word 2007 XML"}`,
           "--convert-to",
-          "pdf",
-          "--outdir",
-          workDir,
-          inputPath,
+          diagTarget,
         ],
-        { timeout: CONVERSION_TIMEOUT_MS },
-      );
+      });
     } catch {
       throw new Error("Conversion failed. The document may be corrupted, password-protected, or in an unsupported format.");
     }
-
-    return await readFile(outputPath);
   } finally {
     await rm(workDir, { recursive: true, force: true });
     await rm(profileDir, { recursive: true, force: true });
@@ -238,32 +365,23 @@ async function convertPdfToWord({ fileUrl }) {
     await writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
 
     try {
-      await execFileAsync(
-        LIBREOFFICE_BINARY,
-        [
-          "--headless",
-          "--norestore",
-          `-env:UserInstallation=file://${profileDir}`,
-          // Forces LibreOffice to hand the PDF to Writer's text/layout
-          // importer instead of Draw -- without this, --convert-to docx on
-          // a .pdf can silently produce a docx containing one embedded
-          // image per page instead of editable text.
-          "--infilter=writer_pdf_import",
-          "--convert-to",
-          "docx",
-          "--outdir",
-          workDir,
-          inputPath,
-        ],
-        { timeout: CONVERSION_TIMEOUT_MS },
-      );
+      return await runSoffice({
+        jobId,
+        profileDir,
+        workDir,
+        inputPath,
+        outputPath,
+        // Forces LibreOffice to hand the PDF to Writer's text/layout
+        // importer instead of Draw -- without this, --convert-to docx on
+        // a .pdf can silently produce a docx containing one embedded
+        // image per page instead of editable text.
+        extraArgs: ["--infilter=writer_pdf_import", "--convert-to", "docx"],
+      });
     } catch {
       throw new Error(
         "Conversion failed. The document may be corrupted, password-protected, image-only, or in an unsupported format.",
       );
     }
-
-    return await readFile(outputPath);
   } finally {
     await rm(workDir, { recursive: true, force: true });
     await rm(profileDir, { recursive: true, force: true });
@@ -357,4 +475,9 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`word-to-pdf / pdf-to-word converter listening on :${PORT}`);
+  sweepStaleTempDirs();
+  setInterval(sweepStaleTempDirs, SWEEP_INTERVAL_MS).unref();
+  execFileAsync(LIBREOFFICE_BINARY, ["--version"])
+    .then((result) => console.log(`soffice version: ${result.stdout.trim()}`))
+    .catch((error) => console.error(`soffice --version failed: ${error.message}`));
 });
