@@ -204,7 +204,7 @@ export default function PdfToWordTool() {
         inputId="pdf-to-word-upload"
         title="Drop your PDF here"
         description="or choose a file from your device"
-        acceptedNote="PDF · One file"
+        acceptedNote="PDF · One file · up to 1.5MB while we add more capacity"
         accept=".pdf,application/pdf"
         multiple={false}
         icon={<PdfIcon />}

@@ -4,7 +4,13 @@ import { createStorageBrowserClient } from "@/lib/supabase/storageBrowserClient"
 // after conversion, no reason to fragment storage per tool direction.
 export const PDF_TO_WORD_BUCKET = "lumeo-temp";
 
-export const MAX_PDF_FILE_SIZE_BYTES = 45 * 1024 * 1024;
+// Temporary cap, well below the 45MB the pipeline can technically accept.
+// The converter runs on Render's free tier (512MB RAM, 0.1 CPU): measured
+// live, a ~2.3MB image-heavy PDF OOM-crashed the whole container (Render
+// auto-restarted it), while a ~1MB image-heavy PDF converted fine in ~60s.
+// 1.5MB keeps real margin below the confirmed-safe point. Raise this once
+// the converter is on a plan with more memory headroom.
+export const MAX_PDF_FILE_SIZE_BYTES = 1.5 * 1024 * 1024;
 
 // Storage uploads can fail transiently (a dropped connection, a Supabase
 // 5xx, a rate-limit blip). Retry the transient ones a couple of times with a
@@ -19,7 +25,8 @@ export function isPdfNamedFile(file: File): boolean {
 
 export function checkPdfFileSize(file: File): string | null {
   if (file.size > MAX_PDF_FILE_SIZE_BYTES) {
-    return `This file is too large. The limit is ${Math.round(MAX_PDF_FILE_SIZE_BYTES / (1024 * 1024))} MB.`;
+    const limitMb = (MAX_PDF_FILE_SIZE_BYTES / (1024 * 1024)).toFixed(1);
+    return `This file is too large. Our free converter is temporarily capped at ${limitMb} MB while we add more capacity -- try a smaller file for now.`;
   }
   return null;
 }
