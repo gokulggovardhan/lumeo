@@ -203,7 +203,7 @@ export default function WordToPdfTool() {
         inputId="word-to-pdf-upload"
         title="Drop your Word document here"
         description="or choose a file from your device"
-        acceptedNote="DOCX or DOC · One file"
+        acceptedNote="DOCX or DOC · One file · up to 1.5MB while we add more capacity"
         accept=".docx,.doc,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
         multiple={false}
         icon={<WordIcon />}

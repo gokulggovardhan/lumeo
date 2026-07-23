@@ -30,6 +30,18 @@ const LIBREOFFICE_BINARY = process.env.LIBREOFFICE_BINARY || "soffice";
 const CONVERSION_TIMEOUT_MS = 260_000;
 const MAX_BODY_BYTES = 10 * 1024;
 
+// Enforced here, not just in the Next.js UI's client-side size check --
+// uploads to the shared Supabase bucket go in as the anon role (by design,
+// see storageBrowserClient.ts), so anyone who can reach this service with a
+// valid fileUrl can bypass any client-side cap entirely. This is the actual
+// box that crashes, so this is the authoritative limit. Measured live on
+// this exact 512MB/0.1CPU instance: a ~2.3MB image-heavy PDF OOM-crashed the
+// whole container (Render auto-restarted it); a ~1MB image-heavy PDF
+// converted fine. Matches the UI's MAX_WORD_FILE_SIZE_BYTES /
+// MAX_PDF_FILE_SIZE_BYTES (lib/supabase/*Storage.ts) -- raise both together
+// once this runs on a plan with more memory headroom.
+const MAX_INPUT_BYTES = 1.5 * 1024 * 1024;
+
 // Each conversion spawns a full LibreOffice process (~150-250MB peak). On a
 // small instance, letting every inbound request spawn one at once is a
 // straight path to OOM -- the box crashes and takes every in-flight request
@@ -274,7 +286,13 @@ async function convertWordToPdf({ fileUrl, fileName }) {
     if (!response.ok) {
       throw new Error("Could not download the uploaded file for conversion.");
     }
-    await writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
+    const inputBuffer = Buffer.from(await response.arrayBuffer());
+    if (inputBuffer.byteLength > MAX_INPUT_BYTES) {
+      throw new Error(
+        `This file is too large. Our free converter is temporarily capped at ${(MAX_INPUT_BYTES / (1024 * 1024)).toFixed(1)} MB while we add more capacity -- try a smaller file for now.`,
+      );
+    }
+    await writeFile(inputPath, inputBuffer);
 
     try {
       return await runSoffice({
@@ -334,7 +352,13 @@ async function convertPdfToWord({ fileUrl }) {
     if (!response.ok) {
       throw new Error("Could not download the uploaded file for conversion.");
     }
-    await writeFile(inputPath, Buffer.from(await response.arrayBuffer()));
+    const inputBuffer = Buffer.from(await response.arrayBuffer());
+    if (inputBuffer.byteLength > MAX_INPUT_BYTES) {
+      throw new Error(
+        `This file is too large. Our free converter is temporarily capped at ${(MAX_INPUT_BYTES / (1024 * 1024)).toFixed(1)} MB while we add more capacity -- try a smaller file for now.`,
+      );
+    }
+    await writeFile(inputPath, inputBuffer);
 
     try {
       return await runSoffice({
