@@ -12,10 +12,13 @@ export type WordToPdfResult = {
   fileName: string;
 };
 
-// Kept comfortably under the route's maxDuration (60s) so a slow conversion
-// aborts with a readable message here instead of being hard-killed by the
-// platform mid-response.
-const CONVERT_TIMEOUT_MS = 55_000;
+// Kept just under the route's maxDuration (300s, the Fluid-compute ceiling)
+// so a slow conversion aborts with a readable message here instead of being
+// hard-killed by the platform mid-response. Large or complex documents on the
+// free-tier converter (limited CPU) can legitimately take a couple of minutes,
+// so this has to be generous -- the old 55s cap made every big file fail even
+// though the converter would have finished given the time.
+const CONVERT_TIMEOUT_MS = 285_000;
 // The warm-up ping only needs to *reach* the container to trigger a wake --
 // we don't wait for it to fully boot.
 const WARM_TIMEOUT_MS = 10_000;
@@ -76,7 +79,7 @@ export async function convertWordToPdf({
   } catch (error) {
     if (error instanceof Error && error.name === "TimeoutError") {
       throw new WordToPdfConversionError(
-        "The conversion is taking longer than usual -- the service may have been waking up. Please try again.",
+        "This document took too long to convert. It may be very large or complex for our free converter -- try a smaller or simpler file.",
       );
     }
     throw new WordToPdfConversionError("Could not reach the conversion service. Please try again.");

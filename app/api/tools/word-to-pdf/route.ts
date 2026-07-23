@@ -11,11 +11,16 @@ import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 // This route brokers the conversion: it talks to the external LibreOffice
 // service (see lib/converters/word-to-pdf.ts) over HTTP. It stays on the
 // Node runtime (not edge) so the fetch budget and env access behave like a
-// normal server, and raises maxDuration so a cold-start conversion isn't
-// hard-killed before the converter answers.
+// normal server, and raises maxDuration to the Fluid-compute ceiling so a
+// large or complex document -- which can legitimately take a few minutes on
+// the free-tier converter's limited CPU -- isn't hard-killed mid-conversion.
+// 300s is the max Vercel allows on Hobby with Fluid Compute enabled (which
+// this project has on); the converter's own soffice timeout and the client
+// fetch abort in word-to-pdf.ts are both set below this so a genuine
+// overrun surfaces as a readable message, not a platform 504.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Fired by the client the moment a file is selected -- wakes the (possibly
 // asleep) converter during the user's think-time so the real POST is fast.
