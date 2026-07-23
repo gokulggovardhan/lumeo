@@ -22,7 +22,12 @@ const execFileAsync = promisify(execFile);
 const PORT = process.env.PORT || 8080;
 const CONVERT_SECRET = process.env.CONVERT_SECRET || "";
 const LIBREOFFICE_BINARY = process.env.LIBREOFFICE_BINARY || "soffice";
-const CONVERSION_TIMEOUT_MS = 90_000;
+// Bounded below the caller's fetch abort (285s in lib/converters/*.ts) and
+// Vercel's 300s function ceiling, but far above the old 90s: a large or
+// image-heavy PDF on this box's limited CPU can legitimately need a couple of
+// minutes, and 90s was killing soffice mid-conversion on files it could
+// otherwise finish. Still capped so a truly stuck soffice can't run forever.
+const CONVERSION_TIMEOUT_MS = 260_000;
 const MAX_BODY_BYTES = 10 * 1024;
 
 // Each conversion spawns a full LibreOffice process (~150-250MB peak). On a

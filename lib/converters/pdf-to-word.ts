@@ -9,10 +9,13 @@ export type PdfToWordResult = {
   fileName: string;
 };
 
-// Kept comfortably under the route's maxDuration (60s) so a slow conversion
-// aborts with a readable message here instead of being hard-killed by the
-// platform mid-response.
-const CONVERT_TIMEOUT_MS = 55_000;
+// Kept just under the route's maxDuration (300s, the Fluid-compute ceiling)
+// so a slow conversion aborts with a readable message here instead of being
+// hard-killed by the platform mid-response. Large or image-heavy PDFs on the
+// free-tier converter (limited CPU) can legitimately take a couple of minutes,
+// so this has to be generous -- the old 55s cap made every big PDF fail even
+// though the converter would have finished given the time.
+const CONVERT_TIMEOUT_MS = 285_000;
 
 function converterBaseUrl(): string | null {
   const url = process.env.WORD_TO_PDF_CONVERTER_URL;
@@ -54,7 +57,7 @@ export async function convertPdfToWord({
   } catch (error) {
     if (error instanceof Error && error.name === "TimeoutError") {
       throw new PdfToWordConversionError(
-        "The conversion is taking longer than usual -- the service may have been waking up. Please try again.",
+        "This PDF took too long to convert. It may be very large or image-heavy for our free converter -- try a smaller or simpler file.",
       );
     }
     throw new PdfToWordConversionError("Could not reach the conversion service. Please try again.");
