@@ -7,7 +7,10 @@ export type PdfToolSlug =
   | "jpg-to-pdf"
   | "pdf-to-jpg"
   | "sign"
-  | "word-to-pdf";
+  | "word-to-pdf"
+  | "organize"
+  | "html-to-pdf"
+  | "extract-text";
 
 export type PdfToolDefinition = {
   slug: PdfToolSlug;
@@ -144,6 +147,58 @@ export const pdfTools: PdfToolDefinition[] = [
       "Handles tables and images",
       "Private, uploaded temporarily",
       "Cleared immediately after conversion",
+    ],
+  },
+  {
+    slug: "organize",
+    title: "Organize PDF",
+    shortTitle: "Organize",
+    description: "Reorder, rotate, duplicate, or remove pages in one document.",
+    route: "/pdf/organize",
+    status: "live",
+    browserNote: "Browser-first organizing",
+    engineNote: "Live now",
+    accepted: "one PDF file",
+    bullets: [
+      "Drag to reorder pages",
+      "Rotate 90/180/270 degrees",
+      "Duplicate or delete pages",
+      "Bulk select and act on many pages",
+      "Local download cleanup",
+    ],
+  },
+  {
+    slug: "html-to-pdf",
+    title: "HTML to PDF",
+    shortTitle: "HTML to PDF",
+    description: "Turn HTML and CSS into a downloadable PDF.",
+    route: "/pdf/html-to-pdf",
+    status: "live",
+    browserNote: "Browser-first generation",
+    engineNote: "Live now",
+    accepted: "HTML/CSS you type or paste",
+    bullets: [
+      "Live preview as you type",
+      "Page size and orientation control",
+      "Margin presets",
+      "Starter templates",
+    ],
+  },
+  {
+    slug: "extract-text",
+    title: "Extract Text",
+    shortTitle: "Extract text",
+    description: "Pull selectable text out of a PDF and read or export it.",
+    route: "/pdf/extract-text",
+    status: "live",
+    browserNote: "Browser-first extraction",
+    engineNote: "Live now",
+    accepted: "one PDF file",
+    bullets: [
+      "Per-page text panels",
+      "Search across all pages",
+      "Copy per page or copy all",
+      "Download as .txt",
     ],
   },
 ];
