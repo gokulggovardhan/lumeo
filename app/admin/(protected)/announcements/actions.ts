@@ -65,6 +65,29 @@ export async function saveAnnouncement(formData: FormData) {
   return successState("Announcement saved.");
 }
 
+export async function deleteAnnouncement(formData: FormData) {
+  const admin = await requireAdmin();
+  if (!canManageAnnouncements(admin.role)) return errorState("You do not have permission to manage announcements.");
+
+  const id = formString(formData, "id", 80);
+  if (!id) return errorState("Choose a valid announcement.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("announcements").delete().eq("id", id);
+
+  if (error) return errorState("Announcement could not be deleted.");
+
+  await writeAuditLog({
+    action: "announcement.delete",
+    entityType: "announcement",
+    entityId: id,
+    summary: "Deleted an announcement.",
+    changes: { id },
+  });
+  revalidatePath("/admin/announcements");
+  return successState("Announcement deleted.");
+}
+
 export async function toggleAnnouncement(formData: FormData) {
   const admin = await requireAdmin();
   if (!canManageAnnouncements(admin.role)) return errorState("You do not have permission to manage announcements.");

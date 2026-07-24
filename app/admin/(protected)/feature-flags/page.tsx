@@ -9,7 +9,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getFeatureFlags } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageFeatureFlags } from "@/lib/admin/permissions";
-import { saveFeatureFlag, toggleFeatureFlag } from "@/app/admin/(protected)/feature-flags/actions";
+import { deleteFeatureFlag, saveFeatureFlag, toggleFeatureFlag } from "@/app/admin/(protected)/feature-flags/actions";
 import type { FeatureFlag } from "@/lib/supabase/database.types";
 
 function effectiveStatus(flag: FeatureFlag): { label: string; tone: "success" | "neutral" | "warning" | "danger" } {
@@ -87,11 +87,19 @@ export default async function FeatureFlagsPage() {
             <AdminStatusBadge key="state" tone={status.tone}>{status.label}</AdminStatusBadge>,
             new Date(flag.updated_at).toLocaleDateString(),
             canEdit ? (
-              <form key="toggle" action={asAdminFormAction(toggleFeatureFlag)}>
-                <input type="hidden" name="id" value={flag.id} />
-                <input type="hidden" name="is_enabled" value={flag.is_enabled ? "false" : "true"} />
-                <AdminSubmitButton variant="secondary" pendingLabel="Updating...">{flag.is_enabled ? "Disable" : "Enable"}</AdminSubmitButton>
-              </form>
+              <div key="actions" className="flex gap-2">
+                <form action={asAdminFormAction(toggleFeatureFlag)}>
+                  <input type="hidden" name="id" value={flag.id} />
+                  <input type="hidden" name="is_enabled" value={flag.is_enabled ? "false" : "true"} />
+                  <AdminSubmitButton variant="secondary" pendingLabel="Updating...">{flag.is_enabled ? "Disable" : "Enable"}</AdminSubmitButton>
+                </form>
+                <form action={asAdminFormAction(deleteFeatureFlag)}>
+                  <input type="hidden" name="id" value={flag.id} />
+                  <AdminSubmitButton variant="danger" pendingLabel="Deleting..." confirmMessage={`Delete the "${flag.key}" feature flag? This cannot be undone.`}>
+                    Delete
+                  </AdminSubmitButton>
+                </form>
+              </div>
             ) : "Read-only",
           ];
           })}

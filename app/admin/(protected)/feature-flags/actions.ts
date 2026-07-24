@@ -69,6 +69,29 @@ export async function saveFeatureFlag(formData: FormData) {
   return successState("Feature flag saved.");
 }
 
+export async function deleteFeatureFlag(formData: FormData) {
+  const admin = await requireAdmin();
+  if (!canManageFeatureFlags(admin.role)) return errorState("You do not have permission to manage feature flags.");
+
+  const id = formString(formData, "id", 80);
+  if (!id) return errorState("Choose a valid feature flag.");
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("feature_flags").delete().eq("id", id);
+
+  if (error) return errorState("Feature flag could not be deleted.");
+
+  await writeAuditLog({
+    action: "feature_flag.delete",
+    entityType: "feature_flag",
+    entityId: id,
+    summary: "Deleted a feature flag.",
+    changes: { id },
+  });
+  revalidatePath("/admin/feature-flags");
+  return successState("Feature flag deleted.");
+}
+
 export async function toggleFeatureFlag(formData: FormData) {
   const admin = await requireAdmin();
   if (!canManageFeatureFlags(admin.role)) return errorState("You do not have permission to manage feature flags.");

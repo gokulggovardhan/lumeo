@@ -14,7 +14,14 @@ import { updateSiteSetting } from "@/app/admin/(protected)/settings/actions";
 const approvedSettings = [
   ["maintenance_mode", "Maintenance mode", "When enabled, every public route shows the maintenance page. /admin stays reachable so you can turn it back off."],
   ["public_analytics_enabled", "Public analytics enabled", "Enables optional anonymous product-use events. Do Not Track is still respected."],
+  ["contact_page_enabled", "Contact page enabled", "Controls whether the public /contact page and its form are reachable."],
+  ["workspace_display_name", "Workspace display name", "The product name shown in page titles and branding. Defaults to “Lumeo” if left blank."],
+  ["support_email", "Support email", "Contact address shown to visitors on the public site."],
+  ["homepage_privacy_message", "Homepage privacy message", "Optional short note shown near the trust row on the homepage."],
+  ["default_seo_suffix", "Default SEO suffix", "Appended to page titles that don't have their own SEO record, e.g. “ | Lumeo PDF”."],
 ] as const satisfies ReadonlyArray<readonly [string, string, string]>;
+
+const booleanSettings = new Set(["maintenance_mode", "public_analytics_enabled", "contact_page_enabled"]);
 
 function settingMessageValue(value: unknown, field: "title" | "message") {
   if (value && typeof value === "object" && field in value) {
@@ -53,7 +60,7 @@ export default async function SettingsPage() {
           <div className="grid gap-4 lg:grid-cols-2">
             {approvedSettings.map(([key, label, description]) => {
               const current = settingMap.get(key);
-              const isBoolean = key === "maintenance_mode" || key === "public_analytics_enabled";
+              const isBoolean = booleanSettings.has(key);
               const isMaintenanceMode = key === "maintenance_mode";
               const isCurrentlyEnabled = isMaintenanceMode && settingDisplay(current?.value) === "Enabled";
               return (
