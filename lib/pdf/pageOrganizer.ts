@@ -1,6 +1,13 @@
-// Relative import (not the usual @/lib/pdf/... alias) so this module can be
-// loaded directly by Node's test runner, which has no path-alias resolution.
-import { normalizeRotation } from "./rotation.ts";
+// Snaps to the nearest of the four PDF-legal rotation values; anything else
+// collapses to 0. Duplicated from lib/pdf/rotation.ts (not imported) because
+// this module must load directly under Node's test runner, which has no
+// tsconfig path-alias resolution, while a relative ".ts"-extensioned import
+// breaks Next.js's production type-check for any file (like this one) that
+// a real app component also imports.
+function normalizeRotation(value: number): 0 | 90 | 180 | 270 {
+  const next = ((value % 360) + 360) % 360;
+  return next === 0 || next === 90 || next === 180 || next === 270 ? next : 0;
+}
 
 export type OrganizerItem = {
   id: string;
