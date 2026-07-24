@@ -11,7 +11,7 @@ const entityTypes = [
   "admin_member",
   "announcement",
   "feature_flag",
-  "homepage_tool_slot",
+  "feedback_query",
   "pdf_tool",
   "seo_setting",
   "site_setting",

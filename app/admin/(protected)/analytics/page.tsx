@@ -191,6 +191,16 @@ export default async function AnalyticsPage() {
                 value: item.count,
               }))}
             />
+            <AnalyticsBarList
+              title="Top tools by successful conversion"
+              items={data.topToolsBySuccess.map((item) => ({
+                label: item.toolSlug,
+                value: item.count,
+              }))}
+            />
+          </section>
+
+          <section className="grid gap-4 lg:grid-cols-1">
             <AdminSectionCard
               title="Seven-day activity table"
               description="Discovery events only. Operation lifecycle metrics are planned."

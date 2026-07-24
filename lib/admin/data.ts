@@ -10,7 +10,6 @@ import type {
   DailyToolMetric,
   FeatureFlag,
   FeedbackQuery,
-  HomepageToolSlot,
   PdfTool,
   SeoSetting,
   SiteSetting,
@@ -27,10 +26,6 @@ export type ToolWithCategory = PdfTool & {
   category_slug: string | null;
 };
 
-export type HomepageSlotView = HomepageToolSlot & {
-  tool: PdfTool | null;
-};
-
 export type OverviewData = {
   enabledTools: number;
   maintenanceTools: number;
@@ -45,7 +40,6 @@ export type OverviewData = {
   analyticsDataStatus: "available" | "unavailable";
   recentAuditLogs: AuditLog[];
   tools: ToolWithCategory[];
-  homepageSlots: HomepageSlotView[];
 };
 
 export type AnalyticsSummary = {
@@ -157,27 +151,6 @@ export async function getPdfTools(): Promise<DataResult<ToolWithCategory[]>> {
   });
 
   return safe(tools, error);
-}
-
-export async function getHomepageSlots(): Promise<DataResult<HomepageSlotView[]>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("homepage_tool_slots")
-    .select("*, pdf_tools(*)")
-    .order("slot_number", { ascending: true });
-
-  const slots = (data ?? []).map((row) => {
-    const slot = row as HomepageToolSlot & { pdf_tools?: PdfTool | null };
-    return {
-      slot_number: slot.slot_number,
-      tool_id: slot.tool_id,
-      updated_by: slot.updated_by,
-      updated_at: slot.updated_at,
-      tool: slot.pdf_tools ?? null,
-    };
-  });
-
-  return safe(slots, error);
 }
 
 export async function getFeatureFlags(): Promise<DataResult<FeatureFlag[]>> {
@@ -661,14 +634,13 @@ export function collapseUnknownLocationRuns(events: RecentAnalyticsEvent[]): Rec
 
 export async function getOverviewData(): Promise<DataResult<OverviewData>> {
   const supabase = await createClient();
-  const [toolsResult, announcementsResult, flagsResult, auditResult, analyticsResult, slotsResult] =
+  const [toolsResult, announcementsResult, flagsResult, auditResult, analyticsResult] =
     await Promise.all([
       getPdfTools(),
       getAnnouncements(),
       getFeatureFlags(),
       getAuditLogs(5),
       getAnalyticsSummary(),
-      getHomepageSlots(),
     ]);
 
   const tools = toolsResult.data;
@@ -695,14 +667,12 @@ export async function getOverviewData(): Promise<DataResult<OverviewData>> {
       analyticsDataStatus: analyticsResult.data.dataStatus,
       recentAuditLogs: auditResult.data,
       tools,
-      homepageSlots: slotsResult.data,
     },
     toolsResult.error ??
       announcementsResult.error ??
       flagsResult.error ??
       auditResult.error ??
       analyticsResult.error ??
-      slotsResult.error ??
       auditCountError,
   );
 }

@@ -10,7 +10,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getAnnouncements } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageAnnouncements } from "@/lib/admin/permissions";
-import { saveAnnouncement, toggleAnnouncement } from "@/app/admin/(protected)/announcements/actions";
+import { deleteAnnouncement, saveAnnouncement, toggleAnnouncement } from "@/app/admin/(protected)/announcements/actions";
 
 function toLocalInputValue(value: string | null) {
   if (!value) return "";
@@ -93,6 +93,12 @@ export default async function AnnouncementsPage({
                   <input type="hidden" name="id" value={announcement.id} />
                   <input type="hidden" name="is_active" value={announcement.is_active ? "false" : "true"} />
                   <AdminSubmitButton variant="secondary" pendingLabel="Updating...">{announcement.is_active ? "Deactivate" : "Activate"}</AdminSubmitButton>
+                </form>
+                <form action={asAdminFormAction(deleteAnnouncement)}>
+                  <input type="hidden" name="id" value={announcement.id} />
+                  <AdminSubmitButton variant="danger" pendingLabel="Deleting..." confirmMessage={`Delete "${announcement.title}"? This cannot be undone.`}>
+                    Delete
+                  </AdminSubmitButton>
                 </form>
               </div>
             ) : "Read-only",

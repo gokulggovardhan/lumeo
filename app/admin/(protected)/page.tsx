@@ -88,7 +88,7 @@ export default async function AdminPage() {
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
             <p className="text-sm font-semibold text-[#F0EAD6]">Platform configuration progress</p>
             <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">
-              {data.tools.length} catalog tools and {data.homepageSlots.length} homepage slots are readable.
+              {data.tools.length} catalog tools are readable.
             </p>
           </div>
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
@@ -139,25 +139,6 @@ export default async function AdminPage() {
           </div>
         </AdminSectionCard>
       </div>
-
-      <AdminSectionCard
-        title="Homepage slot status"
-        description="Five configurable slots plus one permanent All PDF Tools card."
-        action={<Link href="/admin/homepage" className="text-sm font-semibold text-[var(--text-accent)] hover:underline">Manage slots</Link>}
-      >
-        <div className="grid gap-3 md:grid-cols-3">
-          {data.homepageSlots.map((slot) => (
-            <div key={slot.slot_number} className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]/70">Slot {slot.slot_number}</p>
-              <p className="mt-2 text-sm font-semibold text-[#F0EAD6]">{slot.tool?.name ?? "Unassigned"}</p>
-            </div>
-          ))}
-          <div className="rounded-2xl border border-[#1E6B4A]/35 bg-[#1E6B4A]/10 p-4">
-            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#CBA052]/70">Permanent</p>
-            <p className="mt-2 text-sm font-semibold text-[#F0EAD6]">All PDF Tools</p>
-          </div>
-        </div>
-      </AdminSectionCard>
     </div>
   );
 }
