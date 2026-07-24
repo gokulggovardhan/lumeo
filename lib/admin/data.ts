@@ -608,12 +608,55 @@ function parseRecentEvents(value: unknown): RecentAnalyticsEvent[] {
 // This answers "where did each individual recent click come from" -- a raw,
 // most-recent-first feed, capped at `limit`. Same privacy scope as
 // everywhere else: no session id, no IP, no precise coordinates.
-export async function getRecentAnalyticsEvents(limit = 50): Promise<DataResult<RecentAnalyticsEvent[]>> {
+export async function getRecentAnalyticsEvents(limit = 200): Promise<DataResult<RecentAnalyticsEvent[]>> {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("get_admin_recent_analytics_events", { p_limit: limit });
 
   if (error) return safe([], error);
   return safe(parseRecentEvents(data), null);
+}
+
+export type RecentActivityRow =
+  | { kind: "event"; event: RecentAnalyticsEvent }
+  | { kind: "unknown_location_burst"; count: number; latestAt: string; earliestAt: string };
+
+// Bots, ad blockers, and requests that arrive without the geo cookie yet
+// (first hit before it's set, or non-Vercel environments) all land as
+// "Unknown location" -- in bursts, they drown out the events that actually
+// have somewhere to show. Collapses each consecutive run of unknown-location
+// events (list is already newest-first) into one summary row instead of
+// listing every one individually; events with a real location are always
+// shown on their own.
+export function collapseUnknownLocationRuns(events: RecentAnalyticsEvent[]): RecentActivityRow[] {
+  const rows: RecentActivityRow[] = [];
+  let i = 0;
+
+  while (i < events.length) {
+    const event = events[i];
+    if (event.locationLabel !== "Unknown location") {
+      rows.push({ kind: "event", event });
+      i += 1;
+      continue;
+    }
+
+    let j = i;
+    while (j < events.length && events[j].locationLabel === "Unknown location") j += 1;
+    const run = events.slice(i, j);
+
+    if (run.length === 1) {
+      rows.push({ kind: "event", event: run[0] });
+    } else {
+      rows.push({
+        kind: "unknown_location_burst",
+        count: run.length,
+        latestAt: run[0].occurredAt,
+        earliestAt: run[run.length - 1].occurredAt,
+      });
+    }
+    i = j;
+  }
+
+  return rows;
 }
 
 export async function getOverviewData(): Promise<DataResult<OverviewData>> {

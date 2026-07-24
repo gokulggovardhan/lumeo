@@ -4,10 +4,16 @@ import { geolocation } from "@vercel/functions";
 import { GEO_COOKIE_NAME } from "@/lib/analytics/geo-cookie-name";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
+// Next's cookie serializer already percent-encodes the whole value on write
+// (that's a single encoding pass we don't control) -- pre-encoding each
+// segment here on top of that double-encodes it. The literal "|" join
+// character itself gets encoded to %7C by that pass, so the client-side
+// reader must decode the WHOLE value once before splitting on "|", not
+// split first and decode each part (see lib/analytics/geo.ts).
 function buildGeoCookieValue(request: NextRequest) {
   const { city, countryRegion, country } = geolocation(request);
   if (!city && !countryRegion && !country) return null;
-  return [city, countryRegion, country].map((part) => encodeURIComponent(part ?? "")).join("|");
+  return [city ?? "", countryRegion ?? "", country ?? ""].join("|");
 }
 
 function applyGeoCookie(response: NextResponse, value: string | null) {
