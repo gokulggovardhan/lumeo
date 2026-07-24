@@ -21,6 +21,8 @@ type PublicCatalogRow = {
   route?: unknown;
   icon_key?: unknown;
   status?: unknown;
+  is_enabled?: unknown;
+  maintenance_message?: unknown;
   category_slug?: unknown;
   category_name?: unknown;
   category_description?: unknown;
@@ -43,7 +45,13 @@ function asString(value: unknown) {
 }
 
 function asStatus(value: unknown): PublicToolStatus | null {
-  return value === "active" || value === "beta" || value === "coming_soon" ? value : null;
+  return value === "active" ||
+    value === "beta" ||
+    value === "coming_soon" ||
+    value === "hidden" ||
+    value === "maintenance"
+    ? value
+    : null;
 }
 
 function asNumber(value: unknown, fallback: number) {
@@ -69,6 +77,8 @@ function mapCatalogRow(row: PublicCatalogRow): PublicPdfTool | null {
     route,
     iconKey,
     status,
+    isEnabled: row.is_enabled !== false,
+    maintenanceMessage: asString(row.maintenance_message),
     categorySlug: asString(row.category_slug),
     categoryName: asString(row.category_name) ?? "PDF Tools",
     categoryDescription: asString(row.category_description),

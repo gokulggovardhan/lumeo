@@ -30,6 +30,10 @@ export type ToolAction = {
   slug: string;
   route?: string;
   live: boolean;
+  // Populated by resolveLumeoTools() when the admin-controlled DB row says
+  // this action isn't live right now -- undefined in the static catalog.
+  dbStatus?: string;
+  maintenanceMessage?: string | null;
 };
 
 export type LumeoTool = {
