@@ -5,8 +5,10 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AnalyticsBarList } from "@/components/admin/analytics/AnalyticsBarList";
 import { AnalyticsPrivacyNotice } from "@/components/admin/analytics/AnalyticsPrivacyNotice";
+import Link from "next/link";
 import { AnalyticsTrendChart } from "@/components/admin/analytics/AnalyticsTrendChart";
-import { getAnalyticsSummary, getRecentAnalyticsEvents } from "@/lib/admin/data";
+import { RecentActivityTable, RECENT_ACTIVITY_PREVIEW_SIZE } from "@/components/admin/analytics/RecentActivityTable";
+import { collapseUnknownLocationRuns, getAnalyticsSummary, getRecentAnalyticsEvents } from "@/lib/admin/data";
 
 function formatDate(value: string | null) {
   return value
@@ -17,25 +19,13 @@ function formatDate(value: string | null) {
     : "None yet";
 }
 
-function formatEventTime(value: string) {
-  return new Date(value).toLocaleString("en", { dateStyle: "medium", timeStyle: "medium" });
-}
-
-const EVENT_LABEL: Record<string, string> = {
-  page_view: "Page view",
-  tool_opened: "Tool opened",
-  processing_started: "Processing started",
-  processing_succeeded: "Processing succeeded",
-  processing_failed: "Processing failed",
-  download_started: "Download started",
-};
-
 export default async function AnalyticsPage() {
   const [summary, recentEvents] = await Promise.all([
     getAnalyticsSummary(),
-    getRecentAnalyticsEvents(50),
+    getRecentAnalyticsEvents(200),
   ]);
   const data = summary.data;
+  const activityRows = collapseUnknownLocationRuns(recentEvents.data);
   const unavailable = data.dataStatus === "unavailable";
   const mostOpenedTool = data.topToolsByOpens[0];
   const noData = data.eventsToday === 0 && data.sevenDayTotals.length === 0;
@@ -263,22 +253,17 @@ export default async function AnalyticsPage() {
             title="Recent activity"
             description="Most recent events, newest first, with the approximate location behind each click. Never includes a session id, IP address, or precise coordinates."
           >
-            <AdminDataTable
-              columns={["Time", "Event", "Tool", "Location", "Device"]}
-              rows={recentEvents.data.map((event) => [
-                formatEventTime(event.occurredAt),
-                EVENT_LABEL[event.eventName] ?? event.eventName,
-                event.toolSlug ?? "—",
-                event.locationLabel,
-                `${event.deviceClass} · ${event.browserFamily} · ${event.operatingSystem}`,
-              ])}
-              empty={
-                <AdminEmptyState
-                  title="No recent activity yet"
-                  description="Individual events will appear here as visitors interact with the public site."
-                />
-              }
-            />
+            <RecentActivityTable rows={activityRows.slice(0, RECENT_ACTIVITY_PREVIEW_SIZE)} />
+            {activityRows.length > RECENT_ACTIVITY_PREVIEW_SIZE ? (
+              <div className="mt-4 text-right">
+                <Link
+                  href="/admin/analytics/activity"
+                  className="text-sm font-bold text-[var(--text-accent)] hover:underline"
+                >
+                  View full activity log →
+                </Link>
+              </div>
+            ) : null}
           </AdminSectionCard>
         </>
       ) : null}

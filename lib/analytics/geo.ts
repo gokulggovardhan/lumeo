@@ -16,15 +16,22 @@ export function readGeoCookie(): GeoInfo | null {
     .find((entry) => entry.startsWith(`${GEO_COOKIE_NAME}=`));
   if (!match) return null;
 
-  const raw = match.slice(GEO_COOKIE_NAME.length + 1);
-  const [city, region, country] = raw.split("|").map((part) => {
-    try {
-      const decoded = decodeURIComponent(part ?? "");
-      return decoded || null;
-    } catch {
-      return null;
-    }
-  });
+  const rawValue = match.slice(GEO_COOKIE_NAME.length + 1);
+
+  // proxy.ts joins the three raw segments with "|" and lets the cookie
+  // serializer's own percent-encoding handle the whole value on write --
+  // that encoding pass turns "|" into "%7C", so it must be decoded once as
+  // a whole BEFORE splitting, not split first and decoded per part (that
+  // used to find zero literal "|" characters and dump the entire decoded
+  // blob into `city` alone, leaving region/country empty).
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(rawValue);
+  } catch {
+    return null;
+  }
+
+  const [city, region, country] = decoded.split("|").map((part) => part || null);
 
   if (!city && !region && !country) return null;
   return { city, region, country };
