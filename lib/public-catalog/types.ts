@@ -1,4 +1,4 @@
-export type PublicToolStatus = "active" | "beta" | "coming_soon";
+export type PublicToolStatus = "active" | "beta" | "coming_soon" | "hidden" | "maintenance";
 
 export type PublicPdfTool = {
   toolSlug: string;
@@ -7,6 +7,8 @@ export type PublicPdfTool = {
   route: string;
   iconKey: string;
   status: PublicToolStatus;
+  isEnabled: boolean;
+  maintenanceMessage: string | null;
   categorySlug: string | null;
   categoryName: string;
   categoryDescription: string | null;

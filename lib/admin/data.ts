@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import { formatLocationLabel } from "@/lib/analytics/location-names";
 import type { AdminContext, AdminRole } from "@/lib/admin/types";
 import type {
   Announcement,
@@ -346,7 +347,7 @@ function parseLocationRows(value: unknown) {
     const city = stringValue(row.city);
     const region = stringValue(row.region);
     const country = stringValue(row.country_code);
-    const label = [city, region, country].filter(Boolean).join(", ") || "Unknown";
+    const label = formatLocationLabel(city, region, country);
     rows.push({ label, count });
   }
   return rows;
@@ -562,6 +563,57 @@ export async function getAnalyticsSummary(): Promise<DataResult<AnalyticsSummary
     },
     null,
   );
+}
+
+export type RecentAnalyticsEvent = {
+  occurredAt: string;
+  eventName: string;
+  toolSlug: string | null;
+  deviceClass: string;
+  browserFamily: string;
+  operatingSystem: string;
+  locationLabel: string;
+  success: boolean | null;
+};
+
+function parseRecentEvents(value: unknown): RecentAnalyticsEvent[] {
+  if (!Array.isArray(value)) return [];
+  const rows: RecentAnalyticsEvent[] = [];
+  for (const row of value) {
+    if (!isRecord(row)) continue;
+    const occurredAt = stringValue(row.occurred_at);
+    const eventName = stringValue(row.event_name);
+    if (!occurredAt || !eventName) continue;
+
+    rows.push({
+      occurredAt,
+      eventName,
+      toolSlug: stringValue(row.tool_slug),
+      deviceClass: stringValue(row.device_class) ?? "unknown",
+      browserFamily: stringValue(row.browser_family) ?? "Unknown",
+      operatingSystem: stringValue(row.operating_system) ?? "Unknown",
+      locationLabel: formatLocationLabel(
+        stringValue(row.city),
+        stringValue(row.region),
+        stringValue(row.country_code),
+      ),
+      success: typeof row.success === "boolean" ? row.success : null,
+    });
+  }
+  return rows;
+}
+
+// The aggregate `location_summary` in getAnalyticsSummary answers "where are
+// visitors from, in general" (top 15, grouped, distinct-visitor-ranked).
+// This answers "where did each individual recent click come from" -- a raw,
+// most-recent-first feed, capped at `limit`. Same privacy scope as
+// everywhere else: no session id, no IP, no precise coordinates.
+export async function getRecentAnalyticsEvents(limit = 50): Promise<DataResult<RecentAnalyticsEvent[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_admin_recent_analytics_events", { p_limit: limit });
+
+  if (error) return safe([], error);
+  return safe(parseRecentEvents(data), null);
 }
 
 export async function getOverviewData(): Promise<DataResult<OverviewData>> {

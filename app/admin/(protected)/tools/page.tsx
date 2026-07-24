@@ -8,7 +8,13 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getPdfTools, getToolCategories } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageTools } from "@/lib/admin/permissions";
-import { updateToolCategory, updateToolEnabled, updateToolSortOrder, updateToolStatus } from "@/app/admin/(protected)/tools/actions";
+import {
+  updateToolCategory,
+  updateToolEnabled,
+  updateToolMaintenanceMessage,
+  updateToolSortOrder,
+  updateToolStatus,
+} from "@/app/admin/(protected)/tools/actions";
 
 export default async function ToolsPage() {
   const admin = await requireAdmin();
@@ -20,11 +26,11 @@ export default async function ToolsPage() {
       <AdminPageHeader
         eyebrow="Catalog"
         title="PDF Tools"
-        description="Manage the database catalog for Lumeo PDF tools. An action's status and enabled state here control whether it shows as live in the nav, homepage, and tools catalog. Tool grouping and naming (Compose, Distill, and the rest) are defined in code — see lib/tools/catalog.ts."
+        description="Manage the database catalog for Lumeo PDF tools. An action's status and enabled state here control whether it shows as live in the nav, homepage, tools catalog, and its own page — set status to Maintenance (or disable it) and it's blocked on its own page too, showing the message below."
       />
       <AdminSectionCard title="Tool catalog" description={canEdit ? "Owner and admin roles can update catalog controls." : "Analyst access is read-only."}>
         <AdminDataTable
-          columns={["Tool", "Category", "Route", "Status", "Enabled", "Sort", "Updated"]}
+          columns={["Tool", "Category", "Route", "Status", "Maintenance message", "Enabled", "Sort", "Updated"]}
           rows={tools.data.map((tool) => [
             <div key="tool">
               <p className="font-semibold text-[#F0EAD6]">{tool.name}</p>
@@ -54,6 +60,20 @@ export default async function ToolsPage() {
                 <AdminSubmitButton variant="secondary" pendingLabel="...">Save</AdminSubmitButton>
               </form>
             ) : <AdminStatusBadge>{tool.status}</AdminStatusBadge>,
+            canEdit ? (
+              <form key="maintenance_message" action={asAdminFormAction(updateToolMaintenanceMessage)} className="flex gap-2">
+                <input type="hidden" name="id" value={tool.id} />
+                <textarea
+                  name="maintenance_message"
+                  defaultValue={tool.maintenance_message ?? ""}
+                  placeholder="e.g. Upgrading this tool -- back shortly."
+                  rows={2}
+                  maxLength={300}
+                  className="min-h-10 w-56 resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 py-1.5 text-xs"
+                />
+                <AdminSubmitButton variant="secondary" pendingLabel="...">Save</AdminSubmitButton>
+              </form>
+            ) : (tool.maintenance_message || <span className="text-[#F0EAD6]/40">None</span>),
             canEdit ? (
               <form key="enabled" action={asAdminFormAction(updateToolEnabled)} className="flex items-center gap-2">
                 <input type="hidden" name="id" value={tool.id} />

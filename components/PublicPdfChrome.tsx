@@ -97,38 +97,3 @@ export function PublicPageShell({
   );
 }
 
-export function ToolPlaceholder({
-  title,
-  description,
-  accepted,
-}: {
-  title: string;
-  description: string;
-  accepted: string;
-}) {
-  return (
-    <PublicPageShell
-      mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
-      contentClassName="px-5 py-14 sm:px-8 sm:py-20"
-      maxWidth="max-w-[820px]"
-    >
-      <section className="mx-auto text-center">
-        <p className="aura-text-label text-[var(--text-accent)]">
-          Coming next
-        </p>
-        <h1 className="mt-4 font-serif text-4xl tracking-[-0.04em] text-[var(--text-primary)] sm:text-6xl">
-          {title}
-        </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-[var(--text-secondary)] sm:text-lg sm:leading-8">
-          {description}
-        </p>
-
-        <div className="aura-luminous-card mx-auto mt-10 max-w-2xl rounded-[24px] px-6 py-8 sm:px-8">
-          <p className="relative text-xl font-bold text-[var(--text-primary)]">This workspace is being prepared.</p>
-          <p className="relative mt-3 text-sm leading-6 text-[var(--text-secondary)]">Accepted format: {accepted}</p>
-          <p className="relative mt-5 text-xs font-semibold text-[var(--text-success)]">Private by design · Browser-first where possible</p>
-        </div>
-      </section>
-    </PublicPageShell>
-  );
-}

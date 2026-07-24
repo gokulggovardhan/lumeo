@@ -28,8 +28,14 @@ export function resolveLumeoTools(dbTools: PublicPdfTool[]): ResolvedTool[] {
       const dbTool = dbBySlug.get(action.slug);
       if (!dbTool) return action;
 
-      const live = dbTool.status === "active" || dbTool.status === "beta";
-      return { ...action, live, route: live ? action.route ?? dbTool.route : action.route };
+      const live = dbTool.isEnabled && (dbTool.status === "active" || dbTool.status === "beta");
+      return {
+        ...action,
+        live,
+        route: live ? action.route ?? dbTool.route : action.route,
+        dbStatus: dbTool.isEnabled ? dbTool.status : "hidden",
+        maintenanceMessage: dbTool.maintenanceMessage,
+      };
     });
 
     const liveRoutes = actions.filter((action) => action.live && action.route);

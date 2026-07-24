@@ -6,7 +6,7 @@ import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AnalyticsBarList } from "@/components/admin/analytics/AnalyticsBarList";
 import { AnalyticsPrivacyNotice } from "@/components/admin/analytics/AnalyticsPrivacyNotice";
 import { AnalyticsTrendChart } from "@/components/admin/analytics/AnalyticsTrendChart";
-import { getAnalyticsSummary } from "@/lib/admin/data";
+import { getAnalyticsSummary, getRecentAnalyticsEvents } from "@/lib/admin/data";
 
 function formatDate(value: string | null) {
   return value
@@ -17,8 +17,24 @@ function formatDate(value: string | null) {
     : "None yet";
 }
 
+function formatEventTime(value: string) {
+  return new Date(value).toLocaleString("en", { dateStyle: "medium", timeStyle: "medium" });
+}
+
+const EVENT_LABEL: Record<string, string> = {
+  page_view: "Page view",
+  tool_opened: "Tool opened",
+  processing_started: "Processing started",
+  processing_succeeded: "Processing succeeded",
+  processing_failed: "Processing failed",
+  download_started: "Download started",
+};
+
 export default async function AnalyticsPage() {
-  const summary = await getAnalyticsSummary();
+  const [summary, recentEvents] = await Promise.all([
+    getAnalyticsSummary(),
+    getRecentAnalyticsEvents(50),
+  ]);
   const data = summary.data;
   const unavailable = data.dataStatus === "unavailable";
   const mostOpenedTool = data.topToolsByOpens[0];
@@ -242,6 +258,28 @@ export default async function AnalyticsPage() {
               emptyText="No location data yet. Run migration 20260719017_analytics_location.sql to enable."
             />
           </section>
+
+          <AdminSectionCard
+            title="Recent activity"
+            description="Most recent events, newest first, with the approximate location behind each click. Never includes a session id, IP address, or precise coordinates."
+          >
+            <AdminDataTable
+              columns={["Time", "Event", "Tool", "Location", "Device"]}
+              rows={recentEvents.data.map((event) => [
+                formatEventTime(event.occurredAt),
+                EVENT_LABEL[event.eventName] ?? event.eventName,
+                event.toolSlug ?? "—",
+                event.locationLabel,
+                `${event.deviceClass} · ${event.browserFamily} · ${event.operatingSystem}`,
+              ])}
+              empty={
+                <AdminEmptyState
+                  title="No recent activity yet"
+                  description="Individual events will appear here as visitors interact with the public site."
+                />
+              }
+            />
+          </AdminSectionCard>
         </>
       ) : null}
     </div>
