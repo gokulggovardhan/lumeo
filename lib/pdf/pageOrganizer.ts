@@ -1,3 +1,5 @@
+// Relative import (not the usual @/lib/pdf/... alias) so this module can be
+// loaded directly by Node's test runner, which has no path-alias resolution.
 import { normalizeRotation } from "./rotation.ts";
 
 export type OrganizerItem = {
