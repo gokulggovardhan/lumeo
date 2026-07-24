@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
+import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
+import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
 const SignPdfTool = dynamic(() => import("@/components/pdf/SignPdfTool"), {
@@ -34,7 +36,9 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export default function SignPdfPage() {
+export default async function SignPdfPage() {
+  const toolState = await getToolBlockedState("sign");
+
   return (
     <PublicCatalogPageShell
       maxWidth="max-w-[1240px]"
@@ -46,7 +50,11 @@ export default function SignPdfPage() {
         description="Draw or type your signature, then place it on any page."
       />
 
-      <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-sign-tool"><SignPdfTool /></div>
+      {toolState.blocked ? (
+        <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
+      ) : (
+        <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-sign-tool"><SignPdfTool /></div>
+      )}
     </PublicCatalogPageShell>
   );
 }

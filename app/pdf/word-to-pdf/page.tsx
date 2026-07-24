@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
+import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
+import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
 const WordToPdfTool = dynamic(() => import("@/components/pdf/WordToPdfTool"), {
@@ -28,7 +30,9 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export default function WordToPdfPage() {
+export default async function WordToPdfPage() {
+  const toolState = await getToolBlockedState("word-to-pdf");
+
   return (
     <PublicCatalogPageShell
       maxWidth="max-w-[1240px]"
@@ -40,7 +44,11 @@ export default function WordToPdfPage() {
         description="Convert Word documents to PDF. Uploaded securely, converted on our server, deleted immediately after."
       />
 
-      <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-word-to-pdf-tool"><WordToPdfTool /></div>
+      {toolState.blocked ? (
+        <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
+      ) : (
+        <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-word-to-pdf-tool"><WordToPdfTool /></div>
+      )}
     </PublicCatalogPageShell>
   );
 }

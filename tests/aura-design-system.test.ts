@@ -18,7 +18,7 @@ const launcher = read("components/pdf/PdfToolLauncher.tsx");
 const publicChrome = read("components/PublicPdfChrome.tsx");
 const publicFooter = read("components/PublicFooter.tsx");
 const publicMenu = read("components/public/PublicPdfToolsMenuClient.tsx");
-const placeholder = read("components/pdf/PdfToolPlaceholder.tsx");
+const maintenanceNotice = read("components/pdf/ToolMaintenanceNotice.tsx");
 const directoryLoading = read("app/pdf-tools/loading.tsx");
 const directoryError = read("app/pdf-tools/error.tsx");
 const rolloutDoc = read("docs/LUMEO_AURA_ROLLOUT.md");
@@ -274,12 +274,10 @@ test("Lumeo 2 directory, loading and error states use public foundations", () =>
   assert.doesNotMatch(pdfTools, /\b(popular|ratings?|users?|downloads?)\b/i);
 });
 
-test("Lumeo 2 placeholder tools are clearly non-operational", () => {
-  assert.ok(placeholder.includes("Non-operational preview"));
-  assert.ok(placeholder.includes("No files can be selected or processed"));
-  assert.ok(placeholder.includes("Browse PDF tools"));
-  assert.ok(placeholder.includes("Back home"));
-  assert.doesNotMatch(placeholder, /AuraUploadSurface|Select files|Start conversion|Convert now/);
+test("Lumeo tool maintenance notice is clearly non-operational", () => {
+  assert.ok(maintenanceNotice.includes("Undergoing maintenance"));
+  assert.ok(maintenanceNotice.includes("Coming soon"));
+  assert.doesNotMatch(maintenanceNotice, /AuraUploadSurface|Select files|Start conversion|Convert now/);
 });
 
 test("Lumeo 2 footer has grouped navigation and public verifier exists", () => {

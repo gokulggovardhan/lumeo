@@ -37,6 +37,33 @@ export async function updateToolStatus(formData: FormData) {
   return successState("Tool status updated.");
 }
 
+export async function updateToolMaintenanceMessage(formData: FormData) {
+  const admin = await requireAdmin();
+  if (!canManageTools(admin.role)) return errorState("You do not have permission to update tools.");
+
+  const id = formString(formData, "id", 80);
+  const message = formString(formData, "maintenance_message", 300);
+  if (!id) return errorState("Choose a valid tool.");
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("pdf_tools")
+    .update({ maintenance_message: message || null })
+    .eq("id", id);
+  if (error) return errorState("Maintenance message could not be updated.");
+
+  await writeAuditLog({
+    action: "tool.maintenance_message.update",
+    entityType: "pdf_tool",
+    entityId: id,
+    summary: message ? "Set a PDF tool's maintenance message." : "Cleared a PDF tool's maintenance message.",
+    changes: { maintenance_message: message || null },
+  });
+  revalidatePath("/admin/tools");
+  revalidatePath("/admin/homepage");
+  return successState("Maintenance message updated.");
+}
+
 export async function updateToolEnabled(formData: FormData) {
   const admin = await requireAdmin();
   if (!canManageTools(admin.role)) return errorState("You do not have permission to update tools.");

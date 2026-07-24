@@ -5,8 +5,10 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AnalyticsBarList } from "@/components/admin/analytics/AnalyticsBarList";
 import { AnalyticsPrivacyNotice } from "@/components/admin/analytics/AnalyticsPrivacyNotice";
+import Link from "next/link";
 import { AnalyticsTrendChart } from "@/components/admin/analytics/AnalyticsTrendChart";
-import { getAnalyticsSummary } from "@/lib/admin/data";
+import { RecentActivityTable, RECENT_ACTIVITY_PREVIEW_SIZE } from "@/components/admin/analytics/RecentActivityTable";
+import { collapseUnknownLocationRuns, getAnalyticsSummary, getRecentAnalyticsEvents } from "@/lib/admin/data";
 
 function formatDate(value: string | null) {
   return value
@@ -18,8 +20,12 @@ function formatDate(value: string | null) {
 }
 
 export default async function AnalyticsPage() {
-  const summary = await getAnalyticsSummary();
+  const [summary, recentEvents] = await Promise.all([
+    getAnalyticsSummary(),
+    getRecentAnalyticsEvents(200),
+  ]);
   const data = summary.data;
+  const activityRows = collapseUnknownLocationRuns(recentEvents.data);
   const unavailable = data.dataStatus === "unavailable";
   const mostOpenedTool = data.topToolsByOpens[0];
   const noData = data.eventsToday === 0 && data.sevenDayTotals.length === 0;
@@ -242,6 +248,23 @@ export default async function AnalyticsPage() {
               emptyText="No location data yet. Run migration 20260719017_analytics_location.sql to enable."
             />
           </section>
+
+          <AdminSectionCard
+            title="Recent activity"
+            description="Most recent events, newest first, with the approximate location behind each click. Never includes a session id, IP address, or precise coordinates."
+          >
+            <RecentActivityTable rows={activityRows.slice(0, RECENT_ACTIVITY_PREVIEW_SIZE)} />
+            {activityRows.length > RECENT_ACTIVITY_PREVIEW_SIZE ? (
+              <div className="mt-4 text-right">
+                <Link
+                  href="/admin/analytics/activity"
+                  className="text-sm font-bold text-[var(--text-accent)] hover:underline"
+                >
+                  View full activity log →
+                </Link>
+              </div>
+            ) : null}
+          </AdminSectionCard>
         </>
       ) : null}
     </div>

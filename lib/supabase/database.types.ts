@@ -72,6 +72,7 @@ export type PdfTool = {
   route: string;
   icon_key: string;
   status: ToolStatus;
+  maintenance_message: string | null;
   is_enabled: boolean;
   is_homepage_eligible: boolean;
   sort_order: number;

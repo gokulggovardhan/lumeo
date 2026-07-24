@@ -61,6 +61,8 @@ export function getFallbackPublicTools(): PublicPdfTool[] {
         route: local.route,
         iconKey: local.slug,
         status: toPublicStatus(local.status),
+        isEnabled: true,
+        maintenanceMessage: null,
         categorySlug: category.slug,
         categoryName: category.name,
         categoryDescription: category.description,

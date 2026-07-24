@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
+import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
+import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
 const PdfToJpgTool = dynamic(() => import("@/components/pdf/PdfToJpgTool"), {
@@ -35,7 +37,9 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export default function PdfToJpgPage() {
+export default async function PdfToJpgPage() {
+  const toolState = await getToolBlockedState("pdf-to-jpg");
+
   return (
     <PublicCatalogPageShell
       maxWidth="max-w-[1240px]"
@@ -47,7 +51,11 @@ export default function PdfToJpgPage() {
         description="Export PDF pages as image files."
       />
 
-      <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-pdf-to-jpg-tool"><PdfToJpgTool /></div>
+      {toolState.blocked ? (
+        <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
+      ) : (
+        <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-pdf-to-jpg-tool"><PdfToJpgTool /></div>
+      )}
     </PublicCatalogPageShell>
   );
 }

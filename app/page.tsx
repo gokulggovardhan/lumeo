@@ -131,24 +131,24 @@ export default function Home() {
 
       <section className="relative z-10 flex-1">
         <div className="mx-auto w-full max-w-[1160px] px-5 pb-16 pt-4 sm:px-8 sm:pt-5 lg:pt-5">
-          <header className="lumeo-fade-up mx-auto max-w-[40rem] text-center">
+          <header className="lumeo-fade-up mx-auto max-w-[36rem] text-center">
             <p className="aura-text-label inline-flex items-center gap-2 text-[var(--text-accent)]">
               <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--text-accent)]" />
               Runs entirely in your browser
             </p>
             <h1
               id="tool-heading"
-              className="mt-2.5 font-serif font-semibold text-[clamp(1.75rem,3.6vw,2.5rem)] leading-[1.1] tracking-[-0.015em] text-[var(--text-primary)]"
+              className="mt-3 font-serif font-semibold text-[clamp(2rem,4.6vw,3.1rem)] leading-[1.06] tracking-[-0.02em] text-[var(--text-primary)]"
             >
-              The PDF tool you need, right <em className="not-italic text-[var(--atelier-sage-300)]">where you need it.</em>
+              Pick a tool. <em className="not-italic text-[var(--atelier-sage-300)]">Get it done.</em>
             </h1>
           </header>
 
-          <div className="mt-4 sm:mt-5">
+          <div className="mt-9 sm:mt-12">
             <PdfToolLauncher showHeading={false} />
           </div>
 
-          <div className="mt-5 flex flex-wrap justify-center gap-6 border-y border-[var(--border-hairline)] py-4 sm:gap-10">
+          <div className="mt-9 flex flex-wrap justify-center gap-6 border-y border-[var(--border-hairline)] py-4 sm:mt-12 sm:gap-10">
             {trustItems.map((item) => (
               <div key={item.label} className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
                 <item.icon />

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import dynamic from "next/dynamic";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
+import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
+import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
 const JpgToPdfTool = dynamic(() => import("@/components/pdf/JpgToPdfTool"), {
@@ -35,7 +37,9 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export default function JpgToPdfPage() {
+export default async function JpgToPdfPage() {
+  const toolState = await getToolBlockedState("jpg-to-pdf");
+
   return (
     <PublicCatalogPageShell
       maxWidth="max-w-[1240px]"
@@ -47,7 +51,11 @@ export default function JpgToPdfPage() {
         description="Convert images into a clean PDF document."
       />
 
-      <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-jpg-to-pdf-tool"><JpgToPdfTool /></div>
+      {toolState.blocked ? (
+        <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
+      ) : (
+        <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-jpg-to-pdf-tool"><JpgToPdfTool /></div>
+      )}
     </PublicCatalogPageShell>
   );
 }
