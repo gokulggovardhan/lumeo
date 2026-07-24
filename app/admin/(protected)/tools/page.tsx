@@ -63,13 +63,13 @@ export default async function ToolsPage() {
             canEdit ? (
               <form key="maintenance_message" action={asAdminFormAction(updateToolMaintenanceMessage)} className="flex gap-2">
                 <input type="hidden" name="id" value={tool.id} />
-                <textarea
+                <input
+                  type="text"
                   name="maintenance_message"
                   defaultValue={tool.maintenance_message ?? ""}
-                  placeholder="e.g. Upgrading this tool -- back shortly."
-                  rows={2}
+                  placeholder="e.g. Upgrading -- back shortly"
                   maxLength={300}
-                  className="min-h-10 w-56 resize-y rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 py-1.5 text-xs"
+                  className="min-h-10 w-44 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
                 />
                 <AdminSubmitButton variant="secondary" pendingLabel="...">Save</AdminSubmitButton>
               </form>
