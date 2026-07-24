@@ -34,7 +34,7 @@ export default async function AnnouncementsPage({
       <AdminPageHeader
         eyebrow="Messaging"
         title="Announcements"
-        description="Prepare calm public messages with scheduling and link validation. Public rendering is not changed in this phase."
+        description="Calm public messages with scheduling and link validation. Active announcements render live as a banner across the public site."
       />
       {canEdit && (
         <AdminSectionCard

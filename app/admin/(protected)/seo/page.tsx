@@ -32,7 +32,10 @@ const publicRoutes = [
   "/pdf/jpg-to-pdf",
   "/pdf/merge",
   "/pdf/pdf-to-jpg",
+  "/pdf/pdf-to-word",
+  "/pdf/sign",
   "/pdf/split",
+  "/pdf/word-to-pdf",
 ];
 
 export default async function SeoPage({
@@ -54,7 +57,7 @@ export default async function SeoPage({
       <AdminPageHeader
         eyebrow="Search foundation"
         title="SEO"
-        description="Manage route SEO records in the database. Public page metadata remains static in this phase."
+        description="Manage route SEO records in the database. Saved records override each route's default title, description, and social preview live."
       />
 
       <AdminSectionCard
