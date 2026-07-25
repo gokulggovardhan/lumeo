@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildHtml2PdfOptions, MARGIN_MM, validateHtmlSource } from "../lib/pdf/htmlToPdfOptions.ts";
+import {
+  buildHtml2PdfOptions,
+  getPageContentWidthPx,
+  MARGIN_MM,
+  validateHtmlSource,
+} from "../lib/pdf/htmlToPdfOptions.ts";
 
 test("margin presets are in millimeters, wide > normal > none", () => {
   assert.equal(MARGIN_MM.none, 0);
@@ -27,4 +32,12 @@ test("buildHtml2PdfOptions maps page size, orientation, and margin correctly", (
   assert.equal(options.jsPDF.orientation, "landscape");
   assert.equal(options.jsPDF.unit, "mm");
   assert.equal(options.image.type, "jpeg");
+});
+
+test("getPageContentWidthPx returns the real page width in CSS px at 96dpi, orientation-aware", () => {
+  assert.equal(getPageContentWidthPx("a4", "portrait"), 794);
+  assert.equal(getPageContentWidthPx("a4", "landscape"), 1123);
+  assert.equal(getPageContentWidthPx("letter", "portrait"), 816);
+  assert.equal(getPageContentWidthPx("legal", "portrait"), 816);
+  assert.equal(getPageContentWidthPx("legal", "landscape"), 1344);
 });
