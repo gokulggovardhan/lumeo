@@ -186,8 +186,8 @@ export const pdfTools: PdfToolDefinition[] = [
   },
   {
     slug: "extract-text",
-    title: "Extract Text",
-    shortTitle: "Extract text",
+    title: "PDF Text Extract",
+    shortTitle: "PDF Text Extract",
     description: "Pull selectable text out of a PDF and read or export it.",
     route: "/pdf/extract-text",
     status: "live",
@@ -197,8 +197,9 @@ export const pdfTools: PdfToolDefinition[] = [
     bullets: [
       "Per-page text panels",
       "Search across all pages",
+      "Selective page-range extraction",
+      "Export as TXT, JSON, or CSV",
       "Copy per page or copy all",
-      "Download as .txt",
     ],
   },
 ];

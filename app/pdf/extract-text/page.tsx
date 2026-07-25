@@ -12,11 +12,11 @@ const ExtractTextTool = dynamic(() => import("@/components/pdf/ExtractTextTool")
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf/extract-text", {
-    title: { absolute: "Extract Text from PDF Online Privately - Lumeo PDF" },
-    description: "Pull selectable text out of a PDF privately in your browser. Read it, search it, copy it, or download it as .txt.",
+    title: { absolute: "PDF Text Extract Online Privately - Lumeo PDF" },
+    description: "Pull selectable text out of a PDF privately in your browser. Search it, extract a page range, and export as TXT, JSON, or CSV.",
     alternates: { canonical: "/pdf/extract-text" },
     openGraph: {
-      title: "Extract Text from PDF Online Privately - Lumeo PDF",
+      title: "PDF Text Extract Online Privately - Lumeo PDF",
       description: "Read, search, and export PDF text in a calm browser-first workspace.",
       url: "https://lumeo.in/pdf/extract-text",
       siteName: "Lumeo PDF",
@@ -24,7 +24,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: "Extract Text from PDF Online Privately - Lumeo PDF",
+      title: "PDF Text Extract Online Privately - Lumeo PDF",
       description: "Extract PDF text directly on your device using Lumeo PDF Workspace.",
     },
   });
@@ -40,8 +40,8 @@ export default async function ExtractTextPage() {
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
       <L2ToolPageHeader
-        title="Extract Text"
-        description="Pull selectable text out of a PDF and read, search, or export it."
+        title="PDF Text Extract"
+        description="Pull selectable text out of a PDF, narrow to a page range, and export as TXT, JSON, or CSV."
       />
 
       {toolState.blocked ? (

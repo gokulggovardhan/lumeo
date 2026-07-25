@@ -123,7 +123,7 @@ export const lumeoTools: LumeoTool[] = [
       { label: "PDF to JPG", slug: "pdf-to-jpg", route: "/pdf/pdf-to-jpg", live: true },
       { label: "PDF to PNG", slug: "pdf-to-png", route: "/pdf/pdf-to-jpg", live: true },
       { label: "PDF to WEBP", slug: "pdf-to-webp", route: "/pdf/pdf-to-jpg", live: true },
-      { label: "Extract text", slug: "extract-text", route: "/pdf/extract-text", live: true },
+      { label: "PDF Text Extract", slug: "extract-text", route: "/pdf/extract-text", live: true },
       { label: "PDF to HTML", slug: "pdf-to-html", live: false },
     ],
   },
