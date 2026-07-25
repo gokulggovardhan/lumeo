@@ -14,8 +14,25 @@ import {
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
-import { buildTxtFile, isEffectivelyEmpty, joinTextItems } from "@/lib/pdf/textExtraction";
+import {
+  buildCsvFromEntries,
+  buildJsonFromEntries,
+  buildTxtFromEntries,
+  isEffectivelyEmpty,
+  joinTextItems,
+  parsePageRange,
+  selectPageEntries,
+} from "@/lib/pdf/textExtraction";
 import { checkPdfFileSize, hasPdfMagicBytes, isPdfNamedFile } from "@/lib/pdf/uploadValidation";
+
+type ExportFormat = "txt" | "json" | "csv";
+
+const FORMAT_EXTENSION: Record<ExportFormat, string> = { txt: "txt", json: "json", csv: "csv" };
+const FORMAT_MIME: Record<ExportFormat, string> = {
+  txt: "text/plain",
+  json: "application/json",
+  csv: "text/csv",
+};
 
 function ExtractIcon() {
   return (
@@ -26,8 +43,8 @@ function ExtractIcon() {
   );
 }
 
-function downloadText(content: string, fileName: string) {
-  const blob = new Blob([content], { type: "text/plain" });
+function downloadText(content: string, fileName: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -45,6 +62,8 @@ export default function ExtractTextTool() {
   const [fileName, setFileName] = useState("");
   const [pageTexts, setPageTexts] = useState<string[] | null>(null);
   const [search, setSearch] = useState("");
+  const [pageRangeInput, setPageRangeInput] = useState("");
+  const [format, setFormat] = useState<ExportFormat>("txt");
   const [error, setError] = useState("");
   const [isExtracting, setIsExtracting] = useState(false);
 
@@ -121,25 +140,47 @@ export default function ExtractTextTool() {
     }
   }
 
+  const rangeResult = useMemo(
+    () => parsePageRange(pageRangeInput, pageTexts?.length ?? 0),
+    [pageRangeInput, pageTexts],
+  );
+
   const filteredIndices = useMemo(() => {
-    if (!pageTexts || !search.trim()) return pageTexts?.map((_, index) => index) ?? [];
+    if (!pageTexts) return [];
     const term = search.trim().toLowerCase();
     return pageTexts
       .map((text, index) => ({ text, index }))
-      .filter(({ text }) => text.toLowerCase().includes(term))
+      .filter(({ index }) => !rangeResult.pages || rangeResult.pages.has(index + 1))
+      .filter(({ text }) => !term || text.toLowerCase().includes(term))
       .map(({ index }) => index);
-  }, [pageTexts, search]);
+  }, [pageTexts, search, rangeResult.pages]);
+
+  const selectedEntries = useMemo(
+    () => (pageTexts ? selectPageEntries(pageTexts, rangeResult.pages) : []),
+    [pageTexts, rangeResult.pages],
+  );
 
   const noTextLayer = pageTexts ? isEffectivelyEmpty(pageTexts) : false;
+  const exportDisabled = noTextLayer || selectedEntries.length === 0;
 
   function handleCopyAll() {
-    if (!pageTexts) return;
-    void navigator.clipboard.writeText(buildTxtFile(pageTexts));
+    if (exportDisabled) return;
+    void navigator.clipboard.writeText(buildTxtFromEntries(selectedEntries));
   }
 
   function handleDownload() {
-    if (!pageTexts) return;
-    downloadText(buildTxtFile(pageTexts), `${sanitizeFileStem(fileName, "lumeo-extract")}.txt`);
+    if (exportDisabled) return;
+    const content =
+      format === "json"
+        ? buildJsonFromEntries(selectedEntries)
+        : format === "csv"
+          ? buildCsvFromEntries(selectedEntries)
+          : buildTxtFromEntries(selectedEntries);
+    downloadText(
+      content,
+      `${sanitizeFileStem(fileName, "lumeo-extract")}.${FORMAT_EXTENSION[format]}`,
+      FORMAT_MIME[format],
+    );
     track({ eventName: "download_started", toolSlug: "extract-text" });
   }
 
@@ -176,6 +217,10 @@ export default function ExtractTextTool() {
             <div role="status" className="rounded-lg border border-[var(--text-primary)]/14 bg-[var(--text-primary)]/[0.045] p-4 text-sm font-medium text-[var(--text-primary)]">
               No selectable text found — this looks like a scanned document.
             </div>
+          ) : filteredIndices.length === 0 ? (
+            <div role="status" className="rounded-lg border border-[var(--text-primary)]/14 bg-[var(--text-primary)]/[0.045] p-4 text-sm font-medium text-[var(--text-primary)]">
+              No pages match the current page range and search.
+            </div>
           ) : (
             <div className="grid gap-3">
               {filteredIndices.map((index) => (
@@ -199,26 +244,56 @@ export default function ExtractTextTool() {
           )}
         </L2ToolMainColumn>
 
-        <L2ToolSettingsPanel title="Search" description="Filters pages by matching text.">
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search extracted text…"
-            className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm"
-          />
+        <L2ToolSettingsPanel title="Search & export" description="Narrow to a page range, search matching text, and choose an export format.">
+          <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
+            Search
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search extracted text…"
+              className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm font-normal"
+            />
+          </label>
+          <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
+            Page range
+            <input
+              value={pageRangeInput}
+              onChange={(event) => setPageRangeInput(event.target.value)}
+              placeholder="e.g. 1-3, 7 (leave blank for all pages)"
+              className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm font-normal"
+            />
+          </label>
+          {rangeResult.error ? (
+            <p role="alert" className="text-xs font-bold text-[var(--text-danger)]">
+              {rangeResult.error}
+            </p>
+          ) : null}
+          <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
+            Export format
+            <select
+              value={format}
+              onChange={(event) => setFormat(event.target.value as ExportFormat)}
+              className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm font-normal"
+            >
+              <option value="txt">Plain text (.txt)</option>
+              <option value="json">JSON (.json)</option>
+              <option value="csv">CSV (.csv)</option>
+            </select>
+          </label>
+
           <L2ActionArea
             primary={
               <button
                 type="button"
                 onClick={handleDownload}
-                disabled={noTextLayer}
+                disabled={exportDisabled}
                 className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Download .txt
+                Download .{FORMAT_EXTENSION[format]}
               </button>
             }
             secondary={
-              <button type="button" onClick={handleCopyAll} disabled={noTextLayer} className="text-sm font-bold text-[var(--text-primary)]">
+              <button type="button" onClick={handleCopyAll} disabled={exportDisabled} className="text-sm font-bold text-[var(--text-primary)]">
                 Copy all
               </button>
             }
