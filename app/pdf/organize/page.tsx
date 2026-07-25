@@ -31,7 +31,11 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function OrganizePdfPage() {
-  const toolState = await getToolBlockedState("organize");
+  // "reorder" (not "organize") -- this is the tool's real catalog action
+  // slug in lib/tools/catalog.ts, and the admin console's pdf_tools row
+  // for this page uses the same slug, so one admin toggle controls both
+  // the page-level maintenance check and the catalog-level live/dead tile.
+  const toolState = await getToolBlockedState("reorder");
 
   return (
     <PublicCatalogPageShell
