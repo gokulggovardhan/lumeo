@@ -50,8 +50,10 @@ export default function ExtractTextTool() {
 
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
-    track({ eventName: "tool_opened", toolSlug: "extract-text" });
-    openedTrackedRef.current = true;
+    const result = track({ eventName: "tool_opened", toolSlug: "extract-text" });
+    if (result.accepted) {
+      openedTrackedRef.current = true;
+    }
   }, [availability, track]);
 
   async function handleFiles(files: FileList) {

@@ -13,6 +13,7 @@ import {
   L2ToolWorkspace,
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
+import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { formatBytes } from "@/lib/pdf/formatBytes";
 import {
@@ -100,19 +101,39 @@ export default function OrganizePdfTool() {
   const [isExporting, setIsExporting] = useState(false);
   const [result, setResult] = useState<OrganizeResult | null>(null);
 
+  async function destroyPdfJsDocument() {
+    const doc = pdfJsDocRef.current;
+    pdfJsDocRef.current = null;
+    if (doc) {
+      try {
+        await (doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
+      } catch {
+        // PDF.js may already be cleaning itself up.
+      }
+    }
+  }
+
   useEffect(() => {
-    if (availability !== "enabled" || openedTrackedRef.current) return;
-    track({ eventName: "tool_opened", toolSlug: "organize" });
-    openedTrackedRef.current = true;
+    if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
+    const result = track({ eventName: "tool_opened", toolSlug: "organize" });
+    if (result.accepted) {
+      openedTrackedRef.current = true;
+    }
   }, [availability, track]);
 
   useEffect(() => {
     return () => {
       if (result?.url) URL.revokeObjectURL(result.url);
-      thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      thumbnailUrlsRef.current.clear();
     };
   }, [result?.url]);
+
+  useEffect(() => {
+    return () => {
+      thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      thumbnailUrlsRef.current.clear();
+      void destroyPdfJsDocument();
+    };
+  }, []);
 
   async function renderThumbnails(doc: PDFDocumentProxy, pageCount: number, session: number) {
     const pending = Array.from({ length: pageCount }, (_, index) => index + 1);
@@ -167,6 +188,7 @@ export default function OrganizePdfTool() {
     setThumbnails({});
     thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     thumbnailUrlsRef.current.clear();
+    await destroyPdfJsDocument();
 
     if (!isPdfNamedFile(file)) {
       setError("Please add one PDF file.");
@@ -235,6 +257,11 @@ export default function OrganizePdfTool() {
     const next = selected.size ? rotateItems(items, selected, direction) : items;
     setItems(next);
     reindexSelection(next, selectedIds);
+    setResult(null);
+  }
+
+  function handleRotateOne(index: number, direction: "left" | "right") {
+    setItems(rotateItem(items, index, direction));
     setResult(null);
   }
 
@@ -373,8 +400,8 @@ export default function OrganizePdfTool() {
                 <div className="mt-2 flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]">
                   <span>Page {index + 1}</span>
                   <span className="flex gap-1">
-                    <button type="button" aria-label="Rotate left" onClick={() => setItems(rotateItem(items, index, "left"))}>⟲</button>
-                    <button type="button" aria-label="Rotate right" onClick={() => setItems(rotateItem(items, index, "right"))}>⟳</button>
+                    <button type="button" aria-label="Rotate left" onClick={() => handleRotateOne(index, "left")}>⟲</button>
+                    <button type="button" aria-label="Rotate right" onClick={() => handleRotateOne(index, "right")}>⟳</button>
                     <button type="button" aria-label="Duplicate page" onClick={() => handleDuplicate(index)}>⧉</button>
                     <button type="button" aria-label="Delete page" onClick={() => handleDelete(index)}>✕</button>
                   </span>
