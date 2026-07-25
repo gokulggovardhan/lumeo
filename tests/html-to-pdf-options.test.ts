@@ -25,6 +25,8 @@ test("buildHtml2PdfOptions maps page size, orientation, and margin correctly", (
     pageSize: "letter",
     orientation: "landscape",
     margin: "wide",
+    contentWidthPx: 1056,
+    contentHeightPx: 2000,
   });
   assert.equal(options.filename, "lumeo-html.pdf");
   assert.equal(options.margin, MARGIN_MM.wide);
@@ -32,6 +34,33 @@ test("buildHtml2PdfOptions maps page size, orientation, and margin correctly", (
   assert.equal(options.jsPDF.orientation, "landscape");
   assert.equal(options.jsPDF.unit, "mm");
   assert.equal(options.image.type, "jpeg");
+});
+
+test("buildHtml2PdfOptions passes explicit width/height to html2canvas instead of relying on viewport auto-detection", () => {
+  const options = buildHtml2PdfOptions({
+    fileName: "lumeo-html.pdf",
+    pageSize: "a4",
+    orientation: "portrait",
+    margin: "normal",
+    contentWidthPx: 794,
+    contentHeightPx: 1200,
+  });
+  assert.equal(options.html2canvas.width, 794);
+  assert.equal(options.html2canvas.height, 1200);
+  assert.equal(options.html2canvas.windowWidth, 794);
+  assert.equal(options.html2canvas.windowHeight, 1200);
+});
+
+test("buildHtml2PdfOptions enables CSS-aware page-break slicing", () => {
+  const options = buildHtml2PdfOptions({
+    fileName: "lumeo-html.pdf",
+    pageSize: "a4",
+    orientation: "portrait",
+    margin: "normal",
+    contentWidthPx: 794,
+    contentHeightPx: 1200,
+  });
+  assert.deepEqual(options.pagebreak?.mode, ["css", "legacy"]);
 });
 
 test("getPageContentWidthPx returns the real page width in CSS px at 96dpi, orientation-aware", () => {

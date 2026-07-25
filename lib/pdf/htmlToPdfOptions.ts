@@ -10,11 +10,22 @@ export interface Html2PdfOptions {
     quality?: number;
   };
   enableLinks?: boolean;
-  html2canvas?: object;
+  html2canvas?: {
+    scale?: number;
+    useCORS?: boolean;
+    backgroundColor?: string;
+    width?: number;
+    height?: number;
+    windowWidth?: number;
+    windowHeight?: number;
+  };
   jsPDF?: {
     unit?: string;
     format?: string | [number, number];
     orientation?: "portrait" | "landscape";
+  };
+  pagebreak?: {
+    mode?: Array<"avoid-all" | "css" | "legacy">;
   };
 }
 
@@ -53,12 +64,32 @@ export function buildHtml2PdfOptions(options: {
   pageSize: PageSize;
   orientation: Orientation;
   margin: MarginPreset;
+  contentWidthPx: number;
+  contentHeightPx: number;
 }): Html2PdfOptions {
   return {
     filename: options.fileName,
     margin: MARGIN_MM[options.margin],
     image: { type: "jpeg", quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+    // width/height/windowWidth/windowHeight are passed explicitly rather
+    // than left for html2canvas to auto-detect from the source element's
+    // iframe viewport -- an off-screen iframe's viewport can still report
+    // its pre-resize height at capture time (a real, observed cross-frame
+    // layout timing gap), silently producing a zero-height, blank capture.
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      width: options.contentWidthPx,
+      height: options.contentHeightPx,
+      windowWidth: options.contentWidthPx,
+      windowHeight: options.contentHeightPx,
+    },
     jsPDF: { unit: "mm", format: options.pageSize, orientation: options.orientation },
+    // "css" mode makes html2pdf.js honor page-break-before/after/inside
+    // rules in the source HTML when slicing the captured canvas into pages;
+    // without it, only fixed-page-height ("legacy") slicing is applied and
+    // an explicit forced page break in the user's CSS is ignored.
+    pagebreak: { mode: ["css", "legacy"] },
   };
 }

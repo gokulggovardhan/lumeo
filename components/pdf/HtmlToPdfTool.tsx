@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import DOMPurify from "dompurify";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
@@ -58,26 +59,78 @@ async function runWithTimeout<T>(promise: Promise<T>, message: string): Promise<
   }
 }
 
-// Rendered off-screen at the PDF page's real pixel width so html2canvas
-// captures the exact proportions the page will have -- capturing the visible
-// preview iframe instead would bake in whatever arbitrary width the two-column
-// layout gives it on screen, which jsPDF then rescales to fit the page and
-// throws off alignment/wrapping versus what the user saw.
-function createExportFrame(html: string, widthPx: number): Promise<HTMLIFrameElement> {
-  return new Promise((resolve, reject) => {
-    const frame = document.createElement("iframe");
-    frame.setAttribute("aria-hidden", "true");
-    frame.style.position = "fixed";
-    frame.style.top = "0";
-    frame.style.left = "-10000px";
-    frame.style.width = `${widthPx}px`;
-    frame.style.height = "1px";
-    frame.style.border = "0";
-    frame.onload = () => resolve(frame);
-    frame.onerror = () => reject(new Error("Could not prepare the document for export."));
-    document.body.appendChild(frame);
-    frame.srcdoc = html;
+type ExportSurface = {
+  host: HTMLDivElement;
+  container: HTMLElement;
+  contentWidthPx: number;
+  contentHeightPx: number;
+};
+
+// html2canvas cannot reliably paint content that lives in a different
+// document than the one calling it -- capturing an <iframe>'s contentDocument
+// (the previous approach here) produced a correctly-sized but genuinely
+// blank canvas every time, regardless of viewport/height settings, because
+// the source element's realm differs from html2canvas's own. Rendering the
+// user's HTML into a Shadow DOM subtree of the *same* document keeps
+// html2canvas in a single realm (fixing that) while still isolating the
+// user's own <style> rules from leaking onto the rest of the page.
+function createExportSurface(html: string, widthPx: number): Promise<ExportSurface> {
+  // Rendered in the app's own document (not a sandboxed iframe, see the note
+  // above), so any <script> or event-handler attribute in the user's typed
+  // HTML must be stripped before it ever touches the DOM -- otherwise it
+  // would execute with this page's own origin privileges.
+  const sanitizedHtml = DOMPurify.sanitize(html, {
+    WHOLE_DOCUMENT: true,
+    FORBID_TAGS: ["script", "iframe", "object", "embed"],
+    FORBID_ATTR: ["srcdoc"],
   });
+  const parsed = new DOMParser().parseFromString(sanitizedHtml, "text/html");
+  const styleNodes = Array.from(parsed.querySelectorAll("style"));
+  const bodyHtml = parsed.body?.innerHTML ?? "";
+
+  const host = document.createElement("div");
+  host.setAttribute("aria-hidden", "true");
+  host.style.position = "fixed";
+  host.style.top = "0";
+  host.style.left = "-10000px";
+  host.style.width = `${widthPx}px`;
+  document.body.appendChild(host);
+
+  const shadow = host.attachShadow({ mode: "open" });
+  styleNodes.forEach((style) => shadow.appendChild(style.cloneNode(true)));
+
+  const container = document.createElement("div");
+  container.style.width = `${widthPx}px`;
+  container.style.background = "#ffffff";
+  container.innerHTML = bodyHtml;
+  shadow.appendChild(container);
+
+  const images = Array.from(container.querySelectorAll("img"));
+  const imagesReady = images.length
+    ? Promise.race([
+        Promise.all(
+          images.map(
+            (img) =>
+              new Promise<void>((resolve) => {
+                if (img.complete) {
+                  resolve();
+                  return;
+                }
+                img.addEventListener("load", () => resolve(), { once: true });
+                img.addEventListener("error", () => resolve(), { once: true });
+              }),
+          ),
+        ).then(() => undefined),
+        new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+      ])
+    : Promise.resolve();
+
+  return imagesReady.then(() => ({
+    host,
+    container,
+    contentWidthPx: widthPx,
+    contentHeightPx: Math.max(container.scrollHeight, 1),
+  }));
 }
 
 export default function HtmlToPdfTool() {
@@ -121,14 +174,11 @@ export default function HtmlToPdfTool() {
     const startedAt = performance.now();
     track({ eventName: "processing_started", toolSlug: "html-to-pdf" });
 
-    let exportFrame: HTMLIFrameElement | null = null;
+    let exportSurface: ExportSurface | null = null;
     try {
       const pageWidthPx = getPageContentWidthPx(pageSize, orientation);
-      exportFrame = await createExportFrame(source, pageWidthPx);
-      const element = exportFrame.contentDocument?.body;
-      if (!element) {
-        throw new Error("Could not prepare the document for export.");
-      }
+      exportSurface = await createExportSurface(source, pageWidthPx);
+      const surface = exportSurface;
 
       const html2pdf = (await import("html2pdf.js")).default;
       const options = buildHtml2PdfOptions({
@@ -136,11 +186,14 @@ export default function HtmlToPdfTool() {
         pageSize,
         orientation,
         margin,
+        contentWidthPx: surface.contentWidthPx,
+        contentHeightPx: surface.contentHeightPx,
       });
       await runWithTimeout(
-        html2pdf().set(options).from(element).save(),
+        html2pdf().set(options).from(surface.container).save(),
         "Generating the PDF took too long. Try simpler HTML/CSS or fewer images.",
       );
+
       track({
         eventName: "processing_succeeded",
         toolSlug: "html-to-pdf",
@@ -161,7 +214,7 @@ export default function HtmlToPdfTool() {
         errorCode: "processing_error",
       });
     } finally {
-      exportFrame?.remove();
+      exportSurface?.host.remove();
       setIsGenerating(false);
     }
   }
