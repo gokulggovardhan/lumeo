@@ -1,0 +1,30 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { buildHtml2PdfOptions, MARGIN_MM, validateHtmlSource } from "../lib/pdf/htmlToPdfOptions.ts";
+
+test("margin presets are in millimeters, wide > normal > none", () => {
+  assert.equal(MARGIN_MM.none, 0);
+  assert.ok(MARGIN_MM.normal > MARGIN_MM.none);
+  assert.ok(MARGIN_MM.wide > MARGIN_MM.normal);
+});
+
+test("validateHtmlSource rejects blank input only", () => {
+  assert.match(validateHtmlSource("") ?? "", /Add some HTML/);
+  assert.match(validateHtmlSource("   ") ?? "", /Add some HTML/);
+  assert.equal(validateHtmlSource("<p>hi</p>"), null);
+});
+
+test("buildHtml2PdfOptions maps page size, orientation, and margin correctly", () => {
+  const options = buildHtml2PdfOptions({
+    fileName: "lumeo-html.pdf",
+    pageSize: "letter",
+    orientation: "landscape",
+    margin: "wide",
+  });
+  assert.equal(options.filename, "lumeo-html.pdf");
+  assert.equal(options.margin, MARGIN_MM.wide);
+  assert.equal(options.jsPDF.format, "letter");
+  assert.equal(options.jsPDF.orientation, "landscape");
+  assert.equal(options.jsPDF.unit, "mm");
+  assert.equal(options.image.type, "jpeg");
+});
