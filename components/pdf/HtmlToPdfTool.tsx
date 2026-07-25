@@ -1,15 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import DOMPurify from "dompurify";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
-import {
-  L2ActionArea,
-  L2PrivacyNote,
-  L2ToolMainColumn,
-  L2ToolSettingsPanel,
-  L2ToolWorkspace,
-} from "@/components/pdf/workspace/ToolWorkspace";
+import { L2ActionArea, L2PrivacyNote } from "@/components/pdf/workspace/ToolWorkspace";
 import {
   buildHtml2PdfOptions,
   getPageContentWidthPx,
@@ -44,6 +38,64 @@ const TEMPLATES: Record<string, string> = {
 <p>Write your letter content here.</p>
 <p>Sincerely,<br/>Your name</p>`,
 };
+
+const DRAFT_STORAGE_KEY = "lumeo.html-to-pdf.draft";
+const DRAFT_SAVE_DEBOUNCE_MS = 500;
+
+type Draft = {
+  source: string;
+  pageSize: PageSize;
+  orientation: Orientation;
+  margin: MarginPreset;
+  fileName: string;
+};
+
+function loadDraft(): Draft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.localStorage.getItem(DRAFT_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<Draft>;
+    if (typeof parsed.source !== "string" || !parsed.source.trim()) return null;
+    return {
+      source: parsed.source,
+      pageSize: parsed.pageSize === "letter" || parsed.pageSize === "legal" ? parsed.pageSize : "a4",
+      orientation: parsed.orientation === "landscape" ? "landscape" : "portrait",
+      margin: parsed.margin === "none" || parsed.margin === "wide" ? parsed.margin : "normal",
+      fileName: typeof parsed.fileName === "string" && parsed.fileName.trim() ? parsed.fileName : "lumeo-document",
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(draft: Draft) {
+  try {
+    window.localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft));
+  } catch {
+    // Best-effort -- private browsing / storage-full failures are non-fatal.
+  }
+}
+
+function ToolPanel({
+  title,
+  action,
+  children,
+}: {
+  title: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-2)]">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--text-primary)]/10 px-3 py-2">
+        <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-primary)]/60">{title}</span>
+        {action}
+      </div>
+      <div className="min-h-0 flex-1 p-3">{children}</div>
+    </div>
+  );
+}
 
 async function runWithTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -138,12 +190,14 @@ export default function HtmlToPdfTool() {
   const openedTrackedRef = useRef(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
 
-  const [source, setSource] = useState(TEMPLATES.Blank);
-  const [preview, setPreview] = useState(TEMPLATES.Blank);
-  const [pageSize, setPageSize] = useState<PageSize>("a4");
-  const [orientation, setOrientation] = useState<Orientation>("portrait");
-  const [margin, setMargin] = useState<MarginPreset>("normal");
-  const [fileName, setFileName] = useState("lumeo-document");
+  const initialDraft = useMemo(() => loadDraft(), []);
+
+  const [source, setSource] = useState(initialDraft?.source ?? TEMPLATES.Blank);
+  const [preview, setPreview] = useState(initialDraft?.source ?? TEMPLATES.Blank);
+  const [pageSize, setPageSize] = useState<PageSize>(initialDraft?.pageSize ?? "a4");
+  const [orientation, setOrientation] = useState<Orientation>(initialDraft?.orientation ?? "portrait");
+  const [margin, setMargin] = useState<MarginPreset>(initialDraft?.margin ?? "normal");
+  const [fileName, setFileName] = useState(initialDraft?.fileName ?? "lumeo-document");
   const [error, setError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -160,7 +214,23 @@ export default function HtmlToPdfTool() {
     return () => clearTimeout(id);
   }, [source]);
 
+  useEffect(() => {
+    const id = setTimeout(() => {
+      saveDraft({ source, pageSize, orientation, margin, fileName });
+    }, DRAFT_SAVE_DEBOUNCE_MS);
+    return () => clearTimeout(id);
+  }, [source, pageSize, orientation, margin, fileName]);
+
   const validationError = useMemo(() => validateHtmlSource(source), [source]);
+  const wordCount = useMemo(() => {
+    const text = source.replace(/<[^>]*>/g, " ").trim();
+    return text ? text.split(/\s+/).length : 0;
+  }, [source]);
+
+  function handleReset() {
+    setSource(TEMPLATES.Blank);
+    setError("");
+  }
 
   async function handleGenerate() {
     const currentValidationError = validateHtmlSource(source);
@@ -220,95 +290,112 @@ export default function HtmlToPdfTool() {
   }
 
   return (
-    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
-      <L2ToolWorkspace>
-        <L2ToolMainColumn>
-          <div className="grid gap-3 lg:grid-cols-2">
-            <div className="grid gap-2">
-              <div className="flex flex-wrap gap-2">
-                {Object.keys(TEMPLATES).map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    onClick={() => setSource(TEMPLATES[name])}
-                    className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1 text-xs font-bold text-[var(--text-primary)]"
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-              <textarea
-                value={source}
-                onChange={(event) => setSource(event.target.value)}
-                spellCheck={false}
-                aria-label="HTML and CSS source"
-                className="min-h-[380px] w-full rounded-xl border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-2)] p-3 font-mono text-sm text-[var(--text-primary)]"
-              />
-            </div>
-            <div className="rounded-xl border border-[var(--text-primary)]/14 bg-white">
-              <iframe
-                ref={iframeRef}
-                title="HTML preview"
-                srcDoc={preview}
-                sandbox="allow-same-origin"
-                className="h-[380px] w-full rounded-xl"
-              />
-            </div>
-          </div>
-        </L2ToolMainColumn>
-
-        <L2ToolSettingsPanel title="Page settings" description="Applied when the PDF is generated.">
-          <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
-            File name
-            <input
-              value={fileName}
-              onChange={(event) => setFileName(event.target.value)}
-              className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm"
-            />
-          </label>
-          <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
-            Page size
-            <select value={pageSize} onChange={(event) => setPageSize(event.target.value as PageSize)} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
-              <option value="a4">A4</option>
-              <option value="letter">Letter</option>
-              <option value="legal">Legal</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
-            Orientation
-            <select value={orientation} onChange={(event) => setOrientation(event.target.value as Orientation)} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
-              <option value="portrait">Portrait</option>
-              <option value="landscape">Landscape</option>
-            </select>
-          </label>
-          <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
-            Margin
-            <select value={margin} onChange={(event) => setMargin(event.target.value as MarginPreset)} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
-              <option value="none">None</option>
-              <option value="normal">Normal</option>
-              <option value="wide">Wide</option>
-            </select>
-          </label>
-
-          <L2ActionArea
-            primary={
+    <section className="l2-tool-deep-workspace mx-auto grid w-full max-w-[1240px] gap-5 pb-4 lg:pb-0">
+      <div className="grid gap-3 lg:h-[480px] lg:grid-cols-3">
+        <ToolPanel
+          title="HTML / CSS"
+          action={
+            <div className="flex flex-wrap items-center gap-1.5">
+              {Object.keys(TEMPLATES).map((name) => (
+                <button
+                  key={name}
+                  type="button"
+                  onClick={() => setSource(TEMPLATES[name])}
+                  className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-xs font-bold text-[var(--text-primary)]"
+                >
+                  {name}
+                </button>
+              ))}
               <button
                 type="button"
-                onClick={() => void handleGenerate()}
-                disabled={isGenerating || Boolean(validationError)}
-                className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                onClick={handleReset}
+                className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-xs font-bold text-[var(--text-primary)]"
               >
-                {isGenerating ? "Generating…" : "Generate PDF"}
+                Reset
               </button>
-            }
-          />
-          {error ? (
-            <div role="alert" className="rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-3 text-sm font-medium text-[var(--text-danger)]">
-              {error}
             </div>
-          ) : null}
-        </L2ToolSettingsPanel>
-      </L2ToolWorkspace>
+          }
+        >
+          <div className="flex h-full flex-col gap-1.5">
+            <textarea
+              value={source}
+              onChange={(event) => setSource(event.target.value)}
+              spellCheck={false}
+              aria-label="HTML and CSS source"
+              className="min-h-[260px] w-full flex-1 resize-none rounded-lg border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)] p-3 font-mono text-sm text-[var(--text-primary)]"
+            />
+            <p className="shrink-0 text-right text-xs font-semibold text-[var(--text-primary)]/40">
+              {source.length.toLocaleString()} characters · {wordCount.toLocaleString()} words
+            </p>
+          </div>
+        </ToolPanel>
+
+        <ToolPanel title="Live preview">
+          <iframe
+            ref={iframeRef}
+            title="HTML preview"
+            srcDoc={preview}
+            sandbox="allow-same-origin"
+            className="h-full w-full rounded-lg bg-white"
+          />
+        </ToolPanel>
+
+        <ToolPanel title="Page settings">
+          <div className="flex h-full flex-col gap-3 overflow-y-auto">
+            <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
+              File name
+              <input
+                value={fileName}
+                onChange={(event) => setFileName(event.target.value)}
+                className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
+              Page size
+              <select value={pageSize} onChange={(event) => setPageSize(event.target.value as PageSize)} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
+                <option value="a4">A4</option>
+                <option value="letter">Letter</option>
+                <option value="legal">Legal</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
+              Orientation
+              <select value={orientation} onChange={(event) => setOrientation(event.target.value as Orientation)} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </label>
+            <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
+              Margin
+              <select value={margin} onChange={(event) => setMargin(event.target.value as MarginPreset)} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
+                <option value="none">None</option>
+                <option value="normal">Normal</option>
+                <option value="wide">Wide</option>
+              </select>
+            </label>
+
+            <div className="mt-auto grid gap-3">
+              <L2ActionArea
+                primary={
+                  <button
+                    type="button"
+                    onClick={() => void handleGenerate()}
+                    disabled={isGenerating || Boolean(validationError)}
+                    className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {isGenerating ? "Generating…" : "Generate PDF"}
+                  </button>
+                }
+              />
+              {error ? (
+                <div role="alert" className="rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-3 text-sm font-medium text-[var(--text-danger)]">
+                  {error}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </ToolPanel>
+      </div>
 
       <L2PrivacyNote />
     </section>
