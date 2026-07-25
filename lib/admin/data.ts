@@ -138,7 +138,6 @@ export async function getPdfTools(): Promise<DataResult<ToolWithCategory[]>> {
   const { data, error } = await supabase
     .from("pdf_tools")
     .select("*, tool_categories(name, slug)")
-    .order("sort_order", { ascending: true })
     .order("name", { ascending: true });
 
   const tools = (data ?? []).map((row) => {

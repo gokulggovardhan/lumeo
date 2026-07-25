@@ -77,7 +77,7 @@ export async function PdfToolLauncher({ showHeading = true }: { showHeading?: bo
       ) : null}
 
       <nav aria-label="Available PDF tools">
-        <ul className="grid grid-cols-2 gap-3.5 sm:gap-4 md:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-3.5 sm:gap-4 md:grid-cols-4 xl:grid-cols-5">
           {tiles.map((tile, index) => (
             <ToolTile key={tile.route} tile={tile} index={index} />
           ))}

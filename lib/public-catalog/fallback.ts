@@ -93,7 +93,11 @@ export function groupPublicTools(tools: PublicPdfTool[]): PublicToolCategory[] {
     });
   }
 
-  return Array.from(groups.values()).sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
+  for (const group of groups.values()) {
+    group.tools.sort((a, b) => a.toolName.localeCompare(b.toolName));
+  }
+
+  return Array.from(groups.values()).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function getFallbackPublicCatalog(): PublicCatalogResult {

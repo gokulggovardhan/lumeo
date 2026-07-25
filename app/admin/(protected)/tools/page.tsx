@@ -24,7 +24,7 @@ export default async function ToolsPage() {
       />
       <AdminSectionCard title="Tool catalog" description={canEdit ? "Owner and admin roles can update catalog controls. Each row saves together as one change." : "Analyst access is read-only."}>
         <AdminDataTable
-          columns={["Tool", "Category", "Route", "Status", "Maintenance message", "Enabled", "Sort", "Updated", ""]}
+          columns={["Tool", "Category", "Route", "Status", "Maintenance message", "Enabled", "Updated", ""]}
           rows={tools.data.map((tool) => {
             const formId = `tool-form-${tool.id}`;
 
@@ -39,7 +39,6 @@ export default async function ToolsPage() {
                 <AdminStatusBadge key="status">{tool.status}</AdminStatusBadge>,
                 tool.maintenance_message || <span className="text-[#F0EAD6]/40">None</span>,
                 tool.is_enabled ? "Yes" : "No",
-                tool.sort_order,
                 new Date(tool.updated_at).toLocaleDateString(),
                 null,
               ];
@@ -89,14 +88,6 @@ export default async function ToolsPage() {
               <label key="enabled" className="flex min-h-10 items-center justify-center gap-2">
                 <input type="checkbox" form={formId} name="is_enabled" defaultChecked={tool.is_enabled} className="h-4 w-4" />
               </label>,
-              <input
-                key="sort"
-                type="number"
-                form={formId}
-                name="sort_order"
-                defaultValue={tool.sort_order}
-                className="min-h-10 w-16 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
-              />,
               new Date(tool.updated_at).toLocaleDateString(),
               <AdminSubmitButton
                 key="save"
