@@ -25,6 +25,9 @@ const TILE_DESCRIPTION: Record<string, string> = {
   sign: "Add your signature and initials.",
   "word-to-pdf": "Convert Word documents to PDF.",
   "pdf-to-word": "Convert PDF pages into an editable Word file.",
+  reorder: "Reorder, rotate, duplicate, or remove pages in one document.",
+  "extract-text": "Pull selectable text out of a PDF and read, search, or export it.",
+  "html-to-pdf": "Turn HTML and CSS into a downloadable PDF.",
 };
 
 // Sage for document-structure work, brass for the two actions that produce
@@ -74,5 +77,5 @@ export function buildTiles(tools: ResolvedTool[]): Tile[] {
     }
   }
 
-  return tiles;
+  return tiles.sort((a, b) => a.label.localeCompare(b.label));
 }

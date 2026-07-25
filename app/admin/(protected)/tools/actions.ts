@@ -8,16 +8,16 @@ import { createClient } from "@/lib/supabase/server";
 import {
   errorState,
   formBoolean,
-  formNumber,
   formString,
   successState,
   validateToolStatus,
 } from "@/lib/admin/validation";
 
 // One form per table row (see app/admin/(protected)/tools/page.tsx) instead
-// of five independent forms -- category, status, maintenance message,
-// enabled, and sort order all save together with a single click, and one
-// audit log entry, rather than requiring five separate saves per tool.
+// of four independent forms -- category, status, maintenance message, and
+// enabled all save together with a single click, and one audit log entry,
+// rather than requiring four separate saves per tool. Tool order is
+// automatic (alphabetical) everywhere now, not admin-editable.
 export async function updateTool(formData: FormData) {
   const admin = await requireAdmin();
   if (!canManageTools(admin.role)) return errorState("You do not have permission to update tools.");
@@ -27,7 +27,6 @@ export async function updateTool(formData: FormData) {
   const status = formString(formData, "status", 40);
   const maintenanceMessage = formString(formData, "maintenance_message", 300);
   const isEnabled = formBoolean(formData, "is_enabled");
-  const sortOrder = formNumber(formData, "sort_order", 0);
 
   if (!id) return errorState("Choose a valid tool.");
   if (!validateToolStatus(status)) return errorState("Choose a valid tool status.");
@@ -40,7 +39,6 @@ export async function updateTool(formData: FormData) {
       status,
       maintenance_message: maintenanceMessage || null,
       is_enabled: isEnabled,
-      sort_order: sortOrder,
     })
     .eq("id", id);
 
@@ -51,7 +49,7 @@ export async function updateTool(formData: FormData) {
     entityType: "pdf_tool",
     entityId: id,
     summary: "Updated a PDF tool's catalog controls.",
-    changes: { category_id: categoryId, status, is_enabled: isEnabled, sort_order: sortOrder },
+    changes: { category_id: categoryId, status, is_enabled: isEnabled },
   });
   revalidatePath("/admin/tools");
   revalidatePath("/admin/homepage");
