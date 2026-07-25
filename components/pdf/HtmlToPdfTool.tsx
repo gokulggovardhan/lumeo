@@ -11,6 +11,7 @@ import {
 } from "@/components/pdf/workspace/ToolWorkspace";
 import {
   buildHtml2PdfOptions,
+  getPageContentWidthPx,
   validateHtmlSource,
   type MarginPreset,
   type Orientation,
@@ -57,6 +58,28 @@ async function runWithTimeout<T>(promise: Promise<T>, message: string): Promise<
   }
 }
 
+// Rendered off-screen at the PDF page's real pixel width so html2canvas
+// captures the exact proportions the page will have -- capturing the visible
+// preview iframe instead would bake in whatever arbitrary width the two-column
+// layout gives it on screen, which jsPDF then rescales to fit the page and
+// throws off alignment/wrapping versus what the user saw.
+function createExportFrame(html: string, widthPx: number): Promise<HTMLIFrameElement> {
+  return new Promise((resolve, reject) => {
+    const frame = document.createElement("iframe");
+    frame.setAttribute("aria-hidden", "true");
+    frame.style.position = "fixed";
+    frame.style.top = "0";
+    frame.style.left = "-10000px";
+    frame.style.width = `${widthPx}px`;
+    frame.style.height = "1px";
+    frame.style.border = "0";
+    frame.onload = () => resolve(frame);
+    frame.onerror = () => reject(new Error("Could not prepare the document for export."));
+    document.body.appendChild(frame);
+    frame.srcdoc = html;
+  });
+}
+
 export default function HtmlToPdfTool() {
   const { availability, track } = useAnalytics();
   const openedTrackedRef = useRef(false);
@@ -92,18 +115,21 @@ export default function HtmlToPdfTool() {
       setError(currentValidationError);
       return;
     }
-    const element = iframeRef.current?.contentDocument?.body;
-    if (!element) {
-      setError("Preview isn't ready yet. Try again in a moment.");
-      return;
-    }
 
     setIsGenerating(true);
     setError("");
     const startedAt = performance.now();
     track({ eventName: "processing_started", toolSlug: "html-to-pdf" });
 
+    let exportFrame: HTMLIFrameElement | null = null;
     try {
+      const pageWidthPx = getPageContentWidthPx(pageSize, orientation);
+      exportFrame = await createExportFrame(source, pageWidthPx);
+      const element = exportFrame.contentDocument?.body;
+      if (!element) {
+        throw new Error("Could not prepare the document for export.");
+      }
+
       const html2pdf = (await import("html2pdf.js")).default;
       const options = buildHtml2PdfOptions({
         fileName: `${sanitizeFileStem(fileName, "lumeo-document")}.pdf`,
@@ -135,6 +161,7 @@ export default function HtmlToPdfTool() {
         errorCode: "processing_error",
       });
     } finally {
+      exportFrame?.remove();
       setIsGenerating(false);
     }
   }
