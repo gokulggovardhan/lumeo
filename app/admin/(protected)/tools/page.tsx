@@ -56,7 +56,7 @@ export default async function ToolsPage() {
                 form={formId}
                 name="category_id"
                 defaultValue={tool.category_id ?? ""}
-                className="min-h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
+                className="min-h-10 w-full min-w-[10.5rem] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
               >
                 <option value="">None</option>
                 {categories.data.map((category) => (
@@ -69,7 +69,7 @@ export default async function ToolsPage() {
                 form={formId}
                 name="status"
                 defaultValue={tool.status}
-                className="min-h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
+                className="min-h-10 w-full min-w-[8.5rem] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
               >
                 {["active", "beta", "coming_soon", "hidden", "maintenance"].map((status) => (
                   <option key={status} value={status}>{status}</option>
