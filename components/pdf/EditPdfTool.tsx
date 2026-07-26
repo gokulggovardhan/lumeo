@@ -96,6 +96,13 @@ export default function EditPdfTool() {
   const [pageIndex, setPageIndex] = useState(0);
   const [pageImageUrl, setPageImageUrl] = useState("");
   const [pageDisplaySize, setPageDisplaySize] = useState<{ width: number; height: number } | null>(null);
+  // The current page's real size in PDF points (from pdfjs's scale-1
+  // viewport, which matches pdf-lib's page.getSize() used at export time).
+  // Combined with pageDisplaySize (the same page's rendered pixel size),
+  // this gives the px-per-point factor needed to make on-screen text size
+  // match the exported PDF's point size -- see EditElementView's
+  // `pixelsPerPoint` prop.
+  const [pagePointSize, setPagePointSize] = useState<{ width: number; height: number } | null>(null);
   const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -173,6 +180,7 @@ export default function EditPdfTool() {
       try {
         const page = await doc.getPage(pageIndex + 1);
         const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
+        const pointViewport = page.getViewport({ scale: 1 });
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d", { alpha: false });
         if (!context) return;
@@ -189,6 +197,7 @@ export default function EditPdfTool() {
         pageImageUrlRef.current = url;
         setPageImageUrl(url);
         setPageDisplaySize({ width: canvas.width, height: canvas.height });
+        setPagePointSize({ width: pointViewport.width, height: pointViewport.height });
       } catch {
         setError("This page could not be previewed. Try a different page.");
       } finally {
@@ -298,6 +307,13 @@ export default function EditPdfTool() {
 
   const currentPageElements = useMemo(() => elementsForPage(elements, pageIndex), [elements, pageIndex]);
   const selectedElement = useMemo(() => elements.find((item) => item.id === selectedId) ?? null, [elements, selectedId]);
+  // Falls back to PAGE_RENDER_SCALE (the ratio the canvas was rendered at
+  // before pagePointSize is known) so text isn't briefly unsized on first
+  // paint; once pagePointSize loads for the current page, this becomes the
+  // exact px-per-point ratio for that page.
+  const pixelsPerPoint = pageDisplaySize && pagePointSize && pagePointSize.width > 0
+    ? pageDisplaySize.width / pagePointSize.width
+    : PAGE_RENDER_SCALE;
 
   const generateEditedPdf = useCallback(async () => {
     if (!pdf) return;
@@ -431,6 +447,7 @@ export default function EditPdfTool() {
                         setSelectedId(null);
                       }}
                       onTextChange={(text) => setElements((current) => patchElement(current, element.id, { text } as Partial<EditElement>))}
+                      pixelsPerPoint={pixelsPerPoint}
                     />
                   ))}
 
