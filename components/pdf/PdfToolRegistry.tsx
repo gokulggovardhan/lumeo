@@ -186,8 +186,8 @@ export const pdfTools: PdfToolDefinition[] = [
   },
   {
     slug: "extract-text",
-    title: "PDF Text Extract",
-    shortTitle: "PDF Text Extract",
+    title: "Text Extract",
+    shortTitle: "Text Extract",
     description: "Pull selectable text out of a PDF and read or export it.",
     route: "/pdf/extract-text",
     status: "live",
