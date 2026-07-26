@@ -12,6 +12,8 @@
 
 export type ShapeKind = "rect" | "ellipse" | "line" | "highlight";
 
+export type EditElementType = "text" | "shape" | "whiteout" | "ink";
+
 export type EditElementBase = {
   id: string;
   pageIndex: number;
