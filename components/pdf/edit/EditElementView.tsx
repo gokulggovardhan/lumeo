@@ -142,10 +142,24 @@ export function EditElementView({
       const fixedY = resize.originYPct + resize.originHeightPct;
       const nextX = clamp(resize.originXPct + deltaXPct, 0, 100);
       const nextY = clamp(resize.originYPct + deltaYPct, 0, 100);
-      live.xPct = Math.min(nextX, fixedX);
-      live.yPct = Math.min(nextY, fixedY);
-      live.widthPct = Math.max(MIN_SIZE_PCT, Math.abs(fixedX - nextX));
-      live.heightPct = Math.max(MIN_SIZE_PCT, Math.abs(fixedY - nextY));
+      const widthPct = Math.max(MIN_SIZE_PCT, Math.abs(fixedX - nextX));
+      const heightPct = Math.max(MIN_SIZE_PCT, Math.abs(fixedY - nextY));
+      live.widthPct = widthPct;
+      live.heightPct = heightPct;
+      // Re-derive xPct/yPct from the FLOORED width/height so the fixed corner
+      // (fixedX, fixedY) stays truly pinned once the MIN_SIZE_PCT floor kicks
+      // in -- which happens almost immediately for a freshly-created line,
+      // since default heightPct is 0.5, already below the 2% floor.
+      //
+      // When the drag point hasn't crossed the fixed corner (nextX <= fixedX),
+      // the fixed corner is the box's right edge, so xPct = fixedX - widthPct
+      // keeps xPct + widthPct === fixedX exactly, even after flooring.
+      // When the drag point has crossed past the fixed corner (nextX > fixedX),
+      // the fixed corner is the box's LEFT edge instead, so xPct = fixedX
+      // keeps it pinned there while the box grows in the other direction.
+      // (A naive unconditional `fixedX - widthPct` breaks this crossover case.)
+      live.xPct = nextX <= fixedX ? fixedX - widthPct : fixedX;
+      live.yPct = nextY <= fixedY ? fixedY - heightPct : fixedY;
     } else {
       live.widthPct = clamp(resize.originWidthPct + deltaXPct, MIN_SIZE_PCT, 100 - resize.originXPct);
       live.heightPct = clamp(resize.originHeightPct + deltaYPct, MIN_SIZE_PCT, 100 - resize.originYPct);
