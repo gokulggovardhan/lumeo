@@ -5,6 +5,19 @@ import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspa
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
+
+const softwareSchema = buildSoftwareApplicationSchema({
+  name: "Lumeo JPG to PDF",
+  description: "Convert JPG, PNG, and WEBP images into a PDF document privately in your browser.",
+  path: "/pdf/jpg-to-pdf",
+  featureList: ["Combine multiple images", "Reorder images", "Page size and orientation control", "No file upload"],
+});
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: "Home", path: "/" },
+  { name: "PDF Tools", path: "/pdf-tools" },
+  { name: "JPG to PDF", path: "/pdf/jpg-to-pdf" },
+]);
 
 const JpgToPdfTool = dynamic(() => import("@/components/pdf/JpgToPdfTool"), {
   loading: () => <ToolWorkspaceLoading />,
@@ -56,6 +69,9 @@ export default async function JpgToPdfPage() {
       ) : (
         <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-jpg-to-pdf-tool"><JpgToPdfTool /></div>
       )}
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
     </PublicCatalogPageShell>
   );
 }

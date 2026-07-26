@@ -5,6 +5,19 @@ import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspa
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
+
+const softwareSchema = buildSoftwareApplicationSchema({
+  name: "Lumeo Compress PDF",
+  description: "Reduce PDF file size privately in your browser using profile-based compression.",
+  path: "/pdf/compress",
+  featureList: ["Profile-based compression", "Quality control", "Local document analysis", "No file upload"],
+});
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: "Home", path: "/" },
+  { name: "PDF Tools", path: "/pdf-tools" },
+  { name: "Compress PDF", path: "/pdf/compress" },
+]);
 
 const CompressPdfTool = dynamic(() => import("@/components/pdf/CompressPdfTool"), {
   loading: () => <ToolWorkspaceLoading />,
@@ -49,6 +62,9 @@ export default async function CompressPdfPage() {
       ) : (
         <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-compress-tool"><CompressPdfTool /></div>
       )}
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
     </PublicCatalogPageShell>
   );
 }

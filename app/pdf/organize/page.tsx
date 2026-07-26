@@ -5,6 +5,19 @@ import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspa
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
+
+const softwareSchema = buildSoftwareApplicationSchema({
+  name: "Lumeo Page Re-Order",
+  description: "Reorder, rotate, duplicate, or remove PDF pages privately in your browser.",
+  path: "/pdf/organize",
+  featureList: ["Drag to reorder pages", "Rotate pages", "Duplicate or delete pages", "Bulk select and act on many pages"],
+});
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: "Home", path: "/" },
+  { name: "PDF Tools", path: "/pdf-tools" },
+  { name: "Page Re-Order", path: "/pdf/organize" },
+]);
 
 const OrganizePdfTool = dynamic(() => import("@/components/pdf/OrganizePdfTool"), {
   loading: () => <ToolWorkspaceLoading />,
@@ -53,6 +66,9 @@ export default async function OrganizePdfPage() {
       ) : (
         <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool"><OrganizePdfTool /></div>
       )}
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
     </PublicCatalogPageShell>
   );
 }

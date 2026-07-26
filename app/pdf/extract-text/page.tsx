@@ -5,6 +5,19 @@ import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspa
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
+
+const softwareSchema = buildSoftwareApplicationSchema({
+  name: "Lumeo Text Extract",
+  description: "Pull selectable text out of a PDF and export it as TXT, JSON, or CSV, privately in your browser.",
+  path: "/pdf/extract-text",
+  featureList: ["Per-page text panels", "Search across all pages", "Page-range extraction", "Export as TXT, JSON, or CSV"],
+});
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: "Home", path: "/" },
+  { name: "PDF Tools", path: "/pdf-tools" },
+  { name: "Text Extract", path: "/pdf/extract-text" },
+]);
 
 const ExtractTextTool = dynamic(() => import("@/components/pdf/ExtractTextTool"), {
   loading: () => <ToolWorkspaceLoading />,
@@ -49,6 +62,9 @@ export default async function ExtractTextPage() {
       ) : (
         <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool"><ExtractTextTool /></div>
       )}
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
     </PublicCatalogPageShell>
   );
 }

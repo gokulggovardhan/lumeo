@@ -5,134 +5,34 @@ import {
   InfoPageShell,
   InfoStructuredData,
 } from "@/components/InfoPage";
-import { mergeFaqs, splitFaqs } from "@/components/pdf/PdfSeoContent";
+import {
+  compressFaqs,
+  extractTextFaqs,
+  htmlToPdfFaqs,
+  jpgToPdfFaqs,
+  mergeFaqs,
+  organizeFaqs,
+  pdfToJpgFaqs,
+  pdfToWordFaqs,
+  privacyFaqs,
+  signFaqs,
+  splitFaqs,
+  wordToPdfFaqs,
+} from "@/components/pdf/toolFaqs";
 import { withSeoOverride } from "@/lib/public-site/seo";
-
-const compressFaqs = [
-  {
-    question: "Are my PDF files uploaded?",
-    answer:
-      "No. Supported compression processing takes place directly in your browser for this tool.",
-  },
-  {
-    question: "Can every PDF be compressed significantly?",
-    answer:
-      "No. Results depend on the document. Text-only or already optimised PDFs may have limited savings.",
-  },
-  {
-    question: "Will compression reduce quality?",
-    answer:
-      "Compression can reduce page rendering detail. Review the downloaded result before replacing the original.",
-  },
-  {
-    question: "What happens if the compressed file is larger?",
-    answer:
-      "Lumeo compares the actual result with the original and recommends keeping the original when compression does not provide a useful reduction.",
-  },
-];
-
-const privacyFaqs = [
-  {
-    question: "What does browser-first mean?",
-    answer:
-      "Browser-first means supported PDF work happens on your device in the browser instead of requiring a server upload.",
-  },
-  {
-    question: "Do I need an account for PDF tools?",
-    answer:
-      "No. The public PDF workspaces are designed for simple document tasks without unnecessary sign-in.",
-  },
-];
-
-const organizeFaqs = [
-  {
-    question: "What's the difference between Split and Page Re-Order?",
-    answer:
-      "Split produces separate files from one PDF. Page Re-Order changes the order, rotation, or count of pages inside a single PDF and gives back one file.",
-  },
-  {
-    question: "Can I undo a reorder or delete before exporting?",
-    answer:
-      "Yes. Changes only apply to the working copy in your browser tab — reload the page to start over before you download.",
-  },
-  {
-    question: "Does duplicating a page keep its rotation?",
-    answer:
-      "Yes. A duplicated page carries over any rotation already applied to the original.",
-  },
-];
-
-const extractTextFaqs = [
-  {
-    question: "Does Text Extract work on scanned PDFs?",
-    answer:
-      "Only if the PDF already has selectable text. Scanned pages without an OCR layer have no extractable text — a searchable-scan tool is planned separately.",
-  },
-  {
-    question: "Which export formats are supported?",
-    answer:
-      "TXT, JSON, and CSV — one page range or the full document, with per-page or copy-all options in the workspace itself.",
-  },
-  {
-    question: "Can I extract only some pages?",
-    answer:
-      "Yes. Enter a page range (e.g. 1-3,5) and only those pages are pulled into the preview and export.",
-  },
-];
-
-const htmlToPdfFaqs = [
-  {
-    question: "Can I paste a full HTML document?",
-    answer:
-      "Yes. Paste a complete document or a fragment — styles are applied either way, and the result is sanitized before rendering.",
-  },
-  {
-    question: "Does it support CSS page breaks?",
-    answer:
-      "Page size, orientation, and margins are configurable, but forced CSS page-break rules are not guaranteed to be honored by the current renderer.",
-  },
-  {
-    question: "Is my pasted HTML uploaded anywhere?",
-    answer:
-      "No. It's rendered and converted to PDF entirely in your browser.",
-  },
-];
-
-const signFaqs = [
-  {
-    question: "Is my signature stored anywhere?",
-    answer:
-      "No. Signatures are drawn or typed in your browser and applied directly to the downloaded file.",
-  },
-  {
-    question: "Can I resize or reposition a signature after placing it?",
-    answer:
-      "Yes, before you finish — drag to reposition and use the resize handles to scale it on the page.",
-  },
-];
-
-const convertFaqs = [
-  {
-    question: "Are Word/PDF conversions private?",
-    answer:
-      "Office format conversion needs a server-side engine (free, self-hosted LibreOffice), so the file is uploaded temporarily and cleared immediately after conversion — it is not stored.",
-  },
-  {
-    question: "Does Word to PDF preserve formatting?",
-    answer:
-      "Layout, fonts, tables, and images are preserved for standard DOCX/DOC documents. Highly complex layouts may shift slightly.",
-  },
-];
 
 const allFaqs = [
   ...mergeFaqs,
   ...splitFaqs,
   ...compressFaqs,
   ...organizeFaqs,
+  ...jpgToPdfFaqs,
+  ...pdfToJpgFaqs,
   ...extractTextFaqs,
   ...htmlToPdfFaqs,
   ...signFaqs,
-  ...convertFaqs,
+  ...wordToPdfFaqs,
+  ...pdfToWordFaqs,
   ...privacyFaqs,
 ];
 
@@ -385,9 +285,12 @@ export default function GuidesPage() {
       <FaqGroup title="Compose — Split PDF questions" items={splitFaqs} />
       <FaqGroup title="Compose — Page Re-Order questions" items={organizeFaqs} />
       <FaqGroup title="Distill — Compress PDF questions" items={compressFaqs} />
+      <FaqGroup title="Capture — JPG to PDF questions" items={jpgToPdfFaqs} />
+      <FaqGroup title="Render — PDF to JPG questions" items={pdfToJpgFaqs} />
       <FaqGroup title="Render — Text Extract questions" items={extractTextFaqs} />
       <FaqGroup title="Seal — Sign PDF questions" items={signFaqs} />
-      <FaqGroup title="Convert — Word/PDF questions" items={convertFaqs} />
+      <FaqGroup title="Convert — Word to PDF questions" items={wordToPdfFaqs} />
+      <FaqGroup title="Convert — PDF to Word questions" items={pdfToWordFaqs} />
       <FaqGroup title="Convert — HTML to PDF questions" items={htmlToPdfFaqs} />
       <FaqGroup title="Privacy questions" items={privacyFaqs} />
     </InfoPageShell>

@@ -5,6 +5,19 @@ import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspa
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
+
+const softwareSchema = buildSoftwareApplicationSchema({
+  name: "Lumeo Word to PDF",
+  description: "Convert Word documents (DOCX, DOC) to PDF using free, self-hosted LibreOffice.",
+  path: "/pdf/word-to-pdf",
+  featureList: ["Preserves layout and fonts", "Handles tables and images", "Cleared immediately after conversion"],
+});
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: "Home", path: "/" },
+  { name: "PDF Tools", path: "/pdf-tools" },
+  { name: "Word to PDF", path: "/pdf/word-to-pdf" },
+]);
 
 const WordToPdfTool = dynamic(() => import("@/components/pdf/WordToPdfTool"), {
   loading: () => <ToolWorkspaceLoading />,
@@ -49,6 +62,9 @@ export default async function WordToPdfPage() {
       ) : (
         <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-word-to-pdf-tool"><WordToPdfTool /></div>
       )}
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
     </PublicCatalogPageShell>
   );
 }
