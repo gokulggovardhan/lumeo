@@ -8,6 +8,7 @@ export type PdfToolSlug =
   | "pdf-to-jpg"
   | "sign"
   | "word-to-pdf"
+  | "pdf-to-word"
   | "organize"
   | "html-to-pdf"
   | "extract-text";
@@ -145,6 +146,22 @@ export const pdfTools: PdfToolDefinition[] = [
     bullets: [
       "Preserves layout and fonts",
       "Handles tables and images",
+      "Private, uploaded temporarily",
+      "Cleared immediately after conversion",
+    ],
+  },
+  {
+    slug: "pdf-to-word",
+    title: "PDF to Word",
+    shortTitle: "PDF to Word",
+    description: "Convert PDF documents to editable Word files.",
+    route: "/pdf/pdf-to-word",
+    status: "live",
+    browserNote: "Server-side conversion",
+    engineNote: "Live now",
+    accepted: "one PDF file",
+    bullets: [
+      "Preserves layout, fonts, and tables",
       "Private, uploaded temporarily",
       "Cleared immediately after conversion",
     ],
