@@ -10,7 +10,7 @@ $$;
 
 -- Six live tools were shipped to production without ever getting a
 -- pdf_tools row: sign, word-to-pdf, pdf-to-word, organize (Page Re-Order),
--- extract-text (PDF Text Extract), html-to-pdf. Each tool's own page calls
+-- extract-text (Text Extract), html-to-pdf. Each tool's own page calls
 -- getToolBlockedState(slug), which returns "not blocked" when no matching
 -- row exists -- so the public site kept working, but the admin console had
 -- no row to show and zero ability to put any of these six into maintenance
@@ -33,7 +33,7 @@ values
   ('word-to-pdf', (select id from public.tool_categories where slug = 'convert-to-pdf'), 'Word to PDF', 'Convert Word documents to PDF using free, self-hosted LibreOffice.', '/pdf/word-to-pdf', 'convert', 'active', true, true, 0),
   ('pdf-to-word', (select id from public.tool_categories where slug = 'convert-from-pdf'), 'PDF to Word', 'Convert PDF pages into an editable Word file.', '/pdf/pdf-to-word', 'convert', 'active', true, true, 0),
   ('reorder', (select id from public.tool_categories where slug = 'organize-pdf'), 'Organize PDF', 'Reorder, rotate, duplicate, or remove pages in one document.', '/pdf/organize', 'reorder', 'active', true, true, 0),
-  ('extract-text', (select id from public.tool_categories where slug = 'convert-from-pdf'), 'PDF Text Extract', 'Pull selectable text out of a PDF and read, search, or export it.', '/pdf/extract-text', 'render', 'active', true, true, 0),
+  ('extract-text', (select id from public.tool_categories where slug = 'convert-from-pdf'), 'Text Extract', 'Pull selectable text out of a PDF and read, search, or export it.', '/pdf/extract-text', 'render', 'active', true, true, 0),
   ('html-to-pdf', (select id from public.tool_categories where slug = 'convert-to-pdf'), 'HTML to PDF', 'Turn HTML and CSS into a downloadable PDF.', '/pdf/html-to-pdf', 'convert', 'active', true, true, 0)
 on conflict (slug) do update
 set category_id = excluded.category_id,
