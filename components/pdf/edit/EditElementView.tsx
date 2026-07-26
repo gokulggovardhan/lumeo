@@ -33,6 +33,7 @@ export function EditElementView({
   onChange,
   onDelete,
   onTextChange,
+  pixelsPerPoint,
 }: {
   element: EditElement;
   selected: boolean;
@@ -41,6 +42,12 @@ export function EditElementView({
   onChange: (patch: Partial<EditElement>) => void;
   onDelete: () => void;
   onTextChange: (text: string) => void;
+  // Converts a PDF point (the unit `element.fontSizePt` is stored in, and
+  // the unit lib/pdf/edit/export.ts draws text at) into the CSS pixels the
+  // on-screen textarea should render at, so the editor stays WYSIWYG with
+  // the exported PDF. Computed once in EditPdfTool.tsx from the rendered
+  // page's pixel dimensions vs. its real point dimensions.
+  pixelsPerPoint: number;
 }) {
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const liveRef = useRef<LiveGeometry | null>(null);
@@ -213,10 +220,11 @@ export function EditElementView({
           value={element.text}
           onChange={(event) => onTextChange(event.target.value)}
           onPointerDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => event.stopPropagation()}
           placeholder="Type here"
           className={`h-full w-full resize-none rounded-sm bg-transparent px-1 outline-none ${selected ? "ring-2 ring-[var(--lumeo-gold)]" : "hover:ring-1 hover:ring-[var(--text-primary)]/20"}`}
           style={{
-            fontSize: `${element.fontSizePt}px`,
+            fontSize: `${element.fontSizePt * pixelsPerPoint}px`,
             lineHeight: 1.15,
             color: element.color,
             fontWeight: element.bold ? 700 : 400,
