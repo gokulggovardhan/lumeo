@@ -40,6 +40,32 @@ export async function openPdfJsDocument(data: ArrayBuffer | Uint8Array) {
 // the user gets an actionable error instead of a frozen progress indicator.
 export const PAGE_RENDER_TIMEOUT_MS = 20_000;
 
+// General-purpose guard for any single-page pdf.js operation (not just
+// canvas rendering) that could hang instead of rejecting -- e.g.
+// getTextContent() on a page with a malformed/circular content stream.
+// Rejects with a descriptive, page-scoped error instead of letting one bad
+// page stall (or silently starve) a whole-document loop forever.
+export async function withPageTimeout<T>(
+  promise: Promise<T>,
+  pageNumber: number,
+  timeoutMs: number,
+  operation: string,
+): Promise<T> {
+  let timeoutId: number | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timeoutId = window.setTimeout(() => {
+          reject(new Error(`Page ${pageNumber} took too long to ${operation}.`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+  }
+}
+
 type MinimalRenderTask = { promise: Promise<void>; cancel: () => void };
 
 export async function renderPageWithTimeout(task: MinimalRenderTask, pageNumber: number) {

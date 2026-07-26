@@ -222,6 +222,11 @@ export default function HtmlToPdfTool() {
   }, [source, pageSize, orientation, margin, fileName]);
 
   const validationError = useMemo(() => validateHtmlSource(source), [source]);
+  // vh/vw resolve against the real browser window during capture (the
+  // off-screen host isn't a real viewport at the PDF's physical size), so
+  // they silently scale wrong instead of erroring -- flagging it up front is
+  // the only fix possible without a server-side print engine.
+  const hasViewportUnits = useMemo(() => /\b\d+(\.\d+)?\s*(vh|vw)\b/i.test(source), [source]);
   const wordCount = useMemo(() => {
     const text = source.replace(/<[^>]*>/g, " ").trim();
     return text ? text.split(/\s+/).length : 0;
@@ -327,6 +332,11 @@ export default function HtmlToPdfTool() {
             <p className="shrink-0 text-right text-xs font-semibold text-[var(--text-primary)]/40">
               {source.length.toLocaleString()} characters · {wordCount.toLocaleString()} words
             </p>
+            {hasViewportUnits ? (
+              <p role="status" className="shrink-0 rounded-lg border border-[var(--text-warning,#b45309)]/25 bg-[var(--text-warning,#b45309)]/10 px-3 py-2 text-xs font-medium text-[var(--text-warning,#b45309)]">
+                vh/vw units don&apos;t map to the printed page size and can scale incorrectly. Use mm, px, or pt instead for reliable output.
+              </p>
+            ) : null}
           </div>
         </ToolPanel>
 

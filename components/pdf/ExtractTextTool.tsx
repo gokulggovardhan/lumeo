@@ -12,7 +12,7 @@ import {
   L2UploadStage,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
-import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
+import { openPdfJsDocument, withPageTimeout } from "@/lib/pdf/pdfjs";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import {
   buildCsvFromEntries,
@@ -26,6 +26,9 @@ import {
 import { checkPdfFileSize, hasPdfMagicBytes, isPdfNamedFile } from "@/lib/pdf/uploadValidation";
 
 type ExportFormat = "txt" | "json" | "csv";
+
+const PAGE_EXTRACT_TIMEOUT_MS = 15_000;
+const UNREADABLE_PAGE_TEXT = "[This page could not be read -- it may use an unsupported encoding or a damaged content stream.]";
 
 const FORMAT_EXTENSION: Record<ExportFormat, string> = { txt: "txt", json: "json", csv: "csv" };
 const FORMAT_MIME: Record<ExportFormat, string> = {
@@ -106,10 +109,18 @@ export default function ExtractTextTool() {
 
       const doc = await openPdfJsDocument(bytes);
       const texts: string[] = [];
+      // Each page is isolated: a malformed content stream or unsupported
+      // encoding on one page (real-world corrupt/hand-crafted PDFs) fails or
+      // hangs that page alone -- the rest of the document still extracts
+      // instead of the whole operation dying on one bad page.
       for (let pageNumber = 1; pageNumber <= doc.numPages; pageNumber += 1) {
-        const page = await doc.getPage(pageNumber);
-        const content = await page.getTextContent();
-        texts.push(joinTextItems(content.items as Array<{ str: string }>));
+        try {
+          const page = await withPageTimeout(doc.getPage(pageNumber), pageNumber, PAGE_EXTRACT_TIMEOUT_MS, "load");
+          const content = await withPageTimeout(page.getTextContent(), pageNumber, PAGE_EXTRACT_TIMEOUT_MS, "extract text from");
+          texts.push(joinTextItems(content.items as Array<{ str: string }>));
+        } catch {
+          texts.push(UNREADABLE_PAGE_TEXT);
+        }
         await new Promise((resolve) => setTimeout(resolve, 0));
       }
       await (doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
