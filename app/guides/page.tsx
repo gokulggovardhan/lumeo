@@ -7,6 +7,7 @@ import {
 } from "@/components/InfoPage";
 import {
   compressFaqs,
+  editPdfFaqs,
   extractTextFaqs,
   htmlToPdfFaqs,
   jpgToPdfFaqs,
@@ -30,6 +31,7 @@ const allFaqs = [
   ...pdfToJpgFaqs,
   ...extractTextFaqs,
   ...htmlToPdfFaqs,
+  ...editPdfFaqs,
   ...signFaqs,
   ...wordToPdfFaqs,
   ...pdfToWordFaqs,
@@ -271,6 +273,13 @@ export default function GuidesPage() {
           workflow="Paste or type HTML/CSS, preview live, set page size and margins, generate, download."
           limitation="Forced CSS page-break rules are not guaranteed to be honored."
         />
+        <ToolGuide
+          title="Inscribe — Edit PDF"
+          href="/pdf/edit"
+          use="Add text, freehand drawing, shapes, and whiteout boxes to a PDF."
+          workflow="Add one PDF, pick a tool, click the page to place an element, adjust or delete it, export."
+          limitation="Whiteout is visual-only -- it does not strip the underlying text or image data."
+        />
       </InfoPageSection>
 
       <InfoPageSection title="Browser-first privacy">
@@ -292,6 +301,7 @@ export default function GuidesPage() {
       <FaqGroup title="Convert — Word to PDF questions" items={wordToPdfFaqs} />
       <FaqGroup title="Convert — PDF to Word questions" items={pdfToWordFaqs} />
       <FaqGroup title="Convert — HTML to PDF questions" items={htmlToPdfFaqs} />
+      <FaqGroup title="Inscribe — Edit PDF questions" items={editPdfFaqs} />
       <FaqGroup title="Privacy questions" items={privacyFaqs} />
     </InfoPageShell>
   );

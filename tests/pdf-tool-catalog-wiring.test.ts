@@ -43,3 +43,15 @@ test("PdfToolRegistry includes the three new tools", () => {
   assert.match(registryContent, /slug:\s*"html-to-pdf"/);
   assert.match(registryContent, /slug:\s*"extract-text"/);
 });
+
+test("edit is live and routed to /pdf/edit", () => {
+  const action = findAction("edit");
+  assert.ok(action, "expected action edit to exist");
+  assert.equal(action?.live, true);
+  assert.equal(action?.route, "/pdf/edit");
+});
+
+test("PdfToolRegistry includes edit", () => {
+  const registryContent = readFileSync("components/pdf/PdfToolRegistry.tsx", "utf8");
+  assert.match(registryContent, /slug:\s*"edit"/);
+});

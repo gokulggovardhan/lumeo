@@ -148,6 +148,22 @@ export const htmlToPdfFaqs: FaqItem[] = [
   },
 ];
 
+export const editPdfFaqs: FaqItem[] = [
+  {
+    question: "Does whiteout actually remove the underlying content?",
+    answer:
+      "No -- whiteout in Edit PDF hides content visually in the exported PDF, it does not strip the underlying text or image data. For documents with legal or compliance requirements, verify the underlying content is also removed before sharing.",
+  },
+  {
+    question: "Can I resize a shape or text box after placing it?",
+    answer: "Yes. Select it and drag the corner handle (or either endpoint, for a line) to resize. Freehand ink strokes can be moved and deleted, but not resized.",
+  },
+  {
+    question: "Can I edit an existing signature or reorganize pages with this tool?",
+    answer: "No -- use Sign PDF for signatures and Page Re-Order for rotating, reordering, or deleting pages. Edit PDF focuses on adding text, drawing, shapes, and whiteout boxes.",
+  },
+];
+
 export const signFaqs: FaqItem[] = [
   {
     question: "Is my signature stored anywhere?",
