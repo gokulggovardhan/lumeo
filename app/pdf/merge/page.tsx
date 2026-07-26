@@ -5,6 +5,19 @@ import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspa
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
+
+const softwareSchema = buildSoftwareApplicationSchema({
+  name: "Lumeo Merge PDF",
+  description: "Combine multiple PDF files into one document privately in your browser, with page reordering and output sizing controls.",
+  path: "/pdf/merge",
+  featureList: ["Merge multiple PDFs", "Reorder before merging", "Smart output sizing", "No file upload"],
+});
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: "Home", path: "/" },
+  { name: "PDF Tools", path: "/pdf-tools" },
+  { name: "Merge PDF", path: "/pdf/merge" },
+]);
 
 // Defers pdf-lib (and pdfjs-dist for the preview) until this page is
 // actually visited and hydrates client-side, instead of shipping them in
@@ -53,6 +66,9 @@ export default async function MergePdfPage() {
       ) : (
         <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-merge-tool"><MergePdfTool /></div>
       )}
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
     </PublicCatalogPageShell>
   );
 }

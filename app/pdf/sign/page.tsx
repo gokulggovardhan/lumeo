@@ -5,6 +5,19 @@ import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspa
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
+
+const softwareSchema = buildSoftwareApplicationSchema({
+  name: "Lumeo Sign PDF",
+  description: "Draw or type a signature and place it on any PDF page privately in your browser.",
+  path: "/pdf/sign",
+  featureList: ["Draw signature", "Type signature", "Drag to position", "No file upload"],
+});
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: "Home", path: "/" },
+  { name: "PDF Tools", path: "/pdf-tools" },
+  { name: "Sign PDF", path: "/pdf/sign" },
+]);
 
 const SignPdfTool = dynamic(() => import("@/components/pdf/SignPdfTool"), {
   loading: () => <ToolWorkspaceLoading />,
@@ -55,6 +68,9 @@ export default async function SignPdfPage() {
       ) : (
         <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-sign-tool"><SignPdfTool /></div>
       )}
+
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
     </PublicCatalogPageShell>
   );
 }

@@ -49,8 +49,27 @@ const structuredData = [
     applicationCategory: "BusinessApplication",
     operatingSystem: "Any modern browser",
     description:
-      "A browser-first PDF workspace for private document merging, splitting, compression, and image conversion.",
-    featureList: ["Merge PDF", "Split PDF", "Compress PDF", "JPG to PDF", "PDF to JPG"],
+      "A browser-first PDF workspace for private document merging, splitting, compression, signing, and conversion.",
+    featureList: [
+      "Merge PDF",
+      "Split PDF",
+      "Page Re-Order",
+      "Compress PDF",
+      "JPG to PDF",
+      "PDF to JPG",
+      "Sign PDF",
+      "Word to PDF",
+      "PDF to Word",
+      "Text Extract",
+      "HTML to PDF",
+    ],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Lumeo PDF",
+    url: "https://lumeo.in",
+    logo: "https://lumeo.in/icon.png",
   },
 ];
 
