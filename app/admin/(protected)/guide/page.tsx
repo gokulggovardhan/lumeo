@@ -13,10 +13,10 @@ import {
 const guidanceModules = [
   {
     title: "PDF tool catalog",
-    control: "Enables, disables and labels tools in the private catalog foundation.",
-    enabled: "Eligible public tool cards can stay discoverable when public catalog wiring is active.",
-    disabled: "The tool remains stored but should be treated as unavailable in future catalog reads.",
-    dependencies: ["Supabase tool record", "Public catalog integration", "Audit logging"],
+    control: "Sets each tool's route, category, status, maintenance message, and enabled state. All 11 live tools have a database row and are fully wired to the nav, homepage, /pdf-tools catalog, and the tool's own page.",
+    enabled: "The tool shows as live everywhere it's linked from, using the status set here (active, beta, coming_soon, hidden, or maintenance).",
+    disabled: "The tool is immediately blocked on its own page (shows the maintenance message, if any) and hidden from the nav, homepage, and catalog.",
+    dependencies: ["Supabase pdf_tools row", "resolveLumeoTools()", "getToolBlockedState()", "Audit logging"],
     risk: "medium" as const,
   },
   {
@@ -75,10 +75,10 @@ export default function AdminGuidePage() {
       <AuraPanel>
         <div className="grid gap-4 lg:grid-cols-2">
           <AdminSettingExplanation
-            title="What happens when Compress PDF is disabled?"
-            runtime="The value is stored for catalog-aware surfaces. Existing direct routes and browser processing are not removed by this setting alone."
-            deployment="No deployment is required to save the database value. Public behaviour changes only where runtime code reads the catalog."
-            history="A management action should write an audit entry with the changed tool and status."
+            title="What happens when a live tool (e.g. Compress PDF) is disabled?"
+            runtime="Takes effect immediately on save — the tool's own page shows the maintenance notice, and it drops out of the nav, homepage, and /pdf-tools catalog on the next request."
+            deployment="No deployment is required. Public behaviour reads the pdf_tools row directly at request time."
+            history="A management action writes an audit entry with the changed tool and status."
           />
           <AdminSettingExplanation
             title="What happens when public analytics is disabled?"

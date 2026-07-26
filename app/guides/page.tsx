@@ -44,10 +44,95 @@ const privacyFaqs = [
   },
 ];
 
+const organizeFaqs = [
+  {
+    question: "What's the difference between Split and Page Re-Order?",
+    answer:
+      "Split produces separate files from one PDF. Page Re-Order changes the order, rotation, or count of pages inside a single PDF and gives back one file.",
+  },
+  {
+    question: "Can I undo a reorder or delete before exporting?",
+    answer:
+      "Yes. Changes only apply to the working copy in your browser tab — reload the page to start over before you download.",
+  },
+  {
+    question: "Does duplicating a page keep its rotation?",
+    answer:
+      "Yes. A duplicated page carries over any rotation already applied to the original.",
+  },
+];
+
+const extractTextFaqs = [
+  {
+    question: "Does Text Extract work on scanned PDFs?",
+    answer:
+      "Only if the PDF already has selectable text. Scanned pages without an OCR layer have no extractable text — a searchable-scan tool is planned separately.",
+  },
+  {
+    question: "Which export formats are supported?",
+    answer:
+      "TXT, JSON, and CSV — one page range or the full document, with per-page or copy-all options in the workspace itself.",
+  },
+  {
+    question: "Can I extract only some pages?",
+    answer:
+      "Yes. Enter a page range (e.g. 1-3,5) and only those pages are pulled into the preview and export.",
+  },
+];
+
+const htmlToPdfFaqs = [
+  {
+    question: "Can I paste a full HTML document?",
+    answer:
+      "Yes. Paste a complete document or a fragment — styles are applied either way, and the result is sanitized before rendering.",
+  },
+  {
+    question: "Does it support CSS page breaks?",
+    answer:
+      "Page size, orientation, and margins are configurable, but forced CSS page-break rules are not guaranteed to be honored by the current renderer.",
+  },
+  {
+    question: "Is my pasted HTML uploaded anywhere?",
+    answer:
+      "No. It's rendered and converted to PDF entirely in your browser.",
+  },
+];
+
+const signFaqs = [
+  {
+    question: "Is my signature stored anywhere?",
+    answer:
+      "No. Signatures are drawn or typed in your browser and applied directly to the downloaded file.",
+  },
+  {
+    question: "Can I resize or reposition a signature after placing it?",
+    answer:
+      "Yes, before you finish — drag to reposition and use the resize handles to scale it on the page.",
+  },
+];
+
+const convertFaqs = [
+  {
+    question: "Are Word/PDF conversions private?",
+    answer:
+      "Office format conversion needs a server-side engine (free, self-hosted LibreOffice), so the file is uploaded temporarily and cleared immediately after conversion — it is not stored.",
+  },
+  {
+    question: "Does Word to PDF preserve formatting?",
+    answer:
+      "Layout, fonts, tables, and images are preserved for standard DOCX/DOC documents. Highly complex layouts may shift slightly.",
+  },
+];
+
 const allFaqs = [
   ...mergeFaqs,
   ...splitFaqs,
   ...compressFaqs,
+  ...organizeFaqs,
+  ...extractTextFaqs,
+  ...htmlToPdfFaqs,
+  ...signFaqs,
+  ...convertFaqs,
   ...privacyFaqs,
 ];
 
@@ -57,7 +142,7 @@ export async function generateMetadata(): Promise<Metadata> {
       absolute: "Lumeo PDF Guides",
     },
     description:
-      "Concise guides for Compose, Distill, Capture, and Render — Lumeo's browser-first PDF tools — plus how to choose the right one.",
+      "Concise guides for every Lumeo PDF tool — Compose, Distill, Capture, Render, Seal, and Convert — plus how to choose the right one.",
     alternates: {
       canonical: "/guides",
     },
@@ -197,12 +282,14 @@ export default function GuidesPage() {
 
       <InfoPageSection title="Choosing the right tool">
         <p>
-          Use Compose when separate documents need to become one file, or one
-          file needs selected pages, smaller ranges, or page cleanup — it
-          bundles merge, split, and related organizing actions in one place.
-          Use Distill when a file is too large for sharing or uploading. Use
-          Capture to turn photos or scans into a PDF, and Render to export PDF
-          pages as images or pull the text out.
+          Use Compose when separate documents need to become one file, one
+          file needs selected pages or smaller ranges, or pages need
+          reordering, rotating, or removing. Use Distill when a file is too
+          large for sharing or uploading. Use Capture to turn photos or scans
+          into a PDF, and Render to export PDF pages as images or pull
+          selectable text out. Use Seal to sign or initial a document, and
+          Convert to move between PDF and Office formats or turn HTML into a
+          PDF.
         </p>
       </InfoPageSection>
 
@@ -222,6 +309,13 @@ export default function GuidesPage() {
           limitation="Password-protected or damaged PDFs may not open in the browser."
         />
         <ToolGuide
+          title="Compose — Page Re-Order"
+          href="/pdf/organize"
+          use="Reorder, rotate, duplicate, or remove pages within one document."
+          workflow="Add one PDF, drag pages to reorder, rotate or bulk-select, download."
+          limitation="Password-protected or damaged PDFs may not open in the browser."
+        />
+        <ToolGuide
           title="Distill — Compress PDF"
           href="/pdf/compress"
           use="Reduce file size for sharing, forms, and upload limits."
@@ -238,9 +332,44 @@ export default function GuidesPage() {
         <ToolGuide
           title="Render — PDF to JPG"
           href="/pdf/pdf-to-jpg"
-          use="Export PDF pages as image files, or pull the page content out."
+          use="Export PDF pages as sharp image files."
           workflow="Add one PDF, choose the pages and quality, export, download."
           limitation="Scanned pages without selectable text export as images only."
+        />
+        <ToolGuide
+          title="Render — Text Extract"
+          href="/pdf/extract-text"
+          use="Pull selectable text out of a PDF to read, search, or export it."
+          workflow="Add one PDF, search or set a page range, choose TXT, JSON, or CSV, export."
+          limitation="Scanned pages without an existing text layer have nothing to extract."
+        />
+        <ToolGuide
+          title="Seal — Sign PDF"
+          href="/pdf/sign"
+          use="Draw or type a signature and place it on any page."
+          workflow="Add one PDF, create a signature, drag and resize it into place, download."
+          limitation="Legally binding e-signature workflows with audit trails are not provided."
+        />
+        <ToolGuide
+          title="Convert — Word to PDF"
+          href="/pdf/word-to-pdf"
+          use="Convert Word documents to PDF using free, self-hosted LibreOffice."
+          workflow="Upload a DOCX or DOC file, convert, download the PDF."
+          limitation="Server-side conversion, so the file is uploaded temporarily and cleared right after."
+        />
+        <ToolGuide
+          title="Convert — PDF to Word"
+          href="/pdf/pdf-to-word"
+          use="Convert PDF pages into an editable Word file."
+          workflow="Upload one PDF, convert, download the DOCX."
+          limitation="Complex layouts, tables, or scanned pages may not convert cleanly."
+        />
+        <ToolGuide
+          title="Convert — HTML to PDF"
+          href="/pdf/html-to-pdf"
+          use="Turn HTML and CSS into a downloadable PDF."
+          workflow="Paste or type HTML/CSS, preview live, set page size and margins, generate, download."
+          limitation="Forced CSS page-break rules are not guaranteed to be honored."
         />
       </InfoPageSection>
 
@@ -254,7 +383,12 @@ export default function GuidesPage() {
 
       <FaqGroup title="Compose — Merge PDF questions" items={mergeFaqs} />
       <FaqGroup title="Compose — Split PDF questions" items={splitFaqs} />
+      <FaqGroup title="Compose — Page Re-Order questions" items={organizeFaqs} />
       <FaqGroup title="Distill — Compress PDF questions" items={compressFaqs} />
+      <FaqGroup title="Render — Text Extract questions" items={extractTextFaqs} />
+      <FaqGroup title="Seal — Sign PDF questions" items={signFaqs} />
+      <FaqGroup title="Convert — Word/PDF questions" items={convertFaqs} />
+      <FaqGroup title="Convert — HTML to PDF questions" items={htmlToPdfFaqs} />
       <FaqGroup title="Privacy questions" items={privacyFaqs} />
     </InfoPageShell>
   );
