@@ -44,7 +44,7 @@ import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
-import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize } from "@/lib/pdf/uploadValidation";
+import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 
 type ActiveTool = "select" | "text" | "draw" | "shape" | "whiteout";
 
@@ -260,6 +260,12 @@ export default function EditPdfTool() {
       const doc = await openPdfJsDocument(new Uint8Array(copyArrayBuffer(bytes)));
       const pageCount = doc.numPages;
       void (doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
+
+      const pageCountError = checkPdfPageCount(pageCount);
+      if (pageCountError) {
+        setError(pageCountError);
+        return;
+      }
 
       setPdf({ file, bytes, pageCount });
       setPageIndex(0);
