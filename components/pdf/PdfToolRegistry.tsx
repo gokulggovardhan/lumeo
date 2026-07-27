@@ -11,7 +11,8 @@ export type PdfToolSlug =
   | "pdf-to-word"
   | "organize"
   | "html-to-pdf"
-  | "extract-text";
+  | "extract-text"
+  | "edit";
 
 export type PdfToolDefinition = {
   slug: PdfToolSlug;
@@ -217,6 +218,24 @@ export const pdfTools: PdfToolDefinition[] = [
       "Selective page-range extraction",
       "Export as TXT, JSON, or CSV",
       "Copy per page or copy all",
+    ],
+  },
+  {
+    slug: "edit",
+    title: "Edit PDF",
+    shortTitle: "Edit PDF",
+    description: "Add text, freehand drawing, shapes, and whiteout boxes to a PDF.",
+    route: "/pdf/edit",
+    status: "live",
+    browserNote: "Browser-first editing",
+    engineNote: "Live now",
+    accepted: "one PDF file",
+    bullets: [
+      "Click-to-type text boxes",
+      "Freehand ink with adjustable color and thickness",
+      "Rectangle, ellipse, line, and highlight shapes",
+      "Whiteout boxes (visual only)",
+      "Undo/redo",
     ],
   },
 ];

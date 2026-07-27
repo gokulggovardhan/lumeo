@@ -18,6 +18,7 @@ const routes = [
   "/pdf/organize",
   "/pdf/extract-text",
   "/pdf/html-to-pdf",
+  "/pdf/edit",
   "/guides",
   "/about",
   "/privacy",

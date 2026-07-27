@@ -63,6 +63,7 @@ jobs:
           app/pdf/organize/page.tsx
           app/pdf/extract-text/page.tsx
           app/pdf/html-to-pdf/page.tsx
+          app/pdf/edit/page.tsx
           components/PublicFooter.tsx
           components/PublicPdfChrome.tsx
           components/pdf/PdfToolLauncher.tsx
