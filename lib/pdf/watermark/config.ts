@@ -5,16 +5,29 @@
 // established by lib/pdf/edit/elements.ts.
 //
 // Coordinates are percent of the visual (rotation-aware) page, 0-100,
-// top-left origin -- same convention as Edit PDF's element model. Position
-// (xPct/yPct) is the watermark's own top-left corner in single-placement
-// mode; width/height for corner-anchoring and tiling are supplied by the
-// caller (lib/pdf/watermark/export.ts), since actual rendered size depends
-// on pdf-lib font metrics / image natural dimensions, which this pure
-// module has no access to.
+// top-left origin -- same convention as Edit PDF's element model. Width/
+// height for corner-anchoring and tiling are supplied by the caller
+// (lib/pdf/watermark/export.ts), since actual rendered size depends on
+// pdf-lib font metrics / image natural dimensions, which this pure module
+// has no access to.
 
 export type WatermarkPlacementMode = "single" | "tiled";
 
 export type WatermarkPlacementCorner = "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+
+// Corner placement is a PAGE-LOCAL constraint, not a document-level
+// coordinate: "top-left, 4% margin" means something different in absolute
+// points on every page, and a different rotated bounding box wherever page
+// size/orientation differs. So a corner placement stores only the corner +
+// (marginPct/rotationDeg/content size live elsewhere on WatermarkConfig,
+// already page-independent) -- never a baked xPct/yPct -- and the caller
+// (export.ts's per-page loop, or the single-page preview) must call
+// cornerAnchorPct fresh for whichever page it's rendering. Manual
+// placement (after a drag) has no page-local derivation to fall back on,
+// so it's the one case that legitimately stores a raw xPct/yPct.
+export type WatermarkSinglePlacement =
+  | { mode: "corner"; corner: WatermarkPlacementCorner }
+  | { mode: "manual"; xPct: number; yPct: number };
 
 export type WatermarkTextContent = {
   kind: "text";
@@ -46,8 +59,12 @@ export type WatermarkConfig = {
   rotationDeg: number; // user-chosen rotation, applied on top of the page's own rotation
   scale: number; // multiplier over the content's base rendered size
   placementMode: WatermarkPlacementMode;
-  xPct: number; // anchor top-left, used when placementMode is "single"
-  yPct: number;
+  // Active anchor when placementMode is "single" (ignored, but retained
+  // as-is, while placementMode is "tiled" -- so toggling tiled off
+  // restores whatever single placement was set before, rather than
+  // resetting it). See WatermarkSinglePlacement above for why corner mode
+  // carries no coordinates.
+  placement: WatermarkSinglePlacement;
   marginPct: number; // inset used by corner-anchor presets
   tileSpacingPct: number; // gap between repeats in tiled mode
   pageRange: WatermarkPageRange;
@@ -75,8 +92,7 @@ export function createDefaultTextWatermarkConfig(): WatermarkConfig {
     rotationDeg: DEFAULT_ROTATION_DEG,
     scale: DEFAULT_SCALE,
     placementMode: "single",
-    xPct: 50,
-    yPct: 50,
+    placement: { mode: "corner", corner: "center" },
     marginPct: DEFAULT_MARGIN_PCT,
     tileSpacingPct: DEFAULT_TILE_SPACING_PCT,
     pageRange: { mode: "all" },
@@ -90,8 +106,7 @@ export function createDefaultImageWatermarkConfig(imageDataUrl: string, imageFor
     rotationDeg: 0,
     scale: DEFAULT_SCALE,
     placementMode: "single",
-    xPct: 50,
-    yPct: 50,
+    placement: { mode: "corner", corner: "center" },
     marginPct: DEFAULT_MARGIN_PCT,
     tileSpacingPct: DEFAULT_TILE_SPACING_PCT,
     pageRange: { mode: "all" },
@@ -101,28 +116,96 @@ export function createDefaultImageWatermarkConfig(imageDataUrl: string, imageFor
 // Top-left anchor (xPct, yPct) for a box of the given size, for one of the
 // five placement presets, inset from the page edge by marginPct. "center"
 // ignores marginPct (a centered element has no edge to inset from).
+//
+// Rotation-aware: pdf-lib's drawText/drawImage `rotate` option pivots the
+// content around the (x, y) point it's given, in PDF's own native space --
+// x running right, y running UP from the text baseline (0,0) -- so a naive
+// axis-aligned inset (the pre-rotation width/height only) under-clamps
+// whenever rotationDeg != 0: the rotated box's corners can swing well
+// outside the unrotated footprint and past the page edge even though the
+// anchor itself looks correctly inset.
+//
+// xPct/yPct are top-down (yPct 0 = top of page), matching CSS/screen
+// convention, while PDF's native space this rotation actually happens in
+// is bottom-up -- lib/pdf/watermark/export.ts's toNativePoint bridges the
+// two via `nativeY = nativeHeight - visualY - heightPt` (the visual anchor
+// names the box's top-left; the native anchor pdf-lib rotates around is
+// the box's baseline-left). That flip reverses rotational handedness
+// between the two spaces, so the X and Y axes below are NOT symmetric:
+// X can be solved directly (no flip), but Y must be solved in native
+// space first and converted back, or a positive rotationDeg would bend
+// the wrong way and the "safe" edge would be the wrong one -- exactly the
+// failure an earlier version of this function had (verified only against
+// its own, equally-flipped, self-check; caught by comparing against a
+// real exported PDF's content stream instead).
 export function cornerAnchorPct(
   corner: WatermarkPlacementCorner,
   marginPct: number,
   widthPct: number,
   heightPct: number,
+  rotationDeg: number,
+  pageWidthPt: number,
+  pageHeightPt: number,
 ): { xPct: number; yPct: number } {
-  switch (corner) {
-    case "top-left":
-      return { xPct: marginPct, yPct: marginPct };
-    case "top-right":
-      return { xPct: Math.max(marginPct, 100 - marginPct - widthPct), yPct: marginPct };
-    case "bottom-left":
-      return { xPct: marginPct, yPct: Math.max(marginPct, 100 - marginPct - heightPct) };
-    case "bottom-right":
-      return {
-        xPct: Math.max(marginPct, 100 - marginPct - widthPct),
-        yPct: Math.max(marginPct, 100 - marginPct - heightPct),
-      };
-    case "center":
-    default:
-      return { xPct: (100 - widthPct) / 2, yPct: (100 - heightPct) / 2 };
+  const widthPt = (widthPct / 100) * pageWidthPt;
+  const heightPt = (heightPct / 100) * pageHeightPt;
+  const marginXPt = (marginPct / 100) * pageWidthPt;
+  const marginYPt = (marginPct / 100) * pageHeightPt;
+
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  // Local corners in PDF's own native drawing frame: (0,0) is the
+  // baseline point pdf-lib rotates around, +x right, +y UP.
+  const corners: Array<[number, number]> = [
+    [0, 0],
+    [widthPt, 0],
+    [0, heightPt],
+    [widthPt, heightPt],
+  ];
+  const rotated = corners.map(([x, y]): [number, number] => [x * cos - y * sin, x * sin + y * cos]);
+  const minX = Math.min(...rotated.map(([x]) => x));
+  const maxX = Math.max(...rotated.map(([x]) => x));
+  const minY = Math.min(...rotated.map(([, y]) => y));
+  const maxY = Math.max(...rotated.map(([, y]) => y));
+
+  // X has no space flip: the visual anchor's x is the native anchor's x
+  // directly. Both "start" and "end" always place their own named edge
+  // exactly at its margin, unconditionally -- rotating the local origin
+  // always maps back to itself, so the named edge can never go negative
+  // regardless of content size. When the content is too big to fit the
+  // page at all, this is what keeps the *requested* corner's own edge
+  // correct and pushes all of the unavoidable overflow to the opposite
+  // (unrequested) edge -- the smallest overflow possible while still
+  // honoring the corner the user actually picked, rather than silently
+  // sliding the anchor away from it.
+  function xAnchor(align: "start" | "end" | "center"): number {
+    if (align === "center") return pageWidthPt / 2 - (minX + maxX) / 2;
+    if (align === "start") return marginXPt - minX;
+    return pageWidthPt - marginXPt - maxX;
   }
+
+  // Y is solved for nativeY (top-margin-safe: nativeY <= pageHeightPt -
+  // marginYPt: bottom-margin-safe: nativeY >= marginYPt), each expressed
+  // as a bound on visualY via nativeY = pageHeightPt - visualY - heightPt
+  // + rotatedY, then converted back. "top" (visually near yPct=0) wants
+  // the smallest valid visualY; "bottom" wants the largest. Same
+  // unconditional-per-edge policy as X above -- see its comment.
+  function yAnchor(align: "start" | "end" | "center"): number {
+    if (align === "center") return pageHeightPt / 2 - heightPt + (minY + maxY) / 2;
+    if (align === "start") return marginYPt - heightPt + maxY; // keeps the visual-top edge inside the top margin
+    return pageHeightPt - marginYPt - heightPt + minY; // keeps the visual-bottom edge inside the bottom margin
+  }
+
+  const xAlign: "start" | "end" | "center" =
+    corner === "top-left" || corner === "bottom-left" ? "start" : corner === "top-right" || corner === "bottom-right" ? "end" : "center";
+  const yAlign: "start" | "end" | "center" =
+    corner === "top-left" || corner === "top-right" ? "start" : corner === "bottom-left" || corner === "bottom-right" ? "end" : "center";
+
+  const xPt = xAnchor(xAlign);
+  const yPt = yAnchor(yAlign);
+
+  return { xPct: (xPt / pageWidthPt) * 100, yPct: (yPt / pageHeightPt) * 100 };
 }
 
 // Generates a grid of top-left anchors covering the full 0-100% page area,

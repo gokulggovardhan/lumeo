@@ -202,3 +202,109 @@ test("exportWatermarkedPdf handles a mixed-orientation document without cross-pa
     assert.equal(reloaded.getPage(pageIndex).getRotation().angle, rotationDeg);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Mixed page sizes -- corner placement is a page-local constraint, not a
+// document-level coordinate (see WatermarkSinglePlacement in
+// lib/pdf/watermark/config.ts). WatermarkConfig stores only the corner
+// itself for corner placements; export.ts derives the actual xPct/yPct
+// anchor fresh for EACH page from that corner + marginPct + rotationDeg +
+// that page's own real dimensions -- the same per-page recompute tiled
+// mode already did. Manual placement (after a drag) has no page-local
+// derivation, so it's the one case that stores a raw xPct/yPct, applied
+// verbatim to every page (matching Edit PDF's existing percent-of-page
+// element model).
+// ---------------------------------------------------------------------------
+
+function extractAllTm(stream: string): number[][] {
+  return Array.from(stream.matchAll(/([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) ([-\d.]+) Tm/g)).map(
+    (m) => m.slice(1, 7).map(Number),
+  );
+}
+
+function rotatedBBoxFromTm(tm: number[], widthPt: number, heightPt: number) {
+  const [a, b, c, d, e, f] = tm;
+  const corners = [
+    [0, 0],
+    [widthPt, 0],
+    [0, heightPt],
+    [widthPt, heightPt],
+  ];
+  const xs = corners.map(([x, y]) => e + a * x + c * y);
+  const ys = corners.map(([x, y]) => f + b * x + d * y);
+  return { minX: Math.min(...xs), maxX: Math.max(...xs), minY: Math.min(...ys), maxY: Math.max(...ys) };
+}
+
+test("exportWatermarkedPdf with a corner placement recomputes the anchor per page on mixed page sizes (regression for the confirmed cross-page overflow bug)", async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([612, 792]); // Letter portrait
+  doc.addPage([792, 612]); // Letter landscape -- previously overflowed
+  const saved = await doc.save();
+  const original = saved.buffer.slice(saved.byteOffset, saved.byteOffset + saved.byteLength) as ArrayBuffer;
+
+  const config = {
+    ...createDefaultTextWatermarkConfig(),
+    rotationDeg: 30,
+    marginPct: 4,
+    placement: { mode: "corner" as const, corner: "top-left" as const },
+  };
+
+  const { bytes, skippedPages } = await exportWatermarkedPdf(original, config);
+  assert.deepEqual(skippedPages, []);
+
+  const stream = decodeContentStreams(bytes);
+  const matrices = extractAllTm(stream);
+  assert.equal(matrices.length, 2, "expected one Tm per page");
+
+  // font.widthOfTextAtSize("CONFIDENTIAL", 36) for Helvetica-Bold, matching
+  // export.ts's own real metric -- not re-derived, read directly from a
+  // fresh embed so this test can't drift from a hardcoded magic number.
+  const probeDoc = await PDFDocument.create();
+  const probeFont = await probeDoc.embedFont("Helvetica-Bold");
+  const textWidthPt = probeFont.widthOfTextAtSize("CONFIDENTIAL", 36);
+
+  const page1Box = rotatedBBoxFromTm(matrices[0], textWidthPt, 36);
+  const page2Box = rotatedBBoxFromTm(matrices[1], textWidthPt, 36);
+
+  // Page 1: top-left corner honored, left/top margins at exactly 4% of 612x792.
+  approxEqual(page1Box.minX, 0.04 * 612, 0.5);
+  approxEqual(page1Box.maxY, 792 - 0.04 * 792, 0.5);
+
+  // Page 2 (792x612, a different size/orientation than page 1): must ALSO
+  // honor its own top-left margins -- there is no stale percentage to carry
+  // over, since the config never stored one. Before this fix (an earlier
+  // xPct/yPct-based design) this page's bbox spilled ~5pt past the top edge
+  // (maxY > 612); a page-local corner derivation can't reproduce that class
+  // of bug at all, since every page computes its own anchor independently.
+  assert.ok(page2Box.minX >= -0.5, `page2 left edge ${page2Box.minX} < 0`);
+  assert.ok(page2Box.maxX <= 792 + 0.5, `page2 right edge ${page2Box.maxX} > 792`);
+  assert.ok(page2Box.minY >= -0.5, `page2 bottom edge ${page2Box.minY} < 0`);
+  assert.ok(page2Box.maxY <= 612 + 0.5, `page2 top edge ${page2Box.maxY} > 612 (this was 616.9 before the fix)`);
+  approxEqual(page2Box.minX, 0.04 * 792, 0.5);
+  approxEqual(page2Box.maxY, 612 - 0.04 * 612, 0.5);
+});
+
+test("exportWatermarkedPdf with a manual placement reuses xPct/yPct verbatim (unaffected by the per-page corner recompute)", async () => {
+  const doc = await PDFDocument.create();
+  doc.addPage([612, 792]);
+  doc.addPage([792, 612]);
+  const saved = await doc.save();
+  const original = saved.buffer.slice(saved.byteOffset, saved.byteOffset + saved.byteLength) as ArrayBuffer;
+
+  const config = { ...createDefaultTextWatermarkConfig(), placement: { mode: "manual" as const, xPct: 10, yPct: 20 } };
+
+  const { bytes, skippedPages } = await exportWatermarkedPdf(original, config);
+  assert.deepEqual(skippedPages, []);
+  const matrices = extractAllTm(decodeContentStreams(bytes));
+  assert.equal(matrices.length, 2);
+
+  // toNativePoint's x mapping for an unrotated page (both pages here have
+  // no native /Rotate) is the identity: nativeX = visualX = xPct/100 * pageWidth.
+  // Tm's e (translation-x) is exactly that nativeX, so it must scale with
+  // each page's own width for the same 10% anchor -- confirming no
+  // corner-style recompute (which would NOT scale linearly with page width)
+  // kicked in for a plain manual-placed position.
+  const [, , , , e1] = matrices[0];
+  const [, , , , e2] = matrices[1];
+  approxEqual(e1 / 612, e2 / 792, 0.01);
+});

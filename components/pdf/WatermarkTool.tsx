@@ -28,7 +28,6 @@ import { WatermarkPreview } from "@/components/pdf/watermark/WatermarkPreview";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
-  cornerAnchorPct,
   createDefaultImageWatermarkConfig,
   createDefaultTextWatermarkConfig,
   parsePageRangeInput,
@@ -134,6 +133,19 @@ export default function WatermarkTool() {
     };
   }, []);
 
+  // Any export-affecting config change (text, image, opacity, rotation,
+  // scale, color, font size, bold/italic, margin, placement, tiled mode,
+  // tile spacing, page range) invalidates the previous export -- the
+  // downloaded file no longer matches the current settings, so the stale
+  // blob URL is revoked and the primary button reverts to "Add Watermark"
+  // until the user exports again.
+  useEffect(() => {
+    if (!downloadUrlRef.current) return;
+    URL.revokeObjectURL(downloadUrlRef.current);
+    downloadUrlRef.current = "";
+    setDownloadUrl("");
+  }, [config]);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -235,6 +247,8 @@ export default function WatermarkTool() {
       setContentMode("text");
       setPageRangeInput("");
       setPageRangeError("");
+      if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
+      downloadUrlRef.current = "";
       setDownloadUrl("");
     } catch (uploadError) {
       const message =
@@ -264,10 +278,16 @@ export default function WatermarkTool() {
     reader.readAsDataURL(file);
   }
 
+  // Corner placement stores only the corner itself -- no coordinates, no
+  // page dimensions, no async page fetch. It's a page-local constraint
+  // (see WatermarkSinglePlacement in lib/pdf/watermark/config.ts): the
+  // actual xPct/yPct anchor is derived fresh for whichever page is being
+  // rendered, by WatermarkPreview for the on-screen preview and by
+  // export.ts per page for the real export. That's what keeps every page
+  // corner-safe on a document mixing page sizes/orientations -- there is
+  // no single anchor that would be correct for every page at once.
   function applyCorner(corner: WatermarkPlacementCorner) {
-    const { widthPct, heightPct } = estimatedContentSize;
-    const anchor = cornerAnchorPct(corner, config.marginPct, widthPct, heightPct);
-    setConfig((current) => ({ ...current, placementMode: "single", xPct: anchor.xPct, yPct: anchor.yPct }));
+    setConfig((current) => ({ ...current, placementMode: "single", placement: { mode: "corner", corner } }));
   }
 
   function handlePageRangeInputChange(value: string) {
@@ -393,7 +413,9 @@ export default function WatermarkTool() {
                 config={config}
                 contentWidthPct={estimatedContentSize.widthPct}
                 contentHeightPct={estimatedContentSize.heightPct}
-                onPositionChange={(position) => setConfig((current) => ({ ...current, xPct: position.xPct, yPct: position.yPct }))}
+                pageWidthPt={pageDisplaySize.width}
+                pageHeightPt={pageDisplaySize.height}
+                onPositionChange={(position) => setConfig((current) => ({ ...current, placement: { mode: "manual", xPct: position.xPct, yPct: position.yPct } }))}
               />
             )}
           </section>
@@ -542,17 +564,18 @@ export default function WatermarkTool() {
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">Placement</span>
               <div className="grid grid-cols-3 gap-1.5">
                 {([
-                  ["top-left", "↖"],
-                  ["center", "•"],
-                  ["top-right", "↗"],
-                  ["bottom-left", "↙"],
-                  ["bottom-right", "↘"],
-                ] as [WatermarkPlacementCorner, string][]).map(([corner, glyph]) => (
+                  ["top-left", "↖", "Top left"],
+                  ["center", "•", "Center"],
+                  ["top-right", "↗", "Top right"],
+                  ["bottom-left", "↙", "Bottom left"],
+                  ["bottom-right", "↘", "Bottom right"],
+                ] as [WatermarkPlacementCorner, string, string][]).map(([corner, glyph, label]) => (
                   <button
                     key={corner}
                     type="button"
                     onClick={() => applyCorner(corner)}
                     title={corner}
+                    aria-label={label}
                     className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-sm text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40"
                   >
                     {glyph}

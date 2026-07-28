@@ -17,13 +17,14 @@
 // /Rotate value.
 
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFImage } from "pdf-lib";
-import type { WatermarkConfig, WatermarkPageRange } from "./config";
+import type { WatermarkConfig, WatermarkPageRange, WatermarkPlacementCorner } from "./config";
 
-// computeTilePositions/resolvePageIndices are duplicated from ./config
-// (same file-loading constraint as the rotation helpers above) -- ./config
-// remains the tested, canonical definition for the UI layer to import
-// directly (a .tsx file compiled by Next.js's bundler, not loaded by the
-// bare Node test runner, so a normal extensionless import is safe there).
+// computeTilePositions/resolvePageIndices/cornerAnchorPct are duplicated
+// from ./config (same file-loading constraint as the rotation helpers
+// above) -- ./config remains the tested, canonical definition for the UI
+// layer to import directly (a .tsx file compiled by Next.js's bundler,
+// not loaded by the bare Node test runner, so a normal extensionless
+// import is safe there).
 
 function resolvePageIndices(pageRange: WatermarkPageRange, pageCount: number): number[] {
   switch (pageRange.mode) {
@@ -62,6 +63,65 @@ function computeTilePositions(
   }
 
   return positions;
+}
+
+// Verbatim duplicate of lib/pdf/watermark/config.ts's cornerAnchorPct (see
+// that file for the full derivation and for why WatermarkConfig stores a
+// corner, never a baked xPct/yPct, for corner placements). Called fresh
+// inside the per-page loop below, using THAT page's own widthPct/
+// heightPct/dimensions -- this is what keeps every page corner-safe in a
+// document mixing page sizes or orientations, since a corner + margin is a
+// page-local constraint with no single document-wide coordinate answer.
+function cornerAnchorPct(
+  corner: WatermarkPlacementCorner,
+  marginPct: number,
+  widthPct: number,
+  heightPct: number,
+  rotationDeg: number,
+  pageWidthPt: number,
+  pageHeightPt: number,
+): { xPct: number; yPct: number } {
+  const widthPt = (widthPct / 100) * pageWidthPt;
+  const heightPt = (heightPct / 100) * pageHeightPt;
+  const marginXPt = (marginPct / 100) * pageWidthPt;
+  const marginYPt = (marginPct / 100) * pageHeightPt;
+
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const corners: Array<[number, number]> = [
+    [0, 0],
+    [widthPt, 0],
+    [0, heightPt],
+    [widthPt, heightPt],
+  ];
+  const rotated = corners.map(([x, y]): [number, number] => [x * cos - y * sin, x * sin + y * cos]);
+  const minX = Math.min(...rotated.map(([x]) => x));
+  const maxX = Math.max(...rotated.map(([x]) => x));
+  const minY = Math.min(...rotated.map(([, y]) => y));
+  const maxY = Math.max(...rotated.map(([, y]) => y));
+
+  function xAnchor(align: "start" | "end" | "center"): number {
+    if (align === "center") return pageWidthPt / 2 - (minX + maxX) / 2;
+    if (align === "start") return marginXPt - minX;
+    return pageWidthPt - marginXPt - maxX;
+  }
+
+  function yAnchor(align: "start" | "end" | "center"): number {
+    if (align === "center") return pageHeightPt / 2 - heightPt + (minY + maxY) / 2;
+    if (align === "start") return marginYPt - heightPt + maxY;
+    return pageHeightPt - marginYPt - heightPt + minY;
+  }
+
+  const xAlign: "start" | "end" | "center" =
+    corner === "top-left" || corner === "bottom-left" ? "start" : corner === "top-right" || corner === "bottom-right" ? "end" : "center";
+  const yAlign: "start" | "end" | "center" =
+    corner === "top-left" || corner === "top-right" ? "start" : corner === "bottom-left" || corner === "bottom-right" ? "end" : "center";
+
+  const xPt = xAnchor(xAlign);
+  const yPt = yAnchor(yAlign);
+
+  return { xPct: (xPt / pageWidthPt) * 100, yPct: (yPt / pageHeightPt) * 100 };
 }
 
 type PageRotation = 0 | 90 | 180 | 270;
@@ -180,7 +240,9 @@ export async function exportWatermarkedPdf(
 
         const anchors = config.placementMode === "tiled"
           ? computeTilePositions(widthPct, heightPct, config.tileSpacingPct)
-          : [{ xPct: config.xPct, yPct: config.yPct }];
+          : [config.placement.mode === "corner"
+              ? cornerAnchorPct(config.placement.corner, config.marginPct, widthPct, heightPct, config.rotationDeg, visualWidth, visualHeight)
+              : { xPct: config.placement.xPct, yPct: config.placement.yPct }];
 
         for (const anchor of anchors) {
           const visualX = (anchor.xPct / 100) * visualWidth;
@@ -205,7 +267,9 @@ export async function exportWatermarkedPdf(
 
         const anchors = config.placementMode === "tiled"
           ? computeTilePositions(widthPct, heightPct, config.tileSpacingPct)
-          : [{ xPct: config.xPct, yPct: config.yPct }];
+          : [config.placement.mode === "corner"
+              ? cornerAnchorPct(config.placement.corner, config.marginPct, widthPct, heightPct, config.rotationDeg, visualWidth, visualHeight)
+              : { xPct: config.placement.xPct, yPct: config.placement.yPct }];
 
         for (const anchor of anchors) {
           const visualX = (anchor.xPct / 100) * visualWidth;

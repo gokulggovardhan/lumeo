@@ -13,13 +13,15 @@
 
 import { useRef } from "react";
 import type { WatermarkConfig } from "@/lib/pdf/watermark/config";
-import { computeTilePositions } from "@/lib/pdf/watermark/config";
+import { computeTilePositions, cornerAnchorPct } from "@/lib/pdf/watermark/config";
 
 export function WatermarkPreview({
   pageImageUrl,
   config,
   contentWidthPct,
   contentHeightPct,
+  pageWidthPt,
+  pageHeightPt,
   onPositionChange,
 }: {
   pageImageUrl: string;
@@ -29,15 +31,29 @@ export function WatermarkPreview({
   // same "page-relative box" approach export.ts uses for the real export.
   contentWidthPct: number;
   contentHeightPct: number;
+  // The currently-displayed page's own dimensions (any consistent unit --
+  // cornerAnchorPct's math only depends on their ratio, e.g. rendered
+  // canvas pixels work exactly as well as PDF points). Needed to derive a
+  // corner placement's on-screen position for THIS page; a manual
+  // placement doesn't need them at all.
+  pageWidthPt: number;
+  pageHeightPt: number;
   onPositionChange: (position: { xPct: number; yPct: number }) => void;
 }) {
   const stageRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; originXPct: number; originYPct: number } | null>(null);
 
+  // Corner placement has no stored coordinates -- derive where it lands on
+  // THIS page, fresh, the same way export.ts derives it per page. Manual
+  // placement already has its own stored percentage.
+  const singleAnchorPct = config.placement.mode === "manual"
+    ? { xPct: config.placement.xPct, yPct: config.placement.yPct }
+    : cornerAnchorPct(config.placement.corner, config.marginPct, contentWidthPct, contentHeightPct, config.rotationDeg, pageWidthPt, pageHeightPt);
+
   function handlePointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if (config.placementMode !== "single") return;
     (event.target as HTMLElement).setPointerCapture(event.pointerId);
-    dragRef.current = { startX: event.clientX, startY: event.clientY, originXPct: config.xPct, originYPct: config.yPct };
+    dragRef.current = { startX: event.clientX, startY: event.clientY, originXPct: singleAnchorPct.xPct, originYPct: singleAnchorPct.yPct };
   }
 
   function handlePointerMove(event: React.PointerEvent<HTMLDivElement>) {
@@ -98,7 +114,7 @@ export function WatermarkPreview({
           data-watermark-anchor="true"
           onPointerDown={handlePointerDown}
           className="absolute cursor-grab select-none whitespace-nowrap active:cursor-grabbing"
-          style={{ left: `${config.xPct}%`, top: `${config.yPct}%`, ...previewStyle }}
+          style={{ left: `${singleAnchorPct.xPct}%`, top: `${singleAnchorPct.yPct}%`, ...previewStyle }}
         >
           {config.content.kind === "image" ? (
             // eslint-disable-next-line @next/next/no-img-element
