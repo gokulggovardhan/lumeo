@@ -12,7 +12,8 @@ export type PdfToolSlug =
   | "organize"
   | "html-to-pdf"
   | "extract-text"
-  | "edit";
+  | "edit"
+  | "watermark";
 
 export type PdfToolDefinition = {
   slug: PdfToolSlug;
@@ -235,6 +236,24 @@ export const pdfTools: PdfToolDefinition[] = [
       "Freehand ink with adjustable color and thickness",
       "Rectangle, ellipse, line, and highlight shapes",
       "Whiteout boxes (visual only)",
+      "Undo/redo",
+    ],
+  },
+  {
+    slug: "watermark",
+    title: "Watermark PDF",
+    shortTitle: "Watermark",
+    description: "Add a text or image watermark to a PDF.",
+    route: "/pdf/watermark",
+    status: "live",
+    browserNote: "Browser-first watermarking",
+    engineNote: "Live now",
+    accepted: "one PDF file",
+    bullets: [
+      "Text watermark with font, color, and rotation",
+      "Image watermark (PNG with transparency, or JPG)",
+      "Single anchor or tiled placement",
+      "All pages, first page, odd/even, or a custom range",
       "Undo/redo",
     ],
   },

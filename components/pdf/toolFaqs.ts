@@ -164,6 +164,25 @@ export const editPdfFaqs: FaqItem[] = [
   },
 ];
 
+export const watermarkFaqs: FaqItem[] = [
+  {
+    question: "Are my PDF files uploaded to a server?",
+    answer: "No. Lumeo Watermark PDF uses browser-first processing, so your document stays on your device.",
+  },
+  {
+    question: "Can I use an image as a watermark, not just text?",
+    answer: "Yes. Upload a PNG or JPG. PNG transparency is preserved in the exported PDF; JPG watermarks are always opaque, since the JPG format itself has no transparency channel.",
+  },
+  {
+    question: "Can I apply the watermark to only some pages?",
+    answer: "Yes -- choose all pages, first page only, odd pages, even pages, or a custom range like 1,3,5-8.",
+  },
+  {
+    question: "Will the watermark stay upright on a rotated page?",
+    answer: "Yes. Lumeo detects each page's own rotation and composes it with your chosen watermark angle, so text and images render upright and correctly placed regardless of page rotation.",
+  },
+];
+
 export const signFaqs: FaqItem[] = [
   {
     question: "Is my signature stored anywhere?",

@@ -55,3 +55,15 @@ test("PdfToolRegistry includes edit", () => {
   const registryContent = readFileSync("components/pdf/PdfToolRegistry.tsx", "utf8");
   assert.match(registryContent, /slug:\s*"edit"/);
 });
+
+test("watermark is live and routed to /pdf/watermark", () => {
+  const action = findAction("watermark");
+  assert.ok(action, "expected action watermark to exist");
+  assert.equal(action?.live, true);
+  assert.equal(action?.route, "/pdf/watermark");
+});
+
+test("PdfToolRegistry includes watermark", () => {
+  const registryContent = readFileSync("components/pdf/PdfToolRegistry.tsx", "utf8");
+  assert.match(registryContent, /slug:\s*"watermark"/);
+});

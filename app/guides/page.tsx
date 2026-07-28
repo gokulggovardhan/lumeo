@@ -8,6 +8,7 @@ import {
 import {
   compressFaqs,
   editPdfFaqs,
+  watermarkFaqs,
   extractTextFaqs,
   htmlToPdfFaqs,
   jpgToPdfFaqs,
@@ -32,6 +33,7 @@ const allFaqs = [
   ...extractTextFaqs,
   ...htmlToPdfFaqs,
   ...editPdfFaqs,
+  ...watermarkFaqs,
   ...signFaqs,
   ...wordToPdfFaqs,
   ...pdfToWordFaqs,
@@ -280,6 +282,13 @@ export default function GuidesPage() {
           workflow="Add one PDF, pick a tool, click the page to place an element, adjust or delete it, export."
           limitation="Whiteout is visual-only -- it does not strip the underlying text or image data."
         />
+        <ToolGuide
+          title="Inscribe — Watermark PDF"
+          href="/pdf/watermark"
+          use="Add a text or image watermark to a PDF."
+          workflow="Add one PDF, choose text or image, set opacity/rotation/placement and page range, add watermark, download."
+          limitation="JPG watermarks are always opaque -- JPG has no transparency channel; use PNG for a see-through watermark."
+        />
       </InfoPageSection>
 
       <InfoPageSection title="Browser-first privacy">
@@ -302,6 +311,7 @@ export default function GuidesPage() {
       <FaqGroup title="Convert — PDF to Word questions" items={pdfToWordFaqs} />
       <FaqGroup title="Convert — HTML to PDF questions" items={htmlToPdfFaqs} />
       <FaqGroup title="Inscribe — Edit PDF questions" items={editPdfFaqs} />
+      <FaqGroup title="Inscribe — Watermark PDF questions" items={watermarkFaqs} />
       <FaqGroup title="Privacy questions" items={privacyFaqs} />
     </InfoPageShell>
   );
