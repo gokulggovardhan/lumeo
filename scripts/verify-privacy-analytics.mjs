@@ -25,7 +25,7 @@ const files = [
   "lib/supabase/database.types.ts",
   "app/admin/(protected)/analytics/page.tsx",
   "app/admin/(protected)/page.tsx",
-  "app/admin/(protected)/system/page.tsx",
+  "app/admin/(protected)/settings/page.tsx",
 ];
 
 function read(relativePath) {
@@ -168,8 +168,13 @@ try {
     { file: "components/pdf/SplitPdfTool.tsx", slug: "split" },
     { file: "components/pdf/CompressPdfTool.tsx", slug: "compress" },
   ];
-  const activeToolEvents = ["tool_opened"];
-  const postponedLifecycleEvents = ["processing_started", "processing_succeeded", "processing_failed", "download_started"];
+  // Operation lifecycle events (processing_started/succeeded/failed,
+  // download_started) were originally postponed past Analytics V1, but were
+  // verified live in production across all 14 PDF tools as of 2026-07-29
+  // (confirmed via components/pdf/*Tool.tsx track() calls and real,
+  // non-placeholder AdminMetricCard values on /admin/analytics) -- this check
+  // was updated from "must not emit" to "must emit" to match reality.
+  const activeToolEvents = ["tool_opened", "processing_started", "processing_succeeded", "processing_failed", "download_started"];
   for (const { file: toolFile, slug } of pdfTools) {
     const tool = read(toolFile);
     assert(tool.includes("availability"), `${toolFile} must read analytics availability.`);
@@ -180,13 +185,10 @@ try {
     for (const eventName of activeToolEvents) {
       assert(tool.includes(`eventName: "${eventName}"`), `${toolFile} must track ${eventName}.`);
     }
-    for (const eventName of postponedLifecycleEvents) {
-      assert(!tool.includes(`eventName: "${eventName}"`), `${toolFile} must not emit postponed ${eventName} during Analytics V1.`);
-    }
     assert(!/await\s+track\(/.test(tool), `${toolFile} must not block processing on analytics.`);
     assert(!/await\s+trackMergeAnalytics\(/.test(tool), `${toolFile} must not block processing on analytics.`);
     const trackCalls = tool.match(/(?:track|trackMergeAnalytics)\(\{[\s\S]*?\}\);/g) ?? [];
-    assert(trackCalls.length === 1, `${toolFile} must only include tool_opened analytics in V1.`);
+    assert(trackCalls.length === activeToolEvents.length, `${toolFile} must include exactly the ${activeToolEvents.length} Analytics V1 events (tool_opened + operation lifecycle).`);
     assert(!/console\.info\(/.test(tool), `${toolFile} must not contain analytics debug console logs.`);
     assert(!/Analytics Probe/.test(tool), `${toolFile} must not contain temporary analytics probes.`);
     for (const call of trackCalls) {
@@ -198,17 +200,21 @@ try {
   const adminPage = read("app/admin/(protected)/analytics/page.tsx");
   assert(adminPage.includes("AnalyticsPrivacyNotice"), "Admin analytics privacy notice missing.");
   assert(adminPage.includes("Analytics V1"), "Admin analytics page must identify Analytics V1.");
-  assert(adminPage.includes("Discovery analytics"), "Admin analytics page must use discovery analytics wording.");
+  assert(adminPage.includes("Discovery & operation analytics"), "Admin analytics page must use discovery & operation analytics wording.");
   assert(adminPage.includes("Page Views Today"), "Admin analytics page must display page views.");
   assert(adminPage.includes("Tool Opens Today"), "Admin analytics page must display tool opens.");
   assert(adminPage.includes("Top tools by opens"), "Admin analytics page must display top tools by opens.");
   assert(adminPage.includes("Device class"), "Admin analytics page must display device summary.");
   assert(adminPage.includes("Browser family"), "Admin analytics page must display browser summary.");
   assert(adminPage.includes("Operating system"), "Admin analytics page must display operating-system summary.");
-  assert(adminPage.includes("Operation analytics"), "Admin analytics page must explain postponed lifecycle metrics.");
-  for (const forbiddenLabel of ["Started", "Succeeded", "Failed", "Downloads", "Success Rate", "Avg Duration"]) {
-    assert(!adminPage.includes(`label="${forbiddenLabel}"`), `Admin analytics page must not show ${forbiddenLabel} as a V1 metric card.`);
+  assert(adminPage.includes("Operation analytics"), "Admin analytics page must explain operation lifecycle metrics.");
+  // Operation lifecycle metric cards were originally postponed past
+  // Analytics V1, but were verified live in production as of 2026-07-29 --
+  // see the matching note in scripts/verify-control-center.mjs.
+  for (const requiredLabel of ["Processing Started", "Processing Succeeded", "Processing Failed", "Downloads Started"]) {
+    assert(adminPage.includes(`label="${requiredLabel}"`), `Admin analytics page must show ${requiredLabel} as a metric card.`);
   }
+  assert(adminPage.includes("Success Rate"), "Admin analytics page must show processing success rate.");
   assert(adminPage.includes("dataStatus") && adminPage.includes("unavailable"), "Admin analytics page must distinguish unavailable data from genuine zero.");
 
   const adminData = read("lib/admin/data.ts");

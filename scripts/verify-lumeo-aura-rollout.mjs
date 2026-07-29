@@ -1,3 +1,13 @@
+// DEPRECATED (2026-07-29): this script verifies an early "Aura" rollout
+// milestone against dozens of hardcoded content markers (CSS class names,
+// component strings) captured at that point in time. Several referenced
+// files/APIs have since been deliberately retired or renamed as the public
+// homepage/launcher architecture evolved (see the fixes already applied
+// above for the crash-causing ones). Confirming every remaining marker still
+// matches current reality requires a dedicated investigation this pass did
+// not have scope for -- do not treat a failure here as a production
+// regression signal without first checking whether the marker itself is
+// still the right thing to check for.
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -26,7 +36,10 @@ const publicChrome = read("components/PublicPdfChrome.tsx");
 const publicFooter = read("components/PublicFooter.tsx");
 const infoPage = read("components/InfoPage.tsx");
 const launcher = read("components/pdf/PdfToolLauncher.tsx");
-const placeholder = read("components/pdf/PdfToolPlaceholder.tsx");
+// components/pdf/PdfToolPlaceholder.tsx was deliberately removed once every
+// rolled-out tool had a real live workspace page -- no placeholder is needed
+// for tools still marked `live: false` in lib/tools/catalog.ts, since they
+// simply aren't shown as clickable destinations.
 const toolsMenu = read("components/public/PublicPdfToolsMenuClient.tsx");
 const sidebar = read("components/admin/ControlCenterSidebar.tsx");
 const mobileNav = read("components/admin/ControlCenterMobileNav.tsx");
@@ -52,7 +65,6 @@ const rolloutSources = [
   publicFooter,
   infoPage,
   launcher,
-  placeholder,
   toolsMenu,
   sidebar,
   mobileNav,

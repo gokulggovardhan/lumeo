@@ -123,8 +123,12 @@ try {
   assert(compressTool.includes("Grayscale") && compressTool.includes("Quality mode") && compressTool.includes("Target size"), "Compress controls changed unexpectedly.");
   assert(compressTool.includes("Target achieved") && compressTool.includes("Closest safe result") && compressTool.includes("Compression not beneficial") && compressTool.includes("Unable to process"), "Target status wording changed unexpectedly.");
 
+  // Operation lifecycle events were originally postponed past Run 3, but
+  // were verified live in production across all 14 PDF tools as of
+  // 2026-07-29 -- this check was updated to match reality (see
+  // scripts/verify-privacy-analytics.mjs).
   const analyticsLifecycleEvents = /processing_started|processing_succeeded|processing_failed|download_started/;
-  assert(!analyticsLifecycleEvents.test([mergeTool, splitTool, compressTool].join("\n")), "Analytics V1 must remain tool_opened only in Run 3.");
+  assert(analyticsLifecycleEvents.test([mergeTool, splitTool, compressTool].join("\n")), "Analytics lifecycle events must be present.");
 
   assert(docs.includes("Tool Workspace Lifecycle"), "Run 3 workspace documentation is missing.");
   assert(docs.includes("Deep Workspace Implementation"), "Run 4 deep workspace documentation is missing.");

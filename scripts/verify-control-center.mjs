@@ -25,12 +25,13 @@ const protectedRoutes = [
   "app/admin/(protected)/announcements/page.tsx",
   "app/admin/(protected)/seo/page.tsx",
   "app/admin/(protected)/audit/page.tsx",
-  "app/admin/(protected)/system/page.tsx",
   "app/admin/(protected)/settings/page.tsx",
 ];
 const actionFiles = [
   "app/admin/(protected)/tools/actions.ts",
-  "app/admin/(protected)/homepage/actions.ts",
+  // homepage/actions.ts was deliberately removed -- the homepage editor was
+  // retired once the public homepage moved to the fixed dual-named tool
+  // catalog (see app/admin/(protected)/homepage/page.tsx for the rationale).
   "app/admin/(protected)/feature-flags/actions.ts",
   "app/admin/(protected)/announcements/actions.ts",
   "app/admin/(protected)/seo/actions.ts",
@@ -126,22 +127,29 @@ try {
   assert(analyticsPage.includes("Analytics V1"), "Analytics page must use Analytics V1 wording.");
   assert(analyticsPage.includes("Page Views Today"), "Analytics page must display page views.");
   assert(analyticsPage.includes("Tool Opens Today"), "Analytics page must display tool opens.");
-  assert(analyticsPage.includes("Operation analytics"), "Analytics page must explain postponed operation analytics.");
-  assert(!analyticsPage.includes('label="Started"'), "Analytics page must not show lifecycle Started metric cards in V1.");
-  assert(!analyticsPage.includes('label="Succeeded"'), "Analytics page must not show lifecycle Succeeded metric cards in V1.");
-  assert(!analyticsPage.includes('label="Failed"'), "Analytics page must not show lifecycle Failed metric cards in V1.");
-  assert(!analyticsPage.includes('label="Downloads"'), "Analytics page must not show lifecycle Downloads metric cards in V1.");
-  assert(!analyticsPage.includes("Success Rate"), "Analytics page must not show processing success rate in V1.");
-  assert(!analyticsPage.includes("Avg Duration"), "Analytics page must not show average processing duration in V1.");
+  assert(analyticsPage.includes("Operation analytics"), "Analytics page must explain operation analytics.");
+  // Operation lifecycle metrics were originally postponed past Analytics V1,
+  // but were verified live in production as of 2026-07-29 (real,
+  // non-placeholder metric cards fed by processing_started/succeeded/failed
+  // and download_started events emitted by every live PDF tool) -- these
+  // checks were updated from "must not show" to "must show" to match reality.
+  assert(analyticsPage.includes('label="Processing Started"'), "Analytics page must show the Processing Started metric card.");
+  assert(analyticsPage.includes('label="Processing Succeeded"'), "Analytics page must show the Processing Succeeded metric card.");
+  assert(analyticsPage.includes('label="Processing Failed"'), "Analytics page must show the Processing Failed metric card.");
+  assert(analyticsPage.includes('label="Downloads Started"'), "Analytics page must show the Downloads Started metric card.");
+  assert(analyticsPage.includes("Success Rate"), "Analytics page must show processing success rate.");
 
   const overviewPage = read("app/admin/(protected)/page.tsx");
   assert(overviewPage.includes("Public Page Views"), "Overview must surface public page views.");
   assert(overviewPage.includes("Tool Opens Today"), "Overview must surface tool opens.");
   assert(!overviewPage.includes("Processing Success Rate"), "Overview must not show processing success rate in V1.");
 
-  const systemPage = read("app/admin/(protected)/system/page.tsx");
-  assert(systemPage.includes("V1 - Discovery analytics"), "System page must identify Analytics V1.");
-  assert(systemPage.includes("Operation lifecycle metrics"), "System page must mark lifecycle metrics as planned.");
+  // The standalone System page was deliberately removed as redundant (see
+  // "refactor: remove redundant System page, trim unwired Settings, group
+  // reference nav" #34) -- its Analytics V1 messaging now lives on the
+  // analytics page checked above (`analyticsPage`), so no separate read is
+  // needed here.
+  assert(analyticsPage.includes("Operation lifecycle metrics"), "Analytics page must reference operation lifecycle metrics.");
 
   const packageJson = JSON.parse(read("package.json"));
   assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");

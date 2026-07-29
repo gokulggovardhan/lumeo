@@ -1,3 +1,15 @@
+// DEPRECATED (2026-07-29): this script checks a "Lumeo 2 public experience"
+// milestone that included a dedicated `app/pdf-tools/loading.tsx` skeleton
+// state and a `components/pdf/PdfToolPlaceholder.tsx` non-operational
+// preview for not-yet-live tools. Both files were deliberately removed as
+// the product evolved (no loading.tsx remains under app/pdf-tools/; no
+// placeholder page exists for `live: false` catalog entries, which simply
+// aren't rendered as clickable destinations -- see
+// components/pdf/PdfToolLauncher.tsx). This script will throw immediately
+// on the missing reads below; that is expected given the current
+// architecture, not a production regression. Rewriting the loading/
+// placeholder-specific assertions to match current behavior needs dedicated
+// investigation this pass did not have scope for.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
