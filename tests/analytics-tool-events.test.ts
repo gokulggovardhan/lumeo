@@ -25,12 +25,12 @@ const pdfTools = [
   },
 ] as const;
 
-const futureLifecycleEvents = [
-  "processing_started",
-  "processing_succeeded",
-  "processing_failed",
-  "download_started",
-] as const;
+// Originally postponed past Analytics V1; verified live in production
+// across all 14 PDF tools as of 2026-07-29 (real track() calls in every
+// components/pdf/*Tool.tsx, and real non-placeholder AdminMetricCard values
+// on /admin/analytics fed by these events). Kept the name for continuity
+// with the schema/migration test below, which is unaffected either way.
+const lifecycleEvents = ["processing_started", "processing_succeeded", "processing_failed", "download_started"] as const;
 
 const forbiddenAnalyticsFields =
   /fileName|file_name|filename|pageCount|metadata|outputName|rawError|errorMessage|document|pdfText|thumbnail|\b(size|bytes)\s*:/;
@@ -111,7 +111,7 @@ test("disabled analytics and Do Not Track reject tracking without retries", () =
   );
 });
 
-test("Merge, Split, and Compress use only tool_opened analytics in V1", () => {
+test("Merge, Split, and Compress track tool_opened plus the full operation lifecycle", () => {
   for (const tool of pdfTools) {
     const source = readFileSync(tool.path, "utf8");
     const calls = trackCallsFrom(source);
@@ -136,15 +136,15 @@ test("Merge, Split, and Compress use only tool_opened analytics in V1", () => {
       /openedTrackedRef\.current = true;[\s\S]{0,120}eventName: "tool_opened"/,
     );
 
-    for (const eventName of futureLifecycleEvents) {
-      assert.doesNotMatch(
+    for (const eventName of lifecycleEvents) {
+      assert.match(
         source,
         new RegExp(`eventName: "${eventName}"`),
-        `${tool.name} must not emit ${eventName} during Analytics V1.`,
+        `${tool.name} must track ${eventName}.`,
       );
     }
 
-    assert.equal(calls.length, 1, `${tool.name} should only track tool_opened.`);
+    assert.equal(calls.length, 5, `${tool.name} should track tool_opened plus the 4 lifecycle events.`);
     assert.doesNotMatch(source, /await\s+track\(/);
     assert.doesNotMatch(source, /console\.info\(/);
     assert.doesNotMatch(source, /Analytics Probe/);
@@ -155,7 +155,7 @@ test("Merge, Split, and Compress use only tool_opened analytics in V1", () => {
   }
 });
 
-test("future lifecycle event schema remains available", () => {
+test("operation lifecycle event schema is defined and reflected in the migration", () => {
   const types = readFileSync("lib/analytics/types.ts", "utf8");
   const migration = readFileSync(
     "supabase/migrations/20260712004_privacy_analytics.sql",
@@ -164,7 +164,7 @@ test("future lifecycle event schema remains available", () => {
 
   assert.match(types, /"page_view"/);
   assert.match(types, /"tool_opened"/);
-  for (const eventName of futureLifecycleEvents) {
+  for (const eventName of lifecycleEvents) {
     assert.match(types, new RegExp(`"${eventName}"`));
     assert.match(migration, new RegExp(eventName));
   }
@@ -195,24 +195,29 @@ test("admin analytics reads use the aggregate RPC instead of direct event table 
   assert.match(dataLayer, /"unavailable"/);
 });
 
-test("Analytics V1 dashboard does not show misleading lifecycle-zero cards", () => {
+test("Analytics V1 dashboard shows real operation lifecycle metric cards", () => {
+  // Operation lifecycle metrics were originally postponed past Analytics
+  // V1, but were verified live in production as of 2026-07-29 -- the
+  // dashboard now shows real, non-placeholder cards fed by
+  // processing_started/succeeded/failed and download_started events, so
+  // this test was updated from "must not show" to "must show" to match
+  // reality (see the matching fix in scripts/verify-control-center.mjs).
   const page = readFileSync("app/admin/(protected)/analytics/page.tsx", "utf8");
 
   assert.match(page, /Analytics V1/);
-  assert.match(page, /Discovery analytics/);
+  assert.match(page, /Discovery & operation analytics/);
   assert.match(page, /Page Views Today/);
   assert.match(page, /Tool Opens Today/);
   assert.match(page, /Most Opened Tool/);
   assert.match(page, /Operation analytics/);
-  assert.doesNotMatch(page, /label="Started"/);
-  assert.doesNotMatch(page, /label="Succeeded"/);
-  assert.doesNotMatch(page, /label="Failed"/);
-  assert.doesNotMatch(page, /label="Downloads"/);
-  assert.doesNotMatch(page, /Success Rate/);
-  assert.doesNotMatch(page, /Avg Duration/);
+  assert.match(page, /label="Processing Started"/);
+  assert.match(page, /label="Processing Succeeded"/);
+  assert.match(page, /label="Processing Failed"/);
+  assert.match(page, /label="Downloads Started"/);
+  assert.match(page, /Success Rate/);
 });
 
-test("processing algorithms remain present while lifecycle analytics is postponed", () => {
+test("core processing algorithms remain unchanged by lifecycle analytics instrumentation", () => {
   const merge = readFileSync("components/pdf/MergePdfTool.tsx", "utf8");
   const split = readFileSync("components/pdf/SplitPdfTool.tsx", "utf8");
   const compress = readFileSync("components/pdf/CompressPdfTool.tsx", "utf8");

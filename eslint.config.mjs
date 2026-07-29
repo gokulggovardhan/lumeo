@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored third-party bundle, not app source.
+    "public/ffmpeg/**",
+    // Standalone CommonJS container service, built and deployed
+    // independently of the Next.js app (see services/word-to-pdf-converter/README.md).
+    "services/word-to-pdf-converter/**",
   ]),
 ]);
 
