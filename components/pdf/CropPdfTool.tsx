@@ -30,8 +30,11 @@ import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
   applyAspectPreset,
+  centerCropRect,
   clampCropRect,
   createDefaultCropConfig,
+  DEFAULT_CROP_RECT,
+  ENTIRE_PAGE_RECT,
   isCropRectValid,
   type CropAspectPreset,
   type CropConfig,
@@ -101,6 +104,7 @@ export default function CropPdfTool() {
     useHistoryState<CropConfig>(createDefaultCropConfig());
   const [scopeInput, setScopeInput] = useState("");
   const [scopeError, setScopeError] = useState("");
+  const [lockAspectRatio, setLockAspectRatio] = useState(false);
 
   const [isExporting, setIsExporting] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
@@ -257,6 +261,20 @@ export default function CropPdfTool() {
     }));
   }
 
+  // UX-polish actions -- each is a one-shot commit onto config.rect, same
+  // as a drag-end or a numeric-input edit, so export.ts needs no changes.
+  function handleResetCrop() {
+    setConfig((current) => ({ ...current, aspectPreset: "free", rect: { ...DEFAULT_CROP_RECT } }));
+  }
+
+  function handleCenterCrop() {
+    setConfig((current) => ({ ...current, rect: centerCropRect(current.rect) }));
+  }
+
+  function handleSelectEntirePage() {
+    setConfig((current) => ({ ...current, aspectPreset: "free", rect: { ...ENTIRE_PAGE_RECT } }));
+  }
+
   function handleScopeInputChange(value: string) {
     setScopeInput(value);
     if (!pdf) return;
@@ -391,6 +409,11 @@ export default function CropPdfTool() {
           </section>
 
           <section className="mt-3 rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3.5 shadow-2xl shadow-black/24">
+            {pageDisplaySize ? (
+              <p className="mb-2 text-[11px] font-semibold text-[var(--text-primary)]/40">
+                Page size: {Math.round(pageDisplaySize.width)} × {Math.round(pageDisplaySize.height)} (preview px, {PAGE_RENDER_SCALE}x render scale)
+              </p>
+            ) : null}
             {pageLoading || !pageImageUrl || !pageDisplaySize ? (
               <div className="flex h-64 items-center justify-center rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/40 text-sm text-[var(--text-primary)]/40">
                 Loading page preview...
@@ -399,7 +422,12 @@ export default function CropPdfTool() {
               <div ref={stageRef} className="relative mx-auto max-h-[32rem] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={pageImageUrl} alt="Page preview" className="pointer-events-none block h-full w-full select-none" />
-                <CropRectView stageRef={stageRef} rect={config.rect} onRectChange={(rect) => setConfig((current) => ({ ...current, rect }))} />
+                <CropRectView
+                  stageRef={stageRef}
+                  rect={config.rect}
+                  onRectChange={(rect) => setConfig((current) => ({ ...current, rect }))}
+                  lockAspectRatio={lockAspectRatio}
+                />
               </div>
             )}
           </section>
@@ -413,8 +441,24 @@ export default function CropPdfTool() {
 
         <L2ToolSettingsPanel title="Crop" description="Drag the rectangle, then export.">
           <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
+            <div className="grid grid-cols-3 gap-1.5">
+              <button type="button" onClick={handleResetCrop} className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
+                Reset Crop
+              </button>
+              <button type="button" onClick={handleCenterCrop} className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
+                Center Crop
+              </button>
+              <button type="button" onClick={handleSelectEntirePage} className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
+                Entire Page
+              </button>
+            </div>
+
             <div className="grid gap-2 border-t border-[var(--text-primary)]/10 pt-3">
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">Aspect ratio</span>
+              <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
+                Lock width/height ratio while resizing
+                <input type="checkbox" checked={lockAspectRatio} onChange={(e) => setLockAspectRatio(e.target.checked)} />
+              </label>
               <div className="grid grid-cols-3 gap-1.5">
                 {ASPECT_PRESETS.map(([preset, label]) => (
                   <button
@@ -482,6 +526,7 @@ export default function CropPdfTool() {
               <div className="grid grid-cols-2 gap-1.5">
                 <button
                   type="button"
+                  aria-pressed={config.scope.mode === "all"}
                   onClick={() => {
                     setScopeInput("");
                     setScopeError("");
@@ -493,6 +538,7 @@ export default function CropPdfTool() {
                 </button>
                 <button
                   type="button"
+                  aria-pressed={config.scope.mode === "current"}
                   onClick={() => {
                     setScopeInput("");
                     setScopeError("");

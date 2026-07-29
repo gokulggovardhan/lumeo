@@ -54,6 +54,26 @@ export function createDefaultCropConfig(): CropConfig {
   };
 }
 
+// UX-polish helpers (v1.0 roadmap step "NEW UX POLISH") -- pure, UI-only,
+// none of these touch export.ts: they just produce a new CropRect the same
+// way a drag-commit does, so the existing clamp/validity/export path
+// handles them with no new code there.
+
+// "Select Entire Page" -- the widest possible valid rect.
+export const ENTIRE_PAGE_RECT: CropRect = { xPct: 0, yPct: 0, widthPct: 100, heightPct: 100 };
+
+// "Center Crop" -- keeps the rect's current size, moves it to the middle
+// of the page (both axes). Degenerate case (rect bigger than the page)
+// still resolves to something on-page via the same clamp already used
+// everywhere else.
+export function centerCropRect(rect: CropRect): CropRect {
+  return clampCropRect({
+    ...rect,
+    xPct: (100 - rect.widthPct) / 2,
+    yPct: (100 - rect.heightPct) / 2,
+  });
+}
+
 // Point-space aspect ratios (width/height) for the fixed presets. "a4" and
 // "letter" use the same portrait point dimensions Watermark's own tests
 // use for real-world page sizes (595.28x841.89 and 612x792 respectively).

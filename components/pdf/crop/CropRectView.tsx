@@ -41,8 +41,11 @@ function describeRect(rect: CropRect): string {
 
 // Resizes `origin` by (deltaXPct, deltaYPct) dragging the given corner --
 // the two edges NOT named by the handle stay fixed (e.g. dragging "se"
-// keeps the top and left edges fixed and grows right/down).
-function resizeFromHandle(origin: CropRect, deltaXPct: number, deltaYPct: number, handle: Handle): CropRect {
+// keeps the top and left edges fixed and grows right/down). When
+// `aspectRatio` (widthPct/heightPct) is given, the width from the drag
+// drives the result and height is derived to match the ratio -- the corner
+// opposite the dragged handle still stays fixed, same as the unlocked case.
+function resizeFromHandle(origin: CropRect, deltaXPct: number, deltaYPct: number, handle: Handle, aspectRatio?: number): CropRect {
   const right = origin.xPct + origin.widthPct;
   const bottom = origin.yPct + origin.heightPct;
   let { xPct, yPct, widthPct, heightPct } = origin;
@@ -55,7 +58,14 @@ function resizeFromHandle(origin: CropRect, deltaXPct: number, deltaYPct: number
     xPct = newX;
   }
 
-  if (handle === "sw" || handle === "se") {
+  if (aspectRatio) {
+    heightPct = widthPct / aspectRatio;
+    if (handle === "nw" || handle === "ne") {
+      yPct = bottom - heightPct;
+    } else {
+      yPct = origin.yPct;
+    }
+  } else if (handle === "sw" || handle === "se") {
     heightPct = clamp(origin.heightPct + deltaYPct, 1, 100 - origin.yPct);
   } else {
     const newY = clamp(origin.yPct + deltaYPct, 0, bottom - 1);
@@ -70,10 +80,16 @@ export function CropRectView({
   stageRef,
   rect,
   onRectChange,
+  lockAspectRatio = false,
 }: {
   stageRef: React.RefObject<HTMLDivElement | null>;
   rect: CropRect;
   onRectChange: (rect: CropRect) => void;
+  // "Maintain Aspect Ratio" toggle -- when on, every resize (drag or
+  // keyboard) derives height from width using the rect's ratio AT THE
+  // START of that resize gesture, so a locked resize can't drift ratio
+  // gesture-to-gesture the way re-deriving from `rect` on every move would.
+  lockAspectRatio?: boolean;
 }) {
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const dragRef = useRef<{ startX: number; startY: number; origin: CropRect } | null>(null);
@@ -150,7 +166,8 @@ export function CropRectView({
     if (!resize || !stageRect) return;
     const deltaXPct = ((event.clientX - resize.startX) / stageRect.width) * 100;
     const deltaYPct = ((event.clientY - resize.startY) / stageRect.height) * 100;
-    applyLiveStyle(resizeFromHandle(resize.origin, deltaXPct, deltaYPct, resize.handle));
+    const aspectRatio = lockAspectRatio ? resize.origin.widthPct / resize.origin.heightPct : undefined;
+    applyLiveStyle(resizeFromHandle(resize.origin, deltaXPct, deltaYPct, resize.handle, aspectRatio));
   }
 
   function handleResizeEnd(event: React.PointerEvent<HTMLDivElement>) {
@@ -159,7 +176,8 @@ export function CropRectView({
     if (resize && stageRect) {
       const deltaXPct = ((event.clientX - resize.startX) / stageRect.width) * 100;
       const deltaYPct = ((event.clientY - resize.startY) / stageRect.height) * 100;
-      commit(resizeFromHandle(resize.origin, deltaXPct, deltaYPct, resize.handle));
+      const aspectRatio = lockAspectRatio ? resize.origin.widthPct / resize.origin.heightPct : undefined;
+      commit(resizeFromHandle(resize.origin, deltaXPct, deltaYPct, resize.handle, aspectRatio));
     }
     resizeRef.current = null;
     (event.target as HTMLElement).releasePointerCapture(event.pointerId);
@@ -189,7 +207,8 @@ export function CropRectView({
     else return;
     event.preventDefault();
     event.stopPropagation();
-    commit(resizeFromHandle(rect, dx, dy, handle));
+    const aspectRatio = lockAspectRatio ? rect.widthPct / rect.heightPct : undefined;
+    commit(resizeFromHandle(rect, dx, dy, handle, aspectRatio));
   }
 
   const handles: Handle[] = ["nw", "ne", "sw", "se"];

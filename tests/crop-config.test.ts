@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   applyAspectPreset,
+  centerCropRect,
   clampCropRect,
   createDefaultCropConfig,
+  ENTIRE_PAGE_RECT,
   isCropRectValid,
   resolveCropPageIndices,
   type CropRect,
@@ -115,4 +117,23 @@ test("resolveCropPageIndices handles all/current/custom", () => {
   assert.deepEqual(resolveCropPageIndices({ mode: "current", pageIndex: 2 }, 4), [2]);
   assert.deepEqual(resolveCropPageIndices({ mode: "current", pageIndex: 9 }, 4), []);
   assert.deepEqual(resolveCropPageIndices({ mode: "custom", pages: [0, 2, 9] }, 4), [0, 2]);
+});
+
+test("ENTIRE_PAGE_RECT is the full, valid page", () => {
+  assert.deepEqual(ENTIRE_PAGE_RECT, { xPct: 0, yPct: 0, widthPct: 100, heightPct: 100 });
+  assert.ok(isCropRectValid(ENTIRE_PAGE_RECT));
+});
+
+test("centerCropRect keeps size, centers on both axes", () => {
+  const result = centerCropRect({ xPct: 5, yPct: 70, widthPct: 40, heightPct: 20 });
+  assert.equal(result.widthPct, 40);
+  assert.equal(result.heightPct, 20);
+  approxEqual(result.xPct, 30); // (100-40)/2
+  approxEqual(result.yPct, 40); // (100-20)/2
+  assert.ok(isCropRectValid(result));
+});
+
+test("centerCropRect on an oversized rect still returns a clamped, valid rect", () => {
+  const result = centerCropRect({ xPct: 0, yPct: 0, widthPct: 120, heightPct: 150 });
+  assert.ok(isCropRectValid(result));
 });
