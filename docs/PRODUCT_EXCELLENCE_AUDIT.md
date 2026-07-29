@@ -86,6 +86,26 @@ Technical Debt 70). New/updated dimensions for this pass:
 | Scalability | 82 | The tool catalog's declarative `live: true/false` pattern is already built for growth — confirmed by reading the actual data structure, not assumed. |
 | Commercial Readiness | 70 | Real functional pipeline works, trust messaging is now consistent, SEO/social metadata is complete. Held back by the same gaps noted throughout this session: no admin walkthrough, no conversion data, incomplete a11y audit, blocked analytics. |
 
+## Addendum — second pass (same mission re-run)
+
+The mission was re-issued verbatim after the first pass merged (PR #120).
+Rather than repeat the same report, this pass extended into areas
+explicitly flagged as unaudited: Aura button component states, keyboard
+shortcut coverage, and toast/notification consistency.
+
+| Check | Finding |
+|---|---|
+| `AuraButton`/`AuraIconButton` state coverage | Read `components/ui/Aura.tsx:36-96` directly: all 7 button variants (primary/secondary/ghost/premium/danger/success/icon) define `hover:`, and the shared base class defines `focus-visible:ring-4`, `active:scale`, `disabled:cursor-not-allowed`/`opacity-60`, plus a built-in `loading` spinner state. **Complete, consistent state coverage — no gap.** |
+| Keyboard shortcut (`keydown`) handling | Present in 6 of 14 tools (Edit, Sign, Merge, Split, JpgToPdf, PdfToJpg) — all tools with a reorderable list or canvas-editing surface where shortcuts (delete/arrow-key reorder/escape) make sense. The other 8 (Compress, Watermark, Crop, Extract Text, Organize, Word↔PDF, HTML→PDF) don't have that kind of interaction surface. **Reads as justified variation, not an inconsistency** — no specific missing shortcut was identified in a context that needed one. |
+| Toast component usage | `AuraToast` (`Aura.tsx:445`) looked unused in tool UIs on first grep, but a second, repo-wide search found it's real: demoed on the admin style-guide page (`app/admin/(protected)/design-system/page.tsx:146`) and tracked in `lib/design-system/tokens.ts`'s component inventory. Tools use persistent inline result cards for feedback instead of ephemeral toasts — confirmed live for Merge PDF's "Merged PDF ready" state in an earlier session pass. This is a deliberate, arguably better pattern for "your file is ready" (a toast that auto-dismisses would be worse here), not a defect. **No action.** |
+
+No new defect was found in this pass. Per the mission's own instruction
+to stop when no further evidence-backed improvement can be justified:
+this concludes the product-excellence audit until either real user/
+analytics data becomes available (Phase 21, still pending) or a live
+walkthrough of the remaining 12 tools' full flow is specifically
+requested.
+
 ## What's next
 
 Per your instruction to stop when no further meaningful, evidence-backed
