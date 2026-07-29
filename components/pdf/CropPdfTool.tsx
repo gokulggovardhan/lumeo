@@ -20,6 +20,7 @@ import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
   L2FileCard,
+  L2PrivacyNote,
   L2ToolMainColumn,
   L2ToolSettingsPanel,
   L2ToolWorkspace,
@@ -371,6 +372,7 @@ export default function CropPdfTool() {
             onFilesSelected={(files) => void addFile(files)}
           />
         </div>
+        <L2PrivacyNote />
         {error ? (
           <div role="alert" className="mt-4 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}

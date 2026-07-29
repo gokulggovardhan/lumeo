@@ -27,6 +27,7 @@ import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
   L2FileCard,
+  L2PrivacyNote,
   L2ToolMainColumn,
   L2ToolSettingsPanel,
   L2ToolWorkspace,
@@ -580,9 +581,7 @@ export default function SignPdfTool() {
             }}
           />
         </div>
-        <p className="mx-auto flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]/44">
-          🔒 Your PDF stays on your device.
-        </p>
+        <L2PrivacyNote />
         {error ? (
           <div role="alert" className="mt-4 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
