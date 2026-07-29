@@ -1,4 +1,7 @@
 import { createStorageBrowserClient } from "@/lib/supabase/storageBrowserClient";
+import { isPdfNamedFile } from "@/lib/pdf/uploadValidation";
+
+export { isPdfNamedFile };
 
 // Same scratch bucket as Word->PDF -- both are short-lived, deleted right
 // after conversion, no reason to fragment storage per tool direction.
@@ -18,10 +21,6 @@ export const MAX_PDF_FILE_SIZE_BYTES = 1.5 * 1024 * 1024;
 // on one hiccup.
 const UPLOAD_MAX_ATTEMPTS = 3;
 const UPLOAD_RETRY_BASE_MS = 400;
-
-export function isPdfNamedFile(file: File): boolean {
-  return file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-}
 
 export function checkPdfFileSize(file: File): string | null {
   if (file.size > MAX_PDF_FILE_SIZE_BYTES) {
