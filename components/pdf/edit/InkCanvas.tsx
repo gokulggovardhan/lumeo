@@ -127,6 +127,8 @@ export function InkCanvas({
       ref={canvasRef}
       width={stageWidthPx}
       height={stageHeightPx}
+      role="img"
+      aria-label="Ink drawing surface -- draw freehand with mouse, stylus, or touch"
       className="absolute inset-0 h-full w-full touch-none"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
