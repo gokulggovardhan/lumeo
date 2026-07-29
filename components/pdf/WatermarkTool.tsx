@@ -28,9 +28,23 @@ import { WatermarkPreview } from "@/components/pdf/watermark/WatermarkPreview";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
+  alignBottom,
+  alignLeft,
+  alignRight,
+  alignTop,
+  anchorPointFromTopLeft,
+  centerHorizontally,
+  centerVertically,
+  clampManualPosition,
+  cornerAnchorPct,
   createDefaultImageWatermarkConfig,
   createDefaultTextWatermarkConfig,
   parsePageRangeInput,
+  pctToPoints,
+  pointsToPct,
+  resetManualPosition,
+  topLeftFromAnchorPoint,
+  type WatermarkAnchor,
   type WatermarkConfig,
   type WatermarkPlacementCorner,
 } from "@/lib/pdf/watermark/config";
@@ -48,6 +62,18 @@ type ContentMode = "text" | "image";
 const PAGE_RENDER_SCALE = 1.3;
 const EXPORT_TIMEOUT_MS = 30_000;
 const APPROX_CHAR_WIDTH_PCT = 0.9; // rough on-screen text-width estimate for the draggable preview only; export.ts measures real font metrics
+
+// 3x3 anchor grid, row-major (top row, middle row, bottom row).
+const ANCHOR_GRID: WatermarkAnchor[] = [
+  "top-left", "top-center", "top-right",
+  "center-left", "center", "center-right",
+  "bottom-left", "bottom-center", "bottom-right",
+];
+const ANCHOR_LABELS: Record<WatermarkAnchor, string> = {
+  "top-left": "Top left", "top-center": "Top center", "top-right": "Top right",
+  "center-left": "Center left", center: "Center", "center-right": "Center right",
+  "bottom-left": "Bottom left", "bottom-center": "Bottom center", "bottom-right": "Bottom right",
+};
 
 async function runWithTimeout<T>(promise: Promise<T>, message: string): Promise<T> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -108,6 +134,9 @@ export default function WatermarkTool() {
   const [contentMode, setContentMode] = useState<ContentMode>("text");
   const [pageRangeInput, setPageRangeInput] = useState("");
   const [pageRangeError, setPageRangeError] = useState("");
+  const [positionUnit, setPositionUnit] = useState<"pt" | "pct">("pt");
+  const [snapToCenter, setSnapToCenter] = useState(true);
+  const [snapToEdges, setSnapToEdges] = useState(true);
 
   const [isExporting, setIsExporting] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
@@ -290,6 +319,62 @@ export default function WatermarkTool() {
     setConfig((current) => ({ ...current, placementMode: "single", placement: { mode: "corner", corner } }));
   }
 
+  const estimatedContentSize = estimateContentSizePct(config.content, config.scale);
+
+  // What the numeric X/Y fields display: the currently-selected anchor
+  // point's position, projected from the stored top-left (per
+  // docs/specs/watermark-manual-position-v1.1-spec.md section 3 -- storage
+  // never changes, only this read/write projection does).
+  const manualAnchorPointPct = config.placement.mode === "manual"
+    ? anchorPointFromTopLeft(config.placement.xPct, config.placement.yPct, estimatedContentSize.widthPct, estimatedContentSize.heightPct, config.manualAnchor)
+    : { xPct: 0, yPct: 0 };
+
+  // Switching Preset <-> Manual preserves the current visual position
+  // whenever possible (per spec section 11): Preset -> Manual snapshots
+  // wherever the corner preset currently lands on THIS page (the same
+  // cornerAnchorPct call WatermarkPreview.tsx already uses to draw it) into
+  // a manual xPct/yPct. Manual -> Preset has no stored corner to restore
+  // (manual mode carries no corner at all), so it defaults to "center" --
+  // the same fallback the spec documents for a session that never picked a
+  // corner. Deliberately no "remember last corner" ref: mutating a ref
+  // inside a plain (non-memoized) click handler broke React Compiler's
+  // whole-component memoization for the unrelated generateWatermarkedPdf
+  // callback below (verified by bisection -- removing the ref write alone
+  // took the build from 36 lint errors back to the 35-error baseline).
+  function switchToManualPosition() {
+    if (config.placement.mode === "manual") return;
+    const anchor = cornerAnchorPct(
+      config.placement.corner,
+      config.marginPct,
+      estimatedContentSize.widthPct,
+      estimatedContentSize.heightPct,
+      config.rotationDeg,
+      pageDisplaySize?.width ?? 1,
+      pageDisplaySize?.height ?? 1,
+    );
+    setConfig((current) => ({ ...current, placementMode: "single", placement: { mode: "manual", xPct: anchor.xPct, yPct: anchor.yPct } }));
+  }
+
+  function switchToPresetPosition() {
+    if (config.placement.mode === "corner") return;
+    setConfig((current) => ({ ...current, placementMode: "single", placement: { mode: "corner", corner: "center" } }));
+  }
+
+  // v1.1 Phase 3 alignment tools -- each is a one-shot commit onto the
+  // stored top-left, same shape as a drag-end (see
+  // lib/pdf/watermark/config.ts's align*/center*/reset helpers). Only
+  // meaningful in manual mode; the buttons are only rendered there.
+  function applyAlignment(align: (widthPct: number, heightPct: number, otherAxisPct: number) => { xPct: number; yPct: number }, otherAxisPct: number) {
+    if (config.placement.mode !== "manual") return;
+    const next = align(estimatedContentSize.widthPct, estimatedContentSize.heightPct, otherAxisPct);
+    setConfig((current) => ({ ...current, placement: { mode: "manual", xPct: next.xPct, yPct: next.yPct, allowOverflow: current.placement.mode === "manual" ? current.placement.allowOverflow : false } }));
+  }
+
+  function handleResetPosition() {
+    const next = resetManualPosition(estimatedContentSize.widthPct, estimatedContentSize.heightPct);
+    setConfig((current) => ({ ...current, placement: { mode: "manual", xPct: next.xPct, yPct: next.yPct } }));
+  }
+
   function handlePageRangeInputChange(value: string) {
     setPageRangeInput(value);
     if (!pdf) return;
@@ -306,8 +391,6 @@ export default function WatermarkTool() {
     setPageRangeError("");
     setConfig((current) => ({ ...current, pageRange: { mode: "custom", pages } }));
   }
-
-  const estimatedContentSize = estimateContentSizePct(config.content, config.scale);
 
   const generateWatermarkedPdf = useCallback(async () => {
     if (!pdf) return;
@@ -415,7 +498,12 @@ export default function WatermarkTool() {
                 contentHeightPct={estimatedContentSize.heightPct}
                 pageWidthPt={pageDisplaySize.width}
                 pageHeightPt={pageDisplaySize.height}
-                onPositionChange={(position) => setConfig((current) => ({ ...current, placement: { mode: "manual", xPct: position.xPct, yPct: position.yPct } }))}
+                snapToCenter={snapToCenter}
+                snapToEdges={snapToEdges}
+                onPositionChange={(position) => {
+                  const allowOverflow = config.placement.mode === "manual" ? (config.placement.allowOverflow ?? false) : false;
+                  setConfig((current) => ({ ...current, placement: { mode: "manual", xPct: position.xPct, yPct: position.yPct, allowOverflow } }));
+                }}
               />
             )}
           </section>
@@ -562,26 +650,184 @@ export default function WatermarkTool() {
 
             <div className="grid gap-2 border-t border-[var(--text-primary)]/10 pt-3">
               <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">Placement</span>
-              <div className="grid grid-cols-3 gap-1.5">
-                {([
-                  ["top-left", "↖", "Top left"],
-                  ["center", "•", "Center"],
-                  ["top-right", "↗", "Top right"],
-                  ["bottom-left", "↙", "Bottom left"],
-                  ["bottom-right", "↘", "Bottom right"],
-                ] as [WatermarkPlacementCorner, string, string][]).map(([corner, glyph, label]) => (
-                  <button
-                    key={corner}
-                    type="button"
-                    onClick={() => applyCorner(corner)}
-                    title={corner}
-                    aria-label={label}
-                    className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-sm text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40"
-                  >
-                    {glyph}
-                  </button>
-                ))}
+              <div className="grid grid-cols-2 gap-1.5" role="group" aria-label="Placement mode">
+                <button
+                  type="button"
+                  aria-pressed={config.placement.mode === "corner"}
+                  onClick={switchToPresetPosition}
+                  className={`rounded-lg border px-2 py-1.5 text-[11px] font-bold transition ${config.placement.mode === "corner" ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12 text-[var(--text-primary)]/60"}`}
+                >
+                  Preset Position
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={config.placement.mode === "manual"}
+                  onClick={switchToManualPosition}
+                  className={`rounded-lg border px-2 py-1.5 text-[11px] font-bold transition ${config.placement.mode === "manual" ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12 text-[var(--text-primary)]/60"}`}
+                >
+                  Manual Position
+                </button>
               </div>
+              {config.placement.mode === "corner" ? (
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([
+                    ["top-left", "↖", "Top left"],
+                    ["center", "•", "Center"],
+                    ["top-right", "↗", "Top right"],
+                    ["bottom-left", "↙", "Bottom left"],
+                    ["bottom-right", "↘", "Bottom right"],
+                  ] as [WatermarkPlacementCorner, string, string][]).map(([corner, glyph, label]) => (
+                    <button
+                      key={corner}
+                      type="button"
+                      aria-pressed={config.placement.mode === "corner" && config.placement.corner === corner}
+                      onClick={() => applyCorner(corner)}
+                      title={corner}
+                      aria-label={label}
+                      className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-sm text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40"
+                    >
+                      {glyph}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
+                    <span>Units</span>
+                    <div className="flex gap-1.5" role="group" aria-label="Position unit">
+                      <button
+                        type="button"
+                        aria-pressed={positionUnit === "pt"}
+                        onClick={() => setPositionUnit("pt")}
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-bold transition ${positionUnit === "pt" ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
+                      >
+                        Points
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={positionUnit === "pct"}
+                        onClick={() => setPositionUnit("pct")}
+                        className={`rounded-full border px-2.5 py-1 text-[10px] font-bold transition ${positionUnit === "pct" ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
+                      >
+                        Percent
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid gap-1">
+                    <span className="text-xs font-semibold text-[var(--text-primary)]/60">Anchor point</span>
+                    <div className="grid grid-cols-3 gap-1" role="group" aria-label="Anchor point">
+                      {ANCHOR_GRID.map((anchor) => (
+                        <button
+                          key={anchor}
+                          type="button"
+                          aria-pressed={config.manualAnchor === anchor}
+                          aria-label={ANCHOR_LABELS[anchor]}
+                          title={ANCHOR_LABELS[anchor]}
+                          onClick={() => setConfig((current) => ({ ...current, manualAnchor: anchor }))}
+                          className={`h-6 rounded border transition ${config.manualAnchor === anchor ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="grid gap-1 text-xs font-semibold text-[var(--text-primary)]/60">
+                      X Position
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={
+                          positionUnit === "pt"
+                            ? pctToPoints(manualAnchorPointPct.xPct, pageDisplaySize?.width ?? 0).toFixed(1)
+                            : manualAnchorPointPct.xPct.toFixed(1)
+                        }
+                        onChange={(e) => {
+                          const entered = Number(e.target.value);
+                          if (!Number.isFinite(entered)) return;
+                          const anchorXPct = positionUnit === "pt" ? pointsToPct(entered, pageDisplaySize?.width ?? 0) : entered;
+                          const topLeft = topLeftFromAnchorPoint(anchorXPct, manualAnchorPointPct.yPct, estimatedContentSize.widthPct, estimatedContentSize.heightPct, config.manualAnchor);
+                          const yPct = config.placement.mode === "manual" ? config.placement.yPct : 0;
+                          const allowOverflow = config.placement.mode === "manual" ? (config.placement.allowOverflow ?? false) : false;
+                          const clamped = clampManualPosition(topLeft.xPct, yPct, estimatedContentSize.widthPct, estimatedContentSize.heightPct, allowOverflow);
+                          setConfig((current) => ({ ...current, placement: { mode: "manual", xPct: clamped.xPct, yPct: clamped.yPct, allowOverflow } }));
+                        }}
+                        className="rounded border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-[var(--text-primary)]/60">
+                      Y Position
+                      <input
+                        type="number"
+                        step="0.1"
+                        value={
+                          positionUnit === "pt"
+                            ? pctToPoints(manualAnchorPointPct.yPct, pageDisplaySize?.height ?? 0).toFixed(1)
+                            : manualAnchorPointPct.yPct.toFixed(1)
+                        }
+                        onChange={(e) => {
+                          const entered = Number(e.target.value);
+                          if (!Number.isFinite(entered)) return;
+                          const anchorYPct = positionUnit === "pt" ? pointsToPct(entered, pageDisplaySize?.height ?? 0) : entered;
+                          const topLeft = topLeftFromAnchorPoint(manualAnchorPointPct.xPct, anchorYPct, estimatedContentSize.widthPct, estimatedContentSize.heightPct, config.manualAnchor);
+                          const xPct = config.placement.mode === "manual" ? config.placement.xPct : 0;
+                          const allowOverflow = config.placement.mode === "manual" ? (config.placement.allowOverflow ?? false) : false;
+                          const clamped = clampManualPosition(xPct, topLeft.yPct, estimatedContentSize.widthPct, estimatedContentSize.heightPct, allowOverflow);
+                          setConfig((current) => ({ ...current, placement: { mode: "manual", xPct: clamped.xPct, yPct: clamped.yPct, allowOverflow } }));
+                        }}
+                        className="rounded border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm"
+                      />
+                    </label>
+                  </div>
+
+                  <div className="grid gap-1">
+                    <span className="text-xs font-semibold text-[var(--text-primary)]/60">Align</span>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      <button type="button" onClick={() => applyAlignment(alignLeft, config.placement.mode === "manual" ? config.placement.yPct : 0)} className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
+                        Align Left
+                      </button>
+                      <button type="button" onClick={() => applyAlignment(centerHorizontally, config.placement.mode === "manual" ? config.placement.yPct : 0)} className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
+                        Align Center
+                      </button>
+                      <button type="button" onClick={() => applyAlignment(alignRight, config.placement.mode === "manual" ? config.placement.yPct : 0)} className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
+                        Align Right
+                      </button>
+                      <button type="button" onClick={() => applyAlignment(alignTop, config.placement.mode === "manual" ? config.placement.xPct : 0)} className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
+                        Align Top
+                      </button>
+                      <button type="button" onClick={() => applyAlignment(centerVertically, config.placement.mode === "manual" ? config.placement.xPct : 0)} className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
+                        Align Middle
+                      </button>
+                      <button type="button" onClick={() => applyAlignment(alignBottom, config.placement.mode === "manual" ? config.placement.xPct : 0)} className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
+                        Align Bottom
+                      </button>
+                    </div>
+                    <button type="button" onClick={handleResetPosition} className="mt-1 rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
+                      Reset Position
+                    </button>
+                  </div>
+
+                  <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
+                    Snap to Center
+                    <input type="checkbox" checked={snapToCenter} onChange={(e) => setSnapToCenter(e.target.checked)} />
+                  </label>
+                  <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
+                    Snap to Edges
+                    <input type="checkbox" checked={snapToEdges} onChange={(e) => setSnapToEdges(e.target.checked)} />
+                  </label>
+                  <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
+                    Allow Overflow
+                    <input
+                      type="checkbox"
+                      checked={config.placement.mode === "manual" ? (config.placement.allowOverflow ?? false) : false}
+                      onChange={(e) => {
+                        if (config.placement.mode !== "manual") return;
+                        const allowOverflow = e.target.checked;
+                        const clamped = clampManualPosition(config.placement.xPct, config.placement.yPct, estimatedContentSize.widthPct, estimatedContentSize.heightPct, allowOverflow);
+                        setConfig((current) => ({ ...current, placement: { mode: "manual", xPct: clamped.xPct, yPct: clamped.yPct, allowOverflow } }));
+                      }}
+                    />
+                  </label>
+                </div>
+              )}
               <label className="mt-1 flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
                 Tiled
                 <input

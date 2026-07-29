@@ -160,6 +160,56 @@ function composeRotationDegrees(pageRotation: PageRotation, additionalDegrees: n
   return ((pageRotation + additionalDegrees) % 360 + 360) % 360;
 }
 
+// Verbatim duplicate of lib/pdf/watermark/config.ts's nativeAnchorForCenter
+// (see that file for the full derivation) -- used only for manual
+// placement's rotation-safe draw below. Deliberately NOT used for corner
+// placement's cornerAnchorPct, whose own "center" branch operates in a
+// different (pre-page-rotation, pre-baseline-flip) coordinate frame; see
+// docs/specs/watermark-manual-position-v1.1-spec.md section 7 for why
+// unifying the two would risk the exact regression class this feature's
+// freeze policy exists to prevent, for no real benefit.
+function nativeAnchorForCenter(
+  centerXPt: number,
+  centerYPt: number,
+  widthPt: number,
+  heightPt: number,
+  rotationDeg: number,
+): { x: number; y: number } {
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const halfW = widthPt / 2;
+  const halfH = heightPt / 2;
+  const rotatedHalfX = halfW * cos - halfH * sin;
+  const rotatedHalfY = halfW * sin + halfH * cos;
+  return { x: centerXPt - rotatedHalfX, y: centerYPt - rotatedHalfY };
+}
+
+// Manual placement's rotation-safe native anchor: converts the box's fixed
+// VISUAL center (from the stored top-left + its own width/height) into
+// native space via toNativePoint (a pure coordinate conversion using the
+// PAGE's own rotation only), then finds the native draw anchor that keeps
+// that exact point as the rotation pivot for the watermark's OWN rotation
+// (totalRotateDeg). Result: turning the rotation knob spins the watermark
+// around its own center -- the stored xPct/yPct never moves.
+function manualNativeAnchor(
+  rotation: PageRotation,
+  nativeWidth: number,
+  nativeHeight: number,
+  visualWidth: number,
+  visualHeight: number,
+  topLeftXPct: number,
+  topLeftYPct: number,
+  widthPt: number,
+  heightPt: number,
+  totalRotateDeg: number,
+): { x: number; y: number } {
+  const centerVisualX = (topLeftXPct / 100) * visualWidth + widthPt / 2;
+  const centerVisualY = (topLeftYPct / 100) * visualHeight + heightPt / 2;
+  const nativeCenter = toNativePoint(rotation, nativeWidth, nativeHeight, centerVisualX, centerVisualY);
+  return nativeAnchorForCenter(nativeCenter.x, nativeCenter.y, widthPt, heightPt, totalRotateDeg);
+}
+
 // At scale 1, an image watermark renders at this fraction of the visual
 // page width, aspect-locked -- keeps visual size consistent across
 // differently-sized pages in the same document, matching how Edit PDF's
@@ -238,6 +288,7 @@ export async function exportWatermarkedPdf(
         const heightPct = (textHeightPt / visualHeight) * 100;
         const { r, g, b } = hexToRgb01(color);
 
+        const isManualSingle = config.placementMode === "single" && config.placement.mode === "manual";
         const anchors = config.placementMode === "tiled"
           ? computeTilePositions(widthPct, heightPct, config.tileSpacingPct)
           : [config.placement.mode === "corner"
@@ -245,9 +296,9 @@ export async function exportWatermarkedPdf(
               : { xPct: config.placement.xPct, yPct: config.placement.yPct }];
 
         for (const anchor of anchors) {
-          const visualX = (anchor.xPct / 100) * visualWidth;
-          const visualY = (anchor.yPct / 100) * visualHeight;
-          const nativeAnchor = toNativePoint(rotation, nativeWidth, nativeHeight, visualX, visualY + textHeightPt);
+          const nativeAnchor = isManualSingle
+            ? manualNativeAnchor(rotation, nativeWidth, nativeHeight, visualWidth, visualHeight, anchor.xPct, anchor.yPct, textWidthPt, textHeightPt, totalRotateDeg)
+            : toNativePoint(rotation, nativeWidth, nativeHeight, (anchor.xPct / 100) * visualWidth, (anchor.yPct / 100) * visualHeight + textHeightPt);
           page.drawText(text, {
             x: nativeAnchor.x,
             y: nativeAnchor.y,
@@ -265,6 +316,7 @@ export async function exportWatermarkedPdf(
         const heightPt = widthPt * aspect;
         const heightPct = (heightPt / visualHeight) * 100;
 
+        const isManualSingle = config.placementMode === "single" && config.placement.mode === "manual";
         const anchors = config.placementMode === "tiled"
           ? computeTilePositions(widthPct, heightPct, config.tileSpacingPct)
           : [config.placement.mode === "corner"
@@ -272,9 +324,9 @@ export async function exportWatermarkedPdf(
               : { xPct: config.placement.xPct, yPct: config.placement.yPct }];
 
         for (const anchor of anchors) {
-          const visualX = (anchor.xPct / 100) * visualWidth;
-          const visualY = (anchor.yPct / 100) * visualHeight;
-          const nativeAnchor = toNativePoint(rotation, nativeWidth, nativeHeight, visualX, visualY + heightPt);
+          const nativeAnchor = isManualSingle
+            ? manualNativeAnchor(rotation, nativeWidth, nativeHeight, visualWidth, visualHeight, anchor.xPct, anchor.yPct, widthPt, heightPt, totalRotateDeg)
+            : toNativePoint(rotation, nativeWidth, nativeHeight, (anchor.xPct / 100) * visualWidth, (anchor.yPct / 100) * visualHeight + heightPt);
           page.drawImage(embeddedImage, {
             x: nativeAnchor.x,
             y: nativeAnchor.y,

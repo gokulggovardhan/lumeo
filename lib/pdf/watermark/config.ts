@@ -27,7 +27,157 @@ export type WatermarkPlacementCorner = "center" | "top-left" | "top-right" | "bo
 // so it's the one case that legitimately stores a raw xPct/yPct.
 export type WatermarkSinglePlacement =
   | { mode: "corner"; corner: WatermarkPlacementCorner }
-  | { mode: "manual"; xPct: number; yPct: number };
+  | { mode: "manual"; xPct: number; yPct: number; allowOverflow?: boolean };
+
+// v1.1 manual-position numeric inputs display in PDF points, not percent --
+// converted on the fly from the currently-viewed page's own visual size, so
+// the canonical stored value stays exactly xPct/yPct (never migrated to raw
+// points; see docs/specs/watermark-manual-position-v1.1-spec.md section 2
+// for why: raw points would reintroduce the mixed-page-size bug class
+// v1.0.0 fixed, since one manual position can apply across a page range of
+// different sizes). These two are pure unit-conversion, no clamping -- the
+// caller clamps the result the same way a drag-commit already does.
+export function pctToPoints(pct: number, pageSizePt: number): number {
+  return (pct / 100) * pageSizePt;
+}
+
+export function pointsToPct(points: number, pageSizePt: number): number {
+  if (pageSizePt <= 0) return 0;
+  return (points / pageSizePt) * 100;
+}
+
+// v1.1 Phase 2: the 9-point anchor is a UI-only projection, never a second
+// source of truth. WatermarkSinglePlacement's "manual" variant still stores
+// exactly the box's top-left corner in percent, unchanged from Phase 1 --
+// switching anchors only changes which point the numeric X/Y fields and the
+// drag handle represent, translated to/from that stored top-left using the
+// content's own widthPct/heightPct. See
+// docs/specs/watermark-manual-position-v1.1-spec.md section 3.
+export type WatermarkAnchor =
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "center-left"
+  | "center"
+  | "center-right"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
+
+function anchorFractions(anchor: WatermarkAnchor): { xFrac: number; yFrac: number } {
+  const xFrac = anchor.includes("left") ? 0 : anchor.includes("right") ? 1 : 0.5;
+  const yFrac = anchor.includes("top") ? 0 : anchor.includes("bottom") ? 1 : 0.5;
+  return { xFrac, yFrac };
+}
+
+// Projects the stored top-left position into wherever the given anchor
+// point currently sits on the box.
+export function anchorPointFromTopLeft(
+  topLeftXPct: number,
+  topLeftYPct: number,
+  widthPct: number,
+  heightPct: number,
+  anchor: WatermarkAnchor,
+): { xPct: number; yPct: number } {
+  const { xFrac, yFrac } = anchorFractions(anchor);
+  return { xPct: topLeftXPct + xFrac * widthPct, yPct: topLeftYPct + yFrac * heightPct };
+}
+
+// Inverse of anchorPointFromTopLeft: given where the anchor point should
+// land, returns the top-left percent to actually store.
+export function topLeftFromAnchorPoint(
+  anchorXPct: number,
+  anchorYPct: number,
+  widthPct: number,
+  heightPct: number,
+  anchor: WatermarkAnchor,
+): { xPct: number; yPct: number } {
+  const { xFrac, yFrac } = anchorFractions(anchor);
+  return { xPct: anchorXPct - xFrac * widthPct, yPct: anchorYPct - yFrac * heightPct };
+}
+
+// Shared center-pivot rotation helper (v1.1 Phase 2). Returns the native-space
+// draw anchor pdf-lib's drawText/drawImage `x,y` (and its rotation pivot)
+// must use so that a box of (widthPt, heightPt), rotated by rotationDeg
+// COUNTERCLOCKWISE around its own center (pdf-lib's actual rotate
+// convention, native space, y-up), has that center land exactly at
+// (centerXPt, centerYPt).
+//
+// Derivation: pdf-lib rotates the drawn box around the anchor point it's
+// given, so after rotation the box's center is anchor + Rot(halfW, halfH)
+// (Rot being the same rotation matrix cornerAnchorPct already uses for its
+// corners). Solving for anchor: anchor = center - Rot(halfW, halfH).
+//
+// This is the general form of what cornerAnchorPct's own "center" branch
+// already computed (anchored to the page's center specifically) -- see
+// cornerAnchorPct below, which now calls this directly for corner==="center"
+// and is regression-tested to produce byte-identical results to before this
+// extraction (tests/watermark-config.test.ts's corner sweep).
+export function nativeAnchorForCenter(
+  centerXPt: number,
+  centerYPt: number,
+  widthPt: number,
+  heightPt: number,
+  rotationDeg: number,
+): { x: number; y: number } {
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const halfW = widthPt / 2;
+  const halfH = heightPt / 2;
+  const rotatedHalfX = halfW * cos - halfH * sin;
+  const rotatedHalfY = halfW * sin + halfH * cos;
+  return { x: centerXPt - rotatedHalfX, y: centerYPt - rotatedHalfY };
+}
+
+// v1.1 Phase 3: clamps a manual placement's top-left percent to stay fully
+// on-page (matches Crop PDF's clampCropRect pattern), unless allowOverflow
+// is set -- in which case it's still bounded to a generous but finite
+// range so a fat-fingered value can't produce a pathological export.
+export function clampManualPosition(
+  xPct: number,
+  yPct: number,
+  widthPct: number,
+  heightPct: number,
+  allowOverflow: boolean,
+): { xPct: number; yPct: number } {
+  if (allowOverflow) {
+    return {
+      xPct: Math.min(200 - widthPct, Math.max(-100, xPct)),
+      yPct: Math.min(200 - heightPct, Math.max(-100, yPct)),
+    };
+  }
+  return {
+    xPct: Math.min(100 - widthPct, Math.max(0, xPct)),
+    yPct: Math.min(100 - heightPct, Math.max(0, yPct)),
+  };
+}
+
+// v1.1 Phase 3 alignment helpers -- each is a one-shot commit onto the
+// stored top-left (same shape as a drag-end or numeric-input edit), not a
+// live constraint. Pure percent-space math; no rotation/anchor algebra
+// needed here since these are axis-aligned page placements.
+export function alignLeft(widthPct: number, heightPct: number, currentYPct: number): { xPct: number; yPct: number } {
+  return clampManualPosition(0, currentYPct, widthPct, heightPct, false);
+}
+export function alignRight(widthPct: number, heightPct: number, currentYPct: number): { xPct: number; yPct: number } {
+  return clampManualPosition(100 - widthPct, currentYPct, widthPct, heightPct, false);
+}
+export function alignTop(widthPct: number, heightPct: number, currentXPct: number): { xPct: number; yPct: number } {
+  return clampManualPosition(currentXPct, 0, widthPct, heightPct, false);
+}
+export function alignBottom(widthPct: number, heightPct: number, currentXPct: number): { xPct: number; yPct: number } {
+  return clampManualPosition(currentXPct, 100 - heightPct, widthPct, heightPct, false);
+}
+export function centerHorizontally(widthPct: number, heightPct: number, currentYPct: number): { xPct: number; yPct: number } {
+  return clampManualPosition((100 - widthPct) / 2, currentYPct, widthPct, heightPct, false);
+}
+export function centerVertically(widthPct: number, heightPct: number, currentXPct: number): { xPct: number; yPct: number } {
+  return clampManualPosition(currentXPct, (100 - heightPct) / 2, widthPct, heightPct, false);
+}
+export function resetManualPosition(widthPct: number, heightPct: number): { xPct: number; yPct: number } {
+  return clampManualPosition((100 - widthPct) / 2, (100 - heightPct) / 2, widthPct, heightPct, false);
+}
 
 export type WatermarkTextContent = {
   kind: "text";
@@ -65,6 +215,11 @@ export type WatermarkConfig = {
   // resetting it). See WatermarkSinglePlacement above for why corner mode
   // carries no coordinates.
   placement: WatermarkSinglePlacement;
+  // UI-only projection for manual placement's numeric fields/drag handle
+  // (see WatermarkAnchor above) -- ignored by export.ts entirely; stored
+  // here only so the UI reopens with the same numeric-field semantics
+  // after undo/reload.
+  manualAnchor: WatermarkAnchor;
   marginPct: number; // inset used by corner-anchor presets
   tileSpacingPct: number; // gap between repeats in tiled mode
   pageRange: WatermarkPageRange;
@@ -93,6 +248,7 @@ export function createDefaultTextWatermarkConfig(): WatermarkConfig {
     scale: DEFAULT_SCALE,
     placementMode: "single",
     placement: { mode: "corner", corner: "center" },
+    manualAnchor: "top-left",
     marginPct: DEFAULT_MARGIN_PCT,
     tileSpacingPct: DEFAULT_TILE_SPACING_PCT,
     pageRange: { mode: "all" },
@@ -107,6 +263,7 @@ export function createDefaultImageWatermarkConfig(imageDataUrl: string, imageFor
     scale: DEFAULT_SCALE,
     placementMode: "single",
     placement: { mode: "corner", corner: "center" },
+    manualAnchor: "top-left",
     marginPct: DEFAULT_MARGIN_PCT,
     tileSpacingPct: DEFAULT_TILE_SPACING_PCT,
     pageRange: { mode: "all" },
