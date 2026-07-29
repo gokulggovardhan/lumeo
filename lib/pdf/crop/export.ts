@@ -5,9 +5,8 @@
 // (load fresh, never mutate the pdfjs-rendered copy; per-page try/catch
 // with skippedPages reported rather than losing the whole export).
 //
-// Coordinate conversion logic is duplicated from lib/pdf/pageCoordinates.ts
-// (the canonical, independently-tested definition) rather than imported --
-// this module must load directly under Node's test runner (no path-alias
+// Coordinate conversion logic below is a deliberate duplicate rather than
+// a shared import -- this module must load directly under Node's test runner (no path-alias
 // or loader support), while a relative ".ts"-extensioned value import
 // breaks Next.js's production type-check for any file a real app
 // component also imports. Same constraint and same resolution already
@@ -50,8 +49,8 @@ function visualPageSize(rotation: PageRotation, nativeWidth: number, nativeHeigh
 // Inverse of pdfjs's PageViewport rotation transform: converts a point in
 // VISUAL space (points, origin top-left, y-down) into pdf-lib's NATIVE
 // page space (points, origin bottom-left, y-up, unrotated
-// MediaBox-relative). Verbatim copy of lib/pdf/pageCoordinates.ts's
-// toNativePoint -- see that file for the full derivation.
+// MediaBox-relative). Mirrors the same transform used in
+// lib/pdf/watermark/export.ts.
 function toNativePoint(
   rotation: PageRotation,
   nativeWidth: number,
@@ -73,7 +72,6 @@ function toNativePoint(
 
 // Maps an axis-aligned visual-space box (top-left origin, y-down) to an
 // axis-aligned native-space box -- this IS the crop-rectangle transform.
-// Verbatim copy of lib/pdf/pageCoordinates.ts's toNativeBox.
 function toNativeBox(
   rotation: PageRotation,
   nativeWidth: number,
@@ -119,9 +117,8 @@ export async function exportCroppedPdf(
 
       // Set both MediaBox and CropBox to the same rectangle -- not every
       // viewer respects CropBox over MediaBox, so both are written
-      // (same "don't trust one PDF box in isolation" lesson
-      // lib/pdf/pageCoordinates.ts's own header comment documents for
-      // MediaBox vs. viewport under rotation).
+      // (don't trust one PDF box in isolation for MediaBox vs. viewport
+      // under rotation).
       page.setMediaBox(nativeBox.x, nativeBox.y, nativeBox.width, nativeBox.height);
       page.setCropBox(nativeBox.x, nativeBox.y, nativeBox.width, nativeBox.height);
     } catch {
