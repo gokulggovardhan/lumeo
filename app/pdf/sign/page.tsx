@@ -40,11 +40,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://lumeo.in/pdf/sign",
       siteName: "Lumeo PDF",
       type: "website",
+      images: ["https://lumeo.in/opengraph-image"],
     },
     twitter: {
       card: "summary_large_image",
       title: "Sign PDF Online Privately | Lumeo PDF",
       description: "Draw or type a signature and place it on any page, directly in your browser.",
+      images: ["https://lumeo.in/twitter-image"],
     },
   });
 }

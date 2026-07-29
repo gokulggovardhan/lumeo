@@ -34,11 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://lumeo.in/pdf/compress",
       siteName: "Lumeo PDF",
       type: "website",
+      images: ["https://lumeo.in/opengraph-image"],
     },
     twitter: {
       card: "summary_large_image",
       title: "Compress PDF Online Privately - Lumeo PDF",
       description: "Compress PDF files privately in your browser with Lumeo PDF Workspace.",
+      images: ["https://lumeo.in/twitter-image"],
     },
   });
 }

@@ -34,11 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://lumeo.in/pdf/crop",
       siteName: "Lumeo PDF",
       type: "website",
+      images: ["https://lumeo.in/opengraph-image"],
     },
     twitter: {
       card: "summary_large_image",
       title: "Crop PDF Online Privately - Lumeo PDF",
       description: "Crop a PDF's pages directly in your browser.",
+      images: ["https://lumeo.in/twitter-image"],
     },
   });
 }

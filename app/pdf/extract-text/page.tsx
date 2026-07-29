@@ -34,11 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://lumeo.in/pdf/extract-text",
       siteName: "Lumeo PDF",
       type: "website",
+      images: ["https://lumeo.in/opengraph-image"],
     },
     twitter: {
       card: "summary_large_image",
       title: "Text Extract Online Privately - Lumeo PDF",
       description: "Extract PDF text directly on your device using Lumeo PDF Workspace.",
+      images: ["https://lumeo.in/twitter-image"],
     },
   });
 }

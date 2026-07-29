@@ -34,11 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://lumeo.in/pdf/pdf-to-word",
       siteName: "Lumeo PDF",
       type: "website",
+      images: ["https://lumeo.in/opengraph-image"],
     },
     twitter: {
       card: "summary_large_image",
       title: "PDF to Word Converter Online - Lumeo PDF",
       description: "Convert PDF documents to editable Word files online with Lumeo, powered by free, self-hosted LibreOffice.",
+      images: ["https://lumeo.in/twitter-image"],
     },
   });
 }
