@@ -82,6 +82,22 @@
   --v2-interactive-focus-ring: var(--shadow-focus);
   --v2-interactive-active-scale: 0.985; /* matches AuraButton's existing active:scale-[0.985] */
   --v2-interactive-disabled-opacity: 0.6; /* matches AuraButton's existing disabled:opacity-60 */
+  --v2-active-scale-icon: 0.96; /* matches AuraIconButton's existing active:scale-[0.96] -- deliberately different from the button scale above, not a duplicate to merge */
+
+  /* PR 3 addition: components/ui/Aura.tsx's focus-visible ring uses
+   * the same rgba(champagne) pattern at several DIFFERENT alpha
+   * values across components (0.2 buttons, 0.18 cards/nav/upload,
+   * 0.16 directory card, 0.14 form fields) -- these are genuinely
+   * different values today, not accidental duplicates, so migrating
+   * them to a single shared token would be a visual change, not a
+   * refactor. Named per their real current value instead, so the
+   * repeated "focus-visible:ring-4 focus-visible:ring-[rgba(...)]"
+   * PATTERN has one canonical source per distinct value, without
+   * changing any of them. */
+  --v2-focus-ring-strong: rgba(var(--champagne-rgb), 0.2);   /* AuraButton, AuraIconButton */
+  --v2-focus-ring-default: rgba(var(--champagne-rgb), 0.18); /* cards, nav links, upload surface */
+  --v2-focus-ring-subtle: rgba(var(--champagne-rgb), 0.16);  /* directory tool card */
+  --v2-focus-ring-field: rgba(var(--champagne-rgb), 0.14);   /* form fields (AuraInput/Textarea/Select) */
 
   /* ============================================================
    * MOTION ALIASES

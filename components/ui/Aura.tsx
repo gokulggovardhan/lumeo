@@ -67,7 +67,7 @@ export function AuraButton({
       {...props}
       disabled={disabled || loading}
       className={cx(
-        "lumeo2-button-press inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] border font-extrabold transition duration-[var(--motion-standard)] ease-[var(--ease-standard)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60",
+        "lumeo2-button-press inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] border font-extrabold transition duration-[var(--v2-motion-normal)] ease-[var(--v2-ease-standard)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-strong)] active:scale-[var(--v2-interactive-active-scale)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]",
         buttonVariants[variant],
         sizeClasses[size],
         className,
@@ -91,7 +91,7 @@ export function AuraIconButton({
       aria-label={label}
       title={label}
       className={cx(
-        "lumeo2-button-press inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(var(--paper-rgb),0.07)] text-[var(--text-secondary)] transition duration-[var(--motion-standard)] hover:border-[var(--border-premium)] hover:bg-[rgba(var(--paper-rgb),0.12)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]",
+        "lumeo2-button-press inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(var(--paper-rgb),0.07)] text-[var(--text-secondary)] transition duration-[var(--v2-motion-normal)] hover:border-[var(--border-premium)] hover:bg-[rgba(var(--paper-rgb),0.12)] active:scale-[var(--v2-active-scale-icon)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-strong)]",
         className,
       )}
     >
@@ -109,8 +109,8 @@ export function AuraCard({ className, interactive = false, ...props }: HTMLAttri
     <div
       {...props}
       className={cx(
-        "aura-luminous-card rounded-[var(--radius-xl)] p-5 transition duration-[var(--motion-standard)]",
-        interactive && "lumeo2-soft-card-lift focus-within:shadow-[var(--shadow-focus)]",
+        "aura-luminous-card rounded-[var(--radius-xl)] p-5 transition duration-[var(--v2-motion-normal)]",
+        interactive && "lumeo2-soft-card-lift focus-within:shadow-[var(--v2-elevation-focus)]",
         className,
       )}
     />
@@ -123,7 +123,7 @@ export function AuraPanel({ className, ...props }: HTMLAttributes<HTMLElement>) 
 
 function fieldClass(className?: string) {
   return cx(
-    "min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] transition duration-[var(--motion-standard)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.14)] disabled:cursor-not-allowed disabled:opacity-60",
+    "min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] transition duration-[var(--v2-motion-normal)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-[var(--v2-focus-ring-field)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]",
     className,
   );
 }
@@ -212,7 +212,7 @@ export function AuraSwitch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onCheckedChange?.(!checked)}
-      className={cx("flex min-h-11 w-full items-center justify-between gap-4 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.045)] p-3 text-left transition hover:border-[var(--border-premium)] disabled:cursor-not-allowed disabled:opacity-60", className)}
+      className={cx("flex min-h-11 w-full items-center justify-between gap-4 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.045)] p-3 text-left transition hover:border-[var(--border-premium)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]", className)}
     >
       <span>
         <span className="block text-sm font-extrabold text-[var(--text-primary)]">{label}</span>

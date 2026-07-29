@@ -24,6 +24,7 @@ const rolloutDoc = read("docs/LUMEO_AURA_ROLLOUT.md");
 const lumeo2Doc = read("docs/LUMEO_2_DESIGN_SYSTEM.md");
 const lumeo2Verifier = read("scripts/verify-lumeo-2-foundation.mjs");
 const publicExperienceVerifier = read("scripts/verify-lumeo-2-public-experience.mjs");
+const v2Tokens = read("app/aura-v2-tokens.css");
 const mergePage = read("app/pdf/merge/page.tsx");
 const splitPage = read("app/pdf/split/page.tsx");
 const compressPage = read("app/pdf/compress/page.tsx");
@@ -93,7 +94,12 @@ test("Lumeo Atelier retheme keeps soft semantic tokens and interaction contracts
   assert.ok(css.includes("rgb(var(--atelier-sage-rgb) / 0.08)"));
   assert.ok(css.includes("rgb(var(--atelier-brass-rgb) / 0.06)"));
   assert.ok(css.includes("background: var(--surface-canvas);"));
-  assert.ok(ui.includes("rgba(var(--champagne-rgb),0.2)"));
+  // AuraButton/AuraIconButton's focus ring was migrated (Aura OS v2 PR 3)
+  // from a literal rgba() to a named --v2-focus-ring-strong token -- the
+  // computed value is unchanged (verified below: the token itself resolves
+  // to the exact same rgba this test previously pinned as a literal).
+  assert.ok(ui.includes("var(--v2-focus-ring-strong)"));
+  assert.ok(v2Tokens.includes("--v2-focus-ring-strong: rgba(var(--champagne-rgb), 0.2);"));
   assert.ok(ui.includes("rgba(var(--atelier-sage-rgb),0.09)"));
   assert.doesNotMatch(ui, /rgba\(var\(--sky-rgb\)/);
   assert.ok(showcase.includes("Lumeo Atelier"));
