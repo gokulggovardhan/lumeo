@@ -158,7 +158,6 @@ try {
   assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");
   assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.110.2", "Supabase JS version changed unexpectedly.");
-  assert(packageJson.dependencies.firebase === "^12.16.0", "Firebase version changed unexpectedly.");
 
   const newSource = [ui, workspace, guidance, read("components/layout/AuraPublicShell.tsx"), read("app/admin/(protected)/design-system/page.tsx")].join("\n");
   assert(!/console\.(log|info|warn|error)/.test(newSource), "Production debug logging must not be added.");

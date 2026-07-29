@@ -243,8 +243,12 @@ summary and breakdown data so it does not need direct table access.
 
 ## PDF Tool Event Lifecycle
 
-Merge PDF, Split PDF, and Compress PDF currently use the same Analytics V1
-workspace-open lifecycle:
+> Updated 2026-07-29: this section originally described only Merge, Split, and
+> Compress. All 14 live PDF tools now use the same Analytics V1 workspace-open
+> lifecycle described below.
+
+Every live PDF tool currently uses the same Analytics V1 workspace-open
+lifecycle:
 
 - `tool_opened` fires once per mounted tool workspace after analytics becomes
   enabled. The one-time ref is marked only when `track()` returns

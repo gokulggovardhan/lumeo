@@ -1,5 +1,16 @@
 # Lumeo roadmap
 
+> **Deprecated / mismatched content notice (2026-07-29):** everything below
+> this line describes a video-editing/studio product (timelines, export
+> presets, aspect ratios, AI clipping, etc.) and does not match the current
+> Lumeo PDF Workspace product in this repository. It appears to be leftover
+> content from an earlier or different product direction. Left in place as a
+> historical record rather than deleted outright, since removing it wasn't
+> explicitly confirmed — but it should not be treated as this repo's actual
+> roadmap. For the current PDF-tool roadmap, see `lib/tools/catalog.ts`
+> (actions with `live: false` are the actual near-term backlog) and the
+> "Project structure" / "How to add a new tool" sections of `README.md`.
+
 ## Current development: Non-AI studio features
 
 ### Available now / build first
