@@ -1,0 +1,179 @@
+/*
+ * Aura OS v2 — Design Token Infrastructure (PR 1)
+ *
+ * Scope: tokens and theme plumbing only. Nothing in this file is consumed
+ * by any component yet -- it exists so future PRs (buttons, inputs,
+ * cards, workspace, etc.) can migrate onto it incrementally, per
+ * docs/AURA_OS_V2_PLAN.md and docs/AURA_OS_V2_DESIGN_SPEC.md.
+ *
+ * Every value below resolves to an EXISTING token from app/globals.css
+ * (via var()) rather than a new literal color/number, so this file is
+ * additive and value-identical to production today. Nothing currently
+ * rendered can change appearance from this file alone, since nothing
+ * references --v2-* yet.
+ *
+ * Naming: everything here is prefixed --v2- to guarantee zero collision
+ * with the three existing token generations documented in the v2 plan
+ * (--lumeo-*, --atelier-*, --maison-* and generic names). This is deliberate: v2
+ * is a fourth, *canonical* generation that the older three should
+ * eventually fold into (deprecation candidates, not touched here) --
+ * not a fifth generation added on top without a plan.
+ */
+
+:root {
+  /* ============================================================
+   * SEMANTIC SURFACES
+   * Aliases onto the existing --surface-* scale (app/globals.css).
+   * ============================================================ */
+  --v2-surface-primary: var(--surface-base);
+  --v2-surface-secondary: var(--surface-raised);
+  --v2-surface-elevated: var(--surface-elevated);
+  --v2-surface-workspace: var(--surface-interactive);
+  --v2-surface-floating: var(--surface-floating);
+  --v2-surface-overlay: var(--surface-overlay);
+
+  /* ============================================================
+   * ELEVATION
+   * Aliases onto the existing --shadow-* scale. Semantic step
+   * names map 1:1 to today's steps -- no new shadow values.
+   * ============================================================ */
+  --v2-elevation-0: none;
+  --v2-elevation-1: var(--shadow-xs);
+  --v2-elevation-2: var(--shadow-sm);
+  --v2-elevation-3: var(--shadow-md);
+  --v2-elevation-4: var(--shadow-lg);
+  --v2-elevation-5: var(--shadow-xl);
+  --v2-elevation-floating: var(--shadow-floating);
+  --v2-elevation-interactive: var(--shadow-interactive);
+  --v2-elevation-focus: var(--shadow-focus);
+
+  /* ============================================================
+   * GLASS SYSTEM (new -- no equivalent exists in the current
+   * token set; confirmed absent in docs/AURA_OS_V2_PLAN.md's
+   * analysis). Each tier bundles blur + tint + border + shadow
+   * as four coordinated tokens sharing one tier name, per
+   * docs/AURA_OS_V2_DESIGN_SPEC.md Phase 2. Tint/border derive
+   * from the existing --paper-rgb / border scale so the glass
+   * system stays visually consistent with the rest of the
+   * palette rather than introducing new base colors.
+   * ============================================================ */
+  --v2-glass-thin-blur: 8px;
+  --v2-glass-thin-bg: rgb(var(--paper-rgb) / 0.04);
+  --v2-glass-thin-border: rgb(var(--paper-rgb) / 0.10);
+  --v2-glass-thin-shadow: var(--shadow-xs);
+
+  --v2-glass-regular-blur: 16px;
+  --v2-glass-regular-bg: rgb(var(--paper-rgb) / 0.08);
+  --v2-glass-regular-border: rgb(var(--paper-rgb) / 0.14);
+  --v2-glass-regular-shadow: var(--shadow-md);
+
+  --v2-glass-thick-blur: 24px;
+  --v2-glass-thick-bg: rgb(var(--paper-rgb) / 0.14);
+  --v2-glass-thick-border: rgb(var(--paper-rgb) / 0.20);
+  --v2-glass-thick-shadow: var(--shadow-xl);
+
+  /* ============================================================
+   * INTERACTION TOKENS
+   * Aliases onto existing border/opacity-bearing values used by
+   * AuraButton etc. today, given a semantic name so future
+   * components reference "the hover state," not a raw value.
+   * ============================================================ */
+  --v2-interactive-hover-ring: var(--border-premium);
+  --v2-interactive-focus-ring: var(--shadow-focus);
+  --v2-interactive-active-scale: 0.985; /* matches AuraButton's existing active:scale-[0.985] */
+  --v2-interactive-disabled-opacity: 0.6; /* matches AuraButton's existing disabled:opacity-60 */
+
+  /* ============================================================
+   * MOTION ALIASES
+   * Purpose names over the existing --motion-* and --ease-* scales.
+   * No new durations or curves -- same values, semantic names.
+   * ============================================================ */
+  --v2-motion-instant: var(--motion-instant);
+  --v2-motion-fast: var(--motion-fast);
+  --v2-motion-normal: var(--motion-standard);
+  --v2-motion-expressive: var(--motion-expressive);
+  --v2-motion-slow: var(--motion-entrance);
+
+  --v2-ease-standard: var(--ease-standard);
+  --v2-ease-enter: var(--ease-enter);
+  --v2-ease-exit: var(--ease-exit);
+
+  /* ============================================================
+   * SPACING ALIASES
+   * Named steps for the 4px-rhythm scale already implied by
+   * Tailwind's default spacing utilities (gap-1..gap-12 etc).
+   * These are NEW custom properties (Tailwind's scale isn't
+   * exposed as CSS vars today) but resolve to literal values
+   * already in use throughout the app via Tailwind classes --
+   * not new spacing, just a named reference point for future
+   * non-utility-class consumers (e.g. computed styles in JS).
+   * ============================================================ */
+  --v2-space-1: 0.25rem;  /* 4px */
+  --v2-space-2: 0.5rem;   /* 8px */
+  --v2-space-3: 0.75rem;  /* 12px */
+  --v2-space-4: 1rem;     /* 16px */
+  --v2-space-5: 1.25rem;  /* 20px */
+  --v2-space-6: 1.5rem;   /* 24px */
+  --v2-space-8: 2rem;     /* 32px */
+  --v2-space-10: 2.5rem;  /* 40px */
+  --v2-space-12: 3rem;    /* 48px */
+
+  /* ============================================================
+   * TYPOGRAPHY ALIASES
+   * Pure aliases onto the existing fluid clamp() scale -- no
+   * new sizes, just a v2-namespaced reference point.
+   * ============================================================ */
+  --v2-text-display-xl: var(--text-display-xl);
+  --v2-text-display-lg: var(--text-display-lg);
+  --v2-text-display-md: var(--text-display-md);
+  --v2-text-heading-xl: var(--text-heading-xl);
+  --v2-text-heading-lg: var(--text-heading-lg);
+  --v2-text-heading-md: var(--text-heading-md);
+  --v2-text-heading-sm: var(--text-heading-sm);
+  --v2-text-body-lg: var(--text-body-lg);
+  --v2-text-body-md: var(--text-body-md);
+  --v2-text-body-sm: var(--text-body-sm);
+  --v2-text-label: var(--text-label);
+  --v2-text-caption: var(--text-caption);
+  --v2-text-micro: var(--text-micro);
+
+  /* ============================================================
+   * RADIUS (pass-through, documented for completeness -- the
+   * existing 7-step scale is kept as-is per the v2 plan, no
+   * alias layer needed since component code already consumes
+   * --radius-* directly and consistently).
+   * ============================================================ */
+}
+
+/*
+ * THEME INFRASTRUCTURE
+ *
+ * Dark remains the production default (:root, unscoped, above) --
+ * nothing changes there. This block only *exists* so a future PR can
+ * attach data-theme="dark" explicitly without a behavior change, and
+ * so light-theme work has a real attachment point to fill in later.
+ *
+ * Per this PR's explicit scope ("Do NOT redesign light theme yet"),
+ * [data-theme="light"] below currently repeats the same dark values as
+ * :root -- it is intentionally inert. No element in the app sets
+ * data-theme="light" today (confirmed: zero occurrences of
+ * data-theme in the codebase before this PR), so this block has no
+ * way to be reached and cannot change production's appearance.
+ */
+:root[data-theme="dark"] {
+  /* Identical to :root above by design -- dark is already the default. */
+}
+
+:root[data-theme="light"] {
+  /* Placeholder: intentionally identical to dark for now. Real light
+   * values are out of scope for PR 1 (design tokens/infrastructure
+   * only) and land in a dedicated future PR once the light theme is
+   * actually designed and contrast-checked per
+   * docs/AURA_OS_V2_DESIGN_SPEC.md Phase 7, rule 9. */
+  --v2-surface-primary: var(--surface-base);
+  --v2-surface-secondary: var(--surface-raised);
+  --v2-surface-elevated: var(--surface-elevated);
+  --v2-surface-workspace: var(--surface-interactive);
+  --v2-surface-floating: var(--surface-floating);
+  --v2-surface-overlay: var(--surface-overlay);
+}
