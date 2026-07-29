@@ -38,11 +38,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://lumeo.in/pdf/merge",
       siteName: "Lumeo PDF",
       type: "website",
+      images: ["https://lumeo.in/opengraph-image"],
     },
     twitter: {
       card: "summary_large_image",
       title: "Merge PDF Online Privately - Lumeo PDF",
       description: "Combine and reorder PDF files directly in your browser with no server upload for supported processing.",
+      images: ["https://lumeo.in/twitter-image"],
     },
   });
 }

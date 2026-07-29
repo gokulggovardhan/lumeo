@@ -34,11 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://lumeo.in/pdf/split",
       siteName: "Lumeo PDF",
       type: "website",
+      images: ["https://lumeo.in/opengraph-image"],
     },
     twitter: {
       card: "summary_large_image",
       title: "Split PDF Online Privately - Lumeo PDF",
       description: "Split and extract PDF pages directly on your device using Lumeo PDF Workspace.",
+      images: ["https://lumeo.in/twitter-image"],
     },
   });
 }

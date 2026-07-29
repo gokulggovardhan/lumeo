@@ -40,6 +40,7 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://lumeo.in/pdf/pdf-to-jpg",
       siteName: "Lumeo PDF",
       type: "website",
+      images: ["https://lumeo.in/opengraph-image"],
     },
     twitter: {
       card: "summary_large_image",

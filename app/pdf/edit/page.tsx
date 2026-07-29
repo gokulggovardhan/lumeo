@@ -34,11 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
       url: "https://lumeo.in/pdf/edit",
       siteName: "Lumeo PDF",
       type: "website",
+      images: ["https://lumeo.in/opengraph-image"],
     },
     twitter: {
       card: "summary_large_image",
       title: "Edit PDF Online Privately - Lumeo PDF",
       description: "Add text, drawing, shapes, and whiteout boxes to a PDF directly in your browser.",
+      images: ["https://lumeo.in/twitter-image"],
     },
   });
 }
