@@ -39,7 +39,6 @@ try {
   assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");
   assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.110.2", "Supabase JS version changed unexpectedly.");
-  assert(packageJson.dependencies.firebase === "^12.16.0", "Firebase version changed unexpectedly.");
 
   for (const component of [
     "L2PublicHeader",

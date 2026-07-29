@@ -147,8 +147,7 @@ try {
   assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");
   assert(packageJson.dependencies["react-dom"] === "^19.2.7", "React DOM version changed unexpectedly.");
-  assert(packageJson.dependencies.firebase === "^12.16.0", "Firebase version changed unexpectedly.");
-  assert(packageJson.dependencies["firebase-admin"] === "^14.1.0", "firebase-admin version changed unexpectedly.");
+  assert(packageJson.dependencies["firebase-admin"] === "^14.2.0", "firebase-admin version changed unexpectedly.");
 
   const protectedStatus = gitStatus(protectedNonAdminFiles);
   assert(!protectedStatus, `Protected non-admin files must not be modified by Control Center work:\n${protectedStatus}`);

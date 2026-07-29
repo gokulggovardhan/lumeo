@@ -235,7 +235,6 @@ try {
   assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");
   assert(packageJson.dependencies["react-dom"] === "^19.2.7", "React DOM version changed unexpectedly.");
-  assert(packageJson.dependencies.firebase === "^12.16.0", "Firebase version changed unexpectedly.");
 
   console.log("PASS privacy analytics migration exists");
   console.log("PASS approved event allowlist and secure RPCs exist");
