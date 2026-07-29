@@ -336,7 +336,7 @@ export function AuraTooltip({ label, children }: { label: string; children: Reac
   return (
     <span className="group relative inline-flex">
       {children}
-      <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-floating)] px-2 py-1 text-xs font-bold text-[var(--lumeo-ink-950)] shadow-[var(--shadow-floating)] group-hover:block group-focus-within:block">
+      <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--v2-surface-floating)] px-2 py-1 text-xs font-bold text-[var(--lumeo-ink-950)] shadow-[var(--v2-elevation-floating)] group-hover:block group-focus-within:block">
         {label}
       </span>
     </span>
@@ -348,7 +348,7 @@ export function AuraPopover({ trigger, children }: { trigger: ReactNode; childre
   return (
     <div className="relative inline-flex">
       <span onClick={() => setOpen((value) => !value)}>{trigger}</span>
-      {open ? <div className="aura-menu-reveal absolute right-0 top-full z-30 mt-2 min-w-64 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--surface-floating)] p-3 shadow-[var(--shadow-lg)]">{children}</div> : null}
+      {open ? <div className="aura-menu-reveal absolute right-0 top-full z-30 mt-2 min-w-64 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--v2-surface-floating)] p-3 shadow-[var(--v2-elevation-4)]">{children}</div> : null}
     </div>
   );
 }
@@ -396,8 +396,8 @@ export function AuraDialog({
 
   if (!open) return null;
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="aura-dialog-title" className="fixed inset-0 z-50 grid place-items-center bg-[var(--surface-overlay)] p-4">
-      <div className="aura-scale-in w-full max-w-lg rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-floating)] p-6 shadow-[var(--shadow-xl)]">
+    <div role="dialog" aria-modal="true" aria-labelledby="aura-dialog-title" className="fixed inset-0 z-50 grid place-items-center bg-[var(--v2-surface-overlay)] p-4">
+      <div className="aura-scale-in w-full max-w-lg rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--v2-surface-floating)] p-6 shadow-[var(--v2-elevation-5)]">
         <div className="flex items-center justify-between gap-4">
           <h2 id="aura-dialog-title" className="text-xl font-extrabold text-[var(--lumeo-paper-50)]">{title}</h2>
           <AuraIconButton label="Close dialog" onClick={onClose}>×</AuraIconButton>
@@ -430,8 +430,8 @@ export function AuraDrawer({
 
   if (!open) return null;
   return (
-    <aside role="dialog" aria-modal="true" aria-labelledby="aura-drawer-title" className="fixed inset-0 z-50 bg-[var(--surface-overlay)]">
-      <div className="aura-drawer-enter ml-auto h-full w-full max-w-md border-l border-[var(--border-subtle)] bg-[var(--surface-floating)] p-6 shadow-[var(--shadow-xl)]">
+    <aside role="dialog" aria-modal="true" aria-labelledby="aura-drawer-title" className="fixed inset-0 z-50 bg-[var(--v2-surface-overlay)]">
+      <div className="aura-drawer-enter ml-auto h-full w-full max-w-md border-l border-[var(--border-subtle)] bg-[var(--v2-surface-floating)] p-6 shadow-[var(--v2-elevation-5)]">
         <div className="flex items-center justify-between gap-4">
           <h2 id="aura-drawer-title" className="text-xl font-extrabold text-[var(--lumeo-paper-50)]">{title}</h2>
           <AuraIconButton label="Close drawer" onClick={onClose}>×</AuraIconButton>
@@ -444,7 +444,7 @@ export function AuraDrawer({
 
 export function AuraToast({ tone = "info", title, message }: { tone?: Tone; title: string; message?: string }) {
   return (
-    <div role="status" className={cx("rounded-[var(--radius-xl)] border p-4 shadow-[var(--shadow-md)]", toneClasses[tone])}>
+    <div role="status" className={cx("rounded-[var(--radius-xl)] border p-4 shadow-[var(--v2-elevation-3)]", toneClasses[tone])}>
       <p className="font-extrabold">{title}</p>
       {message ? <p className="mt-1 text-sm opacity-80">{message}</p> : null}
     </div>
