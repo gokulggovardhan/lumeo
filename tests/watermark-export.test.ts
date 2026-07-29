@@ -298,13 +298,18 @@ test("exportWatermarkedPdf with a manual placement reuses xPct/yPct verbatim (un
   const matrices = extractAllTm(decodeContentStreams(bytes));
   assert.equal(matrices.length, 2);
 
-  // toNativePoint's x mapping for an unrotated page (both pages here have
-  // no native /Rotate) is the identity: nativeX = visualX = xPct/100 * pageWidth.
-  // Tm's e (translation-x) is exactly that nativeX, so it must scale with
-  // each page's own width for the same 10% anchor -- confirming no
-  // corner-style recompute (which would NOT scale linearly with page width)
-  // kicked in for a plain manual-placed position.
+  // Since v1.1 Phase 2, manual placement's draw anchor pivots the
+  // watermark's rotation around its own center (see manualNativeAnchor in
+  // export.ts), so the anchor is now visualX-plus-a-page-independent-
+  // rotation-offset rather than visualX alone -- e no longer scales purely
+  // linearly with page width (that was the pre-Phase-2 invariant). The
+  // still-true regression invariant is that the offset FROM the plain
+  // visualX = (xPct/100)*pageWidth term is identical across both pages --
+  // i.e. no per-page corner-style recompute kicked in for a plain manual
+  // position, just the same fixed rotation-center offset applied uniformly.
   const [, , , , e1] = matrices[0];
   const [, , , , e2] = matrices[1];
-  approxEqual(e1 / 612, e2 / 792, 0.01);
+  const offset1 = e1 - (10 / 100) * 612;
+  const offset2 = e2 - (10 / 100) * 792;
+  approxEqual(offset1, offset2, 0.01);
 });
