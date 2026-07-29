@@ -1,0 +1,192 @@
+/*
+ * Aura OS v2 -- Utility Classes (PR 2)
+ *
+ * Scope: reusable, opt-in CSS classes that consume the --v2-* tokens
+ * from app/aura-v2-tokens.css. Nothing in this file is applied to any
+ * existing markup -- every class here is new, unreferenced, and
+ * therefore cannot change any rendered output today. Future PRs adopt
+ * these one component at a time, per docs/AURA_OS_V2_PLAN.md's PR
+ * roadmap.
+ *
+ * These do NOT replace or modify the existing global rules for
+ * ::selection, :focus-visible, or scrollbars (still present, unchanged,
+ * further down in app/globals.css) -- this file adds parallel, opt-in
+ * alternatives for future components to adopt deliberately, rather than
+ * silently changing every element's current selection/focus/scrollbar
+ * appearance by touching a global selector.
+ */
+
+/* ============================================================
+ * SURFACE UTILITIES
+ * ============================================================ */
+.aura-surface-primary { background-color: var(--v2-surface-primary); }
+.aura-surface-secondary { background-color: var(--v2-surface-secondary); }
+.aura-surface-elevated { background-color: var(--v2-surface-elevated); }
+.aura-surface-workspace { background-color: var(--v2-surface-workspace); }
+.aura-surface-floating { background-color: var(--v2-surface-floating); }
+.aura-surface-overlay { background-color: var(--v2-surface-overlay); }
+
+/* ============================================================
+ * ELEVATION UTILITIES
+ * ============================================================ */
+.aura-elevated-1 { box-shadow: var(--v2-elevation-1); }
+.aura-elevated-2 { box-shadow: var(--v2-elevation-2); }
+.aura-elevated-3 { box-shadow: var(--v2-elevation-3); }
+.aura-elevated-4 { box-shadow: var(--v2-elevation-4); }
+.aura-elevated-5 { box-shadow: var(--v2-elevation-5); }
+.aura-elevated-floating { box-shadow: var(--v2-elevation-floating); }
+.aura-elevated-interactive { box-shadow: var(--v2-elevation-interactive); }
+
+/* ============================================================
+ * GLASS UTILITIES
+ * Per mission scope: created, NOT applied anywhere. Each bundles
+ * blur + tint + border + shadow from the matching PR 1 glass tier.
+ * backdrop-filter requires -webkit- prefix for Safari; both are
+ * included since Lumeo ships to Safari users (per this session's
+ * earlier device/browser certification gaps -- Safari specifically
+ * flagged as unverified, so the prefix is included defensively
+ * rather than assumed unnecessary).
+ * ============================================================ */
+.aura-glass-thin {
+  background-color: var(--v2-glass-thin-bg);
+  border: 1px solid var(--v2-glass-thin-border);
+  box-shadow: var(--v2-glass-thin-shadow);
+  -webkit-backdrop-filter: blur(var(--v2-glass-thin-blur));
+  backdrop-filter: blur(var(--v2-glass-thin-blur));
+}
+
+.aura-glass-regular {
+  background-color: var(--v2-glass-regular-bg);
+  border: 1px solid var(--v2-glass-regular-border);
+  box-shadow: var(--v2-glass-regular-shadow);
+  -webkit-backdrop-filter: blur(var(--v2-glass-regular-blur));
+  backdrop-filter: blur(var(--v2-glass-regular-blur));
+}
+
+.aura-glass-thick {
+  background-color: var(--v2-glass-thick-bg);
+  border: 1px solid var(--v2-glass-thick-border);
+  box-shadow: var(--v2-glass-thick-shadow);
+  -webkit-backdrop-filter: blur(var(--v2-glass-thick-blur));
+  backdrop-filter: blur(var(--v2-glass-thick-blur));
+}
+
+/* ============================================================
+ * FOCUS-RING UTILITY (unified, accessible)
+ * Opt-in alternative to the existing global :focus-visible rule
+ * (app/globals.css) -- same visual intent (a clear outline ring
+ * driven by the focus token), offered as a reusable class for
+ * components that want an explicit box-shadow-based ring (e.g.
+ * elements where an outline would be clipped by overflow:hidden,
+ * a known limitation of the outline approach) instead of changing
+ * the global default.
+ * ============================================================ */
+.aura-focus-ring {
+  outline: none;
+}
+.aura-focus-ring:focus-visible {
+  box-shadow: var(--v2-interactive-focus-ring);
+}
+
+/* ============================================================
+ * DIVIDER UTILITY
+ * ============================================================ */
+.aura-divider {
+  border: none;
+  border-top: 1px solid var(--border-hairline);
+}
+.aura-divider-vertical {
+  border: none;
+  border-left: 1px solid var(--border-hairline);
+}
+
+/* ============================================================
+ * SCROLLBAR UTILITY
+ * Mirrors the resolved appearance of the existing .l2-file-list
+ * thin-scrollbar rule (app/globals.css) as an opt-in, reusable
+ * class -- same thin width, same paper-tinted thumb color, same
+ * transparent track. Not applied anywhere; existing scrollbar
+ * rules elsewhere in globals.css are untouched.
+ * ============================================================ */
+.aura-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(var(--paper-rgb), 0.22) transparent;
+}
+.aura-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.aura-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.aura-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(var(--paper-rgb), 0.22);
+  border-radius: var(--radius-pill);
+}
+
+/* ============================================================
+ * SELECTION UTILITY
+ * Mirrors the exact resolved value of the existing global
+ * ::selection rule (app/globals.css: rgba(203, 160, 82, 0.34) /
+ * #fffdf7 -- both literal brass/ivory values, not yet token-
+ * backed there). Offered here as a token-backed, scoped
+ * alternative (e.g. `.aura-selection ::selection` for a
+ * container that wants the same look explicitly) without
+ * changing the page-wide default.
+ * ============================================================ */
+.aura-selection ::selection {
+  background: rgb(var(--champagne-rgb) / 0.34);
+  color: var(--text-on-accent);
+}
+
+/* ============================================================
+ * MOTION HELPER UTILITIES
+ * Opt-in transition-duration/easing classes. Do not attach to
+ * any element by default; a future PR applies these explicitly
+ * per-component, replacing ad hoc duration/easing values one
+ * component at a time.
+ * ============================================================ */
+.aura-motion-instant { transition-duration: var(--v2-motion-instant); transition-timing-function: var(--v2-ease-standard); }
+.aura-motion-fast { transition-duration: var(--v2-motion-fast); transition-timing-function: var(--v2-ease-standard); }
+.aura-motion-normal { transition-duration: var(--v2-motion-normal); transition-timing-function: var(--v2-ease-standard); }
+.aura-motion-expressive { transition-duration: var(--v2-motion-expressive); transition-timing-function: var(--v2-ease-enter); }
+.aura-motion-slow { transition-duration: var(--v2-motion-slow); transition-timing-function: var(--v2-ease-standard); }
+
+@media (prefers-reduced-motion: reduce) {
+  .aura-motion-instant,
+  .aura-motion-fast,
+  .aura-motion-normal,
+  .aura-motion-expressive,
+  .aura-motion-slow {
+    transition-duration: 1ms;
+  }
+}
+
+/* ============================================================
+ * DENSITY HELPERS
+ * Per docs/AURA_OS_V2_DESIGN_SPEC.md Phase 1's two-density model
+ * (spacious public/workspace-empty-state vs compact admin/
+ * workspace-loaded). These set spacing-scale custom properties a
+ * future component can read via var(--aura-density-gap) etc.,
+ * rather than hardcoding two different spacing values per
+ * component. Not applied anywhere yet.
+ * ============================================================ */
+.aura-density-spacious {
+  --aura-density-gap: var(--v2-space-6);
+  --aura-density-padding: var(--v2-space-8);
+}
+.aura-density-compact {
+  --aura-density-gap: var(--v2-space-3);
+  --aura-density-padding: var(--v2-space-4);
+}
+
+/* ============================================================
+ * INTERACTION-STATE HELPERS
+ * Semantic opacity classes matching AuraButton's existing
+ * disabled:opacity-60 convention, exposed for non-button
+ * elements that need the same "this is off" treatment.
+ * ============================================================ */
+.aura-state-disabled {
+  opacity: var(--v2-interactive-disabled-opacity);
+  pointer-events: none;
+}

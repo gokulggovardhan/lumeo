@@ -97,26 +97,32 @@
   --v2-ease-standard: var(--ease-standard);
   --v2-ease-enter: var(--ease-enter);
   --v2-ease-exit: var(--ease-exit);
+  --v2-ease-spring: var(--ease-spring-soft);
+  --v2-ease-emphasized: var(--ease-emphasized);
 
   /* ============================================================
    * SPACING ALIASES
-   * Named steps for the 4px-rhythm scale already implied by
-   * Tailwind's default spacing utilities (gap-1..gap-12 etc).
-   * These are NEW custom properties (Tailwind's scale isn't
-   * exposed as CSS vars today) but resolve to literal values
-   * already in use throughout the app via Tailwind classes --
-   * not new spacing, just a named reference point for future
-   * non-utility-class consumers (e.g. computed styles in JS).
+   * CORRECTED in PR 2: app/globals.css already defines a native
+   * --space-1..--space-24 scale (confirmed by reading the file --
+   * PR 1 did not know this and duplicated the same values as new
+   * literals, which is exactly the "duplicate a token under a new
+   * name" anti-pattern the v2 design spec's Phase 7 rule 8 warns
+   * against). Fixed here: these are now pure var() aliases onto
+   * the native scale, not new literals, and extended to cover the
+   * native scale's full range (native goes to --space-24).
    * ============================================================ */
-  --v2-space-1: 0.25rem;  /* 4px */
-  --v2-space-2: 0.5rem;   /* 8px */
-  --v2-space-3: 0.75rem;  /* 12px */
-  --v2-space-4: 1rem;     /* 16px */
-  --v2-space-5: 1.25rem;  /* 20px */
-  --v2-space-6: 1.5rem;   /* 24px */
-  --v2-space-8: 2rem;     /* 32px */
-  --v2-space-10: 2.5rem;  /* 40px */
-  --v2-space-12: 3rem;    /* 48px */
+  --v2-space-1: var(--space-1);   /* 4px */
+  --v2-space-2: var(--space-2);   /* 8px */
+  --v2-space-3: var(--space-3);   /* 12px */
+  --v2-space-4: var(--space-4);   /* 16px */
+  --v2-space-5: var(--space-5);   /* 20px */
+  --v2-space-6: var(--space-6);   /* 24px */
+  --v2-space-8: var(--space-8);   /* 32px */
+  --v2-space-10: var(--space-10); /* 40px */
+  --v2-space-12: var(--space-12); /* 48px */
+  --v2-space-16: var(--space-16); /* 64px */
+  --v2-space-20: var(--space-20); /* 80px */
+  --v2-space-24: var(--space-24); /* 96px */
 
   /* ============================================================
    * TYPOGRAPHY ALIASES
