@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "./aura-v2-tokens.css";
 
 :root {
   --foreground: #f0ead6;
