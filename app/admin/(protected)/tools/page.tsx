@@ -86,7 +86,14 @@ export default async function ToolsPage() {
                 className="min-h-10 w-44 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
               />,
               <label key="enabled" className="flex min-h-10 items-center justify-center gap-2">
-                <input type="checkbox" form={formId} name="is_enabled" defaultChecked={tool.is_enabled} className="h-4 w-4" />
+                <input
+                  type="checkbox"
+                  form={formId}
+                  name="is_enabled"
+                  defaultChecked={tool.is_enabled}
+                  className="h-4 w-4"
+                  aria-label={`${tool.name} enabled`}
+                />
               </label>,
               new Date(tool.updated_at).toLocaleDateString(),
               <AdminSubmitButton
