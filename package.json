@@ -16,6 +16,7 @@
     "verify:lumeo2-foundation": "node scripts/verify-lumeo-2-foundation.mjs",
     "verify:lumeo2-public-experience": "node scripts/verify-lumeo-2-public-experience.mjs",
     "verify:lumeo2-workspaces": "node scripts/verify-lumeo-2-workspaces.mjs",
+    "verify:release": "node scripts/verify-release.mjs",
     "test": "node --no-warnings --test --experimental-strip-types",
     "test:compression-target": "node --no-warnings --test --experimental-strip-types tests/compression-target.test.ts",
     "copy-ffmpeg-core": "node scripts/copy-ffmpeg-core.mjs",
