@@ -141,7 +141,7 @@ export const lumeoTools: LumeoTool[] = [
       { label: "Watermark", slug: "watermark", route: "/pdf/watermark", live: true },
       { label: "Page numbers", slug: "page-numbers", live: false },
       { label: "Header & footer", slug: "header-footer", live: false },
-      { label: "Crop", slug: "crop", live: false },
+      { label: "Crop", slug: "crop", route: "/pdf/crop", live: true },
       { label: "Bookmarks", slug: "bookmarks", live: false },
     ],
   },
