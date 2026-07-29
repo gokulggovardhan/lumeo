@@ -5,9 +5,8 @@
 // (load fresh, never mutate the pdfjs-rendered copy; per-page try/catch
 // with skippedPages reported rather than losing the whole export).
 //
-// Coordinate conversion logic is duplicated from lib/pdf/pageCoordinates.ts
-// (the canonical, independently-tested definition) rather than imported --
-// this module must load directly under Node's test runner (no path-alias
+// Coordinate conversion logic below is a deliberate duplicate rather than
+// a shared import -- this module must load directly under Node's test runner (no path-alias
 // or loader support), while a relative ".ts"-extensioned value import
 // breaks Next.js's production type-check for any file a real app component
 // also imports. Same constraint and same resolution already documented in
