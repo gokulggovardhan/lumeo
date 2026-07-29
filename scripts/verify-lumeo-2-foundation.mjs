@@ -300,7 +300,11 @@ try {
   assert(mergeTool.includes("PDFDocument.create()") && mergeTool.includes("copyPages"), "Merge PDF algorithm markers changed unexpectedly.");
   assert(splitTool.includes("JSZip") && splitTool.includes("copyPages"), "Split PDF algorithm markers changed unexpectedly.");
   assert(compressTool.includes("Target Size Studio") && compressTool.includes("Under 100 KB") && compressTool.includes("Under 200 KB") && compressTool.includes("Under 400 KB"), "Compress Target Size Studio markers changed unexpectedly.");
-  assert(!/processing_started|processing_succeeded|processing_failed|download_started/.test([mergeTool, splitTool, compressTool].join("\n")), "Analytics lifecycle events must not be reintroduced.");
+  // Operation lifecycle events were originally postponed past this run, but
+  // were verified live in production across all 14 PDF tools as of
+  // 2026-07-29 -- this check was updated from "must not be reintroduced" to
+  // "must be present" to match reality (see scripts/verify-privacy-analytics.mjs).
+  assert(/processing_started|processing_succeeded|processing_failed|download_started/.test([mergeTool, splitTool, compressTool].join("\n")), "Analytics lifecycle events must be present.");
 
   const scannedSource = [ui, workspace, publicShell, footer, controlShell, sidebar, mobileNav, guidance, showcase, tokens, docs].join("\n");
   assert(!/console\.(log|info|warn|error)/.test(scannedSource), "Production debug logging must not be added.");

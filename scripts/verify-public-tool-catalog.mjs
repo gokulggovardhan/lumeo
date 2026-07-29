@@ -9,10 +9,11 @@ const newFiles = [
   "lib/public-catalog/types.ts",
   "lib/public-catalog/data.ts",
   "lib/public-catalog/fallback.ts",
-  "components/public/PublicPdfToolsMenu.tsx",
+  // PublicPdfToolsMenu.tsx was renamed to PublicPdfToolsMenuClient.tsx; no
+  // separate loading.tsx exists under app/pdf-tools/ (removed since the
+  // initial rollout -- page.tsx and error.tsx cover the route today).
   "components/public/PublicPdfToolsMenuClient.tsx",
   "app/pdf-tools/page.tsx",
-  "app/pdf-tools/loading.tsx",
   "app/pdf-tools/error.tsx",
   "docs/PUBLIC_TOOL_CATALOG.md",
 ];
@@ -69,11 +70,19 @@ try {
     "Fallback order must be Merge, Split, Compress, JPG to PDF, PDF to JPG.",
   );
 
+  // The 5-slot admin-configured homepage (getPublicHomepageTools /
+  // homepage_tool_slots) was deliberately retired in favor of a fixed,
+  // flat catalog grid driven by lib/tools/catalog.ts -- see the header
+  // comment in components/pdf/PdfToolLauncher.tsx for the rationale.
   const launcher = read("components/pdf/PdfToolLauncher.tsx");
-  assert(launcher.includes("getPublicHomepageTools"), "Homepage launcher must use configured public homepage tools.");
-  assert(launcher.includes("configuredTools.slice(0, 5)"), "Homepage launcher must use exactly five configurable slots.");
-  assert(launcher.includes("All PDF Tools"), "Homepage launcher must include permanent All PDF Tools card.");
-  assert(launcher.includes("/pdf-tools"), "All PDF Tools card must link to /pdf-tools.");
+  assert(launcher.includes("getPublicPdfCatalog") && launcher.includes("resolveLumeoTools"), "Homepage launcher must use the public PDF catalog and resolved Lumeo tools.");
+  assert(launcher.includes("buildTiles(resolved)"), "Homepage launcher must build tiles from the resolved catalog.");
+  // The permanent "All PDF Tools" card no longer lives in the launcher itself
+  // -- the homepage now shows every live tool directly, so the "see all"
+  // link moved to the public footer instead.
+  const footer = read("components/PublicFooter.tsx");
+  assert(footer.includes("All PDF Tools"), "Public footer must include a permanent All PDF Tools link.");
+  assert(footer.includes("/pdf-tools"), "All PDF Tools link must point to /pdf-tools.");
 
   const menu = read("components/public/PublicPdfToolsMenuClient.tsx");
   assert(menu.includes("PDF Tools"), "Navigation label must be PDF Tools.");
@@ -104,7 +113,7 @@ try {
   console.log("PASS public RPC functions and grants exist");
   console.log("PASS no direct anon table grants or public writes");
   console.log("PASS public catalog types, data layer, and fallback exist");
-  console.log("PASS homepage has five configured slots plus permanent All PDF Tools");
+  console.log("PASS homepage launcher renders the resolved catalog as a flat tile grid");
   console.log("PASS /pdf-tools route exists");
   console.log("PASS PDF Tools menu accessibility markers exist");
   console.log("PASS no PDF processing engines, analytics tracking, or service-role usage changed");
