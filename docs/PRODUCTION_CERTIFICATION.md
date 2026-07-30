@@ -39,10 +39,16 @@ code level only (`lib/admin/auth.ts`, `lib/admin/permissions.ts`,
 
 ## Analytics
 
-**Blocked, not completed.** See [ANALYTICS_CERTIFICATION.md](./ANALYTICS_CERTIFICATION.md).
-Dashboard-vs-raw-table reconciliation requires either admin credentials
-or a Supabase service-role key, neither of which was available. RLS was
-confirmed to correctly block anon access to raw `analytics_events`.
+**Reconciled.** See [ANALYTICS_CERTIFICATION.md](./ANALYTICS_CERTIFICATION.md).
+The project owner ran the raw-table queries themselves (Supabase SQL
+editor, own credentials -- no key was shared with this session) and
+pasted back the results. All 9 checkable "Today" dashboard metrics
+(unique visitors, events, page views, tool opens, processing started/
+succeeded/failed, success rate, downloads) matched the raw
+`analytics_events` table exactly. RLS was separately confirmed to
+correctly block anon access to raw `analytics_events`. Wider-window and
+per-widget (trend chart, device/browser breakdowns) reconciliation is
+still open -- see that document's "What's still not covered" section.
 
 ## SEO
 

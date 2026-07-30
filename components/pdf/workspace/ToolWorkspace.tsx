@@ -128,7 +128,16 @@ export function ToolPrivacyNote({ compact = false }: { compact?: boolean }) {
 
 export function ToolActionBar({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky bottom-3 z-10 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--lumeo-ink-850)] p-3 shadow-[var(--shadow-lg)]">
+    // Aura OS v2 (PR 6): genuinely floating chrome (sticky over scrolling
+    // canvas content) -- exactly the "floating action area" glass
+    // candidate named in the v2 design spec. Was an opaque solid fill
+    // (--lumeo-ink-850, a legacy-generation token) with a plain border;
+    // now real glass (PR 2's aura-glass-regular), with the original
+    // shadow-lg weight preserved via --v2-elevation-4 (the same value,
+    // just no longer overridden by the glass tier's own lighter shadow)
+    // so this bar keeps reading as more elevated than the dropdown/menu
+    // surfaces that use the unmodified glass-regular shadow.
+    <div className="aura-glass-regular sticky bottom-3 z-10 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-4)]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">{children}</div>
     </div>
   );
@@ -224,6 +233,64 @@ export function L2ToolPageHeader({
   );
 }
 
+// Aura OS v2 (PR 10) -- the reference desktop-workspace shell: sticky glass
+// header, three-panel grid (queue / main workspace / inspector), and a
+// floating contextual toolbar. Introduced for the Merge PDF redesign but
+// deliberately generic (no Merge-specific copy or state) so the next tool
+// redesigns in this series reuse it rather than each hand-rolling their own
+// sticky/glass chrome.
+
+export function L2WorkspaceHeader({
+  title,
+  description,
+  categoryLabel = "PDF TOOL",
+  action,
+}: {
+  title: string;
+  description: string;
+  categoryLabel?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <header className="l2-workspace-header aura-glass-thin sticky top-3 z-20 flex flex-col justify-between gap-4 rounded-[var(--radius-2xl)] px-5 py-4 shadow-[var(--v2-elevation-2)] md:flex-row md:items-center">
+      <div className="min-w-0">
+        <p className="aura-text-label text-[var(--text-accent)]">{categoryLabel}</p>
+        <h1 className="mt-1.5 truncate font-serif text-[clamp(1.25rem,2vw,1.5rem)] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]">
+          {title}
+        </h1>
+        <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">{description}</p>
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </header>
+  );
+}
+
+export function L2WorkspaceToolbar({ children }: { children: ReactNode }) {
+  return (
+    <div className="l2-workspace-toolbar aura-glass-thin sticky top-[5.75rem] z-10 flex flex-wrap items-center gap-2.5 rounded-[var(--radius-xl)] px-3.5 py-2.5 shadow-[var(--v2-elevation-1)]">
+      {children}
+    </div>
+  );
+}
+
+export function L2WorkspaceGrid({
+  queue,
+  main,
+  inspector,
+}: {
+  queue: ReactNode;
+  main: ReactNode;
+  inspector: ReactNode;
+}) {
+  return (
+    <div className="l2-workspace-grid grid min-w-0 gap-5 lg:grid-cols-[260px_minmax(0,1fr)_320px] xl:gap-6">
+      <div className="l2-workspace-queue grid min-w-0 auto-rows-min gap-4 lg:order-1">{queue}</div>
+      <div className="l2-workspace-main grid min-w-0 auto-rows-min gap-4 lg:order-2">{main}</div>
+      <div className="l2-workspace-inspector min-w-0 lg:order-3">{inspector}</div>
+    </div>
+  );
+}
+
 export function L2ToolWorkspace({ children }: { children: ReactNode }) {
   return (
     <section className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] gap-5">
@@ -250,7 +317,13 @@ export function L2ToolSettingsPanel({
   action?: ReactNode;
 }) {
   return (
-    <aside className="l2-tool-settings-panel aura-luminous-card rounded-[var(--radius-2xl)] p-5 lg:sticky lg:top-24 lg:self-start">
+    // Aura OS v2 (PR 6): the inspector/settings panel is sticky
+    // (lg:sticky lg:top-24), genuinely floating over the canvas/file-list
+    // column on desktop for all 13 live tools that use this component --
+    // the clearest real "inspector" glass candidate in the workspace.
+    // Was aura-luminous-card (an opaque gradient), now real glass
+    // consistent with the header/menu/action-bar treatment.
+    <aside className="l2-tool-settings-panel aura-glass-regular rounded-[var(--radius-2xl)] p-5 lg:sticky lg:top-24 lg:self-start">
       <AuraSectionHeader title={title} description={description} />
       <div className="mt-5 grid gap-4">{children}</div>
       {action ? <div className="l2-tool-action-area mt-5">{action}</div> : null}
@@ -374,7 +447,7 @@ export function L2UploadStage({
         event.stopPropagation();
         openFileChooser();
       }}
-      className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-200 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+      className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] sm:w-auto"
     >
       {buttonLabel ?? (multiple ? "Select PDFs" : "Select PDF")}
     </button>
@@ -573,13 +646,13 @@ export function L2AdvancedDisclosure({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-xl)] px-4 py-3 text-left font-black text-[var(--text-primary)] transition hover:bg-[rgb(var(--paper-rgb)/0.055)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-xl)] px-4 py-3 text-left font-black text-[var(--text-primary)] transition hover:bg-[rgb(var(--paper-rgb)/0.055)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
       >
         <span>
           {title}
           {description ? <span className="mt-1 block text-xs font-bold leading-5 text-[var(--text-secondary)]">{description}</span> : null}
         </span>
-        <span aria-hidden="true" className={cx("transition duration-[var(--motion-standard)]", open && "rotate-180")}>⌄</span>
+        <span aria-hidden="true" className={cx("transition duration-[var(--v2-motion-normal)]", open && "rotate-180")}>⌄</span>
       </button>
       {open ? <div className="aura-menu-reveal px-4 pb-4">{children}</div> : null}
     </section>

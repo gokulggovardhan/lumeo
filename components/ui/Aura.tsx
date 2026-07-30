@@ -67,7 +67,7 @@ export function AuraButton({
       {...props}
       disabled={disabled || loading}
       className={cx(
-        "lumeo2-button-press inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] border font-extrabold transition duration-[var(--motion-standard)] ease-[var(--ease-standard)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-60",
+        "lumeo2-button-press inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] border font-extrabold transition duration-[var(--v2-motion-normal)] ease-[var(--v2-ease-standard)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-strong)] active:scale-[var(--v2-interactive-active-scale)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]",
         buttonVariants[variant],
         sizeClasses[size],
         className,
@@ -91,7 +91,7 @@ export function AuraIconButton({
       aria-label={label}
       title={label}
       className={cx(
-        "lumeo2-button-press inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(var(--paper-rgb),0.07)] text-[var(--text-secondary)] transition duration-[var(--motion-standard)] hover:border-[var(--border-premium)] hover:bg-[rgba(var(--paper-rgb),0.12)] active:scale-[0.96] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]",
+        "lumeo2-button-press inline-flex min-h-11 min-w-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[rgba(var(--paper-rgb),0.07)] text-[var(--text-secondary)] transition duration-[var(--v2-motion-normal)] hover:border-[var(--border-premium)] hover:bg-[rgba(var(--paper-rgb),0.12)] active:scale-[var(--v2-active-scale-icon)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-strong)]",
         className,
       )}
     >
@@ -109,8 +109,8 @@ export function AuraCard({ className, interactive = false, ...props }: HTMLAttri
     <div
       {...props}
       className={cx(
-        "aura-luminous-card rounded-[var(--radius-xl)] p-5 transition duration-[var(--motion-standard)]",
-        interactive && "lumeo2-soft-card-lift focus-within:shadow-[var(--shadow-focus)]",
+        "aura-luminous-card rounded-[var(--radius-xl)] p-5 transition duration-[var(--v2-motion-normal)]",
+        interactive && "lumeo2-soft-card-lift focus-within:shadow-[var(--v2-elevation-focus)]",
         className,
       )}
     />
@@ -123,7 +123,7 @@ export function AuraPanel({ className, ...props }: HTMLAttributes<HTMLElement>) 
 
 function fieldClass(className?: string) {
   return cx(
-    "min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] transition duration-[var(--motion-standard)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-[rgba(var(--champagne-rgb),0.14)] disabled:cursor-not-allowed disabled:opacity-60",
+    "min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm font-semibold text-[var(--text-primary)] placeholder:text-[var(--text-subtle)] transition duration-[var(--v2-motion-normal)] focus:border-[var(--border-focus)] focus:outline-none focus:ring-4 focus:ring-[var(--v2-focus-ring-field)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]",
     className,
   );
 }
@@ -212,7 +212,7 @@ export function AuraSwitch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onCheckedChange?.(!checked)}
-      className={cx("flex min-h-11 w-full items-center justify-between gap-4 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.045)] p-3 text-left transition hover:border-[var(--border-premium)] disabled:cursor-not-allowed disabled:opacity-60", className)}
+      className={cx("flex min-h-11 w-full items-center justify-between gap-4 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.045)] p-3 text-left transition hover:border-[var(--border-premium)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]", className)}
     >
       <span>
         <span className="block text-sm font-extrabold text-[var(--text-primary)]">{label}</span>
@@ -336,7 +336,7 @@ export function AuraTooltip({ label, children }: { label: string; children: Reac
   return (
     <span className="group relative inline-flex">
       {children}
-      <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-floating)] px-2 py-1 text-xs font-bold text-[var(--lumeo-ink-950)] shadow-[var(--shadow-floating)] group-hover:block group-focus-within:block">
+      <span role="tooltip" className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--v2-surface-floating)] px-2 py-1 text-xs font-bold text-[var(--lumeo-ink-950)] shadow-[var(--v2-elevation-floating)] group-hover:block group-focus-within:block">
         {label}
       </span>
     </span>
@@ -348,7 +348,7 @@ export function AuraPopover({ trigger, children }: { trigger: ReactNode; childre
   return (
     <div className="relative inline-flex">
       <span onClick={() => setOpen((value) => !value)}>{trigger}</span>
-      {open ? <div className="aura-menu-reveal absolute right-0 top-full z-30 mt-2 min-w-64 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--surface-floating)] p-3 shadow-[var(--shadow-lg)]">{children}</div> : null}
+      {open ? <div className="aura-menu-reveal absolute right-0 top-full z-30 mt-2 min-w-64 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--v2-surface-floating)] p-3 shadow-[var(--v2-elevation-4)]">{children}</div> : null}
     </div>
   );
 }
@@ -396,8 +396,8 @@ export function AuraDialog({
 
   if (!open) return null;
   return (
-    <div role="dialog" aria-modal="true" aria-labelledby="aura-dialog-title" className="fixed inset-0 z-50 grid place-items-center bg-[var(--surface-overlay)] p-4">
-      <div className="aura-scale-in w-full max-w-lg rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-floating)] p-6 shadow-[var(--shadow-xl)]">
+    <div role="dialog" aria-modal="true" aria-labelledby="aura-dialog-title" className="fixed inset-0 z-50 grid place-items-center bg-[var(--v2-surface-overlay)] p-4">
+      <div className="aura-scale-in w-full max-w-lg rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--v2-surface-floating)] p-6 shadow-[var(--v2-elevation-5)]">
         <div className="flex items-center justify-between gap-4">
           <h2 id="aura-dialog-title" className="text-xl font-extrabold text-[var(--lumeo-paper-50)]">{title}</h2>
           <AuraIconButton label="Close dialog" onClick={onClose}>×</AuraIconButton>
@@ -430,8 +430,8 @@ export function AuraDrawer({
 
   if (!open) return null;
   return (
-    <aside role="dialog" aria-modal="true" aria-labelledby="aura-drawer-title" className="fixed inset-0 z-50 bg-[var(--surface-overlay)]">
-      <div className="aura-drawer-enter ml-auto h-full w-full max-w-md border-l border-[var(--border-subtle)] bg-[var(--surface-floating)] p-6 shadow-[var(--shadow-xl)]">
+    <aside role="dialog" aria-modal="true" aria-labelledby="aura-drawer-title" className="fixed inset-0 z-50 bg-[var(--v2-surface-overlay)]">
+      <div className="aura-drawer-enter ml-auto h-full w-full max-w-md border-l border-[var(--border-subtle)] bg-[var(--v2-surface-floating)] p-6 shadow-[var(--v2-elevation-5)]">
         <div className="flex items-center justify-between gap-4">
           <h2 id="aura-drawer-title" className="text-xl font-extrabold text-[var(--lumeo-paper-50)]">{title}</h2>
           <AuraIconButton label="Close drawer" onClick={onClose}>×</AuraIconButton>
@@ -444,7 +444,7 @@ export function AuraDrawer({
 
 export function AuraToast({ tone = "info", title, message }: { tone?: Tone; title: string; message?: string }) {
   return (
-    <div role="status" className={cx("rounded-[var(--radius-xl)] border p-4 shadow-[var(--shadow-md)]", toneClasses[tone])}>
+    <div role="status" className={cx("rounded-[var(--radius-xl)] border p-4 shadow-[var(--v2-elevation-3)]", toneClasses[tone])}>
       <p className="font-extrabold">{title}</p>
       {message ? <p className="mt-1 text-sm opacity-80">{message}</p> : null}
     </div>
@@ -783,11 +783,19 @@ export function L2PublicHeader({ children, className, ...props }: HTMLAttributes
     <header
       {...props}
       className={cx(
-        "l2-public-header sticky top-0 z-40 bg-[var(--atelier-canvas-950)] px-4 py-2.5 sm:px-6",
+        "l2-public-header sticky top-0 z-40 bg-[var(--atelier-canvas-950)] px-4 py-3 sm:px-6",
         className,
       )}
     >
-      <div className="mx-auto max-w-[var(--container-wide)] rounded-[var(--radius-xl)] bg-[linear-gradient(180deg,rgba(47,50,44,0.96),rgba(20,22,20,0.94))] px-3 shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,253,248,0.08)]">
+      {/* Aura OS v2 (PR 5): floating glass header. Was an opaque
+          gradient panel with no backdrop-filter at all -- swapped for
+          the v2 glass system (aura-glass-regular, from PR 2's utility
+          layer) so content actually blurs behind the sticky header, a
+          real premium/floating feel instead of a solid painted block.
+          Border and shadow now come from the same glass tier for a
+          coherent, single-source "clean border + premium shadow"
+          rather than a hand-tuned one-off box-shadow. */}
+      <div className="aura-glass-regular mx-auto max-w-[var(--container-wide)] rounded-[var(--radius-xl)] px-3">
         {children}
       </div>
     </header>
@@ -804,8 +812,15 @@ export function L2PublicNavLink({
       {...props}
       aria-current={active ? "page" : props["aria-current"]}
       className={cx(
-        "inline-flex min-h-11 items-center rounded-[var(--radius-md)] px-3 text-sm font-extrabold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.075)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]",
-        active && "bg-[rgba(var(--paper-rgb),0.08)] text-[var(--text-primary)]",
+        "inline-flex min-h-11 items-center rounded-[var(--radius-md)] px-3 text-sm font-extrabold text-[var(--text-secondary)] transition duration-[var(--v2-motion-fast)] hover:bg-[rgba(var(--paper-rgb),0.075)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]",
+        // Real current-page indicator (Aura OS v2 PR 5): a bottom accent
+        // bar plus the existing tint/text treatment, so "active" reads
+        // clearly at a glance without introducing a new color -- reuses
+        // the same border-focus token every other active/selected state
+        // in the app already uses.
+        active
+          ? "bg-[rgba(var(--paper-rgb),0.08)] text-[var(--text-primary)] shadow-[inset_0_-2px_0_var(--border-focus)]"
+          : null,
         className,
       )}
     />
@@ -819,7 +834,12 @@ export const L2MenuSurface = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEl
         {...props}
         ref={ref}
         className={cx(
-          "l2-menu-surface rounded-[var(--radius-2xl)] bg-[var(--surface-floating)] p-3 shadow-[var(--shadow-xl)] ring-1 ring-[var(--border-hairline)]",
+          // Aura OS v2 (PR 5): matches the header's glass treatment for a
+          // consistent design language between the sticky nav and the
+          // dropdown/mobile drawer it opens -- was an opaque surface
+          // color with no blur, now real glass (PR 2's aura-glass-regular
+          // utility) with the same border/shadow tier the header uses.
+          "l2-menu-surface aura-glass-regular rounded-[var(--radius-2xl)] p-3",
           className,
         )}
       />

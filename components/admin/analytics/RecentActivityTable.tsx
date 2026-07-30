@@ -1,6 +1,7 @@
 import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import type { RecentActivityRow } from "@/lib/admin/data";
+import { formatAdminDateTime } from "@/lib/admin/timezone";
 
 export const RECENT_ACTIVITY_PREVIEW_SIZE = 15;
 export const RECENT_ACTIVITY_PAGE_SIZE = 25;
@@ -15,7 +16,7 @@ const EVENT_LABEL: Record<string, string> = {
 };
 
 function formatEventTime(value: string) {
-  return new Date(value).toLocaleString("en", { dateStyle: "medium", timeStyle: "medium" });
+  return formatAdminDateTime(value, "medium");
 }
 
 export function RecentActivityTable({ rows }: { rows: RecentActivityRow[] }) {

@@ -27,6 +27,7 @@ import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
   L2FileCard,
+  L2PrivacyNote,
   L2ToolMainColumn,
   L2ToolSettingsPanel,
   L2ToolWorkspace,
@@ -50,6 +51,7 @@ import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import {
   hasPdfMagicBytes,
@@ -543,6 +545,7 @@ export default function SignPdfTool() {
       setDownloadUrl(url);
       setDownloadName(sanitizePdfFileName(outputName));
       track({ eventName: "processing_succeeded", toolSlug: "sign", durationMs: performance.now() - startedAt, success: true });
+      recordRecentFile({ tool: "sign", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
     } catch {
       setError("Signing failed. Try a smaller file or fewer elements.");
       pushToast("Could not sign the PDF. Please try again.", "error");
@@ -580,9 +583,7 @@ export default function SignPdfTool() {
             }}
           />
         </div>
-        <p className="mx-auto flex items-center gap-1.5 text-xs font-semibold text-[var(--text-primary)]/44">
-          🔒 Your PDF stays on your device.
-        </p>
+        <L2PrivacyNote />
         {error ? (
           <div role="alert" className="mt-4 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}

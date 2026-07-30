@@ -5,6 +5,7 @@ import { ArrowLeft, Inbox as InboxIcon, Loader2, Mail, MailOpen, Phone, Search, 
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { deleteFeedbackQuery } from "@/app/admin/(protected)/inbox/actions";
 import { createClient } from "@/lib/supabase/client";
+import { formatAdminDateTime } from "@/lib/admin/timezone";
 import type { FeedbackQuery, FeedbackQueryType } from "@/lib/supabase/database.types";
 
 type TypeFilter = "all" | FeedbackQueryType;
@@ -19,11 +20,11 @@ function relativeTime(iso: string) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString();
+  return formatAdminDateTime(iso);
 }
 
 function absoluteTime(iso: string) {
-  return new Date(iso).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" });
+  return formatAdminDateTime(iso);
 }
 
 export function InboxClient({

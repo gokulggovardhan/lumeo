@@ -24,6 +24,7 @@ const rolloutDoc = read("docs/LUMEO_AURA_ROLLOUT.md");
 const lumeo2Doc = read("docs/LUMEO_2_DESIGN_SYSTEM.md");
 const lumeo2Verifier = read("scripts/verify-lumeo-2-foundation.mjs");
 const publicExperienceVerifier = read("scripts/verify-lumeo-2-public-experience.mjs");
+const v2Tokens = read("app/aura-v2-tokens.css");
 const mergePage = read("app/pdf/merge/page.tsx");
 const splitPage = read("app/pdf/split/page.tsx");
 const compressPage = read("app/pdf/compress/page.tsx");
@@ -93,7 +94,12 @@ test("Lumeo Atelier retheme keeps soft semantic tokens and interaction contracts
   assert.ok(css.includes("rgb(var(--atelier-sage-rgb) / 0.08)"));
   assert.ok(css.includes("rgb(var(--atelier-brass-rgb) / 0.06)"));
   assert.ok(css.includes("background: var(--surface-canvas);"));
-  assert.ok(ui.includes("rgba(var(--champagne-rgb),0.2)"));
+  // AuraButton/AuraIconButton's focus ring was migrated (Aura OS v2 PR 3)
+  // from a literal rgba() to a named --v2-focus-ring-strong token -- the
+  // computed value is unchanged (verified below: the token itself resolves
+  // to the exact same rgba this test previously pinned as a literal).
+  assert.ok(ui.includes("var(--v2-focus-ring-strong)"));
+  assert.ok(v2Tokens.includes("--v2-focus-ring-strong: rgba(var(--champagne-rgb), 0.2);"));
   assert.ok(ui.includes("rgba(var(--atelier-sage-rgb),0.09)"));
   assert.doesNotMatch(ui, /rgba\(var\(--sky-rgb\)/);
   assert.ok(showcase.includes("Lumeo Atelier"));
@@ -393,18 +399,35 @@ test("Run 3 PDF workspace rules preserve algorithms and Analytics V1 scope", () 
 });
 
 test("Run 4 live PDF tools use shared workspace primitives internally", () => {
-  const tools = [
-    ["Merge", read("components/pdf/MergePdfTool.tsx")],
-    ["Split", read("components/pdf/SplitPdfTool.tsx")],
-    ["Compress", read("components/pdf/CompressPdfTool.tsx")],
-  ] as const;
+  // Compress still uses the pre-Aura-OS-v2-PR10 workspace primitives
+  // (two-column L2ToolWorkspace/L2ToolMainColumn/L2ToolSettingsPanel/
+  // L2ActionArea). Merge (PR10) and Split (PR11) were deliberately migrated
+  // to the newer three-panel workspace shell (L2WorkspaceHeader/
+  // L2WorkspaceGrid/L2WorkspaceToolbar/ToolActionBar) -- they're
+  // intentionally on a different, newer primitive set than Compress until
+  // it's redesigned too, not a regression.
+  const legacyWorkspaceTools = [["Compress", read("components/pdf/CompressPdfTool.tsx")]] as const;
 
-  for (const [name, source] of tools) {
+  for (const [name, source] of legacyWorkspaceTools) {
     for (const primitive of ["L2UploadStage", "L2ToolWorkspace", "L2ToolMainColumn", "L2ToolSettingsPanel", "L2ActionArea", "L2PrivacyNote"]) {
       assert.ok(source.includes(primitive), `${name} should use ${primitive}`);
     }
     assert.ok(source.includes("l2-tool-empty-state"), `${name} should use compact empty state class`);
     assert.ok(source.includes("l2-tool-deep-workspace"), `${name} should use deep workspace class`);
+    assert.ok(source.includes("lumeo-primary-action"), `${name} should mark its primary actions`);
+  }
+
+  const v2WorkspaceTools = [
+    ["Merge", read("components/pdf/MergePdfTool.tsx")],
+    ["Split", read("components/pdf/SplitPdfTool.tsx")],
+  ] as const;
+
+  for (const [name, source] of v2WorkspaceTools) {
+    for (const primitive of ["L2UploadStage", "L2WorkspaceHeader", "L2WorkspaceGrid", "L2WorkspaceToolbar", "ToolActionBar", "L2PrivacyNote"]) {
+      assert.ok(source.includes(primitive), `${name} should use ${primitive}`);
+    }
+    assert.ok(source.includes("l2-workspace"), `${name} should use the v2 workspace empty-state class`);
+    assert.ok(source.includes("l2-workspace-deep"), `${name} should use the v2 deep workspace class`);
     assert.ok(source.includes("lumeo-primary-action"), `${name} should mark its primary actions`);
   }
 
@@ -431,7 +454,7 @@ test("Run 4 live PDF tool rules remain tool-specific and truthful", () => {
   assert.ok(mergeTool.includes("One combined PDF using the file order shown."));
   assert.ok(mergeTool.includes("Move ${item.file.name} up"));
   assert.ok(mergeTool.includes("Remove ${item.file.name}"));
-  assert.doesNotMatch(mergeTool.match(/<L2ToolSettingsPanel title="Merge options"[\s\S]*?<\/L2ToolSettingsPanel>/)?.[0] ?? "", /metadata removal|archive/i);
+  assert.doesNotMatch(mergeTool.match(/inspector=\{[\s\S]*?Merge options[\s\S]*?<\/div>\s*\}/)?.[0] ?? "", /metadata removal|archive/i);
 
   for (const splitMode of ['"extract"', '"ranges"', '"everyPage"', '"everyN"', '"remove"']) {
     assert.ok(splitTool.includes(splitMode), `Split should keep ${splitMode}`);

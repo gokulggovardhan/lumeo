@@ -9,14 +9,10 @@ import Link from "next/link";
 import { AnalyticsTrendChart } from "@/components/admin/analytics/AnalyticsTrendChart";
 import { RecentActivityTable, RECENT_ACTIVITY_PREVIEW_SIZE } from "@/components/admin/analytics/RecentActivityTable";
 import { collapseUnknownLocationRuns, getAnalyticsSummary, getRecentAnalyticsEvents } from "@/lib/admin/data";
+import { formatAdminDateTime } from "@/lib/admin/timezone";
 
 function formatDate(value: string | null) {
-  return value
-    ? new Date(value).toLocaleString("en", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      })
-    : "None yet";
+  return value ? formatAdminDateTime(value) : "None yet";
 }
 
 export default async function AnalyticsPage() {
@@ -203,7 +199,7 @@ export default async function AnalyticsPage() {
           <section className="grid gap-4 lg:grid-cols-1">
             <AdminSectionCard
               title="Seven-day activity table"
-              description="Discovery events only. Operation lifecycle metrics are planned."
+              description="Discovery events only, IST calendar days (12:00 AM - 11:59 PM Asia/Kolkata). Operation lifecycle metrics are planned."
             >
               <AdminDataTable
                 columns={["Date", "Unique Visitors", "Page Views", "Tool Opens", "Events"]}

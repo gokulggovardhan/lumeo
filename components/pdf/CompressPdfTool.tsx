@@ -46,6 +46,7 @@ import { loadPdfJsModule, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
+import { recordRecentFile } from "@/lib/recent-files";
 import {
   hasPdfMagicBytes,
   isPdfNamedFile,
@@ -921,6 +922,12 @@ export default function CompressPdfTool() {
         toolSlug: "compress",
         durationMs: performance.now() - startedAt,
         success: true,
+      });
+      recordRecentFile({
+        tool: "compress",
+        filename: outputFileName,
+        fileSize: blob.size,
+        pageCount: analysis.pageCount,
       });
     } catch (compressError) {
       if (currentSession !== sessionRef.current) return;

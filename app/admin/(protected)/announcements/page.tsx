@@ -10,13 +10,8 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getAnnouncements } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageAnnouncements } from "@/lib/admin/permissions";
+import { formatAdminDateTime, utcIsoToIstInputValue } from "@/lib/admin/timezone";
 import { deleteAnnouncement, saveAnnouncement, toggleAnnouncement } from "@/app/admin/(protected)/announcements/actions";
-
-function toLocalInputValue(value: string | null) {
-  if (!value) return "";
-  // datetime-local inputs need "YYYY-MM-DDTHH:mm", not a full ISO string.
-  return value.slice(0, 16);
-}
 
 export default async function AnnouncementsPage({
   searchParams,
@@ -39,7 +34,7 @@ export default async function AnnouncementsPage({
       {canEdit && (
         <AdminSectionCard
           title={editing ? `Edit "${editing.title}"` : "Create announcement"}
-          description="Keep messages concise and avoid urgent marketing language."
+          description="Keep messages concise and avoid urgent marketing language. Start/end times are IST (Asia/Kolkata)."
         >
           <form action={asAdminFormAction(saveAnnouncement)} className="grid gap-4 md:grid-cols-2">
             {editing && <input type="hidden" name="id" value={editing.id} />}
@@ -55,11 +50,11 @@ export default async function AnnouncementsPage({
             <AdminFormField label="Message" name="message" defaultValue={editing?.message ?? ""} />
             <AdminFormField label="Link label" name="link_label" defaultValue={editing?.link_label ?? ""} />
             <AdminFormField label="Link URL" name="link_url" defaultValue={editing?.link_url ?? ""} help="Must begin with / or https://." />
-            <AdminFormField label="Starts at" name="starts_at" type="datetime-local" defaultValue={toLocalInputValue(editing?.starts_at ?? null)} />
-            <AdminFormField label="Ends at" name="ends_at" type="datetime-local" defaultValue={toLocalInputValue(editing?.ends_at ?? null)} />
+            <AdminFormField label="Starts at (IST)" name="starts_at" type="datetime-local" defaultValue={utcIsoToIstInputValue(editing?.starts_at ?? null)} />
+            <AdminFormField label="Ends at (IST)" name="ends_at" type="datetime-local" defaultValue={utcIsoToIstInputValue(editing?.ends_at ?? null)} />
             <label className="flex min-h-11 items-center gap-3 text-sm font-semibold text-[#F0EAD6]">
-              <input type="checkbox" name="is_active" defaultChecked={editing?.is_active ?? false} className="h-4 w-4" />
-              Active
+              <input type="checkbox" name="is_active" defaultChecked={editing ? editing.is_active : true} className="h-4 w-4" />
+              Active (shows on lumeo.in immediately, unless scheduled otherwise)
             </label>
             <div className="flex items-center gap-3 md:col-span-2">
               <AdminSubmitButton pendingLabel="Saving announcement...">{editing ? "Save changes" : "Create announcement"}</AdminSubmitButton>
@@ -79,7 +74,7 @@ export default async function AnnouncementsPage({
             <div key="title"><p className="font-semibold text-[#F0EAD6]">{announcement.title}</p><p className="text-xs text-[#F0EAD6]/46">{announcement.message}</p></div>,
             announcement.tone,
             <AdminStatusBadge key="state" tone={announcement.is_active ? "success" : "neutral"}>{announcement.is_active ? "Active" : "Inactive"}</AdminStatusBadge>,
-            `${announcement.starts_at ?? "Anytime"} - ${announcement.ends_at ?? "No end"}`,
+            `${announcement.starts_at ? formatAdminDateTime(announcement.starts_at) : "Anytime"} - ${announcement.ends_at ? formatAdminDateTime(announcement.ends_at) : "No end"}`,
             announcement.link_url ? `${announcement.link_label ?? "Link"}: ${announcement.link_url}` : "None",
             canEdit ? (
               <div key="actions" className="flex flex-wrap items-center gap-2">

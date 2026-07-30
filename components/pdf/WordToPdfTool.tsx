@@ -15,6 +15,7 @@ import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import {
   checkWordFileSize,
   isWordNamedFile,
@@ -169,6 +170,7 @@ export default function WordToPdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
+      recordRecentFile({ tool: "word-to-pdf", filename: outputName, fileSize: blob.size });
     } catch (conversionError) {
       if (currentSession !== sessionRef.current) return;
       if (uploadPath) await removeWordUpload(uploadPath).catch(() => {});

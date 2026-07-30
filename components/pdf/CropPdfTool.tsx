@@ -20,6 +20,7 @@ import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2ActionArea,
   L2FileCard,
+  L2PrivacyNote,
   L2ToolMainColumn,
   L2ToolSettingsPanel,
   L2ToolWorkspace,
@@ -44,6 +45,7 @@ import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 
@@ -338,6 +340,7 @@ export default function CropPdfTool() {
       setDownloadUrl(url);
       setDownloadName(sanitizePdfFileName(outputName));
       track({ eventName: "processing_succeeded", toolSlug: "crop", durationMs: performance.now() - startedAt, success: true });
+      recordRecentFile({ tool: "crop", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Could not crop the PDF. Please try again.");
       track({ eventName: "processing_failed", toolSlug: "crop", durationMs: performance.now() - startedAt, success: false, errorCode: "processing_error" });
@@ -371,6 +374,7 @@ export default function CropPdfTool() {
             onFilesSelected={(files) => void addFile(files)}
           />
         </div>
+        <L2PrivacyNote />
         {error ? (
           <div role="alert" className="mt-4 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}

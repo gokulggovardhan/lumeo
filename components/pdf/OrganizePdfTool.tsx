@@ -29,6 +29,7 @@ import {
 } from "@/lib/pdf/pageOrganizer";
 import { openPdfJsDocument, PAGE_RENDER_TIMEOUT_MS, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import { checkPdfFileSize, hasPdfMagicBytes, isPdfNamedFile } from "@/lib/pdf/uploadValidation";
 
 const THUMBNAIL_CONCURRENCY = 3;
@@ -306,6 +307,7 @@ export default function OrganizePdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
+      recordRecentFile({ tool: "organize", filename: fileName, fileSize: blob.size, pageCount: items.length });
     } catch (exportError) {
       setError(
         exportError instanceof Error
@@ -421,7 +423,7 @@ export default function OrganizePdfTool() {
                 type="button"
                 onClick={() => void handleExport()}
                 disabled={isExporting || items.length === 0}
-                className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]"
               >
                 {isExporting ? "Building PDF…" : "Save organized PDF"}
               </button>

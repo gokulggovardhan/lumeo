@@ -2,6 +2,7 @@ import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
 import { formatLocationLabel } from "@/lib/analytics/location-names";
+import { istIsoDate } from "@/lib/admin/timezone";
 import type { AdminContext, AdminRole } from "@/lib/admin/types";
 import type {
   Announcement,
@@ -100,7 +101,7 @@ function safe<T>(data: T, error: unknown): DataResult<T> {
 }
 
 function todayIsoDate() {
-  return new Date().toISOString().slice(0, 10);
+  return istIsoDate();
 }
 
 function yesterdayIso() {
@@ -108,7 +109,7 @@ function yesterdayIso() {
 }
 
 function sixDaysAgoIsoDate() {
-  return new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return istIsoDate(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
 }
 
 function isPublicAnalyticsEnabled(setting: SiteSetting | null | undefined) {
@@ -791,4 +792,18 @@ export async function getFeedbackQueries(limit = 25, offset = 0): Promise<DataRe
   }
 
   return safe((data ?? []) as FeedbackQuery[], error);
+}
+
+export async function getUnreadInboxCount(): Promise<DataResult<number>> {
+  const supabase = await createClient();
+  const { count, error } = await supabase
+    .from("feedback_queries")
+    .select("id", { count: "exact", head: true })
+    .eq("is_read", false);
+
+  if (error) {
+    console.error("getUnreadInboxCount failed:", error.message);
+  }
+
+  return safe(count ?? 0, error);
 }

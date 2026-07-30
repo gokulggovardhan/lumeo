@@ -13,6 +13,7 @@ import {
   type PageSize,
 } from "@/lib/pdf/htmlToPdfOptions";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 const GENERATE_TIMEOUT_MS = 30_000;
@@ -275,6 +276,7 @@ export default function HtmlToPdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
+      recordRecentFile({ tool: "html-to-pdf", filename: `${sanitizeFileStem(fileName, "lumeo-document")}.pdf` });
     } catch (generateError) {
       setError(
         generateError instanceof Error
@@ -391,7 +393,7 @@ export default function HtmlToPdfTool() {
                     type="button"
                     onClick={() => void handleGenerate()}
                     disabled={isGenerating || Boolean(validationError)}
-                    className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]"
                   >
                     {isGenerating ? "Generating…" : "Generate PDF"}
                   </button>

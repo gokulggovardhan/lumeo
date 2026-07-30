@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getPdfTools, getToolCategories } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageTools } from "@/lib/admin/permissions";
+import { formatAdminDate } from "@/lib/admin/timezone";
 import { updateTool } from "@/app/admin/(protected)/tools/actions";
 
 export default async function ToolsPage() {
@@ -39,7 +40,7 @@ export default async function ToolsPage() {
                 <AdminStatusBadge key="status">{tool.status}</AdminStatusBadge>,
                 tool.maintenance_message || <span className="text-[#F0EAD6]/40">None</span>,
                 tool.is_enabled ? "Yes" : "No",
-                new Date(tool.updated_at).toLocaleDateString(),
+                formatAdminDate(tool.updated_at),
                 null,
               ];
             }
@@ -95,7 +96,7 @@ export default async function ToolsPage() {
                   aria-label={`${tool.name} enabled`}
                 />
               </label>,
-              new Date(tool.updated_at).toLocaleDateString(),
+              formatAdminDate(tool.updated_at),
               <AdminSubmitButton
                 key="save"
                 form={formId}
