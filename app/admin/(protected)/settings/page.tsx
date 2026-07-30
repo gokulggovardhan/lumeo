@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getSiteSettings } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageSettings } from "@/lib/admin/permissions";
+import { formatAdminDate } from "@/lib/admin/timezone";
 import { updateSiteSetting } from "@/app/admin/(protected)/settings/actions";
 
 const approvedSettings = [
@@ -132,7 +133,7 @@ export default async function SettingsPage() {
             setting.key,
             settingDisplay(setting.value),
             <AdminStatusBadge key="public" tone={setting.is_public ? "success" : "neutral"}>{setting.is_public ? "Public flag" : "Private"}</AdminStatusBadge>,
-            new Date(setting.updated_at).toLocaleDateString(),
+            formatAdminDate(setting.updated_at),
           ])}
           empty={<AdminEmptyState title="No settings stored" description="Approved settings will appear here after an owner saves them." />}
         />

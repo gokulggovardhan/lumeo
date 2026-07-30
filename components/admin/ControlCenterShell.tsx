@@ -8,10 +8,12 @@ export function ControlCenterShell({
   children,
   email,
   role,
+  unreadInboxCount = 0,
 }: {
   children: ReactNode;
   email: string | null;
   role: AdminRole;
+  unreadInboxCount?: number;
 }) {
   return (
     <main className="min-h-dvh bg-[var(--surface-canvas)] text-[var(--lumeo-paper-100)]">
@@ -20,9 +22,9 @@ export function ControlCenterShell({
         <div className="absolute bottom-[12%] right-[8%] h-72 w-72 rounded-full bg-[rgba(var(--lumeo-seal-rgb),0.12)] blur-3xl" />
       </div>
       <div className="relative mx-auto flex min-h-dvh w-full max-w-[1680px] flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:gap-5 lg:px-6">
-        <ControlCenterSidebar email={email} role={role} />
+        <ControlCenterSidebar email={email} role={role} unreadInboxCount={unreadInboxCount} />
         <section className="flex min-h-0 flex-1 flex-col">
-          <ControlCenterMobileNav email={email} role={role} />
+          <ControlCenterMobileNav email={email} role={role} unreadInboxCount={unreadInboxCount} />
           <div className="mb-3 hidden justify-end lg:flex">
             <Link
               href="/admin/guide"

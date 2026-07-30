@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getFeatureFlags } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageFeatureFlags } from "@/lib/admin/permissions";
+import { formatAdminDate } from "@/lib/admin/timezone";
 import { deleteFeatureFlag, saveFeatureFlag, toggleFeatureFlag } from "@/app/admin/(protected)/feature-flags/actions";
 import type { FeatureFlag } from "@/lib/supabase/database.types";
 
@@ -85,7 +86,7 @@ export default async function FeatureFlagsPage() {
             <div key="name"><p className="font-semibold text-[#F0EAD6]">{flag.name}</p><p className="text-xs text-[#F0EAD6]/46">{flag.description ?? "No description"}</p></div>,
             flag.environment,
             <AdminStatusBadge key="state" tone={status.tone}>{status.label}</AdminStatusBadge>,
-            new Date(flag.updated_at).toLocaleDateString(),
+            formatAdminDate(flag.updated_at),
             canEdit ? (
               <div key="actions" className="flex gap-2">
                 <form action={asAdminFormAction(toggleFeatureFlag)}>

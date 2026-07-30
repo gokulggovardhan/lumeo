@@ -6,7 +6,8 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getOverviewData, getSystemStatus } from "@/lib/admin/data";
+import { getOverviewData, getSystemStatus, getUnreadInboxCount } from "@/lib/admin/data";
+import { formatAdminDateTime } from "@/lib/admin/timezone";
 
 function MetricLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
@@ -17,12 +18,16 @@ function MetricLink({ href, children }: { href: string; children: React.ReactNod
 }
 
 function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }) : "Unavailable";
+  return value ? formatAdminDateTime(value) : "Unavailable";
 }
 
 export default async function AdminPage() {
   const admin = await requireAdmin();
-  const [overview, system] = await Promise.all([getOverviewData(), getSystemStatus(admin)]);
+  const [overview, system, unreadInbox] = await Promise.all([
+    getOverviewData(),
+    getSystemStatus(admin),
+    getUnreadInboxCount(),
+  ]);
   const data = overview.data;
   const analyticsUnavailable = data.analyticsDataStatus === "unavailable";
 
@@ -74,6 +79,9 @@ export default async function AdminPage() {
         </MetricLink>
         <MetricLink href="/admin/analytics">
           <AdminMetricCard label="Tool Opens Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsToolOpensToday} detail="PDF tool workspaces opened today." tone={analyticsUnavailable ? "warning" : "gold"} />
+        </MetricLink>
+        <MetricLink href="/admin/inbox">
+          <AdminMetricCard label="Unread Messages" value={unreadInbox.data} detail="Inbox queries and feedback awaiting a first read." tone={unreadInbox.data > 0 ? "warning" : "success"} />
         </MetricLink>
       </section>
 

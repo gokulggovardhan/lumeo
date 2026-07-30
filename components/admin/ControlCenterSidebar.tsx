@@ -5,15 +5,18 @@ import { usePathname } from "next/navigation";
 import { BrandLockup } from "@/components/BrandMark";
 import { AdminIcon } from "@/components/admin/AdminIcons";
 import { AdminSignOutButton } from "@/components/admin/AdminSignOutButton";
+import { InboxCountBadge } from "@/components/admin/InboxCountBadge";
 import { isActiveAdminRoute, visibleAdminNavigation } from "@/lib/admin/navigation";
 import type { AdminRole } from "@/lib/admin/types";
 
 export function ControlCenterSidebar({
   email,
   role,
+  unreadInboxCount = 0,
 }: {
   email: string | null;
   role: AdminRole;
+  unreadInboxCount?: number;
 }) {
   const pathname = usePathname();
   const items = visibleAdminNavigation(role);
@@ -35,6 +38,7 @@ export function ControlCenterSidebar({
       >
         <AdminIcon name={item.icon} className="h-4 w-4 shrink-0" />
         <span>{item.label}</span>
+        {item.href === "/admin/inbox" ? <InboxCountBadge initialCount={unreadInboxCount} /> : null}
       </Link>
     );
   }
