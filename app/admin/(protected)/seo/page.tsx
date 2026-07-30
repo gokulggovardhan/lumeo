@@ -10,6 +10,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getSeoSettings } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageSeo } from "@/lib/admin/permissions";
+import { formatAdminDate } from "@/lib/admin/timezone";
 import { deleteSeoSetting, saveSeoSetting } from "@/app/admin/(protected)/seo/actions";
 
 // Known public routes this app actually serves (excludes /admin/** and
@@ -113,7 +114,7 @@ export default async function SeoPage({
             record.title,
             record.description,
             <AdminStatusBadge key="robots" tone={record.robots_index ? "success" : "warning"}>{record.robots_index ? "Index" : "Noindex"} / {record.robots_follow ? "Follow" : "Nofollow"}</AdminStatusBadge>,
-            new Date(record.updated_at).toLocaleDateString(),
+            formatAdminDate(record.updated_at),
             canEdit ? (
               <div key="actions" className="flex flex-wrap items-center gap-2">
                 <Link

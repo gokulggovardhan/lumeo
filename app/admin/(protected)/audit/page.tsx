@@ -6,6 +6,7 @@ import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getAuditLogs, resolveAdminEmails } from "@/lib/admin/data";
 import { canViewAudit } from "@/lib/admin/permissions";
+import { formatAdminDateTime } from "@/lib/admin/timezone";
 
 const entityTypes = [
   "admin_member",
@@ -123,7 +124,7 @@ export default async function AuditPage({
         <AdminDataTable
           columns={["Time", "Actor", "Role", "Action", "Entity", "Summary"]}
           rows={logs.data.map((log) => [
-            new Date(log.created_at).toLocaleString(),
+            formatAdminDateTime(log.created_at),
             log.actor_user_id ? (actorEmails[log.actor_user_id] ?? log.actor_user_id) : "Unknown",
             log.actor_role ?? "Unknown",
             log.action,

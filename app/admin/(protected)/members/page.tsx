@@ -9,10 +9,11 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getAdminMembers } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageMembers } from "@/lib/admin/permissions";
+import { formatAdminDateTime } from "@/lib/admin/timezone";
 import { addAdminMember, updateAdminMember } from "@/app/admin/(protected)/members/actions";
 
 function formatDate(value: string | null) {
-  return value ? new Date(value).toLocaleString("en", { dateStyle: "medium", timeStyle: "short" }) : "Never";
+  return value ? formatAdminDateTime(value) : "Never";
 }
 
 export default async function MembersPage() {

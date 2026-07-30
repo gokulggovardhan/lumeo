@@ -6,15 +6,18 @@ import { useEffect, useRef, useState } from "react";
 import { BrandLockup } from "@/components/BrandMark";
 import { AdminIcon } from "@/components/admin/AdminIcons";
 import { AdminSignOutButton } from "@/components/admin/AdminSignOutButton";
+import { InboxCountBadge } from "@/components/admin/InboxCountBadge";
 import { isActiveAdminRoute, visibleAdminNavigation } from "@/lib/admin/navigation";
 import type { AdminRole } from "@/lib/admin/types";
 
 export function ControlCenterMobileNav({
   email,
   role,
+  unreadInboxCount = 0,
 }: {
   email: string | null;
   role: AdminRole;
+  unreadInboxCount?: number;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -39,6 +42,7 @@ export function ControlCenterMobileNav({
       >
         <AdminIcon name={item.icon} className="h-4 w-4" />
         {item.label}
+        {item.href === "/admin/inbox" ? <InboxCountBadge initialCount={unreadInboxCount} /> : null}
       </Link>
     );
   }
