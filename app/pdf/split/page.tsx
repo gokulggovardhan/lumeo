@@ -54,14 +54,18 @@ export default async function SplitPdfPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader
-        title="Split PDF"
-        description="Extract pages or separate one PDF into smaller files."
-      />
-
       {toolState.blocked ? (
-        <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
+        <>
+          <L2ToolPageHeader
+            title="Split PDF"
+            description="Extract pages or separate one PDF into smaller files."
+          />
+          <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
+        </>
       ) : (
+        // SplitPdfTool renders its own sticky Aura OS v2 workspace header
+        // (title + description) -- no page-level header here, matching the
+        // Merge PDF redesign (PR 10).
         <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-split-tool"><SplitPdfTool /></div>
       )}
 
