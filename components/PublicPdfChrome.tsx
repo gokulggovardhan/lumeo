@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { L2PublicHeader, L2PublicNavLink } from "@/components/ui/Aura";
+import { L2PublicHeader } from "@/components/ui/Aura";
 import { PublicPdfToolsMenuClient } from "@/components/public/PublicPdfToolsMenuClient";
+import { PublicNavLink } from "@/components/public/PublicNavLink";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
 import { resolveLumeoTools } from "@/lib/tools/resolve";
 import { buildTiles } from "@/lib/tools/tiles";
@@ -47,10 +48,10 @@ export async function PublicNav({
         <div className="flex shrink-0 items-center gap-2">
           <PublicPdfToolsMenuClient tiles={tiles} hasMoreComingSoon={hasMoreComingSoon} compact />
           <span className="hidden sm:inline-flex">
-            <L2PublicNavLink href="/guides">Guides</L2PublicNavLink>
+            <PublicNavLink href="/guides">Guides</PublicNavLink>
           </span>
           <span className="hidden sm:inline-flex">
-            <L2PublicNavLink href="/privacy">Privacy</L2PublicNavLink>
+            <PublicNavLink href="/privacy">Privacy</PublicNavLink>
           </span>
           <Link
             href="/contact"
