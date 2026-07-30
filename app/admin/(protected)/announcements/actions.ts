@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { canManageAnnouncements } from "@/lib/admin/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { istInputValueToUtcIso } from "@/lib/admin/timezone";
 import {
   errorState,
   formBoolean,
@@ -26,15 +27,21 @@ export async function saveAnnouncement(formData: FormData) {
   const tone = formString(formData, "tone", 40);
   const linkLabel = formString(formData, "link_label", 80) || null;
   const linkUrl = formString(formData, "link_url", 240) || null;
-  const startsAt = formString(formData, "starts_at", 80) || null;
-  const endsAt = formString(formData, "ends_at", 80) || null;
+  // Raw values are IST wall-clock strings from a datetime-local input
+  // ("YYYY-MM-DDTHH:mm") -- validated against each other in that form, then
+  // converted to UTC instants only for storage.
+  const startsAtRaw = formString(formData, "starts_at", 80) || null;
+  const endsAtRaw = formString(formData, "ends_at", 80) || null;
   const isActive = formBoolean(formData, "is_active");
 
   if (!title || !message || !tones.has(tone)) return errorState("Enter a title, message, and valid tone.");
   if (!validateLinkUrl(linkUrl ?? "")) return errorState("Announcement links must begin with / or https://.");
-  if (!validateAnnouncementSchedule(startsAt ?? "", endsAt ?? "")) {
+  if (!validateAnnouncementSchedule(startsAtRaw ?? "", endsAtRaw ?? "")) {
     return errorState("End time must be after the start time.");
   }
+
+  const startsAt = startsAtRaw ? istInputValueToUtcIso(startsAtRaw) : null;
+  const endsAt = endsAtRaw ? istInputValueToUtcIso(endsAtRaw) : null;
 
   const supabase = await createClient();
   const payload = {
