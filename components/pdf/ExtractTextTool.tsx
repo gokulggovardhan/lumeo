@@ -14,6 +14,7 @@ import {
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { openPdfJsDocument, withPageTimeout } from "@/lib/pdf/pdfjs";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import {
   buildCsvFromEntries,
   buildJsonFromEntries,
@@ -133,6 +134,7 @@ export default function ExtractTextTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
+      recordRecentFile({ tool: "extract-text", filename: file.name, fileSize: file.size, pageCount: texts.length });
     } catch (extractError) {
       const message =
         extractError instanceof Error && /password|encrypt/i.test(extractError.message)

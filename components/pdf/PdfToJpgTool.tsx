@@ -20,6 +20,7 @@ import { bucketFileSize } from "@/lib/analytics/size-bucket";
 import { loadPdfJsModule, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
 import { formatBytes } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { normalizeRotation } from "@/lib/pdf/rotation";
 import {
@@ -914,6 +915,14 @@ export default function PdfToJpgTool() {
       setStatus("Download ready");
       setProgressDetail("Conversion complete.");
 
+      if (analysis) {
+        recordRecentFile({
+          tool: TOOL_SLUG,
+          filename: analysis.name,
+          fileSize: analysis.size,
+          pageCount: analysis.pageCount,
+        });
+      }
       track({
         eventName: "processing_succeeded",
         toolSlug: TOOL_SLUG,

@@ -5,8 +5,12 @@ import Link from "next/link";
 import PublicFooter from "@/components/PublicFooter";
 import { PublicNav } from "@/components/PublicPdfChrome";
 import { PdfToolLauncher } from "@/components/pdf/PdfToolLauncher";
+import { ContinueWorking } from "@/components/ContinueWorking";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
+import { resolveLumeoTools } from "@/lib/tools/resolve";
+import { buildTiles } from "@/lib/tools/tiles";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/", {
@@ -132,7 +136,10 @@ const whyItems = [
   },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const catalog = await getPublicPdfCatalog();
+  const tiles = buildTiles(resolveLumeoTools(catalog.tools));
+
   return (
     <main id="main-content" className="lumeo-page-enter aura-home relative flex min-h-dvh flex-col overflow-x-hidden text-[var(--lumeo-paper-100)]">
       <script
@@ -175,6 +182,8 @@ export default function Home() {
               </div>
             ))}
           </div>
+
+          <ContinueWorking tiles={tiles} />
 
           <section className="pt-16">
             <div className="mx-auto mb-10 max-w-[35rem] text-center">

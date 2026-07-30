@@ -18,6 +18,7 @@ import { AuraOptionCard, AuraSegmentedControl } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
+import { recordRecentFile } from "@/lib/recent-files";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { normalizeRotation } from "@/lib/pdf/rotation";
@@ -797,6 +798,7 @@ export default function MergePdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
+      recordRecentFile({ tool: "merge", filename: safeName, fileSize: blob.size, pageCount: totalPages });
     } catch (mergeError) {
       setStatus("Ready");
       setError(
