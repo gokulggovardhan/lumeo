@@ -38,61 +38,37 @@
 .aura-elevated-interactive { box-shadow: var(--v2-elevation-interactive); }
 
 /* ============================================================
- * GLASS UTILITIES
- * Per mission scope: created, NOT applied anywhere. Each bundles
- * blur + tint + border + shadow from the matching PR 1 glass tier.
- * backdrop-filter requires -webkit- prefix for Safari; both are
- * included since Lumeo ships to Safari users (per this session's
- * earlier device/browser certification gaps -- Safari specifically
- * flagged as unverified, so the prefix is included defensively
- * rather than assumed unnecessary).
+ * GLASS UTILITIES (name kept for backward compatibility with every
+ * existing .aura-glass-* consumer -- MergePdfTool, SplitPdfTool,
+ * ToolWorkspace's shared shell, CommandPaletteDialog, ContinueWorking,
+ * the PDF Tools nav dropdown -- but these are now fully opaque solid
+ * panels, not translucent/blurred glass. Two earlier attempts at partial
+ * opacity + backdrop-filter (first 4%/8%/14%, then 72%/84%/92% with an
+ * @supports opaque fallback) both still let some of the page show
+ * through, which was reported directly as unwanted ("I don't want to
+ * see background if I open pdf tools dropdown"). backdrop-filter is
+ * also a known source of visible GPU-tile compositing seams on
+ * less-than-fully-opaque elements -- reported separately as a stray
+ * vertical line partway across Compress PDF's settings panel. Once the
+ * background is 100% opaque there's nothing left for backdrop-filter to
+ * blur, so it's removed here rather than kept as effect-free dead code.
  * ============================================================ */
 .aura-glass-thin {
   background-color: var(--v2-glass-thin-bg);
   border: 1px solid var(--v2-glass-thin-border);
   box-shadow: var(--v2-glass-thin-shadow);
-  -webkit-backdrop-filter: blur(var(--v2-glass-thin-blur));
-  backdrop-filter: blur(var(--v2-glass-thin-blur));
 }
 
 .aura-glass-regular {
   background-color: var(--v2-glass-regular-bg);
   border: 1px solid var(--v2-glass-regular-border);
   box-shadow: var(--v2-glass-regular-shadow);
-  -webkit-backdrop-filter: blur(var(--v2-glass-regular-blur));
-  backdrop-filter: blur(var(--v2-glass-regular-blur));
 }
 
 .aura-glass-thick {
   background-color: var(--v2-glass-thick-bg);
   border: 1px solid var(--v2-glass-thick-border);
   box-shadow: var(--v2-glass-thick-shadow);
-  -webkit-backdrop-filter: blur(var(--v2-glass-thick-blur));
-  backdrop-filter: blur(var(--v2-glass-thick-blur));
-}
-
-/* Opaque fallback for every environment where backdrop-filter silently
- * no-ops (GPU compositing disabled, some remote-desktop/VM Chrome
- * configs, certain hardware/driver combinations) -- Chrome does not
- * expose this as a JS-visible failure, so there's no way to feature-detect
- * it except via @supports on the render thread itself. Without this, the
- * *-bg tokens above (4%/8%/14% opaque) are a near-invisible tint with no
- * blur behind it: overlapping panels (the merge/split three-column layout,
- * the PDF Tools dropdown, the Command Palette) all read as one illegible,
- * "glossy transparent" smear of stacked text. Bumping to a strongly
- * opaque, blur-free solid keeps every glass surface legible on its own,
- * with the same tone. Applies automatically to every current and future
- * .aura-glass-* consumer -- no per-component fix needed. */
-@supports (not (backdrop-filter: blur(1px))) and (not (-webkit-backdrop-filter: blur(1px))) {
-  .aura-glass-thin {
-    background-color: var(--v2-surface-elevated);
-  }
-  .aura-glass-regular {
-    background-color: var(--v2-surface-floating);
-  }
-  .aura-glass-thick {
-    background-color: var(--v2-surface-floating);
-  }
 }
 
 /* ============================================================

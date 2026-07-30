@@ -57,36 +57,38 @@
    * system stays visually consistent with the rest of the
    * palette rather than introducing new base colors.
    * ============================================================ */
-  /* Background is a dark tint (derived from --atelier-surface-4 /
-   * #2e342d, this theme's floating-surface color -- not --paper-rgb,
-   * which is light) at high-ish alpha, so every tier is legible on its
-   * own as a near-opaque dark card. Legibility cannot depend on blur:
-   * a browser can silently fail to *render* backdrop-filter (GPU
-   * compositing disabled, some remote-desktop/VM Chrome configs,
-   * certain driver combinations) while still fully supporting the CSS
-   * property syntactically -- confirmed by simulating
-   * backdrop-filter:none and observing @supports still reports the
-   * property as supported, so a fallback gated on @supports alone
-   * (see the block below, kept for the smaller case of browsers that
-   * genuinely don't parse backdrop-filter) cannot catch this. A first
-   * attempt at this fix reused --paper-rgb (light, ~#f2efe6) at high
-   * alpha instead: at 0.6+ that turns the panel itself near-white,
-   * which would have made this theme's light text unreadable against
-   * its own panel -- caught and corrected before shipping. */
+  /* Fully opaque, no blur. Two prior attempts (partial-opacity tint, then
+   * an @supports-gated opaque fallback) both still left a visible sliver
+   * of "see the page through the panel" -- reported directly ("I don't
+   * want to see background if I open pdf tools dropdown") -- and,
+   * separately, backdrop-filter on a still-not-fully-opaque element is a
+   * known source of GPU-tile compositing seams (a visible vertical line
+   * partway across a panel, reported on Compress PDF's settings card).
+   * Once the background is 100% opaque, backdrop-filter has nothing left
+   * to blur and produces zero visible effect either way, so it's removed
+   * outright in app/aura-v2-utilities.css rather than kept as dead,
+   * misleading code. Background is a dark tint derived from
+   * --atelier-surface-4 (#2e342d, this theme's floating-surface color) --
+   * not --paper-rgb, which is light and would make this dark theme's
+   * light text unreadable against its own panel at full opacity. */
   --v2-glass-tint-rgb: 46 52 45;
 
+  /* *-blur tokens are kept even though .aura-glass-* no longer uses them
+   * (app/aura-v2-utilities.css) -- PublicPdfToolsMenuClient.tsx consumes
+   * --v2-glass-thin-blur directly for its mobile menu backdrop scrim,
+   * a separate, unrelated use of the same token. */
   --v2-glass-thin-blur: 8px;
-  --v2-glass-thin-bg: rgb(var(--v2-glass-tint-rgb) / 0.72);
+  --v2-glass-thin-bg: rgb(var(--v2-glass-tint-rgb) / 1);
   --v2-glass-thin-border: rgb(var(--paper-rgb) / 0.10);
   --v2-glass-thin-shadow: var(--shadow-xs);
 
   --v2-glass-regular-blur: 16px;
-  --v2-glass-regular-bg: rgb(var(--v2-glass-tint-rgb) / 0.84);
+  --v2-glass-regular-bg: rgb(var(--v2-glass-tint-rgb) / 1);
   --v2-glass-regular-border: rgb(var(--paper-rgb) / 0.14);
   --v2-glass-regular-shadow: var(--shadow-md);
 
   --v2-glass-thick-blur: 24px;
-  --v2-glass-thick-bg: rgb(var(--v2-glass-tint-rgb) / 0.92);
+  --v2-glass-thick-bg: rgb(var(--v2-glass-tint-rgb) / 1);
   --v2-glass-thick-border: rgb(var(--paper-rgb) / 0.20);
   --v2-glass-thick-shadow: var(--shadow-xl);
 
