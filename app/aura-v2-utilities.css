@@ -83,7 +83,7 @@
  * opaque, blur-free solid keeps every glass surface legible on its own,
  * with the same tone. Applies automatically to every current and future
  * .aura-glass-* consumer -- no per-component fix needed. */
-@supports not (backdrop-filter: blur(1px)) and not (-webkit-backdrop-filter: blur(1px)) {
+@supports (not (backdrop-filter: blur(1px))) and (not (-webkit-backdrop-filter: blur(1px))) {
   .aura-glass-thin {
     background-color: var(--v2-surface-elevated);
   }
