@@ -128,7 +128,16 @@ export function ToolPrivacyNote({ compact = false }: { compact?: boolean }) {
 
 export function ToolActionBar({ children }: { children: ReactNode }) {
   return (
-    <div className="sticky bottom-3 z-10 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--lumeo-ink-850)] p-3 shadow-[var(--shadow-lg)]">
+    // Aura OS v2 (PR 6): genuinely floating chrome (sticky over scrolling
+    // canvas content) -- exactly the "floating action area" glass
+    // candidate named in the v2 design spec. Was an opaque solid fill
+    // (--lumeo-ink-850, a legacy-generation token) with a plain border;
+    // now real glass (PR 2's aura-glass-regular), with the original
+    // shadow-lg weight preserved via --v2-elevation-4 (the same value,
+    // just no longer overridden by the glass tier's own lighter shadow)
+    // so this bar keeps reading as more elevated than the dropdown/menu
+    // surfaces that use the unmodified glass-regular shadow.
+    <div className="aura-glass-regular sticky bottom-3 z-10 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-4)]">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">{children}</div>
     </div>
   );
@@ -250,7 +259,13 @@ export function L2ToolSettingsPanel({
   action?: ReactNode;
 }) {
   return (
-    <aside className="l2-tool-settings-panel aura-luminous-card rounded-[var(--radius-2xl)] p-5 lg:sticky lg:top-24 lg:self-start">
+    // Aura OS v2 (PR 6): the inspector/settings panel is sticky
+    // (lg:sticky lg:top-24), genuinely floating over the canvas/file-list
+    // column on desktop for all 13 live tools that use this component --
+    // the clearest real "inspector" glass candidate in the workspace.
+    // Was aura-luminous-card (an opaque gradient), now real glass
+    // consistent with the header/menu/action-bar treatment.
+    <aside className="l2-tool-settings-panel aura-glass-regular rounded-[var(--radius-2xl)] p-5 lg:sticky lg:top-24 lg:self-start">
       <AuraSectionHeader title={title} description={description} />
       <div className="mt-5 grid gap-4">{children}</div>
       {action ? <div className="l2-tool-action-area mt-5">{action}</div> : null}
@@ -573,13 +588,13 @@ export function L2AdvancedDisclosure({
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-xl)] px-4 py-3 text-left font-black text-[var(--text-primary)] transition hover:bg-[rgb(var(--paper-rgb)/0.055)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
+        className="flex min-h-12 w-full items-center justify-between gap-3 rounded-[var(--radius-xl)] px-4 py-3 text-left font-black text-[var(--text-primary)] transition hover:bg-[rgb(var(--paper-rgb)/0.055)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
       >
         <span>
           {title}
           {description ? <span className="mt-1 block text-xs font-bold leading-5 text-[var(--text-secondary)]">{description}</span> : null}
         </span>
-        <span aria-hidden="true" className={cx("transition duration-[var(--motion-standard)]", open && "rotate-180")}>⌄</span>
+        <span aria-hidden="true" className={cx("transition duration-[var(--v2-motion-normal)]", open && "rotate-180")}>⌄</span>
       </button>
       {open ? <div className="aura-menu-reveal px-4 pb-4">{children}</div> : null}
     </section>
