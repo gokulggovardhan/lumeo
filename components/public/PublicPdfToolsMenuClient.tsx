@@ -10,7 +10,7 @@ const MENU_ID = "lumeo-pdf-tools-menu";
 
 function Chevron({ open }: { open: boolean }) {
   return (
-    <svg aria-hidden="true" viewBox="0 0 16 16" className={`h-4 w-4 transition-transform duration-200 ${open ? "rotate-180" : ""}`} fill="none">
+    <svg aria-hidden="true" viewBox="0 0 16 16" className={`h-4 w-4 transition-transform duration-[var(--v2-motion-normal)] ${open ? "rotate-180" : ""}`} fill="none">
       <path d="m4 6 4 4 4-4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
     </svg>
   );
@@ -70,7 +70,7 @@ export function PublicPdfToolsMenuClient({
         aria-expanded={open}
         aria-controls={MENU_ID}
         onClick={() => setOpen((value) => !value)}
-        className={`lumeo-press lumeo-focus-ring inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[rgba(var(--paper-rgb),0.075)] text-sm font-extrabold text-[var(--text-secondary)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition duration-200 hover:bg-[rgba(var(--paper-rgb),0.12)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] ${
+        className={`lumeo-press lumeo-focus-ring inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[rgba(var(--paper-rgb),0.075)] text-sm font-extrabold text-[var(--text-secondary)] shadow-[inset_0_1px_0_rgba(255,253,248,0.08)] transition duration-[var(--v2-motion-normal)] hover:bg-[rgba(var(--paper-rgb),0.12)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)] ${
           compact ? "h-11 px-3.5 sm:px-4" : "px-3 py-2.5 sm:px-4"
         }`}
       >
@@ -80,7 +80,7 @@ export function PublicPdfToolsMenuClient({
 
       {open ? (
         <>
-          <div className="fixed inset-0 z-40 bg-[var(--surface-overlay)] md:hidden" aria-hidden="true" />
+          <div className="fixed inset-0 z-40 bg-[var(--v2-surface-overlay)] backdrop-blur-[var(--v2-glass-thin-blur)] md:hidden" aria-hidden="true" />
           <L2MenuSurface
             id={MENU_ID}
             role="menu"
@@ -98,7 +98,7 @@ export function PublicPdfToolsMenuClient({
                   setOpen(false);
                   buttonRef.current?.focus();
                 }}
-                className="min-h-10 rounded-[var(--radius-md)] px-3 text-xs font-black text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.07)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] md:hidden"
+                className="min-h-10 rounded-[var(--radius-md)] px-3 text-xs font-black text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.07)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)] md:hidden"
               >
                 Close
               </button>
@@ -111,7 +111,7 @@ export function PublicPdfToolsMenuClient({
                   href={tile.route}
                   role="menuitem"
                   onClick={() => setOpen(false)}
-                  className="lumeo-tool-menuitem group flex items-center gap-3 rounded-[var(--radius-lg)] px-2.5 py-2.5 text-left transition duration-200 hover:bg-[rgba(var(--paper-rgb),0.075)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.16)]"
+                  className="lumeo-tool-menuitem group flex items-center gap-3 rounded-[var(--radius-lg)] px-2.5 py-2.5 text-left transition duration-[var(--v2-motion-normal)] hover:bg-[rgba(var(--paper-rgb),0.075)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-subtle)]"
                 >
                   <span aria-hidden="true" className="grid h-9 w-9 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[rgba(var(--champagne-rgb),0.1)] text-[var(--text-premium)]">
                     <ToolGlyph name={tile.glyph} className="h-[19px] w-[19px]" />
@@ -135,7 +135,7 @@ export function PublicPdfToolsMenuClient({
               href="/pdf-tools"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="mt-3 flex min-h-11 items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-3 text-sm font-black text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,253,248,0.07)] transition hover:bg-[rgba(var(--paper-rgb),0.085)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
+              className="mt-3 flex min-h-11 items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-3 text-sm font-black text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,253,248,0.07)] transition hover:bg-[rgba(var(--paper-rgb),0.085)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
             >
               <span>View all PDF tools</span>
               <span aria-hidden="true" className="text-[var(--text-premium)]">→</span>

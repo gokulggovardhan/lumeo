@@ -783,11 +783,19 @@ export function L2PublicHeader({ children, className, ...props }: HTMLAttributes
     <header
       {...props}
       className={cx(
-        "l2-public-header sticky top-0 z-40 bg-[var(--atelier-canvas-950)] px-4 py-2.5 sm:px-6",
+        "l2-public-header sticky top-0 z-40 bg-[var(--atelier-canvas-950)] px-4 py-3 sm:px-6",
         className,
       )}
     >
-      <div className="mx-auto max-w-[var(--container-wide)] rounded-[var(--radius-xl)] bg-[linear-gradient(180deg,rgba(47,50,44,0.96),rgba(20,22,20,0.94))] px-3 shadow-[0_12px_32px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,253,248,0.08)]">
+      {/* Aura OS v2 (PR 5): floating glass header. Was an opaque
+          gradient panel with no backdrop-filter at all -- swapped for
+          the v2 glass system (aura-glass-regular, from PR 2's utility
+          layer) so content actually blurs behind the sticky header, a
+          real premium/floating feel instead of a solid painted block.
+          Border and shadow now come from the same glass tier for a
+          coherent, single-source "clean border + premium shadow"
+          rather than a hand-tuned one-off box-shadow. */}
+      <div className="aura-glass-regular mx-auto max-w-[var(--container-wide)] rounded-[var(--radius-xl)] px-3">
         {children}
       </div>
     </header>
@@ -804,8 +812,15 @@ export function L2PublicNavLink({
       {...props}
       aria-current={active ? "page" : props["aria-current"]}
       className={cx(
-        "inline-flex min-h-11 items-center rounded-[var(--radius-md)] px-3 text-sm font-extrabold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.075)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]",
-        active && "bg-[rgba(var(--paper-rgb),0.08)] text-[var(--text-primary)]",
+        "inline-flex min-h-11 items-center rounded-[var(--radius-md)] px-3 text-sm font-extrabold text-[var(--text-secondary)] transition duration-[var(--v2-motion-fast)] hover:bg-[rgba(var(--paper-rgb),0.075)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]",
+        // Real current-page indicator (Aura OS v2 PR 5): a bottom accent
+        // bar plus the existing tint/text treatment, so "active" reads
+        // clearly at a glance without introducing a new color -- reuses
+        // the same border-focus token every other active/selected state
+        // in the app already uses.
+        active
+          ? "bg-[rgba(var(--paper-rgb),0.08)] text-[var(--text-primary)] shadow-[inset_0_-2px_0_var(--border-focus)]"
+          : null,
         className,
       )}
     />
@@ -819,7 +834,12 @@ export const L2MenuSurface = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEl
         {...props}
         ref={ref}
         className={cx(
-          "l2-menu-surface rounded-[var(--radius-2xl)] bg-[var(--surface-floating)] p-3 shadow-[var(--shadow-xl)] ring-1 ring-[var(--border-hairline)]",
+          // Aura OS v2 (PR 5): matches the header's glass treatment for a
+          // consistent design language between the sticky nav and the
+          // dropdown/mobile drawer it opens -- was an opaque surface
+          // color with no blur, now real glass (PR 2's aura-glass-regular
+          // utility) with the same border/shadow tier the header uses.
+          "l2-menu-surface aura-glass-regular rounded-[var(--radius-2xl)] p-3",
           className,
         )}
       />
