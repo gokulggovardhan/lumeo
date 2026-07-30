@@ -90,11 +90,15 @@ export function PublicPageShell({
 }) {
   return (
     <main id="main-content" className={`lumeo-page-enter aura-page-shell relative overflow-x-hidden ${mainClassName}`}>
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="lumeo-ambient absolute -left-44 -top-48 h-[32rem] w-[32rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.07)] blur-[60px] md:blur-[150px]" />
-        <div className="lumeo-ambient absolute -right-44 top-0 [animation-delay:-4s] h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.055)] blur-[60px] md:blur-[155px]" />
-      </div>
-
+      {/* Aura OS v2 (fix): the ambient sage/brass glow blobs previously here sat
+       * edge-adjacent (near-zero gap) to the tool workspace's settings panel and
+       * header title, both docked at the top corners. Their large blur radius
+       * (150-155px) visibly bled color across the panel/header regardless of the
+       * panel being fully opaque and stacked above (z-10 vs the blob's z-index
+       * auto), reported as a translucent/glossy patch on Compress PDF's settings
+       * panel and Merge PDF's header. Removed rather than repositioned: this
+       * shell wraps every PDF tool page, so there's no gap large enough to keep
+       * decorative glow clear of docked chrome at every viewport width. */}
       <div className="relative z-10">
         <PublicNav maxWidth={maxWidth} />
         <div className={`mx-auto ${maxWidth} ${contentClassName}`}>{children}</div>
