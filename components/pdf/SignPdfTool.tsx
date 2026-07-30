@@ -51,6 +51,7 @@ import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import {
   hasPdfMagicBytes,
@@ -544,6 +545,7 @@ export default function SignPdfTool() {
       setDownloadUrl(url);
       setDownloadName(sanitizePdfFileName(outputName));
       track({ eventName: "processing_succeeded", toolSlug: "sign", durationMs: performance.now() - startedAt, success: true });
+      recordRecentFile({ tool: "sign", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
     } catch {
       setError("Signing failed. Try a smaller file or fewer elements.");
       pushToast("Could not sign the PDF. Please try again.", "error");

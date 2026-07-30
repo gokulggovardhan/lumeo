@@ -13,6 +13,7 @@ import {
   type PageSize,
 } from "@/lib/pdf/htmlToPdfOptions";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 const GENERATE_TIMEOUT_MS = 30_000;
@@ -275,6 +276,7 @@ export default function HtmlToPdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
+      recordRecentFile({ tool: "html-to-pdf", filename: `${sanitizeFileStem(fileName, "lumeo-document")}.pdf` });
     } catch (generateError) {
       setError(
         generateError instanceof Error

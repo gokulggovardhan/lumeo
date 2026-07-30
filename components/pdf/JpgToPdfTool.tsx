@@ -17,6 +17,7 @@ import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import { normalizeRotation } from "@/lib/pdf/rotation";
 import {
   hasImageMagicBytes,
@@ -766,6 +767,7 @@ export default function JpgToPdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
+      recordRecentFile({ tool: "jpg-to-pdf", filename: safeName, fileSize: blob.size, pageCount: files.length });
     } catch (convertError) {
       setStatus("Ready");
       setError(

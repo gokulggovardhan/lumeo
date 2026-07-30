@@ -29,6 +29,7 @@ import {
 } from "@/lib/pdf/pageOrganizer";
 import { openPdfJsDocument, PAGE_RENDER_TIMEOUT_MS, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import { checkPdfFileSize, hasPdfMagicBytes, isPdfNamedFile } from "@/lib/pdf/uploadValidation";
 
 const THUMBNAIL_CONCURRENCY = 3;
@@ -306,6 +307,7 @@ export default function OrganizePdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
+      recordRecentFile({ tool: "organize", filename: fileName, fileSize: blob.size, pageCount: items.length });
     } catch (exportError) {
       setError(
         exportError instanceof Error

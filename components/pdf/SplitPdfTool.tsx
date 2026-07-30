@@ -20,6 +20,7 @@ import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
 import { formatBytes } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { normalizeRotation } from "@/lib/pdf/rotation";
 import {
@@ -1184,6 +1185,12 @@ export default function SplitPdfTool() {
         toolSlug: "split",
         durationMs: performance.now() - startedAt,
         success: true,
+      });
+      recordRecentFile({
+        tool: "split",
+        filename: fileName,
+        fileSize: blob.size,
+        pageCount: groups.reduce((sum, group) => sum + group.length, 0),
       });
     } catch (splitError) {
       const message =

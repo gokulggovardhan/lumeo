@@ -8,6 +8,7 @@ import {
   searchCommandPaletteIndex,
   type CommandPaletteItem,
 } from "@/lib/command-palette";
+import { useRecentFiles } from "@/lib/recent-files/useRecentFiles";
 import type { Tile } from "@/lib/tools/tiles";
 
 // Dynamically imported by CommandPaletteTrigger only once the palette is
@@ -33,6 +34,38 @@ export function CommandPaletteDialog({
 
   const index = useMemo(() => buildCommandPaletteIndex(tiles), [tiles]);
   const results = useMemo(() => searchCommandPaletteIndex(index, query), [index, query]);
+
+  const tileBySlug = useMemo(() => new Map(tiles.map((tile) => [tile.slug, tile])), [tiles]);
+  const recentFiles = useRecentFiles();
+  const trimmedQuery = query.trim();
+
+  // Only shown when there's no query -- once the visitor starts typing,
+  // this reverts to plain search results (no mixing "recent" relevance into
+  // the match ranking).
+  const recentItems: CommandPaletteItem[] = useMemo(() => {
+    if (trimmedQuery) return [];
+    const items: CommandPaletteItem[] = [];
+    for (const file of recentFiles) {
+      const tile = tileBySlug.get(file.tool);
+      if (!tile) continue;
+      items.push({
+        id: `recent-${file.id}`,
+        title: file.filename,
+        description: `${tile.label} · Recent`,
+        category: "Tool",
+        route: tile.route,
+        glyph: tile.glyph,
+        keywords: [],
+      });
+      if (items.length >= 5) break;
+    }
+    return items;
+  }, [recentFiles, tileBySlug, trimmedQuery]);
+
+  const displayResults = useMemo(
+    () => (recentItems.length > 0 ? [...recentItems, ...results] : results),
+    [recentItems, results],
+  );
 
   // Autofocus the input on open (real keyboard focus, not a JS .focus()
   // hack applied to something the user didn't ask for -- this is the
@@ -92,22 +125,26 @@ export function CommandPaletteDialog({
       // Looping is intentional here -- every command-palette convention
       // this is modeled on (Spotlight, Raycast, Linear) wraps around,
       // and with a short, single-page result list there's no cost to it.
-      setActiveIndex((current) => (results.length ? (current + 1) % results.length : 0));
+      setActiveIndex((current) => (displayResults.length ? (current + 1) % displayResults.length : 0));
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
-      setActiveIndex((current) => (results.length ? (current - 1 + results.length) % results.length : 0));
+      setActiveIndex((current) =>
+        displayResults.length ? (current - 1 + displayResults.length) % displayResults.length : 0,
+      );
       return;
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      const selected = results[activeIndex];
+      const selected = displayResults[activeIndex];
       if (selected) activate(selected);
     }
   }
 
-  const activeOptionId = results[activeIndex] ? `${listboxId}-option-${results[activeIndex].id}` : undefined;
+  const activeOptionId = displayResults[activeIndex]
+    ? `${listboxId}-option-${displayResults[activeIndex].id}`
+    : undefined;
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center bg-[var(--v2-surface-overlay)] px-4 pt-[12vh] sm:pt-[16vh]">
@@ -148,15 +185,30 @@ export function CommandPaletteDialog({
           aria-label="Search results"
           className="aura-scrollbar max-h-[min(60vh,26rem)] overflow-y-auto p-2"
         >
-          {results.length === 0 ? (
+          {displayResults.length === 0 ? (
             <li role="presentation" className="px-3 py-8 text-center text-sm text-[var(--text-subtle)]">
               No results for &ldquo;{query}&rdquo;.
             </li>
           ) : (
-            results.map((item, resultIndex) => {
+            displayResults.map((item, resultIndex) => {
               const selected = resultIndex === activeIndex;
+              // Group headers for the "recent items above search results"
+              // layout -- presentational only, never part of keyboard nav
+              // or the activedescendant index math above.
+              const showRecentHeader = resultIndex === 0 && recentItems.length > 0;
+              const showAllToolsHeader = resultIndex === recentItems.length && recentItems.length > 0;
               return (
                 <li key={item.id} role="presentation">
+                  {showRecentHeader ? (
+                    <p className="px-3 pb-1 pt-1 text-[10px] font-black uppercase tracking-[0.08em] text-[var(--text-subtle)]">
+                      Recent
+                    </p>
+                  ) : null}
+                  {showAllToolsHeader ? (
+                    <p className="px-3 pb-1 pt-3 text-[10px] font-black uppercase tracking-[0.08em] text-[var(--text-subtle)]">
+                      All tools and pages
+                    </p>
+                  ) : null}
                   <button
                     type="button"
                     id={`${listboxId}-option-${item.id}`}
