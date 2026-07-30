@@ -3,6 +3,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { L2PublicHeader } from "@/components/ui/Aura";
+import { CommandPaletteTrigger } from "@/components/CommandPaletteTrigger";
 import { PublicPdfToolsMenuClient } from "@/components/public/PublicPdfToolsMenuClient";
 import { PublicNavLink } from "@/components/public/PublicNavLink";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
@@ -46,6 +47,7 @@ export async function PublicNav({
         </Link>
 
         <div className="flex shrink-0 items-center gap-2">
+          <CommandPaletteTrigger tiles={tiles} />
           <PublicPdfToolsMenuClient tiles={tiles} hasMoreComingSoon={hasMoreComingSoon} compact />
           <span className="hidden sm:inline-flex">
             <PublicNavLink href="/guides">Guides</PublicNavLink>
