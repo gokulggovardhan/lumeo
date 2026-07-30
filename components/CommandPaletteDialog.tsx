@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { ToolGlyph } from "@/components/pdf/ToolGlyph";
 import {
@@ -146,7 +147,15 @@ export function CommandPaletteDialog({
     ? `${listboxId}-option-${displayResults[activeIndex].id}`
     : undefined;
 
-  return (
+  // Portaled to document.body -- the header this trigger lives in uses
+  // aura-glass-regular (backdrop-filter), and per the CSS spec any
+  // backdrop-filter/filter/transform ancestor becomes the containing block
+  // for its `position: fixed` descendants. Without the portal, this
+  // dialog's "fixed inset-0" overlay was being clipped to the header's own
+  // small bounding box instead of the viewport -- confirmed live
+  // (getBoundingClientRect returned the header's ~1215x115 box, not
+  // 1280x720) before this fix.
+  return createPortal(
     <div className="fixed inset-0 z-[60] flex items-start justify-center bg-[var(--v2-surface-overlay)] px-4 pt-[12vh] sm:pt-[16vh]">
       <div
         ref={panelRef}
@@ -242,6 +251,7 @@ export function CommandPaletteDialog({
           )}
         </ul>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
