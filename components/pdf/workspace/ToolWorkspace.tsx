@@ -389,7 +389,7 @@ export function L2UploadStage({
         event.stopPropagation();
         openFileChooser();
       }}
-      className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-200 hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+      className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] sm:w-auto"
     >
       {buttonLabel ?? (multiple ? "Select PDFs" : "Select PDF")}
     </button>
