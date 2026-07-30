@@ -58,14 +58,18 @@ export default async function MergePdfPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader
-        title="Merge PDF"
-        description="Combine PDFs into one clean document."
-      />
-
       {toolState.blocked ? (
-        <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
+        <>
+          <L2ToolPageHeader
+            title="Merge PDF"
+            description="Combine PDFs into one clean document."
+          />
+          <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
+        </>
       ) : (
+        // MergePdfTool renders its own sticky Aura OS v2 workspace header
+        // (title + description) -- no page-level header here, or the two
+        // would stack redundantly above the tool.
         <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool aura-merge-tool"><MergePdfTool /></div>
       )}
 

@@ -399,13 +399,20 @@ test("Run 3 PDF workspace rules preserve algorithms and Analytics V1 scope", () 
 });
 
 test("Run 4 live PDF tools use shared workspace primitives internally", () => {
-  const tools = [
-    ["Merge", read("components/pdf/MergePdfTool.tsx")],
+  // Split and Compress still use the pre-Aura-OS-v2-PR10 workspace
+  // primitives (two-column L2ToolWorkspace/L2ToolMainColumn/
+  // L2ToolSettingsPanel/L2ActionArea). Merge was deliberately migrated to
+  // the newer three-panel workspace shell (L2WorkspaceHeader/
+  // L2WorkspaceGrid/L2WorkspaceToolbar/ToolActionBar) introduced in PR10 as
+  // the reference implementation for future tool redesigns -- it is
+  // intentionally on a different, newer primitive set than its siblings
+  // until they're redesigned too, not a regression.
+  const legacyWorkspaceTools = [
     ["Split", read("components/pdf/SplitPdfTool.tsx")],
     ["Compress", read("components/pdf/CompressPdfTool.tsx")],
   ] as const;
 
-  for (const [name, source] of tools) {
+  for (const [name, source] of legacyWorkspaceTools) {
     for (const primitive of ["L2UploadStage", "L2ToolWorkspace", "L2ToolMainColumn", "L2ToolSettingsPanel", "L2ActionArea", "L2PrivacyNote"]) {
       assert.ok(source.includes(primitive), `${name} should use ${primitive}`);
     }
@@ -413,6 +420,14 @@ test("Run 4 live PDF tools use shared workspace primitives internally", () => {
     assert.ok(source.includes("l2-tool-deep-workspace"), `${name} should use deep workspace class`);
     assert.ok(source.includes("lumeo-primary-action"), `${name} should mark its primary actions`);
   }
+
+  const mergeSource = read("components/pdf/MergePdfTool.tsx");
+  for (const primitive of ["L2UploadStage", "L2WorkspaceHeader", "L2WorkspaceGrid", "L2WorkspaceToolbar", "ToolActionBar", "L2PrivacyNote"]) {
+    assert.ok(mergeSource.includes(primitive), `Merge should use ${primitive}`);
+  }
+  assert.ok(mergeSource.includes("l2-workspace"), "Merge should use the v2 workspace empty-state class");
+  assert.ok(mergeSource.includes("l2-workspace-deep"), "Merge should use the v2 deep workspace class");
+  assert.ok(mergeSource.includes("lumeo-primary-action"), "Merge should mark its primary actions");
 
   const mergeTool = read("components/pdf/MergePdfTool.tsx");
   const splitTool = read("components/pdf/SplitPdfTool.tsx");
@@ -437,7 +452,7 @@ test("Run 4 live PDF tool rules remain tool-specific and truthful", () => {
   assert.ok(mergeTool.includes("One combined PDF using the file order shown."));
   assert.ok(mergeTool.includes("Move ${item.file.name} up"));
   assert.ok(mergeTool.includes("Remove ${item.file.name}"));
-  assert.doesNotMatch(mergeTool.match(/<L2ToolSettingsPanel title="Merge options"[\s\S]*?<\/L2ToolSettingsPanel>/)?.[0] ?? "", /metadata removal|archive/i);
+  assert.doesNotMatch(mergeTool.match(/inspector=\{[\s\S]*?Merge options[\s\S]*?<\/div>\s*\}/)?.[0] ?? "", /metadata removal|archive/i);
 
   for (const splitMode of ['"extract"', '"ranges"', '"everyPage"', '"everyN"', '"remove"']) {
     assert.ok(splitTool.includes(splitMode), `Split should keep ${splitMode}`);

@@ -233,6 +233,64 @@ export function L2ToolPageHeader({
   );
 }
 
+// Aura OS v2 (PR 10) -- the reference desktop-workspace shell: sticky glass
+// header, three-panel grid (queue / main workspace / inspector), and a
+// floating contextual toolbar. Introduced for the Merge PDF redesign but
+// deliberately generic (no Merge-specific copy or state) so the next tool
+// redesigns in this series reuse it rather than each hand-rolling their own
+// sticky/glass chrome.
+
+export function L2WorkspaceHeader({
+  title,
+  description,
+  categoryLabel = "PDF TOOL",
+  action,
+}: {
+  title: string;
+  description: string;
+  categoryLabel?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <header className="l2-workspace-header aura-glass-thin sticky top-3 z-20 flex flex-col justify-between gap-4 rounded-[var(--radius-2xl)] px-5 py-4 shadow-[var(--v2-elevation-2)] md:flex-row md:items-center">
+      <div className="min-w-0">
+        <p className="aura-text-label text-[var(--text-accent)]">{categoryLabel}</p>
+        <h1 className="mt-1.5 truncate font-serif text-[clamp(1.25rem,2vw,1.5rem)] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]">
+          {title}
+        </h1>
+        <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">{description}</p>
+      </div>
+      {action ? <div className="shrink-0">{action}</div> : null}
+    </header>
+  );
+}
+
+export function L2WorkspaceToolbar({ children }: { children: ReactNode }) {
+  return (
+    <div className="l2-workspace-toolbar aura-glass-thin sticky top-[5.75rem] z-10 flex flex-wrap items-center gap-2.5 rounded-[var(--radius-xl)] px-3.5 py-2.5 shadow-[var(--v2-elevation-1)]">
+      {children}
+    </div>
+  );
+}
+
+export function L2WorkspaceGrid({
+  queue,
+  main,
+  inspector,
+}: {
+  queue: ReactNode;
+  main: ReactNode;
+  inspector: ReactNode;
+}) {
+  return (
+    <div className="l2-workspace-grid grid min-w-0 gap-5 lg:grid-cols-[260px_minmax(0,1fr)_320px] xl:gap-6">
+      <div className="l2-workspace-queue grid min-w-0 auto-rows-min gap-4 lg:order-1">{queue}</div>
+      <div className="l2-workspace-main grid min-w-0 auto-rows-min gap-4 lg:order-2">{main}</div>
+      <div className="l2-workspace-inspector min-w-0 lg:order-3">{inspector}</div>
+    </div>
+  );
+}
+
 export function L2ToolWorkspace({ children }: { children: ReactNode }) {
   return (
     <section className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] gap-5">
