@@ -314,6 +314,19 @@ textarea {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* iOS Safari force-zooms the whole page on focus for any text input
+ * under 16px. Every PDF tool's form fields (rename box, page-range,
+ * chunk size, ...) use Tailwind's text-sm (14px), so this hit every
+ * tool with a text field. Bumping to 16px only below the breakpoint
+ * where iOS actually applies this rule avoids touching desktop type. */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 button,
 a {
   touch-action: manipulation;

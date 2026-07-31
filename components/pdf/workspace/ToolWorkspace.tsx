@@ -137,7 +137,10 @@ export function ToolActionBar({ children }: { children: ReactNode }) {
     // just no longer overridden by the glass tier's own lighter shadow)
     // so this bar keeps reading as more elevated than the dropdown/menu
     // surfaces that use the unmodified glass-regular shadow.
-    <div className="aura-glass-regular sticky bottom-3 z-10 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-4)]">
+    <div
+      className="aura-glass-regular sticky z-10 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-4)]"
+      style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">{children}</div>
     </div>
   );
