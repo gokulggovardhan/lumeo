@@ -298,7 +298,7 @@ export default function HtmlToPdfTool() {
 
   return (
     <section className="l2-tool-deep-workspace mx-auto grid w-full max-w-[1240px] gap-5 pb-4 lg:pb-0">
-      <div className="grid min-h-[420px] gap-3 lg:h-[480px] lg:grid-cols-3">
+      <div className="grid gap-3 lg:h-[480px] lg:grid-cols-3">
         <ToolPanel
           title="HTML / CSS"
           action={
@@ -348,7 +348,7 @@ export default function HtmlToPdfTool() {
             title="HTML preview"
             srcDoc={preview}
             sandbox="allow-same-origin"
-            className="h-full w-full rounded-lg bg-white"
+            className="h-full min-h-[260px] w-full rounded-lg bg-white"
           />
         </ToolPanel>
 
