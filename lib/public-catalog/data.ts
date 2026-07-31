@@ -155,6 +155,7 @@ async function fetchPublicHomepageTools(): Promise<PublicHomepageTool[]> {
 
 export const getPublicPdfCatalog = unstable_cache(fetchPublicPdfCatalog, ["lumeo-public-pdf-catalog"], {
   revalidate: 300,
+  tags: ["public-pdf-catalog"],
 });
 
 export const getPublicHomepageTools = unstable_cache(fetchPublicHomepageTools, ["lumeo-public-homepage-tools"], {
