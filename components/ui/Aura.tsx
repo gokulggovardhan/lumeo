@@ -652,8 +652,8 @@ export function AuraFileCard({
       {icon ?? <FileIcon />}
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black text-[var(--lumeo-paper-50)]">{name}</p>
-        <p className="mt-1 text-xs text-[var(--lumeo-paper-400)]">{meta}</p>
-        {status ? <p className="mt-1 text-xs font-bold text-[var(--text-success)]">{status}</p> : null}
+        <p className="mt-1 truncate text-xs text-[var(--lumeo-paper-400)]">{meta}</p>
+        {status ? <p className="mt-1 truncate text-xs font-bold text-[var(--text-success)]">{status}</p> : null}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {onMoveUp || onMoveDown ? (

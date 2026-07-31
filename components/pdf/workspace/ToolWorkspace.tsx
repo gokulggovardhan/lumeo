@@ -137,7 +137,10 @@ export function ToolActionBar({ children }: { children: ReactNode }) {
     // just no longer overridden by the glass tier's own lighter shadow)
     // so this bar keeps reading as more elevated than the dropdown/menu
     // surfaces that use the unmodified glass-regular shadow.
-    <div className="aura-glass-regular sticky bottom-3 z-10 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-4)]">
+    <div
+      className="aura-glass-regular sticky z-10 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-4)]"
+      style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">{children}</div>
     </div>
   );
@@ -278,14 +281,20 @@ export function L2WorkspaceGrid({
   main,
   inspector,
 }: {
-  queue: ReactNode;
+  queue?: ReactNode;
   main: ReactNode;
   inspector: ReactNode;
 }) {
   return (
-    <div className="l2-workspace-grid grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[260px_minmax(0,1fr)_320px] xl:gap-6">
-      <div className="l2-workspace-queue grid min-w-0 auto-rows-min gap-4 lg:order-1">{queue}</div>
-      <div className="l2-workspace-main grid min-w-0 auto-rows-min gap-4 lg:order-2">{main}</div>
+    <div
+      className={`l2-workspace-grid grid min-w-0 grid-cols-1 gap-5 xl:gap-6 ${
+        queue ? "lg:grid-cols-[260px_minmax(0,1fr)_320px]" : "lg:grid-cols-[minmax(0,1fr)_320px]"
+      }`}
+    >
+      {queue ? (
+        <div className="l2-workspace-queue grid min-w-0 grid-cols-1 auto-rows-min gap-4 lg:order-1">{queue}</div>
+      ) : null}
+      <div className="l2-workspace-main grid min-w-0 grid-cols-1 auto-rows-min gap-4 lg:order-2">{main}</div>
       <div className="l2-workspace-inspector min-w-0 lg:order-3">{inspector}</div>
     </div>
   );
