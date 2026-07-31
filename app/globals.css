@@ -170,7 +170,7 @@
   --surface-elevated: var(--atelier-surface-3);
   --surface-floating: var(--atelier-surface-4);
   --surface-interactive: var(--atelier-surface-2);
-  --surface-selected: color-mix(in srgb, var(--atelier-sage-500) 16%, var(--atelier-surface-3));
+  --surface-selected: var(--atelier-sage-500);
   --surface-input: var(--atelier-surface-1);
   --surface-overlay: rgb(17 19 16 / 0.82);
   --surface-danger: rgba(var(--ruby-rgb), 0.13);
