@@ -1364,42 +1364,41 @@ export default function SplitPdfTool() {
         </span>
       </L2WorkspaceToolbar>
 
-      <L2WorkspaceGrid
-        queue={
-          <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-4 shadow-[var(--v2-elevation-1)]">
-            <p className="aura-text-label text-[var(--text-accent)]">File</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">Source PDF.</p>
+      <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3.5 shadow-[var(--v2-elevation-1)]">
+        <div className="flex items-center gap-3">
+          <span className="aura-text-label shrink-0 text-[var(--text-accent)]">File</span>
+          <div className="min-w-0 flex-1">
+            <L2FileCard
+              name={analysis.name}
+              meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatBytes(analysis.size)} · ${analysis.pageSizeType}`}
+              icon={<FileIcon />}
+              action={<AuraStatus tone="success" label={status} />}
+            />
+          </div>
+        </div>
 
-            <div className="mt-3 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.04)] px-3 py-2">
-              <L2FileCard
-                name={analysis.name}
-                meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatBytes(analysis.size)} · ${analysis.pageSizeType}`}
-                icon={<FileIcon />}
-                action={<AuraStatus tone="success" label={status} />}
-              />
-            </div>
-
-            {largeFile || veryLargeDocument || analysis.pageSizeType === "Mixed" ? (
-              <div className="mt-3 grid gap-2">
-                {largeFile ? (
-                  <div className="rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.08)] px-3 py-2 text-xs text-[var(--text-secondary)]">
-                    Large files may take longer because splitting happens in your browser.
-                  </div>
-                ) : null}
-                {veryLargeDocument ? (
-                  <div className="rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.08)] px-3 py-2 text-xs text-[var(--text-secondary)]">
-                    Previews render progressively for this document.
-                  </div>
-                ) : null}
-                {analysis.pageSizeType === "Mixed" ? (
-                  <div className="rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.08)] px-3 py-2 text-xs text-[var(--text-secondary)]">
-                    Mixed page sizes detected.
-                  </div>
-                ) : null}
+        {largeFile || veryLargeDocument || analysis.pageSizeType === "Mixed" ? (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+            {largeFile ? (
+              <div className="rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.08)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+                Large files may take longer because splitting happens in your browser.
+              </div>
+            ) : null}
+            {veryLargeDocument ? (
+              <div className="rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.08)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+                Previews render progressively for this document.
+              </div>
+            ) : null}
+            {analysis.pageSizeType === "Mixed" ? (
+              <div className="rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.08)] px-3 py-2 text-xs text-[var(--text-secondary)]">
+                Mixed page sizes detected.
               </div>
             ) : null}
           </div>
-        }
+        ) : null}
+      </div>
+
+      <L2WorkspaceGrid
         main={
           <div className="aura-glass-thin flex min-h-0 flex-col rounded-[var(--radius-2xl)] p-4 shadow-[var(--v2-elevation-1)]">
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
