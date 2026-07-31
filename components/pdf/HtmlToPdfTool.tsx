@@ -348,7 +348,7 @@ export default function HtmlToPdfTool() {
             title="HTML preview"
             srcDoc={preview}
             sandbox="allow-same-origin"
-            className="h-full w-full rounded-lg bg-white"
+            className="h-full min-h-[260px] w-full rounded-lg bg-white"
           />
         </ToolPanel>
 

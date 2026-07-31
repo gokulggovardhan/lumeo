@@ -201,7 +201,8 @@ export function WatermarkPreview({
   return (
     <div
       ref={stageRef}
-      className="relative mx-auto max-h-[32rem] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white"
+      className="relative mx-auto max-h-[70vh] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white"
+      style={{ aspectRatio: `${pageWidthPt} / ${pageHeightPt}` }}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}

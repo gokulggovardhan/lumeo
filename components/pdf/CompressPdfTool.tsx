@@ -1116,7 +1116,7 @@ export default function CompressPdfTool() {
         </L2ToolMainColumn>
 
         <L2ToolSettingsPanel title="Compression settings" description="Choose a quality profile or target size, then compress locally.">
-          <div className="flex h-full min-h-0 flex-col">
+          <div className="flex h-full min-h-0 min-w-0 flex-col">
             <div className={result ? "hidden" : "border-b border-[var(--text-primary)]/10 pb-3"}>
               <AuraSegmentedControl
                 label="Compression mode"

@@ -423,9 +423,13 @@ export default function CropPdfTool() {
                 Loading page preview...
               </div>
             ) : (
-              <div ref={stageRef} className="relative mx-auto max-h-[32rem] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white">
+              <div
+                ref={stageRef}
+                className="relative mx-auto max-h-[70vh] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white"
+                style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={pageImageUrl} alt="Page preview" className="pointer-events-none block h-full w-full select-none" />
+                <img src={pageImageUrl} alt="Page preview" className="pointer-events-none block h-full w-full object-contain select-none" />
                 <CropRectView
                   stageRef={stageRef}
                   rect={config.rect}
