@@ -5,13 +5,17 @@ import { degrees, PDFDocument } from "pdf-lib";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
-  L2ActionArea,
+  L2PanelLabel,
   L2PrivacyNote,
   L2ResultState,
-  L2ToolMainColumn,
-  L2ToolSettingsPanel,
-  L2ToolWorkspace,
+  L2ToolbarButton,
   L2UploadStage,
+  L2WorkspaceGrid,
+  L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
+  L2WorkspaceToolbar,
+  ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
@@ -334,8 +338,10 @@ export default function OrganizePdfTool() {
 
   if (!document_) {
     return (
-      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
-        <div className="mx-auto w-full max-w-[1040px]">
+      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+        <L2WorkspaceHeader title="Organize PDF" description="Reorder, rotate, duplicate, or remove pages in one document." />
+
+        <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="organize-pdf-upload"
             accept="application/pdf,.pdf"
@@ -346,9 +352,11 @@ export default function OrganizePdfTool() {
             onFilesSelected={handleFiles}
           />
         </div>
+
         <L2PrivacyNote />
+
         {error ? (
-          <div role="alert" className="mt-4 rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+          <div role="alert" className="mx-auto w-full max-w-[720px] rounded-[var(--radius-lg)] border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
@@ -356,14 +364,30 @@ export default function OrganizePdfTool() {
     );
   }
 
+  const summaryLine = `${items.length} page${items.length === 1 ? "" : "s"} · ${formatBytes(document_.size)}`;
+
   return (
-    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
-      <L2ToolWorkspace>
-        <L2ToolMainColumn>
-          <div
-            role="list"
-            className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
-          >
+    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+      <L2WorkspaceHeader title="Organize PDF" description={summaryLine} />
+
+      <L2WorkspaceToolbar>
+        {selected.size > 0 ? (
+          <>
+            <L2ToolbarButton onClick={() => handleRotate("left")}>Rotate selected left</L2ToolbarButton>
+            <L2ToolbarButton onClick={() => handleRotate("right")}>Rotate selected right</L2ToolbarButton>
+          </>
+        ) : null}
+        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{summaryLine}</span>
+      </L2WorkspaceToolbar>
+
+      <L2WorkspaceGrid
+        main={
+          <L2WorkspacePanel>
+            <L2PanelLabel title="Pages" description="Drag to reorder. Select multiple to rotate or delete together." />
+            <div
+              role="list"
+              className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
+            >
             {items.map((item, index) => (
               <div
                 key={item.id}
@@ -410,44 +434,30 @@ export default function OrganizePdfTool() {
                 </div>
               </div>
             ))}
-          </div>
-        </L2ToolMainColumn>
-
-        <L2ToolSettingsPanel
-          title="Organize"
-          description={`${items.length} page${items.length === 1 ? "" : "s"} · ${formatBytes(document_.size)}`}
-        >
-          <L2ActionArea
-            primary={
-              <button
-                type="button"
-                onClick={() => void handleExport()}
-                disabled={isExporting || items.length === 0}
-                className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]"
-              >
-                {isExporting ? "Building PDF…" : "Save organized PDF"}
-              </button>
-            }
-            secondary={
-              selected.size > 0 ? (
-                <>
-                  <button type="button" onClick={() => handleRotate("left")} className="text-sm font-bold text-[var(--text-primary)]">
-                    Rotate selected left
-                  </button>
-                  <button type="button" onClick={() => handleRotate("right")} className="text-sm font-bold text-[var(--text-primary)]">
-                    Rotate selected right
-                  </button>
-                </>
-              ) : undefined
-            }
-          />
-          {error ? (
-            <div role="alert" className="rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-3 text-sm font-medium text-[var(--text-danger)]">
-              {error}
             </div>
-          ) : null}
-        </L2ToolSettingsPanel>
-      </L2ToolWorkspace>
+          </L2WorkspacePanel>
+        }
+        inspector={
+          <L2WorkspaceInspector title="Organize" description="Save applies the page order, rotations, duplicates, and deletions shown here.">
+            {error ? (
+              <div role="alert" className="mt-4 rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-3 text-sm font-medium text-[var(--text-danger)]">
+                {error}
+              </div>
+            ) : null}
+          </L2WorkspaceInspector>
+        }
+      />
+
+      <ToolActionBar>
+        <button
+          type="button"
+          onClick={() => void handleExport()}
+          disabled={isExporting || items.length === 0}
+          className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] sm:w-auto"
+        >
+          {isExporting ? "Building PDF…" : "Save organized PDF"}
+        </button>
+      </ToolActionBar>
 
       {result ? (
         <L2ResultState
