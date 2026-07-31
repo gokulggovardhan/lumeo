@@ -8,9 +8,12 @@ import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2FileCard,
   L2PrivacyNote,
+  L2ToolbarButton,
   L2UploadStage,
   L2WorkspaceGrid,
   L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
   L2WorkspaceToolbar,
   ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
@@ -1336,29 +1339,13 @@ export default function SplitPdfTool() {
       <L2WorkspaceHeader title="Split PDF" description={summaryLine} />
 
       <L2WorkspaceToolbar>
-        <button
-          type="button"
-          onClick={handleUndo}
-          disabled={!undoStack.length}
-          className="lumeo-press inline-flex h-9 items-center rounded-[var(--radius-pill)] border border-[var(--border-default)] px-4 text-xs font-bold text-[var(--text-secondary)] transition duration-[var(--v2-motion-fast)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]"
-        >
+        <L2ToolbarButton onClick={handleUndo} disabled={!undoStack.length}>
           Undo
-        </button>
-        <button
-          type="button"
-          onClick={handleRedo}
-          disabled={!redoStack.length}
-          className="lumeo-press inline-flex h-9 items-center rounded-[var(--radius-pill)] border border-[var(--border-default)] px-4 text-xs font-bold text-[var(--text-secondary)] transition duration-[var(--v2-motion-fast)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]"
-        >
+        </L2ToolbarButton>
+        <L2ToolbarButton onClick={handleRedo} disabled={!redoStack.length}>
           Redo
-        </button>
-        <button
-          type="button"
-          onClick={resetTool}
-          className="lumeo-press inline-flex h-9 items-center rounded-[var(--radius-pill)] border border-[var(--border-default)] px-4 text-xs font-bold text-[var(--text-secondary)] transition duration-[var(--v2-motion-fast)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
-        >
-          Start new
-        </button>
+        </L2ToolbarButton>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">
           {analysis.pageCount} page{analysis.pageCount === 1 ? "" : "s"} · {formatBytes(analysis.size)}
         </span>
@@ -1400,7 +1387,7 @@ export default function SplitPdfTool() {
 
       <L2WorkspaceGrid
         main={
-          <div className="aura-glass-thin flex min-h-0 flex-col rounded-[var(--radius-2xl)] p-4 shadow-[var(--v2-elevation-1)]">
+          <L2WorkspacePanel>
             <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="aura-text-label text-[var(--text-accent)]">Pages</p>
@@ -1527,15 +1514,10 @@ export default function SplitPdfTool() {
                 ),
               )}
             </div>
-          </div>
+          </L2WorkspacePanel>
         }
         inspector={
-          <div className="aura-glass-regular rounded-[var(--radius-2xl)] p-5 shadow-[var(--v2-elevation-2)] lg:sticky lg:top-[9.5rem] lg:self-start">
-            <p className="aura-text-label text-[var(--text-accent)]">Split settings</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-              Choose the split mode, page selection, and output name.
-            </p>
-
+          <L2WorkspaceInspector title="Split settings" description="Choose the split mode, page selection, and output name.">
             <div className="mt-4 border-b border-[var(--border-subtle)] pb-3">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]">
@@ -1793,7 +1775,7 @@ export default function SplitPdfTool() {
                 </div>
               ) : null}
             </div>
-          </div>
+          </L2WorkspaceInspector>
         }
       />
 
