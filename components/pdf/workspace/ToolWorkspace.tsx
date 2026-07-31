@@ -284,8 +284,8 @@ export function L2WorkspaceGrid({
 }) {
   return (
     <div className="l2-workspace-grid grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[260px_minmax(0,1fr)_320px] xl:gap-6">
-      <div className="l2-workspace-queue grid min-w-0 auto-rows-min gap-4 lg:order-1">{queue}</div>
-      <div className="l2-workspace-main grid min-w-0 auto-rows-min gap-4 lg:order-2">{main}</div>
+      <div className="l2-workspace-queue grid min-w-0 grid-cols-1 auto-rows-min gap-4 lg:order-1">{queue}</div>
+      <div className="l2-workspace-main grid min-w-0 grid-cols-1 auto-rows-min gap-4 lg:order-2">{main}</div>
       <div className="l2-workspace-inspector min-w-0 lg:order-3">{inspector}</div>
     </div>
   );
