@@ -276,6 +276,102 @@ export function L2WorkspaceToolbar({ children }: { children: ReactNode }) {
   );
 }
 
+// Shared across every L2WorkspaceGrid-based tool (Merge, Split, and any
+// future migration): the small "SECTION LABEL / one-line description"
+// header that tops every panel and inspector in this family. Kept as its
+// own component instead of copy-pasted <p> pairs so the exact type scale
+// (aura-text-label + text-xs leading-5) can't drift between tools.
+export function L2PanelLabel({ title, description }: { title: string; description?: ReactNode }) {
+  return (
+    <div>
+      <p className="aura-text-label text-[var(--text-accent)]">{title}</p>
+      {description ? <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">{description}</p> : null}
+    </div>
+  );
+}
+
+// The glass panel chrome shared by every queue/main-column card in the
+// L2WorkspaceGrid family (Merge's document tray + arrange panel, Split's
+// pages panel). "flex" is for panels with an internal scroll region that
+// needs to fill remaining height; "flat" is for panels that just contain
+// static content (Merge's drop-more-files tray).
+export function L2WorkspacePanel({
+  variant = "flex",
+  className,
+  children,
+}: {
+  variant?: "flex" | "flat";
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={cx(
+        "aura-glass-thin rounded-[var(--radius-2xl)] p-4 shadow-[var(--v2-elevation-1)]",
+        variant === "flex" && "flex min-h-0 flex-col",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+// The sticky settings/inspector chrome shared by every L2WorkspaceGrid
+// tool's inspector slot (Merge options, Split settings). Distinct from
+// L2ToolSettingsPanel (used by the simpler two-column tools): this family's
+// taller sticky header+toolbar stack needs a larger top offset.
+export function L2WorkspaceInspector({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="aura-glass-regular rounded-[var(--radius-2xl)] p-5 shadow-[var(--v2-elevation-2)] lg:sticky lg:top-[9.5rem] lg:self-start">
+      <L2PanelLabel title={title} description={description} />
+      {children}
+    </div>
+  );
+}
+
+// The secondary/primary toolbar button shared by every L2WorkspaceToolbar
+// consumer (Undo/Redo/Start new/Clear all use "secondary"; Merge's
+// "+ Add PDFs" uses "primary").
+export function L2ToolbarButton({
+  variant = "secondary",
+  disabled,
+  onClick,
+  className,
+  children,
+}: {
+  variant?: "primary" | "secondary";
+  disabled?: boolean;
+  onClick?: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cx(
+        "lumeo-press inline-flex h-9 items-center rounded-[var(--radius-pill)] px-4 text-xs font-bold transition duration-[var(--v2-motion-fast)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]",
+        variant === "primary"
+          ? "gap-1.5 bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] font-extrabold text-[var(--text-on-accent)] hover:-translate-y-0.5"
+          : "border border-[var(--border-default)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]",
+        className,
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function L2WorkspaceGrid({
   queue,
   main,

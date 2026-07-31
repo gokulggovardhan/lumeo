@@ -7,10 +7,14 @@ import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2AdvancedDisclosure,
   L2FileCard,
+  L2PanelLabel,
   L2PrivacyNote,
+  L2ToolbarButton,
   L2UploadStage,
   L2WorkspaceGrid,
   L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
   L2WorkspaceToolbar,
   ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
@@ -921,20 +925,10 @@ export default function MergePdfTool() {
       <L2WorkspaceHeader title="Merge PDF" description={readySummary} />
 
       <L2WorkspaceToolbar>
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          className="lumeo-press inline-flex h-9 items-center gap-1.5 rounded-[var(--radius-pill)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-4 text-xs font-extrabold text-[var(--text-on-accent)] transition duration-[var(--v2-motion-fast)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
-        >
+        <L2ToolbarButton variant="primary" onClick={() => inputRef.current?.click()}>
           + Add PDFs
-        </button>
-        <button
-          type="button"
-          onClick={clearAllFiles}
-          className="lumeo-press inline-flex h-9 items-center rounded-[var(--radius-pill)] border border-[var(--border-default)] px-4 text-xs font-bold text-[var(--text-secondary)] transition duration-[var(--v2-motion-fast)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
-        >
-          Clear all
-        </button>
+        </L2ToolbarButton>
+        <L2ToolbarButton onClick={clearAllFiles}>Clear all</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">
           {files.length} file{files.length === 1 ? "" : "s"} · {totalPages} pages · {formatFileSize(totalSize)}
         </span>
@@ -942,11 +936,8 @@ export default function MergePdfTool() {
 
       <L2WorkspaceGrid
         queue={
-          <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-4 shadow-[var(--v2-elevation-1)]">
-            <p className="aura-text-label text-[var(--text-accent)]">Document tray</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-              Drop more PDFs here, or use Add PDFs above.
-            </p>
+          <L2WorkspacePanel variant="flat">
+            <L2PanelLabel title="Document tray" description="Drop more PDFs here, or use Add PDFs above." />
             <div
               onDragOver={(event) => {
                 event.preventDefault();
@@ -967,13 +958,12 @@ export default function MergePdfTool() {
               <MergeIcon />
               <p className="text-xs font-bold text-[var(--text-secondary)]">Drop PDFs here</p>
             </div>
-          </div>
+          </L2WorkspacePanel>
         }
         main={
-          <div className="l2-workspace-arrange aura-glass-thin flex min-h-0 flex-col rounded-[var(--radius-2xl)] p-4 shadow-[var(--v2-elevation-1)]">
+          <L2WorkspacePanel className="l2-workspace-arrange">
             <div className="mb-3">
-              <p className="aura-text-label text-[var(--text-accent)]">Arrange</p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">Drag to reorder the final document.</p>
+              <L2PanelLabel title="Arrange" description="Drag to reorder the final document." />
             </div>
 
             <div className="no-scrollbar aura-scrollbar min-h-0 space-y-2 overflow-y-auto pr-1 lg:max-h-[52vh]">
@@ -1079,14 +1069,10 @@ export default function MergePdfTool() {
                 </div>
               ) : null}
             </div>
-          </div>
+          </L2WorkspacePanel>
         }
         inspector={
-          <div className="aura-glass-regular rounded-[var(--radius-2xl)] p-5 shadow-[var(--v2-elevation-2)] lg:sticky lg:top-[9.5rem] lg:self-start">
-            <p className="aura-text-label text-[var(--text-accent)]">Merge options</p>
-            <p className="mt-1 text-xs leading-5 text-[var(--text-secondary)]">
-              One combined PDF using the file order shown.
-            </p>
+          <L2WorkspaceInspector title="Merge options" description="One combined PDF using the file order shown.">
 
             <div className="mt-4 rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.04)] p-3">
               <div className="flex items-start justify-between gap-3">
@@ -1159,7 +1145,7 @@ export default function MergePdfTool() {
                 placeholder="lumeo-merged.pdf"
               />
             </label>
-          </div>
+          </L2WorkspaceInspector>
         }
       />
 
