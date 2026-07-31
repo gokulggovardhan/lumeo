@@ -283,7 +283,7 @@ export function L2WorkspaceGrid({
   inspector: ReactNode;
 }) {
   return (
-    <div className="l2-workspace-grid grid min-w-0 gap-5 lg:grid-cols-[260px_minmax(0,1fr)_320px] xl:gap-6">
+    <div className="l2-workspace-grid grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[260px_minmax(0,1fr)_320px] xl:gap-6">
       <div className="l2-workspace-queue grid min-w-0 auto-rows-min gap-4 lg:order-1">{queue}</div>
       <div className="l2-workspace-main grid min-w-0 auto-rows-min gap-4 lg:order-2">{main}</div>
       <div className="l2-workspace-inspector min-w-0 lg:order-3">{inspector}</div>
@@ -293,8 +293,8 @@ export function L2WorkspaceGrid({
 
 export function L2ToolWorkspace({ children }: { children: ReactNode }) {
   return (
-    <section className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] gap-5">
-      <div className="l2-tool-workspace-grid grid gap-5 lg:grid-cols-[minmax(0,1.9fr)_minmax(330px,1fr)] xl:gap-7">
+    <section className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] grid-cols-1 gap-5">
+      <div className="l2-tool-workspace-grid grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.9fr)_minmax(330px,1fr)] xl:gap-7">
         {children}
       </div>
     </section>
@@ -323,9 +323,9 @@ export function L2ToolSettingsPanel({
     // the clearest real "inspector" glass candidate in the workspace.
     // Was aura-luminous-card (an opaque gradient), now real glass
     // consistent with the header/menu/action-bar treatment.
-    <aside className="l2-tool-settings-panel aura-glass-regular rounded-[var(--radius-2xl)] p-5 lg:sticky lg:top-24 lg:self-start">
+    <aside className="l2-tool-settings-panel aura-glass-regular min-w-0 rounded-[var(--radius-2xl)] p-5 lg:sticky lg:top-24 lg:self-start">
       <AuraSectionHeader title={title} description={description} />
-      <div className="mt-5 grid gap-4">{children}</div>
+      <div className="mt-5 grid min-w-0 gap-4">{children}</div>
       {action ? <div className="l2-tool-action-area mt-5">{action}</div> : null}
     </aside>
   );
@@ -737,8 +737,8 @@ export function L2PrivacyNote({ compact = false }: { compact?: boolean }) {
 // doesn't jump once the tool mounts.
 export function ToolWorkspaceLoading() {
   return (
-    <section aria-hidden="true" aria-label="Loading tool" className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] gap-5">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.9fr)_minmax(330px,1fr)] xl:gap-7">
+    <section aria-hidden="true" aria-label="Loading tool" className="l2-tool-workspace mx-auto grid w-full max-w-[1240px] grid-cols-1 gap-5">
+      <div className="grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.9fr)_minmax(330px,1fr)] xl:gap-7">
         <AuraSkeleton className="min-h-[22rem] rounded-[var(--radius-2xl)]" />
         <AuraSkeleton className="min-h-[22rem] rounded-[var(--radius-2xl)]" />
       </div>
