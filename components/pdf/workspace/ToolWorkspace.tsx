@@ -20,53 +20,6 @@ function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
-export function ToolWorkspaceShell({
-  title,
-  description,
-  children,
-  action,
-}: {
-  title: string;
-  description: string;
-  children: ReactNode;
-  action?: ReactNode;
-}) {
-  return (
-    <section className="aura-tool-workspace-shell mx-auto grid min-h-[70dvh] w-full max-w-[var(--container-wide)] gap-5 px-[var(--page-gutter)] py-5">
-      <ToolStepHeader title={title} description={description} action={action} />
-      <div className="aura-tool-workspace-layout grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(340px,0.75fr)]">
-        {children}
-      </div>
-      <ToolPrivacyNote />
-    </section>
-  );
-}
-
-export function ToolStepHeader({
-  title,
-  description,
-  action,
-}: {
-  title: string;
-  description: string;
-  action?: ReactNode;
-}) {
-  return (
-    <header className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
-      <div>
-        <p className="aura-text-label text-[var(--lumeo-gold-300)]">Lumeo tool workspace</p>
-        <h1 className="mt-2 font-serif text-[var(--text-heading-xl)] leading-[var(--leading-heading)] text-[var(--lumeo-paper-50)]">
-          {title}
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--lumeo-paper-400)]">
-          {description}
-        </p>
-      </div>
-      {action ? <div>{action}</div> : null}
-    </header>
-  );
-}
-
 export function ToolUploadStage({
   title = "Drop PDFs here",
   description = "or choose files from your device",
