@@ -1043,21 +1043,11 @@ export default function PdfToJpgTool() {
       <L2WorkspaceHeader
         title="PDF to JPG"
         description={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatBytes(analysis.size)}`}
-        action={
-          <div className="flex items-center gap-2">
-            <AuraStatus tone="success" label={status} />
-            <button
-              type="button"
-              onClick={resetTool}
-              className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/56 transition hover:border-[var(--text-primary)]/22 hover:text-[var(--text-primary)]"
-            >
-              Start new
-            </button>
-          </div>
-        }
+        action={<AuraStatus tone="success" label={status} />}
       />
 
       <L2WorkspaceToolbar>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
         {selectionMode === "custom" ? (
           <>
             <L2ToolbarButton onClick={selectAllCustom}>Select all</L2ToolbarButton>
