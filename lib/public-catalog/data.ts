@@ -1,7 +1,8 @@
 import "server-only";
 
+import { createClient } from "@supabase/supabase-js";
 import { unstable_cache } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getSupabaseEnv } from "@/lib/supabase/env";
 import {
   getFallbackHomepageTools,
   getFallbackPublicCatalog,
@@ -103,12 +104,26 @@ function mapHomepageRow(row: HomepageToolRow): PublicHomepageTool | null {
   return { slotNumber, toolSlug, toolName, shortDescription, route, iconKey, status };
 }
 
+// Plain, cookie-free client for the two unstable_cache-wrapped reads below.
+// The cookie-aware client in lib/supabase/server.ts calls next/headers'
+// cookies() -- a Dynamic API -- which this Next.js version rejects when
+// invoked from inside a function wrapped by unstable_cache(), throwing
+// "Route ... used cookies() inside a function cached with unstable_cache()".
+// That exception was landing in the catch block below on every request,
+// silently activating the hardcoded fallback catalog. Neither RPC needs a
+// user session (both are public, anon-key-readable), so a plain client
+// sidesteps the restriction entirely instead of working around it.
+function createPublicCatalogClient() {
+  const { url, publishableKey } = getSupabaseEnv();
+  return createClient(url, publishableKey);
+}
+
 async function fetchPublicPdfCatalog(): Promise<PublicCatalogResult> {
   try {
-    const supabase = await createClient();
+    const supabase = createPublicCatalogClient();
     const { data, error } = await supabase.rpc("get_public_pdf_catalog");
     if (error || !Array.isArray(data)) {
-      console.warn("Lumeo public catalog fallback active.");
+      console.warn("Lumeo public catalog fallback active.", error?.message ?? "unexpected response shape");
       return getFallbackPublicCatalog();
     }
 
@@ -116,25 +131,28 @@ async function fetchPublicPdfCatalog(): Promise<PublicCatalogResult> {
       .map(mapCatalogRow)
       .filter((tool): tool is PublicPdfTool => Boolean(tool));
 
-    if (tools.length === 0) return getFallbackPublicCatalog();
+    if (tools.length === 0) {
+      console.warn("Lumeo public catalog fallback active.", "rpc returned 0 mappable rows");
+      return getFallbackPublicCatalog();
+    }
 
     return {
       tools,
       categories: groupPublicTools(tools),
       source: "supabase",
     };
-  } catch {
-    console.warn("Lumeo public catalog fallback active.");
+  } catch (err) {
+    console.warn("Lumeo public catalog fallback active.", err instanceof Error ? err.message : String(err));
     return getFallbackPublicCatalog();
   }
 }
 
 async function fetchPublicHomepageTools(): Promise<PublicHomepageTool[]> {
   try {
-    const supabase = await createClient();
+    const supabase = createPublicCatalogClient();
     const { data, error } = await supabase.rpc("get_public_homepage_tools");
     if (error || !Array.isArray(data)) {
-      console.warn("Lumeo homepage tool fallback active.");
+      console.warn("Lumeo homepage tool fallback active.", error?.message ?? "unexpected response shape");
       return getFallbackHomepageTools();
     }
 
