@@ -4,12 +4,16 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
-  L2ActionArea,
+  L2PanelLabel,
   L2PrivacyNote,
-  L2ToolMainColumn,
-  L2ToolSettingsPanel,
-  L2ToolWorkspace,
+  L2ToolbarButton,
   L2UploadStage,
+  L2WorkspaceGrid,
+  L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
+  L2WorkspaceToolbar,
+  ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { openPdfJsDocument, withPageTimeout } from "@/lib/pdf/pdfjs";
@@ -181,6 +185,15 @@ export default function ExtractTextTool() {
     void navigator.clipboard.writeText(buildTxtFromEntries(selectedEntries));
   }
 
+  function resetTool() {
+    setFileName("");
+    setPageTexts(null);
+    setSearch("");
+    setPageRangeInput("");
+    setFormat("txt");
+    setError("");
+  }
+
   function handleDownload() {
     if (exportDisabled) return;
     const content =
@@ -199,8 +212,10 @@ export default function ExtractTextTool() {
 
   if (!pageTexts) {
     return (
-      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
-        <div className="mx-auto w-full max-w-[1040px]">
+      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+        <L2WorkspaceHeader title="Text Extract" description="Pull selectable text out of a PDF, narrow to a page range, and export as TXT, JSON, or CSV." />
+
+        <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="extract-text-upload"
             accept="application/pdf,.pdf"
@@ -212,9 +227,11 @@ export default function ExtractTextTool() {
             onFilesSelected={handleFiles}
           />
         </div>
+
         <L2PrivacyNote />
+
         {error ? (
-          <div role="alert" className="mt-4 rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+          <div role="alert" className="mx-auto w-full max-w-[720px] rounded-[var(--radius-lg)] border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
@@ -222,10 +239,22 @@ export default function ExtractTextTool() {
     );
   }
 
+  const summaryLine = `${pageTexts.length} page${pageTexts.length === 1 ? "" : "s"} extracted`;
+
   return (
-    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
-      <L2ToolWorkspace>
-        <L2ToolMainColumn>
+    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+      <L2WorkspaceHeader title="Text Extract" description={summaryLine} />
+
+      <L2WorkspaceToolbar>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
+        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{summaryLine}</span>
+      </L2WorkspaceToolbar>
+
+      <L2WorkspaceGrid
+        main={
+          <L2WorkspacePanel>
+            <L2PanelLabel title="Extracted text" description="Expand a page to read or copy its text." />
+            <div className="mt-3">
           {noTextLayer ? (
             <div role="status" className="rounded-lg border border-[var(--text-primary)]/14 bg-[var(--text-primary)]/[0.045] p-4 text-sm font-medium text-[var(--text-primary)]">
               No selectable text found — this looks like a scanned document.
@@ -255,9 +284,11 @@ export default function ExtractTextTool() {
               ))}
             </div>
           )}
-        </L2ToolMainColumn>
-
-        <L2ToolSettingsPanel title="Search & export" description="Narrow to a page range, search matching text, and choose an export format.">
+            </div>
+          </L2WorkspacePanel>
+        }
+        inspector={
+          <L2WorkspaceInspector title="Search & export" description="Narrow to a page range, search matching text, and choose an export format.">
           <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
             Search
             <input
@@ -293,26 +324,28 @@ export default function ExtractTextTool() {
               <option value="csv">CSV (.csv)</option>
             </select>
           </label>
+          </L2WorkspaceInspector>
+        }
+      />
 
-          <L2ActionArea
-            primary={
-              <button
-                type="button"
-                onClick={handleDownload}
-                disabled={exportDisabled}
-                className="lumeo-primary-action lumeo-press inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]"
-              >
-                Download .{FORMAT_EXTENSION[format]}
-              </button>
-            }
-            secondary={
-              <button type="button" onClick={handleCopyAll} disabled={exportDisabled} className="text-sm font-bold text-[var(--text-primary)]">
-                Copy all
-              </button>
-            }
-          />
-        </L2ToolSettingsPanel>
-      </L2ToolWorkspace>
+      <ToolActionBar>
+        <button
+          type="button"
+          onClick={handleCopyAll}
+          disabled={exportDisabled}
+          className="lumeo-press inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-5 text-sm font-bold text-[var(--text-secondary)] transition duration-[var(--v2-motion-fast)] hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]"
+        >
+          Copy all
+        </button>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={exportDisabled}
+          className="lumeo-primary-action lumeo-press inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 text-sm font-extrabold text-[var(--text-on-accent)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] sm:w-auto"
+        >
+          Download .{FORMAT_EXTENSION[format]}
+        </button>
+      </ToolActionBar>
 
       <L2PrivacyNote />
     </section>
