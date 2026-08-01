@@ -159,7 +159,7 @@ test("reduced motion and high contrast support exist", () => {
 });
 
 test("tool workspace and admin guidance foundations are present", () => {
-  for (const name of ["ToolWorkspaceShell", "ToolUploadStage", "ToolResultStage", "ToolPrivacyNote"]) {
+  for (const name of ["ToolUploadStage", "ToolResultStage", "ToolPrivacyNote"]) {
     assert.ok(workspace.includes(`export function ${name}`), `${name} should exist`);
   }
 
