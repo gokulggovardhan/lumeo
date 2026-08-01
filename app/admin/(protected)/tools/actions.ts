@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { requireAdmin } from "@/lib/admin/auth";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { canManageTools } from "@/lib/admin/permissions";
@@ -53,5 +53,15 @@ export async function updateTool(formData: FormData) {
   });
   revalidatePath("/admin/tools");
   revalidatePath("/admin/homepage");
+  // getToolBlockedState/resolveLumeoTools read this row through
+  // getPublicPdfCatalog, an unstable_cache with a 5-minute revalidate --
+  // revalidatePath alone doesn't reach that cache entry (it only re-renders
+  // the two admin routes above), so without this tag every live tool page,
+  // the nav, and the homepage tiles kept serving the pre-update
+  // status/enabled/maintenance state for up to 5 minutes after a save.
+  // updateTag (not revalidateTag) gives read-your-own-writes semantics from
+  // within this Server Action -- the admin sees the effect on the very next
+  // page load, not just eventually.
+  updateTag("public-pdf-catalog");
   return successState("Tool updated.");
 }
