@@ -5,13 +5,16 @@ import JSZip from "jszip";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
-  L2ActionArea,
-  L2FileCard,
+  L2PanelLabel,
   L2PrivacyNote,
-  L2ToolMainColumn,
-  L2ToolSettingsPanel,
-  L2ToolWorkspace,
+  L2ToolbarButton,
   L2UploadStage,
+  L2WorkspaceGrid,
+  L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
+  L2WorkspaceToolbar,
+  ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { AuraIconButton, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
@@ -1009,8 +1012,10 @@ export default function PdfToJpgTool() {
 
   if (!analysis) {
     return (
-      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
-        <div className="mx-auto w-full max-w-[1040px]">
+      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+        <L2WorkspaceHeader title="PDF to JPG" description="Export PDF pages as JPG, PNG, or WEBP images." />
+
+        <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="pdf-to-jpg-upload"
             accept="application/pdf,.pdf"
@@ -1025,7 +1030,7 @@ export default function PdfToJpgTool() {
         <L2PrivacyNote />
 
         {error ? (
-          <div role="alert" className="mt-4 rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+          <div role="alert" className="mx-auto w-full max-w-[720px] rounded-[var(--radius-lg)] border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
@@ -1034,39 +1039,35 @@ export default function PdfToJpgTool() {
   }
 
   return (
-    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
-      <L2ToolWorkspace>
-        <L2ToolMainColumn>
-          <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[var(--text-primary)]/14 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-2)] p-3 shadow-2xl shadow-black/32">
-            <section className="shrink-0">
-              <div className="mb-2 flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
-                    Document
-                  </p>
-                  <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">Source PDF.</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={resetTool}
-                  className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/56 transition hover:border-[var(--text-primary)]/22 hover:text-[var(--text-primary)]"
-                >
-                  Start new
-                </button>
-              </div>
+    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+      <L2WorkspaceHeader
+        title="PDF to JPG"
+        description={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatBytes(analysis.size)}`}
+        action={<AuraStatus tone="success" label={status} />}
+      />
 
-              <div className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/74 px-3 py-2">
-                <L2FileCard
-                  name={analysis.name}
-                  meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatBytes(analysis.size)}`}
-                  icon={<FileIcon />}
-                  action={<AuraStatus tone="success" label={status} />}
-                />
-              </div>
-            </section>
+      <L2WorkspaceToolbar>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
+        {selectionMode === "custom" ? (
+          <>
+            <L2ToolbarButton onClick={selectAllCustom}>Select all</L2ToolbarButton>
+            <L2ToolbarButton onClick={clearCustomSelection} disabled={!selectedPages.length}>
+              Clear
+            </L2ToolbarButton>
+          </>
+        ) : null}
+        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">
+          {selectionMode === "custom"
+            ? `Selected: ${selectedPages.length} ${selectedPages.length === 1 ? "page" : "pages"}`
+            : `${analysis.pageCount} pages in this PDF`}
+        </span>
+      </L2WorkspaceToolbar>
 
+      <L2WorkspaceGrid
+        main={
+          <L2WorkspacePanel>
             {largeFile || manyPages ? (
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="mb-3 grid gap-2 sm:grid-cols-2">
                 {largeFile ? (
                   <div className="rounded-xl border border-[var(--lumeo-gold)]/20 bg-[var(--lumeo-gold)]/8 px-3 py-2 text-xs text-[var(--text-primary)]/72">
                     Large files may take longer because conversion happens in your browser.
@@ -1080,348 +1081,290 @@ export default function PdfToJpgTool() {
               </div>
             ) : null}
 
-            <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/62 p-3">
-              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">Pages</p>
-                  <p className="text-xs text-[var(--text-primary)]/38">
-                    {selectionMode === "custom"
-                      ? `Selected: ${selectedPages.length} ${selectedPages.length === 1 ? "page" : "pages"}`
-                      : `${analysis.pageCount} pages in this PDF`}
-                  </p>
-                </div>
-                {selectionMode === "custom" ? (
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={selectAllCustom}
-                      className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/56 transition hover:border-[var(--text-primary)]/22 hover:text-[var(--text-primary)]"
-                    >
-                      Select all
-                    </button>
-                    <button
-                      type="button"
-                      onClick={clearCustomSelection}
-                      disabled={!selectedPages.length}
-                      className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/56 transition hover:border-[var(--text-primary)]/22 hover:text-[var(--text-primary)] disabled:opacity-35"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                ) : null}
-              </div>
+            <L2PanelLabel title="Pages" description={analysis.name} />
 
-              <div
-                role="grid"
-                aria-label="PDF pages"
-                onKeyDown={handleGridKeyDown}
-                className="no-scrollbar grid max-h-[420px] grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
-              >
-                {pageNumbers.map((page) => (
-                  <PdfToJpgThumbnail
-                    key={page}
-                    page={page}
-                    selected={selectionMode === "custom" ? selectedPages.includes(page) : true}
-                    focused={focusedPage === page}
-                    imageUrl={thumbnailUrls[page]}
-                    loading={Boolean(thumbnailLoading[page])}
-                    interactive={selectionMode === "custom"}
-                    rotation={rotations[page] ?? 0}
-                    onVisible={scheduleThumbnailRender}
-                    onToggle={togglePage}
-                    onFocus={setFocusedPage}
-                    onRotate={rotatePage}
-                    onPreview={(pageNumber) => void openPreview(pageNumber)}
-                    registerRef={(pageNumber, node) => {
-                      if (node) gridButtonsRef.current.set(pageNumber, node);
-                      else gridButtonsRef.current.delete(pageNumber);
-                    }}
-                  />
-                ))}
-              </div>
+            <div
+              role="grid"
+              aria-label="PDF pages"
+              onKeyDown={handleGridKeyDown}
+              className="no-scrollbar mt-3 grid max-h-[420px] grid-cols-3 gap-2 overflow-y-auto pr-1 sm:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6"
+            >
+              {pageNumbers.map((page) => (
+                <PdfToJpgThumbnail
+                  key={page}
+                  page={page}
+                  selected={selectionMode === "custom" ? selectedPages.includes(page) : true}
+                  focused={focusedPage === page}
+                  imageUrl={thumbnailUrls[page]}
+                  loading={Boolean(thumbnailLoading[page])}
+                  interactive={selectionMode === "custom"}
+                  rotation={rotations[page] ?? 0}
+                  onVisible={scheduleThumbnailRender}
+                  onToggle={togglePage}
+                  onFocus={setFocusedPage}
+                  onRotate={rotatePage}
+                  onPreview={(pageNumber) => void openPreview(pageNumber)}
+                  registerRef={(pageNumber, node) => {
+                    if (node) gridButtonsRef.current.set(pageNumber, node);
+                    else gridButtonsRef.current.delete(pageNumber);
+                  }}
+                />
+              ))}
             </div>
-          </div>
 
-          <div className="no-scrollbar space-y-2 lg:max-h-[74px] lg:overflow-y-auto">
-            {error ? (
-              <div role="alert" className="rounded-lg border border-red-400/20 bg-red-500/10 p-4 text-sm font-medium text-red-100/86">
-                {error}
-              </div>
-            ) : null}
-
-            {cleanupMessage ? (
-              <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/[0.06] p-4 text-sm font-medium text-[var(--text-primary)]">
-                {cleanupMessage}
-              </div>
-            ) : null}
-          </div>
-        </L2ToolMainColumn>
-
-        <L2ToolSettingsPanel title="PDF to JPG options" description="Export selected pages as JPG images.">
-          <div className="flex h-full min-h-0 flex-col">
-            <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/74 p-2.5 shadow-inner shadow-black/20">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">Page selection</p>
-                <div className="mt-1.5">
-                  <AuraSegmentedControl
-                    label="Page selection"
-                    options={selectionModeOptions}
-                    value={selectionMode}
-                    onChange={(value) => {
-                      setSelectionMode(value as SelectionMode);
-                      if (value === "custom" && !selectedPages.length && analysis) {
-                        setSelectedPages([1]);
-                      }
-                      clearResults();
-                    }}
-                  />
+            <div className="mt-3 grid gap-2">
+              {error ? (
+                <div role="alert" className="rounded-[var(--radius-lg)] border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-3 text-sm font-medium text-[var(--text-danger)]">
+                  {error}
                 </div>
+              ) : null}
 
-                {selectionMode === "range" ? (
-                  <input
-                    value={rangeInput}
-                    onChange={(event) => {
-                      setRangeInput(event.target.value);
-                      clearResults();
-                    }}
-                    placeholder="1-3, 5, 8-end"
-                    className="mt-2 w-full rounded-md border border-[var(--text-primary)]/12 bg-[var(--atelier-surface-1)]/70 px-2.5 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-primary)]/26 focus:border-[var(--lumeo-gold)]/45"
-                  />
-                ) : null}
-
-                {selectionPreview && !selectionPreview.valid ? (
-                  <p className="mt-1.5 text-xs font-semibold text-[var(--text-danger)]">{selectionPreview.message}</p>
-                ) : null}
+              {cleanupMessage ? (
+                <div className="rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.18)] bg-[rgba(var(--atelier-brass-rgb),0.06)] p-3 text-sm font-medium text-[var(--text-primary)]">
+                  {cleanupMessage}
+                </div>
+              ) : null}
+            </div>
+          </L2WorkspacePanel>
+        }
+        inspector={
+          <L2WorkspaceInspector title="PDF to JPG options" description="Export selected pages as JPG images.">
+            <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/74 p-2.5 shadow-inner shadow-black/20">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">Page selection</p>
+              <div className="mt-1.5">
+                <AuraSegmentedControl
+                  label="Page selection"
+                  options={selectionModeOptions}
+                  value={selectionMode}
+                  onChange={(value) => {
+                    setSelectionMode(value as SelectionMode);
+                    if (value === "custom" && !selectedPages.length && analysis) {
+                      setSelectedPages([1]);
+                    }
+                    clearResults();
+                  }}
+                />
               </div>
 
-              <div className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/74 p-2.5 shadow-inner shadow-black/20">
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">Output</p>
-                  <div className="flex overflow-hidden rounded-full border border-[var(--text-primary)]/12">
-                    {(["jpeg", "png", "webp"] as const).map((format) => (
-                      <button
-                        key={format}
-                        type="button"
-                        aria-pressed={outputFormat === format}
-                        onClick={() => {
-                          setOutputFormat(format);
-                          clearResults();
-                        }}
-                        className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition ${
-                          outputFormat === format
-                            ? "bg-[var(--surface-selected)] text-[var(--lumeo-gold)]"
-                            : "text-[var(--text-primary)]/48 hover:text-[var(--text-primary)]"
-                        }`}
-                      >
-                        {format === "jpeg" ? "JPG" : format === "png" ? "PNG" : "WEBP"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+              {selectionMode === "range" ? (
+                <input
+                  value={rangeInput}
+                  onChange={(event) => {
+                    setRangeInput(event.target.value);
+                    clearResults();
+                  }}
+                  placeholder="1-3, 5, 8-end"
+                  className="mt-2 w-full rounded-md border border-[var(--text-primary)]/12 bg-[var(--atelier-surface-1)]/70 px-2.5 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-primary)]/26 focus:border-[var(--lumeo-gold)]/45"
+                />
+              ) : null}
 
-                <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                  {dpiPresets.map((preset) => (
+              {selectionPreview && !selectionPreview.valid ? (
+                <p className="mt-1.5 text-xs font-semibold text-[var(--text-danger)]">{selectionPreview.message}</p>
+              ) : null}
+            </div>
+
+            <div className="mt-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/74 p-2.5 shadow-inner shadow-black/20">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">Output</p>
+                <div className="flex overflow-hidden rounded-full border border-[var(--text-primary)]/12">
+                  {(["jpeg", "png", "webp"] as const).map((format) => (
                     <button
-                      key={preset.value}
+                      key={format}
                       type="button"
-                      aria-pressed={dpiPreset === preset.value}
+                      aria-pressed={outputFormat === format}
                       onClick={() => {
-                        setDpiPreset(preset.value);
+                        setOutputFormat(format);
                         clearResults();
                       }}
-                      className={`rounded-lg border px-2 py-1.5 text-center transition ${
-                        dpiPreset === preset.value
-                          ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
-                          : "border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.03] hover:border-[var(--border-selected)]"
+                      className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide transition ${
+                        outputFormat === format
+                          ? "bg-[var(--surface-selected)] text-[var(--lumeo-gold)]"
+                          : "text-[var(--text-primary)]/48 hover:text-[var(--text-primary)]"
                       }`}
                     >
-                      <span className="block text-xs font-bold text-[var(--text-primary)]">{preset.label}</span>
-                      <span className="block text-[10px] text-[var(--text-primary)]/44">{preset.dpi} dpi</span>
+                      {format === "jpeg" ? "JPG" : format === "png" ? "PNG" : "WEBP"}
                     </button>
                   ))}
                 </div>
-                <p className="mt-1 text-[11px] text-[var(--text-primary)]/40">
-                  {selectedPreset.description}
-                  {estimatedOutputSize ? ` · Estimated ~${formatBytes(estimatedOutputSize)}` : ""}
-                </p>
+              </div>
 
-                {outputFormat === "jpeg" || outputFormat === "webp" ? (
-                  <>
-                    <div className="mt-2 flex items-center justify-between gap-3">
-                      <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
-                        Quality
-                      </span>
-                      <span className="text-xs font-bold text-[var(--text-primary)]">{Math.round(quality * 100)}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0.5}
-                      max={1}
-                      step={0.05}
-                      value={quality}
-                      onChange={(event) => {
-                        setQuality(Number(event.target.value));
-                        clearResults();
-                      }}
-                      className="mt-1 w-full accent-[var(--lumeo-gold)]"
-                      aria-label={outputFormat === "webp" ? "WEBP quality" : "JPEG quality"}
-                      aria-valuetext={`${Math.round(quality * 100)}%`}
-                    />
-                  </>
-                ) : (
-                  <p className="mt-2 text-[11px] text-[var(--text-primary)]/40">PNG is lossless — no quality setting.</p>
-                )}
-
-                <label className="mt-2 block">
-                  <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
-                    File name
-                  </span>
-                  <input
-                    value={outputName}
-                    onChange={(event) => {
-                      setOutputName(event.target.value);
+              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                {dpiPresets.map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    aria-pressed={dpiPreset === preset.value}
+                    onClick={() => {
+                      setDpiPreset(preset.value);
                       clearResults();
                     }}
-                    className="mt-1 w-full rounded-md border border-[var(--text-primary)]/12 bg-[var(--atelier-surface-1)]/70 px-2.5 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-primary)]/26 focus:border-[var(--lumeo-gold)]/45"
-                    placeholder="lumeo-pages"
+                    className={`rounded-lg border px-2 py-1.5 text-center transition ${
+                      dpiPreset === preset.value
+                        ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
+                        : "border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.03] hover:border-[var(--border-selected)]"
+                    }`}
+                  >
+                    <span className="block text-xs font-bold text-[var(--text-primary)]">{preset.label}</span>
+                    <span className="block text-[10px] text-[var(--text-primary)]/44">{preset.dpi} dpi</span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-[11px] text-[var(--text-primary)]/40">
+                {selectedPreset.description}
+                {estimatedOutputSize ? ` · Estimated ~${formatBytes(estimatedOutputSize)}` : ""}
+              </p>
+
+              {outputFormat === "jpeg" || outputFormat === "webp" ? (
+                <>
+                  <div className="mt-2 flex items-center justify-between gap-3">
+                    <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
+                      Quality
+                    </span>
+                    <span className="text-xs font-bold text-[var(--text-primary)]">{Math.round(quality * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0.5}
+                    max={1}
+                    step={0.05}
+                    value={quality}
+                    onChange={(event) => {
+                      setQuality(Number(event.target.value));
+                      clearResults();
+                    }}
+                    className="mt-1 w-full accent-[var(--lumeo-gold)]"
+                    aria-label={outputFormat === "webp" ? "WEBP quality" : "JPEG quality"}
+                    aria-valuetext={`${Math.round(quality * 100)}%`}
                   />
-                </label>
-              </div>
+                </>
+              ) : (
+                <p className="mt-2 text-[11px] text-[var(--text-primary)]/40">PNG is lossless — no quality setting.</p>
+              )}
+
+              <label className="mt-2 block">
+                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">
+                  File name
+                </span>
+                <input
+                  value={outputName}
+                  onChange={(event) => {
+                    setOutputName(event.target.value);
+                    clearResults();
+                  }}
+                  className="mt-1 w-full rounded-md border border-[var(--text-primary)]/12 bg-[var(--atelier-surface-1)]/70 px-2.5 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-primary)]/26 focus:border-[var(--lumeo-gold)]/45"
+                  placeholder="lumeo-pages"
+                />
+              </label>
             </div>
+          </L2WorkspaceInspector>
+        }
+      />
 
-            <div className="mt-2 border-t border-[var(--text-primary)]/10 pt-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">Finish</p>
+      <div ref={statusRegionRef} tabIndex={-1} aria-live="polite" className="outline-none">
+        {isConverting ? (
+          <L2WorkspacePanel variant="flat">
+            <p className="text-base font-semibold text-[var(--text-primary)]">{status}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">{progressDetail}</p>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--text-primary)]/10">
+              <div
+                className="h-full rounded-full bg-[var(--lumeo-gold)] transition-all duration-200"
+                style={{
+                  width: progressTotal ? `${Math.round((progressCurrent / progressTotal) * 100)}%` : "8%",
+                }}
+              />
+            </div>
+          </L2WorkspacePanel>
+        ) : results.length ? (
+          <L2WorkspacePanel variant="flat" className="aura-success-reveal">
+            <p className="text-base font-semibold text-[var(--text-primary)]">
+              {results.length} {outputFormat === "png" ? "PNG" : outputFormat === "webp" ? "WEBP" : "JPG"}
+              {results.length === 1 ? "" : "s"} ready
+            </p>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">{formatBytes(totalResultSize)} total</p>
 
-              <div ref={statusRegionRef} tabIndex={-1} aria-live="polite" className="outline-none">
-                {isConverting ? (
-                  <div className="mt-2">
-                    <p className="text-base font-semibold text-[var(--text-primary)]">{status}</p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">{progressDetail}</p>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-[var(--text-primary)]/10">
-                      <div
-                        className="h-full rounded-full bg-[var(--lumeo-gold)] transition-all duration-200"
-                        style={{
-                          width: progressTotal
-                            ? `${Math.round((progressCurrent / progressTotal) * 100)}%`
-                            : "8%",
-                        }}
-                      />
-                    </div>
-                  </div>
-                ) : results.length ? (
-                  <div className="aura-success-reveal mt-2">
-                    <p className="text-base font-semibold text-[var(--text-primary)]">
-                      {results.length} {outputFormat === "png" ? "PNG" : outputFormat === "webp" ? "WEBP" : "JPG"}
-                      {results.length === 1 ? "" : "s"} ready
-                    </p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">
-                      {formatBytes(totalResultSize)} total
-                    </p>
-
-                    <div className="mt-2 flex flex-col gap-2">
-                      <L2ActionArea
-                        primary={(
-                          <button
-                            type="button"
-                            disabled={allDownloaded || isDownloadingAll}
-                            onClick={() => void handleDownloadAll()}
-                            className="lumeo-primary-action rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 active:scale-[0.98]"
-                          >
-                            {isDownloadingAll
-                              ? "Downloading…"
-                              : allDownloaded
-                                ? "All downloaded"
-                                : results.length === 1
-                                  ? `Download ${outputFormat === "png" ? "PNG" : outputFormat === "webp" ? "WEBP" : "JPG"}`
-                                  : "Download all"}
-                          </button>
-                        )}
-                        secondary={(
-                          <>
-                            {results.length > 1 ? (
-                              <button
-                                type="button"
-                                disabled={isZipping}
-                                onClick={() => void handleDownloadZip()}
-                                className="rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)]/62 transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-45"
-                              >
-                                {isZipping ? "Zipping…" : "Download as ZIP"}
-                              </button>
-                            ) : null}
-                            <button
-                              type="button"
-                              onClick={resetTool}
-                              className="rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)]/62 transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)]"
-                            >
-                              Start new
-                            </button>
-                          </>
-                        )}
-                      />
-                    </div>
-
-                    {results.length > 1 ? (
-                      <div className="no-scrollbar mt-2 max-h-[180px] space-y-1.5 overflow-y-auto pr-1">
-                        {results.map((item) => (
-                          <div
-                            key={item.page}
-                            className="flex items-center gap-2 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/50 px-2.5 py-1.5"
-                          >
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.04]">
-                              {thumbnailUrls[item.page] ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={thumbnailUrls[item.page]}
-                                  alt={`Page ${item.page} thumbnail`}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <FileIcon />
-                              )}
-                            </span>
-                            <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--text-primary)]/80">
-                              {item.fileName}
-                            </span>
-                            <span className="shrink-0 text-[10px] text-[var(--text-primary)]/40">{formatBytes(item.size)}</span>
-                            {item.downloaded ? (
-                              <span className="shrink-0 text-[10px] font-bold text-[var(--lumeo-sage-accent)]">Downloaded</span>
-                            ) : (
-                              <AuraIconButton label={`Download ${item.fileName}`} onClick={() => handleDownloadOne(item)}>
-                                ↓
-                              </AuraIconButton>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="mt-2">
-                    <p className="text-base font-semibold text-[var(--text-primary)]">Ready to convert</p>
-                    <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">
-                      {selectionPreview?.valid
-                        ? `${selectionPreview.count} page${selectionPreview.count === 1 ? "" : "s"} · ${selectedPreset.label} (${selectedPreset.dpi} dpi)`
-                        : "Choose pages to convert."}
-                    </p>
-                    <L2ActionArea
-                      primary={(
-                        <button
-                          type="button"
-                          disabled={!selectionPreview?.valid}
-                          onClick={() => void convertPages()}
-                          className="lumeo-primary-action mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
-                        >
-                          Convert to {outputFormat === "png" ? "PNG" : outputFormat === "webp" ? "WEBP" : "JPG"}
-                        </button>
+            {results.length > 1 ? (
+              <div className="no-scrollbar mt-2 max-h-[180px] space-y-1.5 overflow-y-auto pr-1">
+                {results.map((item) => (
+                  <div
+                    key={item.page}
+                    className="flex items-center gap-2 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/50 px-2.5 py-1.5"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-md border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.04]">
+                      {thumbnailUrls[item.page] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={thumbnailUrls[item.page]}
+                          alt={`Page ${item.page} thumbnail`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <FileIcon />
                       )}
-                    />
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-xs font-semibold text-[var(--text-primary)]/80">
+                      {item.fileName}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-[var(--text-primary)]/40">{formatBytes(item.size)}</span>
+                    {item.downloaded ? (
+                      <span className="shrink-0 text-[10px] font-bold text-[var(--lumeo-sage-accent)]">Downloaded</span>
+                    ) : (
+                      <AuraIconButton label={`Download ${item.fileName}`} onClick={() => handleDownloadOne(item)}>
+                        ↓
+                      </AuraIconButton>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
-            </div>
-          </div>
-        </L2ToolSettingsPanel>
-      </L2ToolWorkspace>
+            ) : null}
+          </L2WorkspacePanel>
+        ) : (
+          <p className="text-xs leading-5 text-[var(--text-subtle)]">
+            {selectionPreview?.valid
+              ? `${selectionPreview.count} page${selectionPreview.count === 1 ? "" : "s"} · ${selectedPreset.label} (${selectedPreset.dpi} dpi)`
+              : "Choose pages to convert."}
+          </p>
+        )}
+      </div>
+
+      <ToolActionBar>
+        {results.length ? (
+          <>
+            <button
+              type="button"
+              disabled={isZipping || results.length <= 1}
+              onClick={() => void handleDownloadZip()}
+              className={results.length > 1 ? "inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]" : "hidden"}
+            >
+              {isZipping ? "Zipping…" : "Download as ZIP"}
+            </button>
+            <button
+              type="button"
+              disabled={allDownloaded || isDownloadingAll}
+              onClick={() => void handleDownloadAll()}
+              className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
+            >
+              {isDownloadingAll
+                ? "Downloading…"
+                : allDownloaded
+                  ? "All downloaded"
+                  : results.length === 1
+                    ? `Download ${outputFormat === "png" ? "PNG" : outputFormat === "webp" ? "WEBP" : "JPG"}`
+                    : "Download all"}
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={!selectionPreview?.valid || isConverting}
+            onClick={() => void convertPages()}
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] disabled:hover:translate-y-0 active:scale-[0.98] sm:w-auto"
+          >
+            {isConverting ? "Converting pages…" : `Convert to ${outputFormat === "png" ? "PNG" : outputFormat === "webp" ? "WEBP" : "JPG"}`}
+          </button>
+        )}
+      </ToolActionBar>
+
+      <L2PrivacyNote />
 
       {previewPage ? (
         <div
