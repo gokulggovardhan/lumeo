@@ -399,7 +399,7 @@ test("Run 3 PDF workspace rules preserve algorithms and Analytics V1 scope", () 
 });
 
 test("Run 4 live PDF tools use shared workspace primitives internally", () => {
-  const legacyWorkspaceTools = [] as const;
+  const legacyWorkspaceTools: Array<readonly [string, string]> = [];
 
   for (const [name, source] of legacyWorkspaceTools) {
     for (const primitive of ["L2UploadStage", "L2ToolWorkspace", "L2ToolMainColumn", "L2ToolSettingsPanel", "L2ActionArea", "L2PrivacyNote"]) {
