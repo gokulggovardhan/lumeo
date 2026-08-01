@@ -506,8 +506,8 @@ a:active {
   box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 253, 248, 0.08) !important;
 }
 
-.l2-live-tool-workspace :is(button, a)[class*="rounded-full"],
-.l2-live-tool-workspace :is(button, a)[class*="rounded-[999"] {
+.l2-live-tool-workspace :is(button, a)[class*="rounded-full"]:not([role="switch"]),
+.l2-live-tool-workspace :is(button, a)[class*="rounded-[999"]:not([role="switch"]) {
   border-radius: var(--radius-md) !important;
 }
 
@@ -585,7 +585,7 @@ a:active {
     padding: var(--space-5) !important;
   }
 
-  .l2-live-tool-workspace :is(button, a) {
+  .l2-live-tool-workspace :is(button, a):not([role="switch"]) {
     width: 100%;
   }
 
