@@ -1333,7 +1333,7 @@ export default function PdfToJpgTool() {
               type="button"
               disabled={isZipping || results.length <= 1}
               onClick={() => void handleDownloadZip()}
-              className={results.length > 1 ? "rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)]/62 transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-45" : "hidden"}
+              className={results.length > 1 ? "inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)]" : "hidden"}
             >
               {isZipping ? "Zipping…" : "Download as ZIP"}
             </button>
@@ -1341,7 +1341,7 @@ export default function PdfToJpgTool() {
               type="button"
               disabled={allDownloaded || isDownloadingAll}
               onClick={() => void handleDownloadAll()}
-              className="lumeo-primary-action rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 active:scale-[0.98]"
+              className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
             >
               {isDownloadingAll
                 ? "Downloading…"
