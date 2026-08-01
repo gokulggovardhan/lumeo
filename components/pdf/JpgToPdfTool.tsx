@@ -4,13 +4,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PDFDocument, rgb } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
-  L2ActionArea,
   L2FileCard,
+  L2PanelLabel,
   L2PrivacyNote,
-  L2ToolMainColumn,
-  L2ToolSettingsPanel,
-  L2ToolWorkspace,
+  L2ToolbarButton,
   L2UploadStage,
+  L2WorkspaceGrid,
+  L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
+  L2WorkspaceToolbar,
+  ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { AuraSegmentedControl } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
@@ -808,8 +812,10 @@ export default function JpgToPdfTool() {
 
   if (files.length === 0) {
     return (
-      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
-        <div className="mx-auto w-full max-w-[1040px]">
+      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+        <L2WorkspaceHeader title="JPG to PDF" description="Turn JPG, PNG, or WEBP images into one clean PDF." />
+
+        <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="jpg-to-pdf-upload"
             title="Drop images here"
@@ -828,13 +834,13 @@ export default function JpgToPdfTool() {
         <L2PrivacyNote />
 
         {error ? (
-          <div className="mt-4 rounded-lg border border-[var(--border-danger)] bg-[var(--surface-danger)] p-4 text-sm font-medium text-[var(--text-danger)]">
+          <div className="mx-auto w-full max-w-[720px] rounded-[var(--radius-lg)] border border-[var(--border-danger)] bg-[var(--surface-danger)] p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
 
         {softWarning ? (
-          <div className="mt-4 rounded-[var(--radius-md)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.1)] p-4 text-sm font-medium text-[var(--text-primary)]">
+          <div className="mx-auto w-full max-w-[720px] rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.1)] p-4 text-sm font-medium text-[var(--text-primary)]">
             {softWarning}
           </div>
         ) : null}
@@ -843,13 +849,7 @@ export default function JpgToPdfTool() {
   }
 
   return (
-    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
-      <style>{`
-        @keyframes consoleReveal {
-          from { opacity: 0; transform: translateY(8px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
+    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
       <input
         ref={inputRef}
         type="file"
@@ -862,29 +862,22 @@ export default function JpgToPdfTool() {
         }}
       />
 
-      <L2ToolWorkspace>
-        <L2ToolMainColumn>
-          <section className="min-w-0 animate-[consoleReveal_260ms_ease-out] rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3 shadow-2xl shadow-black/28">
-            <div className="mb-2.5 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
-                  Image tray
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
-                  Add more images to the deck.
-                </p>
-              </div>
-              {files.length > 0 ? (
-                <button
-                  type="button"
-                  onClick={clearAllFiles}
-                  className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)]"
-                >
-                  Clear all
-                </button>
-              ) : null}
-            </div>
+      <L2WorkspaceHeader title="JPG to PDF" description={readySummary} />
 
+      <L2WorkspaceToolbar>
+        <L2ToolbarButton variant="primary" onClick={() => inputRef.current?.click()}>
+          + Add images
+        </L2ToolbarButton>
+        <L2ToolbarButton onClick={clearAllFiles}>Clear all</L2ToolbarButton>
+        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">
+          {files.length} image{files.length === 1 ? "" : "s"} · {formatFileSize(totalSize)}
+        </span>
+      </L2WorkspaceToolbar>
+
+      <L2WorkspaceGrid
+        queue={
+          <L2WorkspacePanel variant="flat">
+            <L2PanelLabel title="Image tray" description="Drop more images here, or use Add images above." />
             <div
               onDragOver={(event) => {
                 event.preventDefault();
@@ -896,61 +889,24 @@ export default function JpgToPdfTool() {
                 setIsDragging(false);
                 void addFiles(event.dataTransfer.files);
               }}
-              className={`group relative overflow-hidden rounded-[24px] border px-4 py-2.5 transition-all duration-200 ${
+              className={`mt-3 flex min-h-24 flex-col items-center justify-center gap-1.5 rounded-[var(--radius-xl)] border-2 border-dashed p-4 text-center transition duration-[var(--v2-motion-normal)] ${
                 isDragging
-                  ? "border-[var(--border-selected)] bg-[var(--surface-selected)] shadow-[0_18px_50px_rgba(0,0,0,0.18)]"
-                  : "border-[var(--text-primary)]/16 bg-[var(--atelier-surface-1)]/70 hover:border-[var(--border-selected)] hover:bg-[var(--atelier-surface-1)]/82"
+                  ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
+                  : "border-[var(--border-subtle)] hover:border-[var(--border-selected)]"
               }`}
             >
-              <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-[var(--lumeo-gold)]/28 to-transparent opacity-0 transition group-hover:opacity-100" />
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-4">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--text-primary)]/[0.045] text-[var(--text-secondary)] transition group-hover:bg-[var(--text-primary)]/[0.08]">
-                    <JpgToPdfIcon />
-                  </span>
-                  <div>
-                    <p className="text-base font-semibold text-[var(--text-primary)]">
-                      Drop images here
-                    </p>
-                    <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
-                      Choose files from your device
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => inputRef.current?.click()}
-                  className="inline-flex items-center justify-center rounded-full bg-[var(--lumeo-gold)] px-4 py-2 text-xs font-semibold text-[var(--foreground)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--lumeo-seal-500)] active:scale-[0.98]"
-                >
-                  Select images
-                </button>
-              </div>
+              <JpgToPdfIcon />
+              <p className="text-xs font-bold text-[var(--text-secondary)]">Drop images here</p>
             </div>
-          </section>
-
-          <section className="flex min-h-0 min-w-0 flex-1 animate-[consoleReveal_320ms_ease-out] flex-col rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3.5 shadow-2xl shadow-black/24">
-            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
-                  Arrange
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
-                  Drag, or focus a row and use ↑ / ↓.
-                </p>
-              </div>
-              {files.length > 0 ? (
-                <p className="text-xs font-semibold text-[var(--text-primary)]/44">
-                  {files.length} image{files.length === 1 ? "" : "s"} - {formatFileSize(totalSize)}
-                </p>
-              ) : null}
+          </L2WorkspacePanel>
+        }
+        main={
+          <L2WorkspacePanel className="l2-workspace-arrange">
+            <div className="mb-3">
+              <L2PanelLabel title="Arrange" description="Drag, or focus a row and use ↑ / ↓." />
             </div>
 
-            {files.length === 0 ? (
-              <div className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/48 p-5 text-sm text-[var(--text-primary)]/46">
-                Add at least one image to begin arranging your PDF.
-              </div>
-            ) : (
-              <div className="no-scrollbar min-h-0 space-y-2 overflow-y-auto pr-1 lg:max-h-full">
+            <div className="no-scrollbar aura-scrollbar min-h-0 space-y-2 overflow-y-auto pr-1 lg:max-h-[52vh]">
                 {files.map((item, index) => (
                   <div
                     key={item.id}
@@ -1024,41 +980,40 @@ export default function JpgToPdfTool() {
                     </div>
                   </div>
                 ))}
-              </div>
-            )}
-          </section>
+            </div>
 
-          <div className="no-scrollbar space-y-2 lg:max-h-[74px] lg:overflow-y-auto">
-            {error ? (
-              <div className="rounded-lg border border-[var(--border-danger)] bg-[var(--surface-danger)] p-4 text-sm font-medium text-[var(--text-danger)]">
-                {error}
+            {error || softWarning || hasLargeFiles || cleanupMessage ? (
+              <div className="mt-3 grid gap-2">
+                {error ? (
+                  <div className="rounded-[var(--radius-lg)] border border-[var(--border-danger)] bg-[var(--surface-danger)] p-3 text-sm font-medium text-[var(--text-danger)]">
+                    {error}
+                  </div>
+                ) : null}
+
+                {softWarning ? (
+                  <div className="rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.08)] p-3 text-sm font-medium text-[var(--text-primary)]">
+                    {softWarning}
+                  </div>
+                ) : null}
+
+                {hasLargeFiles ? (
+                  <div className="rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.08)] p-3 text-xs text-[var(--text-secondary)]">
+                    Large images may take longer because conversion happens in your browser.
+                  </div>
+                ) : null}
+
+                {cleanupMessage ? (
+                  <div className="rounded-[var(--radius-lg)] border border-[rgba(var(--atelier-brass-rgb),0.2)] bg-[rgba(var(--atelier-brass-rgb),0.08)] p-3 text-xs text-[var(--text-secondary)]">
+                    {cleanupMessage}
+                  </div>
+                ) : null}
               </div>
             ) : null}
-
-            {softWarning ? (
-              <div className="rounded-lg border border-[var(--lumeo-gold)]/20 bg-[var(--lumeo-gold)]/10 p-4 text-sm font-medium text-[var(--text-primary)]">
-                {softWarning}
-              </div>
-            ) : null}
-
-            {hasLargeFiles ? (
-              <div className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/50 p-4 text-sm font-medium text-[var(--text-primary)]/56">
-                Large images may take longer because conversion happens in your browser.
-              </div>
-            ) : null}
-
-            {cleanupMessage ? (
-              <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/[0.06] p-4 text-sm font-medium text-[var(--text-primary)]">
-                {cleanupMessage}
-              </div>
-            ) : null}
-          </div>
-        </L2ToolMainColumn>
-
-        <L2ToolSettingsPanel title="JPG to PDF options" description="One combined PDF using the image order shown.">
-          <div className="flex h-full min-h-0 flex-col">
-            <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
-              <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/74 p-2.5 shadow-inner shadow-black/20">
+          </L2WorkspacePanel>
+        }
+        inspector={
+          <L2WorkspaceInspector title="JPG to PDF options" description="One combined PDF using the image order shown.">
+              <div className="mt-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/74 p-2.5 shadow-inner shadow-black/20">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">Output</p>
 
                 <div className="mt-1.5 grid grid-cols-3 gap-1.5">
@@ -1196,81 +1151,54 @@ export default function JpgToPdfTool() {
                   />
                 </label>
               </div>
-            </div>
+          </L2WorkspaceInspector>
+        }
+      />
 
-            <div className="mt-2 border-t border-[var(--text-primary)]/10 pt-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
-                Finish
-              </p>
-
-              {downloadUrl ? (
-                <div className="aura-success-reveal mt-2">
-                  <p className="text-base font-semibold text-[var(--text-primary)]">
-                    PDF ready
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">
-                    {downloadName} - {pageSizeLabel} - {files.length} image{files.length === 1 ? "" : "s"}
-                  </p>
-                  <div className="mt-2 hidden flex-col gap-2 lg:flex">
-                    <L2ActionArea
-                      primary={(
-                        <button
-                          type="button"
-                          onClick={downloadPdf}
-                          className="lumeo-primary-action min-h-[44px] rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]"
-                        >
-                          Download PDF
-                        </button>
-                      )}
-                      secondary={(
-                        <button
-                          type="button"
-                          onClick={startNewConversion}
-                          className="min-h-[44px] rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 py-2.5 text-sm font-semibold text-[var(--text-primary)]/62 transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)]"
-                        >
-                          Start new
-                        </button>
-                      )}
-                    />
-                  </div>
-                </div>
-              ) : files.length >= 1 ? (
-                <div className="mt-2">
-                  <p className="text-base font-semibold text-[var(--text-primary)]">
-                    Ready to convert
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">
-                    {readySummary}
-                  </p>
-                  <L2ActionArea
-                    primary={(
-                      <button
-                        type="button"
-                        disabled={status === "Converting in your browser..."}
-                        onClick={convertToPdf}
-                        className="lumeo-primary-action mt-2.5 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0 active:scale-[0.98]"
-                      >
-                        {status === "Converting in your browser..." ? (
-                          <>
-                            <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--lumeo-paper-200)]/24 border-t-white" />
-                            Converting in your browser...
-                          </>
-                        ) : (
-                          "Convert to PDF"
-                        )}
-                      </button>
-                    )}
-                  />
-                </div>
+      <ToolActionBar>
+        {downloadUrl ? (
+          <>
+            <span className="mr-auto text-xs font-bold text-[var(--text-secondary)]">
+              {downloadName} · {pageSizeLabel} · {files.length} image{files.length === 1 ? "" : "s"}
+            </span>
+            <button
+              type="button"
+              onClick={startNewConversion}
+              className="lumeo-press inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-5 text-sm font-bold text-[var(--text-secondary)] transition duration-[var(--v2-motion-fast)] hover:text-[var(--text-primary)]"
+            >
+              Start new
+            </button>
+            <button
+              type="button"
+              onClick={downloadPdf}
+              className="lumeo-primary-action inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]"
+            >
+              Download PDF
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="mr-auto text-xs font-bold text-[var(--text-secondary)]">
+              Ready to convert · {readySummary}
+            </span>
+            <button
+              type="button"
+              disabled={status === "Converting in your browser..."}
+              onClick={convertToPdf}
+              className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] disabled:hover:translate-y-0 active:scale-[0.98] sm:w-auto"
+            >
+              {status === "Converting in your browser..." ? (
+                <>
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-[var(--lumeo-paper-200)]/24 border-t-white" />
+                  Converting in your browser...
+                </>
               ) : (
-                <p className="mt-2 text-sm leading-6 text-[var(--text-primary)]/48">
-                  Add an image to convert.
-                </p>
+                "Convert to PDF"
               )}
-            </div>
-          </div>
-        </L2ToolSettingsPanel>
-      </L2ToolWorkspace>
+            </button>
+          </>
+        )}
+      </ToolActionBar>
 
       {previewFile ? (
         <div
