@@ -18,13 +18,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
-  L2ActionArea,
   L2FileCard,
+  L2PanelLabel,
   L2PrivacyNote,
-  L2ToolMainColumn,
-  L2ToolSettingsPanel,
-  L2ToolWorkspace,
+  L2ToolbarButton,
   L2UploadStage,
+  L2WorkspaceGrid,
+  L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
+  L2WorkspaceToolbar,
+  ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { CropRectView } from "@/components/pdf/crop/CropRectView";
 import { FileIcon } from "@/components/ui/FileIcon";
@@ -362,8 +366,10 @@ export default function CropPdfTool() {
 
   if (!pdf) {
     return (
-      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
-        <div className="mx-auto w-full max-w-[1040px]">
+      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+        <L2WorkspaceHeader title="Crop PDF" description="Crop PDF pages to a custom rectangle." />
+
+        <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="crop-pdf-upload"
             accept="application/pdf,.pdf"
@@ -374,9 +380,11 @@ export default function CropPdfTool() {
             onFilesSelected={(files) => void addFile(files)}
           />
         </div>
+
         <L2PrivacyNote />
+
         {error ? (
-          <div role="alert" className="mt-4 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+          <div role="alert" className="mx-auto w-full max-w-[720px] rounded-[var(--radius-lg)] border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
@@ -385,23 +393,28 @@ export default function CropPdfTool() {
   }
 
   return (
-    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
-      <L2ToolWorkspace>
-        <L2ToolMainColumn>
-          <section className="rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3 shadow-2xl shadow-black/28">
-            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-              <L2FileCard icon={<FileIcon />} name={pdf.file.name} meta={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`} />
-              <div className="flex items-center gap-1.5">
-                <button type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24 disabled:opacity-30">
-                  Undo
-                </button>
-                <button type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24 disabled:opacity-30">
-                  Redo
-                </button>
-              </div>
-            </div>
+    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+      <L2WorkspaceHeader
+        title="Crop PDF"
+        description={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
+      />
 
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/60 px-3 py-2">
+      <L2WorkspaceToolbar>
+        <L2ToolbarButton onClick={undo} disabled={!canUndo}>
+          Undo
+        </L2ToolbarButton>
+        <L2ToolbarButton onClick={redo} disabled={!canRedo}>
+          Redo
+        </L2ToolbarButton>
+        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
+      </L2WorkspaceToolbar>
+
+      <L2WorkspaceGrid
+        main={
+          <L2WorkspacePanel>
+            <L2FileCard icon={<FileIcon />} name={pdf.file.name} meta={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`} />
+
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/60 px-3 py-2">
               <button type="button" disabled={pageIndex === 0} onClick={() => setPageIndex((c) => Math.max(0, c - 1))} className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40 disabled:opacity-35">
                 ← Prev
               </button>
@@ -410,46 +423,48 @@ export default function CropPdfTool() {
                 Next →
               </button>
             </div>
-          </section>
 
-          <section className="mt-3 rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3.5 shadow-2xl shadow-black/24">
-            {pageDisplaySize ? (
-              <p className="mb-2 text-[11px] font-semibold text-[var(--text-primary)]/40">
-                Page size: {Math.round(pageDisplaySize.width)} × {Math.round(pageDisplaySize.height)} (preview px, {PAGE_RENDER_SCALE}x render scale)
-              </p>
-            ) : null}
-            {pageLoading || !pageImageUrl || !pageDisplaySize ? (
-              <div className="flex h-64 items-center justify-center rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/40 text-sm text-[var(--text-primary)]/40">
-                Loading page preview...
-              </div>
-            ) : (
-              <div
-                ref={stageRef}
-                className="relative mx-auto max-h-[70vh] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white"
-                style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={pageImageUrl} alt="Page preview" className="pointer-events-none block h-full w-full object-contain select-none" />
-                <CropRectView
-                  stageRef={stageRef}
-                  rect={config.rect}
-                  onRectChange={(rect) => setConfig((current) => ({ ...current, rect }))}
-                  lockAspectRatio={lockAspectRatio}
-                />
-              </div>
-            )}
-          </section>
-
-          {error ? (
-            <div role="alert" className="mt-3 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
-              {error}
+            <div className="mt-3">
+              <L2PanelLabel
+                title="Preview"
+                description={
+                  pageDisplaySize
+                    ? `Page size: ${Math.round(pageDisplaySize.width)} × ${Math.round(pageDisplaySize.height)} (preview px, ${PAGE_RENDER_SCALE}x render scale)`
+                    : undefined
+                }
+              />
+              {pageLoading || !pageImageUrl || !pageDisplaySize ? (
+                <div className="mt-3 flex h-64 items-center justify-center rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/40 text-sm text-[var(--text-primary)]/40">
+                  Loading page preview...
+                </div>
+              ) : (
+                <div
+                  ref={stageRef}
+                  className="relative mx-auto mt-3 max-h-[70vh] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white"
+                  style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={pageImageUrl} alt="Page preview" className="pointer-events-none block h-full w-full object-contain select-none" />
+                  <CropRectView
+                    stageRef={stageRef}
+                    rect={config.rect}
+                    onRectChange={(rect) => setConfig((current) => ({ ...current, rect }))}
+                    lockAspectRatio={lockAspectRatio}
+                  />
+                </div>
+              )}
             </div>
-          ) : null}
-        </L2ToolMainColumn>
 
-        <L2ToolSettingsPanel title="Crop" description="Drag the rectangle, then export.">
-          <div className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
-            <div className="grid grid-cols-3 gap-1.5">
+            {error ? (
+              <div role="alert" className="mt-3 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+                {error}
+              </div>
+            ) : null}
+          </L2WorkspacePanel>
+        }
+        inspector={
+          <L2WorkspaceInspector title="Crop" description="Drag the rectangle, then export.">
+            <div className="mt-3 grid grid-cols-3 gap-1.5">
               <button type="button" onClick={handleResetCrop} className="rounded-lg border border-[var(--text-primary)]/12 px-2 py-1.5 text-[11px] font-bold text-[var(--text-primary)]/60 transition hover:border-[var(--lumeo-gold)]/40">
                 Reset Crop
               </button>
@@ -566,7 +581,7 @@ export default function CropPdfTool() {
               {scopeError ? <p className="text-[11px] text-[var(--text-danger)]">{scopeError}</p> : null}
             </div>
 
-            <div className="mt-auto border-t border-[var(--text-primary)]/10 pt-3">
+            <div className="mt-3 border-t border-[var(--text-primary)]/10 pt-3">
               <label className="block rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/50 p-2.5">
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">File name</span>
                 <input
@@ -579,35 +594,33 @@ export default function CropPdfTool() {
                   placeholder="lumeo-cropped.pdf"
                 />
               </label>
-
-              <div className="mt-3">
-                {downloadUrl ? (
-                  <L2ActionArea
-                    primary={
-                      <button type="button" onClick={downloadCroppedPdf} className="lumeo-primary-action w-full rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)]">
-                        Download cropped PDF
-                      </button>
-                    }
-                  />
-                ) : (
-                  <L2ActionArea
-                    primary={
-                      <button
-                        type="button"
-                        disabled={isExporting || !!scopeError || !isCropRectValid(config.rect)}
-                        onClick={() => void generateCroppedPdf()}
-                        className="lumeo-primary-action w-full rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45"
-                      >
-                        {isExporting ? "Cropping..." : "Apply Crop"}
-                      </button>
-                    }
-                  />
-                )}
-              </div>
             </div>
-          </div>
-        </L2ToolSettingsPanel>
-      </L2ToolWorkspace>
+          </L2WorkspaceInspector>
+        }
+      />
+
+      <ToolActionBar>
+        {downloadUrl ? (
+          <button
+            type="button"
+            onClick={downloadCroppedPdf}
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
+          >
+            Download cropped PDF
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={isExporting || !!scopeError || !isCropRectValid(config.rect)}
+            onClick={() => void generateCroppedPdf()}
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
+          >
+            {isExporting ? "Cropping..." : "Apply Crop"}
+          </button>
+        )}
+      </ToolActionBar>
+
+      <L2PrivacyNote />
     </section>
   );
 }
