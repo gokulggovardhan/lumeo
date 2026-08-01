@@ -399,14 +399,7 @@ test("Run 3 PDF workspace rules preserve algorithms and Analytics V1 scope", () 
 });
 
 test("Run 4 live PDF tools use shared workspace primitives internally", () => {
-  // Compress still uses the pre-Aura-OS-v2-PR10 workspace primitives
-  // (two-column L2ToolWorkspace/L2ToolMainColumn/L2ToolSettingsPanel/
-  // L2ActionArea). Merge (PR10) and Split (PR11) were deliberately migrated
-  // to the newer three-panel workspace shell (L2WorkspaceHeader/
-  // L2WorkspaceGrid/L2WorkspaceToolbar/ToolActionBar) -- they're
-  // intentionally on a different, newer primitive set than Compress until
-  // it's redesigned too, not a regression.
-  const legacyWorkspaceTools = [["Compress", read("components/pdf/CompressPdfTool.tsx")]] as const;
+  const legacyWorkspaceTools = [] as const;
 
   for (const [name, source] of legacyWorkspaceTools) {
     for (const primitive of ["L2UploadStage", "L2ToolWorkspace", "L2ToolMainColumn", "L2ToolSettingsPanel", "L2ActionArea", "L2PrivacyNote"]) {
@@ -417,9 +410,13 @@ test("Run 4 live PDF tools use shared workspace primitives internally", () => {
     assert.ok(source.includes("lumeo-primary-action"), `${name} should mark its primary actions`);
   }
 
+  // Compress was migrated to the Aura OS v2 three-panel workspace shell
+  // (L2WorkspaceHeader/L2WorkspaceGrid/L2WorkspaceToolbar/ToolActionBar),
+  // matching Merge (PR10) and Split (PR11).
   const v2WorkspaceTools = [
     ["Merge", read("components/pdf/MergePdfTool.tsx")],
     ["Split", read("components/pdf/SplitPdfTool.tsx")],
+    ["Compress", read("components/pdf/CompressPdfTool.tsx")],
   ] as const;
 
   for (const [name, source] of v2WorkspaceTools) {

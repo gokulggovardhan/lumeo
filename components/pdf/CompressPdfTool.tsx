@@ -30,14 +30,18 @@ import {
 } from "@/lib/compressionTarget";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
-  L2ActionArea,
   L2AdvancedDisclosure,
   L2FileCard,
+  L2PanelLabel,
   L2PrivacyNote,
-  L2ToolMainColumn,
-  L2ToolSettingsPanel,
-  L2ToolWorkspace,
+  L2ToolbarButton,
   L2UploadStage,
+  L2WorkspaceGrid,
+  L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
+  L2WorkspaceToolbar,
+  ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { AuraOptionCard, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
@@ -992,11 +996,17 @@ export default function CompressPdfTool() {
 
   if (!analysis) {
     return (
-      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
-        {uploadArea}
+      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+        <L2WorkspaceHeader title="Compress PDF" description="Reduce file size while keeping documents usable." />
+
+        <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
+          {uploadArea}
+        </div>
+
         <L2PrivacyNote />
+
         {error ? (
-          <div role="alert" className="mt-4 rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+          <div role="alert" className="mx-auto w-full max-w-[720px] rounded-[var(--radius-lg)] border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
@@ -1005,29 +1015,23 @@ export default function CompressPdfTool() {
   }
 
   return (
-    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
-      <L2ToolWorkspace>
-        <L2ToolMainColumn>
-        <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[var(--text-primary)]/14 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-2)] p-3 shadow-2xl shadow-black/32">
-          <section className="shrink-0">
-            <div className="mb-2 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
-                  Document profile
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
-                  Estimated local analysis.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={resetTool}
-                className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/56 transition hover:border-[var(--text-primary)]/22 hover:text-[var(--text-primary)]"
-              >
-                Start new
-              </button>
-            </div>
-            <div className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/74 px-3 py-2">
+    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+      <L2WorkspaceHeader
+        title="Compress PDF"
+        description={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatFileSize(analysis.size)} · ${analysis.pageSizeType}`}
+      />
+
+      <L2WorkspaceToolbar>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
+        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{analysis.name}</span>
+      </L2WorkspaceToolbar>
+
+      <L2WorkspaceGrid
+        main={
+          <L2WorkspacePanel>
+            <L2PanelLabel title="Document profile" description="Estimated local analysis." />
+
+            <div className="mt-3 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/74 px-3 py-2">
               <L2FileCard
                 name={analysis.name}
                 meta={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatFileSize(analysis.size)} · ${analysis.pageSizeType}`}
@@ -1035,89 +1039,87 @@ export default function CompressPdfTool() {
                 action={<AuraStatus tone="success" label={displayStatus} />}
               />
             </div>
-          </section>
 
-          <div className="grid gap-3 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-[var(--text-primary)]">
-                {analysis.opportunity === "High" ? "Image-heavy document" : analysis.opportunity === "Moderate" ? "Balanced document" : "Already compact document"}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/48">
-                Compression opportunity: {analysis.opportunity} · Recommended: {profiles[analysis.recommendation].label}
-              </p>
-              <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/38">
-                {opportunityCopy}
-              </p>
-            </div>
-            {previewUrl ? (
-              <div className="hidden h-24 w-20 overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] md:block">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={previewUrl} alt={`Representative preview of page ${analysis.samplePage}`} className="h-full w-full object-contain" />
+            <div className="mt-3 grid gap-3 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-[var(--text-primary)]">
+                  {analysis.opportunity === "High" ? "Image-heavy document" : analysis.opportunity === "Moderate" ? "Balanced document" : "Already compact document"}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/48">
+                  Compression opportunity: {analysis.opportunity} · Recommended: {profiles[analysis.recommendation].label}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/38">
+                  {opportunityCopy}
+                </p>
               </div>
-            ) : null}
-          </div>
-
-          <div className="hidden gap-3 md:grid-cols-3">
-            <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Compression opportunity</p>
-              <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{analysis.opportunity}</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">{opportunityCopy}</p>
-            </div>
-            <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Estimated image-heavy pages</p>
-              <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{Math.round(analysis.estimatedImageHeavyRatio * 100)}%</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">Based on local document signals, not remote analysis.</p>
-            </div>
-            <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
-              <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Recommended for this document</p>
-              <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{profiles[analysis.recommendation].label}</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">{profileExplanation(analysis.opportunity)}</p>
-            </div>
-          </div>
-
-          <div className="hidden min-h-0 flex-1 gap-3 lg:grid-cols-[0.8fr_1.2fr] lg:overflow-hidden">
-            <div className="min-h-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/62 p-3">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">Quality preview</p>
-              <p className="mt-1 text-xs text-[var(--text-primary)]/40">Representative original preview · Page {analysis.samplePage}</p>
-              <div className="mt-3 flex h-64 items-center justify-center overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.04] lg:h-full lg:min-h-[16rem]">
-                {previewUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+              {previewUrl ? (
+                <div className="hidden h-24 w-20 overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] md:block">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={previewUrl} alt={`Representative preview of page ${analysis.samplePage}`} className="h-full w-full object-contain" />
-                ) : (
-                  <span className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--text-primary)]/28">Preview</span>
-                )}
-              </div>
-            </div>
-            <div className="no-scrollbar min-h-0 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/62 p-3">
-              <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">Risk notes</p>
-              <div className="mt-3 space-y-2">
-                <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/8 p-3 text-xs leading-5 text-[var(--text-primary)]/74">
-                  This compression pass rebuilds page appearance as optimized images. Review the output before replacing files that need selectable text, forms, links, signatures, or archival conformance.
                 </div>
-                {analysis.opportunity === "Low" ? (
-                  <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/8 p-3 text-xs leading-5 text-[var(--text-primary)]/74">
-                    This PDF already appears well optimised. Strong compression may reduce image clarity without producing meaningful savings.
-                  </div>
-                ) : null}
-                {analysis.risks.length ? (
-                  analysis.risks.map((risk) => (
-                    <div key={risk.title} className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.035] p-3">
-                      <p className="text-sm font-bold text-[var(--text-primary)]">{risk.title}</p>
-                      <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">{risk.description}</p>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm leading-6 text-[var(--text-primary)]/46">No specific form, signature, attachment, PDF/A, or large-file risk markers were detected in the sampled local analysis.</p>
-                )}
+              ) : null}
+            </div>
+
+            <div className="mt-3 hidden gap-3 md:grid md:grid-cols-3">
+              <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Compression opportunity</p>
+                <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{analysis.opportunity}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">{opportunityCopy}</p>
+              </div>
+              <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Estimated image-heavy pages</p>
+                <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{Math.round(analysis.estimatedImageHeavyRatio * 100)}%</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">Based on local document signals, not remote analysis.</p>
+              </div>
+              <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Recommended for this document</p>
+                <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{profiles[analysis.recommendation].label}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">{profileExplanation(analysis.opportunity)}</p>
               </div>
             </div>
-          </div>
-        </div>
-        </L2ToolMainColumn>
 
-        <L2ToolSettingsPanel title="Compression settings" description="Choose a quality profile or target size, then compress locally.">
-          <div className="flex h-full min-h-0 min-w-0 flex-col">
-            <div className={result ? "hidden" : "border-b border-[var(--text-primary)]/10 pb-3"}>
+            <div className="mt-3 hidden min-h-0 gap-3 lg:grid lg:grid-cols-[0.8fr_1.2fr]">
+              <div className="min-h-0 rounded-xl border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/62 p-3">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">Quality preview</p>
+                <p className="mt-1 text-xs text-[var(--text-primary)]/40">Representative original preview · Page {analysis.samplePage}</p>
+                <div className="mt-3 flex h-64 items-center justify-center overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.04] lg:h-full lg:min-h-[16rem]">
+                  {previewUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={previewUrl} alt={`Representative preview of page ${analysis.samplePage}`} className="h-full w-full object-contain" />
+                  ) : (
+                    <span className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--text-primary)]/28">Preview</span>
+                  )}
+                </div>
+              </div>
+              <div className="no-scrollbar min-h-0 overflow-y-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/62 p-3">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">Risk notes</p>
+                <div className="mt-3 space-y-2">
+                  <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/8 p-3 text-xs leading-5 text-[var(--text-primary)]/74">
+                    This compression pass rebuilds page appearance as optimized images. Review the output before replacing files that need selectable text, forms, links, signatures, or archival conformance.
+                  </div>
+                  {analysis.opportunity === "Low" ? (
+                    <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/8 p-3 text-xs leading-5 text-[var(--text-primary)]/74">
+                      This PDF already appears well optimised. Strong compression may reduce image clarity without producing meaningful savings.
+                    </div>
+                  ) : null}
+                  {analysis.risks.length ? (
+                    analysis.risks.map((risk) => (
+                      <div key={risk.title} className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.035] p-3">
+                        <p className="text-sm font-bold text-[var(--text-primary)]">{risk.title}</p>
+                        <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/46">{risk.description}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm leading-6 text-[var(--text-primary)]/46">No specific form, signature, attachment, PDF/A, or large-file risk markers were detected in the sampled local analysis.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </L2WorkspacePanel>
+        }
+        inspector={
+          <L2WorkspaceInspector title="Compression settings" description="Choose a quality profile or target size, then compress locally.">
+            <div className={result ? "hidden" : "mt-3 border-b border-[var(--text-primary)]/10 pb-3"}>
               <AuraSegmentedControl
                 label="Compression mode"
                 options={[
@@ -1326,11 +1328,10 @@ export default function CompressPdfTool() {
               {previewIssue ? <div className="mt-4 rounded-xl border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/8 px-3 py-2 text-xs text-[var(--text-primary)]/70">{previewIssue}</div> : null}
               {cleanupMessage ? <div className="mt-4 rounded-xl border border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)] px-3 py-2 text-sm text-[var(--text-success)]">{cleanupMessage}</div> : null}
               {progressDetail ? <div aria-live="polite" className="mt-4 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.035] px-3 py-2 text-xs text-[var(--text-primary)]/48">{progressDetail}</div> : null}
-            </div>
 
-            <div className={result ? "flex min-h-0 flex-1 flex-col justify-center border-0 pt-0" : "border-t border-[var(--text-primary)]/10 pt-3"}>
+            <div className={result ? "mt-3" : "mt-3 border-t border-[var(--text-primary)]/10 pt-3"}>
               {result ? (
-                <div className={`aura-success-reveal mb-4 rounded-xl border p-4 ${result.target ? result.target.outcome === "achieved" ? "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)]" : result.target.outcome === "closest-safe" ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]" : "border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10" : result.tone === "success" ? "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)]" : result.tone === "limited" ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]" : "border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10"}`}>
+                <div className={`aura-success-reveal rounded-xl border p-4 ${result.target ? result.target.outcome === "achieved" ? "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)]" : result.target.outcome === "closest-safe" ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]" : "border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10" : result.tone === "success" ? "border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)]" : result.tone === "limited" ? "border-[var(--border-subtle)] bg-[var(--surface-elevated)]" : "border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10"}`}>
                   <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">
                     Size Outcome
                   </p>
@@ -1366,45 +1367,42 @@ export default function CompressPdfTool() {
                   </div>
                 </div>
               ) : (
-                <p className="mb-3 text-xs text-[var(--text-primary)]/42">
+                <p className="text-xs text-[var(--text-primary)]/42">
                   Ready to compress · {compressionMode === "target" ? `Under ${formatFileSize(targetBytes)}` : profileLabel}
                 </p>
               )}
-
-              {result ? (
-                <div className="grid gap-2">
-                  <L2ActionArea
-                    primary={(
-                      <button type="button" onClick={handleDownload} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]">
-                        Download compressed PDF
-                      </button>
-                    )}
-                    secondary={(
-                      <>
-                        <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); }} className="inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-3 text-xs font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]">
-                          Compress again
-                        </button>
-                        {result.mode === "target" ? (
-                          <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); window.setTimeout(() => customTargetInputRef.current?.focus(), 0); }} className="inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-3 text-xs font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]">
-                            Change target
-                          </button>
-                        ) : null}
-                        <button type="button" onClick={resetTool} className="inline-flex h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]">
-                          Clear and start new
-                        </button>
-                      </>
-                    )}
-                  />
-                </div>
-              ) : (
-                <button type="button" disabled={!canCompress} onClick={handleCompress} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55">
-                  {isCompressing ? "Compressing in your browser..." : error ? "Retry compression" : "Compress PDF"}
-                </button>
-              )}
             </div>
-          </div>
-        </L2ToolSettingsPanel>
-      </L2ToolWorkspace>
+            </div>
+          </L2WorkspaceInspector>
+        }
+      />
+
+      <ToolActionBar>
+        {result ? (
+          <>
+            <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); }} className="inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]">
+              Compress again
+            </button>
+            {result.mode === "target" ? (
+              <button type="button" onClick={() => { clearResult(); setStatus("Ready"); setProgressDetail(""); setError(""); window.setTimeout(() => customTargetInputRef.current?.focus(), 0); }} className="inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]">
+                Change target
+              </button>
+            ) : null}
+            <button type="button" onClick={resetTool} className="inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]">
+              Clear and start new
+            </button>
+            <button type="button" onClick={handleDownload} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto">
+              Download compressed PDF
+            </button>
+          </>
+        ) : (
+          <button type="button" disabled={!canCompress} onClick={handleCompress} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto">
+            {isCompressing ? "Compressing in your browser..." : error ? "Retry compression" : "Compress PDF"}
+          </button>
+        )}
+      </ToolActionBar>
+
+      <L2PrivacyNote />
     </section>
   );
 }
