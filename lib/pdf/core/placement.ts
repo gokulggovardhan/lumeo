@@ -16,7 +16,14 @@
 
 import { nativeAnchorForCenter } from "./anchors.ts";
 
-export type PlacementCorner = "center" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
+export type PlacementCorner =
+  | "center"
+  | "top-left"
+  | "top-center"
+  | "top-right"
+  | "bottom-left"
+  | "bottom-center"
+  | "bottom-right";
 
 // v1.1 Phase 3: clamps a manual placement's top-left percent to stay fully
 // on-page (matches Crop PDF's clampCropRect pattern), unless allowOverflow
@@ -150,7 +157,11 @@ export function cornerAnchorPct(
   const xAlign: "start" | "end" | "center" =
     corner === "top-left" || corner === "bottom-left" ? "start" : corner === "top-right" || corner === "bottom-right" ? "end" : "center";
   const yAlign: "start" | "end" | "center" =
-    corner === "top-left" || corner === "top-right" ? "start" : corner === "bottom-left" || corner === "bottom-right" ? "end" : "center";
+    corner === "top-left" || corner === "top-right" || corner === "top-center"
+      ? "start"
+      : corner === "bottom-left" || corner === "bottom-right" || corner === "bottom-center"
+        ? "end"
+        : "center";
 
   const xPt = xAnchor(xAlign);
   const yPt = yAnchor(yAlign);
