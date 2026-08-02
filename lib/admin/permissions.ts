@@ -48,6 +48,14 @@ export function canViewAnalytics(role: AdminRole | null) {
   return role === "owner" || role === "admin" || role === "analyst";
 }
 
+export function canViewErrors(role: AdminRole | null) {
+  return role === "owner" || role === "admin" || role === "analyst";
+}
+
+export function canManageErrors(role: AdminRole | null) {
+  return role === "owner" || role === "admin";
+}
+
 export function assertPermission(allowed: boolean) {
   if (!allowed) {
     return {
