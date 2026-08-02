@@ -96,6 +96,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.8,
     },
     {
+      url: `${baseUrl}/pdf/header-footer`,
+      lastModified,
+      changeFrequency: "monthly",
+      priority: 0.8,
+    },
+    {
       url: `${baseUrl}/pdf/word-to-pdf`,
       lastModified,
       changeFrequency: "monthly",
