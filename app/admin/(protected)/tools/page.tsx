@@ -57,6 +57,7 @@ export default async function ToolsPage() {
                 form={formId}
                 name="category_id"
                 defaultValue={tool.category_id ?? ""}
+                aria-label={`${tool.name} category`}
                 className="min-h-10 w-full min-w-[10.5rem] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
               >
                 <option value="">None</option>
@@ -70,6 +71,7 @@ export default async function ToolsPage() {
                 form={formId}
                 name="status"
                 defaultValue={tool.status}
+                aria-label={`${tool.name} status`}
                 className="min-h-10 w-full min-w-[8.5rem] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
               >
                 {["active", "beta", "coming_soon", "hidden", "maintenance"].map((status) => (
@@ -83,6 +85,7 @@ export default async function ToolsPage() {
                 name="maintenance_message"
                 defaultValue={tool.maintenance_message ?? ""}
                 placeholder="e.g. Upgrading -- back shortly"
+                aria-label={`${tool.name} maintenance message`}
                 maxLength={300}
                 className="min-h-10 w-44 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
               />,
