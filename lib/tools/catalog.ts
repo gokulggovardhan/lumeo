@@ -139,7 +139,7 @@ export const lumeoTools: LumeoTool[] = [
       { label: "Edit PDF", slug: "edit", route: "/pdf/edit", live: true },
       { label: "Images", slug: "add-images", live: false },
       { label: "Watermark", slug: "watermark", route: "/pdf/watermark", live: true },
-      { label: "Page numbers", slug: "page-numbers", live: false },
+      { label: "Page numbers", slug: "page-numbers", route: "/pdf/page-numbers", live: true },
       { label: "Header & footer", slug: "header-footer", live: false },
       { label: "Crop", slug: "crop", route: "/pdf/crop", live: true },
       { label: "Bookmarks", slug: "bookmarks", live: false },
