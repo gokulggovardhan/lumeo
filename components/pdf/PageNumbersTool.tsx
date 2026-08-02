@@ -54,6 +54,7 @@ import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
+import { resetPdfPreviewState } from "@/lib/pdf/resetPreviewState";
 
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 
@@ -165,13 +166,7 @@ export default function PageNumbersTool() {
   // of state a new upload doesn't already reinitialize -- returns to the
   // upload screen ready for a different file immediately.
   function resetTool() {
-    if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
-    if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
-    pageImageUrlRef.current = "";
-    downloadUrlRef.current = "";
-    void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
-    pdfJsDocRef.current = null;
-    setDocReady(0);
+    resetPdfPreviewState({ pageImageUrlRef, downloadUrlRef, pdfJsDocRef, setDocReady });
     setPdf(null);
     setPageIndex(0);
     setPageImageUrl("");
