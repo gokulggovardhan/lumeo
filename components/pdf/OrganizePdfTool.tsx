@@ -31,7 +31,7 @@ import {
   validateOrganizeItems,
   type OrganizerItem,
 } from "@/lib/pdf/pageOrganizer";
-import { openPdfJsDocument, PAGE_RENDER_TIMEOUT_MS, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
+import { openPdfJsDocument, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { checkPdfFileSize, hasPdfMagicBytes, isPdfNamedFile } from "@/lib/pdf/uploadValidation";
