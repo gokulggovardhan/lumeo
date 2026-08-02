@@ -270,6 +270,28 @@ export function AuraSegmentedControl({
   className?: string;
 }) {
   const currentIndex = Math.max(0, options.findIndex((option) => option.value === value));
+  const trackRef = useRef<HTMLDivElement | null>(null);
+  const buttonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const [indicatorRect, setIndicatorRect] = useState<{ left: number; width: number } | null>(null);
+
+  // Buttons are flex-1 + whitespace-nowrap: when labels are long enough to
+  // overflow the track (long option text on a narrow viewport), flex-1
+  // stops distributing equal widths and each button falls back to its own
+  // content width instead. A pure CSS percentage split (100% / N) then no
+  // longer matches any real button's position, so the highlight lands
+  // between labels instead of under the selected one. Measuring the actual
+  // selected button's offset/width sidesteps that assumption entirely.
+  useEffect(() => {
+    const button = buttonRefs.current[currentIndex];
+    if (!button) return;
+    const measure = () => setIndicatorRect({ left: button.offsetLeft, width: button.offsetWidth });
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(button);
+    if (trackRef.current) observer.observe(trackRef.current);
+    return () => observer.disconnect();
+  }, [currentIndex, options.length]);
+
   function handleKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
     event.preventDefault();
@@ -287,10 +309,32 @@ export function AuraSegmentedControl({
   return (
     <div className={className}>
       <p className="mb-2 text-sm font-extrabold text-[var(--lumeo-paper-50)]">{label}</p>
-      <div role="radiogroup" aria-label={label} onKeyDown={handleKeyDown} className="relative flex overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border-hairline)] bg-[rgba(var(--paper-rgb),0.05)] p-1">
-        <span aria-hidden="true" className="lumeo2-segmented-indicator absolute bottom-1 top-1 rounded-[var(--radius-md)] bg-[var(--surface-selected)]" style={{ left: `calc(${currentIndex} * (100% / ${options.length}) + 0.25rem)`, width: `calc((100% - 0.5rem) / ${options.length})` }} />
-        {options.map((option) => (
-          <button key={option.value} type="button" role="radio" aria-checked={value === option.value} onClick={() => onChange(option.value)} className="relative z-10 min-h-10 flex-1 whitespace-nowrap rounded-[var(--radius-md)] px-4 text-sm font-extrabold text-[var(--lumeo-paper-100)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]">
+      <div
+        ref={trackRef}
+        role="radiogroup"
+        aria-label={label}
+        onKeyDown={handleKeyDown}
+        className="aura-scrollbar relative flex overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border-hairline)] bg-[rgba(var(--paper-rgb),0.05)] p-1"
+      >
+        {indicatorRect ? (
+          <span
+            aria-hidden="true"
+            className="lumeo2-segmented-indicator absolute bottom-1 top-1 rounded-[var(--radius-md)] bg-[var(--surface-selected)] transition-[left,width] duration-150 ease-out"
+            style={{ left: indicatorRect.left, width: indicatorRect.width }}
+          />
+        ) : null}
+        {options.map((option, index) => (
+          <button
+            key={option.value}
+            ref={(node) => {
+              buttonRefs.current[index] = node;
+            }}
+            type="button"
+            role="radio"
+            aria-checked={value === option.value}
+            onClick={() => onChange(option.value)}
+            className="relative z-10 min-h-10 flex-1 whitespace-nowrap rounded-[var(--radius-md)] px-4 text-sm font-extrabold text-[var(--lumeo-paper-100)] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]"
+          >
             {option.label}
           </button>
         ))}

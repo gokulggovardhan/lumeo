@@ -25,13 +25,17 @@ import { degrees, PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
-  L2ActionArea,
   L2FileCard,
+  L2PanelLabel,
   L2PrivacyNote,
-  L2ToolMainColumn,
-  L2ToolSettingsPanel,
-  L2ToolWorkspace,
+  L2ToolbarButton,
   L2UploadStage,
+  L2WorkspaceGrid,
+  L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
+  L2WorkspaceToolbar,
+  ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { PlacedElementView } from "@/components/pdf/sign/PlacedElementView";
 import { SignatureCreator, type CreatedSignature } from "@/components/pdf/sign/SignatureCreator";
@@ -569,8 +573,10 @@ export default function SignPdfTool() {
 
   if (!pdf) {
     return (
-      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
-        <div className="mx-auto w-full max-w-[1040px]">
+      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+        <L2WorkspaceHeader title="Sign PDF" description="Add signatures, dates, initials, and text to a PDF." />
+
+        <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="sign-pdf-upload"
             accept="application/pdf,.pdf"
@@ -583,9 +589,11 @@ export default function SignPdfTool() {
             }}
           />
         </div>
+
         <L2PrivacyNote />
+
         {error ? (
-          <div role="alert" className="mt-4 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+          <div role="alert" className="mx-auto w-full max-w-[720px] rounded-[var(--radius-lg)] border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
@@ -594,30 +602,33 @@ export default function SignPdfTool() {
   }
 
   return (
-    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
-      <L2ToolWorkspace>
-        <L2ToolMainColumn>
-          <section className="rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3 shadow-2xl shadow-black/28">
-            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-              <L2FileCard
-                icon={<FileIcon />}
-                name={pdf.file.name}
-                meta={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
-              />
-              <div className="flex items-center gap-1.5">
-                <button type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24 disabled:opacity-30">
-                  Undo
-                </button>
-                <button type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24 disabled:opacity-30">
-                  Redo
-                </button>
-                <button type="button" onClick={startNew} className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24">
-                  Start new
-                </button>
-              </div>
-            </div>
+    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+      <L2WorkspaceHeader
+        title="Sign PDF"
+        description={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
+      />
 
-            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/60 px-3 py-2">
+      <L2WorkspaceToolbar>
+        <L2ToolbarButton onClick={undo} disabled={!canUndo}>
+          Undo
+        </L2ToolbarButton>
+        <L2ToolbarButton onClick={redo} disabled={!canRedo}>
+          Redo
+        </L2ToolbarButton>
+        <L2ToolbarButton onClick={startNew}>Start new</L2ToolbarButton>
+        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
+      </L2WorkspaceToolbar>
+
+      <L2WorkspaceGrid
+        main={
+          <L2WorkspacePanel>
+            <L2FileCard
+              icon={<FileIcon />}
+              name={pdf.file.name}
+              meta={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
+            />
+
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/60 px-3 py-2">
               <div className="flex items-center gap-3">
                 <button
                   type="button"
@@ -651,13 +662,14 @@ export default function SignPdfTool() {
                 </button>
               </div>
             </div>
-          </section>
 
-          <section className="mt-3 rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3.5 shadow-2xl shadow-black/24">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
+            <div className="mt-3">
+              <L2PanelLabel title="Preview" />
+            </div>
+            <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
               {armedSignature ? "Click anywhere on the page to place it" : "Place your signature"}
             </p>
-            <p className="mb-3 text-xs text-[var(--text-primary)]/48">
+            <p className="mb-3 mt-1 text-xs text-[var(--text-primary)]/48">
               🔒 Your PDF stays on your device. Drag to move, use the corner handle to resize.
             </p>
 
@@ -732,18 +744,17 @@ export default function SignPdfTool() {
                 </div>
               )}
             </div>
-          </section>
 
-          {error ? (
-            <div role="alert" className="mt-3 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
-              {error}
-            </div>
-          ) : null}
-        </L2ToolMainColumn>
-
-        <L2ToolSettingsPanel title="Signature" description="Pick a saved signature or create a new one, then click the page to place it.">
-          <div className="flex h-full min-h-0 flex-col">
-            <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto pr-1">
+            {error ? (
+              <div role="alert" className="mt-3 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+                {error}
+              </div>
+            ) : null}
+          </L2WorkspacePanel>
+        }
+        inspector={
+          <L2WorkspaceInspector title="Signature" description="Pick a saved signature or create a new one, then click the page to place it.">
+            <div className="mt-3">
               {showCreator ? (
                 <div>
                   <button type="button" onClick={() => setShowCreator(false)} className="mb-2 text-xs font-semibold text-[var(--text-primary)]/50 hover:text-[var(--text-primary)]">
@@ -800,39 +811,33 @@ export default function SignPdfTool() {
                   placeholder="lumeo-signed.pdf"
                 />
               </label>
-
-              <div className={`mt-3${downloadUrl ? " aura-success-reveal" : ""}`}>
-                {downloadUrl ? (
-                  <L2ActionArea
-                    primary={
-                      <button
-                        type="button"
-                        onClick={downloadSignedPdf}
-                        className="lumeo-primary-action w-full rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)]"
-                      >
-                        Download signed PDF
-                      </button>
-                    }
-                  />
-                ) : (
-                  <L2ActionArea
-                    primary={
-                      <button
-                        type="button"
-                        disabled={elements.length === 0 || isGenerating}
-                        onClick={() => void generateSignedPdf()}
-                        className="lumeo-primary-action w-full rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45"
-                      >
-                        {isGenerating ? "Signing..." : "Sign PDF"}
-                      </button>
-                    }
-                  />
-                )}
-              </div>
             </div>
-          </div>
-        </L2ToolSettingsPanel>
-      </L2ToolWorkspace>
+          </L2WorkspaceInspector>
+        }
+      />
+
+      <ToolActionBar>
+        {downloadUrl ? (
+          <button
+            type="button"
+            onClick={downloadSignedPdf}
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
+          >
+            Download signed PDF
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={elements.length === 0 || isGenerating}
+            onClick={() => void generateSignedPdf()}
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
+          >
+            {isGenerating ? "Signing..." : "Sign PDF"}
+          </button>
+        )}
+      </ToolActionBar>
+
+      <L2PrivacyNote />
 
       <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col gap-2">
         {toasts.map((toast) => (

@@ -3,12 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, FileDown, FileText, Loader2 } from "lucide-react";
 import {
-  L2ActionArea,
   L2FileCard,
-  L2ToolMainColumn,
-  L2ToolSettingsPanel,
-  L2ToolWorkspace,
+  L2ToolbarButton,
   L2UploadStage,
+  L2WorkspaceGrid,
+  L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
+  L2WorkspaceToolbar,
+  ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { AuraStatus } from "@/components/ui/Aura";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
@@ -219,11 +222,17 @@ export default function PdfToWordTool() {
 
   if (!selected) {
     return (
-      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
-        {uploadArea}
+      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+        <L2WorkspaceHeader title="PDF to Word" description="Convert PDFs to editable Word documents." />
+
+        <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
+          {uploadArea}
+        </div>
+
         <ServerPrivacyNote />
+
         {error ? (
-          <div role="alert" className="mt-4 flex items-center gap-2 rounded-lg border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+          <div role="alert" className="mx-auto flex w-full max-w-[720px] items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
             {error}
           </div>
@@ -233,47 +242,35 @@ export default function PdfToWordTool() {
   }
 
   return (
-    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
-      <L2ToolWorkspace>
-        <L2ToolMainColumn>
-          <div className="flex min-h-0 flex-col gap-3 rounded-xl border border-[var(--text-primary)]/14 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-2)] p-3 shadow-2xl shadow-black/32">
-            <div className="mb-1 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--lumeo-gold)]">
-                  PDF to Word
-                </p>
-                <p className="mt-0.5 text-xs text-[var(--text-primary)]/48">
-                  Converted via free, self-hosted LibreOffice.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={resetTool}
-                disabled={isBusy}
-                className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/56 transition hover:border-[var(--text-primary)]/22 hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Start new
-              </button>
-            </div>
+    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+      <L2WorkspaceHeader title="PDF to Word" description={formatFileSize(selected.file.size)} />
 
-            <div className="rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/74 px-3 py-2">
-              <L2FileCard
-                name={selected.file.name}
-                meta={formatFileSize(selected.file.size)}
-                icon={<FileText aria-hidden="true" className="h-6 w-6 text-[var(--text-accent)]" />}
-                action={<AuraStatus tone={stage === "error" ? "danger" : "neutral"} label={statusLabel || "Ready"} />}
-              />
-            </div>
+      <L2WorkspaceToolbar>
+        <L2ToolbarButton onClick={resetTool} disabled={isBusy}>
+          Start new
+        </L2ToolbarButton>
+        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{selected.file.name}</span>
+      </L2WorkspaceToolbar>
+
+      <L2WorkspaceGrid
+        main={
+          <L2WorkspacePanel variant="flat">
+            <L2FileCard
+              name={selected.file.name}
+              meta={formatFileSize(selected.file.size)}
+              icon={<FileText aria-hidden="true" className="h-6 w-6 text-[var(--text-accent)]" />}
+              action={<AuraStatus tone={stage === "error" ? "danger" : "neutral"} label={statusLabel || "Ready"} />}
+            />
 
             {isBusy ? (
-              <div className="flex items-center gap-3 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/62 p-4">
+              <div className="mt-3 flex items-center gap-3 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/62 p-4">
                 <Loader2 aria-hidden="true" className="h-5 w-5 shrink-0 animate-spin text-[var(--text-accent)]" />
                 <p className="text-sm font-semibold text-[var(--text-primary)]">{statusLabel}</p>
               </div>
             ) : null}
 
             {stage === "success" && result ? (
-              <div className="aura-success-reveal flex items-center gap-3 rounded-xl border border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)] p-4">
+              <div className="aura-success-reveal mt-3 flex items-center gap-3 rounded-xl border border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)] p-4">
                 <CheckCircle2 aria-hidden="true" className="h-5 w-5 shrink-0 text-[var(--text-success)]" />
                 <div>
                   <p className="text-sm font-bold text-[var(--text-success)]">Word document ready</p>
@@ -283,63 +280,66 @@ export default function PdfToWordTool() {
             ) : null}
 
             {error ? (
-              <div role="alert" className="flex items-center gap-2 rounded-xl border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 px-3 py-2 text-sm text-[var(--text-danger)]">
+              <div role="alert" className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 px-3 py-2 text-sm text-[var(--text-danger)]">
                 <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
                 {error}
               </div>
             ) : null}
-          </div>
-        </L2ToolMainColumn>
+          </L2WorkspacePanel>
+        }
+        inspector={
+          <L2WorkspaceInspector
+            title="Convert to Word"
+            description="Your document is uploaded securely, converted on our server, and deleted immediately after."
+          >
+            <p className="mt-3 text-xs leading-5 text-[var(--text-subtle)]">
+              Layout, tables, and formatting are preserved as closely as LibreOffice allows.
+            </p>
+          </L2WorkspaceInspector>
+        }
+      />
 
-        <L2ToolSettingsPanel
-          title="Convert to Word"
-          description="Your document is uploaded securely, converted on our server, and deleted immediately after."
-        >
-          <div className="flex h-full min-h-0 flex-col justify-end">
-            {result ? (
-              <L2ActionArea
-                primary={
-                  <button
-                    type="button"
-                    onClick={handleDownload}
-                    className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98]"
-                  >
-                    <FileDown aria-hidden="true" className="h-4 w-4" />
-                    Download Word document
-                  </button>
-                }
-                secondary={
-                  <button
-                    type="button"
-                    onClick={resetTool}
-                    className="inline-flex h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]"
-                  >
-                    Convert another
-                  </button>
-                }
-              />
+      <ToolActionBar>
+        {result ? (
+          <>
+            <button
+              type="button"
+              onClick={resetTool}
+              className="inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]"
+            >
+              Convert another
+            </button>
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
+            >
+              <FileDown aria-hidden="true" className="h-4 w-4" />
+              Download Word document
+            </button>
+          </>
+        ) : (
+          <button
+            type="button"
+            disabled={isBusy}
+            onClick={handleConvert}
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+          >
+            {isBusy ? (
+              <>
+                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                {statusLabel}
+              </>
+            ) : error ? (
+              "Retry conversion"
             ) : (
-              <button
-                type="button"
-                disabled={isBusy}
-                onClick={handleConvert}
-                className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55"
-              >
-                {isBusy ? (
-                  <>
-                    <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-                    {statusLabel}
-                  </>
-                ) : error ? (
-                  "Retry conversion"
-                ) : (
-                  "Convert to Word"
-                )}
-              </button>
+              "Convert to Word"
             )}
-          </div>
-        </L2ToolSettingsPanel>
-      </L2ToolWorkspace>
+          </button>
+        )}
+      </ToolActionBar>
+
+      <ServerPrivacyNote />
     </section>
   );
 }

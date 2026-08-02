@@ -16,13 +16,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
-  L2ActionArea,
   L2FileCard,
+  L2PanelLabel,
   L2PrivacyNote,
-  L2ToolMainColumn,
-  L2ToolSettingsPanel,
-  L2ToolWorkspace,
+  L2ToolbarButton,
   L2UploadStage,
+  L2WorkspaceGrid,
+  L2WorkspaceHeader,
+  L2WorkspaceInspector,
+  L2WorkspacePanel,
+  L2WorkspaceToolbar,
+  ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { EditElementView } from "@/components/pdf/edit/EditElementView";
 import { InkCanvas } from "@/components/pdf/edit/InkCanvas";
@@ -368,8 +372,10 @@ export default function EditPdfTool() {
 
   if (!pdf) {
     return (
-      <section className="l2-tool-empty-state grid gap-4 pb-4 lg:pb-0">
-        <div className="mx-auto w-full max-w-[1040px]">
+      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+        <L2WorkspaceHeader title="Edit PDF" description="Add text, drawings, shapes, and whiteout to a PDF." />
+
+        <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="edit-pdf-upload"
             accept="application/pdf,.pdf"
@@ -380,9 +386,11 @@ export default function EditPdfTool() {
             onFilesSelected={(files) => void addFile(files)}
           />
         </div>
+
         <L2PrivacyNote />
+
         {error ? (
-          <div role="alert" className="mt-4 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+          <div role="alert" className="mx-auto w-full max-w-[720px] rounded-[var(--radius-lg)] border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
             {error}
           </div>
         ) : null}
@@ -391,33 +399,32 @@ export default function EditPdfTool() {
   }
 
   return (
-    <section className="l2-tool-deep-workspace pb-4 lg:pb-0">
-      <L2ToolWorkspace>
-        <L2ToolMainColumn>
-          <section className="rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3 shadow-2xl shadow-black/28">
-            <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-              <L2FileCard icon={<FileIcon />} name={pdf.file.name} meta={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`} />
-              <div className="flex items-center gap-1.5">
-                <button type="button" onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)" className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24 disabled:opacity-30">
-                  Undo
-                </button>
-                <button type="button" onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)" className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24 disabled:opacity-30">
-                  Redo
-                </button>
-                <button type="button" onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))} title="Zoom out" className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24">
-                  −
-                </button>
-                <span className="text-xs font-semibold text-[var(--text-primary)]/58">{Math.round(zoom * 100)}%</span>
-                <button type="button" onClick={() => setZoom((z) => Math.min(2, z + 0.1))} title="Zoom in" className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24">
-                  +
-                </button>
-                <button type="button" onClick={() => setZoom(1)} title="Fit width" className="rounded-full border border-[var(--text-primary)]/12 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/58 transition hover:border-[var(--text-primary)]/24">
-                  Fit
-                </button>
-              </div>
-            </div>
+    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+      <L2WorkspaceHeader
+        title="Edit PDF"
+        description={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
+      />
 
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/60 px-3 py-2">
+      <L2WorkspaceToolbar>
+        <L2ToolbarButton onClick={undo} disabled={!canUndo}>
+          Undo
+        </L2ToolbarButton>
+        <L2ToolbarButton onClick={redo} disabled={!canRedo}>
+          Redo
+        </L2ToolbarButton>
+        <L2ToolbarButton onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}>−</L2ToolbarButton>
+        <span className="text-xs font-bold text-[var(--text-subtle)]">{Math.round(zoom * 100)}%</span>
+        <L2ToolbarButton onClick={() => setZoom((z) => Math.min(2, z + 0.1))}>+</L2ToolbarButton>
+        <L2ToolbarButton onClick={() => setZoom(1)}>Fit</L2ToolbarButton>
+        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
+      </L2WorkspaceToolbar>
+
+      <L2WorkspaceGrid
+        main={
+          <L2WorkspacePanel>
+            <L2FileCard icon={<FileIcon />} name={pdf.file.name} meta={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`} />
+
+            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/60 px-3 py-2">
               <button type="button" disabled={pageIndex === 0} onClick={() => setPageIndex((c) => Math.max(0, c - 1))} className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40 disabled:opacity-35">
                 ← Prev
               </button>
@@ -426,15 +433,16 @@ export default function EditPdfTool() {
                 Next →
               </button>
             </div>
-          </section>
 
-          <section className="mt-3 rounded-xl border border-[var(--text-primary)]/12 bg-gradient-to-br from-[var(--atelier-surface-3)] via-[var(--atelier-surface-2)] to-[var(--atelier-surface-1)] p-3.5 shadow-2xl shadow-black/24">
+            <div className="mt-3">
+              <L2PanelLabel title="Preview" />
+            </div>
             {pageLoading || !pageImageUrl || !pageDisplaySize ? (
-              <div className="flex h-64 items-center justify-center rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/40 text-sm text-[var(--text-primary)]/40">
+              <div className="mt-3 flex h-64 items-center justify-center rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/40 text-sm text-[var(--text-primary)]/40">
                 Loading page preview...
               </div>
             ) : (
-              <div className="mx-auto" style={{ width: `${zoom * 100}%` }}>
+              <div className="mx-auto mt-3" style={{ width: `${zoom * 100}%` }}>
                 <div
                   ref={stageRef}
                   onClick={handleStageClick}
@@ -473,18 +481,17 @@ export default function EditPdfTool() {
                 </div>
               </div>
             )}
-          </section>
 
-          {error ? (
-            <div role="alert" className="mt-3 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
-              {error}
-            </div>
-          ) : null}
-        </L2ToolMainColumn>
-
-        <L2ToolSettingsPanel title="Tools" description="Pick a tool, then click the page to place it.">
-          <div className="flex h-full min-h-0 flex-col">
-            <div className="grid grid-cols-5 gap-1.5">
+            {error ? (
+              <div role="alert" className="mt-3 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+                {error}
+              </div>
+            ) : null}
+          </L2WorkspacePanel>
+        }
+        inspector={
+          <L2WorkspaceInspector title="Tools" description="Pick a tool, then click the page to place it.">
+            <div className="mt-3 grid grid-cols-5 gap-1.5">
               {(["select", "text", "draw", "shape", "whiteout"] as ActiveTool[]).map((tool) => (
                 <button
                   key={tool}
@@ -572,7 +579,7 @@ export default function EditPdfTool() {
               </div>
             ) : null}
 
-            <div className="mt-auto border-t border-[var(--text-primary)]/10 pt-3">
+            <div className="mt-3 border-t border-[var(--text-primary)]/10 pt-3">
               <label className="block rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/50 p-2.5">
                 <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">File name</span>
                 <input
@@ -585,35 +592,33 @@ export default function EditPdfTool() {
                   placeholder="lumeo-edited.pdf"
                 />
               </label>
-
-              <div className="mt-3">
-                {downloadUrl ? (
-                  <L2ActionArea
-                    primary={
-                      <button type="button" onClick={downloadEditedPdf} className="lumeo-primary-action w-full rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)]">
-                        Download edited PDF
-                      </button>
-                    }
-                  />
-                ) : (
-                  <L2ActionArea
-                    primary={
-                      <button
-                        type="button"
-                        disabled={elements.length === 0 || isExporting}
-                        onClick={() => void generateEditedPdf()}
-                        className="lumeo-primary-action w-full rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 py-2.5 text-sm font-semibold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-45"
-                      >
-                        {isExporting ? "Exporting..." : "Export PDF"}
-                      </button>
-                    }
-                  />
-                )}
-              </div>
             </div>
-          </div>
-        </L2ToolSettingsPanel>
-      </L2ToolWorkspace>
+          </L2WorkspaceInspector>
+        }
+      />
+
+      <ToolActionBar>
+        {downloadUrl ? (
+          <button
+            type="button"
+            onClick={downloadEditedPdf}
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
+          >
+            Download edited PDF
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={elements.length === 0 || isExporting}
+            onClick={() => void generateEditedPdf()}
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
+          >
+            {isExporting ? "Exporting..." : "Export PDF"}
+          </button>
+        )}
+      </ToolActionBar>
+
+      <L2PrivacyNote />
     </section>
   );
 }
