@@ -24,6 +24,7 @@ import {
   L2FileCard,
   L2PanelLabel,
   L2PrivacyNote,
+  L2ToolbarButton,
   L2UploadStage,
   L2WorkspaceGrid,
   L2WorkspaceHeader,
@@ -159,6 +160,29 @@ export default function PageNumbersTool() {
       void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     };
   }, []);
+
+  // Same cleanup an unmount already does, plus a full reset of every piece
+  // of state a new upload doesn't already reinitialize -- returns to the
+  // upload screen ready for a different file immediately.
+  function resetTool() {
+    if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
+    if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
+    pageImageUrlRef.current = "";
+    downloadUrlRef.current = "";
+    void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
+    pdfJsDocRef.current = null;
+    setDocReady(0);
+    setPdf(null);
+    setPageIndex(0);
+    setPageImageUrl("");
+    setPageDisplaySize(null);
+    setError("");
+    setConfig(createDefaultPageNumbersConfig());
+    setPageRangeInput("");
+    setPageRangeError("");
+    setDownloadUrl("");
+    setOutputName("lumeo-page-numbers.pdf");
+  }
 
   // Any export-affecting config change invalidates the previous export --
   // the downloaded file no longer matches the current settings.
@@ -400,7 +424,8 @@ export default function PageNumbersTool() {
       />
 
       <L2WorkspaceToolbar>
-        <span className="text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
+        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
       </L2WorkspaceToolbar>
 
       <L2WorkspaceGrid

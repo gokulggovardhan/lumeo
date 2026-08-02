@@ -140,6 +140,24 @@ export default function OrganizePdfTool() {
     };
   }, []);
 
+  // Same cleanup an unmount already does, plus a full reset of the loaded
+  // document, its items/selection/thumbnails, and any pending result --
+  // returns to the upload screen ready for a different file immediately.
+  function resetTool() {
+    sessionRef.current += 1;
+    if (result?.url) URL.revokeObjectURL(result.url);
+    thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    thumbnailUrlsRef.current.clear();
+    void destroyPdfJsDocument();
+    setDocument(null);
+    setItems([]);
+    setThumbnails({});
+    setSelected(new Set());
+    setDragIndex(null);
+    setError("");
+    setResult(null);
+  }
+
   async function renderThumbnails(doc: PDFDocumentProxy, pageCount: number, session: number) {
     const pending = Array.from({ length: pageCount }, (_, index) => index + 1);
 
@@ -377,6 +395,7 @@ export default function OrganizePdfTool() {
             <L2ToolbarButton onClick={() => handleRotate("right")}>Rotate selected right</L2ToolbarButton>
           </>
         ) : null}
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{summaryLine}</span>
       </L2WorkspaceToolbar>
 

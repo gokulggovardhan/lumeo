@@ -137,6 +137,30 @@ export default function CropPdfTool() {
     };
   }, []);
 
+  // Same cleanup an unmount already does, plus a full reset of every piece
+  // of state a new upload doesn't already reinitialize -- returns to the
+  // upload screen ready for a different file immediately.
+  function resetTool() {
+    if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
+    if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
+    pageImageUrlRef.current = "";
+    downloadUrlRef.current = "";
+    void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
+    pdfJsDocRef.current = null;
+    setDocReady(0);
+    setPdf(null);
+    setPageIndex(0);
+    setPageImageUrl("");
+    setPageDisplaySize(null);
+    setError("");
+    resetConfig(createDefaultCropConfig());
+    setScopeInput("");
+    setScopeError("");
+    setLockAspectRatio(false);
+    setDownloadUrl("");
+    setOutputName("lumeo-cropped.pdf");
+  }
+
   // Any config change invalidates the previous export -- same
   // stale-download-reset pattern WatermarkTool.tsx established.
   useEffect(() => {
@@ -406,6 +430,7 @@ export default function CropPdfTool() {
         <L2ToolbarButton onClick={redo} disabled={!canRedo}>
           Redo
         </L2ToolbarButton>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
       </L2WorkspaceToolbar>
 

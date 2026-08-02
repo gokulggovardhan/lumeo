@@ -168,6 +168,31 @@ export default function WatermarkTool() {
     };
   }, []);
 
+  // Same cleanup an unmount already does (revoke both object URLs, destroy
+  // the live pdfjs document), plus a full reset of every piece of state a
+  // new upload doesn't already reinitialize on its own -- returns to the
+  // upload screen ready for a different file immediately.
+  function resetTool() {
+    if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
+    if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
+    pageImageUrlRef.current = "";
+    downloadUrlRef.current = "";
+    void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
+    pdfJsDocRef.current = null;
+    setDocReady(0);
+    setPdf(null);
+    setPageIndex(0);
+    setPageImageUrl("");
+    setPageDisplaySize(null);
+    setError("");
+    resetConfig(createDefaultTextWatermarkConfig());
+    setContentMode("text");
+    setPageRangeInput("");
+    setPageRangeError("");
+    setDownloadUrl("");
+    setOutputName("lumeo-watermarked.pdf");
+  }
+
   // Any export-affecting config change (text, image, opacity, rotation,
   // scale, color, font size, bold/italic, margin, placement, tiled mode,
   // tile spacing, page range) invalidates the previous export -- the
@@ -483,6 +508,7 @@ export default function WatermarkTool() {
         <L2ToolbarButton onClick={redo} disabled={!canRedo}>
           Redo
         </L2ToolbarButton>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
       </L2WorkspaceToolbar>
 
