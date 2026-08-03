@@ -484,7 +484,7 @@ export default function OrganizePdfTool() {
             <L2ToolbarButton onClick={() => handleRotate("right")}>Rotate selected right</L2ToolbarButton>
           </>
         ) : null}
-        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
+        <L2ToolbarButton onClick={resetTool} disabled={isExporting}>Start new</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{summaryLine}</span>
       </L2WorkspaceToolbar>
 
