@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PDFDict, PDFDocument, PDFName, rgb, type PDFPage } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName, PDFRef, rgb, type PDFContext, type PDFPage } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { findEmbeddedJpegs } from "@/lib/pdf/embeddedImages";
 import {
@@ -635,6 +635,74 @@ export default function CompressPdfTool() {
     }
   }
 
+  // Copies one outline (bookmark) item's Title/Count and its own First/Next
+  // chain of children -- deliberately NOT Dest or A (the entries that make a
+  // bookmark navigate to a page on click). Using PDFObjectCopier's normal
+  // full-object-graph copy for this was tried first and measured to create
+  // a full, orphaned, uncompressed duplicate of whatever page a bookmark's
+  // Dest pointed at for every single bookmark (proven with a real pdf-lib
+  // test: PDFObjectCopier follows every ref it finds, including a page ref
+  // sitting inside a Dest array, and that duplicate page isn't reachable
+  // through the document's real page tree but still gets written into the
+  // saved file by pdf-lib's writer, which serializes every registered
+  // object regardless of reachability -- silently bloating the output for
+  // every bookmarked page). Copying just the title/hierarchy avoids that
+  // entirely, at the cost of bookmarks no longer jumping to a specific
+  // page on click -- remapping Dest to the already-compressed copy of the
+  // right page would need a source-page-ref -> output-page-ref map built
+  // across the whole per-page loop, which is real, separate follow-up work,
+  // not something to rush alongside this fix.
+  function copyOutlineItem(sourceContext: PDFContext, output: PDFDocument, sourceItemDict: PDFDict): PDFRef {
+    const newDict = output.context.obj({});
+    const title = sourceItemDict.get(PDFName.of("Title"));
+    if (title) newDict.set(PDFName.of("Title"), title.clone());
+    const newRef = output.context.register(newDict);
+
+    let previousChildRef: PDFRef | undefined;
+    let firstChildRef: PDFRef | undefined;
+    let sourceChildRef = sourceItemDict.get(PDFName.of("First"));
+    let childCount = 0;
+
+    while (sourceChildRef instanceof PDFRef) {
+      const sourceChildDict = sourceContext.lookup(sourceChildRef, PDFDict);
+      const copiedChildRef = copyOutlineItem(sourceContext, output, sourceChildDict);
+      const copiedChildDict = output.context.lookup(copiedChildRef, PDFDict);
+      copiedChildDict.set(PDFName.of("Parent"), newRef);
+      childCount += 1;
+
+      if (!firstChildRef) firstChildRef = copiedChildRef;
+      if (previousChildRef) {
+        const previousChildDict = output.context.lookup(previousChildRef, PDFDict);
+        previousChildDict.set(PDFName.of("Next"), copiedChildRef);
+        copiedChildDict.set(PDFName.of("Prev"), previousChildRef);
+      }
+      previousChildRef = copiedChildRef;
+      sourceChildRef = sourceChildDict.get(PDFName.of("Next"));
+    }
+
+    if (firstChildRef) newDict.set(PDFName.of("First"), firstChildRef);
+    if (previousChildRef) newDict.set(PDFName.of("Last"), previousChildRef);
+    if (childCount > 0) newDict.set(PDFName.of("Count"), output.context.obj(childCount));
+
+    return newRef;
+  }
+
+  // /Outlines (the bookmark panel) is a document-catalog entry, not part of
+  // any page -- copyPages, which only copies pages, never carries it across.
+  // Confirmed via a real pdf-lib test (tests/compression-document-structure
+  // .test.ts) that this was silently dropping bookmarks on every compressed
+  // PDF regardless of the text-preservation work above, since that's a
+  // per-page decision and this is document-level.
+  function copyOutline(source: PDFDocument, output: PDFDocument) {
+    const outlinesRef = source.catalog.get(PDFName.of("Outlines"));
+    if (!(outlinesRef instanceof PDFRef)) return;
+    const sourceOutlineDict = source.context.lookup(outlinesRef, PDFDict);
+    const copiedRootRef = copyOutlineItem(source.context, output, sourceOutlineDict);
+    const copiedRootDict = output.context.lookup(copiedRootRef, PDFDict);
+    copiedRootDict.set(PDFName.of("Type"), PDFName.of("Outlines"));
+    output.catalog.set(PDFName.of("Outlines"), copiedRootRef);
+  }
+
   // A page with real text can still carry heavy embedded photos (a scanned
   // signature, a letterhead logo, an invoice photo) -- copying it through
   // unchanged (as buildCompressedCandidate does for every text page)
@@ -721,6 +789,10 @@ export default function CompressPdfTool() {
       output.setTitle("Compressed PDF");
       output.setCreator("Lumeo PDF Workspace");
     }
+    // Bookmarks are document navigation structure, not the kind of
+    // author/title metadata metadataMode is about stripping for privacy --
+    // copied unconditionally.
+    copyOutline(sourcePdf, output);
 
     for (let pageIndex = 1; pageIndex <= analysis.pageCount; pageIndex += 1) {
       if (currentSession !== sessionRef.current) {
