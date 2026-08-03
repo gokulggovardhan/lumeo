@@ -118,6 +118,7 @@ type CompressResult = {
     requestedBytes: number;
     attempts: TargetCompressionAttempt[];
     qualityOutlook: TargetQualityOutlook;
+    textPagesPreserved: number;
   };
 };
 
@@ -654,6 +655,7 @@ export default function CompressPdfTool() {
   }) {
     if (!analysis) throw new Error("Document analysis is unavailable.");
     const output = await PDFDocument.create();
+    let textPagesPreserved = 0;
     if (metadataMode === "preserve") {
       await copyMetadata(sourcePdf, output);
     } else {
@@ -687,6 +689,7 @@ export default function CompressPdfTool() {
         (item) => "str" in item && item.str.trim().length > 0,
       );
       if (hasRealText) {
+        textPagesPreserved += 1;
         const [copiedPage] = await output.copyPages(sourcePdf, [pageIndex - 1]);
         output.addPage(copiedPage);
         await new Promise((resolve) => window.setTimeout(resolve, 0));
@@ -747,7 +750,8 @@ export default function CompressPdfTool() {
 
     setStatus("Rebuilding document");
     setProgressDetail(`${passLabel} · rebuilding document`);
-    return output.save({ useObjectStreams: true });
+    const bytes = await output.save({ useObjectStreams: true });
+    return { bytes, textPagesPreserved };
   }
 
   async function handleCompress() {
@@ -802,6 +806,7 @@ export default function CompressPdfTool() {
         let smallestSuccessfulStrength: number | null = null;
         let bestCandidate: Uint8Array | null = null;
         let bestCandidateBytes: number | null = null;
+        let bestCandidateTextPagesPreserved = 0;
         let bestUnderTargetBytes: number | null = null;
         let smallestCandidateBytes = Number.POSITIVE_INFINITY;
 
@@ -817,7 +822,7 @@ export default function CompressPdfTool() {
             currentSession,
             passLabel: `Building pass ${pass} of ${MAX_TARGET_PASSES}`,
           });
-          const candidateBytes = candidate.byteLength;
+          const candidateBytes = candidate.bytes.byteLength;
           setProgressDetail(
             `Pass ${pass} of ${MAX_TARGET_PASSES} · ${formatFileSize(candidateBytes)} so far${
               candidateBytes <= request.targetBytes ? " · under target" : ""
@@ -856,8 +861,9 @@ export default function CompressPdfTool() {
               targetBytes: request.targetBytes,
             })
           ) {
-            bestCandidate = candidate;
+            bestCandidate = candidate.bytes;
             bestCandidateBytes = candidateBytes;
+            bestCandidateTextPagesPreserved = candidate.textPagesPreserved;
           }
 
           const closeEnough =
@@ -894,9 +900,10 @@ export default function CompressPdfTool() {
           requestedBytes: request.targetBytes,
           attempts,
           qualityOutlook: outlook,
+          textPagesPreserved: bestCandidateTextPagesPreserved,
         };
       } else {
-        outputBytes = await buildCompressedCandidate({
+        const candidate = await buildCompressedCandidate({
           processingDoc,
           sourcePdf,
           dpi: selectedPlan.dpi,
@@ -906,6 +913,7 @@ export default function CompressPdfTool() {
           currentSession,
           passLabel: "Processing document",
         });
+        outputBytes = candidate.bytes;
       }
 
       // Recompression can legitimately grow the file (an already-optimized
@@ -1393,6 +1401,14 @@ export default function CompressPdfTool() {
                     {result.mode === "quality" && result.profile ? <p>Profile: {profiles[result.profile].label}</p> : null}
                     {result.target ? <p>Passes: {result.target.attempts.length}</p> : null}
                     {result.target ? <p>Quality: {result.target.qualityOutlook}</p> : null}
+                    {result.target && result.target.textPagesPreserved > 0 && result.target.outcome !== "achieved" ? (
+                      <p>
+                        {result.target.textPagesPreserved} page{result.target.textPagesPreserved === 1 ? "" : "s"} with
+                        real text {result.target.textPagesPreserved === 1 ? "was" : "were"} kept as-is instead of
+                        compressed further, to keep the document searchable and selectable -- this is the reason the
+                        target was not fully reached.
+                      </p>
+                    ) : null}
                     <p>Grayscale: {result.grayscale ? "On" : "Off"}</p>
                     {result.target?.outcome === "closest-safe" ? <p className="text-[var(--text-primary)]/70">Reason: Reducing further would significantly affect readability.</p> : null}
                     {result.tone === "larger" ? <p className="font-semibold text-[var(--text-danger)]">Recommendation: keep original.</p> : null}

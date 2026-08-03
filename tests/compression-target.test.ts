@@ -163,3 +163,12 @@ test("CompressPdfTool preserves real text by copying text pages instead of raste
   );
   assert.ok(compressToolSource.includes("output.copyPages(sourcePdf, [pageIndex - 1])"));
 });
+
+test("CompressPdfTool explains a missed target size when it was caused by preserving real text", () => {
+  assert.ok(compressToolSource.includes("textPagesPreserved: bestCandidateTextPagesPreserved"));
+  assert.ok(
+    compressToolSource.includes(
+      "kept as-is instead of",
+    ),
+  );
+});
