@@ -672,6 +672,27 @@ export default function CompressPdfTool() {
       );
       const page = await processingDoc.getPage(pageIndex);
       const pageInfo = analysis.pages[pageIndex - 1];
+
+      // Rasterizing a page that actually has real text permanently destroys
+      // that text (it becomes an unselectable, unsearchable image) for a
+      // compression benefit that isn't even real -- re-encoding vector text
+      // as a JPEG typically doesn't shrink it, since there was no heavy
+      // image data to recompress in the first place. Pages with genuine
+      // extractable text are copied through unchanged (preserving all text,
+      // fonts, and vector content); only pages without real text -- scans,
+      // photos, image-only pages, which is what this rasterize path is
+      // actually for -- go through the recompress-as-JPEG path below.
+      const textContent = await page.getTextContent();
+      const hasRealText = textContent.items.some(
+        (item) => "str" in item && item.str.trim().length > 0,
+      );
+      if (hasRealText) {
+        const [copiedPage] = await output.copyPages(sourcePdf, [pageIndex - 1]);
+        output.addPage(copiedPage);
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
+        continue;
+      }
+
       const baseViewport = page.getViewport({ scale: 1 });
       const requestedScale = Math.max(
         MIN_RENDER_SCALE,
