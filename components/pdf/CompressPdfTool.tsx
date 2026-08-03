@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName, rgb, type PDFPage } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import { findEmbeddedJpegs } from "@/lib/pdf/embeddedImages";
 import {
   compressionProfiles as profiles,
   type ColourMode,
@@ -634,6 +635,64 @@ export default function CompressPdfTool() {
     }
   }
 
+  // A page with real text can still carry heavy embedded photos (a scanned
+  // signature, a letterhead logo, an invoice photo) -- copying it through
+  // unchanged (as buildCompressedCandidate does for every text page)
+  // preserves the text but leaves those images completely uncompressed.
+  // This recompresses just the plain-JPEG images findEmbeddedJpegs finds
+  // "safe" (see that module for exactly which images qualify), decoding
+  // each through a canvas and re-encoding at the requested quality -- the
+  // same decode/re-encode technique buildCompressedCandidate already uses
+  // for whole-page rasterization, just scoped to one image at a time.
+  // Swaps the page's XObject entry to the new image only if it's actually
+  // smaller, and explicitly deletes the old stream from the context so its
+  // bytes don't linger unreferenced in the saved file -- verified safe
+  // against shared-image pages, since each page here comes from its own
+  // independent copyPages() call and therefore never shares an image
+  // object with any other page already added to `output`.
+  async function recompressPageImages(page: PDFPage, output: PDFDocument, imageQuality: number): Promise<void> {
+    const jpegs = findEmbeddedJpegs(page);
+    for (const { name, ref, bytes } of jpegs) {
+      const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }));
+      try {
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          el.onload = () => resolve(el);
+          el.onerror = () => reject(new Error("Could not decode an embedded image."));
+          el.src = blobUrl;
+        });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const context = canvas.getContext("2d", { alpha: false });
+        if (!context) continue;
+        context.drawImage(img, 0, 0);
+
+        const recompressedBlob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", imageQuality),
+        );
+        canvas.width = 0;
+        canvas.height = 0;
+        if (!recompressedBlob) continue;
+
+        const newBytes = new Uint8Array(await recompressedBlob.arrayBuffer());
+        if (newBytes.byteLength >= bytes.byteLength) continue; // never make an embedded image bigger
+
+        const newImage = await output.embedJpg(newBytes);
+        const resources = page.node.Resources();
+        const xObjects = resources?.lookupMaybe(PDFName.of("XObject"), PDFDict);
+        xObjects?.set(PDFName.of(name), newImage.ref);
+        page.node.context.delete(ref);
+      } catch {
+        // Best-effort: an image this pass can't safely decode/recompress is
+        // left exactly as copyPages already placed it.
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
+    }
+  }
+
   async function buildCompressedCandidate({
     processingDoc,
     sourcePdf,
@@ -692,6 +751,7 @@ export default function CompressPdfTool() {
         textPagesPreserved += 1;
         const [copiedPage] = await output.copyPages(sourcePdf, [pageIndex - 1]);
         output.addPage(copiedPage);
+        await recompressPageImages(copiedPage, output, imageQuality);
         await new Promise((resolve) => window.setTimeout(resolve, 0));
         continue;
       }
