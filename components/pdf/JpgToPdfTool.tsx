@@ -972,7 +972,19 @@ export default function JpgToPdfTool() {
                         }
                         name={item.file.name}
                         meta={`${item.width}x${item.height} - ${formatFileSize(item.file.size)}${item.userRotation ? ` - Rotated ${item.userRotation}°` : ""}`}
+                        onMoveUp={
+                          index === 0 || status === "Converting in your browser..."
+                            ? undefined
+                            : () => moveFile(index, -1)
+                        }
+                        onMoveDown={
+                          index === files.length - 1 || status === "Converting in your browser..."
+                            ? undefined
+                            : () => moveFile(index, 1)
+                        }
                         onRemove={status === "Converting in your browser..." ? undefined : () => removeFile(item.id)}
+                        moveUpLabel={`Move ${item.file.name} up`}
+                        moveDownLabel={`Move ${item.file.name} down`}
                         removeLabel={`Remove ${item.file.name}`}
                       />
                     </div>
