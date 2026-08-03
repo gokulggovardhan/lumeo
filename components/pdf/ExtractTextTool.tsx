@@ -213,8 +213,6 @@ export default function ExtractTextTool() {
   if (!pageTexts) {
     return (
       <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
-        <L2WorkspaceHeader title="Text Extract" description="Pull selectable text out of a PDF, narrow to a page range, and export as TXT, JSON, or CSV." />
-
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="extract-text-upload"
