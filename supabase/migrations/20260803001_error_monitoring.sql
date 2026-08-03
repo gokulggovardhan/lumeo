@@ -3,7 +3,7 @@ begin;
 do $$
 begin
   if to_regclass('public.audit_logs') is null then
-    raise exception 'Missing required table public.audit_logs. Run 20260712002_control_center_foundation.sql before 20260802001_error_monitoring.sql.';
+    raise exception 'Missing required table public.audit_logs. Run 20260712002_control_center_foundation.sql before 20260803001_error_monitoring.sql.';
   end if;
 end;
 $$;
