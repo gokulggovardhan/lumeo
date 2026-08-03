@@ -265,10 +265,26 @@ export default function HtmlToPdfTool() {
         contentWidthPx: surface.contentWidthPx,
         contentHeightPx: surface.contentHeightPx,
       });
-      await runWithTimeout(
-        html2pdf().set(options).from(surface.container).save(),
+      // outputPdf("blob") instead of .save() -- .save() triggers the browser
+      // download as a side effect inside html2pdf's own internal promise
+      // chain, which our timeout race below cannot cancel: if the race times
+      // out while html2canvas/jsPDF keep working in the background (neither
+      // supports abort), the abandoned work can still finish and fire a
+      // surprise download after the user has already seen a timeout error.
+      // Getting the PDF back as a blob and triggering the download ourselves
+      // means that only happens on the path that actually won the race.
+      const blob: Blob = await runWithTimeout(
+        html2pdf().set(options).from(surface.container).outputPdf("blob"),
         "Generating the PDF took too long. Try simpler HTML/CSS or fewer images.",
       );
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = blobUrl;
+      link.download = options.filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(blobUrl);
 
       track({
         eventName: "processing_succeeded",

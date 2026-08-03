@@ -813,8 +813,6 @@ export default function JpgToPdfTool() {
   if (files.length === 0) {
     return (
       <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
-        <L2WorkspaceHeader title="JPG to PDF" description="Turn JPG, PNG, or WEBP images into one clean PDF." />
-
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="jpg-to-pdf-upload"
@@ -984,7 +982,19 @@ export default function JpgToPdfTool() {
                         }
                         name={item.file.name}
                         meta={`${item.width}x${item.height} - ${formatFileSize(item.file.size)}${item.userRotation ? ` - Rotated ${item.userRotation}°` : ""}`}
+                        onMoveUp={
+                          index === 0 || status === "Converting in your browser..."
+                            ? undefined
+                            : () => moveFile(index, -1)
+                        }
+                        onMoveDown={
+                          index === files.length - 1 || status === "Converting in your browser..."
+                            ? undefined
+                            : () => moveFile(index, 1)
+                        }
                         onRemove={status === "Converting in your browser..." ? undefined : () => removeFile(item.id)}
+                        moveUpLabel={`Move ${item.file.name} up`}
+                        moveDownLabel={`Move ${item.file.name} down`}
                         removeLabel={`Remove ${item.file.name}`}
                       />
                     </div>
