@@ -99,6 +99,3 @@ export function isAllowedSetting(key: string) {
   return allowedSettings.has(key);
 }
 
-export function sanitizeEntityId(value: string | null) {
-  return value ? value.slice(0, 120) : null;
-}
