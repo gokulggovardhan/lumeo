@@ -446,8 +446,6 @@ export default function OrganizePdfTool() {
   if (!document_) {
     return (
       <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
-        <L2WorkspaceHeader title="Organize PDF" description="Reorder, rotate, duplicate, or remove pages in one document." />
-
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="organize-pdf-upload"
