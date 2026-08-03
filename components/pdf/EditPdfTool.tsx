@@ -147,6 +147,31 @@ export default function EditPdfTool() {
     };
   }, []);
 
+  // Same cleanup an unmount already does, plus a full reset of every piece
+  // of state a new upload doesn't already reinitialize -- returns to the
+  // upload screen ready for a different file immediately.
+  function resetTool() {
+    if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
+    if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
+    pageImageUrlRef.current = "";
+    downloadUrlRef.current = "";
+    void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
+    pdfJsDocRef.current = null;
+    setDocReady(0);
+    setPdf(null);
+    setPageIndex(0);
+    setPageImageUrl("");
+    setPageDisplaySize(null);
+    setPagePointSize(null);
+    setError("");
+    resetElements([]);
+    setSelectedId(null);
+    setActiveTool("select");
+    setZoom(1);
+    setDownloadUrl("");
+    setOutputName("lumeo-edited.pdf");
+  }
+
   // Opens the source PDF via pdfjs once per uploaded file, kept open for the
   // per-page preview effect below to reuse (no re-parsing on page turns).
   useEffect(() => {
@@ -416,6 +441,7 @@ export default function EditPdfTool() {
         <span className="text-xs font-bold text-[var(--text-subtle)]">{Math.round(zoom * 100)}%</span>
         <L2ToolbarButton onClick={() => setZoom((z) => Math.min(2, z + 0.1))}>+</L2ToolbarButton>
         <L2ToolbarButton onClick={() => setZoom(1)}>Fit</L2ToolbarButton>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
       </L2WorkspaceToolbar>
 

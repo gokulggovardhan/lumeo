@@ -61,6 +61,7 @@ import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
+import { resetPdfPreviewState } from "@/lib/pdf/resetPreviewState";
 
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 type ContentMode = "text" | "image";
@@ -167,6 +168,25 @@ export default function WatermarkTool() {
       void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     };
   }, []);
+
+  // Same cleanup an unmount already does (revoke both object URLs, destroy
+  // the live pdfjs document), plus a full reset of every piece of state a
+  // new upload doesn't already reinitialize on its own -- returns to the
+  // upload screen ready for a different file immediately.
+  function resetTool() {
+    resetPdfPreviewState({ pageImageUrlRef, downloadUrlRef, pdfJsDocRef, setDocReady });
+    setPdf(null);
+    setPageIndex(0);
+    setPageImageUrl("");
+    setPageDisplaySize(null);
+    setError("");
+    resetConfig(createDefaultTextWatermarkConfig());
+    setContentMode("text");
+    setPageRangeInput("");
+    setPageRangeError("");
+    setDownloadUrl("");
+    setOutputName("lumeo-watermarked.pdf");
+  }
 
   // Any export-affecting config change (text, image, opacity, rotation,
   // scale, color, font size, bold/italic, margin, placement, tiled mode,
@@ -483,6 +503,7 @@ export default function WatermarkTool() {
         <L2ToolbarButton onClick={redo} disabled={!canRedo}>
           Redo
         </L2ToolbarButton>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
       </L2WorkspaceToolbar>
 

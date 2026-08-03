@@ -3,29 +3,29 @@ export type Orientation = "portrait" | "landscape";
 export type MarginPreset = "none" | "normal" | "wide";
 
 export interface Html2PdfOptions {
-  margin?: number | [number, number] | [number, number, number, number];
-  filename?: string;
-  image?: {
-    type?: "jpeg" | "png" | "webp";
-    quality?: number;
+  margin: number | [number, number] | [number, number, number, number];
+  filename: string;
+  image: {
+    type: "jpeg" | "png" | "webp";
+    quality: number;
   };
   enableLinks?: boolean;
-  html2canvas?: {
-    scale?: number;
-    useCORS?: boolean;
-    backgroundColor?: string;
-    width?: number;
-    height?: number;
-    windowWidth?: number;
-    windowHeight?: number;
+  html2canvas: {
+    scale: number;
+    useCORS: boolean;
+    backgroundColor: string;
+    width: number;
+    height: number;
+    windowWidth: number;
+    windowHeight: number;
   };
-  jsPDF?: {
-    unit?: string;
-    format?: string | [number, number];
-    orientation?: "portrait" | "landscape";
+  jsPDF: {
+    unit: string;
+    format: string | [number, number];
+    orientation: "portrait" | "landscape";
   };
-  pagebreak?: {
-    mode?: Array<"avoid-all" | "css" | "legacy">;
+  pagebreak: {
+    mode: Array<"avoid-all" | "css" | "legacy">;
   };
 }
 
