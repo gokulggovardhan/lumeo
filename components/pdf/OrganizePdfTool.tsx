@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { degrees, PDFDocument } from "pdf-lib";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
@@ -52,6 +52,95 @@ type OrganizeResult = {
   size: number;
   pageCount: number;
 };
+
+type OrganizePageCellProps = {
+  item: OrganizerItem;
+  index: number;
+  selected: boolean;
+  thumbnailUrl?: string;
+  onDragStart: (index: number) => void;
+  onDragOver: (event: React.DragEvent) => void;
+  onDrop: (index: number) => void;
+  onToggleSelected: (index: number) => void;
+  onRotateOne: (index: number, direction: "left" | "right") => void;
+  onDuplicate: (index: number) => void;
+  onDelete: (index: number) => void;
+};
+
+// Every completed thumbnail render calls setThumbnails once (see
+// renderThumbnails below), which -- without this memo -- re-renders every
+// page cell in the grid on every single page's completion, not just the one
+// that finished. Callback props are intentionally excluded from the
+// comparison (their identity churns every parent render since selection/
+// rotation state isn't memoized); a cell's own visual output only depends on
+// the props actually compared here. Same fix as SplitPdfTool's
+// SplitPageThumbnail -- see that file for the fuller rationale.
+const OrganizePageCell = memo(function OrganizePageCell({
+  item,
+  index,
+  selected,
+  thumbnailUrl,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onToggleSelected,
+  onRotateOne,
+  onDuplicate,
+  onDelete,
+}: OrganizePageCellProps) {
+  return (
+    <div
+      role="listitem"
+      draggable
+      onDragStart={() => onDragStart(index)}
+      onDragOver={onDragOver}
+      onDrop={() => onDrop(index)}
+      className={`group relative rounded-xl border p-2 transition ${
+        selected
+          ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
+          : "border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.035]"
+      }`}
+    >
+      <label className="absolute left-2 top-2 z-10">
+        <input
+          type="checkbox"
+          checked={selected}
+          onChange={() => onToggleSelected(index)}
+          aria-label={`Select page ${index + 1}`}
+        />
+      </label>
+      <div className="flex h-28 items-center justify-center overflow-hidden rounded-lg bg-[var(--text-primary)]/[0.045]">
+        {thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumbnailUrl}
+            alt=""
+            className="h-full w-full object-contain"
+            style={{ transform: `rotate(${item.rotation}deg)` }}
+          />
+        ) : (
+          <div className="h-full w-full animate-pulse bg-[var(--text-primary)]/8" />
+        )}
+      </div>
+      <div className="mt-2 flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]">
+        <span>Page {index + 1}</span>
+        <span className="flex gap-1">
+          <button type="button" aria-label="Rotate left" onClick={() => onRotateOne(index, "left")}>⟲</button>
+          <button type="button" aria-label="Rotate right" onClick={() => onRotateOne(index, "right")}>⟳</button>
+          <button type="button" aria-label="Duplicate page" onClick={() => onDuplicate(index)}>⧉</button>
+          <button type="button" aria-label="Delete page" onClick={() => onDelete(index)}>✕</button>
+        </span>
+      </div>
+    </div>
+  );
+},
+(prev, next) =>
+  prev.item.id === next.item.id &&
+  prev.item.rotation === next.item.rotation &&
+  prev.index === next.index &&
+  prev.selected === next.selected &&
+  prev.thumbnailUrl === next.thumbnailUrl,
+);
 
 function OrganizeIcon() {
   return (
@@ -139,6 +228,24 @@ export default function OrganizePdfTool() {
       void destroyPdfJsDocument();
     };
   }, []);
+
+  // Same cleanup an unmount already does, plus a full reset of the loaded
+  // document, its items/selection/thumbnails, and any pending result --
+  // returns to the upload screen ready for a different file immediately.
+  function resetTool() {
+    sessionRef.current += 1;
+    if (result?.url) URL.revokeObjectURL(result.url);
+    thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    thumbnailUrlsRef.current.clear();
+    void destroyPdfJsDocument();
+    setDocument(null);
+    setItems([]);
+    setThumbnails({});
+    setSelected(new Set());
+    setDragIndex(null);
+    setError("");
+    setResult(null);
+  }
 
   async function renderThumbnails(doc: PDFDocumentProxy, pageCount: number, session: number) {
     const pending = Array.from({ length: pageCount }, (_, index) => index + 1);
@@ -377,6 +484,7 @@ export default function OrganizePdfTool() {
             <L2ToolbarButton onClick={() => handleRotate("right")}>Rotate selected right</L2ToolbarButton>
           </>
         ) : null}
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{summaryLine}</span>
       </L2WorkspaceToolbar>
 
@@ -389,50 +497,20 @@ export default function OrganizePdfTool() {
               className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5"
             >
             {items.map((item, index) => (
-              <div
+              <OrganizePageCell
                 key={item.id}
-                role="listitem"
-                draggable
-                onDragStart={() => setDragIndex(index)}
+                item={item}
+                index={index}
+                selected={selected.has(index)}
+                thumbnailUrl={thumbnails[item.sourcePage]}
+                onDragStart={setDragIndex}
                 onDragOver={(event) => event.preventDefault()}
-                onDrop={() => handleDrop(index)}
-                className={`group relative rounded-xl border p-2 transition ${
-                  selected.has(index)
-                    ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
-                    : "border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.035]"
-                }`}
-              >
-                <label className="absolute left-2 top-2 z-10">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(index)}
-                    onChange={() => toggleSelected(index)}
-                    aria-label={`Select page ${index + 1}`}
-                  />
-                </label>
-                <div className="flex h-28 items-center justify-center overflow-hidden rounded-lg bg-[var(--text-primary)]/[0.045]">
-                  {thumbnails[item.sourcePage] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={thumbnails[item.sourcePage]}
-                      alt=""
-                      className="h-full w-full object-contain"
-                      style={{ transform: `rotate(${item.rotation}deg)` }}
-                    />
-                  ) : (
-                    <div className="h-full w-full animate-pulse bg-[var(--text-primary)]/8" />
-                  )}
-                </div>
-                <div className="mt-2 flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]">
-                  <span>Page {index + 1}</span>
-                  <span className="flex gap-1">
-                    <button type="button" aria-label="Rotate left" onClick={() => handleRotateOne(index, "left")}>⟲</button>
-                    <button type="button" aria-label="Rotate right" onClick={() => handleRotateOne(index, "right")}>⟳</button>
-                    <button type="button" aria-label="Duplicate page" onClick={() => handleDuplicate(index)}>⧉</button>
-                    <button type="button" aria-label="Delete page" onClick={() => handleDelete(index)}>✕</button>
-                  </span>
-                </div>
-              </div>
+                onDrop={handleDrop}
+                onToggleSelected={toggleSelected}
+                onRotateOne={handleRotateOne}
+                onDuplicate={handleDuplicate}
+                onDelete={handleDelete}
+              />
             ))}
             </div>
           </L2WorkspacePanel>

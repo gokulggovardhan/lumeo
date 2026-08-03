@@ -20,6 +20,7 @@ import {
   parametersForStrength,
   qualityOutlookForTarget,
   requiredReductionPercent,
+  shouldFallbackToOriginal,
   targetValueToBytes,
   validateTargetBytes,
   type CompressionMode,
@@ -884,6 +885,16 @@ export default function CompressPdfTool() {
           currentSession,
           passLabel: "Processing document",
         });
+      }
+
+      // Recompression can legitimately grow the file (an already-optimized
+      // scan, or a document where re-encoding overhead outweighs any
+      // savings) -- neither mode above ever compares its candidate against
+      // the original, so without this check the "compressed" download could
+      // be larger than what the user started with. Never ship a result
+      // bigger than the original: fall back to the source bytes verbatim.
+      if (shouldFallbackToOriginal(outputBytes.byteLength, analysis.size)) {
+        outputBytes = new Uint8Array(copyArrayBuffer(analysis.bytes));
       }
       const outputBuffer = toArrayBuffer(outputBytes);
 

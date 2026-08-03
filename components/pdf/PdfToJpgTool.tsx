@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
@@ -202,7 +202,13 @@ type ThumbnailProps = {
   registerRef: (page: number, node: HTMLButtonElement | null) => void;
 };
 
-function PdfToJpgThumbnail({
+// Callback props (onVisible/onToggle/onFocus/onRotate/onPreview/registerRef)
+// are intentionally excluded from the memo comparator below -- their
+// identity churns every parent render, but a cell's own visual output only
+// depends on the props actually compared. Same fix as SplitPdfTool's
+// SplitPageThumbnail and OrganizePdfTool's OrganizePageCell: without this,
+// every completed thumbnail's setThumbnailUrls re-renders the whole grid.
+const PdfToJpgThumbnail = memo(function PdfToJpgThumbnail({
   page,
   selected,
   focused,
@@ -330,7 +336,16 @@ function PdfToJpgThumbnail({
       </div>
     </div>
   );
-}
+},
+(prev, next) =>
+  prev.page === next.page &&
+  prev.selected === next.selected &&
+  prev.focused === next.focused &&
+  prev.imageUrl === next.imageUrl &&
+  prev.loading === next.loading &&
+  prev.interactive === next.interactive &&
+  prev.rotation === next.rotation,
+);
 
 export default function PdfToJpgTool() {
   const { availability, track } = useAnalytics();

@@ -3,11 +3,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { RecentActivityTable, RECENT_ACTIVITY_PAGE_SIZE } from "@/components/admin/analytics/RecentActivityTable";
 import { collapseUnknownLocationRuns, getRecentAnalyticsEvents } from "@/lib/admin/data";
-
-function pageNumber(value: string | undefined) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
-}
+import { pageNumber } from "@/lib/admin/pagination";
 
 export default async function AnalyticsActivityPage({
   searchParams,
