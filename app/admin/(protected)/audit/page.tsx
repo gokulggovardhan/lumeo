@@ -6,6 +6,7 @@ import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getAuditLogs, resolveAdminEmails } from "@/lib/admin/data";
 import { canViewAudit } from "@/lib/admin/permissions";
+import { pageNumber } from "@/lib/admin/pagination";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
 
 const entityTypes = [
@@ -17,11 +18,6 @@ const entityTypes = [
   "seo_setting",
   "site_setting",
 ];
-
-function pageNumber(value: string | undefined) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 1;
-}
 
 function buildQuery(params: Record<string, string | undefined>) {
   const search = new URLSearchParams();

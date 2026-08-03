@@ -32,13 +32,13 @@ test("parsePageRange treats empty input as no filter", () => {
 });
 
 test("parsePageRange parses single pages, ranges, and mixed lists", () => {
-  assert.deepEqual([...parsePageRange("1,3,5", 10).pages], [1, 3, 5]);
-  assert.deepEqual([...parsePageRange("1-3", 10).pages], [1, 2, 3]);
-  assert.deepEqual([...parsePageRange("1-3, 7", 10).pages], [1, 2, 3, 7]);
+  assert.deepEqual([...parsePageRange("1,3,5", 10).pages!], [1, 3, 5]);
+  assert.deepEqual([...parsePageRange("1-3", 10).pages!], [1, 2, 3]);
+  assert.deepEqual([...parsePageRange("1-3, 7", 10).pages!], [1, 2, 3, 7]);
 });
 
 test("parsePageRange clamps ranges to the document's real page count", () => {
-  assert.deepEqual([...parsePageRange("8-20", 10).pages], [8, 9, 10]);
+  assert.deepEqual([...parsePageRange("8-20", 10).pages!], [8, 9, 10]);
   assert.equal(parsePageRange("50", 10).pages, null);
   assert.match(parsePageRange("50", 10).error ?? "", /No pages matched/);
 });

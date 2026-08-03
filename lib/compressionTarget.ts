@@ -190,3 +190,13 @@ export function chooseBetterTargetCandidate({
   if (candidateUnder) return candidateBytes > currentBytes;
   return candidateBytes < currentBytes;
 }
+
+// Recompression can legitimately grow a file (an already-optimized scan, or
+// a document where re-encoding overhead outweighs any savings), and neither
+// compression mode in CompressPdfTool.tsx compares its candidate against
+// the original before finalizing. Compression should never ship a result
+// bigger than what the user started with -- this is the single check that
+// enforces that guarantee, in both quality and target mode.
+export function shouldFallbackToOriginal(outputBytes: number, originalBytes: number): boolean {
+  return outputBytes >= originalBytes;
+}

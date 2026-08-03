@@ -7,6 +7,7 @@ import {
   chooseTargetOutcome,
   createTargetCompressionRequest,
   nextTargetStrength,
+  shouldFallbackToOriginal,
   targetValueToBytes,
   validateTargetBytes,
 } from "../lib/compressionTarget.ts";
@@ -140,4 +141,15 @@ test("preserves Target Size Studio presets and profile quality values", () => {
   assert.equal(compressionProfiles.highQuality.quality, 0.86);
   assert.equal(compressionProfiles.balanced.quality, 0.74);
   assert.equal(compressionProfiles.smaller.quality, 0.58);
+});
+
+test("shouldFallbackToOriginal flags any candidate that is not strictly smaller than the original", () => {
+  assert.equal(shouldFallbackToOriginal(900_000, 1_000_000), false); // genuinely smaller
+  assert.equal(shouldFallbackToOriginal(1_000_000, 1_000_000), true); // identical size -- no benefit, prefer the untouched original
+  assert.equal(shouldFallbackToOriginal(1_500_000, 1_000_000), true); // the reported bug: recompression grew the file
+});
+
+test("CompressPdfTool falls back to the original bytes when a candidate is not smaller (regression for the reported 1MB -> 1.5MB bug)", () => {
+  assert.ok(compressToolSource.includes("shouldFallbackToOriginal(outputBytes.byteLength, analysis.size)"));
+  assert.ok(compressToolSource.includes("new Uint8Array(copyArrayBuffer(analysis.bytes))"));
 });
