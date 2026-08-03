@@ -1,6 +1,19 @@
 "use client";
 
-export default function GlobalError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+import { useEffect } from "react";
+import { captureClientError } from "@/lib/errors/client";
+
+export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    void captureClientError({
+      message: error.message,
+      stack: error.stack ?? null,
+      component: "GlobalError",
+      source: "error_boundary",
+      severity: "critical",
+    });
+  }, [error]);
+
   return (
     <html lang="en">
       <body>

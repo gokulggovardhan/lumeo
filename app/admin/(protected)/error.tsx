@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { captureClientError } from "@/lib/errors/client";
 
 export default function AdminError({
   error,
@@ -11,6 +12,13 @@ export default function AdminError({
 }) {
   useEffect(() => {
     console.error("Admin console error:", error);
+    void captureClientError({
+      message: error.message,
+      stack: error.stack ?? null,
+      component: "AdminError",
+      source: "error_boundary",
+      severity: "high",
+    });
   }, [error]);
 
   return (

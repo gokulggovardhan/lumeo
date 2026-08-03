@@ -3,6 +3,7 @@ import type { SVGProps } from "react";
 const paths: Record<string, string> = {
   overview: "M4 12h6V4H4v8Zm10 8h6V4h-6v16ZM4 20h6v-6H4v6Z",
   analytics: "M5 19V9m7 10V5m7 14v-7",
+  errors: "M12 9v4m0 4h.01M10.3 3.9 2.5 17a2 2 0 0 0 1.7 3h15.6a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z",
   health: "M3 12h4l2-7 4 14 2-7h6",
   tools: "M5 7h14M7 12h10M9 17h6",
   homepage: "M4 11 12 5l8 6v8a1 1 0 0 1-1 1h-5v-5h-4v5H5a1 1 0 0 1-1-1v-8Z",

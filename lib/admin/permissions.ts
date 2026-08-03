@@ -43,3 +43,11 @@ export function canViewAnalytics(role: AdminRole | null) {
 export function canViewHealth(role: AdminRole | null) {
   return role === "owner" || role === "admin" || role === "analyst";
 }
+
+export function canViewErrors(role: AdminRole | null) {
+  return role === "owner" || role === "admin" || role === "analyst";
+}
+
+export function canManageErrors(role: AdminRole | null) {
+  return role === "owner" || role === "admin";
+}
