@@ -813,8 +813,6 @@ export default function JpgToPdfTool() {
   if (files.length === 0) {
     return (
       <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
-        <L2WorkspaceHeader title="JPG to PDF" description="Turn JPG, PNG, or WEBP images into one clean PDF." />
-
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="jpg-to-pdf-upload"
