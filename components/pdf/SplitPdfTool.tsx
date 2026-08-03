@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import JSZip from "jszip";
 import { degrees, PDFDocument } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
@@ -390,7 +390,7 @@ type ThumbnailProps = {
   onFocus: (page: number) => void;
 };
 
-function SplitPageThumbnail({
+const SplitPageThumbnail = memo(function SplitPageThumbnail({
   page,
   selected,
   focused,
@@ -474,7 +474,24 @@ function SplitPageThumbnail({
       </p>
     </button>
   );
-}
+},
+// Callback props (onVisible/onClick/onFocus) are intentionally excluded --
+// their identity churns on every parent render (selection/history state
+// isn't memoized), but a stable callback isn't what a page cell's own
+// visual state depends on. Comparing only the props that actually affect
+// this cell's rendered output keeps an untouched page from re-rendering
+// every time an unrelated thumbnail finishes loading, which otherwise
+// turns a single page-load state update into an O(pageCount) re-render.
+(prev, next) =>
+  prev.page.page === next.page.page &&
+  prev.selected === next.selected &&
+  prev.focused === next.focused &&
+  prev.disabled === next.disabled &&
+  prev.rotation === next.rotation &&
+  prev.density === next.density &&
+  prev.imageUrl === next.imageUrl &&
+  prev.loading === next.loading,
+);
 
 export default function SplitPdfTool() {
   const { availability, track } = useAnalytics();
