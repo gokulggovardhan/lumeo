@@ -39,3 +39,7 @@ export function canViewAudit(role: AdminRole | null) {
 export function canViewAnalytics(role: AdminRole | null) {
   return role === "owner" || role === "admin" || role === "analyst";
 }
+
+export function canViewHealth(role: AdminRole | null) {
+  return role === "owner" || role === "admin" || role === "analyst";
+}

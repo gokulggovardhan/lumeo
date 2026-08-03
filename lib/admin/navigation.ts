@@ -15,6 +15,7 @@ export type AdminNavItem = {
 export const adminNavigation: AdminNavItem[] = [
   { label: "Overview", href: "/admin", icon: "overview" },
   { label: "Analytics", href: "/admin/analytics", icon: "analytics" },
+  { label: "Health", href: "/admin/health", icon: "health" },
   { label: "PDF Tools", href: "/admin/tools", icon: "tools" },
   { label: "Homepage", href: "/admin/homepage", icon: "homepage" },
   { label: "Feature Flags", href: "/admin/feature-flags", icon: "flags" },
