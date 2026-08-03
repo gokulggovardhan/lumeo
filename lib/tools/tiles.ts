@@ -28,6 +28,10 @@ const TILE_DESCRIPTION: Record<string, string> = {
   reorder: "Reorder, rotate, duplicate, or remove pages in one document.",
   "extract-text": "Pull selectable text out of a PDF and read, search, or export it.",
   "html-to-pdf": "Turn HTML and CSS into a downloadable PDF.",
+  watermark: "Stamp text or a logo across every page.",
+  "page-numbers": "Add page numbers in the style and position you choose.",
+  "header-footer": "Add a running header or footer across every page.",
+  crop: "Crop pages to a custom rectangle.",
 };
 
 // Sage for document-structure work, brass for the two actions that produce
