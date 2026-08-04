@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PDFDict, PDFDocument, PDFName, PDFRef, PDFString, type PDFContext } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName, PDFRef, PDFString, degrees, StandardFonts, type PDFContext } from "pdf-lib";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 
 // Mirrors CompressPdfTool.tsx's copyOutlineItem/copyOutline exactly (that
 // file is a "use client" component with canvas/pdfjs dependencies that
@@ -279,4 +280,41 @@ test("copyAcroForm does nothing for a document with no form fields (no stray /Ac
 
   const output = await copyDocumentLikeCompressDoes(source);
   assert.equal(output.catalog.has(PDFName.of("AcroForm")), false);
+});
+
+// Regression: CompressPdfTool.tsx's rasterize path sized the output page
+// with pdf-lib's page.getSize() (reads the raw MediaBox, ignores /Rotate
+// entirely) while the rendered canvas came from pdfjs's page.getViewport()
+// (rotation-aware: swaps width/height for a 90/270-rotated page to match
+// what's actually drawn). For a rotated page those two disagreed, so the
+// output page's declared box didn't match the rendered image's real pixel
+// aspect ratio -- visibly stretching/squishing the page. Fixed by sizing
+// the output page from the same rotation-aware viewport used for
+// rendering. This test exercises both real libraries directly (no
+// reimplemented math) to prove the mismatch existed and would recur if
+// pageInfo-based sizing were ever reintroduced.
+test("a 90-degree-rotated page's pdfjs render viewport does not match pdf-lib's rotation-blind getSize (the exact mismatch CompressPdfTool.tsx's rasterize path must use the viewport, not getSize, to avoid)", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  page.setRotation(degrees(90));
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("Rotated page text.", { x: 50, y: 700, size: 18, font });
+  const bytes = await doc.save();
+
+  const pdfLibDoc = await PDFDocument.load(bytes);
+  const pdfLibSize = pdfLibDoc.getPages()[0].getSize();
+
+  const pdfjsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(bytes) }).promise;
+  const pdfjsPage = await pdfjsDoc.getPage(1);
+  const viewport = pdfjsPage.getViewport({ scale: 1 });
+
+  assert.equal(pdfLibSize.width, 612);
+  assert.equal(pdfLibSize.height, 792);
+  assert.equal(viewport.width, 792);
+  assert.equal(viewport.height, 612);
+  assert.notEqual(
+    pdfLibSize.width,
+    viewport.width,
+    "pdf-lib's rotation-blind size must differ from pdfjs's rotation-aware viewport for a 90-degree page -- sizing the output page from getSize() would stretch the rendered image",
+  );
 });

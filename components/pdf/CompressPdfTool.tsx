@@ -872,7 +872,6 @@ export default function CompressPdfTool() {
         `${passLabel} · page ${pageIndex} of ${analysis.pageCount}`,
       );
       const page = await processingDoc.getPage(pageIndex);
-      const pageInfo = analysis.pages[pageIndex - 1];
 
       // Rasterizing a page that actually has real text permanently destroys
       // that text (it becomes an unselectable, unsearchable image) for a
@@ -930,19 +929,30 @@ export default function CompressPdfTool() {
       if (!blob) throw new Error("Compression failed while rebuilding a page.");
       const imageBytes = await blob.arrayBuffer();
       const image = await output.embedJpg(imageBytes);
-      const outputPage = output.addPage([pageInfo.width, pageInfo.height]);
+      // baseViewport (scale 1, rotation-aware -- see above) already swaps
+      // width/height for a 90/270-rotated page to match what was actually
+      // rendered into the canvas. pageInfo.width/height come from pdf-lib's
+      // getSize(), which reads the raw MediaBox and ignores /Rotate
+      // entirely -- using those here would size the output page to the
+      // page's *unrotated* dimensions while stretching the *rotated*
+      // rendered image into them, visibly distorting every 90/270-rotated
+      // page compressed through this rasterize path. Proven by tracing
+      // pdfjs's own PageViewport (rotation swaps its width/height for
+      // 90/270) against pdf-lib's getSize/getMediaBox (no rotation
+      // adjustment at all).
+      const outputPage = output.addPage([baseViewport.width, baseViewport.height]);
       outputPage.drawRectangle({
         x: 0,
         y: 0,
-        width: pageInfo.width,
-        height: pageInfo.height,
+        width: baseViewport.width,
+        height: baseViewport.height,
         color: rgb(1, 1, 1),
       });
       outputPage.drawImage(image, {
         x: 0,
         y: 0,
-        width: pageInfo.width,
-        height: pageInfo.height,
+        width: baseViewport.width,
+        height: baseViewport.height,
       });
 
       await new Promise((resolve) => window.setTimeout(resolve, 0));
