@@ -23,7 +23,7 @@ import { walkTextShowOperators } from "../lib/pdf/edit/contentStream.ts";
 import { resolveFont } from "../lib/pdf/edit/fontEncoding.ts";
 import { resolveFontMetrics } from "../lib/pdf/edit/fontMetrics.ts";
 import { buildEditPlan } from "../lib/pdf/edit/editPlan.ts";
-import { applyEditPlanToBytes, applyEditPlanToDocument, EditPlanRejectedError } from "../lib/pdf/edit/applyEditPlan.ts";
+import { applyEditPlanToBytes, applyEditPlanToDocument } from "../lib/pdf/edit/applyEditPlan.ts";
 
 async function decodedContentStreamBytes(pdfBytes: Uint8Array): Promise<Uint8Array> {
   const loaded = await PDFDocument.load(pdfBytes);
@@ -274,18 +274,21 @@ test("TJ rewrite: editing one of several TJ operators leaves the others complete
   assert.deepEqual(strs, ["First line", "Middle line", "Third line"]);
 });
 
-test("applyEditPlanToBytes rejects an attempt to replace a TJ run with empty text", async () => {
+// Replacing a TJ run with empty text used to be rejected outright ("no
+// real reproduced example to validate against"); it's since become a real,
+// tested need -- lib/pdf/edit/multiRunEditPlan.ts intentionally empties
+// every operator in a merged span except the first. `[<>] TJ` is
+// syntactically valid PDF (an empty string, an empty array), and produces
+// a correctly-openable, correctly-extracting document.
+test("applyEditPlanToBytes accepts replacing a TJ run with empty text (produces a valid, empty show)", async () => {
   const original = await buildTjFixture(["Hello"]);
   const { plan, resolvedFont } = await buildPlanForOperatorIndex(original, 0, "");
-  // editPlan.ts still marks this editable (an empty replacement has no
-  // unsupported characters) -- applyEditPlan's own invariant check must
-  // catch it independently.
   assert.equal(plan.editable, true);
   assert.equal(plan.replacementGlyphCodes.length, 0);
 
   const streamBytes = await decodedContentStreamBytes(original.slice());
-  assert.throws(
-    () => applyEditPlanToBytes(streamBytes, plan, resolvedFont.bytesPerCode),
-    (error: unknown) => error instanceof EditPlanRejectedError && /empty text/.test((error as Error).message),
-  );
+  const newBytes = applyEditPlanToBytes(streamBytes, plan, resolvedFont.bytesPerCode);
+  const newOperators = walkTextShowOperators(newBytes);
+  assert.equal(newOperators.length, 1);
+  assert.equal(newOperators[0].strings[0].length, 0);
 });
