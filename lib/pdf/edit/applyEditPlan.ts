@@ -2,19 +2,22 @@
 //
 // Phase 3 of true PDF text editing: real content-stream mutation. Given a
 // verified EditPlan (lib/pdf/edit/editPlan.ts), rewrites exactly one
-// Tj or TJ operator's text operand(s) -- nothing else in the content
-// stream, and nothing else in the PDF's object graph, changes.
+// Tj, TJ, ', or " operator's text operand(s) -- nothing else in the
+// content stream, and nothing else in the PDF's object graph, changes.
 //
 // Deliberately narrow, per the approved slice scope:
-// - Only Tj and TJ are supported; ' and " are rejected outright -- each
-//   also moves the text line as a side effect of showing text, a
-//   different, riskier change than either supported operator's.
+// - All four PDF text-showing operators are supported; multi-line/
+//   multi-operator edits in a single call are not (each call rewrites
+//   exactly one operator).
 // - A TJ rewrite always collapses to a single combined string operand
 //   (see buildReplacementOperatorText) plus, when needed, one trailing
 //   spacing-adjustment number computed by fontMetrics.ts's compareAdvance
 //   -- the original's own inter-string kerning numbers are dropped, since
 //   they were tuned for the original text's specific glyph boundaries and
 //   have no coherent meaning once the text changes.
+// - A " rewrite preserves its own aw/ac (word/char spacing) operands
+//   verbatim -- they're never recomputed, only carried through from the
+//   matched EditPlan (see EditPlan.wordSpacing/charSpacing's doc comment).
 // - No fallback-font path -- an EditPlan that isn't already `editable`
 //   (built by editPlan.ts, which already enforces this) is rejected here
 //   too, as a second, independent check rather than trusting the caller.
@@ -36,16 +39,14 @@ function encodeGlyphCodesToHex(codes: number[], bytesPerCode: 1 | 2): string {
   return bytes.map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-const SUPPORTED_OPERATOR_TYPES: ReadonlySet<EditPlan["operatorType"]> = new Set(["Tj", "TJ"]);
+const SUPPORTED_OPERATOR_TYPES: ReadonlySet<EditPlan["operatorType"]> = new Set(["Tj", "TJ", "'", '"']);
 
 function assertApplicable(plan: EditPlan): void {
   if (!plan.editable) {
     throw new EditPlanRejectedError(plan.reason ?? "This edit plan is not editable.");
   }
   if (!SUPPORTED_OPERATOR_TYPES.has(plan.operatorType)) {
-    throw new EditPlanRejectedError(
-      `This rewrite engine only supports Tj and TJ operators (this plan targets "${plan.operatorType}"). ' and " support is separate, later work.`,
-    );
+    throw new EditPlanRejectedError(`This rewrite engine does not support the "${plan.operatorType}" operator.`);
   }
   if (plan.operatorType === "TJ" && plan.replacementGlyphCodes.length === 0 && plan.originalGlyphCodes.length > 0) {
     // A TJ rewritten down to zero glyphs would still be syntactically
@@ -56,11 +57,11 @@ function assertApplicable(plan: EditPlan): void {
   }
 }
 
-// A TJ array's own kerning-adjustment numbers can carry several decimal
-// places; format with just enough precision to round-trip through the
-// tokenizer cleanly without accumulating stray floating-point noise like
-// "12.000000000000002".
-function formatTJNumber(value: number): string {
+// A numeric PDF operand can carry many decimal places when computed
+// (e.g. a spacing delta); format with just enough precision to round-trip
+// through the tokenizer cleanly without accumulating stray floating-point
+// noise like "12.000000000000002".
+function formatPdfNumber(value: number): string {
   const rounded = Math.round(value * 1000) / 1000;
   return rounded.toString();
 }
@@ -73,27 +74,43 @@ function formatTJNumber(value: number): string {
 const TJ_DELTA_EPSILON = 0.01;
 
 // Builds the exact replacement operator invocation text for `plan`:
-// `<hex> Tj` for a Tj plan, or `[<hex>] TJ` / `[<hex> delta] TJ` for a TJ
-// plan. A TJ replacement always collapses to a single combined string
-// operand (task 3: rewrite only text operands) -- the original's own
-// inter-string kerning numbers are dropped rather than kept, since they
-// were tuned for the ORIGINAL text's specific glyph boundaries and have
-// no coherent attachment point once the text itself changes (task 4:
-// leave spacing operands untouched *unless recalculation is required* --
-// here it is required, because the numbers' meaning doesn't survive the
-// edit). In their place, a single trailing adjustment equal to
-// plan.tjSpacingDelta (already computed by lib/pdf/edit/fontMetrics.ts's
-// compareAdvance in the EditPlan slice, task 5: use the existing spacing
-// engine) keeps whatever text follows this operator from shifting
-// position -- omitted entirely when negligible, so an equal-width
-// replacement produces a clean `[<hex>] TJ` with no adjustment at all.
+// - Tj: `<hex> Tj`.
+// - TJ: `[<hex>] TJ` or `[<hex> delta] TJ`. A TJ replacement always
+//   collapses to a single combined string operand (task 3: rewrite only
+//   text operands) -- the original's own inter-string kerning numbers are
+//   dropped rather than kept, since they were tuned for the ORIGINAL
+//   text's specific glyph boundaries and have no coherent attachment
+//   point once the text itself changes (task 4: leave spacing operands
+//   untouched *unless recalculation is required* -- here it is required).
+//   In their place, a single trailing adjustment equal to
+//   plan.tjSpacingDelta (fontMetrics.ts's compareAdvance, task 5: use the
+//   existing spacing engine) keeps whatever text follows this operator
+//   from shifting position -- omitted entirely when negligible.
+// - ' (quote): `<hex> '`. No spacing operands to preserve -- ' takes only
+//   a string.
+// - " (double-quote): `aw ac <hex> "`, where aw/ac are plan.wordSpacing/
+//   plan.charSpacing -- these ARE this operator's own two leading numeric
+//   operands (word spacing, char spacing), carried through EditPlan
+//   unchanged from the original operator (task 5: preserve all non-text
+//   operands verbatim; these are never recomputed).
+// No compensating spacing delta is added for ' or ", unlike TJ: each
+// already performs its own text-line move (equivalent to T*) before
+// showing text, so whatever normally follows starts a fresh line rather
+// than continuing this one -- there is no established "keep the next
+// glyph in place" need the way there is mid-line in a TJ/Tj run.
 function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): string {
   const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, bytesPerCode);
   if (plan.operatorType === "Tj") {
     return `<${hex}> Tj`;
   }
+  if (plan.operatorType === "'") {
+    return `<${hex}> '`;
+  }
+  if (plan.operatorType === '"') {
+    return `${formatPdfNumber(plan.wordSpacing)} ${formatPdfNumber(plan.charSpacing)} <${hex}> "`;
+  }
   const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
-  return needsAdjustment ? `[<${hex}> ${formatTJNumber(plan.tjSpacingDelta)}] TJ` : `[<${hex}>] TJ`;
+  return needsAdjustment ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ` : `[<${hex}>] TJ`;
 }
 
 // Pure byte-level rewrite: replaces exactly the operator's own byte range

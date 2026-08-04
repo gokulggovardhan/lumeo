@@ -19,12 +19,15 @@ import { classifyReplacementChar } from "./fontEncoding.ts";
 import type { FontMetrics } from "./fontMetrics.ts";
 import { compareAdvance, type TextShowState } from "./fontMetrics.ts";
 
-// Only these two operator kinds are in scope for in-place editing in this
-// slice. ' and " each also perform a text-line move as a side effect of
-// showing text (per spec 9.4.3) -- rewriting just their string operand is
-// not the same narrow, well-understood change Tj/TJ's is, so they're
-// explicitly excluded rather than assumed safe.
-const SUPPORTED_OPERATOR_KINDS: ReadonlySet<TextShowOperatorKind> = new Set(["Tj", "TJ"]);
+// All four PDF text-showing operators are in scope for in-place editing:
+// Tj, TJ (#197, #198), and ' and " (this slice). ' and " each also
+// perform a text-line move as a side effect of showing text (per spec
+// 9.4.3, equivalent to T* immediately before the show) -- that move only
+// depends on the current leading (TL), which lives in the graphics state
+// outside the operator's own byte range and is therefore preserved
+// automatically, the same way Tj/TJ already preserve everything outside
+// their own range.
+const SUPPORTED_OPERATOR_KINDS: ReadonlySet<TextShowOperatorKind> = new Set(["Tj", "TJ", "'", '"']);
 
 function bytesToCodes(bytes: Uint8Array, bytesPerCode: 1 | 2): number[] {
   const codes: number[] = [];
@@ -59,6 +62,16 @@ export type EditPlan = {
   operatorType: TextShowOperatorKind;
   fontResourceName: string | null;
   fontSizePt: number;
+  /**
+   * The word/char spacing this operator's show applied. For a " operator
+   * these ARE its own aw/ac operands (non-text, must be preserved
+   * verbatim on rewrite -- see lib/pdf/edit/applyEditPlan.ts). For every
+   * other operator kind these just reflect the graphics state already in
+   * effect, informational only (already folded into originalWidthPt/
+   * replacementWidthPt via fontMetrics.ts's stringAdvancePt).
+   */
+  wordSpacing: number;
+  charSpacing: number;
   originalText: string;
   replacementText: string;
   originalGlyphCodes: number[];
@@ -110,6 +123,8 @@ export function buildEditPlan({
     operatorType: operator.kind,
     fontResourceName: operator.fontResourceName,
     fontSizePt: operator.fontSizePt,
+    wordSpacing: operator.wordSpacing,
+    charSpacing: operator.charSpacing,
     originalText,
     replacementText,
     originalGlyphCodes: originalCodes,
@@ -130,7 +145,7 @@ export function buildEditPlan({
       replacementWidthPt: 0,
       tjSpacingDelta: 0,
       editable: false,
-      reason: `Operator "${operator.kind}" is not supported for in-place editing yet (only Tj and TJ are).`,
+      reason: `Operator "${operator.kind}" is not supported for in-place editing.`,
     };
   }
 
