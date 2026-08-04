@@ -35,7 +35,7 @@ type PdfViewportTransform = number[];
 // Matches pdfjs-dist's Util.transform(m1, m2) exactly: a 2x3 affine matrix
 // product (m1 applied after m2), each matrix in pdfjs's own [a, b, c, d, e, f]
 // convention.
-function transformPoint2x3(m1: number[], m2: number[]): number[] {
+export function transformPoint2x3(m1: number[], m2: number[]): number[] {
   return [
     m1[0] * m2[0] + m1[2] * m2[1],
     m1[1] * m2[0] + m1[3] * m2[1],
@@ -44,6 +44,44 @@ function transformPoint2x3(m1: number[], m2: number[]): number[] {
     m1[0] * m2[4] + m1[2] * m2[5] + m1[4],
     m1[1] * m2[4] + m1[3] * m2[5] + m1[5],
   ];
+}
+
+// A widely-used approximation for a font's ascent as a fraction of its em
+// size (close to Helvetica/Times/Arial). Exact per-font ascent needs the
+// embedded font's own metrics, which detection doesn't load -- fine for
+// hit-testing/highlighting and for matching a run to its content-stream
+// operator (lib/pdf/edit/matchTextRun.ts), since both sides of that match
+// go through this exact same formula and so stay consistent with each
+// other even though neither is the "true" per-font ascent.
+const DEFAULT_ASCENT_RATIO = 0.85;
+const ROTATION_EPSILON = 1e-3;
+
+export type TransformBoxOrigin = {
+  left: number;
+  top: number;
+  fontHeight: number;
+  rotated: boolean;
+  angle: number;
+};
+
+// Given an already-viewport-combined text-rendering transform (device-pixel
+// space; see transformPoint2x3 above), computes the same top-left-origin
+// box position pdfjs's own TextLayer uses to place its text-selection
+// divs. Shared by textRunsFromContent (pdfjs items) and
+// lib/pdf/edit/matchTextRun.ts (this module's own content-stream
+// operators) so both sides of a match are computed identically -- neither
+// duplicates the ascent-ratio constant or the rotated-vs-axis-aligned
+// branch on its own.
+export function boxOriginFromTransform(tx: number[]): TransformBoxOrigin {
+  const angle = Math.atan2(tx[1], tx[0]);
+  const rotated = Math.abs(angle) > ROTATION_EPSILON;
+  const fontHeight = Math.hypot(tx[2], tx[3]);
+  const fontAscent = fontHeight * DEFAULT_ASCENT_RATIO;
+
+  const left = rotated ? tx[4] + fontAscent * Math.sin(angle) : tx[4];
+  const top = rotated ? tx[5] - fontAscent * Math.cos(angle) : tx[5] - fontAscent;
+
+  return { left, top, fontHeight, rotated, angle };
 }
 
 export type DetectedTextRun = {
@@ -65,14 +103,6 @@ export type DetectedTextRun = {
   rotated: boolean;
 };
 
-// A widely-used approximation for a font's ascent as a fraction of its
-// em size (close to Helvetica/Times/Arial). Exact per-font ascent needs
-// the embedded font's own metrics, which this read-only detection pass
-// doesn't load -- fine for hit-testing and highlighting, since nothing
-// here writes back to the PDF.
-const DEFAULT_ASCENT_RATIO = 0.85;
-const ROTATION_EPSILON = 1e-3;
-
 function isTextItem(item: PdfTextItem | PdfTextMarkedContent): item is PdfTextItem {
   return "str" in item;
 }
@@ -91,13 +121,7 @@ export function textRunsFromContent(
     if (!isTextItem(item) || !item.str.trim()) continue;
 
     const tx = transformPoint2x3(viewportTransform, item.transform);
-    const angle = Math.atan2(tx[1], tx[0]);
-    const rotated = Math.abs(angle) > ROTATION_EPSILON;
-    const fontHeight = Math.hypot(tx[2], tx[3]);
-    const fontAscent = fontHeight * DEFAULT_ASCENT_RATIO;
-
-    const left = rotated ? tx[4] + fontAscent * Math.sin(angle) : tx[4];
-    const top = rotated ? tx[5] - fontAscent * Math.cos(angle) : tx[5] - fontAscent;
+    const { left, top, fontHeight, rotated } = boxOriginFromTransform(tx);
 
     const scaleX = Math.hypot(tx[0], tx[1]);
     const widthPx = item.width * scaleX;
