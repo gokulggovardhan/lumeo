@@ -240,32 +240,10 @@ test("applyEditPlanToBytes rejects a subset-font requires-fallback plan the same
   );
 });
 
-test("applyEditPlanToBytes rejects a TJ-targeting plan -- TJ rewriting is explicitly out of scope for this slice", () => {
-  const tjPlan: EditPlan = {
-    pageIndex: 0,
-    contentStreamIndex: 0,
-    operatorIndex: 0,
-    operatorType: "TJ",
-    fontResourceName: "F1",
-    fontSizePt: 12,
-    originalText: "AB",
-    replacementText: "AB",
-    originalGlyphCodes: [65, 66],
-    replacementGlyphCodes: [65, 66],
-    originalWidthPt: 10,
-    replacementWidthPt: 10,
-    tjSpacingDelta: 0,
-    byteOffset: 0,
-    byteLength: 10,
-    editable: true,
-    reason: null,
-  };
-
-  assert.throws(
-    () => applyEditPlanToBytes(new Uint8Array(20), tjPlan, 1),
-    (error: unknown) => error instanceof EditPlanRejectedError && /only supports Tj/.test((error as Error).message),
-  );
-});
+// TJ rewriting was out of scope when this file was first written (PR #197)
+// -- it's now implemented and has its own dedicated coverage in
+// tests/edit-apply-plan-tj.test.ts, including the rejection case that
+// belongs to TJ specifically (an empty-text replacement).
 
 test("applyEditPlanToBytes replaces exactly the operator's byte range and nothing else", () => {
   const streamText = "q\nBT\n/F1 12 Tf\n1 0 0 1 50 700 Tm\n<41> Tj\nET\nQ";
