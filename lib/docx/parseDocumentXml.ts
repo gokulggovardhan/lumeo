@@ -64,13 +64,16 @@ function runPropertyIsOn(rPrXml: string, tagName: string): boolean {
   return valMatch[1] !== "false" && valMatch[1] !== "0";
 }
 
+// &amp; must decode last: decoding it before &lt;/&gt;/&apos;/&quot; would
+// turn an escaped "&amp;lt;" into "&lt;" and then into "<", double-unescaping
+// text that was meant to stay literal.
 function decodeXmlEntities(text: string): string {
   return text
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
     .replace(/&apos;/g, "'")
-    .replace(/&quot;/g, '"');
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&");
 }
 
 function parseRun(runXml: string): DocxRun {
