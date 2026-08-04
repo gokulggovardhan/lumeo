@@ -185,23 +185,10 @@ test("buildEditPlan: TJ operator is supported the same as Tj", () => {
   assert.equal(plan.originalText, "AB");
 });
 
-test("buildEditPlan: unsupported operator kind (') is rejected honestly, not silently attempted", () => {
-  const { resolvedFont, fontMetrics } = fixedWidthsFont();
-  const operator = fixedOperator({ kind: "'" });
-
-  const plan = buildEditPlan({
-    pageIndex: 0,
-    contentStreamIndex: 0,
-    operatorIndex: 0,
-    operator,
-    replacementText: "A",
-    resolvedFont,
-    fontMetrics,
-  });
-
-  assert.equal(plan.editable, false);
-  assert.match(plan.reason ?? "", /not supported/);
-});
+// ' and " were unsupported operator kinds when this file was first written
+// (PR #196) -- they're now implemented and have their own dedicated
+// coverage in tests/edit-plan-quote.test.ts, including buildEditPlan's own
+// handling of "'s aw/ac operands.
 
 test("buildEditPlan: a character requiring a fallback font is rejected, no fallback attempted", () => {
   const { resolvedFont, fontMetrics } = fixedWidthsFont();
