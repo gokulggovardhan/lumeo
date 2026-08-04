@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { PDFDocument, rgb } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName, PDFRef, rgb, type PDFContext, type PDFPage } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
+import { findEmbeddedJpegs } from "@/lib/pdf/embeddedImages";
 import {
   compressionProfiles as profiles,
   type ColourMode,
@@ -118,6 +119,7 @@ type CompressResult = {
     requestedBytes: number;
     attempts: TargetCompressionAttempt[];
     qualityOutlook: TargetQualityOutlook;
+    textPagesPreserved: number;
   };
 };
 
@@ -633,6 +635,132 @@ export default function CompressPdfTool() {
     }
   }
 
+  // Copies one outline (bookmark) item's Title/Count and its own First/Next
+  // chain of children -- deliberately NOT Dest or A (the entries that make a
+  // bookmark navigate to a page on click). Using PDFObjectCopier's normal
+  // full-object-graph copy for this was tried first and measured to create
+  // a full, orphaned, uncompressed duplicate of whatever page a bookmark's
+  // Dest pointed at for every single bookmark (proven with a real pdf-lib
+  // test: PDFObjectCopier follows every ref it finds, including a page ref
+  // sitting inside a Dest array, and that duplicate page isn't reachable
+  // through the document's real page tree but still gets written into the
+  // saved file by pdf-lib's writer, which serializes every registered
+  // object regardless of reachability -- silently bloating the output for
+  // every bookmarked page). Copying just the title/hierarchy avoids that
+  // entirely, at the cost of bookmarks no longer jumping to a specific
+  // page on click -- remapping Dest to the already-compressed copy of the
+  // right page would need a source-page-ref -> output-page-ref map built
+  // across the whole per-page loop, which is real, separate follow-up work,
+  // not something to rush alongside this fix.
+  function copyOutlineItem(sourceContext: PDFContext, output: PDFDocument, sourceItemDict: PDFDict): PDFRef {
+    const newDict = output.context.obj({});
+    const title = sourceItemDict.get(PDFName.of("Title"));
+    if (title) newDict.set(PDFName.of("Title"), title.clone());
+    const newRef = output.context.register(newDict);
+
+    let previousChildRef: PDFRef | undefined;
+    let firstChildRef: PDFRef | undefined;
+    let sourceChildRef = sourceItemDict.get(PDFName.of("First"));
+    let childCount = 0;
+
+    while (sourceChildRef instanceof PDFRef) {
+      const sourceChildDict = sourceContext.lookup(sourceChildRef, PDFDict);
+      const copiedChildRef = copyOutlineItem(sourceContext, output, sourceChildDict);
+      const copiedChildDict = output.context.lookup(copiedChildRef, PDFDict);
+      copiedChildDict.set(PDFName.of("Parent"), newRef);
+      childCount += 1;
+
+      if (!firstChildRef) firstChildRef = copiedChildRef;
+      if (previousChildRef) {
+        const previousChildDict = output.context.lookup(previousChildRef, PDFDict);
+        previousChildDict.set(PDFName.of("Next"), copiedChildRef);
+        copiedChildDict.set(PDFName.of("Prev"), previousChildRef);
+      }
+      previousChildRef = copiedChildRef;
+      sourceChildRef = sourceChildDict.get(PDFName.of("Next"));
+    }
+
+    if (firstChildRef) newDict.set(PDFName.of("First"), firstChildRef);
+    if (previousChildRef) newDict.set(PDFName.of("Last"), previousChildRef);
+    if (childCount > 0) newDict.set(PDFName.of("Count"), output.context.obj(childCount));
+
+    return newRef;
+  }
+
+  // /Outlines (the bookmark panel) is a document-catalog entry, not part of
+  // any page -- copyPages, which only copies pages, never carries it across.
+  // Confirmed via a real pdf-lib test (tests/compression-document-structure
+  // .test.ts) that this was silently dropping bookmarks on every compressed
+  // PDF regardless of the text-preservation work above, since that's a
+  // per-page decision and this is document-level.
+  function copyOutline(source: PDFDocument, output: PDFDocument) {
+    const outlinesRef = source.catalog.get(PDFName.of("Outlines"));
+    if (!(outlinesRef instanceof PDFRef)) return;
+    const sourceOutlineDict = source.context.lookup(outlinesRef, PDFDict);
+    const copiedRootRef = copyOutlineItem(source.context, output, sourceOutlineDict);
+    const copiedRootDict = output.context.lookup(copiedRootRef, PDFDict);
+    copiedRootDict.set(PDFName.of("Type"), PDFName.of("Outlines"));
+    output.catalog.set(PDFName.of("Outlines"), copiedRootRef);
+  }
+
+  // A page with real text can still carry heavy embedded photos (a scanned
+  // signature, a letterhead logo, an invoice photo) -- copying it through
+  // unchanged (as buildCompressedCandidate does for every text page)
+  // preserves the text but leaves those images completely uncompressed.
+  // This recompresses just the plain-JPEG images findEmbeddedJpegs finds
+  // "safe" (see that module for exactly which images qualify), decoding
+  // each through a canvas and re-encoding at the requested quality -- the
+  // same decode/re-encode technique buildCompressedCandidate already uses
+  // for whole-page rasterization, just scoped to one image at a time.
+  // Swaps the page's XObject entry to the new image only if it's actually
+  // smaller, and explicitly deletes the old stream from the context so its
+  // bytes don't linger unreferenced in the saved file -- verified safe
+  // against shared-image pages, since each page here comes from its own
+  // independent copyPages() call and therefore never shares an image
+  // object with any other page already added to `output`.
+  async function recompressPageImages(page: PDFPage, output: PDFDocument, imageQuality: number): Promise<void> {
+    const jpegs = findEmbeddedJpegs(page);
+    for (const { name, ref, bytes } of jpegs) {
+      const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }));
+      try {
+        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const el = new Image();
+          el.onload = () => resolve(el);
+          el.onerror = () => reject(new Error("Could not decode an embedded image."));
+          el.src = blobUrl;
+        });
+
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const context = canvas.getContext("2d", { alpha: false });
+        if (!context) continue;
+        context.drawImage(img, 0, 0);
+
+        const recompressedBlob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob(resolve, "image/jpeg", imageQuality),
+        );
+        canvas.width = 0;
+        canvas.height = 0;
+        if (!recompressedBlob) continue;
+
+        const newBytes = new Uint8Array(await recompressedBlob.arrayBuffer());
+        if (newBytes.byteLength >= bytes.byteLength) continue; // never make an embedded image bigger
+
+        const newImage = await output.embedJpg(newBytes);
+        const resources = page.node.Resources();
+        const xObjects = resources?.lookupMaybe(PDFName.of("XObject"), PDFDict);
+        xObjects?.set(PDFName.of(name), newImage.ref);
+        page.node.context.delete(ref);
+      } catch {
+        // Best-effort: an image this pass can't safely decode/recompress is
+        // left exactly as copyPages already placed it.
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
+    }
+  }
+
   async function buildCompressedCandidate({
     processingDoc,
     sourcePdf,
@@ -654,12 +782,17 @@ export default function CompressPdfTool() {
   }) {
     if (!analysis) throw new Error("Document analysis is unavailable.");
     const output = await PDFDocument.create();
+    let textPagesPreserved = 0;
     if (metadataMode === "preserve") {
       await copyMetadata(sourcePdf, output);
     } else {
       output.setTitle("Compressed PDF");
       output.setCreator("Lumeo PDF Workspace");
     }
+    // Bookmarks are document navigation structure, not the kind of
+    // author/title metadata metadataMode is about stripping for privacy --
+    // copied unconditionally.
+    copyOutline(sourcePdf, output);
 
     for (let pageIndex = 1; pageIndex <= analysis.pageCount; pageIndex += 1) {
       if (currentSession !== sessionRef.current) {
@@ -672,6 +805,29 @@ export default function CompressPdfTool() {
       );
       const page = await processingDoc.getPage(pageIndex);
       const pageInfo = analysis.pages[pageIndex - 1];
+
+      // Rasterizing a page that actually has real text permanently destroys
+      // that text (it becomes an unselectable, unsearchable image) for a
+      // compression benefit that isn't even real -- re-encoding vector text
+      // as a JPEG typically doesn't shrink it, since there was no heavy
+      // image data to recompress in the first place. Pages with genuine
+      // extractable text are copied through unchanged (preserving all text,
+      // fonts, and vector content); only pages without real text -- scans,
+      // photos, image-only pages, which is what this rasterize path is
+      // actually for -- go through the recompress-as-JPEG path below.
+      const textContent = await page.getTextContent();
+      const hasRealText = textContent.items.some(
+        (item) => "str" in item && item.str.trim().length > 0,
+      );
+      if (hasRealText) {
+        textPagesPreserved += 1;
+        const [copiedPage] = await output.copyPages(sourcePdf, [pageIndex - 1]);
+        output.addPage(copiedPage);
+        await recompressPageImages(copiedPage, output, imageQuality);
+        await new Promise((resolve) => window.setTimeout(resolve, 0));
+        continue;
+      }
+
       const baseViewport = page.getViewport({ scale: 1 });
       const requestedScale = Math.max(
         MIN_RENDER_SCALE,
@@ -726,7 +882,8 @@ export default function CompressPdfTool() {
 
     setStatus("Rebuilding document");
     setProgressDetail(`${passLabel} · rebuilding document`);
-    return output.save({ useObjectStreams: true });
+    const bytes = await output.save({ useObjectStreams: true });
+    return { bytes, textPagesPreserved };
   }
 
   async function handleCompress() {
@@ -781,6 +938,7 @@ export default function CompressPdfTool() {
         let smallestSuccessfulStrength: number | null = null;
         let bestCandidate: Uint8Array | null = null;
         let bestCandidateBytes: number | null = null;
+        let bestCandidateTextPagesPreserved = 0;
         let bestUnderTargetBytes: number | null = null;
         let smallestCandidateBytes = Number.POSITIVE_INFINITY;
 
@@ -796,7 +954,7 @@ export default function CompressPdfTool() {
             currentSession,
             passLabel: `Building pass ${pass} of ${MAX_TARGET_PASSES}`,
           });
-          const candidateBytes = candidate.byteLength;
+          const candidateBytes = candidate.bytes.byteLength;
           setProgressDetail(
             `Pass ${pass} of ${MAX_TARGET_PASSES} · ${formatFileSize(candidateBytes)} so far${
               candidateBytes <= request.targetBytes ? " · under target" : ""
@@ -835,8 +993,9 @@ export default function CompressPdfTool() {
               targetBytes: request.targetBytes,
             })
           ) {
-            bestCandidate = candidate;
+            bestCandidate = candidate.bytes;
             bestCandidateBytes = candidateBytes;
+            bestCandidateTextPagesPreserved = candidate.textPagesPreserved;
           }
 
           const closeEnough =
@@ -873,9 +1032,10 @@ export default function CompressPdfTool() {
           requestedBytes: request.targetBytes,
           attempts,
           qualityOutlook: outlook,
+          textPagesPreserved: bestCandidateTextPagesPreserved,
         };
       } else {
-        outputBytes = await buildCompressedCandidate({
+        const candidate = await buildCompressedCandidate({
           processingDoc,
           sourcePdf,
           dpi: selectedPlan.dpi,
@@ -885,6 +1045,7 @@ export default function CompressPdfTool() {
           currentSession,
           passLabel: "Processing document",
         });
+        outputBytes = candidate.bytes;
       }
 
       // Recompression can legitimately grow the file (an already-optimized
@@ -1370,6 +1531,14 @@ export default function CompressPdfTool() {
                     {result.mode === "quality" && result.profile ? <p>Profile: {profiles[result.profile].label}</p> : null}
                     {result.target ? <p>Passes: {result.target.attempts.length}</p> : null}
                     {result.target ? <p>Quality: {result.target.qualityOutlook}</p> : null}
+                    {result.target && result.target.textPagesPreserved > 0 && result.target.outcome !== "achieved" ? (
+                      <p>
+                        {result.target.textPagesPreserved} page{result.target.textPagesPreserved === 1 ? "" : "s"} with
+                        real text {result.target.textPagesPreserved === 1 ? "was" : "were"} kept as-is instead of
+                        compressed further, to keep the document searchable and selectable -- this is the reason the
+                        target was not fully reached.
+                      </p>
+                    ) : null}
                     <p>Grayscale: {result.grayscale ? "On" : "Off"}</p>
                     {result.target?.outcome === "closest-safe" ? <p className="text-[var(--text-primary)]/70">Reason: Reducing further would significantly affect readability.</p> : null}
                     {result.tone === "larger" ? <p className="font-semibold text-[var(--text-danger)]">Recommendation: keep original.</p> : null}
