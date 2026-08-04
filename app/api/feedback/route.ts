@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { geolocation } from "@vercel/functions";
 import { createClient } from "@/lib/supabase/server";
+import { captureServerError, withRouteHandlerCapture } from "@/lib/errors/server";
 
 // Edge runtime: cold starts are dramatically faster here than Node.js
 // serverless (the prior default), which is what made submissions take
@@ -26,7 +27,7 @@ function readApproxLocation(request: NextRequest) {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
-export async function POST(request: NextRequest) {
+export const POST = withRouteHandlerCapture("/api/feedback", async (request: NextRequest) => {
   let body: unknown;
   try {
     body = await request.json();
@@ -75,8 +76,14 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     console.error("feedback insert failed:", error.message);
+    void captureServerError({
+      message: `feedback insert failed: ${error.message}`,
+      route: "/api/feedback",
+      source: "route_handler",
+      severity: "medium",
+    });
     return NextResponse.json({ ok: false, message: "Could not send your message." }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });
-}
+});

@@ -1,9 +1,21 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import { AuraButton, L2PublicErrorState } from "@/components/ui/Aura";
+import { captureClientError } from "@/lib/errors/client";
 
-export default function PdfToolError({ reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function PdfToolError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    void captureClientError({
+      message: error.message,
+      stack: error.stack ?? null,
+      component: "PdfToolError",
+      source: "error_boundary",
+      severity: "high",
+    });
+  }, [error]);
+
   return (
     <main className="min-h-dvh bg-[var(--surface-canvas)] px-5 py-12 text-[var(--text-primary)] sm:px-8">
       <L2PublicErrorState

@@ -813,8 +813,6 @@ export default function JpgToPdfTool() {
   if (files.length === 0) {
     return (
       <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
-        <L2WorkspaceHeader title="JPG to PDF" description="Turn JPG, PNG, or WEBP images into one clean PDF." />
-
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="jpg-to-pdf-upload"
@@ -857,7 +855,7 @@ export default function JpgToPdfTool() {
         multiple
         className="hidden"
         onChange={(event) => {
-          if (event.target.files) void addFiles(event.target.files);
+          if (event.target.files && status !== "Converting in your browser...") void addFiles(event.target.files);
           event.target.value = "";
         }}
       />
@@ -865,10 +863,16 @@ export default function JpgToPdfTool() {
       <L2WorkspaceHeader title="JPG to PDF" description={readySummary} />
 
       <L2WorkspaceToolbar>
-        <L2ToolbarButton variant="primary" onClick={() => inputRef.current?.click()}>
+        <L2ToolbarButton
+          variant="primary"
+          onClick={() => inputRef.current?.click()}
+          disabled={status === "Converting in your browser..."}
+        >
           + Add images
         </L2ToolbarButton>
-        <L2ToolbarButton onClick={clearAllFiles}>Clear all</L2ToolbarButton>
+        <L2ToolbarButton onClick={clearAllFiles} disabled={status === "Converting in your browser..."}>
+          Clear all
+        </L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">
           {files.length} image{files.length === 1 ? "" : "s"} · {formatFileSize(totalSize)}
         </span>
@@ -880,6 +884,7 @@ export default function JpgToPdfTool() {
             <L2PanelLabel title="Image tray" description="Drop more images here, or use Add images above." />
             <div
               onDragOver={(event) => {
+                if (status === "Converting in your browser...") return;
                 event.preventDefault();
                 setIsDragging(true);
               }}
@@ -887,12 +892,15 @@ export default function JpgToPdfTool() {
               onDrop={(event) => {
                 event.preventDefault();
                 setIsDragging(false);
+                if (status === "Converting in your browser...") return;
                 void addFiles(event.dataTransfer.files);
               }}
               className={`mt-3 flex min-h-24 flex-col items-center justify-center gap-1.5 rounded-[var(--radius-xl)] border-2 border-dashed p-4 text-center transition duration-[var(--v2-motion-normal)] ${
-                isDragging
-                  ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
-                  : "border-[var(--border-subtle)] hover:border-[var(--border-selected)]"
+                status === "Converting in your browser..."
+                  ? "cursor-not-allowed opacity-[var(--v2-interactive-disabled-opacity)]"
+                  : isDragging
+                    ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
+                    : "border-[var(--border-subtle)] hover:border-[var(--border-selected)]"
               }`}
             >
               <JpgToPdfIcon />
@@ -974,7 +982,19 @@ export default function JpgToPdfTool() {
                         }
                         name={item.file.name}
                         meta={`${item.width}x${item.height} - ${formatFileSize(item.file.size)}${item.userRotation ? ` - Rotated ${item.userRotation}°` : ""}`}
+                        onMoveUp={
+                          index === 0 || status === "Converting in your browser..."
+                            ? undefined
+                            : () => moveFile(index, -1)
+                        }
+                        onMoveDown={
+                          index === files.length - 1 || status === "Converting in your browser..."
+                            ? undefined
+                            : () => moveFile(index, 1)
+                        }
                         onRemove={status === "Converting in your browser..." ? undefined : () => removeFile(item.id)}
+                        moveUpLabel={`Move ${item.file.name} up`}
+                        moveDownLabel={`Move ${item.file.name} down`}
                         removeLabel={`Remove ${item.file.name}`}
                       />
                     </div>

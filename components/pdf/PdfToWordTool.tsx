@@ -223,8 +223,6 @@ export default function PdfToWordTool() {
   if (!selected) {
     return (
       <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
-        <L2WorkspaceHeader title="PDF to Word" description="Convert PDFs to editable Word documents." />
-
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           {uploadArea}
         </div>

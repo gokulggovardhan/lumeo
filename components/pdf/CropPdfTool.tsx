@@ -52,6 +52,7 @@ import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
+import { resetPdfPreviewState } from "@/lib/pdf/resetPreviewState";
 
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 
@@ -136,6 +137,24 @@ export default function CropPdfTool() {
       void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     };
   }, []);
+
+  // Same cleanup an unmount already does, plus a full reset of every piece
+  // of state a new upload doesn't already reinitialize -- returns to the
+  // upload screen ready for a different file immediately.
+  function resetTool() {
+    resetPdfPreviewState({ pageImageUrlRef, downloadUrlRef, pdfJsDocRef, setDocReady });
+    setPdf(null);
+    setPageIndex(0);
+    setPageImageUrl("");
+    setPageDisplaySize(null);
+    setError("");
+    resetConfig(createDefaultCropConfig());
+    setScopeInput("");
+    setScopeError("");
+    setLockAspectRatio(false);
+    setDownloadUrl("");
+    setOutputName("lumeo-cropped.pdf");
+  }
 
   // Any config change invalidates the previous export -- same
   // stale-download-reset pattern WatermarkTool.tsx established.
@@ -367,8 +386,6 @@ export default function CropPdfTool() {
   if (!pdf) {
     return (
       <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
-        <L2WorkspaceHeader title="Crop PDF" description="Crop PDF pages to a custom rectangle." />
-
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="crop-pdf-upload"
@@ -406,6 +423,7 @@ export default function CropPdfTool() {
         <L2ToolbarButton onClick={redo} disabled={!canRedo}>
           Redo
         </L2ToolbarButton>
+        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
       </L2WorkspaceToolbar>
 

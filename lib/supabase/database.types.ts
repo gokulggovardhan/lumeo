@@ -153,6 +153,34 @@ export type AuditLog = {
   created_at: string;
 };
 
+export type ErrorSeverity = "low" | "medium" | "high" | "critical";
+export type ErrorStatus = "open" | "resolved" | "ignored";
+export type ErrorSource = "client" | "server_action" | "route_handler" | "error_boundary" | "unhandled_rejection";
+
+export type ErrorLog = {
+  id: number;
+  fingerprint: string;
+  severity: ErrorSeverity;
+  status: ErrorStatus;
+  source: ErrorSource;
+  message: string;
+  stack: string | null;
+  route: string | null;
+  component: string | null;
+  browser_family: string | null;
+  operating_system: string | null;
+  device_class: string | null;
+  page_url: string | null;
+  anonymous_session_id: string | null;
+  build_version: string | null;
+  git_sha: string | null;
+  occurrence_count: number;
+  first_seen_at: string;
+  last_seen_at: string;
+  resolved_at: string | null;
+  resolved_by: string | null;
+};
+
 export type FeedbackQueryType = "Query" | "Feedback";
 
 export type FeedbackQuery = {
@@ -210,8 +238,27 @@ export type ControlCenterDatabase = {
       feedback_queries: { Row: FeedbackQuery };
       analytics_events: { Row: AnalyticsEvent };
       daily_tool_metrics: { Row: DailyToolMetric };
+      error_logs: { Row: ErrorLog };
     };
     Functions: {
+      record_error_event: {
+        Args: {
+          message: string;
+          stack: string | null;
+          route: string | null;
+          component: string | null;
+          source: string;
+          severity: string;
+          browser_family: string | null;
+          operating_system: string | null;
+          device_class: string | null;
+          page_url: string | null;
+          anonymous_session_id: string | null;
+          build_version: string | null;
+          git_sha: string | null;
+        };
+        Returns: number;
+      };
       current_admin_role: { Args: Record<string, never>; Returns: AdminRole | null };
       is_active_admin: { Args: Record<string, never>; Returns: boolean };
       can_manage_content: { Args: Record<string, never>; Returns: boolean };

@@ -7,6 +7,7 @@ import {
   chooseTargetOutcome,
   createTargetCompressionRequest,
   nextTargetStrength,
+  shouldFallbackToOriginal,
   targetValueToBytes,
   validateTargetBytes,
 } from "../lib/compressionTarget.ts";
@@ -140,4 +141,34 @@ test("preserves Target Size Studio presets and profile quality values", () => {
   assert.equal(compressionProfiles.highQuality.quality, 0.86);
   assert.equal(compressionProfiles.balanced.quality, 0.74);
   assert.equal(compressionProfiles.smaller.quality, 0.58);
+});
+
+test("shouldFallbackToOriginal flags any candidate that is not strictly smaller than the original", () => {
+  assert.equal(shouldFallbackToOriginal(900_000, 1_000_000), false); // genuinely smaller
+  assert.equal(shouldFallbackToOriginal(1_000_000, 1_000_000), true); // identical size -- no benefit, prefer the untouched original
+  assert.equal(shouldFallbackToOriginal(1_500_000, 1_000_000), true); // the reported bug: recompression grew the file
+});
+
+test("CompressPdfTool falls back to the original bytes when a candidate is not smaller (regression for the reported 1MB -> 1.5MB bug)", () => {
+  assert.ok(compressToolSource.includes("shouldFallbackToOriginal(outputBytes.byteLength, analysis.size)"));
+  assert.ok(compressToolSource.includes("new Uint8Array(copyArrayBuffer(analysis.bytes))"));
+});
+
+test("CompressPdfTool preserves real text by copying text pages instead of rasterizing them (regression: compressing a text PDF then converting to Word produced an image-only, textless result)", () => {
+  assert.ok(compressToolSource.includes("const textContent = await page.getTextContent();"));
+  assert.ok(
+    compressToolSource.includes(
+      'item.str.trim().length > 0',
+    ),
+  );
+  assert.ok(compressToolSource.includes("output.copyPages(sourcePdf, [pageIndex - 1])"));
+});
+
+test("CompressPdfTool explains a missed target size when it was caused by preserving real text", () => {
+  assert.ok(compressToolSource.includes("textPagesPreserved: bestCandidateTextPagesPreserved"));
+  assert.ok(
+    compressToolSource.includes(
+      "kept as-is instead of",
+    ),
+  );
 });
