@@ -44,6 +44,7 @@ import {
   type ShapeKind,
 } from "@/lib/pdf/edit/elements";
 import { exportEditedPdf } from "@/lib/pdf/edit/export";
+import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
@@ -116,6 +117,15 @@ export default function EditPdfTool() {
   const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  // Phase 1 of true PDF text editing: read-only detection of the current
+  // page's existing text runs (see lib/pdf/edit/textRuns.ts), so the select
+  // tool can highlight real text instead of only ever placing new overlay
+  // elements. Nothing here writes back to the PDF yet -- that's a separate,
+  // much harder follow-up (matching a run back to the specific content-
+  // stream operator that produced it so it can be rewritten in place).
+  const [detectedTextRuns, setDetectedTextRuns] = useState<DetectedTextRun[]>([]);
+  const [selectedTextRun, setSelectedTextRun] = useState<DetectedTextRun | null>(null);
+
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   const [shapeKind, setShapeKind] = useState<ShapeKind>(DEFAULT_SHAPE_KIND);
   const [inkColor, setInkColor] = useState("#12141a");
@@ -166,6 +176,8 @@ export default function EditPdfTool() {
     setError("");
     resetElements([]);
     setSelectedId(null);
+    setDetectedTextRuns([]);
+    setSelectedTextRun(null);
     setActiveTool("select");
     setZoom(1);
     setDownloadUrl("");
@@ -208,6 +220,7 @@ export default function EditPdfTool() {
 
     void (async () => {
       setPageLoading(true);
+      setSelectedTextRun(null);
       try {
         const page = await doc.getPage(pageIndex + 1);
         const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
@@ -229,6 +242,18 @@ export default function EditPdfTool() {
         setPageImageUrl(url);
         setPageDisplaySize({ width: canvas.width, height: canvas.height });
         setPagePointSize({ width: pointViewport.width, height: pointViewport.height });
+
+        // Best-effort: a page's existing text is a bonus (lets the select
+        // tool highlight it), never a requirement -- a failure here must
+        // not block the preview or export from working.
+        try {
+          const content = await page.getTextContent();
+          setDetectedTextRuns(
+            textRunsFromContent(content.items as never, viewport.transform, canvas.width, canvas.height),
+          );
+        } catch {
+          setDetectedTextRuns([]);
+        }
       } catch {
         setError("This page could not be previewed. Try a different page.");
       } finally {
@@ -318,10 +343,18 @@ export default function EditPdfTool() {
   }
 
   function handleStageClick(event: React.MouseEvent<HTMLDivElement>) {
-    if (activeTool === "select" || activeTool === "draw") return;
+    if (activeTool === "draw") return;
     if ((event.target as HTMLElement).closest('[role="button"]')) return;
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return;
+
+    if (activeTool === "select") {
+      const xPct = ((event.clientX - rect.left) / rect.width) * 100;
+      const yPct = ((event.clientY - rect.top) / rect.height) * 100;
+      setSelectedTextRun(findTextRunAtPoint(detectedTextRuns, xPct, yPct));
+      return;
+    }
+
     const xPct = ((event.clientX - rect.left) / rect.width) * 100;
     const yPct = ((event.clientY - rect.top) / rect.height) * 100;
     const id = nextElementId();
@@ -502,6 +535,19 @@ export default function EditPdfTool() {
                       onStrokeComplete={handleInkStroke}
                     />
                   ) : null}
+
+                  {activeTool === "select" && selectedTextRun ? (
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute z-10 rounded-[2px] border-2 border-dashed border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10"
+                      style={{
+                        left: `${selectedTextRun.xPct}%`,
+                        top: `${selectedTextRun.yPct}%`,
+                        width: `${selectedTextRun.widthPct}%`,
+                        height: `${selectedTextRun.heightPct}%`,
+                      }}
+                    />
+                  ) : null}
                 </div>
               </div>
             )}
@@ -560,6 +606,15 @@ export default function EditPdfTool() {
               <p className="mt-3 rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] p-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
                 Whiteout hides content visually in the exported PDF. For documents with legal or compliance requirements, verify the underlying content is also removed before sharing.
               </p>
+            ) : null}
+
+            {activeTool === "select" && selectedTextRun ? (
+              <div className="mt-3 grid gap-1 rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] p-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
+                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Existing text (preview)</span>
+                <span className="font-semibold text-[var(--text-primary)]/80">&ldquo;{selectedTextRun.str}&rdquo;</span>
+                <span>Font: {selectedTextRun.fontName} · ~{Math.round(selectedTextRun.fontSizePx / PAGE_RENDER_SCALE)}pt</span>
+                <span>In-place editing of existing text is not available yet -- add a new text box to annotate over it.</span>
+              </div>
             ) : null}
 
             {selectedElement && selectedElement.type === "text" ? (
