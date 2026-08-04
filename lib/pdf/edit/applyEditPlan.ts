@@ -179,7 +179,8 @@ function locateContentStream(doc: PDFDocument, pageIndex: number, contentStreamI
   let contentsArray: PDFArray | null = null;
 
   if (contentsEntry instanceof PDFRef) {
-    const resolved = context.lookupMaybe(contentsEntry, PDFArray);
+    const resolvedEntry = context.lookup(contentsEntry);
+    const resolved = resolvedEntry instanceof PDFArray ? resolvedEntry : undefined;
     if (resolved) {
       contentsArray = resolved;
       const entryRef = resolved.get(contentStreamIndex);

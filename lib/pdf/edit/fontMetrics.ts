@@ -32,6 +32,23 @@ function asNumber(obj: unknown): number | null {
   return obj instanceof PDFNumber ? obj.asNumber() : null;
 }
 
+// pdf-lib's context.lookupMaybe(ref, Type) throws UnexpectedObjectTypeError
+// (same as the strict lookup(ref, Type)) when the ref resolves to an object
+// of the WRONG type -- it only returns undefined for a missing/null object.
+// Every call site below uses the type-less lookup(ref) instead and
+// instanceof-checks the result itself, so a malformed PDF (an indirect
+// reference pointing at an unexpected type) degrades gracefully instead of
+// throwing. See lib/pdf/edit/formXObjects.ts's resolveMaybe for the same fix.
+function resolveArrayMaybe(entry: unknown, context: PDFContext): PDFArray | undefined {
+  const resolved = entry instanceof PDFRef ? context.lookup(entry) : entry;
+  return resolved instanceof PDFArray ? resolved : undefined;
+}
+
+function resolveDictMaybe(entry: unknown, context: PDFContext): PDFDict | undefined {
+  const resolved = entry instanceof PDFRef ? context.lookup(entry) : entry;
+  return resolved instanceof PDFDict ? resolved : undefined;
+}
+
 // Per spec 9.6.3, Table 111 (Type 1/TrueType) and Table 112 (Type 3): a
 // simple font's per-code widths live directly in /Widths, indexed from
 // /FirstChar; a code outside [FirstChar, LastChar] falls back to the
@@ -39,7 +56,7 @@ function asNumber(obj: unknown): number | null {
 function resolveSimpleFontWidthsArray(fontDict: PDFDict, context: PDFContext): FontMetrics | null {
   const firstChar = asNumber(fontDict.get(PDFName.of("FirstChar")));
   const widthsEntry = fontDict.get(PDFName.of("Widths"));
-  const widthsArray = widthsEntry instanceof PDFRef ? context.lookupMaybe(widthsEntry, PDFArray) : widthsEntry;
+  const widthsArray = resolveArrayMaybe(widthsEntry, context);
   if (firstChar === null || !(widthsArray instanceof PDFArray)) return null;
 
   const glyphWidths = new Map<number, number>();
@@ -49,7 +66,7 @@ function resolveSimpleFontWidthsArray(fontDict: PDFDict, context: PDFContext): F
   }
 
   const descriptorRef = fontDict.get(PDFName.of("FontDescriptor"));
-  const descriptor = descriptorRef instanceof PDFRef ? context.lookupMaybe(descriptorRef, PDFDict) : undefined;
+  const descriptor = resolveDictMaybe(descriptorRef, context);
   const missingWidth = descriptor ? (asNumber(descriptor.get(PDFName.of("MissingWidth"))) ?? 0) : 0;
 
   return { bytesPerCode: 1, defaultWidth: missingWidth, glyphWidths, source: "Widths" };
@@ -99,7 +116,7 @@ function parseCidWidthsArray(wArray: PDFArray, context: PDFContext): Map<number,
       continue;
     }
     const next = wArray.get(i + 1);
-    const nextResolved = next instanceof PDFRef ? context.lookupMaybe(next, PDFArray) : next;
+    const nextResolved = resolveArrayMaybe(next, context);
 
     if (nextResolved instanceof PDFArray) {
       for (let j = 0; j < nextResolved.size(); j += 1) {
@@ -129,14 +146,14 @@ function resolveCidFontWidths(fontDict: PDFDict, context: PDFContext): FontMetri
   const descendantFonts = fontDict.get(PDFName.of("DescendantFonts"));
   const descendantDict =
     descendantFonts instanceof PDFArray && descendantFonts.size() > 0
-      ? context.lookupMaybe(descendantFonts.get(0), PDFDict)
+      ? resolveDictMaybe(descendantFonts.get(0), context)
       : undefined;
 
   // Per spec 9.7.4.3: /DW's default is 1000 if the entry is absent.
   const defaultWidth = descendantDict ? (asNumber(descendantDict.get(PDFName.of("DW"))) ?? 1000) : 1000;
 
   const wEntry = descendantDict?.get(PDFName.of("W"));
-  const wArray = wEntry instanceof PDFRef ? context.lookupMaybe(wEntry, PDFArray) : wEntry;
+  const wArray = resolveArrayMaybe(wEntry, context);
 
   if (wArray instanceof PDFArray) {
     return { bytesPerCode: 2, defaultWidth, glyphWidths: parseCidWidthsArray(wArray, context), source: "W" };
