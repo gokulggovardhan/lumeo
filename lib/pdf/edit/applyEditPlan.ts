@@ -1,14 +1,20 @@
 // lib/pdf/edit/applyEditPlan.ts
 //
-// Phase 3 of true PDF text editing, slice 1: the first real content-stream
-// mutation. Given a verified EditPlan (lib/pdf/edit/editPlan.ts), rewrites
-// exactly one Tj operator's string operand -- nothing else in the content
+// Phase 3 of true PDF text editing: real content-stream mutation. Given a
+// verified EditPlan (lib/pdf/edit/editPlan.ts), rewrites exactly one
+// Tj or TJ operator's text operand(s) -- nothing else in the content
 // stream, and nothing else in the PDF's object graph, changes.
 //
 // Deliberately narrow, per the approved slice scope:
-// - Only Tj is supported (TJ, ', " are all rejected outright -- TJ's
-//   interleaved kerning-number array makes a safe rewrite a materially
-//   different, larger problem than a single string operand).
+// - Only Tj and TJ are supported; ' and " are rejected outright -- each
+//   also moves the text line as a side effect of showing text, a
+//   different, riskier change than either supported operator's.
+// - A TJ rewrite always collapses to a single combined string operand
+//   (see buildReplacementOperatorText) plus, when needed, one trailing
+//   spacing-adjustment number computed by fontMetrics.ts's compareAdvance
+//   -- the original's own inter-string kerning numbers are dropped, since
+//   they were tuned for the original text's specific glyph boundaries and
+//   have no coherent meaning once the text changes.
 // - No fallback-font path -- an EditPlan that isn't already `editable`
 //   (built by editPlan.ts, which already enforces this) is rejected here
 //   too, as a second, independent check rather than trusting the caller.
@@ -30,35 +36,84 @@ function encodeGlyphCodesToHex(codes: number[], bytesPerCode: 1 | 2): string {
   return bytes.map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+const SUPPORTED_OPERATOR_TYPES: ReadonlySet<EditPlan["operatorType"]> = new Set(["Tj", "TJ"]);
+
 function assertApplicable(plan: EditPlan): void {
   if (!plan.editable) {
     throw new EditPlanRejectedError(plan.reason ?? "This edit plan is not editable.");
   }
-  if (plan.operatorType !== "Tj") {
+  if (!SUPPORTED_OPERATOR_TYPES.has(plan.operatorType)) {
     throw new EditPlanRejectedError(
-      `This rewrite engine only supports Tj operators (this plan targets "${plan.operatorType}"). TJ support is separate, later work.`,
+      `This rewrite engine only supports Tj and TJ operators (this plan targets "${plan.operatorType}"). ' and " support is separate, later work.`,
     );
   }
+  if (plan.operatorType === "TJ" && plan.replacementGlyphCodes.length === 0 && plan.originalGlyphCodes.length > 0) {
+    // A TJ rewritten down to zero glyphs would still be syntactically
+    // valid PDF ([] TJ), but it's a degenerate case this slice doesn't
+    // have a real reproduced example to validate against -- reject
+    // rather than guess it's safe.
+    throw new EditPlanRejectedError("Replacing a TJ run with empty text is not supported by this rewrite engine.");
+  }
+}
+
+// A TJ array's own kerning-adjustment numbers can carry several decimal
+// places; format with just enough precision to round-trip through the
+// tokenizer cleanly without accumulating stray floating-point noise like
+// "12.000000000000002".
+function formatTJNumber(value: number): string {
+  const rounded = Math.round(value * 1000) / 1000;
+  return rounded.toString();
+}
+
+// The minimum adjustment magnitude worth writing into the TJ array at
+// all -- anything smaller is imperceptible and would only add byte-stream
+// noise (an explicit "0" or near-0 entry), so an equal-width replacement
+// naturally produces the cleanest possible array: just the new string,
+// no adjustment number.
+const TJ_DELTA_EPSILON = 0.01;
+
+// Builds the exact replacement operator invocation text for `plan`:
+// `<hex> Tj` for a Tj plan, or `[<hex>] TJ` / `[<hex> delta] TJ` for a TJ
+// plan. A TJ replacement always collapses to a single combined string
+// operand (task 3: rewrite only text operands) -- the original's own
+// inter-string kerning numbers are dropped rather than kept, since they
+// were tuned for the ORIGINAL text's specific glyph boundaries and have
+// no coherent attachment point once the text itself changes (task 4:
+// leave spacing operands untouched *unless recalculation is required* --
+// here it is required, because the numbers' meaning doesn't survive the
+// edit). In their place, a single trailing adjustment equal to
+// plan.tjSpacingDelta (already computed by lib/pdf/edit/fontMetrics.ts's
+// compareAdvance in the EditPlan slice, task 5: use the existing spacing
+// engine) keeps whatever text follows this operator from shifting
+// position -- omitted entirely when negligible, so an equal-width
+// replacement produces a clean `[<hex>] TJ` with no adjustment at all.
+function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): string {
+  const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, bytesPerCode);
+  if (plan.operatorType === "Tj") {
+    return `<${hex}> Tj`;
+  }
+  const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
+  return needsAdjustment ? `[<${hex}> ${formatTJNumber(plan.tjSpacingDelta)}] TJ` : `[<${hex}>] TJ`;
 }
 
 // Pure byte-level rewrite: replaces exactly the operator's own byte range
 // (plan.byteOffset .. plan.byteOffset + plan.byteLength) in
-// `contentStreamBytes` with a new, self-contained `<hex> Tj` invocation
-// encoding plan.replacementGlyphCodes. Nothing outside that range is
-// touched -- every other operator (BT/ET, Tf, Tm, other text runs,
-// spacing operators, graphics state) is preserved byte-for-byte by
-// construction, not by any explicit "preserve" step.
+// `contentStreamBytes` with a new, self-contained operator invocation
+// (see buildReplacementOperatorText) encoding plan.replacementGlyphCodes.
+// Nothing outside that range is touched -- every other operator (BT/ET,
+// Tf, Tm, other text runs, spacing operators, graphics state) is
+// preserved byte-for-byte by construction, not by any explicit "preserve"
+// step.
 //
-// Always emits a hex string operand regardless of whether the original
-// used a literal `(...)` string -- Tj accepts either form equivalently
+// Always emits hex string operand(s) regardless of whether the original
+// used literal `(...)` strings -- Tj/TJ accept either form equivalently
 // per spec, and hex avoids the literal-string escaping rules entirely
 // (no risk of an unescaped '(' or ')' in re-encoded glyph bytes breaking
 // the stream's balanced-parens structure).
 export function applyEditPlanToBytes(contentStreamBytes: Uint8Array, plan: EditPlan, bytesPerCode: 1 | 2): Uint8Array {
   assertApplicable(plan);
 
-  const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, bytesPerCode);
-  const newOperatorBytes = new TextEncoder().encode(`<${hex}> Tj`);
+  const newOperatorBytes = new TextEncoder().encode(buildReplacementOperatorText(plan, bytesPerCode));
 
   const before = contentStreamBytes.subarray(0, plan.byteOffset);
   const after = contentStreamBytes.subarray(plan.byteOffset + plan.byteLength);
