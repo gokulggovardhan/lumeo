@@ -71,7 +71,59 @@ async function copyDocumentLikeCompressDoes(source: PDFDocument) {
     const [copied] = await output.copyPages(source, [i]);
     output.addPage(copied);
   }
+  copyAcroForm(output);
   return output;
+}
+
+// Mirrors CompressPdfTool.tsx's copyAcroForm exactly. copyPages already
+// carries each field's widget annotation across as part of the page's
+// /Annots, but never registers the catalog-level /AcroForm entry a viewer
+// needs to recognize those widgets as an actual fillable form -- without it
+// a compressed form's fields are still visually drawn but dead. Walks the
+// already-copied pages' own /Annots for Subtype /Widget entries and, for
+// each, walks its /Parent chain up to the true root field (a widget does
+// not necessarily carry /FT itself -- a dotted field name like
+// "applicant.name" makes pdf-lib build a two-level /Parent hierarchy, and
+// /AcroForm.Fields must list only the true root, not an intermediate or
+// the widget itself).
+function copyAcroForm(output: PDFDocument) {
+  const rootRefs: PDFRef[] = [];
+  const seenRoots = new Set<string>();
+
+  for (const page of output.getPages()) {
+    const annots = page.node.Annots();
+    if (!annots) continue;
+    for (let index = 0; index < annots.size(); index += 1) {
+      const annotRef = annots.get(index);
+      if (!(annotRef instanceof PDFRef)) continue;
+      const annotDict = output.context.lookup(annotRef, PDFDict);
+      const subtype = annotDict.get(PDFName.of("Subtype"));
+      if (!(subtype instanceof PDFName) || subtype.asString() !== "/Widget") continue;
+
+      let rootRef = annotRef;
+      let rootDict = annotDict;
+      while (rootDict.has(PDFName.of("Parent"))) {
+        const parentRef = rootDict.get(PDFName.of("Parent"));
+        if (!(parentRef instanceof PDFRef)) break;
+        rootRef = parentRef;
+        rootDict = output.context.lookup(parentRef, PDFDict);
+      }
+
+      const key = rootRef.toString();
+      if (!seenRoots.has(key)) {
+        seenRoots.add(key);
+        rootRefs.push(rootRef);
+      }
+    }
+  }
+  if (rootRefs.length === 0) return;
+
+  const newAcroForm = output.context.obj({
+    Fields: rootRefs,
+    NeedAppearances: true,
+  });
+  const newAcroFormRef = output.context.register(newAcroForm);
+  output.catalog.set(PDFName.of("AcroForm"), newAcroFormRef);
 }
 
 // pdf-lib has no high-level bookmark/outline API, so this builds the
@@ -201,4 +253,30 @@ test("copyPages preserves a page's link annotation (a real /Annots entry, unlike
   const action = copiedAnnotation.lookup(PDFName.of("A"), PDFDict);
   const uri = action.lookup(PDFName.of("URI"));
   assert.equal(uri?.toString(), "(https://example.com)");
+});
+
+test("copyAcroForm makes a compressed form's fields recognized again (regression: widgets survived copyPages but /AcroForm never did, leaving dead unfillable boxes)", async () => {
+  const source = await PDFDocument.create();
+  const page = source.addPage([300, 200]);
+  const form = source.getForm();
+  const field = form.createTextField("applicant.name");
+  field.setText("Jane Doe");
+  field.addToPage(page, { x: 80, y: 145, width: 180, height: 20 });
+
+  const reloadedSource = await PDFDocument.load(await source.save());
+  const output = await copyDocumentLikeCompressDoes(reloadedSource);
+  const reloadedOutput = await PDFDocument.load(await output.save());
+
+  assert.ok(reloadedOutput.catalog.has(PDFName.of("AcroForm")), "output catalog should have /AcroForm");
+  const fields = reloadedOutput.getForm().getFields();
+  assert.equal(fields.length, 1);
+  assert.equal(fields[0].getName(), "applicant.name");
+});
+
+test("copyAcroForm does nothing for a document with no form fields (no stray /AcroForm added)", async () => {
+  const source = await PDFDocument.create();
+  source.addPage([200, 200]);
+
+  const output = await copyDocumentLikeCompressDoes(source);
+  assert.equal(output.catalog.has(PDFName.of("AcroForm")), false);
 });

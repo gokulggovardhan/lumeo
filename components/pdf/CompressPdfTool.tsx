@@ -703,6 +703,74 @@ export default function CompressPdfTool() {
     output.catalog.set(PDFName.of("Outlines"), copiedRootRef);
   }
 
+  // /AcroForm (interactive form fields) lives at the document catalog, not
+  // on any single page -- copyPages already carries each field's widget
+  // annotation across as part of the page's /Annots, but never registers
+  // the catalog-level /AcroForm entry that makes a viewer recognize those
+  // widgets as an actual fillable form. Without it a compressed form's
+  // fields are still visually drawn but dead: not editable, values not
+  // read. Confirmed with a real pdf-lib test: after copyPages, the widget
+  // annotation is present on the copied page but output.catalog has no
+  // /AcroForm at all and getForm().getFields() returns none.
+  //
+  // Walks the already-copied (non-rasterized) output pages' own /Annots for
+  // Subtype /Widget entries and, for each, walks its /Parent chain up to
+  // the true root field -- confirmed with a real pdf-lib test that a widget
+  // does NOT necessarily carry /FT itself: a dotted field name like
+  // "applicant.name" makes pdf-lib build a two-level /Parent hierarchy
+  // (the widget's immediate parent has /FT, but is itself a child of a
+  // grandparent that has no /Parent at all), and /AcroForm.Fields must list
+  // only that true root, never an intermediate or the widget itself, or a
+  // conforming viewer won't recognize the field. Rebuilds Fields from those
+  // already-copied objects rather than attempting to remap refs from source
+  // to output. Fields on rasterized pages are unavoidably lost --
+  // rasterizing a page destroys any interactive widget by definition, the
+  // same limitation the existing "Interactive form detected" risk banner
+  // already discloses.
+  function copyAcroForm(output: PDFDocument) {
+    const rootRefs: PDFRef[] = [];
+    const seenRoots = new Set<string>();
+
+    for (const page of output.getPages()) {
+      const annots = page.node.Annots();
+      if (!annots) continue;
+      for (let index = 0; index < annots.size(); index += 1) {
+        const annotRef = annots.get(index);
+        if (!(annotRef instanceof PDFRef)) continue;
+        const annotDict = output.context.lookup(annotRef, PDFDict);
+        const subtype = annotDict.get(PDFName.of("Subtype"));
+        if (!(subtype instanceof PDFName) || subtype.asString() !== "/Widget") continue;
+
+        let rootRef = annotRef;
+        let rootDict = annotDict;
+        while (rootDict.has(PDFName.of("Parent"))) {
+          const parentRef = rootDict.get(PDFName.of("Parent"));
+          if (!(parentRef instanceof PDFRef)) break;
+          rootRef = parentRef;
+          rootDict = output.context.lookup(parentRef, PDFDict);
+        }
+
+        const key = rootRef.toString();
+        if (!seenRoots.has(key)) {
+          seenRoots.add(key);
+          rootRefs.push(rootRef);
+        }
+      }
+    }
+    if (rootRefs.length === 0) return;
+
+    const newAcroForm = output.context.obj({
+      Fields: rootRefs,
+      // Without a copied /DR (font resources), a strict viewer can't
+      // regenerate an appearance stream for a field that doesn't already
+      // have one -- NeedAppearances asks it to try anyway, which is what
+      // every field pdf-lib itself creates already relies on.
+      NeedAppearances: true,
+    });
+    const newAcroFormRef = output.context.register(newAcroForm);
+    output.catalog.set(PDFName.of("AcroForm"), newAcroFormRef);
+  }
+
   // A page with real text can still carry heavy embedded photos (a scanned
   // signature, a letterhead logo, an invoice photo) -- copying it through
   // unchanged (as buildCompressedCandidate does for every text page)
@@ -879,6 +947,8 @@ export default function CompressPdfTool() {
 
       await new Promise((resolve) => window.setTimeout(resolve, 0));
     }
+
+    copyAcroForm(output);
 
     setStatus("Rebuilding document");
     setProgressDetail(`${passLabel} · rebuilding document`);
