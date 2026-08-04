@@ -917,7 +917,7 @@ export default function MergePdfTool() {
         multiple
         className="hidden"
         onChange={(event) => {
-          if (event.target.files) void addFiles(event.target.files);
+          if (event.target.files && !isMerging) void addFiles(event.target.files);
           event.target.value = "";
         }}
       />
@@ -925,10 +925,10 @@ export default function MergePdfTool() {
       <L2WorkspaceHeader title="Merge PDF" description={readySummary} />
 
       <L2WorkspaceToolbar>
-        <L2ToolbarButton variant="primary" onClick={() => inputRef.current?.click()}>
+        <L2ToolbarButton variant="primary" onClick={() => inputRef.current?.click()} disabled={isMerging}>
           + Add PDFs
         </L2ToolbarButton>
-        <L2ToolbarButton onClick={clearAllFiles}>Clear all</L2ToolbarButton>
+        <L2ToolbarButton onClick={clearAllFiles} disabled={isMerging}>Clear all</L2ToolbarButton>
         <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">
           {files.length} file{files.length === 1 ? "" : "s"} · {totalPages} pages · {formatFileSize(totalSize)}
         </span>
@@ -940,6 +940,7 @@ export default function MergePdfTool() {
             <L2PanelLabel title="Document tray" description="Drop more PDFs here, or use Add PDFs above." />
             <div
               onDragOver={(event) => {
+                if (isMerging) return;
                 event.preventDefault();
                 setIsDragging(true);
               }}
@@ -947,12 +948,15 @@ export default function MergePdfTool() {
               onDrop={(event) => {
                 event.preventDefault();
                 setIsDragging(false);
+                if (isMerging) return;
                 void addFiles(event.dataTransfer.files);
               }}
               className={`mt-3 flex min-h-24 flex-col items-center justify-center gap-1.5 rounded-[var(--radius-xl)] border-2 border-dashed p-4 text-center transition duration-[var(--v2-motion-normal)] ${
-                isDragging
-                  ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
-                  : "border-[var(--border-subtle)] hover:border-[var(--border-selected)]"
+                isMerging
+                  ? "cursor-not-allowed opacity-[var(--v2-interactive-disabled-opacity)]"
+                  : isDragging
+                    ? "border-[var(--border-selected)] bg-[var(--surface-selected)]"
+                    : "border-[var(--border-subtle)] hover:border-[var(--border-selected)]"
               }`}
             >
               <MergeIcon />
