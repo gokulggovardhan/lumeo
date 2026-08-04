@@ -1,14 +1,15 @@
 // lib/pdf/edit/applyEditPlan.ts
 //
-// Phase 3 of true PDF text editing: real content-stream mutation. Given a
-// verified EditPlan (lib/pdf/edit/editPlan.ts), rewrites exactly one
-// Tj, TJ, ', or " operator's text operand(s) -- nothing else in the
-// content stream, and nothing else in the PDF's object graph, changes.
+// Phases 3-4 of true PDF text editing: real content-stream mutation.
+// applyEditPlanToDocument rewrites exactly one verified EditPlan's
+// Tj/TJ/'/" operator; applyMultiRunEditPlanToDocument (Phase 4) rewrites
+// every operator in a verified MultiRunEditPlan
+// (lib/pdf/edit/multiRunEditPlan.ts) as one logical edit. Either way,
+// nothing else in the content stream, and nothing else in the PDF's
+// object graph, changes.
 //
 // Deliberately narrow, per the approved slice scope:
-// - All four PDF text-showing operators are supported; multi-line/
-//   multi-operator edits in a single call are not (each call rewrites
-//   exactly one operator).
+// - All four PDF text-showing operators are supported.
 // - A TJ rewrite always collapses to a single combined string operand
 //   (see buildReplacementOperatorText) plus, when needed, one trailing
 //   spacing-adjustment number computed by fontMetrics.ts's compareAdvance
@@ -23,7 +24,9 @@
 //   too, as a second, independent check rather than trusting the caller.
 
 import { PDFArray, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFStream, decodePDFRawStream } from "pdf-lib";
+import type { PDFContext, PDFPage } from "pdf-lib";
 import type { EditPlan } from "./editPlan.ts";
+import type { MultiRunEditPlan } from "./multiRunEditPlan.ts";
 
 export class EditPlanRejectedError extends Error {}
 
@@ -48,13 +51,12 @@ function assertApplicable(plan: EditPlan): void {
   if (!SUPPORTED_OPERATOR_TYPES.has(plan.operatorType)) {
     throw new EditPlanRejectedError(`This rewrite engine does not support the "${plan.operatorType}" operator.`);
   }
-  if (plan.operatorType === "TJ" && plan.replacementGlyphCodes.length === 0 && plan.originalGlyphCodes.length > 0) {
-    // A TJ rewritten down to zero glyphs would still be syntactically
-    // valid PDF ([] TJ), but it's a degenerate case this slice doesn't
-    // have a real reproduced example to validate against -- reject
-    // rather than guess it's safe.
-    throw new EditPlanRejectedError("Replacing a TJ run with empty text is not supported by this rewrite engine.");
-  }
+  // A plan with zero replacement glyphs (any operator kind) produces
+  // `<>`/`[<>]` -- an empty string/array, syntactically valid PDF that
+  // shows nothing. Proven safe and real, not just theoretically legal:
+  // lib/pdf/edit/multiRunEditPlan.ts intentionally empties every operator
+  // in a merged span except the first, and its own tests confirm the
+  // resulting PDF opens and extracts correctly.
 }
 
 // A numeric PDF operand can carry many decimal places when computed
@@ -152,11 +154,23 @@ export function applyEditPlanToBytes(contentStreamBytes: Uint8Array, plan: EditP
 // behavior PR #189's compress work already had to account for when
 // swapping an embedded image), so leaving the old stream registered would
 // silently bloat the saved file with orphaned bytes.
-export async function applyEditPlanToDocument(doc: PDFDocument, plan: EditPlan, bytesPerCode: 1 | 2): Promise<void> {
-  assertApplicable(plan);
+type LocatedContentStream = {
+  context: PDFContext;
+  targetRef: PDFRef;
+  contentsArray: PDFArray | null;
+  originalStream: PDFRawStream;
+  decodedBytes: Uint8Array;
+};
 
-  const page = doc.getPages()[plan.pageIndex];
-  if (!page) throw new EditPlanRejectedError(`Page ${plan.pageIndex} does not exist in this document.`);
+// Locates and decodes one page's content stream by index (0 for a page
+// with a single, non-array /Contents; an index into the array otherwise)
+// -- shared by applyEditPlanToDocument and
+// lib/pdf/edit/multiRunEditPlan.ts's applyMultiRunEditPlanToDocument,
+// since both need to find and decode the exact same target before
+// rewriting it (one operator at a time, or several in sequence).
+function locateContentStream(doc: PDFDocument, pageIndex: number, contentStreamIndex: number): LocatedContentStream {
+  const page = doc.getPages()[pageIndex];
+  if (!page) throw new EditPlanRejectedError(`Page ${pageIndex} does not exist in this document.`);
 
   const context = doc.context;
   const contentsEntry = page.node.get(PDFName.of("Contents"));
@@ -168,9 +182,9 @@ export async function applyEditPlanToDocument(doc: PDFDocument, plan: EditPlan, 
     const resolved = context.lookupMaybe(contentsEntry, PDFArray);
     if (resolved) {
       contentsArray = resolved;
-      const entryRef = resolved.get(plan.contentStreamIndex);
+      const entryRef = resolved.get(contentStreamIndex);
       if (!(entryRef instanceof PDFRef)) {
-        throw new EditPlanRejectedError(`Content stream index ${plan.contentStreamIndex} is not a valid indirect reference.`);
+        throw new EditPlanRejectedError(`Content stream index ${contentStreamIndex} is not a valid indirect reference.`);
       }
       targetRef = entryRef;
     } else {
@@ -178,9 +192,9 @@ export async function applyEditPlanToDocument(doc: PDFDocument, plan: EditPlan, 
     }
   } else if (contentsEntry instanceof PDFArray) {
     contentsArray = contentsEntry;
-    const entryRef = contentsEntry.get(plan.contentStreamIndex);
+    const entryRef = contentsEntry.get(contentStreamIndex);
     if (!(entryRef instanceof PDFRef)) {
-      throw new EditPlanRejectedError(`Content stream index ${plan.contentStreamIndex} is not a valid indirect reference.`);
+      throw new EditPlanRejectedError(`Content stream index ${contentStreamIndex} is not a valid indirect reference.`);
     }
     targetRef = entryRef;
   } else {
@@ -191,19 +205,86 @@ export async function applyEditPlanToDocument(doc: PDFDocument, plan: EditPlan, 
   if (!(streamCandidate instanceof PDFRawStream)) {
     throw new EditPlanRejectedError("The target content stream is not a raw (undecoded) stream; cannot be safely rewritten.");
   }
-  const originalStream = streamCandidate;
-  const decodedBytes = decodePDFRawStream(originalStream).decode();
-  const newBytes = applyEditPlanToBytes(decodedBytes, plan, bytesPerCode);
 
+  return {
+    context,
+    targetRef,
+    contentsArray,
+    originalStream: streamCandidate,
+    decodedBytes: decodePDFRawStream(streamCandidate).decode(),
+  };
+}
+
+// Registers `newBytes` as a new stream object (using the SAME compression
+// `originalStream` used, so the rewrite doesn't silently change every
+// other page's/stream's encoding convention), swaps the page's /Contents
+// reference to it, and explicitly deletes the old stream from the
+// context: pdf-lib's writer serializes every object still registered in
+// the context regardless of reachability (the same behavior PR #189's
+// compress work already had to account for when swapping an embedded
+// image), so skipping the delete would silently bloat the saved file with
+// orphaned bytes.
+function replaceContentStream(
+  page: PDFPage,
+  located: LocatedContentStream,
+  contentStreamIndex: number,
+  newBytes: Uint8Array,
+): void {
+  const { context, originalStream, targetRef, contentsArray } = located;
   const filter = originalStream.dict.get(PDFName.of("Filter"));
   const wasFlate = filter instanceof PDFName && filter.asString() === "/FlateDecode";
   const newStream = wasFlate ? context.flateStream(newBytes) : context.stream(newBytes);
   const newStreamRef = context.register(newStream);
 
   if (contentsArray) {
-    contentsArray.set(plan.contentStreamIndex, newStreamRef);
+    contentsArray.set(contentStreamIndex, newStreamRef);
   } else {
     page.node.set(PDFName.of("Contents"), newStreamRef);
   }
   context.delete(targetRef);
+}
+
+// Applies one verified EditPlan directly to a loaded PDFDocument's own
+// object graph -- decodes the target content stream, rewrites just the
+// one operator via applyEditPlanToBytes, and re-registers it (see
+// replaceContentStream).
+export async function applyEditPlanToDocument(doc: PDFDocument, plan: EditPlan, bytesPerCode: 1 | 2): Promise<void> {
+  assertApplicable(plan);
+
+  const page = doc.getPages()[plan.pageIndex];
+  const located = locateContentStream(doc, plan.pageIndex, plan.contentStreamIndex);
+  const newBytes = applyEditPlanToBytes(located.decodedBytes, plan, bytesPerCode);
+  replaceContentStream(page, located, plan.contentStreamIndex, newBytes);
+}
+
+// Applies a verified MultiRunEditPlan (lib/pdf/edit/multiRunEditPlan.ts)
+// directly to a loaded PDFDocument -- rewrites every spanned operator's
+// sub-plan against the SAME decoded content-stream buffer, one after
+// another, in REVERSE operator order (last-in-the-stream first). This is
+// required, not a stylistic choice: each sub-plan's byteOffset/byteLength
+// were computed against the ORIGINAL (pre-edit) stream, and rewriting an
+// earlier (smaller-offset) operator first would change the stream's
+// length and silently invalidate every LATER sub-plan's own offsets.
+// Applying right-to-left means every edit only ever touches bytes to the
+// right of any position a not-yet-applied sub-plan still refers to, so
+// each remaining offset stays valid until its own turn.
+export async function applyMultiRunEditPlanToDocument(
+  doc: PDFDocument,
+  plan: MultiRunEditPlan,
+  bytesPerCode: 1 | 2,
+): Promise<void> {
+  if (!plan.editable) {
+    throw new EditPlanRejectedError(plan.reason ?? "This multi-run edit plan is not editable.");
+  }
+  for (const subPlan of plan.subPlans) assertApplicable(subPlan);
+
+  const page = doc.getPages()[plan.pageIndex];
+  const located = locateContentStream(doc, plan.pageIndex, plan.contentStreamIndex);
+
+  let bytes = located.decodedBytes;
+  for (let i = plan.subPlans.length - 1; i >= 0; i -= 1) {
+    bytes = applyEditPlanToBytes(bytes, plan.subPlans[i], bytesPerCode);
+  }
+
+  replaceContentStream(page, located, plan.contentStreamIndex, bytes);
 }
