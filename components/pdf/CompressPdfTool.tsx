@@ -1008,8 +1008,6 @@ export default function CompressPdfTool() {
   if (!analysis) {
     return (
       <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
-        <L2WorkspaceHeader title="Compress PDF" description="Reduce file size while keeping documents usable." />
-
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           {uploadArea}
         </div>
