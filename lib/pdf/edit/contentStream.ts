@@ -228,11 +228,16 @@ export function tokenizeContentStream(bytes: Uint8Array): ContentStreamToken[] {
 
 export type Matrix2x3 = [number, number, number, number, number, number];
 
-const IDENTITY_MATRIX: Matrix2x3 = [1, 0, 0, 1, 0, 0];
+export const IDENTITY_MATRIX: Matrix2x3 = [1, 0, 0, 1, 0, 0];
 
 // m1 applied after m2 -- same convention as pdfjs's Util.transform (see
 // lib/pdf/edit/textRuns.ts's transformPoint2x3, which matches it exactly).
-function multiplyMatrix(m1: Matrix2x3, m2: Matrix2x3): Matrix2x3 {
+// Exported for lib/pdf/edit/formXObjects.ts, which needs the identical CTM
+// composition to track graphics state across a Do operator boundary --
+// reusing this proven implementation rather than re-deriving the same
+// matrix math a second time (see contentStream.ts's own git history for
+// how easy that composition order is to get backwards).
+export function multiplyMatrix(m1: Matrix2x3, m2: Matrix2x3): Matrix2x3 {
   return [
     m1[0] * m2[0] + m1[2] * m2[1],
     m1[1] * m2[0] + m1[3] * m2[1],
@@ -298,12 +303,22 @@ function asNumber(token: ContentStreamToken | undefined): number {
 // matrices via BT/Td/TD/Tm/T*) needed to compute each text-showing
 // operator's exact rendering matrix -- mirrors PDF spec section 9.4.4's
 // Trm = [Tfs*Th, 0, 0, Tfs, 0, Trise] . Tm . CTM.
-export function walkTextShowOperators(bytes: Uint8Array): TextShowOperator[] {
+//
+// `initialCtm` (default: identity) lets a caller seed the starting CTM
+// instead of assuming this stream begins in an unrotated, untranslated
+// coordinate space -- needed by lib/pdf/edit/formXObjects.ts to compute
+// ABSOLUTE (page-space) rendering matrices for text inside a Form
+// XObject, whose own content stream is otherwise evaluated in a
+// coordinate space established by the CTM in effect where it was invoked
+// (the `Do` operator) composed with the Form's own /Matrix entry -- per
+// spec 8.10.1. Every existing caller omits this argument and gets
+// byte-for-byte the same identity-CTM behavior as before.
+export function walkTextShowOperators(bytes: Uint8Array, initialCtm: Matrix2x3 = IDENTITY_MATRIX): TextShowOperator[] {
   const tokens = tokenizeContentStream(bytes);
   const results: TextShowOperator[] = [];
 
   const ctmStack: Matrix2x3[] = [];
-  let ctm: Matrix2x3 = IDENTITY_MATRIX;
+  let ctm: Matrix2x3 = initialCtm;
   let textMatrix: Matrix2x3 = IDENTITY_MATRIX;
   let textLineMatrix: Matrix2x3 = IDENTITY_MATRIX;
   const textState = defaultTextState();

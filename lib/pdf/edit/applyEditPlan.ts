@@ -27,6 +27,7 @@ import { PDFArray, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFStream, decode
 import type { PDFContext, PDFPage } from "pdf-lib";
 import type { EditPlan } from "./editPlan.ts";
 import type { MultiRunEditPlan } from "./multiRunEditPlan.ts";
+import { resolveStreamTarget } from "./formXObjects.ts";
 
 export class EditPlanRejectedError extends Error {}
 
@@ -224,6 +225,29 @@ function locateContentStream(doc: PDFDocument, pageIndex: number, contentStreamI
 // compress work already had to account for when swapping an embedded
 // image), so skipping the delete would silently bloat the saved file with
 // orphaned bytes.
+function isFlateEncoded(stream: PDFRawStream): boolean {
+  const filter = stream.dict.get(PDFName.of("Filter"));
+  return filter instanceof PDFName && filter.asString() === "/FlateDecode";
+}
+
+// A Form XObject's dict entries (Type/Subtype/BBox/Resources/Matrix/Group,
+// etc.) are its identity, not incidental metadata like a page content
+// stream's -- context.stream(bytes)/flateStream(bytes) with no dict arg
+// only produces {Length}, so writing back a Form's replacement bytes this
+// way would silently strip /Subtype /Form and everything else, making the
+// XObject unrecognizable on the next read (proven: pdfjs and
+// collectPageTextOperators both stopped seeing it). Copies every entry
+// from the original stream's dict onto the freshly built one, except
+// /Length and /Filter/DecodeParms, which context.stream/flateStream
+// already compute correctly for the new bytes/encoding.
+function copyStreamDictExceptLengthAndFilter(source: PDFRawStream, target: PDFRawStream): void {
+  for (const [key, value] of source.dict.entries()) {
+    const name = key.asString();
+    if (name === "/Length" || name === "/Filter" || name === "/DecodeParms") continue;
+    target.dict.set(key, value);
+  }
+}
+
 function replaceContentStream(
   page: PDFPage,
   located: LocatedContentStream,
@@ -231,9 +255,7 @@ function replaceContentStream(
   newBytes: Uint8Array,
 ): void {
   const { context, originalStream, targetRef, contentsArray } = located;
-  const filter = originalStream.dict.get(PDFName.of("Filter"));
-  const wasFlate = filter instanceof PDFName && filter.asString() === "/FlateDecode";
-  const newStream = wasFlate ? context.flateStream(newBytes) : context.stream(newBytes);
+  const newStream = isFlateEncoded(originalStream) ? context.flateStream(newBytes) : context.stream(newBytes);
   const newStreamRef = context.register(newStream);
 
   if (contentsArray) {
@@ -250,6 +272,16 @@ function replaceContentStream(
 // replaceContentStream).
 export async function applyEditPlanToDocument(doc: PDFDocument, plan: EditPlan, bytesPerCode: 1 | 2): Promise<void> {
   assertApplicable(plan);
+
+  if (plan.formPath) {
+    const target = resolveStreamTarget(doc, plan.pageIndex, plan.contentStreamIndex, plan.formPath);
+    const newBytes = applyEditPlanToBytes(target.decodedBytes, plan, bytesPerCode);
+    const wasFlate = isFlateEncoded(target.originalStream);
+    const newStream = wasFlate ? target.context.flateStream(newBytes) : target.context.stream(newBytes);
+    copyStreamDictExceptLengthAndFilter(target.originalStream, newStream);
+    target.writeBack(target.context.register(newStream));
+    return;
+  }
 
   const page = doc.getPages()[plan.pageIndex];
   const located = locateContentStream(doc, plan.pageIndex, plan.contentStreamIndex);
