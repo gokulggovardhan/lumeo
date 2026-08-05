@@ -365,7 +365,23 @@ export function resolveStreamTarget(
     decodedBytes: decodePDFRawStream(targetStream).decode(),
     writeBack: (newRef) => {
       finalParentDict.set(PDFName.of(lastName), newRef);
-      context.delete(finalTargetRef);
+      // A Form XObject can be reached from more than one parent
+      // Resources/XObject dict object (e.g. the same header Form invoked
+      // from two different pages, each with its OWN dict) -- deleting
+      // finalTargetRef unconditionally, as this used to do, silently
+      // dangled every OTHER invocation site's own dict entry once this
+      // one got rewired above (proven: after save+reload, the other
+      // page's entry still pointed at finalTargetRef, but that ref no
+      // longer resolved to anything). Re-counting AFTER the rewire above
+      // means finalTargetRef's own count no longer includes THIS
+      // invocation (it now resolves through newRef instead) -- so a
+      // count of zero here means nothing else needs it anymore, safe to
+      // delete exactly as before; a nonzero count means at least one
+      // other site still does, so it's deliberately left registered.
+      const stillReferencedElsewhere = (countDocumentFormXObjectInvocations(doc).get(finalTargetRef) ?? 0) > 0;
+      if (!stillReferencedElsewhere) {
+        context.delete(finalTargetRef);
+      }
     },
   };
 }
