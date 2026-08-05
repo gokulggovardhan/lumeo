@@ -180,7 +180,17 @@ function locateContentStream(doc: PDFDocument, pageIndex: number, contentStreamI
   let contentsArray: PDFArray | null = null;
 
   if (contentsEntry instanceof PDFRef) {
-    const resolved = context.lookupMaybe(contentsEntry, PDFArray);
+    // context.lookupMaybe(ref, Type) is not a graceful "maybe this type"
+    // helper despite its name -- it only returns undefined for a
+    // missing/null object; for an object that resolves but is the WRONG
+    // type (e.g. a single, non-array-wrapped /Contents stream, a common
+    // real-world shape), it throws UnexpectedObjectTypeError just like the
+    // strict lookup(ref, Type). Proven directly: a bare-stream /Contents
+    // ref made this line throw instead of falling through to the `else`
+    // branch below. Fixed the same way as lib/pdf/edit/formXObjects.ts's
+    // resolveMaybe -- untyped lookup() + instanceof, never throws on type.
+    const untyped = context.lookup(contentsEntry);
+    const resolved = untyped instanceof PDFArray ? untyped : undefined;
     if (resolved) {
       contentsArray = resolved;
       const entryRef = resolved.get(contentStreamIndex);
