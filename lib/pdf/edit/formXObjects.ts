@@ -369,3 +369,199 @@ export function resolveStreamTarget(
     },
   };
 }
+
+// Counts, across the ENTIRE document (every page, every content stream,
+// every nested Form), how many distinct Do-invocation sites resolve to
+// each Form XObject ref -- i.e. real, document-wide reuse, not just
+// reuse within one page. Read-only; mirrors collectPageTextOperators's
+// own recursive walk but only needs to count invocations, not locate
+// text. A cyclic reference (already rejected elsewhere by
+// collectPageTextOperators) is simply not re-descended into here, so
+// this never loops.
+export function countDocumentFormXObjectInvocations(doc: PDFDocument): Map<PDFRef, number> {
+  const context = doc.context;
+  const counts = new Map<PDFRef, number>();
+
+  function walk(bytes: Uint8Array, resources: PDFDict, openRefs: ReadonlySet<PDFRef>, depth: number): void {
+    if (depth >= DEFAULT_MAX_DEPTH) return;
+    const invocations = findFormInvocations(bytes);
+    if (invocations.length === 0) return;
+    const xObjectDict = getXObjectDict(resources, context);
+    if (!xObjectDict) return;
+
+    for (const invocation of invocations) {
+      const xObjectEntry = xObjectDict.get(PDFName.of(invocation.xObjectName));
+      if (!(xObjectEntry instanceof PDFRef)) continue;
+      const xObjectStream = lookupRawStream(xObjectEntry, context);
+      if (!xObjectStream) continue;
+      const subtype = xObjectStream.dict.get(PDFName.of("Subtype"));
+      if (!(subtype instanceof PDFName) || subtype.asString() !== "/Form") continue;
+
+      counts.set(xObjectEntry, (counts.get(xObjectEntry) ?? 0) + 1);
+      if (openRefs.has(xObjectEntry)) continue;
+
+      const formResources = getResourcesDict(xObjectStream.dict, context) ?? resources;
+      const formBytes = decodePDFRawStream(xObjectStream).decode();
+      const nextOpenRefs = new Set(openRefs);
+      nextOpenRefs.add(xObjectEntry);
+      walk(formBytes, formResources, nextOpenRefs, depth + 1);
+    }
+  }
+
+  for (const page of doc.getPages()) {
+    const resources = getResourcesDict(page.node, context);
+    if (!resources) continue;
+    for (const ref of getPageContentStreamRefs(page.node, context)) {
+      const stream = lookupRawStream(ref, context);
+      if (!stream) continue;
+      walk(decodePDFRawStream(stream).decode(), resources, new Set([ref]), 0);
+    }
+  }
+
+  return counts;
+}
+
+// A shared Form XObject can't be safely isolated in two situations,
+// both rejected honestly rather than attempted (see
+// resolveIsolatedStreamTarget):
+// - The SAME resource name is invoked more than once within one
+//   immediate parent content stream -- distinguishing which of several
+//   identical `/Name Do` tokens is "the one" would require rewriting a
+//   Do operator's own operand bytes, a fundamentally different and far
+//   riskier kind of edit than anything else in this engine, which has
+//   only ever rewritten Tj/TJ/'/" string operands.
+// - The immediate parent Form itself is ALSO invoked from more than one
+//   place -- redirecting one of ITS resource-dict entries would change
+//   every one of ITS OWN invocation sites too, cascading the exact
+//   problem being solved. Isolating through a chain of shared ancestors
+//   would need cloning the whole chain, which is out of scope for this
+//   slice.
+export class AmbiguousSharedFormError extends Error {}
+
+// Like resolveStreamTarget, but for a Form XObject reused elsewhere in
+// the document (a different page, or a different, NOT-itself-shared
+// parent), redirects just THIS ONE resolution path's own resource-dict
+// entry to a fresh clone of the target Form -- so editing it doesn't
+// silently change every other invocation site. The clone is registered
+// under the SAME resource name, in the SAME parent dict object this one
+// path resolved through; since that parent dict object belongs
+// exclusively to this one invocation site (verified above), no other
+// site is affected, and the original Form ref is left completely
+// untouched (not deleted) since other sites still need it. A Form that
+// isn't actually shared anywhere else needs no clone at all -- resolved
+// exactly like resolveStreamTarget. Page-level content streams (formPath
+// null/empty) aren't "reused" in this sense, so isolation is a no-op
+// there -- delegates straight to resolveStreamTarget.
+export function resolveIsolatedStreamTarget(
+  doc: PDFDocument,
+  pageIndex: number,
+  contentStreamIndex: number,
+  formPath: string[] | null,
+): ResolvedStreamTarget {
+  if (!formPath || formPath.length === 0) {
+    return resolveStreamTarget(doc, pageIndex, contentStreamIndex, null);
+  }
+
+  const context = doc.context;
+  const page = doc.getPages()[pageIndex];
+  if (!page) throw new Error(`Page ${pageIndex} does not exist in this document.`);
+
+  const streamRefs = getPageContentStreamRefs(page.node, context);
+  const pageStreamRef = streamRefs[contentStreamIndex];
+  if (!pageStreamRef) throw new Error(`Content stream index ${contentStreamIndex} does not exist.`);
+  const pageStream = lookupRawStream(pageStreamRef, context);
+  if (!pageStream) throw new Error("The page's content stream is not a raw stream.");
+
+  // Single top-to-bottom walk down formPath, tracking the CURRENT
+  // parent's own bytes/resources/ref as we go. When we reach the last
+  // segment, the parent we're currently holding IS its immediate parent
+  // -- captured before advancing any further, so it never gets
+  // overwritten by the final Form's own (irrelevant, for this purpose)
+  // content. immediateParentRef is null when the immediate parent is the
+  // page itself (formPath.length === 1), which is never itself "shared"
+  // in this model (each page owns its own /Contents).
+  let currentBytes = decodePDFRawStream(pageStream).decode();
+  let currentResources = getResourcesDict(page.node, context);
+  let currentRef: PDFRef | null = null;
+
+  let immediateParentBytes: Uint8Array | null = null;
+  let immediateParentXObjectDict: PDFDict | null = null;
+  let immediateParentRef: PDFRef | null = null;
+  let targetRef: PDFRef | null = null;
+
+  for (let i = 0; i < formPath.length; i += 1) {
+    const name = formPath[i];
+    if (!currentResources) throw new Error(`Missing /Resources while resolving Form path segment "${name}".`);
+    const xObjectDict = getXObjectDict(currentResources, context);
+    if (!xObjectDict) throw new Error(`Missing /Resources /XObject while resolving Form path segment "${name}".`);
+    const entry = xObjectDict.get(PDFName.of(name));
+    if (!(entry instanceof PDFRef)) throw new Error(`Form XObject "${name}" is not a valid indirect reference.`);
+    const stream = lookupRawStream(entry, context);
+    if (!stream) throw new Error(`Form XObject "${name}" is not a raw (undecoded) stream; cannot be safely rewritten.`);
+
+    if (i === formPath.length - 1) {
+      immediateParentBytes = currentBytes;
+      immediateParentXObjectDict = xObjectDict;
+      immediateParentRef = currentRef;
+      targetRef = entry;
+    }
+
+    currentResources = getResourcesDict(stream.dict, context) ?? currentResources;
+    currentBytes = decodePDFRawStream(stream).decode();
+    currentRef = entry;
+  }
+
+  if (!targetRef || !immediateParentXObjectDict || !immediateParentBytes) {
+    throw new Error("Could not resolve the Form XObject path.");
+  }
+
+  const lastName = formPath[formPath.length - 1];
+  const targetStream = lookupRawStream(targetRef, context);
+  if (!targetStream) throw new Error(`Form XObject "${lastName}" is not a raw (undecoded) stream; cannot be safely rewritten.`);
+
+  const sameParentInvocations = findFormInvocations(immediateParentBytes).filter(
+    (inv) => inv.xObjectName === lastName,
+  ).length;
+  if (sameParentInvocations > 1) {
+    throw new AmbiguousSharedFormError(
+      `Form XObject "${lastName}" is invoked more than once by name within the same parent content stream -- isolating a single occurrence would require rewriting a Do operator's own operand, which this engine does not support.`,
+    );
+  }
+
+  const invocationCounts = countDocumentFormXObjectInvocations(doc);
+
+  if (immediateParentRef !== null && (invocationCounts.get(immediateParentRef) ?? 0) > 1) {
+    throw new AmbiguousSharedFormError(
+      `Form XObject "${lastName}"'s immediate parent Form is itself invoked from more than one place -- isolating "${lastName}" here would require also isolating its shared ancestor, which this engine does not support.`,
+    );
+  }
+
+  const totalInvocations = invocationCounts.get(targetRef) ?? 0;
+  if (totalInvocations <= 1) {
+    // Not actually shared anywhere else -- nothing to isolate from.
+    return resolveStreamTarget(doc, pageIndex, contentStreamIndex, formPath);
+  }
+
+  // Genuinely shared, and this specific resolution path is safe to
+  // isolate: the immediate parent dict object belongs exclusively to
+  // this one invocation site (just verified), so redirecting ITS
+  // "lastName" entry -- to a clone, under the SAME name -- affects only
+  // this one path. Every other invocation site, reached through a
+  // DIFFERENT parent dict object entirely, keeps its own "lastName"
+  // entry pointing at the original, completely untouched ref.
+  const finalParentDict = immediateParentXObjectDict;
+  const finalLastName = PDFName.of(lastName);
+  const originalRef = targetRef;
+
+  return {
+    context,
+    targetRef: originalRef,
+    originalStream: targetStream,
+    decodedBytes: decodePDFRawStream(targetStream).decode(),
+    writeBack: (newRef) => {
+      finalParentDict.set(finalLastName, newRef);
+      // Deliberately do NOT delete originalRef: other invocation sites,
+      // reached through a different parent dict object, still need it.
+    },
+  };
+}
