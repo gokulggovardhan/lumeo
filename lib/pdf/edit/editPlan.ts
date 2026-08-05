@@ -58,6 +58,15 @@ function decodeCodes(codes: number[], font: ResolvedFont): { text: string; allDe
 export type EditPlan = {
   pageIndex: number;
   contentStreamIndex: number;
+  /**
+   * Non-null when this operator lives inside a Form XObject rather than
+   * directly in one of the page's own content streams -- a chain of
+   * resource names from the page's own /Resources /XObject down to the
+   * target Form (see lib/pdf/edit/formXObjects.ts's StreamLocator). When
+   * set, contentStreamIndex is unused; applyEditPlan.ts resolves the
+   * target stream via this path instead.
+   */
+  formPath: string[] | null;
   operatorIndex: number;
   operatorType: TextShowOperatorKind;
   fontResourceName: string | null;
@@ -92,6 +101,7 @@ export type EditPlan = {
 export function buildEditPlan({
   pageIndex,
   contentStreamIndex,
+  formPath = null,
   operatorIndex,
   operator,
   replacementText,
@@ -100,6 +110,7 @@ export function buildEditPlan({
 }: {
   pageIndex: number;
   contentStreamIndex: number;
+  formPath?: string[] | null;
   operatorIndex: number;
   operator: TextShowOperator;
   replacementText: string;
@@ -119,6 +130,7 @@ export function buildEditPlan({
   const base: Omit<EditPlan, "replacementGlyphCodes" | "replacementWidthPt" | "tjSpacingDelta" | "editable" | "reason"> = {
     pageIndex,
     contentStreamIndex,
+    formPath,
     operatorIndex,
     operatorType: operator.kind,
     fontResourceName: operator.fontResourceName,
