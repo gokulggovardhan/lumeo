@@ -161,6 +161,27 @@ export function buildEditPlan({
     };
   }
 
+  // Per spec 9.3.3 Table 106: text-rendering modes 4-7 (Fill+Clip,
+  // Stroke+Clip, Fill+Stroke+Clip, Clip-only) add the glyph outlines
+  // themselves to the current clipping path, applied once ET is reached.
+  // Replacing this text's content would change the SHAPE of that clip
+  // path -- silently altering what every later painting operation (until
+  // the next Q) is visible through, not just this text's own glyphs. That
+  // is a fundamentally different, much higher-blast-radius edit than a
+  // normal fill/stroke text replacement, so it's honestly rejected rather
+  // than attempted.
+  if (operator.renderMode >= 4) {
+    return {
+      ...base,
+      originalWidthPt: 0,
+      replacementGlyphCodes: [],
+      replacementWidthPt: 0,
+      tjSpacingDelta: 0,
+      editable: false,
+      reason: `Text-rendering mode ${operator.renderMode} adds this text's outline to the clipping path -- editing it would change what later content is clipped to, not just its own glyphs. Not supported.`,
+    };
+  }
+
   if (resolvedFont.encodingSource === "Unknown") {
     return {
       ...base,
