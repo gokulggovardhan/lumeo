@@ -27,7 +27,7 @@ import { PDFArray, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFStream, decode
 import type { PDFContext, PDFPage } from "pdf-lib";
 import type { EditPlan } from "./editPlan.ts";
 import type { MultiRunEditPlan } from "./multiRunEditPlan.ts";
-import { resolveStreamTarget } from "./formXObjects.ts";
+import { resolveStreamTarget, resolveIsolatedStreamTarget } from "./formXObjects.ts";
 
 export class EditPlanRejectedError extends Error {}
 
@@ -280,11 +280,30 @@ function replaceContentStream(
 // object graph -- decodes the target content stream, rewrites just the
 // one operator via applyEditPlanToBytes, and re-registers it (see
 // replaceContentStream).
-export async function applyEditPlanToDocument(doc: PDFDocument, plan: EditPlan, bytesPerCode: 1 | 2): Promise<void> {
+//
+// `isolate` (default false, so every existing caller's behavior is
+// unchanged byte-for-byte) only matters when plan.formPath is set: false
+// (the default) mutates the target Form XObject's stream directly, same
+// as always -- if that Form is reused elsewhere, every invocation shows
+// the edit (a Form is a stamp; this is correct PDF semantics, proven in
+// lib/pdf/edit/formXObjects.ts's "reused XObject" test). Pass `true` to
+// isolate the edit to just this one invocation site instead: a shared
+// Form gets cloned first (lib/pdf/edit/formXObjects.ts's
+// resolveIsolatedStreamTarget) so every OTHER invocation stays untouched;
+// a Form that isn't actually shared anywhere else is resolved with no
+// clone at all, identically to isolate: false.
+export async function applyEditPlanToDocument(
+  doc: PDFDocument,
+  plan: EditPlan,
+  bytesPerCode: 1 | 2,
+  options: { isolate?: boolean } = {},
+): Promise<void> {
   assertApplicable(plan);
 
   if (plan.formPath) {
-    const target = resolveStreamTarget(doc, plan.pageIndex, plan.contentStreamIndex, plan.formPath);
+    const target = options.isolate
+      ? resolveIsolatedStreamTarget(doc, plan.pageIndex, plan.contentStreamIndex, plan.formPath)
+      : resolveStreamTarget(doc, plan.pageIndex, plan.contentStreamIndex, plan.formPath);
     const newBytes = applyEditPlanToBytes(target.decodedBytes, plan, bytesPerCode);
     const wasFlate = isFlateEncoded(target.originalStream);
     const newStream = wasFlate ? target.context.flateStream(newBytes) : target.context.stream(newBytes);
