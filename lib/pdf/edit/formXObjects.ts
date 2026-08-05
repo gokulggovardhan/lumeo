@@ -364,8 +364,23 @@ export function resolveStreamTarget(
     originalStream: targetStream,
     decodedBytes: decodePDFRawStream(targetStream).decode(),
     writeBack: (newRef) => {
+      // Counted BEFORE the parent dict is repointed below: once this
+      // one entry is repointed to newRef, a re-count of the (now
+      // mutated) document would undercount finalTargetRef's remaining
+      // references by exactly one, wrongly permitting the delete below
+      // when another dict object still points at it.
+      const invocationCount = countDocumentFormXObjectInvocations(doc).get(finalTargetRef) ?? 0;
       finalParentDict.set(PDFName.of(lastName), newRef);
-      context.delete(finalTargetRef);
+      // Only delete the original ref if this was its ONLY invocation
+      // site document-wide. A Form invoked via more than one dict
+      // object -- e.g. the same shared header Form referenced from two
+      // pages' own, separate /Resources /XObject dicts -- has every
+      // OTHER site still pointing at finalTargetRef; deleting it
+      // unconditionally would leave those sites dangling after this
+      // one entry gets repointed to newRef.
+      if (invocationCount <= 1) {
+        context.delete(finalTargetRef);
+      }
     },
   };
 }

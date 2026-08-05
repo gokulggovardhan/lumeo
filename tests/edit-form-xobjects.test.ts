@@ -370,6 +370,64 @@ test("an Image XObject (Subtype /Image, not /Form) invoked via Do is correctly s
   assert.equal(Buffer.from(located[0].operator.strings[0]).toString("latin1"), "Real text");
 });
 
+test("shared Form XObject reused across two pages' SEPARATE Resources/XObject dicts: editing via the default (isolate: false) path must not leave the other page's entry dangling", async () => {
+  const doc = await PDFDocument.create();
+  const formRef = buildFormXObject(doc, "Shared header");
+
+  const page1 = doc.addPage([612, 792]);
+  page1.node.Resources()!.set(PDFName.of("XObject"), doc.context.obj({ Fm1: formRef }));
+  page1.node.set(PDFName.of("Contents"), doc.context.register(doc.context.stream("q 1 0 0 1 50 600 cm /Fm1 Do Q")));
+
+  const page2 = doc.addPage([612, 792]);
+  // A SEPARATE dict object (not the same one page1 uses) that also
+  // happens to point at the same underlying Form ref -- the real-world
+  // shape (two pages each with their own Resources) that the shared
+  // single-dict "reused XObject" test above does not cover.
+  page2.node.Resources()!.set(PDFName.of("XObject"), doc.context.obj({ Fm1: formRef }));
+  page2.node.set(PDFName.of("Contents"), doc.context.register(doc.context.stream("q 1 0 0 1 50 600 cm /Fm1 Do Q")));
+
+  const original = await doc.save();
+  assert.deepEqual(await extractPageStrings(original, 1), ["Shared header"]);
+  assert.deepEqual(await extractPageStrings(original, 2), ["Shared header"]);
+
+  const loaded = await PDFDocument.load(original.slice());
+  const located = collectPageTextOperators(loaded, 0);
+  assert.equal(located.length, 1);
+  assert.deepEqual(located[0].locator, { kind: "xobject", formPath: ["Fm1"] });
+
+  const fontDict = (located[0].resources.lookup(PDFName.of("Font"), PDFDict) as PDFDict).lookup(PDFName.of("FF1"), PDFDict);
+  const resolvedFont = resolveFont(fontDict, loaded.context);
+  const fontMetrics = resolveFontMetrics(fontDict, loaded.context, resolvedFont);
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    formPath: ["Fm1"],
+    operatorIndex: 0,
+    operator: located[0].operator,
+    replacementText: "Edited header",
+    resolvedFont,
+    fontMetrics,
+  });
+  assert.equal(plan.editable, true);
+
+  const editedDoc = await PDFDocument.load(original.slice());
+  // Default path (isolate: false, unchanged behavior) only repoints
+  // page 1's OWN dict entry to the edited stream -- page 2's separate
+  // dict entry still points at the untouched original ref. The bug
+  // this guards against is NOT "page 2 doesn't get the edit" (that's
+  // simply how this path works without isolate: true); it's that the
+  // original ref used to get deleted out from under page 2 regardless,
+  // breaking its Form XObject reference entirely (empty text, not just
+  // unedited text).
+  await applyEditPlanToDocument(editedDoc, plan, resolvedFont.bytesPerCode);
+  const editedBytes = await editedDoc.save();
+
+  const reloaded = await PDFDocument.load(editedBytes.slice());
+  assert.equal(reloaded.getPageCount(), 2);
+  assert.deepEqual(await extractPageStrings(editedBytes, 1), ["Edited header"]);
+  assert.deepEqual(await extractPageStrings(editedBytes, 2), ["Shared header"]);
+});
+
 test("resolveStreamTarget for a page-level (non-Form) location matches the plain contentStreamIndex path exactly", async () => {
   const doc = await PDFDocument.create();
   const page = doc.addPage([612, 792]);
