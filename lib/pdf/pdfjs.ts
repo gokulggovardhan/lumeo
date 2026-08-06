@@ -96,3 +96,21 @@ export async function renderPageWithTimeout(task: MinimalRenderTask, pageNumber:
     if (timeoutId !== undefined) window.clearTimeout(timeoutId);
   }
 }
+
+// Pure scale-clamping math shared by any tool that renders a page to a
+// canvas at a fixed default scale and needs to protect against an oversized
+// MediaBox (rare, but not excluded by upload file-size/page-count limits) --
+// mirrors CompressPdfTool.tsx's own inline dimensionScale calculation.
+// Extracted here (rather than duplicated per tool) so it has one regression
+// test independent of any canvas/DOM harness (this project has none for
+// components). A no-op for any page whose longer side, at requestedScale,
+// stays within maxDimensionPx -- only an oversized page has its scale
+// reduced below what was asked for.
+export function clampRenderScaleToMaxDimension(
+  requestedScale: number,
+  pageWidthPt: number,
+  pageHeightPt: number,
+  maxDimensionPx: number,
+): number {
+  return Math.min(requestedScale, maxDimensionPx / Math.max(pageWidthPt, pageHeightPt));
+}

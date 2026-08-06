@@ -55,7 +55,7 @@ import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import { applyEditPlanToDocument, applyMultiRunEditPlanToDocument } from "@/lib/pdf/edit/applyEditPlan";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
-import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS } from "@/lib/pdf/pdfjs";
+import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
@@ -108,6 +108,26 @@ type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 const PAGE_RENDER_SCALE = 1.3;
 const EXPORT_TIMEOUT_MS = 30_000;
 const DEFAULT_SHAPE_KIND: ShapeKind = "rect";
+// Phase 9.3 memory hardening: every TEXT edit (not overlay-element edit)
+// pushes a full re-saved copy of the whole document's bytes onto the shared
+// undo history (see applyTextRunEdit below) -- unlike overlay-element edits,
+// which reuse the same ArrayBuffer reference and cost nothing extra per
+// history entry. Uploads are capped at 150MB (lib/pdf/uploadValidation.ts's
+// MAX_PDF_FILE_SIZE_BYTES); this budget is double that, so ordinary editing
+// sessions on ordinary-sized files never notice it (the entry-count cap,
+// MAX_HISTORY in lib/sign/useHistoryState.ts, is still what limits them),
+// while a long session of repeated text edits on a large file can no longer
+// grow undo memory unboundedly -- the oldest pdfBytes-bearing entries are
+// dropped first once this total is exceeded.
+const EDIT_HISTORY_MAX_BYTES = 300 * 1024 * 1024;
+// Phase 9.3 large-page-render hardening: mirrors CompressPdfTool.tsx's own
+// dimensionScale safety cap exactly (same 5200px ceiling on the longer
+// side) -- an oversized MediaBox (rare, but not excluded by the file-size/
+// page-count upload limits) would otherwise render at PAGE_RENDER_SCALE
+// unconditionally, producing an arbitrarily large canvas and risking a slow
+// render, a failed canvas allocation, or browser instability on
+// constrained devices.
+const MAX_CANVAS_DIMENSION_PX = 5200;
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -178,7 +198,10 @@ export default function EditPdfTool() {
     canUndo,
     canRedo,
     reset: resetHistory,
-  } = useHistoryState<EditHistorySnapshot>({ elements: [], pdfBytes: new ArrayBuffer(0) });
+  } = useHistoryState<EditHistorySnapshot>(
+    { elements: [], pdfBytes: new ArrayBuffer(0) },
+    { maxTotalSize: EDIT_HISTORY_MAX_BYTES, sizeOf: (snapshot) => snapshot.pdfBytes.byteLength },
+  );
   const elements = historyState.elements;
   // Adapter preserving setElements' EXACT prior call signature (a bare
   // EditElement[] array or updater over one) -- every existing overlay-
@@ -421,11 +444,25 @@ export default function EditPdfTool() {
       runOverlayNodesRef.current.clear();
       try {
         const page = await doc.getPage(pageIndex + 1);
-        const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
         const pointViewport = page.getViewport({ scale: 1 });
+        // See MAX_CANVAS_DIMENSION_PX's own doc comment -- mirrors
+        // CompressPdfTool.tsx's dimensionScale exactly. A no-op for every
+        // ordinary page (dimensionScale === PAGE_RENDER_SCALE, unchanged
+        // behavior); only an oversized MediaBox has its render scale
+        // reduced below the usual default.
+        const dimensionScale = clampRenderScaleToMaxDimension(
+          PAGE_RENDER_SCALE,
+          pointViewport.width,
+          pointViewport.height,
+          MAX_CANVAS_DIMENSION_PX,
+        );
+        const viewport = page.getViewport({ scale: dimensionScale });
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d", { alpha: false });
-        if (!context) return;
+        if (!context) {
+          if (!cancelled) setError("This page is too large to preview in this browser. Try a different page or a smaller file.");
+          return;
+        }
         canvas.width = Math.max(1, Math.floor(viewport.width));
         canvas.height = Math.max(1, Math.floor(viewport.height));
         context.fillStyle = "#FFFFFF";

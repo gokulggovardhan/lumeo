@@ -10,7 +10,7 @@ if (typeof globalThis.window === "undefined") {
   (globalThis as unknown as { window: typeof globalThis }).window = globalThis;
 }
 
-const { withPageTimeout, renderPageWithTimeout, PAGE_RENDER_TIMEOUT_MS } = await import("../lib/pdf/pdfjs.ts");
+const { withPageTimeout, renderPageWithTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension } = await import("../lib/pdf/pdfjs.ts");
 
 // Regression for Phase 9.3's production-readiness audit finding: EditPdfTool's
 // page-render effect used to await page.render().promise and
@@ -54,4 +54,34 @@ test("renderPageWithTimeout rejects and cancels the task when the render hangs p
   t.mock.timers.tick(PAGE_RENDER_TIMEOUT_MS);
   await assert.rejects(promise, /Page 5 took too long to render\./);
   assert.equal(cancelled, true);
+});
+
+// Regression for Phase 9.3's production-readiness audit finding: EditPdfTool
+// rendered every page at a fixed PAGE_RENDER_SCALE regardless of the page's
+// own MediaBox size, so an oversized page (rare, but not excluded by the
+// upload file-size/page-count limits) could produce an arbitrarily large
+// canvas -- risking a slow render, a failed canvas allocation, or browser
+// instability. clampRenderScaleToMaxDimension mirrors CompressPdfTool.tsx's
+// own proven dimensionScale safety cap.
+
+test("clampRenderScaleToMaxDimension is a no-op for an ordinary page well under the cap", () => {
+  // A typical US Letter page (612x792pt) at a 1.3x scale is nowhere near
+  // 5200px on its longer side -- the requested scale should pass through
+  // unchanged.
+  assert.equal(clampRenderScaleToMaxDimension(1.3, 612, 792, 5200), 1.3);
+});
+
+test("clampRenderScaleToMaxDimension reduces scale for an oversized page so its longer side fits the cap", () => {
+  // A 6000x4000pt page at the requested 1.3x scale would be 7800px on its
+  // longer side -- well past a 5200px cap. The clamped scale should bring
+  // that side down to exactly the cap.
+  const scale = clampRenderScaleToMaxDimension(1.3, 6000, 4000, 5200);
+  assert.ok(scale < 1.3, "should reduce below the requested scale");
+  assert.ok(Math.abs(6000 * scale - 5200) < 1e-9, "longer side should land exactly on the cap");
+});
+
+test("clampRenderScaleToMaxDimension uses whichever page dimension is longer, not just width", () => {
+  // A tall/portrait oversized page -- height is the longer side here.
+  const scale = clampRenderScaleToMaxDimension(1.3, 3000, 8000, 5200);
+  assert.ok(Math.abs(8000 * scale - 5200) < 1e-9, "the taller dimension should be clamped to the cap");
 });
