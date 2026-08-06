@@ -55,7 +55,7 @@ import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import { applyEditPlanToDocument, applyMultiRunEditPlanToDocument } from "@/lib/pdf/edit/applyEditPlan";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
-import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
+import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
@@ -431,7 +431,7 @@ export default function EditPdfTool() {
         context.fillStyle = "#FFFFFF";
         context.fillRect(0, 0, canvas.width, canvas.height);
         renderTask = page.render({ canvas, canvasContext: context, viewport });
-        await renderTask.promise;
+        await renderPageWithTimeout(renderTask, pageIndex + 1);
 
         const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
         if (cancelled || !blob) return;
@@ -446,7 +446,7 @@ export default function EditPdfTool() {
         // tool highlight it), never a requirement -- a failure here must
         // not block the preview or export from working.
         try {
-          const content = await page.getTextContent();
+          const content = await withPageTimeout(page.getTextContent(), pageIndex + 1, PAGE_RENDER_TIMEOUT_MS, "extract text from");
           const runs = textRunsFromContent(content.items as never, viewport.transform, canvas.width, canvas.height);
           setDetectedTextRuns(runs);
 
@@ -1214,6 +1214,7 @@ export default function EditPdfTool() {
                 <div className="flex gap-2">
                   <button
                     type="button"
+                    aria-pressed={selectedElement.bold}
                     onClick={() => setElements((current) => patchElement(current, selectedElement.id, { bold: !selectedElement.bold } as Partial<EditElement>))}
                     className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-bold transition ${selectedElement.bold ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
                   >
@@ -1221,6 +1222,7 @@ export default function EditPdfTool() {
                   </button>
                   <button
                     type="button"
+                    aria-pressed={selectedElement.italic}
                     onClick={() => setElements((current) => patchElement(current, selectedElement.id, { italic: !selectedElement.italic } as Partial<EditElement>))}
                     className={`flex-1 rounded-lg border px-2 py-1.5 text-xs italic transition ${selectedElement.italic ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
                   >
