@@ -117,14 +117,28 @@ export function textRunsFromContent(
 
   const runs: DetectedTextRun[] = [];
 
+  // pdfjs's TextItem.width is already the real advance width in PDF
+  // point-space AT THE ITEM'S OWN FONT SIZE (i.e. it's the Tj/TJ advance,
+  // not a per-em unit needing separate font-size scaling) -- converting it
+  // to device pixels needs only the VIEWPORT's own scale factor, computed
+  // once here from viewportTransform alone. Deliberately NOT computed from
+  // each item's own combined tx (viewportTransform . item.transform) the
+  // way boxOriginFromTransform's position math is: tx's a/b components
+  // ALSO already bake in that same item's font size (via item.transform's
+  // own scale), so multiplying item.width by hypot(tx[0], tx[1]) would
+  // double-count the font size and inflate widthPx by roughly the font
+  // size itself -- proven directly: a 24pt "Hello World" (real advance
+  // 124.008pt) came out as widthPct 486% (the whole page many times over)
+  // instead of the correct ~20%.
+  const viewportScaleX = Math.hypot(viewportTransform[0], viewportTransform[1]);
+
   for (const item of items) {
     if (!isTextItem(item) || !item.str.trim()) continue;
 
     const tx = transformPoint2x3(viewportTransform, item.transform);
     const { left, top, fontHeight, rotated } = boxOriginFromTransform(tx);
 
-    const scaleX = Math.hypot(tx[0], tx[1]);
-    const widthPx = item.width * scaleX;
+    const widthPx = item.width * viewportScaleX;
     const heightPx = fontHeight;
 
     runs.push({

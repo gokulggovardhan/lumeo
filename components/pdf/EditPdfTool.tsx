@@ -14,6 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
+import { PDFDocument, PDFName, PDFDict } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2FileCard,
@@ -30,6 +31,7 @@ import {
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { EditElementView } from "@/components/pdf/edit/EditElementView";
 import { InkCanvas } from "@/components/pdf/edit/InkCanvas";
+import { TextRunOverlay } from "@/components/pdf/edit/TextRunOverlay";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
@@ -45,6 +47,13 @@ import {
 } from "@/lib/pdf/edit/elements";
 import { exportEditedPdf } from "@/lib/pdf/edit/export";
 import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
+import { collectPageTextOperators, type LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
+import { matchDetectedRunToOperator, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
+import { resolveFont, type ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
+import { resolveFontMetrics } from "@/lib/pdf/edit/fontMetrics";
+import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
+import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
+import { applyEditPlanToDocument, applyMultiRunEditPlanToDocument } from "@/lib/pdf/edit/applyEditPlan";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
@@ -52,6 +61,45 @@ import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
+
+// A detected run matched to the content-stream operator that produced it
+// (lib/pdf/edit/matchTextRun.ts), paired with the LocatedTextOperator that
+// operator came from (lib/pdf/edit/formXObjects.ts) -- carries everything
+// applyTextRunEdit needs (locator, resources, operatorIndex) to build and
+// apply a real EditPlan. null means this run has no matching operator
+// (Type3 font, or a page/text shape this engine doesn't cover yet) -- in-
+// place editing genuinely isn't available for it, not an error.
+type RunMatch = { locatedOperator: LocatedTextOperator; operator: LocatedTextOperator["operator"] } | null;
+
+// Phase 9.2: the combined undo/redo snapshot -- reusing lib/sign/
+// useHistoryState.ts exactly as-is (no changes to that hook), just widening
+// what it holds, so a SINGLE linear undo stack covers both the existing
+// overlay-element edits AND true text-run edits in the order they actually
+// happened, without touching any existing overlay-element call site's own
+// signature (see the setElements adapter below). pdfBytes
+// only changes reference identity on a REAL text edit or undo/redo across
+// one -- an elements-only action's snapshot reuses the SAME ArrayBuffer
+// reference, so the undo stack never duplicates multi-MB PDF bytes for
+// actions that didn't touch them.
+type EditHistorySnapshot = { elements: EditElement[]; pdfBytes: ArrayBuffer };
+
+// Phase 9.2: a live, dry-run preview of what "Apply edit" would do for the
+// CURRENT selection + draft text -- computed synchronously (buildEditPlan/
+// buildMultiRunEditPlan never touch PDF bytes, so this is cheap enough to
+// recompute on every keystroke) so the UI can disable Apply and explain
+// exactly why BEFORE the user ever clicks it, per lib/pdf/edit/editPlan.ts's
+// own "editable: false, reason: string" contract. The one exception,
+// documented on applyTextRunEdit itself, is a shared Form XObject that
+// can't be safely isolated (AmbiguousSharedFormError) -- detecting that
+// would require actually calling resolveIsolatedStreamTarget, which
+// (unlike buildEditPlan) has real side effects on the pdf-lib document
+// graph when it decides to clone, so it is deliberately NOT called
+// speculatively here; that one case is still surfaced honestly, just at
+// Apply time via the catch block instead of live.
+type EditPreview =
+  | { kind: "empty" }
+  | { kind: "single"; editable: boolean; reason: string | null; plan: EditPlan; resolvedFont: ResolvedFont; locatedOperator: LocatedTextOperator }
+  | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont };
 
 type ActiveTool = "select" | "text" | "draw" | "shape" | "whiteout";
 
@@ -99,7 +147,16 @@ export default function EditPdfTool() {
   const { availability, track } = useAnalytics();
   const openedTrackedRef = useRef(false);
 
-  const [pdf, setPdf] = useState<LoadedPdf | null>(null);
+  // Phase 9.2: split from a single `pdf` state so its `.bytes` can be a pure
+  // DERIVED value (see the `pdf` useMemo below, after historyState) instead
+  // of a separately-`setState`-synced copy of historyState.pdfBytes -- the
+  // prior design needed an effect that called setPdf(...) purely to mirror
+  // another piece of state, which both duplicated data and tripped this
+  // project's react-hooks/set-state-in-effect lint rule (a real, not
+  // stylistic, footgun: that pattern can cascade an extra render on every
+  // state change it mirrors). `pdfMeta` only ever changes on upload/reset,
+  // never on a text edit.
+  const [pdfMeta, setPdfMeta] = useState<{ file: File; pageCount: number } | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageImageUrl, setPageImageUrl] = useState("");
   const [pageDisplaySize, setPageDisplaySize] = useState<{ width: number; height: number } | null>(null);
@@ -113,7 +170,48 @@ export default function EditPdfTool() {
   const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const { state: elements, set: setElements, undo, redo, canUndo, canRedo, reset: resetElements } = useHistoryState<EditElement[]>([]);
+  const {
+    state: historyState,
+    set: setHistoryState,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    reset: resetHistory,
+  } = useHistoryState<EditHistorySnapshot>({ elements: [], pdfBytes: new ArrayBuffer(0) });
+  const elements = historyState.elements;
+  // Adapter preserving setElements' EXACT prior call signature (a bare
+  // EditElement[] array or updater over one) -- every existing overlay-
+  // element call site (drag/resize/delete/patch/create) keeps working
+  // completely unchanged; only what gets PUSHED onto the shared undo stack
+  // widened to also carry pdfBytes alongside elements. (Full-snapshot
+  // resets go through resetHistory directly -- see resetTool/addFile.)
+  const setElements = useCallback((updater: EditElement[] | ((current: EditElement[]) => EditElement[])) => {
+    setHistoryState((current) => ({
+      ...current,
+      elements: typeof updater === "function" ? (updater as (c: EditElement[]) => EditElement[])(current.elements) : updater,
+    }));
+  }, [setHistoryState]);
+  // Tracks the ORIGINAL uploaded bytes (set once per upload in addFile) so
+  // "has this document had a true text edit applied" can be derived by
+  // reference comparison against historyState.pdfBytes, rather than a
+  // separate boolean that could drift out of sync with undo/redo -- see the
+  // Export button's disabled condition (hasTextEdits) below. STATE, not a
+  // ref: hasTextEdits reads this during render, and React forbids reading
+  // a ref's value there.
+  const [originalBytes, setOriginalBytes] = useState<ArrayBuffer | null>(null);
+  // The single source of truth every other effect/handler reads as `pdf` --
+  // combines pdfMeta (file/pageCount, upload-only) with historyState.pdfBytes
+  // (the live, undo/redo-aware document bytes). A NEW object every time
+  // either input changes, exactly like state would produce, so every
+  // existing `[pdf]`-keyed effect (the pdfjs preview load, the pdf-lib edit
+  // doc load) keeps re-running at exactly the same moments it always did --
+  // including right after a text edit or an undo/redo across one, since
+  // that's precisely when historyState.pdfBytes's reference changes.
+  const pdf = useMemo<LoadedPdf | null>(
+    () => (pdfMeta ? { file: pdfMeta.file, pageCount: pdfMeta.pageCount, bytes: historyState.pdfBytes } : null),
+    [pdfMeta, historyState.pdfBytes],
+  );
   const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -124,7 +222,38 @@ export default function EditPdfTool() {
   // much harder follow-up (matching a run back to the specific content-
   // stream operator that produced it so it can be rewritten in place).
   const [detectedTextRuns, setDetectedTextRuns] = useState<DetectedTextRun[]>([]);
-  const [selectedTextRun, setSelectedTextRun] = useState<DetectedTextRun | null>(null);
+  // Phase 9.1: the index-parallel matched-operator for each entry in
+  // detectedTextRuns (lib/pdf/edit/matchTextRun.ts), computed once per page
+  // load alongside detection itself -- cheap position-only matching, no
+  // font resolution yet (that's deferred to the moment a specific edit is
+  // actually attempted, in applyTextRunEdit). selectedRunIndex/
+  // hoveredRunIndex/focusedRunIndex index into this SAME array as
+  // detectedTextRuns, so a run's editability, selection, hover, and focus
+  // state are all looked up by one shared index rather than juggling
+  // separate DetectedTextRun object identities.
+  const [runMatches, setRunMatches] = useState<RunMatch[]>([]);
+  // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
+  // runMatches was derived from), kept around so a multi-run selection can
+  // reconstruct the FULL, in-order operator list one specific content
+  // stream needs for lib/pdf/edit/multiRunEditPlan.ts's buildMultiRunEditPlan
+  // (its `allOperators` param) without re-walking the page from scratch on
+  // every keystroke.
+  const [pageOperators, setPageOperators] = useState<LocatedTextOperator[]>([]);
+  // A contiguous RANGE of detectedTextRuns indices -- selectionAnchorIndex
+  // is where the selection started (a plain click, or the first click of a
+  // Shift+click range); selectedRunIndices is the full (possibly
+  // single-element) range currently selected. Multi-run editing only ever
+  // operates on a CONTIGUOUS run of detected boxes, matching
+  // buildMultiRunEditPlan's own "operators must be consecutive" invariant --
+  // see validateMultiRunSelection below for what else must line up.
+  const [selectionAnchorIndex, setSelectionAnchorIndex] = useState<number | null>(null);
+  const [selectedRunIndices, setSelectedRunIndices] = useState<number[]>([]);
+  const [hoveredRunIndex, setHoveredRunIndex] = useState<number>(-1);
+  const [focusedRunIndex, setFocusedRunIndex] = useState<number | null>(null);
+  const [editDraftText, setEditDraftText] = useState("");
+  const [editApplyError, setEditApplyError] = useState("");
+  const [isApplyingEdit, setIsApplyingEdit] = useState(false);
+  const runOverlayNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
 
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   const [shapeKind, setShapeKind] = useState<ShapeKind>(DEFAULT_SHAPE_KIND);
@@ -142,6 +271,26 @@ export default function EditPdfTool() {
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const [docReady, setDocReady] = useState(0);
+  // Phase 9.1: a SEPARATE pdf-lib PDFDocument, loaded from the exact same
+  // `pdf.bytes` source of truth the pdfjs preview doc above uses -- the
+  // in-place text-editing backend (lib/pdf/edit/*.ts) operates on pdf-lib's
+  // object model, not pdfjs's, so it needs its own instance. Mirrors the
+  // pdfJsDocRef effect immediately below exactly (load once per `pdf`
+  // change, tear down the previous instance, best-effort). Applying an
+  // edit (applyTextRunEdit) re-saves this doc and writes the result back
+  // into `pdf.bytes` itself, which naturally cascades a fresh reload of
+  // BOTH this doc and the pdfjs preview -- there is only ever one baseline,
+  // never two documents that could drift out of sync with each other.
+  const pdfLibDocRef = useRef<PDFDocument | null>(null);
+  // Phase 9.2: a REACTIVE twin of pdfLibDocRef, set together with it
+  // everywhere the ref is -- editPreview (below) needs to read "is the
+  // pdf-lib doc ready, and which one" from within a useMemo, and React
+  // forbids reading a ref's value during render/useMemo (only effects and
+  // event handlers may). Every OTHER read of the doc in this component
+  // (inside effects or the applyTextRunEdit handler) keeps using the ref
+  // directly, exactly as before -- that's the correct, unflagged pattern
+  // for imperative, non-render-path access.
+  const [pdfLibDoc, setPdfLibDoc] = useState<PDFDocument | null>(null);
 
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
@@ -168,16 +317,27 @@ export default function EditPdfTool() {
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     pdfJsDocRef.current = null;
     setDocReady(0);
-    setPdf(null);
+    pdfLibDocRef.current = null;
+    setPdfLibDoc(null);
+    setPdfMeta(null);
     setPageIndex(0);
     setPageImageUrl("");
     setPageDisplaySize(null);
     setPagePointSize(null);
     setError("");
-    resetElements([]);
+    setOriginalBytes(null);
+    resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0) });
     setSelectedId(null);
     setDetectedTextRuns([]);
-    setSelectedTextRun(null);
+    setRunMatches([]);
+    setPageOperators([]);
+    setSelectionAnchorIndex(null);
+    setSelectedRunIndices([]);
+    setHoveredRunIndex(-1);
+    setFocusedRunIndex(null);
+    setEditDraftText("");
+    setEditApplyError("");
+    runOverlayNodesRef.current.clear();
     setActiveTool("select");
     setZoom(1);
     setDownloadUrl("");
@@ -212,15 +372,53 @@ export default function EditPdfTool() {
     };
   }, [pdf]);
 
+  // Phase 9.1: mirrors the pdfjs load effect immediately above, for the
+  // separate pdf-lib PDFDocument the edit backend needs -- see pdfLibDocRef's
+  // own doc comment. Best-effort: a failure here only disables in-place
+  // text editing (runMatches stays empty), it must never block the
+  // existing pdfjs-based preview/overlay-element workflow from working.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      pdfLibDocRef.current = null;
+      setPdfLibDoc(null);
+      if (!pdf) return;
+      try {
+        const doc = await PDFDocument.load(copyArrayBuffer(pdf.bytes));
+        if (cancelled) return;
+        pdfLibDocRef.current = doc;
+        setPdfLibDoc(doc);
+      } catch {
+        // In-place text editing simply won't be available for this file;
+        // the existing overlay-annotation workflow is unaffected.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pdf]);
+
   // Renders the current page to a background image for the placement stage.
   useEffect(() => {
     if (!pdf || !pdfJsDocRef.current) return;
     const doc = pdfJsDocRef.current;
     let cancelled = false;
+    // Phase 9.2 hardening: pdfjs's RenderTask is never awaited to
+    // completion if this effect is cleaned up mid-render (e.g. rapid
+    // Undo/Redo or page changes) -- explicitly cancelling it on cleanup
+    // (rather than only setting `cancelled`) avoids leaving an orphaned
+    // render task racing a new one on the next effect run.
+    let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
 
     void (async () => {
       setPageLoading(true);
-      setSelectedTextRun(null);
+      setSelectionAnchorIndex(null);
+      setSelectedRunIndices([]);
+      setHoveredRunIndex(-1);
+      setFocusedRunIndex(null);
+      setEditDraftText("");
+      setEditApplyError("");
+      runOverlayNodesRef.current.clear();
       try {
         const page = await doc.getPage(pageIndex + 1);
         const viewport = page.getViewport({ scale: PAGE_RENDER_SCALE });
@@ -232,7 +430,8 @@ export default function EditPdfTool() {
         canvas.height = Math.max(1, Math.floor(viewport.height));
         context.fillStyle = "#FFFFFF";
         context.fillRect(0, 0, canvas.width, canvas.height);
-        await page.render({ canvas, canvasContext: context, viewport }).promise;
+        renderTask = page.render({ canvas, canvasContext: context, viewport });
+        await renderTask.promise;
 
         const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
         if (cancelled || !blob) return;
@@ -248,14 +447,47 @@ export default function EditPdfTool() {
         // not block the preview or export from working.
         try {
           const content = await page.getTextContent();
-          setDetectedTextRuns(
-            textRunsFromContent(content.items as never, viewport.transform, canvas.width, canvas.height),
-          );
+          const runs = textRunsFromContent(content.items as never, viewport.transform, canvas.width, canvas.height);
+          setDetectedTextRuns(runs);
+
+          // Phase 9.1: match each detected run to its content-stream
+          // operator (lib/pdf/edit/matchTextRun.ts), so the select tool can
+          // show which runs are actually editable. Best-effort and
+          // independent of the detection above -- collectPageTextOperators
+          // can throw (e.g. CyclicFormReferenceError) on a genuinely
+          // unsupported page structure, which must disable in-place editing
+          // for this page, not the read-only highlighting that already
+          // worked before this slice.
+          if (pdfLibDocRef.current) {
+            try {
+              const located = collectPageTextOperators(pdfLibDocRef.current, pageIndex);
+              setPageOperators(located);
+              const flatOperators = located.map((item) => item.operator);
+              setRunMatches(
+                runs.map((run): RunMatch => {
+                  const matchedOperator = matchDetectedRunToOperator(run, canvas.width, canvas.height, flatOperators, viewport.transform);
+                  if (!matchedOperator) return null;
+                  const locatedOperator = located.find((item) => item.operator === matchedOperator);
+                  return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
+                }),
+              );
+            } catch {
+              setRunMatches([]);
+              setPageOperators([]);
+            }
+          } else {
+            setRunMatches([]);
+            setPageOperators([]);
+          }
         } catch {
           setDetectedTextRuns([]);
+          setRunMatches([]);
+          setPageOperators([]);
         }
       } catch {
-        setError("This page could not be previewed. Try a different page.");
+        // A cancelled render's promise rejects (RenderingCancelledException)
+        // -- that's expected teardown, not a real preview failure.
+        if (!cancelled) setError("This page could not be previewed. Try a different page.");
       } finally {
         if (!cancelled) setPageLoading(false);
       }
@@ -263,8 +495,9 @@ export default function EditPdfTool() {
 
     return () => {
       cancelled = true;
+      renderTask?.cancel();
     };
-  }, [pdf, pageIndex, docReady]);
+  }, [pdf, pageIndex, docReady, pdfLibDoc]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -323,9 +556,10 @@ export default function EditPdfTool() {
         return;
       }
 
-      setPdf({ file, bytes, pageCount });
+      setPdfMeta({ file, pageCount });
       setPageIndex(0);
-      resetElements([]);
+      setOriginalBytes(bytes);
+      resetHistory({ elements: [], pdfBytes: bytes });
       setSelectedId(null);
       setDownloadUrl("");
     } catch (uploadError) {
@@ -351,7 +585,8 @@ export default function EditPdfTool() {
     if (activeTool === "select") {
       const xPct = ((event.clientX - rect.left) / rect.width) * 100;
       const yPct = ((event.clientY - rect.top) / rect.height) * 100;
-      setSelectedTextRun(findTextRunAtPoint(detectedTextRuns, xPct, yPct));
+      const run = findTextRunAtPoint(detectedTextRuns, xPct, yPct);
+      selectTextRun(run ? detectedTextRuns.indexOf(run) : null, event.shiftKey);
       return;
     }
 
@@ -369,12 +604,298 @@ export default function EditPdfTool() {
     setActiveTool("select");
   }
 
+  // Phase 9.2: selects (or deselects, for index null) a detected text run
+  // by its index into detectedTextRuns/runMatches -- shared by the stage's
+  // click handler, TextRunOverlay's own click/Enter/Space handling, and
+  // keyboard navigation, so there is exactly one place that decides what
+  // "selecting a run" resets (the in-progress edit draft and any leftover
+  // apply error from a previously selected run). `extend` (Shift+click, or
+  // Shift+Arrow -- see handleStageKeyDown) grows a CONTIGUOUS range from
+  // the last plain-click anchor to `index`, for multi-run editing; a plain
+  // click/select always starts a fresh single-run selection and a new
+  // anchor. The range is just detectedTextRuns INDICES -- whether it's
+  // actually a valid multi-run EDIT (consecutive operators, one font, same
+  // content stream) is a separate question, answered by editPreview below,
+  // never assumed here.
+  function selectTextRun(index: number | null, extend = false) {
+    if (index === null) {
+      setSelectionAnchorIndex(null);
+      setSelectedRunIndices([]);
+      setEditDraftText("");
+      setEditApplyError("");
+      return;
+    }
+    const range =
+      extend && selectionAnchorIndex !== null
+        ? Array.from(
+            { length: Math.abs(index - selectionAnchorIndex) + 1 },
+            (_, i) => Math.min(selectionAnchorIndex, index) + i,
+          )
+        : [index];
+    if (!extend) setSelectionAnchorIndex(index);
+    setSelectedRunIndices(range);
+    setEditDraftText(range.map((i) => detectedTextRuns[i]?.str ?? "").join(""));
+    setEditApplyError("");
+  }
+
+  // Hover highlighting for the select tool -- a discrete "did the hit-test
+  // result change" comparison before setState, not a per-pixel update, so a
+  // mousemove sweeping across one run's box (or the empty page background)
+  // doesn't re-render on every event, only on an actual run-boundary
+  // crossing. No DOM-direct-write is needed here (unlike a drag gesture)
+  // since this is a single discrete index change, not a continuous one.
+  function handleStageMouseMove(event: React.MouseEvent<HTMLDivElement>) {
+    if (activeTool !== "select") return;
+    const rect = stageRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const xPct = ((event.clientX - rect.left) / rect.width) * 100;
+    const yPct = ((event.clientY - rect.top) / rect.height) * 100;
+    const run = findTextRunAtPoint(detectedTextRuns, xPct, yPct);
+    const index = run ? detectedTextRuns.indexOf(run) : -1;
+    setHoveredRunIndex((current) => (current === index ? current : index));
+  }
+
+  function handleStageMouseLeave() {
+    setHoveredRunIndex((current) => (current === -1 ? current : -1));
+  }
+
+  // Arrow-key navigation between detected runs, in the same reading order
+  // textRunsFromContent already produced them in -- native Tab already
+  // moves focus between the overlays (each is a real, tabbable element);
+  // this adds a faster, position-aware way to step through them without
+  // needing Shift+Tab for "previous". Only intercepts arrow keys while a
+  // run overlay currently has focus, so it never steals arrow keys meant
+  // for, say, the file-name input in the inspector panel. Plain Arrow just
+  // MOVES focus (browsers' usual list-navigation convention); Shift+Arrow
+  // additionally EXTENDS the selection to the newly-focused run, mirroring
+  // Shift+click -- the keyboard-accessible equivalent of a multi-run drag
+  // selection, matching this project's own established Shift+Arrow
+  // precedent (components/pdf/crop/CropRectView.tsx's keyboard resize).
+  function handleStageKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (activeTool !== "select" || focusedRunIndex === null || detectedTextRuns.length === 0) return;
+    const forward = event.key === "ArrowRight" || event.key === "ArrowDown";
+    const backward = event.key === "ArrowLeft" || event.key === "ArrowUp";
+    if (!forward && !backward) return;
+    event.preventDefault();
+    const delta = forward ? 1 : -1;
+    const nextIndex = (focusedRunIndex + delta + detectedTextRuns.length) % detectedTextRuns.length;
+    if (event.shiftKey) selectTextRun(nextIndex, true);
+    runOverlayNodesRef.current.get(nextIndex)?.focus();
+  }
+
+  // Phase 9.2: pre-flight validation for a MULTI-run selection (2+ detected
+  // runs), checked BEFORE lib/pdf/edit/multiRunEditPlan.ts's own
+  // buildMultiRunEditPlan is even called, since that function's own
+  // invariants (consecutive operator indices, one shared font) need
+  // reconstructing "the full operator list for this one content stream" --
+  // buildMultiRunEditPlan has no formPath param at all, so a selection
+  // touching a Form XObject is rejected here honestly rather than passed
+  // through and mishandled.
+  type MultiRunValidation =
+    | { kind: "invalid"; reason: string }
+    | {
+        kind: "valid";
+        contentStreamIndex: number;
+        operatorIndices: number[];
+        allOperators: import("@/lib/pdf/edit/contentStream").TextShowOperator[];
+        resources: PDFDict;
+        fontResourceName: string;
+      };
+
+  function validateMultiRunSelection(indices: number[]): MultiRunValidation {
+    const matches = indices.map((i) => runMatches[i]);
+    if (matches.some((m) => !m)) {
+      return { kind: "invalid", reason: "One or more selected lines couldn't be matched to editable text -- try selecting fewer lines." };
+    }
+    const nonNull = matches as NonNullable<RunMatch>[];
+    const firstLocator = nonNull[0].locatedOperator.locator;
+    if (firstLocator.kind !== "page") {
+      return { kind: "invalid", reason: "Multi-line editing inside a Form XObject (e.g. a stamp or logo) isn't supported yet -- edit one line at a time." };
+    }
+    const sameStream = nonNull.every(
+      (m) => m.locatedOperator.locator.kind === "page" && m.locatedOperator.locator.contentStreamIndex === firstLocator.contentStreamIndex,
+    );
+    if (!sameStream) {
+      return { kind: "invalid", reason: "Selected lines must be part of the same content stream." };
+    }
+    const operatorIndices = [...nonNull.map((m) => m.locatedOperator.operatorIndex)].sort((a, b) => a - b);
+    for (let i = 1; i < operatorIndices.length; i += 1) {
+      if (operatorIndices[i] !== operatorIndices[i - 1] + 1) {
+        return { kind: "invalid", reason: "Selected lines must be consecutive, with nothing unselected in between." };
+      }
+    }
+    const fontResourceName = nonNull[0].operator.fontResourceName;
+    if (!fontResourceName) {
+      return { kind: "invalid", reason: "This text has no associated font resource." };
+    }
+    if (nonNull.some((m) => m.operator.fontResourceName !== fontResourceName)) {
+      return { kind: "invalid", reason: "Selected lines use different fonts -- multi-line edits must share one font." };
+    }
+
+    const allOperators = pageOperators
+      .filter((lo) => lo.locator.kind === "page" && lo.locator.contentStreamIndex === firstLocator.contentStreamIndex)
+      .sort((a, b) => a.operatorIndex - b.operatorIndex)
+      .map((lo) => lo.operator);
+
+    return { kind: "valid", contentStreamIndex: firstLocator.contentStreamIndex, operatorIndices, allOperators, resources: nonNull[0].locatedOperator.resources, fontResourceName };
+  }
+
+  // Phase 9.2: the live dry-run preview driving both the Apply button's
+  // disabled state and the specific reason shown next to it -- see
+  // EditPreview's own doc comment for why the one Form-XObject-reuse case
+  // (AmbiguousSharedFormError) can't be included here and is instead
+  // surfaced at Apply time. Pure/synchronous (buildEditPlan and
+  // buildMultiRunEditPlan never touch PDF bytes), so recomputing this on
+  // every keystroke is cheap. Reads `pdfLibDoc` STATE (not pdfLibDocRef) --
+  // React forbids reading a ref's value during render, even inside
+  // useMemo; pdfLibDoc is pdfLibDocRef's reactive twin kept for exactly
+  // this purpose (see its own doc comment).
+  const editPreview = useMemo((): EditPreview => {
+    if (!pdfLibDoc || selectedRunIndices.length === 0) return { kind: "empty" };
+
+    try {
+      if (selectedRunIndices.length === 1) {
+        const match = runMatches[selectedRunIndices[0]];
+        if (!match) return { kind: "empty" };
+        const { locatedOperator, operator } = match;
+        if (!operator.fontResourceName) throw new Error("This text has no associated font resource.");
+        const fontDict = locatedOperator.resources.lookup(PDFName.of("Font"), PDFDict)?.lookup(PDFName.of(operator.fontResourceName), PDFDict);
+        if (!fontDict) throw new Error("Could not resolve this text's font.");
+        const resolvedFont = resolveFont(fontDict, pdfLibDoc.context);
+        const fontMetrics = resolveFontMetrics(fontDict, pdfLibDoc.context, resolvedFont);
+        const plan = buildEditPlan({
+          pageIndex,
+          contentStreamIndex: locatedOperator.locator.kind === "page" ? locatedOperator.locator.contentStreamIndex : 0,
+          formPath: locatedOperator.locator.kind === "xobject" ? locatedOperator.locator.formPath : null,
+          operatorIndex: locatedOperator.operatorIndex,
+          operator,
+          replacementText: editDraftText,
+          resolvedFont,
+          fontMetrics,
+        });
+        // Real bug, found via live browser testing: see
+        // lib/pdf/edit/matchTextRun.ts's runSpansMultipleOperators for the
+        // full root cause (pdfjs merging several operators into one visual
+        // run, silently corrupting an edit that only rewrites the first).
+        // Rejected honestly here rather than papering over it.
+        const fullRunText = detectedTextRuns[selectedRunIndices[0]]?.str ?? "";
+        if (runSpansMultipleOperators(plan.originalText, fullRunText)) {
+          return {
+            kind: "single",
+            editable: false,
+            reason:
+              "This text is rendered internally as several separate pieces, and only part of it could be matched for editing -- in-place editing isn't available for this run yet.",
+            plan,
+            resolvedFont,
+            locatedOperator,
+          };
+        }
+        return { kind: "single", editable: plan.editable, reason: plan.reason, plan, resolvedFont, locatedOperator };
+      }
+
+      const validation = validateMultiRunSelection(selectedRunIndices);
+      if (validation.kind === "invalid") {
+        return { kind: "multi", editable: false, reason: validation.reason, plan: null as never, resolvedFont: null as never };
+      }
+      const fontDict = validation.resources.lookup(PDFName.of("Font"), PDFDict)?.lookup(PDFName.of(validation.fontResourceName), PDFDict);
+      if (!fontDict) throw new Error("Could not resolve this text's font.");
+      const resolvedFont = resolveFont(fontDict, pdfLibDoc.context);
+      const fontMetrics = resolveFontMetrics(fontDict, pdfLibDoc.context, resolvedFont);
+      const plan = buildMultiRunEditPlan({
+        pageIndex,
+        contentStreamIndex: validation.contentStreamIndex,
+        allOperators: validation.allOperators,
+        operatorIndices: validation.operatorIndices,
+        replacementText: editDraftText,
+        resolvedFont,
+        fontMetrics,
+      });
+      return { kind: "multi", editable: plan.editable, reason: plan.reason, plan, resolvedFont };
+    } catch (previewError) {
+      const reason = previewError instanceof Error ? previewError.message : "Could not validate this edit.";
+      return selectedRunIndices.length === 1
+        ? { kind: "empty" }
+        : { kind: "multi", editable: false, reason, plan: null as never, resolvedFont: null as never };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
+  }, [pdfLibDoc, selectedRunIndices, runMatches, pageOperators, pageIndex, editDraftText, detectedTextRuns]);
+
+  // Phase 9.2: the actual write-back for whatever editPreview currently
+  // says is ready (single-operator via lib/pdf/edit/applyEditPlan.ts's
+  // applyEditPlanToDocument, or a multi-run span via its
+  // applyMultiRunEditPlanToDocument) -- the Apply button is disabled
+  // whenever editPreview isn't editable, so reaching here with an
+  // unsupported plan should be impossible; the checks below are a second,
+  // independent guard rather than trusting the button's disabled state
+  // alone. Single-operator edits inside a Form XObject always isolate
+  // (isolate: true) rather than defaulting to "edit every invocation of
+  // this shared stamp" -- the safer default for a UI where the user has no
+  // way to know or control whether the text they clicked is reused
+  // elsewhere; an edit that can't be safely isolated (AmbiguousSharedFormError)
+  // is the one case editPreview can't predict (see its own doc comment) and
+  // is surfaced honestly here instead, in the catch block below.
+  //
+  // On success, pushes the re-saved pdf-lib bytes onto the SAME shared undo
+  // history overlay-element edits use (setHistoryState, not a separate
+  // setPdf) -- see EditHistorySnapshot's doc comment for how that makes
+  // Undo/Redo cover text edits for free. Since `pdf` is DERIVED from
+  // historyState.pdfBytes (see the `pdf` useMemo near the top of this
+  // component), this alone cascades a fresh reload of both the pdfjs
+  // preview and the pdf-lib edit doc, so the on-screen preview, future
+  // edits, and the final exported PDF (generateEditedPdf, via the existing
+  // overlay-element
+  // export pipeline) all see this edit without any separate wiring.
+  const applyTextRunEdit = useCallback(async () => {
+    const doc = pdfLibDocRef.current;
+    if (!doc || editPreview.kind === "empty" || !editPreview.editable) return;
+
+    setIsApplyingEdit(true);
+    setEditApplyError("");
+    try {
+      if (editPreview.kind === "single") {
+        const { plan, resolvedFont, locatedOperator } = editPreview;
+        await applyEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode, { isolate: locatedOperator.locator.kind === "xobject" });
+      } else {
+        const { plan, resolvedFont } = editPreview;
+        await applyMultiRunEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode);
+      }
+
+      const newBytes = await doc.save();
+      const buffer = newBytes.buffer.slice(newBytes.byteOffset, newBytes.byteOffset + newBytes.byteLength) as ArrayBuffer;
+      setHistoryState((current) => ({ ...current, pdfBytes: buffer }));
+      setDownloadUrl("");
+      // The page-render effect (triggered by pdf.bytes changing, via the
+      // sync effect above) will reset selection/hover/focus/draft state
+      // itself once the refreshed preview and re-matched runs are ready --
+      // no need to duplicate that reset here.
+    } catch (applyError) {
+      // AmbiguousSharedFormError (thrown when a Form XObject edit can't be
+      // safely isolated -- see EditPreview's own doc comment) surfaces here
+      // via its own real Error subclass; no special-casing needed beyond
+      // reading .message, same as any other applyError.
+      setEditApplyError(applyError instanceof Error ? applyError.message : "Could not apply this edit.");
+    } finally {
+      setIsApplyingEdit(false);
+    }
+  }, [editPreview, setHistoryState]);
+
   function handleInkStroke(result: { pngDataUrl: string; xPct: number; yPct: number; widthPct: number; heightPct: number }) {
     const id = nextElementId();
     const element = createInkElement(id, pageIndex, result.xPct, result.yPct, result.widthPct, result.heightPct, result.pngDataUrl);
     setElements((current) => [...current, element]);
   }
 
+  // Phase 9.2: a real, previously-existing UX gap fixed as part of wiring up
+  // true text edits -- the Export button below used to be gated purely on
+  // `elements.length > 0` (overlay annotations), since that was the only
+  // kind of edit this tool could produce. A user who ONLY applied a true
+  // text-run edit (no overlay elements at all) had their change already
+  // baked into `pdf.bytes`, but no way to actually download it -- the
+  // button stayed disabled. Derived by reference comparison against the
+  // ORIGINAL uploaded bytes (captured once in addFile) rather than a
+  // separate boolean flag, so it also correctly flips back to false if the
+  // user undoes every text edit back to the original.
+  const hasTextEdits = historyState.pdfBytes !== originalBytes;
   const currentPageElements = useMemo(() => elementsForPage(elements, pageIndex), [elements, pageIndex]);
   const selectedElement = useMemo(() => elements.find((item) => item.id === selectedId) ?? null, [elements, selectedId]);
   // Falls back to PAGE_RENDER_SCALE (the ratio the canvas was rendered at
@@ -503,6 +1024,9 @@ export default function EditPdfTool() {
                 <div
                   ref={stageRef}
                   onClick={handleStageClick}
+                  onMouseMove={handleStageMouseMove}
+                  onMouseLeave={handleStageMouseLeave}
+                  onKeyDown={handleStageKeyDown}
                   className={`relative mx-auto max-h-[32rem] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""}`}
                   style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
                 >
@@ -536,18 +1060,27 @@ export default function EditPdfTool() {
                     />
                   ) : null}
 
-                  {activeTool === "select" && selectedTextRun ? (
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute z-10 rounded-[2px] border-2 border-dashed border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10"
-                      style={{
-                        left: `${selectedTextRun.xPct}%`,
-                        top: `${selectedTextRun.yPct}%`,
-                        width: `${selectedTextRun.widthPct}%`,
-                        height: `${selectedTextRun.heightPct}%`,
-                      }}
-                    />
-                  ) : null}
+                  {activeTool === "select"
+                    ? detectedTextRuns.map((run, index) => (
+                        <TextRunOverlay
+                          // detectedTextRuns is fully replaced (not reordered/spliced) on every
+                          // page load or edit apply, so an index key is safe here.
+                          key={index}
+                          run={run}
+                          editable={Boolean(runMatches[index])}
+                          selected={selectedRunIndices.includes(index)}
+                          hovered={hoveredRunIndex === index}
+                          onSelect={(shiftKey) => selectTextRun(index, shiftKey)}
+                          onHoverStart={() => setHoveredRunIndex((current) => (current === index ? current : index))}
+                          onHoverEnd={() => setHoveredRunIndex((current) => (current === -1 ? current : -1))}
+                          onFocusRun={() => setFocusedRunIndex(index)}
+                          registerNode={(node) => {
+                            if (node) runOverlayNodesRef.current.set(index, node);
+                            else runOverlayNodesRef.current.delete(index);
+                          }}
+                        />
+                      ))
+                    : null}
                 </div>
               </div>
             )}
@@ -608,12 +1141,51 @@ export default function EditPdfTool() {
               </p>
             ) : null}
 
-            {activeTool === "select" && selectedTextRun ? (
-              <div className="mt-3 grid gap-1 rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] p-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Existing text (preview)</span>
-                <span className="font-semibold text-[var(--text-primary)]/80">&ldquo;{selectedTextRun.str}&rdquo;</span>
-                <span>Font: {selectedTextRun.fontName} · ~{Math.round(selectedTextRun.fontSizePx / PAGE_RENDER_SCALE)}pt</span>
-                <span>In-place editing of existing text is not available yet -- add a new text box to annotate over it.</span>
+            {activeTool === "select" && selectedRunIndices.length > 0 ? (
+              <div className="mt-3 grid gap-2 rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] p-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
+                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
+                  {selectedRunIndices.length === 1 ? "Existing text" : `${selectedRunIndices.length} lines selected`}
+                </span>
+                {selectedRunIndices.length === 1 && detectedTextRuns[selectedRunIndices[0]] ? (
+                  <span>
+                    Font: {detectedTextRuns[selectedRunIndices[0]].fontName} · ~{Math.round(detectedTextRuns[selectedRunIndices[0]].fontSizePx / PAGE_RENDER_SCALE)}pt
+                  </span>
+                ) : null}
+
+                {editPreview.kind !== "empty" ? (
+                  <>
+                    <label className="mt-1 grid gap-1">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with</span>
+                      <input
+                        value={editDraftText}
+                        onChange={(e) => {
+                          setEditDraftText(e.target.value);
+                          setEditApplyError("");
+                        }}
+                        className="w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      disabled={
+                        isApplyingEdit ||
+                        !editPreview.editable ||
+                        editDraftText === selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("")
+                      }
+                      onClick={() => void applyTextRunEdit()}
+                      className="rounded-lg border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-2.5 py-1.5 text-xs font-bold text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {isApplyingEdit ? "Applying..." : "Apply edit"}
+                    </button>
+                    {!editPreview.editable && editPreview.reason ? (
+                      <span role="alert" className="text-[var(--text-danger)]">{editPreview.reason}</span>
+                    ) : editApplyError ? (
+                      <span role="alert" className="text-[var(--text-danger)]">{editApplyError}</span>
+                    ) : null}
+                  </>
+                ) : (
+                  <span>This text couldn&rsquo;t be matched to an editable location on the page (an unsupported font or text layout) -- add a new text box to annotate over it instead.</span>
+                )}
               </div>
             ) : null}
 
@@ -688,7 +1260,7 @@ export default function EditPdfTool() {
         ) : (
           <button
             type="button"
-            disabled={elements.length === 0 || isExporting}
+            disabled={(elements.length === 0 && !hasTextEdits) || isExporting}
             onClick={() => void generateEditedPdf()}
             className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
           >

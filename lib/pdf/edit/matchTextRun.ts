@@ -78,3 +78,21 @@ export function matchDetectedRunToOperator(
 
   return best && bestDistance <= POSITION_TOLERANCE_PX ? best : null;
 }
+
+// Phase 9.2 UI regression: pdfjs's getTextContent() can merge several
+// consecutive content-stream operators (e.g. two back-to-back Tj calls with
+// no positioning gap) into ONE visual DetectedTextRun -- but
+// matchDetectedRunToOperator, by design, only ever matches that run to a
+// SINGLE operator (usually the first). Editing via that one operator alone
+// would silently rewrite only part of the visual run, leaving the other
+// operators' original text sitting directly against the replacement (e.g.
+// replacing a merged "Hello World" run with "Goodbye" actually produced
+// "GoodbyeWorld"). Compares the matched operator's own original text
+// (already decoded through the font's real encoding, e.g.
+// lib/pdf/edit/editPlan.ts's EditPlan.originalText) against the full
+// detected run's raw string -- a mismatch means the run spans more than one
+// operator, and in-place editing must be rejected rather than silently
+// applied to only part of it.
+export function runSpansMultipleOperators(matchedOperatorText: string, fullDetectedRunText: string): boolean {
+  return matchedOperatorText !== fullDetectedRunText;
+}
