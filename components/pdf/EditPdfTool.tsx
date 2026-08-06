@@ -294,6 +294,14 @@ export default function EditPdfTool() {
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const [docReady, setDocReady] = useState(0);
+  // addFile() must open the file via pdfjs once up front to read its page
+  // count (for the page-count limit check) before pdf state is even set --
+  // the [pdf]-keyed effect below would otherwise open the SAME bytes a
+  // second time moments later. Stashing that already-open doc here (keyed by
+  // the exact ArrayBuffer reference it was opened from) lets that effect
+  // reuse it instead of re-parsing; only ever set right before pdf.bytes is
+  // about to become that same reference.
+  const pendingInitialDocRef = useRef<{ bytes: ArrayBuffer; doc: PDFDocumentProxy } | null>(null);
   // Phase 9.1: a SEPARATE pdf-lib PDFDocument, loaded from the exact same
   // `pdf.bytes` source of truth the pdfjs preview doc above uses -- the
   // in-place text-editing backend (lib/pdf/edit/*.ts) operates on pdf-lib's
@@ -326,6 +334,7 @@ export default function EditPdfTool() {
       if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
+      void (pendingInitialDocRef.current?.doc as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | undefined)?.destroy?.();
     };
   }, []);
 
@@ -340,6 +349,10 @@ export default function EditPdfTool() {
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     pdfJsDocRef.current = null;
     setDocReady(0);
+    if (pendingInitialDocRef.current) {
+      void (pendingInitialDocRef.current.doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
+      pendingInitialDocRef.current = null;
+    }
     pdfLibDocRef.current = null;
     setPdfLibDoc(null);
     setPdfMeta(null);
@@ -378,6 +391,22 @@ export default function EditPdfTool() {
       if (previousDoc) void (previousDoc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
 
       if (!pdf) return;
+
+      // Reuse the doc addFile() already opened (to read the page count
+      // before pdf state existed) instead of parsing the same bytes again --
+      // only valid when it was opened from this exact ArrayBuffer instance.
+      const pending = pendingInitialDocRef.current;
+      if (pending && pending.bytes === pdf.bytes) {
+        pendingInitialDocRef.current = null;
+        pdfJsDocRef.current = pending.doc;
+        setDocReady((current) => current + 1);
+        return;
+      }
+      if (pending) {
+        pendingInitialDocRef.current = null;
+        void (pending.doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
+      }
+
       try {
         const doc = await openPdfJsDocument(new Uint8Array(copyArrayBuffer(pdf.bytes)));
         if (cancelled) {
@@ -421,7 +450,13 @@ export default function EditPdfTool() {
     };
   }, [pdf]);
 
-  // Renders the current page to a background image for the placement stage.
+  // Renders the current page to a background image for the placement stage,
+  // and detects its text runs. Deliberately NOT keyed on pdfLibDoc -- that
+  // doc loads independently (effect above) and often arrives after this one
+  // has already rasterized the page; re-running the canvas render/toBlob
+  // work (the expensive part) just because pdfLibDoc changed would be pure
+  // waste. Operator-matching, which does need pdfLibDoc, is a separate
+  // effect below.
   useEffect(() => {
     if (!pdf || !pdfJsDocRef.current) return;
     const doc = pdfJsDocRef.current;
@@ -442,6 +477,11 @@ export default function EditPdfTool() {
       setEditDraftText("");
       setEditApplyError("");
       runOverlayNodesRef.current.clear();
+      // Cleared here (rather than left stale) so the operator-matching
+      // effect below never briefly pairs a new page's detected runs with
+      // the previous page's matches while it's catching up.
+      setRunMatches([]);
+      setPageOperators([]);
       try {
         const page = await doc.getPage(pageIndex + 1);
         const pointViewport = page.getViewport({ scale: 1 });
@@ -486,40 +526,8 @@ export default function EditPdfTool() {
           const content = await withPageTimeout(page.getTextContent(), pageIndex + 1, PAGE_RENDER_TIMEOUT_MS, "extract text from");
           const runs = textRunsFromContent(content.items as never, viewport.transform, canvas.width, canvas.height);
           setDetectedTextRuns(runs);
-
-          // Phase 9.1: match each detected run to its content-stream
-          // operator (lib/pdf/edit/matchTextRun.ts), so the select tool can
-          // show which runs are actually editable. Best-effort and
-          // independent of the detection above -- collectPageTextOperators
-          // can throw (e.g. CyclicFormReferenceError) on a genuinely
-          // unsupported page structure, which must disable in-place editing
-          // for this page, not the read-only highlighting that already
-          // worked before this slice.
-          if (pdfLibDocRef.current) {
-            try {
-              const located = collectPageTextOperators(pdfLibDocRef.current, pageIndex);
-              setPageOperators(located);
-              const flatOperators = located.map((item) => item.operator);
-              setRunMatches(
-                runs.map((run): RunMatch => {
-                  const matchedOperator = matchDetectedRunToOperator(run, canvas.width, canvas.height, flatOperators, viewport.transform);
-                  if (!matchedOperator) return null;
-                  const locatedOperator = located.find((item) => item.operator === matchedOperator);
-                  return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
-                }),
-              );
-            } catch {
-              setRunMatches([]);
-              setPageOperators([]);
-            }
-          } else {
-            setRunMatches([]);
-            setPageOperators([]);
-          }
         } catch {
           setDetectedTextRuns([]);
-          setRunMatches([]);
-          setPageOperators([]);
         }
       } catch {
         // A cancelled render's promise rejects (RenderingCancelledException)
@@ -534,7 +542,59 @@ export default function EditPdfTool() {
       cancelled = true;
       renderTask?.cancel();
     };
-  }, [pdf, pageIndex, docReady, pdfLibDoc]);
+  }, [pdf, pageIndex, docReady]);
+
+  // Phase 9.1: matches each run the effect above detected to its
+  // content-stream operator (lib/pdf/edit/matchTextRun.ts), so the select
+  // tool can show which runs are actually editable. Split into its own
+  // effect (not keyed on docReady/canvas render) because pdfLibDoc loads
+  // independently and often arrives after the canvas above has already
+  // rasterized -- this only needs a cheap, already-cached page/viewport
+  // lookup, not another render pass. Best-effort throughout: a failure here
+  // only disables in-place editing, never the read-only preview/highlight
+  // this depends on.
+  useEffect(() => {
+    if (!pdf || !pdfJsDocRef.current || !pdfLibDoc || detectedTextRuns.length === 0 || !pageDisplaySize) return;
+    const doc = pdfJsDocRef.current;
+    const runs = detectedTextRuns;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const page = await doc.getPage(pageIndex + 1);
+        const pointViewport = page.getViewport({ scale: 1 });
+        const dimensionScale = clampRenderScaleToMaxDimension(
+          PAGE_RENDER_SCALE,
+          pointViewport.width,
+          pointViewport.height,
+          MAX_CANVAS_DIMENSION_PX,
+        );
+        const viewport = page.getViewport({ scale: dimensionScale });
+        if (cancelled || !pdfLibDocRef.current) return;
+        const located = collectPageTextOperators(pdfLibDocRef.current, pageIndex);
+        if (cancelled) return;
+        setPageOperators(located);
+        const flatOperators = located.map((item) => item.operator);
+        setRunMatches(
+          runs.map((run): RunMatch => {
+            const matchedOperator = matchDetectedRunToOperator(run, pageDisplaySize.width, pageDisplaySize.height, flatOperators, viewport.transform);
+            if (!matchedOperator) return null;
+            const locatedOperator = located.find((item) => item.operator === matchedOperator);
+            return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
+          }),
+        );
+      } catch {
+        if (!cancelled) {
+          setRunMatches([]);
+          setPageOperators([]);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pdf, pdfLibDoc, pageIndex, detectedTextRuns, pageDisplaySize]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -580,19 +640,25 @@ export default function EditPdfTool() {
         setError("This doesn't look like a valid PDF file.");
         return;
       }
-      // A lightweight pdfjs open (already done in the effect above once
-      // `pdf` state is set) validates the page count; here we just need
-      // pageCount up front for the Next/Prev bounds, so open once via pdfjs.
+      // Open via pdfjs once, up front, to read the page count for the
+      // page-count limit check below (pdf state doesn't exist yet to drive
+      // the preview-load effect). Stashed in pendingInitialDocRef so that
+      // effect reuses this exact doc instead of re-parsing the same bytes.
+      if (pendingInitialDocRef.current) {
+        void (pendingInitialDocRef.current.doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
+        pendingInitialDocRef.current = null;
+      }
       const doc = await openPdfJsDocument(new Uint8Array(copyArrayBuffer(bytes)));
       const pageCount = doc.numPages;
-      void (doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
 
       const pageCountError = checkPdfPageCount(pageCount);
       if (pageCountError) {
+        void (doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
         setError(pageCountError);
         return;
       }
 
+      pendingInitialDocRef.current = { bytes, doc };
       setPdfMeta({ file, pageCount });
       setPageIndex(0);
       setOriginalBytes(bytes);
