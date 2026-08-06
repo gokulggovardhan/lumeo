@@ -15,7 +15,13 @@
 // elements are on the page.
 
 import { useRef } from "react";
-import { canResizeElement, isLineShape, type EditElement } from "@/lib/pdf/edit/elements";
+import { canResizeElement, isLineShape, moveElementByArrowKey, resizeElementByArrowKey, type EditElement } from "@/lib/pdf/edit/elements";
+
+// Phase 9.3: keyboard-editing hardening -- Arrow keys move, Shift+Arrow
+// resizes, matching CropRectView.tsx's own MOVE_STEP_PCT precedent (this
+// component's step is intentionally NOT Shift-scaled the way CropRectView's
+// is, since Shift here is already spoken for by resize).
+const KEY_STEP_PCT = 1;
 
 const MIN_SIZE_PCT = 2;
 
@@ -185,12 +191,42 @@ export function EditElementView({
   const resizable = canResizeElement(element);
   const isLine = isLineShape(element);
 
+  // Arrow keys move; Shift+Arrow resizes (only when this element supports
+  // resizing at all -- see canResizeElement, false for ink). Delete/
+  // Backspace is unchanged. Both move and resize commit immediately (via
+  // onChange), unlike the pointer-drag gestures above which only commit at
+  // gesture end -- a single keypress IS the whole gesture here, so there's
+  // no live-drag frame to batch.
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Delete" || event.key === "Backspace") {
+      event.preventDefault();
+      event.stopPropagation();
+      onDelete();
+      return;
+    }
+    const forward = event.key === "ArrowRight";
+    const backward = event.key === "ArrowLeft";
+    const down = event.key === "ArrowDown";
+    const up = event.key === "ArrowUp";
+    if (!forward && !backward && !down && !up) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const dxPct = forward ? KEY_STEP_PCT : backward ? -KEY_STEP_PCT : 0;
+    const dyPct = down ? KEY_STEP_PCT : up ? -KEY_STEP_PCT : 0;
+    if (event.shiftKey) {
+      if (!resizable) return;
+      onChange(resizeElementByArrowKey(element, dxPct, dyPct, MIN_SIZE_PCT));
+    } else {
+      onChange(moveElementByArrowKey(element, dxPct, dyPct));
+    }
+  }
+
   return (
     <div
       ref={nodeRef}
       role="button"
       tabIndex={0}
-      aria-label={`${element.type} element, Delete to remove`}
+      aria-label={`${element.type} element. Arrow keys move${resizable ? ", Shift+Arrow resizes" : ""}, Delete removes.`}
       onFocus={onSelect}
       onPointerDown={handleBodyPointerDown}
       onPointerMove={(event) => {
@@ -205,13 +241,7 @@ export function EditElementView({
         handleBodyPointerUp(event);
         handleResizeEnd(event);
       }}
-      onKeyDown={(event) => {
-        if (event.key === "Delete" || event.key === "Backspace") {
-          event.preventDefault();
-          event.stopPropagation();
-          onDelete();
-        }
-      }}
+      onKeyDown={handleKeyDown}
       className={`absolute touch-none select-none ${selected ? "z-20" : "z-10"} cursor-grab active:cursor-grabbing`}
       style={{ left: `${element.xPct}%`, top: `${element.yPct}%`, width: `${element.widthPct}%`, height: `${element.heightPct}%` }}
     >

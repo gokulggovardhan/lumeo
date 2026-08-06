@@ -9,7 +9,9 @@ import {
   deleteElement,
   elementsForPage,
   isLineShape,
+  moveElementByArrowKey,
   patchElement,
+  resizeElementByArrowKey,
 } from "../lib/pdf/edit/elements.ts";
 
 test("createTextElement produces sensible defaults", () => {
@@ -85,4 +87,46 @@ test("elementsForPage filters by pageIndex", () => {
   const page0 = elementsForPage(elements, 0);
   assert.equal(page0.length, 2);
   assert.deepEqual(page0.map((e) => e.id), ["a", "c"]);
+});
+
+// Phase 9.3 regression coverage: EditElementView.tsx's overlay elements
+// (text/shape/whiteout/ink) previously had no keyboard-only way to move or
+// resize -- only Delete/Backspace worked, unlike TextRunOverlay's full
+// keyboard nav. moveElementByArrowKey/resizeElementByArrowKey are the pure
+// clamping logic behind the new Arrow/Shift+Arrow handling; covered here
+// since this project has no component-level test harness to exercise the
+// key events themselves.
+test("moveElementByArrowKey translates by the given delta", () => {
+  const el = createTextElement("a", 0, 40, 45);
+  const moved = moveElementByArrowKey(el, 5, -3);
+  assert.equal(moved.xPct, 45);
+  assert.equal(moved.yPct, 42);
+});
+
+test("moveElementByArrowKey clamps to the stage edges, never past 0 or 100 minus the element's own size", () => {
+  const el = createTextElement("a", 0, 1, 98);
+  const moved = moveElementByArrowKey(el, -5, 5);
+  assert.equal(moved.xPct, 0, "should clamp at the left edge, not go negative");
+  assert.equal(moved.yPct, 100 - el.heightPct, "should clamp so the element's bottom edge never exceeds 100%");
+});
+
+test("resizeElementByArrowKey grows/shrinks from the element's own top-left corner", () => {
+  const el = createShapeElement("a", 0, 20, 20, "rect");
+  const grown = resizeElementByArrowKey(el, 3, -2, 2);
+  assert.equal(grown.widthPct, el.widthPct + 3);
+  assert.equal(grown.heightPct, el.heightPct - 2);
+});
+
+test("resizeElementByArrowKey never shrinks below minSizePct", () => {
+  const el = createShapeElement("a", 0, 20, 20, "rect");
+  const shrunk = resizeElementByArrowKey(el, -1000, -1000, 2);
+  assert.equal(shrunk.widthPct, 2);
+  assert.equal(shrunk.heightPct, 2);
+});
+
+test("resizeElementByArrowKey never grows past the stage edge from the element's fixed xPct/yPct", () => {
+  const el = createShapeElement("a", 0, 90, 85, "rect");
+  const grown = resizeElementByArrowKey(el, 1000, 1000, 2);
+  assert.equal(grown.widthPct, 100 - el.xPct);
+  assert.equal(grown.heightPct, 100 - el.yPct);
 });

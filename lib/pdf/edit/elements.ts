@@ -149,3 +149,40 @@ export function deleteElement(elements: EditElement[], id: string): EditElement[
 export function elementsForPage(elements: EditElement[], pageIndex: number): EditElement[] {
   return elements.filter((item) => item.pageIndex === pageIndex);
 }
+
+function clampPct(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+// Phase 9.3 keyboard-editing hardening: computes the new position for one
+// Arrow-key move step, clamped the same way EditElementView.tsx's own
+// pointer-drag already clamps a move (never past the stage edge, in either
+// direction) -- a pure function so the clamping logic itself has a
+// regression test independent of any DOM/pointer-event harness (this
+// project has none for components).
+export function moveElementByArrowKey(
+  element: Pick<EditElementBase, "xPct" | "yPct" | "widthPct" | "heightPct">,
+  dxPct: number,
+  dyPct: number,
+): { xPct: number; yPct: number } {
+  return {
+    xPct: clampPct(element.xPct + dxPct, 0, 100 - element.widthPct),
+    yPct: clampPct(element.yPct + dyPct, 0, 100 - element.heightPct),
+  };
+}
+
+// Companion to moveElementByArrowKey for Shift+Arrow: grows/shrinks from the
+// element's own top-left corner (xPct/yPct fixed), mirroring the existing
+// pointer-drag resize handle's "end" behavior in EditElementView.tsx exactly
+// -- same floor (minSizePct) and same "never past the stage edge" ceiling.
+export function resizeElementByArrowKey(
+  element: Pick<EditElementBase, "xPct" | "yPct" | "widthPct" | "heightPct">,
+  dxPct: number,
+  dyPct: number,
+  minSizePct: number,
+): { widthPct: number; heightPct: number } {
+  return {
+    widthPct: clampPct(element.widthPct + dxPct, minSizePct, 100 - element.xPct),
+    heightPct: clampPct(element.heightPct + dyPct, minSizePct, 100 - element.yPct),
+  };
+}
