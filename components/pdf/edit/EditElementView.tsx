@@ -64,7 +64,16 @@ function EditElementViewImpl({
 }) {
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const liveRef = useRef<LiveGeometry | null>(null);
-  const dragRef = useRef<{ startX: number; startY: number; originXPct: number; originYPct: number } | null>(null);
+  // Phase 10.3: the stage's bounding rect is captured ONCE per gesture (at
+  // pointerdown/resize-start) and reused for every pointermove of that same
+  // gesture, instead of re-querying getBoundingClientRect() on each move.
+  // Querying it per-move forces a synchronous layout read every event --
+  // and since applyLiveStyle below writes to this same element's inline
+  // style on every move too, each move's rect query would otherwise flush
+  // the PREVIOUS move's pending layout (write-then-read thrashing), on top
+  // of the query's own cost. The stage doesn't resize/scroll mid-gesture,
+  // so one measurement per gesture is exact.
+  const dragRef = useRef<{ startX: number; startY: number; originXPct: number; originYPct: number; rect: DOMRect } | null>(null);
   const resizeRef = useRef<{
     startX: number;
     startY: number;
@@ -77,6 +86,7 @@ function EditElementViewImpl({
     // "start" instead moves the origin point too so the opposite endpoint
     // stays fixed.
     endpoint: "start" | "end";
+    rect: DOMRect;
   } | null>(null);
 
   function getStageRect() {
@@ -108,17 +118,18 @@ function EditElementViewImpl({
 
   function handleBodyPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if ((event.target as HTMLElement).dataset.handle) return;
+    const rect = getStageRect();
+    if (!rect) return;
     onSelect();
     (event.target as HTMLElement).setPointerCapture(event.pointerId);
-    dragRef.current = { startX: event.clientX, startY: event.clientY, originXPct: element.xPct, originYPct: element.yPct };
+    dragRef.current = { startX: event.clientX, startY: event.clientY, originXPct: element.xPct, originYPct: element.yPct, rect };
   }
 
   function handleBodyPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     const drag = dragRef.current;
-    const rect = getStageRect();
-    if (!drag || !rect) return;
-    const deltaXPct = ((event.clientX - drag.startX) / rect.width) * 100;
-    const deltaYPct = ((event.clientY - drag.startY) / rect.height) * 100;
+    if (!drag) return;
+    const deltaXPct = ((event.clientX - drag.startX) / drag.rect.width) * 100;
+    const deltaYPct = ((event.clientY - drag.startY) / drag.rect.height) * 100;
     const live = ensureLive();
     live.xPct = clamp(drag.originXPct + deltaXPct, 0, 100 - live.widthPct);
     live.yPct = clamp(drag.originYPct + deltaYPct, 0, 100 - live.heightPct);
@@ -135,6 +146,8 @@ function EditElementViewImpl({
 
   function handleResizeStart(event: React.PointerEvent<HTMLDivElement>, endpoint: "start" | "end") {
     event.stopPropagation();
+    const rect = getStageRect();
+    if (!rect) return;
     (event.target as HTMLElement).setPointerCapture(event.pointerId);
     resizeRef.current = {
       startX: event.clientX,
@@ -144,15 +157,15 @@ function EditElementViewImpl({
       originXPct: element.xPct,
       originYPct: element.yPct,
       endpoint,
+      rect,
     };
   }
 
   function handleResizeMove(event: React.PointerEvent<HTMLDivElement>) {
     const resize = resizeRef.current;
-    const rect = getStageRect();
-    if (!resize || !rect) return;
-    const deltaXPct = ((event.clientX - resize.startX) / rect.width) * 100;
-    const deltaYPct = ((event.clientY - resize.startY) / rect.height) * 100;
+    if (!resize) return;
+    const deltaXPct = ((event.clientX - resize.startX) / resize.rect.width) * 100;
+    const deltaYPct = ((event.clientY - resize.startY) / resize.rect.height) * 100;
     const live = ensureLive();
 
     if (resize.endpoint === "start") {
