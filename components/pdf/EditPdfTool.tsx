@@ -101,6 +101,17 @@ type EditPreview =
   | { kind: "single"; editable: boolean; reason: string | null; plan: EditPlan; resolvedFont: ResolvedFont; locatedOperator: LocatedTextOperator }
   | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont };
 
+// Phase 11 UX audit -- Shape tool's place in Edit PDF, decided: KEEP.
+// Rect/ellipse/line are genuine freeform annotation shapes with no other
+// path to create them in this tool, so they're clearly justified. The one
+// shape kind that looked like it might duplicate another workflow --
+// "highlight" -- was checked against true text highlighting (marking
+// EXISTING text, independent of editing it): that feature doesn't exist
+// anywhere else in this tool (Select only supports replacing text in place,
+// via Phase 11's inline editor; there's no persisted "mark this text"
+// action). So Shape's highlight kind is currently the ONLY way to highlight
+// existing content -- not a duplicate, the sole implementation. Revisit if
+// a dedicated text-highlight action is ever added to the Select tool.
 type ActiveTool = "select" | "text" | "draw" | "shape" | "whiteout";
 
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
@@ -128,6 +139,10 @@ const EDIT_HISTORY_MAX_BYTES = 300 * 1024 * 1024;
 // render, a failed canvas allocation, or browser instability on
 // constrained devices.
 const MAX_CANVAS_DIMENSION_PX = 5200;
+
+function clampPct(value: number) {
+  return Math.min(100, Math.max(0, value));
+}
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -277,8 +292,18 @@ export default function EditPdfTool() {
   const [editApplyError, setEditApplyError] = useState("");
   const [isApplyingEdit, setIsApplyingEdit] = useState(false);
   const runOverlayNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
+  // Phase 11: the inline caret-over-the-PDF input for a single selected,
+  // editable text run -- see the JSX below (rendered next to the run's
+  // TextRunOverlay) and the autofocus effect just below this.
+  const inlineEditInputRef = useRef<HTMLInputElement | null>(null);
 
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
+  // Phase 11: live drag-to-create preview for the Whiteout tool -- see
+  // handleWhiteoutPointerDown/Move/Up. `snapped` distinguishes "locked to a
+  // detected text run's exact bounds" from "a manually dragged rect," purely
+  // to drive a slightly different preview border color as feedback.
+  const [whiteoutDraft, setWhiteoutDraft] = useState<{ xPct: number; yPct: number; widthPct: number; heightPct: number; snapped: boolean } | null>(null);
+  const whiteoutGestureRef = useRef<{ startXPct: number; startYPct: number; rect: DOMRect } | null>(null);
   const [shapeKind, setShapeKind] = useState<ShapeKind>(DEFAULT_SHAPE_KIND);
   const [inkColor, setInkColor] = useState("#12141a");
   const [inkStrokeWidth, setInkStrokeWidth] = useState(3);
@@ -613,11 +638,45 @@ export default function EditPdfTool() {
         event.preventDefault();
         setElements((current) => deleteElement(current, selectedId));
         setSelectedId(null);
+      } else if (command && (event.key === "=" || event.key === "+")) {
+        // Phase 11: desktop zoom shortcuts (Ctrl/Cmd +/-/0), matching the
+        // Acrobat/Chrome-PDF-viewer convention -- same clamp bounds and step
+        // the on-screen -/+/Fit buttons already use.
+        event.preventDefault();
+        setZoom((z) => Math.min(2, z + 0.1));
+      } else if (command && event.key === "-") {
+        event.preventDefault();
+        setZoom((z) => Math.max(0.5, z - 0.1));
+      } else if (command && event.key === "0") {
+        event.preventDefault();
+        setZoom(1);
+      } else if (!command && pdfMeta && (event.key === "PageDown" || event.key === "PageUp")) {
+        // Phase 11: PageUp/PageDown page navigation -- the Acrobat
+        // convention. Reads pdfMeta.pageCount (not the `pdf` useMemo, which
+        // is a NEW object on every text edit/undo/redo -- putting it in this
+        // effect's deps would re-bind the listener constantly); pdfMeta only
+        // changes on upload/reset, so it's a stable, correct dependency.
+        event.preventDefault();
+        if (event.key === "PageDown") setPageIndex((c) => Math.min(pdfMeta.pageCount - 1, c + 1));
+        else setPageIndex((c) => Math.max(0, c - 1));
       }
     }
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [redo, undo, selectedId, setElements]);
+  }, [redo, undo, selectedId, setElements, pdfMeta]);
+
+  // Phase 11: "click existing text, caret appears, user types immediately."
+  // Focuses (and selects the full contents of) the inline on-page edit
+  // input as soon as it appears for a newly-selected single run, so the
+  // user's next keystroke replaces the text with no extra click into a
+  // sidebar field first.
+  useEffect(() => {
+    if (activeTool === "select" && selectedRunIndices.length === 1 && runMatches[selectedRunIndices[0]]) {
+      inlineEditInputRef.current?.focus();
+      inlineEditInputRef.current?.select();
+    }
+  }, [activeTool, selectedRunIndices, runMatches]);
+
 
   async function addFile(files: FileList | File[]) {
     setError("");
@@ -681,6 +740,11 @@ export default function EditPdfTool() {
 
   function handleStageClick(event: React.MouseEvent<HTMLDivElement>) {
     if (activeTool === "draw") return;
+    // Phase 11: Whiteout is fully handled by the drag-to-create pointer
+    // gesture below (handleWhiteoutPointerDown/Move/Up), including the
+    // simple-tap-with-no-drag fallback -- handling it here too would create
+    // a SECOND element, since a plain tap fires both a pointerup and a click.
+    if (activeTool === "whiteout") return;
     if ((event.target as HTMLElement).closest('[role="button"]')) return;
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -699,8 +763,81 @@ export default function EditPdfTool() {
 
     let element: EditElement;
     if (activeTool === "text") element = createTextElement(id, pageIndex, xPct, yPct);
-    else if (activeTool === "shape") element = createShapeElement(id, pageIndex, xPct, yPct, shapeKind);
-    else element = createWhiteoutElement(id, pageIndex, xPct, yPct);
+    else element = createShapeElement(id, pageIndex, xPct, yPct, shapeKind);
+
+    setElements((current) => [...current, element]);
+    setSelectedId(id);
+    setActiveTool("select");
+  }
+
+  // Phase 11: Whiteout redesign -- drag directly over the text/content you
+  // want to hide, instead of click-to-place-a-default-box-then-resize.
+  // Mirrors EditElementView's own drag pattern (Phase 10.3): the stage rect
+  // is measured ONCE at gesture start and reused for every pointermove, not
+  // re-queried per event, to avoid the write-then-forced-layout-read
+  // thrashing that fix addressed. WHITEOUT_DRAG_THRESHOLD_PCT distinguishes
+  // an intentional drag from a simple tap (mobile-friendly: a tap still
+  // places a sensible default-sized box, exactly like every other tool).
+  const WHITEOUT_DRAG_THRESHOLD_PCT = 1.5;
+
+  function handleWhiteoutPointerDown(event: React.PointerEvent<HTMLDivElement>) {
+    if (activeTool !== "whiteout") return;
+    if ((event.target as HTMLElement).closest('[role="button"]')) return;
+    const rect = stageRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    const startXPct = clampPct(((event.clientX - rect.left) / rect.width) * 100);
+    const startYPct = clampPct(((event.clientY - rect.top) / rect.height) * 100);
+    whiteoutGestureRef.current = { startXPct, startYPct, rect };
+    setWhiteoutDraft({ xPct: startXPct, yPct: startYPct, widthPct: 0, heightPct: 0, snapped: false });
+  }
+
+  function handleWhiteoutPointerMove(event: React.PointerEvent<HTMLDivElement>) {
+    const gesture = whiteoutGestureRef.current;
+    if (!gesture) return;
+    const xPct = clampPct(((event.clientX - gesture.rect.left) / gesture.rect.width) * 100);
+    const yPct = clampPct(((event.clientY - gesture.rect.top) / gesture.rect.height) * 100);
+
+    // Snap-to-text-run: if the pointer is currently over a detected text
+    // run, the preview locks to that run's exact bounds instead of the raw
+    // drag rect -- the "cover this line in one drag" affordance the
+    // redesign asked for. Falls back to the manual rect the instant the
+    // pointer leaves every run's bounds, so the user can still draw an
+    // arbitrary box over non-text content.
+    const hoveredRun = findTextRunAtPoint(detectedTextRuns, xPct, yPct);
+    if (hoveredRun) {
+      setWhiteoutDraft({ xPct: hoveredRun.xPct, yPct: hoveredRun.yPct, widthPct: hoveredRun.widthPct, heightPct: hoveredRun.heightPct, snapped: true });
+      return;
+    }
+
+    const left = Math.min(gesture.startXPct, xPct);
+    const top = Math.min(gesture.startYPct, yPct);
+    const width = Math.abs(xPct - gesture.startXPct);
+    const height = Math.abs(yPct - gesture.startYPct);
+    setWhiteoutDraft({ xPct: left, yPct: top, widthPct: width, heightPct: height, snapped: false });
+  }
+
+  function buildDraggedWhiteoutElement(id: string, box: { xPct: number; yPct: number; widthPct: number; heightPct: number }): EditElement {
+    return { id, type: "whiteout", pageIndex, xPct: box.xPct, yPct: box.yPct, widthPct: box.widthPct, heightPct: box.heightPct, color: "white" };
+  }
+
+  function handleWhiteoutPointerUp(event: React.PointerEvent<HTMLDivElement>) {
+    (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+    // whiteoutGestureRef only exists to avoid re-querying getBoundingClientRect
+    // during pointermove (see its own doc comment) -- pointerup does no rect
+    // math, so whiteoutDraft (state, already tracking the current box, set to
+    // a zero-size box at the start point on pointerdown) is the only signal
+    // needed here for both "was a gesture in progress" and its final geometry.
+    whiteoutGestureRef.current = null;
+    const draft = whiteoutDraft;
+    setWhiteoutDraft(null);
+    if (!draft) return;
+
+    const id = nextElementId();
+    const element: EditElement =
+      draft.widthPct >= WHITEOUT_DRAG_THRESHOLD_PCT || draft.heightPct >= WHITEOUT_DRAG_THRESHOLD_PCT
+        ? buildDraggedWhiteoutElement(id, draft)
+        : createWhiteoutElement(id, pageIndex, draft.xPct, draft.yPct);
 
     setElements((current) => [...current, element]);
     setSelectedId(id);
@@ -1040,6 +1177,20 @@ export default function EditPdfTool() {
   const pixelsPerPoint = pageDisplaySize && pagePointSize && pagePointSize.width > 0
     ? pageDisplaySize.width / pagePointSize.width
     : PAGE_RENDER_SCALE;
+  // Phase 11: single source of truth for "is there an edit ready to apply,"
+  // shared by both the inline on-page toolbar and the sidebar panel -- was
+  // previously computed inline in one place only; extracted so the two
+  // Apply buttons can never disagree about when they're enabled.
+  const canApplyEdit =
+    !isApplyingEdit &&
+    editPreview.kind !== "empty" &&
+    editPreview.editable &&
+    editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
+  // Phase 11: looked up once and reused throughout the inline on-page editor
+  // JSX below, instead of repeatedly indexing detectedTextRuns/runMatches by
+  // selectedRunIndices[0] at each use site.
+  const singleSelectedRun = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
+  const singleSelectedRunMatch = selectedRunIndices.length === 1 ? runMatches[selectedRunIndices[0]] : null;
 
   const generateEditedPdf = useCallback(async () => {
     if (!pdf) return;
@@ -1162,11 +1313,31 @@ export default function EditPdfTool() {
                   onMouseMove={handleStageMouseMove}
                   onMouseLeave={handleStageMouseLeave}
                   onKeyDown={handleStageKeyDown}
-                  className={`relative mx-auto max-h-[32rem] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""}`}
+                  onPointerDown={handleWhiteoutPointerDown}
+                  onPointerMove={handleWhiteoutPointerMove}
+                  onPointerUp={handleWhiteoutPointerUp}
+                  className={`relative mx-auto max-h-[32rem] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""} ${activeTool === "whiteout" ? "touch-none" : ""}`}
                   style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={pageImageUrl} alt={`Page ${pageIndex + 1} preview`} className="pointer-events-none block h-full w-full select-none" />
+
+                  {whiteoutDraft ? (
+                    // Phase 11: live drag-to-create preview -- semi-transparent
+                    // so the text/content underneath stays visible while
+                    // positioning ("show exactly what will be hidden"), with a
+                    // gold border when snapped to a detected text run's exact
+                    // bounds vs. a neutral border for a freehand drag.
+                    <div
+                      className={`pointer-events-none absolute z-20 rounded-[2px] border-2 border-dashed bg-white/55 ${whiteoutDraft.snapped ? "border-[var(--lumeo-gold)]" : "border-[var(--text-primary)]/40"}`}
+                      style={{
+                        left: `${whiteoutDraft.xPct}%`,
+                        top: `${whiteoutDraft.yPct}%`,
+                        width: `${whiteoutDraft.widthPct}%`,
+                        height: `${whiteoutDraft.heightPct}%`,
+                      }}
+                    />
+                  ) : null}
 
                   {currentPageElements.map((element) => (
                     <EditElementView
@@ -1229,6 +1400,81 @@ export default function EditPdfTool() {
                       ))}
                     </div>
                   ) : null}
+
+                  {activeTool === "select" && singleSelectedRun && singleSelectedRunMatch ? (
+                    // Phase 11: true inline editing -- a caret appears
+                    // directly over the clicked text (positioned with the
+                    // exact same percent box TextRunOverlay uses for this
+                    // run) instead of requiring a trip to the sidebar. The
+                    // floating Apply/Cancel pair below it is the ONLY
+                    // required UI for finishing the edit; the sidebar's
+                    // "Replace with" field (same editDraftText state) still
+                    // works too, but is now optional, not the primary path.
+                    <div
+                      className="absolute z-30"
+                      style={{
+                        left: `${singleSelectedRun.xPct}%`,
+                        top: `${singleSelectedRun.yPct}%`,
+                        width: `${singleSelectedRun.widthPct}%`,
+                        height: `${singleSelectedRun.heightPct}%`,
+                      }}
+                    >
+                      <input
+                        ref={inlineEditInputRef}
+                        value={editDraftText}
+                        onChange={(event) => {
+                          setEditDraftText(event.target.value);
+                          setEditApplyError("");
+                        }}
+                        onClick={(event) => event.stopPropagation()}
+                        onKeyDown={(event) => {
+                          event.stopPropagation();
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            if (canApplyEdit) void applyTextRunEdit();
+                          } else if (event.key === "Escape") {
+                            event.preventDefault();
+                            selectTextRun(null);
+                          }
+                        }}
+                        aria-label="Edit text"
+                        className="h-full w-full rounded-[2px] border-2 border-dashed border-[var(--lumeo-gold)] bg-white/95 px-0.5 font-semibold text-[var(--text-primary)] outline-none"
+                        style={{ fontSize: `${Math.max(10, (singleSelectedRun.fontSizePx / PAGE_RENDER_SCALE) * pixelsPerPoint)}px` }}
+                      />
+                      {/* Compact by design (36px, not the app's usual 44px minimum) --
+                          this is a secondary/optional floating toolbar next to a single
+                          line of text, not a primary navigation control; 36px still
+                          comfortably clears WCAG's minimum (24px) target-size guidance. */}
+                      <div className="absolute left-0 top-full z-30 mt-1 flex gap-1 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void applyTextRunEdit();
+                          }}
+                          disabled={!canApplyEdit}
+                          className="min-h-9 rounded-full border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/90 px-3 text-[11px] font-bold text-[var(--atelier-surface-0)] shadow-lg transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {isApplyingEdit ? "Applying…" : "Apply"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            selectTextRun(null);
+                          }}
+                          className="min-h-9 rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-3 text-[11px] font-bold text-[var(--text-primary)]/70 shadow-lg transition hover:border-[var(--text-primary)]/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {editApplyError || (editPreview.kind !== "empty" && !editPreview.editable && editPreview.reason) ? (
+                        <div role="alert" className="absolute left-0 top-full z-30 mt-11 max-w-[220px] rounded-md border border-[var(--border-danger)]/25 bg-[var(--surface-danger)] px-2 py-1 text-[10px] font-semibold leading-4 text-[var(--text-danger)] shadow-lg">
+                          {editApplyError || (editPreview.kind !== "empty" ? editPreview.reason : "")}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}
@@ -1241,7 +1487,7 @@ export default function EditPdfTool() {
           </L2WorkspacePanel>
         }
         inspector={
-          <L2WorkspaceInspector title="Tools" description="Pick a tool, then click the page to place it.">
+          <L2WorkspaceInspector title="Tools" description="Pick a tool, then click or drag on the page.">
             <div className="mt-3 grid grid-cols-5 gap-1.5">
               {(["select", "text", "draw", "shape", "whiteout"] as ActiveTool[]).map((tool) => (
                 <button
@@ -1287,7 +1533,7 @@ export default function EditPdfTool() {
 
             {activeTool === "whiteout" ? (
               <p className="mt-3 rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] p-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
-                Whiteout hides content visually in the exported PDF. For documents with legal or compliance requirements, verify the underlying content is also removed before sharing.
+                Drag over the text or content you want to hide -- it snaps to a line of text automatically, or drag freely for anything else. Hides content visually only; for legal or compliance redaction, verify the underlying content is also removed before sharing.
               </p>
             ) : null}
 
@@ -1317,11 +1563,7 @@ export default function EditPdfTool() {
                     </label>
                     <button
                       type="button"
-                      disabled={
-                        isApplyingEdit ||
-                        !editPreview.editable ||
-                        editDraftText === selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("")
-                      }
+                      disabled={!canApplyEdit}
                       onClick={() => void applyTextRunEdit()}
                       className="min-h-11 rounded-lg border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-2.5 text-xs font-bold text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
                     >
