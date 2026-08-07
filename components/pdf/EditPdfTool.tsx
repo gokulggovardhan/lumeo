@@ -114,6 +114,20 @@ type EditPreview =
 // a dedicated text-highlight action is ever added to the Select tool.
 type ActiveTool = "select" | "text" | "draw" | "shape" | "whiteout";
 
+// Phase 13: unmodified 1-5 tool shortcuts, shown as native tooltips on each
+// tool button (see the tool grid's title attribute below) -- a discrete
+// object (not derived from ActiveTool's own array) so the mapping is a
+// single, greppable source of truth for both the keydown handler and the
+// tooltip text.
+const TOOL_SHORTCUT_KEYS: Record<string, ActiveTool> = {
+  "1": "select",
+  "2": "text",
+  "3": "draw",
+  "4": "shape",
+  "5": "whiteout",
+};
+const TOOL_SHORTCUT_LABELS: Record<ActiveTool, string> = { select: "1", text: "2", draw: "3", shape: "4", whiteout: "5" };
+
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 
 const PAGE_RENDER_SCALE = 1.3;
@@ -659,6 +673,15 @@ export default function EditPdfTool() {
         event.preventDefault();
         if (event.key === "PageDown") setPageIndex((c) => Math.min(pdfMeta.pageCount - 1, c + 1));
         else setPageIndex((c) => Math.max(0, c - 1));
+      } else if (!command && !event.shiftKey && !event.altKey && event.key in TOOL_SHORTCUT_KEYS) {
+        // Phase 13: unmodified number-key tool switching (1-5), the
+        // Figma/Illustrator convention for single-key tool shortcuts --
+        // matching TOOL_SHORTCUT_KEYS' own doc comment near the tool array
+        // below. Safe from colliding with typing: isTypingTarget above
+        // already excludes any focused input/textarea/contentEditable,
+        // including both the sidebar and Phase 11's inline edit fields.
+        event.preventDefault();
+        setActiveTool(TOOL_SHORTCUT_KEYS[event.key as keyof typeof TOOL_SHORTCUT_KEYS]);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
@@ -1322,6 +1345,18 @@ export default function EditPdfTool() {
                   onPointerDown={handleWhiteoutPointerDown}
                   onPointerMove={handleWhiteoutPointerMove}
                   onPointerUp={handleWhiteoutPointerUp}
+                  onWheel={(event) => {
+                    // Phase 13: Ctrl/Cmd+scroll zoom -- the Figma/Photoshop/
+                    // Google-Maps convention, and the same trackpad gesture
+                    // Chrome/Safari themselves already turn into a synthetic
+                    // ctrlKey wheel event for pinch-zoom. Only intercepts
+                    // when the modifier is held, so ordinary scrolling (to
+                    // reach the sidebar below the stage on mobile/narrow
+                    // viewports) is completely unaffected.
+                    if (!event.ctrlKey && !event.metaKey) return;
+                    event.preventDefault();
+                    setZoom((z) => Math.min(2, Math.max(0.5, z - event.deltaY * 0.001)));
+                  }}
                   className={`relative mx-auto max-h-[32rem] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""} ${activeTool === "whiteout" ? "touch-none" : ""}`}
                   style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
                 >
@@ -1518,6 +1553,7 @@ export default function EditPdfTool() {
                   type="button"
                   aria-pressed={activeTool === tool}
                   onClick={() => setActiveTool(tool)}
+                  title={`${tool[0].toUpperCase()}${tool.slice(1)} (${TOOL_SHORTCUT_LABELS[tool]})`}
                   className={`min-h-11 rounded-lg border px-1.5 py-2 text-[11px] font-bold capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${activeTool === tool ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10 text-[var(--text-primary)]" : "border-[var(--text-primary)]/12 text-[var(--text-primary)]/60 hover:border-[var(--text-primary)]/24"}`}
                 >
                   {tool}

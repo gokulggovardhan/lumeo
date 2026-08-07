@@ -323,7 +323,17 @@ function EditElementViewImpl({
                 onDelete();
               }}
               aria-label="Delete"
-              className="grid h-6 w-6 place-items-center rounded-full text-xs text-[var(--text-danger)]/80 transition hover:bg-[var(--text-danger)]/10 hover:text-[var(--text-danger)]"
+              title="Delete (Backspace)"
+              // Phase 13: was h-6 w-6 (24px) -- inconsistent with every other
+              // interactive control in this tool (44px primary controls from
+              // #214, 36px secondary/floating controls from #212). Bumped to
+              // 32px (deliberately still short of 36/44 -- this sits directly
+              // beside the much smaller resize-grip handles below, and a
+              // destructive action benefits from being reachable without
+              // being the most visually dominant element in the cluster) and
+              // given the same focus-visible ring convention as everything
+              // else, in the danger color to match its own visual language.
+              className="grid h-8 w-8 place-items-center rounded-full text-xs text-[var(--text-danger)]/80 transition hover:bg-[var(--text-danger)]/10 hover:text-[var(--text-danger)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-danger)]"
             >
               ✕
             </button>
