@@ -1302,8 +1302,14 @@ export default function EditPdfTool() {
               <L2PanelLabel title="Preview" />
             </div>
             {pageLoading || !pageImageUrl || !pageDisplaySize ? (
-              <div className="mt-3 flex h-64 items-center justify-center rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/40 text-sm text-[var(--text-primary)]/40">
-                Loading page preview...
+              // Phase 12: an animated skeleton in place of a flat "Loading..."
+              // box -- signals real, ongoing progress (a still, static
+              // placeholder reads as stuck/broken on a slow connection or
+              // large file) without needing a spinner asset. animate-pulse is
+              // Tailwind's built-in opacity-breathing keyframe.
+              <div className="mt-3 flex h-64 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/40">
+                <div className="h-40 w-32 animate-pulse rounded-md bg-[var(--text-primary)]/10" />
+                <span className="text-sm font-medium text-[var(--text-primary)]/40">Loading page preview…</span>
               </div>
             ) : (
               <div className="mx-auto mt-3" style={{ width: `${zoom * 100}%` }}>
@@ -1441,11 +1447,16 @@ export default function EditPdfTool() {
                         className="h-full w-full rounded-[2px] border-2 border-dashed border-[var(--lumeo-gold)] bg-white/95 px-0.5 font-semibold text-[var(--text-primary)] outline-none"
                         style={{ fontSize: `${Math.max(10, (singleSelectedRun.fontSizePx / PAGE_RENDER_SCALE) * pixelsPerPoint)}px` }}
                       />
-                      {/* Compact by design (36px, not the app's usual 44px minimum) --
-                          this is a secondary/optional floating toolbar next to a single
-                          line of text, not a primary navigation control; 36px still
-                          comfortably clears WCAG's minimum (24px) target-size guidance. */}
-                      <div className="absolute left-0 top-full z-30 mt-1 flex gap-1 whitespace-nowrap">
+                      {/* Phase 12: icon-only pair (checkmark/X), matching the
+                          compact inline-toolbar convention professional PDF/doc
+                          editors use for a single-run edit, instead of text
+                          labels that read heavier next to one line of text.
+                          Compact by design (36px circles, not the app's usual
+                          44px minimum) -- this is a secondary/optional floating
+                          toolbar, not a primary navigation control; 36px still
+                          comfortably clears WCAG's minimum (24px) target-size
+                          guidance. */}
+                      <div className="absolute left-0 top-full z-30 mt-1 flex gap-1.5 whitespace-nowrap">
                         <button
                           type="button"
                           onClick={(event) => {
@@ -1453,9 +1464,17 @@ export default function EditPdfTool() {
                             void applyTextRunEdit();
                           }}
                           disabled={!canApplyEdit}
-                          className="min-h-9 rounded-full border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/90 px-3 text-[11px] font-bold text-[var(--atelier-surface-0)] shadow-lg transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
+                          aria-label={isApplyingEdit ? "Applying edit" : "Apply edit"}
+                          title="Apply (Enter)"
+                          className="grid h-9 w-9 place-items-center rounded-full border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/90 text-[var(--atelier-surface-0)] shadow-lg transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          {isApplyingEdit ? "Applying…" : "Apply"}
+                          {isApplyingEdit ? (
+                            <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--atelier-surface-0)]/30 border-t-[var(--atelier-surface-0)]" />
+                          ) : (
+                            <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                              <path d="M4 10.5 8 14.5 16 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
                         </button>
                         <button
                           type="button"
@@ -1463,9 +1482,13 @@ export default function EditPdfTool() {
                             event.stopPropagation();
                             selectTextRun(null);
                           }}
-                          className="min-h-9 rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-3 text-[11px] font-bold text-[var(--text-primary)]/70 shadow-lg transition hover:border-[var(--text-primary)]/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                          aria-label="Cancel edit"
+                          title="Cancel (Esc)"
+                          className="grid h-9 w-9 place-items-center rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 text-[var(--text-primary)]/70 shadow-lg transition hover:border-[var(--text-primary)]/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
                         >
-                          Cancel
+                          <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
+                            <path d="M5 5 15 15M15 5 5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                          </svg>
                         </button>
                       </div>
                       {editApplyError || (editPreview.kind !== "empty" && !editPreview.editable && editPreview.reason) ? (
@@ -1548,7 +1571,50 @@ export default function EditPdfTool() {
                   </span>
                 ) : null}
 
-                {editPreview.kind !== "empty" ? (
+                {editPreview.kind === "empty" ? (
+                  <span>This text couldn&rsquo;t be matched to an editable location on the page (an unsupported font or text layout) -- add a new text box to annotate over it instead.</span>
+                ) : selectedRunIndices.length === 1 ? (
+                  // Phase 12: for a single run, the inline caret-over-the-PDF
+                  // editor (Phase 11) is now the primary way to edit -- this
+                  // sidebar field does the exact same thing (same
+                  // editDraftText state) but collapsed by default so it reads
+                  // as a secondary option, not a second required step.
+                  <details className="mt-1 group">
+                    <summary className="cursor-pointer select-none rounded text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40 outline-none transition hover:text-[var(--text-primary)]/60 focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
+                      Edit in sidebar instead
+                    </summary>
+                    <div className="mt-2 grid gap-2">
+                      <label className="grid gap-1">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with</span>
+                        <input
+                          value={editDraftText}
+                          onChange={(e) => {
+                            setEditDraftText(e.target.value);
+                            setEditApplyError("");
+                          }}
+                          className="w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={!canApplyEdit}
+                        onClick={() => void applyTextRunEdit()}
+                        className="min-h-11 rounded-lg border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-2.5 text-xs font-bold text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        {isApplyingEdit ? "Applying..." : "Apply edit"}
+                      </button>
+                      {!editPreview.editable && editPreview.reason ? (
+                        <span role="alert" className="text-[var(--text-danger)]">{editPreview.reason}</span>
+                      ) : editApplyError ? (
+                        <span role="alert" className="text-[var(--text-danger)]">{editApplyError}</span>
+                      ) : null}
+                    </div>
+                  </details>
+                ) : (
+                  // Multi-run selection has no inline editor (Phase 11 scoped
+                  // that to a single run) -- this field is the ONLY way to
+                  // edit a multi-line selection, so it stays visible, not
+                  // collapsed.
                   <>
                     <label className="mt-1 grid gap-1">
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with</span>
@@ -1575,8 +1641,6 @@ export default function EditPdfTool() {
                       <span role="alert" className="text-[var(--text-danger)]">{editApplyError}</span>
                     ) : null}
                   </>
-                ) : (
-                  <span>This text couldn&rsquo;t be matched to an editable location on the page (an unsupported font or text layout) -- add a new text box to annotate over it instead.</span>
                 )}
               </div>
             ) : null}
@@ -1656,9 +1720,16 @@ export default function EditPdfTool() {
             type="button"
             disabled={(elements.length === 0 && !hasTextEdits) || isExporting}
             onClick={() => void generateEditedPdf()}
-            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
           >
-            {isExporting ? "Exporting..." : "Export PDF"}
+            {isExporting ? (
+              <>
+                <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--text-on-accent)]/30 border-t-[var(--text-on-accent)]" />
+                Exporting...
+              </>
+            ) : (
+              "Export PDF"
+            )}
           </button>
         )}
       </ToolActionBar>
