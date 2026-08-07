@@ -78,16 +78,20 @@ function TextRunOverlayImpl({
   }
 
   // Selected always wins visually; otherwise hovered/focused get a lighter
-  // highlight, and a plain (still focusable/clickable) run gets no border
-  // until interacted with, so a text-heavy page doesn't turn into a wall
-  // of boxes at rest.
+  // highlight. At rest, a plain run still gets no border (avoids turning a
+  // text-heavy page into a wall of boxes), but Phase 11 gives an EDITABLE
+  // run a very faint persistent tint (no border) even before hover -- a
+  // lightweight "this text can be edited" discoverability cue, distinct
+  // from a run that isn't matched to an editable location at all.
   const borderClass = selected
     ? "border-2 border-dashed border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10"
     : hovered
       ? editable
         ? "border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/[0.06]"
         : "border border-[var(--text-primary)]/25 bg-[var(--text-primary)]/[0.04]"
-      : "border border-transparent";
+      : editable
+        ? "border border-transparent bg-[var(--lumeo-gold)]/[0.025]"
+        : "border border-transparent";
 
   return (
     <div

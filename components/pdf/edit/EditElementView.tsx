@@ -287,9 +287,14 @@ function EditElementViewImpl({
           <img src={element.pngDataUrl} alt="Ink stroke" className="h-full w-full select-none" draggable={false} />
         </div>
       ) : element.type === "whiteout" ? (
+        // Phase 11: semi-transparent WHILE selected/being positioned (so the
+        // content it's about to cover stays visible -- "show exactly what
+        // will be hidden"), full opacity once deselected so it previews the
+        // actual export result. Screen-only: lib/pdf/edit/export.ts draws
+        // the real, fully-opaque whiteout at export time regardless of this.
         <div
           className={`h-full w-full rounded-sm ${selected ? "ring-2 ring-[var(--lumeo-gold)]" : "hover:ring-1 hover:ring-[var(--text-primary)]/20"}`}
-          style={{ backgroundColor: element.color === "white" ? "#ffffff" : "#000000" }}
+          style={{ backgroundColor: element.color === "white" ? "#ffffff" : "#000000", opacity: selected ? 0.55 : 1 }}
         />
       ) : isLine ? (
         <svg className="h-full w-full overflow-visible" style={{ pointerEvents: "none" }}>
