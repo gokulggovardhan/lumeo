@@ -1138,11 +1138,11 @@ export default function EditPdfTool() {
             <L2FileCard icon={<FileIcon />} name={pdf.file.name} meta={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`} />
 
             <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/60 px-3 py-2">
-              <button type="button" disabled={pageIndex === 0} onClick={() => setPageIndex((c) => Math.max(0, c - 1))} className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40 disabled:opacity-35">
+              <button type="button" disabled={pageIndex === 0} onClick={() => setPageIndex((c) => Math.max(0, c - 1))} className="min-h-11 rounded-full border border-[var(--text-primary)]/14 px-4 text-xs font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:opacity-35">
                 ← Prev
               </button>
               <span className="text-xs font-semibold text-[var(--text-primary)]/60">Page {pageIndex + 1} of {pdf.pageCount}</span>
-              <button type="button" disabled={pageIndex === pdf.pageCount - 1} onClick={() => setPageIndex((c) => Math.min(pdf.pageCount - 1, c + 1))} className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-xs font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40 disabled:opacity-35">
+              <button type="button" disabled={pageIndex === pdf.pageCount - 1} onClick={() => setPageIndex((c) => Math.min(pdf.pageCount - 1, c + 1))} className="min-h-11 rounded-full border border-[var(--text-primary)]/14 px-4 text-xs font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:opacity-35">
                 Next →
               </button>
             </div>
@@ -1247,8 +1247,9 @@ export default function EditPdfTool() {
                 <button
                   key={tool}
                   type="button"
+                  aria-pressed={activeTool === tool}
                   onClick={() => setActiveTool(tool)}
-                  className={`rounded-lg border px-2 py-2 text-[11px] font-bold capitalize transition ${activeTool === tool ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10 text-[var(--text-primary)]" : "border-[var(--text-primary)]/12 text-[var(--text-primary)]/60 hover:border-[var(--text-primary)]/24"}`}
+                  className={`min-h-11 rounded-lg border px-1.5 py-2 text-[11px] font-bold capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${activeTool === tool ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10 text-[var(--text-primary)]" : "border-[var(--text-primary)]/12 text-[var(--text-primary)]/60 hover:border-[var(--text-primary)]/24"}`}
                 >
                   {tool}
                 </button>
@@ -1261,8 +1262,9 @@ export default function EditPdfTool() {
                   <button
                     key={kind}
                     type="button"
+                    aria-pressed={shapeKind === kind}
                     onClick={() => setShapeKind(kind)}
-                    className={`rounded-lg border px-2 py-1.5 text-[10px] font-bold capitalize transition ${shapeKind === kind ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12 text-[var(--text-primary)]/60"}`}
+                    className={`min-h-11 rounded-lg border px-1.5 py-1.5 text-[10px] font-bold capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${shapeKind === kind ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12 text-[var(--text-primary)]/60"}`}
                   >
                     {kind}
                   </button>
@@ -1321,7 +1323,7 @@ export default function EditPdfTool() {
                         editDraftText === selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("")
                       }
                       onClick={() => void applyTextRunEdit()}
-                      className="rounded-lg border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-2.5 py-1.5 text-xs font-bold text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+                      className="min-h-11 rounded-lg border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-2.5 text-xs font-bold text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {isApplyingEdit ? "Applying..." : "Apply edit"}
                     </button>
@@ -1364,7 +1366,7 @@ export default function EditPdfTool() {
                     type="button"
                     aria-pressed={selectedElement.bold}
                     onClick={() => setElements((current) => patchElement(current, selectedElement.id, { bold: !selectedElement.bold } as Partial<EditElement>))}
-                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-bold transition ${selectedElement.bold ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
+                    className={`min-h-11 flex-1 rounded-lg border px-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${selectedElement.bold ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
                   >
                     Bold
                   </button>
@@ -1372,7 +1374,7 @@ export default function EditPdfTool() {
                     type="button"
                     aria-pressed={selectedElement.italic}
                     onClick={() => setElements((current) => patchElement(current, selectedElement.id, { italic: !selectedElement.italic } as Partial<EditElement>))}
-                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs italic transition ${selectedElement.italic ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
+                    className={`min-h-11 flex-1 rounded-lg border px-2 text-xs italic transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${selectedElement.italic ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
                   >
                     Italic
                   </button>
