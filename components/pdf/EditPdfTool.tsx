@@ -50,7 +50,7 @@ import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@
 import { collectPageTextOperators, type LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { matchDetectedRunToOperator, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
 import { resolveFont, type ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
-import { resolveFontMetrics } from "@/lib/pdf/edit/fontMetrics";
+import { resolveFontMetrics, type FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import { applyEditPlanToDocument, applyMultiRunEditPlanToDocument } from "@/lib/pdf/edit/applyEditPlan";
@@ -843,17 +843,22 @@ export default function EditPdfTool() {
     return { kind: "valid", contentStreamIndex: firstLocator.contentStreamIndex, operatorIndices, allOperators, resources: nonNull[0].locatedOperator.resources, fontResourceName };
   }
 
-  // Phase 9.2: the live dry-run preview driving both the Apply button's
-  // disabled state and the specific reason shown next to it -- see
-  // EditPreview's own doc comment for why the one Form-XObject-reuse case
-  // (AmbiguousSharedFormError) can't be included here and is instead
-  // surfaced at Apply time. Pure/synchronous (buildEditPlan and
-  // buildMultiRunEditPlan never touch PDF bytes), so recomputing this on
-  // every keystroke is cheap. Reads `pdfLibDoc` STATE (not pdfLibDocRef) --
-  // React forbids reading a ref's value during render, even inside
-  // useMemo; pdfLibDoc is pdfLibDocRef's reactive twin kept for exactly
-  // this purpose (see its own doc comment).
-  const editPreview = useMemo((): EditPreview => {
+  // Phase 10: font resolution (resolveFont/resolveFontMetrics -- both parse
+  // the font dictionary, the expensive part of building editPreview below)
+  // depends only on WHICH run(s) are selected, never on the draft replacement
+  // text itself. Splitting it out means typing in the "Replace with" field
+  // (which changes editDraftText on every keystroke) only re-runs the cheap,
+  // pure plan-building below, not a font-dict re-parse. Reads `pdfLibDoc`
+  // STATE (not pdfLibDocRef) -- React forbids reading a ref's value during
+  // render, even inside useMemo; pdfLibDoc is pdfLibDocRef's reactive twin
+  // kept for exactly this purpose (see its own doc comment).
+  type ResolvedEditContext =
+    | { kind: "empty" }
+    | { kind: "error"; reason: string; multi: boolean }
+    | { kind: "single"; resolvedFont: ResolvedFont; fontMetrics: FontMetrics; locatedOperator: LocatedTextOperator; operator: LocatedTextOperator["operator"] }
+    | { kind: "multi"; resolvedFont: ResolvedFont; fontMetrics: FontMetrics; validation: Extract<MultiRunValidation, { kind: "valid" }> };
+
+  const resolvedEditContext = useMemo((): ResolvedEditContext => {
     if (!pdfLibDoc || selectedRunIndices.length === 0) return { kind: "empty" };
 
     try {
@@ -866,44 +871,74 @@ export default function EditPdfTool() {
         if (!fontDict) throw new Error("Could not resolve this text's font.");
         const resolvedFont = resolveFont(fontDict, pdfLibDoc.context);
         const fontMetrics = resolveFontMetrics(fontDict, pdfLibDoc.context, resolvedFont);
-        const plan = buildEditPlan({
-          pageIndex,
-          contentStreamIndex: locatedOperator.locator.kind === "page" ? locatedOperator.locator.contentStreamIndex : 0,
-          formPath: locatedOperator.locator.kind === "xobject" ? locatedOperator.locator.formPath : null,
-          operatorIndex: locatedOperator.operatorIndex,
-          operator,
-          replacementText: editDraftText,
-          resolvedFont,
-          fontMetrics,
-        });
-        // Real bug, found via live browser testing: see
-        // lib/pdf/edit/matchTextRun.ts's runSpansMultipleOperators for the
-        // full root cause (pdfjs merging several operators into one visual
-        // run, silently corrupting an edit that only rewrites the first).
-        // Rejected honestly here rather than papering over it.
-        const fullRunText = detectedTextRuns[selectedRunIndices[0]]?.str ?? "";
-        if (runSpansMultipleOperators(plan.originalText, fullRunText)) {
-          return {
-            kind: "single",
-            editable: false,
-            reason:
-              "This text is rendered internally as several separate pieces, and only part of it could be matched for editing -- in-place editing isn't available for this run yet.",
-            plan,
-            resolvedFont,
-            locatedOperator,
-          };
-        }
-        return { kind: "single", editable: plan.editable, reason: plan.reason, plan, resolvedFont, locatedOperator };
+        return { kind: "single", resolvedFont, fontMetrics, locatedOperator, operator };
       }
 
       const validation = validateMultiRunSelection(selectedRunIndices);
-      if (validation.kind === "invalid") {
-        return { kind: "multi", editable: false, reason: validation.reason, plan: null as never, resolvedFont: null as never };
-      }
+      if (validation.kind === "invalid") return { kind: "error", reason: validation.reason, multi: true };
       const fontDict = validation.resources.lookup(PDFName.of("Font"), PDFDict)?.lookup(PDFName.of(validation.fontResourceName), PDFDict);
       if (!fontDict) throw new Error("Could not resolve this text's font.");
       const resolvedFont = resolveFont(fontDict, pdfLibDoc.context);
       const fontMetrics = resolveFontMetrics(fontDict, pdfLibDoc.context, resolvedFont);
+      return { kind: "multi", resolvedFont, fontMetrics, validation };
+    } catch (resolveError) {
+      const reason = resolveError instanceof Error ? resolveError.message : "Could not validate this edit.";
+      return { kind: "error", reason, multi: selectedRunIndices.length > 1 };
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
+  }, [pdfLibDoc, selectedRunIndices, runMatches, pageOperators, pageIndex]);
+
+  // Phase 9.2: the live dry-run preview driving both the Apply button's
+  // disabled state and the specific reason shown next to it -- see
+  // EditPreview's own doc comment for why the one Form-XObject-reuse case
+  // (AmbiguousSharedFormError) can't be included here and is instead
+  // surfaced at Apply time. Pure/synchronous (buildEditPlan and
+  // buildMultiRunEditPlan never touch PDF bytes), so recomputing this on
+  // every keystroke is cheap -- font resolution itself (the expensive part)
+  // already happened in resolvedEditContext above and isn't repeated here.
+  const editPreview = useMemo((): EditPreview => {
+    if (resolvedEditContext.kind === "empty") return { kind: "empty" };
+
+    if (resolvedEditContext.kind === "error") {
+      return resolvedEditContext.multi
+        ? { kind: "multi", editable: false, reason: resolvedEditContext.reason, plan: null as never, resolvedFont: null as never }
+        : { kind: "empty" };
+    }
+
+    if (resolvedEditContext.kind === "single") {
+      const { resolvedFont, fontMetrics, locatedOperator, operator } = resolvedEditContext;
+      const plan = buildEditPlan({
+        pageIndex,
+        contentStreamIndex: locatedOperator.locator.kind === "page" ? locatedOperator.locator.contentStreamIndex : 0,
+        formPath: locatedOperator.locator.kind === "xobject" ? locatedOperator.locator.formPath : null,
+        operatorIndex: locatedOperator.operatorIndex,
+        operator,
+        replacementText: editDraftText,
+        resolvedFont,
+        fontMetrics,
+      });
+      // Real bug, found via live browser testing: see
+      // lib/pdf/edit/matchTextRun.ts's runSpansMultipleOperators for the
+      // full root cause (pdfjs merging several operators into one visual
+      // run, silently corrupting an edit that only rewrites the first).
+      // Rejected honestly here rather than papering over it.
+      const fullRunText = detectedTextRuns[selectedRunIndices[0]]?.str ?? "";
+      if (runSpansMultipleOperators(plan.originalText, fullRunText)) {
+        return {
+          kind: "single",
+          editable: false,
+          reason:
+            "This text is rendered internally as several separate pieces, and only part of it could be matched for editing -- in-place editing isn't available for this run yet.",
+          plan,
+          resolvedFont,
+          locatedOperator,
+        };
+      }
+      return { kind: "single", editable: plan.editable, reason: plan.reason, plan, resolvedFont, locatedOperator };
+    }
+
+    const { resolvedFont, fontMetrics, validation } = resolvedEditContext;
+    try {
       const plan = buildMultiRunEditPlan({
         pageIndex,
         contentStreamIndex: validation.contentStreamIndex,
@@ -916,12 +951,9 @@ export default function EditPdfTool() {
       return { kind: "multi", editable: plan.editable, reason: plan.reason, plan, resolvedFont };
     } catch (previewError) {
       const reason = previewError instanceof Error ? previewError.message : "Could not validate this edit.";
-      return selectedRunIndices.length === 1
-        ? { kind: "empty" }
-        : { kind: "multi", editable: false, reason, plan: null as never, resolvedFont: null as never };
+      return { kind: "multi", editable: false, reason, plan: null as never, resolvedFont: null as never };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
-  }, [pdfLibDoc, selectedRunIndices, runMatches, pageOperators, pageIndex, editDraftText, detectedTextRuns]);
+  }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex]);
 
   // Phase 9.2: the actual write-back for whatever editPreview currently
   // says is ready (single-operator via lib/pdf/edit/applyEditPlan.ts's
