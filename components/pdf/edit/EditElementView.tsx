@@ -14,7 +14,7 @@
 // at gesture end, so dragging stays smooth regardless of how many other
 // elements are on the page.
 
-import { useRef } from "react";
+import { memo, useRef } from "react";
 import { canResizeElement, isLineShape, moveElementByArrowKey, resizeElementByArrowKey, type EditElement } from "@/lib/pdf/edit/elements";
 
 // Phase 9.3: keyboard-editing hardening -- Arrow keys move, Shift+Arrow
@@ -31,7 +31,14 @@ function clamp(value: number, min: number, max: number) {
 
 type LiveGeometry = { xPct: number; yPct: number; widthPct: number; heightPct: number };
 
-export function EditElementView({
+// Phase 10: memoized so dragging/resizing/selecting ONE element doesn't
+// force React to reconcile every other placed element on the page. The
+// parent's (EditPdfTool.tsx) per-item inline callbacks, built fresh inside
+// its .map(), still compare stable across renders where they're unchanged:
+// this project's React Compiler auto-memoizes them by their closed-over
+// dependencies (element.id, setElements, setSelectedId), so no manual
+// useCallback/ref-caching is needed here.
+function EditElementViewImpl({
   element,
   selected,
   stageRef,
@@ -329,3 +336,5 @@ export function EditElementView({
     </div>
   );
 }
+
+export const EditElementView = memo(EditElementViewImpl);

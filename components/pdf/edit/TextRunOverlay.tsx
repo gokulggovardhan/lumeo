@@ -30,7 +30,7 @@
 // range-select convention, and the same Shift+Arrow keyboard equivalent
 // the parent wires at the stage level.
 
-import type { KeyboardEvent, MouseEvent } from "react";
+import { memo, type KeyboardEvent, type MouseEvent } from "react";
 import type { DetectedTextRun } from "@/lib/pdf/edit/textRuns.ts";
 
 type TextRunOverlayProps = {
@@ -45,7 +45,16 @@ type TextRunOverlayProps = {
   registerNode: (node: HTMLDivElement | null) => void;
 };
 
-export function TextRunOverlay({
+// Phase 10: memoized so selecting/hovering ONE run (a state change in the
+// parent, EditPdfTool.tsx) doesn't force React to reconcile every other
+// run's overlay on a text-heavy page -- only the ones whose props actually
+// changed re-render. The parent's per-item inline callbacks (onSelect,
+// onHoverStart, etc., built fresh inside its .map()) still compare stable
+// across renders where they're unchanged: this project's React Compiler
+// auto-memoizes them by their closed-over dependencies, so no manual
+// useCallback/ref-caching is needed (and would conflict with the
+// compiler's own memoization -- see react-hooks/refs).
+function TextRunOverlayImpl({
   run,
   editable,
   selected,
@@ -102,3 +111,5 @@ export function TextRunOverlay({
     />
   );
 }
+
+export const TextRunOverlay = memo(TextRunOverlayImpl);
