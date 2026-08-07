@@ -1195,8 +1195,20 @@ export default function EditPdfTool() {
                     />
                   ) : null}
 
-                  {activeTool === "select"
-                    ? detectedTextRuns.map((run, index) => (
+                  {detectedTextRuns.length > 0 ? (
+                    // Phase 10.2: kept mounted regardless of activeTool (a CSS
+                    // display toggle, not a conditional unmount) -- measured
+                    // root cause of "tool switching feels slow on a text-heavy
+                    // page": the old `activeTool === "select" ? runs.map(...) :
+                    // null` fully unmounted every TextRunOverlay on leaving
+                    // Select and remounted (not just re-rendered) all of them
+                    // on returning, defeating the React.memo wrapping added in
+                    // Phase 10 and paying full DOM node creation cost on every
+                    // switch back. display:none also removes this subtree from
+                    // hit-testing and the focus/tab order for free, so hidden
+                    // runs can't intercept clicks meant for another tool.
+                    <div style={activeTool === "select" ? undefined : { display: "none" }}>
+                      {detectedTextRuns.map((run, index) => (
                         <TextRunOverlay
                           // detectedTextRuns is fully replaced (not reordered/spliced) on every
                           // page load or edit apply, so an index key is safe here.
@@ -1214,8 +1226,9 @@ export default function EditPdfTool() {
                             else runOverlayNodesRef.current.delete(index);
                           }}
                         />
-                      ))
-                    : null}
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
             )}
