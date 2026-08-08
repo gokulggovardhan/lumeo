@@ -15,7 +15,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import type { PDFDocumentProxy } from "pdfjs-dist";
-import { PDFDocument, PDFName, PDFDict } from "pdf-lib";
+// pdf-lib itself is NOT imported as a value here -- see loadEditEngine
+// below, which loads it (and every lib/pdf/edit/*.ts module that touches
+// it internally) lazily, on first actual need, instead of bundling a
+// substantial library into the page's initial JS on every visit to
+// /pdf/edit regardless of whether the user ever uploads a file. Only
+// TYPES are imported statically -- these are erased at compile time and
+// have zero runtime/bundle cost, same treatment PDFDocumentProxy (from
+// pdfjs-dist, also lazy-loaded) already gets above.
+import type { PDFDocument, PDFDict } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
   L2FileCard,
@@ -46,15 +54,22 @@ import {
   type EditElement,
   type ShapeKind,
 } from "@/lib/pdf/edit/elements";
-import { exportEditedPdf } from "@/lib/pdf/edit/export";
+// exportEditedPdf, collectPageTextOperators, resolveFont,
+// resolveFontMetrics, applyEditPlanToDocument, and
+// applyMultiRunEditPlanToDocument are all loaded lazily too -- see
+// loadEditEngine below -- because their own home modules
+// (lib/pdf/edit/export.ts, formXObjects.ts, fontEncoding.ts,
+// fontMetrics.ts, applyEditPlan.ts) each import pdf-lib at their own top
+// level. Statically importing any of THEM here would pull pdf-lib back
+// in transitively regardless of the type-only import above. Their TYPE
+// exports are unaffected (same erased-at-compile-time reasoning).
 import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
-import { collectPageTextOperators, type LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
+import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { matchDetectedRunToOperator, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
-import { resolveFont, type ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
-import { resolveFontMetrics, type FontMetrics } from "@/lib/pdf/edit/fontMetrics";
+import type { ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
+import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
-import { applyEditPlanToDocument, applyMultiRunEditPlanToDocument } from "@/lib/pdf/edit/applyEditPlan";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
@@ -130,6 +145,59 @@ const TOOL_SHORTCUT_KEYS: Record<string, ActiveTool> = {
 const TOOL_SHORTCUT_LABELS: Record<ActiveTool, string> = { select: "1", text: "2", draw: "3", shape: "4", whiteout: "5" };
 
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
+
+// Lazy-loads pdf-lib itself plus every lib/pdf/edit/*.ts module whose OWN
+// top-level imports touch it (export.ts, formXObjects.ts, fontEncoding.ts,
+// fontMetrics.ts, applyEditPlan.ts) -- all six only actually needed once a
+// user has a PDF loaded into Edit PDF, never on initial page load. Those
+// five files' own internals are completely unchanged; this only moves the
+// import EDGE from EditPdfTool.tsx into them from static to dynamic, so
+// webpack code-splits the whole cluster (pdf-lib included) into a separate
+// chunk instead of bundling it into every visit to /pdf/edit regardless of
+// whether the user ever uploads a file.
+//
+// A single module-level cached promise (not a ref) so it survives
+// component remounts, mirroring lib/pdf/pdfjs.ts's loadPdfJsModule exactly
+// -- same singleton-lazy-import pattern already established in this
+// codebase for pdfjs-dist, just applied to pdf-lib's own equally-eager
+// static import.
+let editEngineModulePromise: Promise<{
+  exportEditedPdf: (typeof import("@/lib/pdf/edit/export"))["exportEditedPdf"];
+  collectPageTextOperators: (typeof import("@/lib/pdf/edit/formXObjects"))["collectPageTextOperators"];
+  resolveFont: (typeof import("@/lib/pdf/edit/fontEncoding"))["resolveFont"];
+  resolveFontMetrics: (typeof import("@/lib/pdf/edit/fontMetrics"))["resolveFontMetrics"];
+  applyEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyEditPlanToDocument"];
+  applyMultiRunEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyMultiRunEditPlanToDocument"];
+  PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
+  PDFName: (typeof import("pdf-lib"))["PDFName"];
+  PDFDict: (typeof import("pdf-lib"))["PDFDict"];
+}> | null = null;
+
+function loadEditEngine() {
+  if (!editEngineModulePromise) {
+    editEngineModulePromise = Promise.all([
+      import("@/lib/pdf/edit/export"),
+      import("@/lib/pdf/edit/formXObjects"),
+      import("@/lib/pdf/edit/fontEncoding"),
+      import("@/lib/pdf/edit/fontMetrics"),
+      import("@/lib/pdf/edit/applyEditPlan"),
+      import("pdf-lib"),
+    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod]) => ({
+      exportEditedPdf: exportMod.exportEditedPdf,
+      collectPageTextOperators: formXObjectsMod.collectPageTextOperators,
+      resolveFont: fontEncodingMod.resolveFont,
+      resolveFontMetrics: fontMetricsMod.resolveFontMetrics,
+      applyEditPlanToDocument: applyEditPlanMod.applyEditPlanToDocument,
+      applyMultiRunEditPlanToDocument: applyEditPlanMod.applyMultiRunEditPlanToDocument,
+      PDFDocument: pdfLibMod.PDFDocument,
+      PDFName: pdfLibMod.PDFName,
+      PDFDict: pdfLibMod.PDFDict,
+    }));
+  }
+  return editEngineModulePromise;
+}
+
+type EditEngine = Awaited<ReturnType<typeof loadEditEngine>>;
 
 const PAGE_RENDER_SCALE = 1.3;
 const EXPORT_TIMEOUT_MS = 30_000;
@@ -364,6 +432,15 @@ export default function EditPdfTool() {
   // BOTH this doc and the pdfjs preview -- there is only ever one baseline,
   // never two documents that could drift out of sync with each other.
   const pdfLibDocRef = useRef<PDFDocument | null>(null);
+  // Populated once loadEditEngine() resolves (see the pdfLibDoc-loading
+  // effect below) -- used for imperative access from effects/handlers.
+  const editEngineRef = useRef<EditEngine | null>(null);
+  // A REACTIVE twin of editEngineRef, same reasoning as pdfLibDoc's own
+  // twin just below: resolvedEditContext's useMemo needs synchronous
+  // access to resolveFont/resolveFontMetrics/PDFName/PDFDict during
+  // render, and React forbids reading a ref's value there (even inside
+  // useMemo) -- this project's React Compiler enforces that rule.
+  const [editEngine, setEditEngine] = useState<EditEngine | null>(null);
   // Phase 9.2: a REACTIVE twin of pdfLibDocRef, set together with it
   // everywhere the ref is -- editPreview (below) needs to read "is the
   // pdf-lib doc ready, and which one" from within a useMemo, and React
@@ -486,9 +563,15 @@ export default function EditPdfTool() {
     void (async () => {
       pdfLibDocRef.current = null;
       setPdfLibDoc(null);
+      editEngineRef.current = null;
+      setEditEngine(null);
       if (!pdf) return;
       try {
-        const doc = await PDFDocument.load(copyArrayBuffer(pdf.bytes));
+        const engine = await loadEditEngine();
+        if (cancelled) return;
+        editEngineRef.current = engine;
+        setEditEngine(engine);
+        const doc = await engine.PDFDocument.load(copyArrayBuffer(pdf.bytes));
         if (cancelled) return;
         pdfLibDocRef.current = doc;
         setPdfLibDoc(doc);
@@ -651,8 +734,8 @@ export default function EditPdfTool() {
           MAX_CANVAS_DIMENSION_PX,
         );
         const viewport = page.getViewport({ scale: dimensionScale });
-        if (cancelled || !pdfLibDocRef.current) return;
-        const located = collectPageTextOperators(pdfLibDocRef.current, pageIndex);
+        if (cancelled || !pdfLibDocRef.current || !editEngineRef.current) return;
+        const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
         if (cancelled) return;
         setPageOperators(located);
         const flatOperators = located.map((item) => item.operator);
@@ -1137,7 +1220,8 @@ export default function EditPdfTool() {
     | { kind: "multi"; resolvedFont: ResolvedFont; fontMetrics: FontMetrics; validation: Extract<MultiRunValidation, { kind: "valid" }> };
 
   const resolvedEditContext = useMemo((): ResolvedEditContext => {
-    if (!pdfLibDoc || selectedRunIndices.length === 0) return { kind: "empty" };
+    if (!pdfLibDoc || !editEngine || selectedRunIndices.length === 0) return { kind: "empty" };
+    const { PDFName, PDFDict, resolveFont, resolveFontMetrics } = editEngine;
 
     try {
       if (selectedRunIndices.length === 1) {
@@ -1164,7 +1248,7 @@ export default function EditPdfTool() {
       return { kind: "error", reason, multi: selectedRunIndices.length > 1 };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
-  }, [pdfLibDoc, selectedRunIndices, runMatches, pageOperators, pageIndex]);
+  }, [pdfLibDoc, editEngine, selectedRunIndices, runMatches, pageOperators, pageIndex]);
 
   // Phase 9.2: the live dry-run preview driving both the Apply button's
   // disabled state and the specific reason shown next to it -- see
@@ -1260,17 +1344,18 @@ export default function EditPdfTool() {
   // export pipeline) all see this edit without any separate wiring.
   const applyTextRunEdit = useCallback(async () => {
     const doc = pdfLibDocRef.current;
-    if (!doc || editPreview.kind === "empty" || !editPreview.editable) return;
+    const engine = editEngineRef.current;
+    if (!doc || !engine || editPreview.kind === "empty" || !editPreview.editable) return;
 
     setIsApplyingEdit(true);
     setEditApplyError("");
     try {
       if (editPreview.kind === "single") {
         const { plan, resolvedFont, locatedOperator } = editPreview;
-        await applyEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode, { isolate: locatedOperator.locator.kind === "xobject" });
+        await engine.applyEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode, { isolate: locatedOperator.locator.kind === "xobject" });
       } else {
         const { plan, resolvedFont } = editPreview;
-        await applyMultiRunEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode);
+        await engine.applyMultiRunEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode);
       }
 
       const newBytes = await doc.save();
@@ -1341,8 +1426,15 @@ export default function EditPdfTool() {
     track({ eventName: "processing_started", toolSlug: "edit" });
 
     try {
+      // Not read from editEngineRef here -- export can be reached even if
+      // the user only ever placed overlay elements and never touched
+      // existing text, so the pdfLibDoc-loading effect that normally
+      // populates the ref isn't guaranteed to have run first. loadEditEngine
+      // is cached/idempotent (see its own doc comment), so calling it again
+      // here is a cheap no-op if already loaded, and otherwise loads it now.
+      const engine = await loadEditEngine();
       const { bytes, skippedPages } = await runWithTimeout(
-        exportEditedPdf(copyArrayBuffer(pdf.bytes), elements),
+        engine.exportEditedPdf(copyArrayBuffer(pdf.bytes), elements),
         "Generating the PDF took too long. Try fewer elements or a smaller file.",
       );
       if (skippedPages.length > 0) {
