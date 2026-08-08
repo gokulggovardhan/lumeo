@@ -558,6 +558,21 @@ export default function EditPdfTool() {
         setPageImageUrl(url);
         setPageDisplaySize({ width: canvas.width, height: canvas.height });
         setPagePointSize({ width: pointViewport.width, height: pointViewport.height });
+        // Phase 16: the rendered page image is fully usable right here --
+        // flip pageLoading off NOW instead of waiting for the finally block
+        // below, which previously only ran after getTextContent() below it
+        // ALSO finished. That meant the loading skeleton kept showing (and
+        // the page stayed non-interactive) for the full duration of text
+        // detection even though the image had been ready for a while --
+        // on a text-heavy/complex-font page, getTextContent can itself take
+        // real time, so this was pure added perceived latency for a
+        // secondary, best-effort feature (the select tool's text
+        // highlighting) that has no bearing on whether the page can be
+        // viewed, zoomed, or have Text/Draw/Shape/Whiteout elements placed
+        // on it. Detected runs still populate a moment later and the select
+        // tool's highlighting appears as soon as they do -- nothing about
+        // detection itself changed, only when the page stops being "loading".
+        if (!cancelled) setPageLoading(false);
 
         // Best-effort: a page's existing text is a bonus (lets the select
         // tool highlight it), never a requirement -- a failure here must
@@ -574,6 +589,11 @@ export default function EditPdfTool() {
         // -- that's expected teardown, not a real preview failure.
         if (!cancelled) setError("This page could not be previewed. Try a different page.");
       } finally {
+        // Safety net for every path that returns/throws BEFORE the image is
+        // ready (context allocation failure, render failure/timeout, a
+        // cancelled render) -- the early setPageLoading(false) above only
+        // covers the success path past that point. Calling it again here on
+        // that same success path is a harmless no-op (state already false).
         if (!cancelled) setPageLoading(false);
       }
     })();
