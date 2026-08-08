@@ -13,6 +13,7 @@
 // multi-select, true content-stripping redaction, vector-path ink.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { PDFDocument, PDFName, PDFDict } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
@@ -776,7 +777,7 @@ export default function EditPdfTool() {
       const xPct = ((event.clientX - rect.left) / rect.width) * 100;
       const yPct = ((event.clientY - rect.top) / rect.height) * 100;
       const run = findTextRunAtPoint(detectedTextRuns, xPct, yPct);
-      selectTextRun(run ? detectedTextRuns.indexOf(run) : null, event.shiftKey);
+      selectTextRunAndFocus(run ? detectedTextRuns.indexOf(run) : null, event.shiftKey);
       return;
     }
 
@@ -899,6 +900,34 @@ export default function EditPdfTool() {
     setSelectedRunIndices(range);
     setEditDraftText(range.map((i) => detectedTextRuns[i]?.str ?? "").join(""));
     setEditApplyError("");
+  }
+
+  // Bug fix (reported from iPhone 15 Plus / Safari): tapping editable text
+  // opened the inline caret box, but the on-screen keyboard never appeared.
+  // Root cause -- the autofocus effect below calls inlineEditInputRef.focus()
+  // from a useEffect, which runs on a LATER task/microtask than the tap
+  // event itself. iOS Safari only opens the virtual keyboard for a
+  // programmatic .focus() call made SYNCHRONOUSLY inside a trusted
+  // user-gesture handler; by the time the effect runs, that window has
+  // already closed, so Safari silently focuses the input without ever
+  // showing the keyboard (desktop browsers have no such restriction, which
+  // is why this never reproduced outside a real iOS device).
+  //
+  // Fix: for the two paths that represent an actual tap/click selecting a
+  // single run (TextRunOverlay's own click/Enter/Space, and the stage's
+  // click-to-select fallback below), force the resulting state update AND
+  // its render to complete synchronously via flushSync, then focus the now-
+  // mounted input immediately after -- still inside the same call stack as
+  // the original tap. The plain selectTextRun above is untouched and still
+  // used for paths where there's no input to focus (deselection, keyboard
+  // Arrow-key focus-follow), and the effect below stays as a safety net for
+  // any other path that lands on a single-run selection.
+  function selectTextRunAndFocus(index: number | null, extend = false) {
+    flushSync(() => {
+      selectTextRun(index, extend);
+    });
+    inlineEditInputRef.current?.focus();
+    inlineEditInputRef.current?.select();
   }
 
   // Hover highlighting for the select tool -- a discrete "did the hit-test
@@ -1429,7 +1458,7 @@ export default function EditPdfTool() {
                           editable={Boolean(runMatches[index])}
                           selected={selectedRunIndices.includes(index)}
                           hovered={hoveredRunIndex === index}
-                          onSelect={(shiftKey) => selectTextRun(index, shiftKey)}
+                          onSelect={(shiftKey) => selectTextRunAndFocus(index, shiftKey)}
                           onHoverStart={() => setHoveredRunIndex((current) => (current === index ? current : index))}
                           onHoverEnd={() => setHoveredRunIndex((current) => (current === -1 ? current : -1))}
                           onFocusRun={() => setFocusedRunIndex(index)}
