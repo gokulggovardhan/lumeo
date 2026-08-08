@@ -218,6 +218,17 @@ export default function EditPdfTool() {
   // `pixelsPerPoint` prop.
   const [pagePointSize, setPagePointSize] = useState<{ width: number; height: number } | null>(null);
   const [pageLoading, setPageLoading] = useState(false);
+  // Phase 20: distinct from pageLoading (which now flips false as soon as
+  // the page IMAGE is ready, per #220) -- this specifically tracks whether
+  // text-run detection has finished for the CURRENT page, so the Select
+  // tool can show "Preparing editable text..." instead of silently looking
+  // like there's simply no text on the page while detection is still in
+  // flight (getTextContent can take real time on a text-heavy/complex-font
+  // page). False means "still detecting OR not started yet for this page";
+  // true means detection finished, successfully or not -- detectedTextRuns
+  // itself (empty or populated) is the source of truth for the RESULT,
+  // this is only about whether that result is final yet.
+  const [textDetectionReady, setTextDetectionReady] = useState(false);
   const [error, setError] = useState("");
 
   const {
@@ -405,6 +416,7 @@ export default function EditPdfTool() {
     resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0) });
     setSelectedId(null);
     setDetectedTextRuns([]);
+    setTextDetectionReady(false);
     setRunMatches([]);
     setPageOperators([]);
     setSelectionAnchorIndex(null);
@@ -522,6 +534,7 @@ export default function EditPdfTool() {
       // the previous page's matches while it's catching up.
       setRunMatches([]);
       setPageOperators([]);
+      setTextDetectionReady(false);
       try {
         const page = await doc.getPage(pageIndex + 1);
         const pointViewport = page.getViewport({ scale: 1 });
@@ -583,6 +596,14 @@ export default function EditPdfTool() {
           setDetectedTextRuns(runs);
         } catch {
           setDetectedTextRuns([]);
+        } finally {
+          // Detection is "done" here whether it succeeded, found nothing, or
+          // failed -- all three are a final answer, not a still-in-progress
+          // state. Not gated on `cancelled` like pageLoading above: this
+          // flag only matters as a display concern for the CURRENT page's
+          // sidebar, and if the effect was cancelled a fresh run for the
+          // new page has already reset it back to false anyway.
+          setTextDetectionReady(true);
         }
       } catch {
         // A cancelled render's promise rejects (RenderingCancelledException)
@@ -719,6 +740,39 @@ export default function EditPdfTool() {
       inlineEditInputRef.current?.focus();
       inlineEditInputRef.current?.select();
     }
+  }, [activeTool, selectedRunIndices, runMatches]);
+
+  // Phase 20 (D): scrollIntoView (Phase 15, above/selectTextRunAndFocus)
+  // only runs ONCE, synchronously at the moment of tap -- it can't account
+  // for the keyboard's own opening ANIMATION, which on iOS Safari resizes
+  // the visual viewport gradually over the following few hundred ms, not
+  // instantly. If the keyboard finishes opening after that one scroll
+  // already ran, it can still end up covering the input/toolbar. This
+  // effect supplements (does not replace) that fix: while the inline
+  // editor is open, it listens for visualViewport's own resize event
+  // (fires as the keyboard animates) and re-checks whether the input is
+  // still within the now-current visible bounds, nudging it back into view
+  // if not. Feature-detected -- browsers without visualViewport support
+  // simply don't get this extra correction and fall back to the Phase 15
+  // scrollIntoView-at-focus-time behavior alone, unchanged.
+  useEffect(() => {
+    const isEditorOpen = activeTool === "select" && selectedRunIndices.length === 1 && Boolean(runMatches[selectedRunIndices[0]]);
+    if (!isEditorOpen || typeof window === "undefined" || !window.visualViewport) return;
+
+    const viewport = window.visualViewport;
+    function handleViewportResize() {
+      const input = inlineEditInputRef.current;
+      if (!input || !viewport) return;
+      const rect = input.getBoundingClientRect();
+      const visibleBottom = viewport.offsetTop + viewport.height;
+      const visibleTop = viewport.offsetTop;
+      if (rect.bottom > visibleBottom || rect.top < visibleTop) {
+        const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+        input.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
+      }
+    }
+    viewport.addEventListener("resize", handleViewportResize);
+    return () => viewport.removeEventListener("resize", handleViewportResize);
   }, [activeTool, selectedRunIndices, runMatches]);
 
 
@@ -1040,7 +1094,10 @@ export default function EditPdfTool() {
       (m) => m.locatedOperator.locator.kind === "page" && m.locatedOperator.locator.contentStreamIndex === firstLocator.contentStreamIndex,
     );
     if (!sameStream) {
-      return { kind: "invalid", reason: "Selected lines must be part of the same content stream." };
+      // Phase 20 (M): was "Selected lines must be part of the same content
+      // stream." -- accurate but meaningless to a non-technical user (the
+      // phase's own explicit example of the kind of message to avoid).
+      return { kind: "invalid", reason: "This text is split internally by the PDF and can't be edited as one piece here -- try editing one part at a time." };
     }
     const operatorIndices = [...nonNull.map((m) => m.locatedOperator.operatorIndex)].sort((a, b) => a - b);
     for (let i = 1; i < operatorIndices.length; i += 1) {
@@ -1050,7 +1107,7 @@ export default function EditPdfTool() {
     }
     const fontResourceName = nonNull[0].operator.fontResourceName;
     if (!fontResourceName) {
-      return { kind: "invalid", reason: "This text has no associated font resource." };
+      return { kind: "invalid", reason: "This text's font couldn't be identified, so it can't be edited here." };
     }
     if (nonNull.some((m) => m.operator.fontResourceName !== fontResourceName)) {
       return { kind: "invalid", reason: "Selected lines use different fonts -- multi-line edits must share one font." };
@@ -1087,7 +1144,7 @@ export default function EditPdfTool() {
         const match = runMatches[selectedRunIndices[0]];
         if (!match) return { kind: "empty" };
         const { locatedOperator, operator } = match;
-        if (!operator.fontResourceName) throw new Error("This text has no associated font resource.");
+        if (!operator.fontResourceName) throw new Error("This text's font couldn't be identified, so it can't be edited here.");
         const fontDict = locatedOperator.resources.lookup(PDFName.of("Font"), PDFDict)?.lookup(PDFName.of(operator.fontResourceName), PDFDict);
         if (!fontDict) throw new Error("Could not resolve this text's font.");
         const resolvedFont = resolveFont(fontDict, pdfLibDoc.context);
@@ -1654,6 +1711,20 @@ export default function EditPdfTool() {
             {activeTool === "whiteout" ? (
               <p className="mt-3 rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] p-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
                 Drag over the text or content you want to hide -- it snaps to a line of text automatically, or drag freely for anything else. Hides content visually only; for legal or compliance redaction, verify the underlying content is also removed before sharing.
+              </p>
+            ) : null}
+
+            {activeTool === "select" && !textDetectionReady && selectedRunIndices.length === 0 && pageImageUrl ? (
+              // Phase 20: fast-first-paint UX -- the page itself became
+              // usable (image displayed, zoomable, navigable) the moment
+              // pageLoading cleared (#220), which can now happen BEFORE
+              // text-run detection finishes. Without this, tapping around
+              // on the Select tool during that window looked identical to
+              // "this page just has no text at all" -- silently wrong, not
+              // merely slow-looking. This note is the only UI difference;
+              // detection itself, and every other tool, is unaffected.
+              <p role="status" className="mt-3 rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] p-2.5 text-[11px] leading-5 text-[var(--text-primary)]/50">
+                Preparing editable text…
               </p>
             ) : null}
 
