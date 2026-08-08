@@ -71,7 +71,7 @@ import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
-import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension } from "@/lib/pdf/pdfjs";
+import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
@@ -222,6 +222,17 @@ const EDIT_HISTORY_MAX_BYTES = 300 * 1024 * 1024;
 // render, a failed canvas allocation, or browser instability on
 // constrained devices.
 const MAX_CANVAS_DIMENSION_PX = 5200;
+// Phase 26: MAX_CANVAS_DIMENSION_PX alone only bounds the canvas's LONGER
+// side -- a page large on BOTH axes (e.g. near-square, close to the
+// dimension cap on each side) can still pass that check while producing a
+// canvas up to 5200x5200 = ~27 million pixels (a ~108MB RGBA backing
+// buffer for one canvas). See clampRenderScaleToPixelBudget's own doc
+// comment in lib/pdf/pdfjs.ts -- this budget is set well above any
+// realistic document (Letter/A4 and even large-format pages like ANSI E
+// at 34x44in stay under 15M px at PAGE_RENDER_SCALE) so it's a no-op for
+// every normal page, and only reduces scale further for the rare
+// pathological one.
+const MAX_CANVAS_TOTAL_PIXELS = 20_000_000;
 
 function clampPct(value: number) {
   return Math.min(100, Math.max(0, value));
@@ -635,11 +646,11 @@ export default function EditPdfTool() {
         // ordinary page (dimensionScale === PAGE_RENDER_SCALE, unchanged
         // behavior); only an oversized MediaBox has its render scale
         // reduced below the usual default.
-        const dimensionScale = clampRenderScaleToMaxDimension(
-          PAGE_RENDER_SCALE,
+        const dimensionScale = clampRenderScaleToPixelBudget(
+          clampRenderScaleToMaxDimension(PAGE_RENDER_SCALE, pointViewport.width, pointViewport.height, MAX_CANVAS_DIMENSION_PX),
           pointViewport.width,
           pointViewport.height,
-          MAX_CANVAS_DIMENSION_PX,
+          MAX_CANVAS_TOTAL_PIXELS,
         );
         const viewport = page.getViewport({ scale: dimensionScale });
         pageAndViewportRef.current = { pageIndex, page, viewport };
@@ -749,11 +760,11 @@ export default function EditPdfTool() {
             : await (async () => {
                 const fetchedPage = await doc.getPage(pageIndex + 1);
                 const pointViewport = fetchedPage.getViewport({ scale: 1 });
-                const dimensionScale = clampRenderScaleToMaxDimension(
-                  PAGE_RENDER_SCALE,
+                const dimensionScale = clampRenderScaleToPixelBudget(
+                  clampRenderScaleToMaxDimension(PAGE_RENDER_SCALE, pointViewport.width, pointViewport.height, MAX_CANVAS_DIMENSION_PX),
                   pointViewport.width,
                   pointViewport.height,
-                  MAX_CANVAS_DIMENSION_PX,
+                  MAX_CANVAS_TOTAL_PIXELS,
                 );
                 return { viewport: fetchedPage.getViewport({ scale: dimensionScale }) };
               })();

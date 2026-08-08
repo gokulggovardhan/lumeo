@@ -115,6 +115,33 @@ export function clampRenderScaleToMaxDimension(
   return Math.min(requestedScale, maxDimensionPx / Math.max(pageWidthPt, pageHeightPt));
 }
 
+// Phase 26: clampRenderScaleToMaxDimension alone only bounds the LONGER
+// side of the canvas -- a page whose MediaBox is large on BOTH axes (e.g.
+// close to square, near the dimension cap on each side) can still pass
+// that check while producing an enormous total pixel count. Concretely: at
+// MAX_CANVAS_DIMENSION_PX=5200, a ~5200x5200pt page clamps its scale to
+// ~1.0 (a no-op relative to the cap) and still rasterizes a 5200x5200
+// canvas -- 27 million pixels, a ~108MB RGBA backing buffer for one canvas,
+// before JPEG encoding even begins. Ordinary pages (Letter/A4, and even
+// large-format ones like ANSI E at 34x44in) stay far below this and are
+// completely unaffected -- this only reduces scale further for the rare
+// page that's large on both axes at once, exactly mirroring
+// computeAdaptiveRenderScale's own maxTotalPixels budget (see its own doc
+// comment) but as a standalone, DPR/CSS-width-independent safety net that
+// can be applied to the CURRENT live render path without any of the
+// unverifiable-in-this-sandbox assumptions that keep that function itself
+// unwired.
+export function clampRenderScaleToPixelBudget(
+  requestedScale: number,
+  pageWidthPt: number,
+  pageHeightPt: number,
+  maxTotalPixels: number,
+): number {
+  const totalPixels = pageWidthPt * requestedScale * (pageHeightPt * requestedScale);
+  if (totalPixels <= maxTotalPixels) return requestedScale;
+  return requestedScale * Math.sqrt(maxTotalPixels / totalPixels);
+}
+
 // Phase 20: a device-aware render-scale policy, prepared as tested
 // infrastructure but NOT yet wired into any live render path (see
 // EditPdfTool.tsx's page-render effect, which still calls
