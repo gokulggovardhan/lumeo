@@ -926,8 +926,20 @@ export default function EditPdfTool() {
     flushSync(() => {
       selectTextRun(index, extend);
     });
-    inlineEditInputRef.current?.focus();
-    inlineEditInputRef.current?.select();
+    const input = inlineEditInputRef.current;
+    if (!input) return;
+    input.focus();
+    input.select();
+    // Phase 15: iOS Safari shrinks the VISUAL viewport (not the layout
+    // viewport) when the on-screen keyboard opens, and does not itself
+    // guarantee the just-focused element ends up above it -- for a run near
+    // the bottom of the page preview, the keyboard can cover the input and
+    // its floating Apply/Cancel toolbar right after they appear. A single
+    // explicit scrollIntoView resolves it the same way native form inputs
+    // are auto-scrolled into view. matchMedia check (not a CSS class) since
+    // this is imperative, not stylable.
+    const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    input.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
   }
 
   // Hover highlighting for the select tool -- a discrete "did the hit-test
