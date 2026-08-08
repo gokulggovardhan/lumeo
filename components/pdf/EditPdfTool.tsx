@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from "pdfjs-dist";
 // pdf-lib itself is NOT imported as a value here -- see loadEditEngine
 // below, which loads it (and every lib/pdf/edit/*.ts module that touches
 // it internally) lazily, on first actual need, instead of bundling a
@@ -412,6 +412,15 @@ export default function EditPdfTool() {
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
+  // Phase 22: the render effect below already fetches this exact page and
+  // computes its scaled viewport once per pageIndex -- the operator-matching
+  // effect used to independently re-fetch and re-derive both from scratch
+  // (a second doc.getPage() + two more getViewport() calls per page view,
+  // pure duplicated pdf.js/main-thread work) purely so it could read the
+  // same numbers a moment later. Cached here, keyed by pageIndex, so it can
+  // reuse them instead. Only ever read by the operator effect right after
+  // the render effect that populated it, for the SAME pageIndex.
+  const pageAndViewportRef = useRef<{ pageIndex: number; page: PDFPageProxy; viewport: PageViewport } | null>(null);
   const [docReady, setDocReady] = useState(0);
   // addFile() must open the file via pdfjs once up front to read its page
   // count (for the page-count limit check) before pdf state is even set --
@@ -633,6 +642,7 @@ export default function EditPdfTool() {
           MAX_CANVAS_DIMENSION_PX,
         );
         const viewport = page.getViewport({ scale: dimensionScale });
+        pageAndViewportRef.current = { pageIndex, page, viewport };
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d", { alpha: false });
         if (!context) {
@@ -725,15 +735,28 @@ export default function EditPdfTool() {
 
     void (async () => {
       try {
-        const page = await doc.getPage(pageIndex + 1);
-        const pointViewport = page.getViewport({ scale: 1 });
-        const dimensionScale = clampRenderScaleToMaxDimension(
-          PAGE_RENDER_SCALE,
-          pointViewport.width,
-          pointViewport.height,
-          MAX_CANVAS_DIMENSION_PX,
-        );
-        const viewport = page.getViewport({ scale: dimensionScale });
+        // Reuse the render effect's already-fetched page/viewport for this
+        // same pageIndex instead of re-deriving them -- see
+        // pageAndViewportRef's own doc comment. The cached entry is
+        // guaranteed present by the time this effect can run: it depends on
+        // pageDisplaySize, which the render effect only sets AFTER
+        // populating this ref for the current pageIndex. The direct fetch
+        // stays as a defensive fallback in case that invariant ever changes.
+        const cached = pageAndViewportRef.current;
+        const { viewport } =
+          cached && cached.pageIndex === pageIndex
+            ? cached
+            : await (async () => {
+                const fetchedPage = await doc.getPage(pageIndex + 1);
+                const pointViewport = fetchedPage.getViewport({ scale: 1 });
+                const dimensionScale = clampRenderScaleToMaxDimension(
+                  PAGE_RENDER_SCALE,
+                  pointViewport.width,
+                  pointViewport.height,
+                  MAX_CANVAS_DIMENSION_PX,
+                );
+                return { viewport: fetchedPage.getViewport({ scale: dimensionScale }) };
+              })();
         if (cancelled || !pdfLibDocRef.current || !editEngineRef.current) return;
         const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
         if (cancelled) return;
