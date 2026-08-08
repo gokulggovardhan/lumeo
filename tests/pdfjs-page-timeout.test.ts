@@ -10,7 +10,7 @@ if (typeof globalThis.window === "undefined") {
   (globalThis as unknown as { window: typeof globalThis }).window = globalThis;
 }
 
-const { withPageTimeout, renderPageWithTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension } = await import("../lib/pdf/pdfjs.ts");
+const { withPageTimeout, renderPageWithTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, computeAdaptiveRenderScale } = await import("../lib/pdf/pdfjs.ts");
 
 // Regression for Phase 9.3's production-readiness audit finding: EditPdfTool's
 // page-render effect used to await page.render().promise and
@@ -84,4 +84,119 @@ test("clampRenderScaleToMaxDimension uses whichever page dimension is longer, no
   // A tall/portrait oversized page -- height is the longer side here.
   const scale = clampRenderScaleToMaxDimension(1.3, 3000, 8000, 5200);
   assert.ok(Math.abs(8000 * scale - 5200) < 1e-9, "the taller dimension should be clamped to the cap");
+});
+
+// Phase 20: computeAdaptiveRenderScale -- prepared, tested infrastructure for
+// a future device-aware render policy (not yet wired into any live render
+// path; see its own doc comment in lib/pdf/pdfjs.ts for why). These tests
+// are the only proof of correctness available in this project, since there
+// is no real high-DPR device or DOM harness to verify it against visually.
+
+const US_LETTER_PT = { pageWidthPt: 612, pageHeightPt: 792 };
+
+test("computeAdaptiveRenderScale falls back to today's exact fixed-scale behavior when cssDisplayWidthPx is unknown", () => {
+  const scale = computeAdaptiveRenderScale({
+    ...US_LETTER_PT,
+    cssDisplayWidthPx: null,
+    devicePixelRatio: 3,
+    baseScale: 1.3,
+    maxDimensionPx: 5200,
+    maxTotalPixels: Infinity,
+  });
+  assert.equal(scale, clampRenderScaleToMaxDimension(1.3, 612, 792, 5200));
+});
+
+test("computeAdaptiveRenderScale treats a non-positive or non-finite cssDisplayWidthPx the same as unknown", () => {
+  const fallback = clampRenderScaleToMaxDimension(1.3, 612, 792, 5200);
+  for (const bad of [0, -100, NaN, Infinity]) {
+    const scale = computeAdaptiveRenderScale({
+      ...US_LETTER_PT,
+      cssDisplayWidthPx: bad,
+      devicePixelRatio: 2,
+      baseScale: 1.3,
+      maxDimensionPx: 5200,
+      maxTotalPixels: Infinity,
+    });
+    assert.equal(scale, fallback, `cssDisplayWidthPx=${bad} should fall back exactly like null`);
+  }
+});
+
+test("computeAdaptiveRenderScale never returns below baseScale, even for a tiny/narrow display", () => {
+  // A 320px-wide phone at DPR 1 wants far less than the existing baseline
+  // quality (320/612 ~= 0.52) -- the policy must never make output blurrier
+  // than what already ships today.
+  const scale = computeAdaptiveRenderScale({
+    ...US_LETTER_PT,
+    cssDisplayWidthPx: 320,
+    devicePixelRatio: 1,
+    baseScale: 1.3,
+    maxDimensionPx: 5200,
+    maxTotalPixels: Infinity,
+  });
+  assert.equal(scale, 1.3);
+});
+
+test("computeAdaptiveRenderScale increases scale for a wide, high-DPR display, above baseScale", () => {
+  // A ~900 CSS px wide tablet/desktop-class display at DPR 2 genuinely
+  // benefits from more than the mobile-conservative baseline.
+  const scale = computeAdaptiveRenderScale({
+    ...US_LETTER_PT,
+    cssDisplayWidthPx: 900,
+    devicePixelRatio: 2,
+    baseScale: 1.3,
+    maxDimensionPx: 5200,
+    maxTotalPixels: Infinity,
+  });
+  assert.ok(scale > 1.3, `expected scale above baseline 1.3, got ${scale}`);
+  assert.ok(Math.abs(scale - (900 * 2) / 612) < 1e-9, "should exactly match the desired raster width / page width");
+});
+
+test("computeAdaptiveRenderScale caps devicePixelRatio at MAX_EFFECTIVE_DPR (2) to prevent a runaway request", () => {
+  const at2x = computeAdaptiveRenderScale({
+    ...US_LETTER_PT,
+    cssDisplayWidthPx: 900,
+    devicePixelRatio: 2,
+    baseScale: 1.3,
+    maxDimensionPx: 5200,
+    maxTotalPixels: Infinity,
+  });
+  const at4x = computeAdaptiveRenderScale({
+    ...US_LETTER_PT,
+    cssDisplayWidthPx: 900,
+    devicePixelRatio: 4,
+    baseScale: 1.3,
+    maxDimensionPx: 5200,
+    maxTotalPixels: Infinity,
+  });
+  assert.equal(at4x, at2x, "a DPR above the cap should produce identical output to the cap itself");
+});
+
+test("computeAdaptiveRenderScale still respects the longer-side dimension cap for an oversized page", () => {
+  const scale = computeAdaptiveRenderScale({
+    pageWidthPt: 3000,
+    pageHeightPt: 4000,
+    cssDisplayWidthPx: 1200,
+    devicePixelRatio: 2,
+    baseScale: 1.3,
+    maxDimensionPx: 5200,
+    maxTotalPixels: Infinity,
+  });
+  assert.ok(Math.abs(4000 * scale - 5200) < 1e-6, "the longer side (height) should land exactly on the dimension cap");
+});
+
+test("computeAdaptiveRenderScale enforces a hard total-pixel budget independent of the dimension cap", () => {
+  // A wide-aspect page that stays comfortably under the longer-side cap
+  // could still produce an enormous total pixel count -- the budget must
+  // catch that case even when clampRenderScaleToMaxDimension alone would not.
+  const scale = computeAdaptiveRenderScale({
+    pageWidthPt: 2000,
+    pageHeightPt: 100,
+    cssDisplayWidthPx: 2000,
+    devicePixelRatio: 2,
+    baseScale: 1.3,
+    maxDimensionPx: 5200,
+    maxTotalPixels: 500_000,
+  });
+  const totalPixels = 2000 * scale * (100 * scale);
+  assert.ok(totalPixels <= 500_000 + 1, `expected total pixels within budget, got ${totalPixels}`);
 });

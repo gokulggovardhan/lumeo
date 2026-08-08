@@ -114,3 +114,94 @@ export function clampRenderScaleToMaxDimension(
 ): number {
   return Math.min(requestedScale, maxDimensionPx / Math.max(pageWidthPt, pageHeightPt));
 }
+
+// Phase 20: a device-aware render-scale policy, prepared as tested
+// infrastructure but NOT yet wired into any live render path (see
+// EditPdfTool.tsx's page-render effect, which still calls
+// clampRenderScaleToMaxDimension directly, unchanged). Rationale:
+//
+// This function's whole purpose is to raster sharper on a real high-DPR
+// mobile screen -- but doing that correctly needs the actual CSS pixel
+// width the canvas will be DISPLAYED at, measured from the live page
+// stage element. This project has no way to verify that measurement (or
+// its downstream visual/performance effect) without a real device: the
+// sandboxed browser tooling available in this environment cannot
+// composite the interactive canvas at all (confirmed via repeated
+// `screenshot` failures across the PDF-edit performance work in this
+// thread), and even where DOM state IS inspectable, devicePixelRatio in
+// that sandbox reads 1, so a DPR>1 code path can never be exercised there
+// either. Shipping a live behavior change whose only different branch is
+// completely unverifiable would repeat exactly the mistake this project's
+// own PDF-edit history warns against (see PAGE_RENDER_SCALE's sibling
+// comments) -- so this is deliberately scoped to "correct, tested,
+// available for a future PR once real-device verification exists," not
+// "wired in now."
+//
+// Design, so a future caller can trust it without re-deriving the math:
+// - When cssDisplayWidthPx is unknown (null/<=0), returns EXACTLY
+//   clampRenderScaleToMaxDimension(baseScale, ...) -- byte-for-byte the
+//   scale every page already renders at today. This is the only path
+//   this project's tooling can currently prove correct, and it's also
+//   the correct fallback for a real caller that hasn't measured yet.
+// - devicePixelRatio is capped at MAX_EFFECTIVE_DPR before use, so a
+//   pathological report (e.g. some Android devices misreport very high
+//   values) can't request a runaway raster size.
+// - The result never drops BELOW baseScale -- this policy only ever
+//   asks for equal-or-sharper output than today, never blurrier, so a
+//   caller adopting it can't accidentally regress visual quality.
+// - A hard total-pixel budget (independent of the longer-side cap
+//   clampRenderScaleToMaxDimension already enforces, which alone can't
+//   catch a wide-aspect page that stays under the longer-side cap but
+//   would still blow a memory budget) caps the final scale.
+const MAX_EFFECTIVE_DPR = 2;
+
+export function computeAdaptiveRenderScale({
+  pageWidthPt,
+  pageHeightPt,
+  cssDisplayWidthPx,
+  devicePixelRatio,
+  baseScale,
+  maxDimensionPx,
+  maxTotalPixels,
+}: {
+  pageWidthPt: number;
+  pageHeightPt: number;
+  // The CSS pixel width the rendered canvas will actually be DISPLAYED
+  // at (the page stage element's own width, not the canvas's own
+  // backing-store width) -- null/0 means "not measured," and falls back
+  // to today's fixed-scale behavior exactly.
+  cssDisplayWidthPx: number | null;
+  devicePixelRatio: number;
+  baseScale: number;
+  maxDimensionPx: number;
+  // Hard ceiling on total raster pixel count (width * height of the
+  // resulting canvas), independent of maxDimensionPx's longer-side-only
+  // cap. Callers without a specific memory budget in mind can pass
+  // Infinity to rely on maxDimensionPx alone.
+  maxTotalPixels: number;
+}): number {
+  if (!cssDisplayWidthPx || cssDisplayWidthPx <= 0 || !Number.isFinite(cssDisplayWidthPx)) {
+    return clampRenderScaleToMaxDimension(baseScale, pageWidthPt, pageHeightPt, maxDimensionPx);
+  }
+
+  const effectiveDpr = Math.min(Math.max(devicePixelRatio, 1), MAX_EFFECTIVE_DPR);
+  const desiredRasterWidthPx = cssDisplayWidthPx * effectiveDpr;
+  const desiredScale = desiredRasterWidthPx / pageWidthPt;
+
+  // The ceiling here is maxDimensionPx's RAW cap, not
+  // clampRenderScaleToMaxDimension(baseScale, ...) -- for an ordinary
+  // (non-oversized) page, that would equal baseScale itself, silently
+  // making the "raster sharper for a high-DPR display" branch below a
+  // permanent no-op (max(desiredScale, baseScale) can never exceed a
+  // ceiling that's already pinned to baseScale). The raw cap is the
+  // genuine longer-side pixel budget; baseScale only needs to act as the
+  // FLOOR (see its own doc comment above).
+  const rawDimensionCeiling = maxDimensionPx / Math.max(pageWidthPt, pageHeightPt);
+  let scale = Math.min(Math.max(desiredScale, baseScale), rawDimensionCeiling);
+
+  const totalPixels = pageWidthPt * scale * (pageHeightPt * scale);
+  if (Number.isFinite(maxTotalPixels) && totalPixels > maxTotalPixels) {
+    scale *= Math.sqrt(maxTotalPixels / totalPixels);
+  }
+  return scale;
+}
