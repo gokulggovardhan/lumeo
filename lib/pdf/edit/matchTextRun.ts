@@ -54,16 +54,17 @@ function operatorOriginPx(operator: TextShowOperator, viewportTransform: number[
 // stream, or text inside a form XObject), and callers must treat "no
 // match" as "in-place editing isn't available for this run yet," never
 // guess a nearby operator instead.
-export function matchDetectedRunToOperator(
-  run: DetectedTextRun,
-  pageWidthPx: number,
-  pageHeightPx: number,
+// Shared by both the brute-force matchDetectedRunToOperator below and the
+// spatial-index path (matchDetectedRunToOperatorIndexed) -- the only
+// difference between them is how many candidates get passed in here, never
+// the matching math itself, so there is exactly one place that decides
+// what "closest" and "close enough" mean.
+function bestOperatorAmong(
   operators: TextShowOperator[],
+  targetLeftPx: number,
+  targetTopPx: number,
   viewportTransform: number[],
 ): TextShowOperator | null {
-  const targetLeftPx = (run.xPct / 100) * pageWidthPx;
-  const targetTopPx = (run.yPct / 100) * pageHeightPx;
-
   let best: TextShowOperator | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
 
@@ -77,6 +78,90 @@ export function matchDetectedRunToOperator(
   }
 
   return best && bestDistance <= POSITION_TOLERANCE_PX ? best : null;
+}
+
+export function matchDetectedRunToOperator(
+  run: DetectedTextRun,
+  pageWidthPx: number,
+  pageHeightPx: number,
+  operators: TextShowOperator[],
+  viewportTransform: number[],
+): TextShowOperator | null {
+  const targetLeftPx = (run.xPct / 100) * pageWidthPx;
+  const targetTopPx = (run.yPct / 100) * pageHeightPx;
+  return bestOperatorAmong(operators, targetLeftPx, targetTopPx, viewportTransform);
+}
+
+// Phase 24: EditPdfTool matches EVERY detected run against EVERY operator
+// (O(runs x operators), see matchDetectedRunToOperator above) once per page
+// -- fine for an ordinary page, but a genuinely dense one (500+ runs and a
+// similar operator count) can reach hundreds of thousands of
+// transformPoint2x3+hypot calls per page view. Only operators within
+// POSITION_TOLERANCE_PX of a run can ever actually be chosen (see
+// bestOperatorAmong's own tolerance check) -- everything farther away is
+// wasted work. A uniform spatial grid, built once per page and reused for
+// every run's lookup, exploits that: bucket every operator's own origin by
+// its cell, then for a given run only scan the 3x3 neighborhood of cells
+// around its target position.
+//
+// Correctness: INDEX_CELL_PX is chosen as 2x POSITION_TOLERANCE_PX
+// specifically so that neighborhood is PROVABLY sufficient, not just
+// "probably fine" -- if two points' cell indices (floor(coord/cellSize))
+// differ by 2 or more along either axis, the points themselves are more
+// than cellSize apart along that axis (a direct consequence of how floor
+// division buckets a number line), which here is more than
+// 2*POSITION_TOLERANCE_PX >= POSITION_TOLERANCE_PX. So any operator within
+// tolerance of a run's target position is guaranteed to share the run's
+// cell or one immediately adjacent to it -- the 3x3 scan can never miss a
+// real match, and matchDetectedRunToOperatorIndexed returns EXACTLY what
+// matchDetectedRunToOperator would for the same inputs, just without
+// scoring operators that were never going to be picked anyway.
+const INDEX_CELL_PX = POSITION_TOLERANCE_PX * 2;
+
+export type OperatorSpatialIndex = {
+  buckets: Map<string, TextShowOperator[]>;
+  viewportTransform: number[];
+};
+
+function cellKey(leftPx: number, topPx: number): string {
+  return `${Math.floor(leftPx / INDEX_CELL_PX)},${Math.floor(topPx / INDEX_CELL_PX)}`;
+}
+
+// Builds the index once per page (see EditPdfTool.tsx's operator-matching
+// effect) -- O(operators), the same one-time cost matchDetectedRunToOperator
+// already pays per-run today, just paid once instead of once-per-run.
+export function buildOperatorSpatialIndex(operators: TextShowOperator[], viewportTransform: number[]): OperatorSpatialIndex {
+  const buckets = new Map<string, TextShowOperator[]>();
+  for (const operator of operators) {
+    const origin = operatorOriginPx(operator, viewportTransform);
+    const key = cellKey(origin.left, origin.top);
+    const bucket = buckets.get(key);
+    if (bucket) bucket.push(operator);
+    else buckets.set(key, [operator]);
+  }
+  return { buckets, viewportTransform };
+}
+
+export function matchDetectedRunToOperatorIndexed(
+  run: DetectedTextRun,
+  pageWidthPx: number,
+  pageHeightPx: number,
+  index: OperatorSpatialIndex,
+): TextShowOperator | null {
+  const targetLeftPx = (run.xPct / 100) * pageWidthPx;
+  const targetTopPx = (run.yPct / 100) * pageHeightPx;
+  const cellX = Math.floor(targetLeftPx / INDEX_CELL_PX);
+  const cellY = Math.floor(targetTopPx / INDEX_CELL_PX);
+
+  const candidates: TextShowOperator[] = [];
+  for (let dx = -1; dx <= 1; dx += 1) {
+    for (let dy = -1; dy <= 1; dy += 1) {
+      const bucket = index.buckets.get(`${cellX + dx},${cellY + dy}`);
+      if (bucket) candidates.push(...bucket);
+    }
+  }
+
+  return bestOperatorAmong(candidates, targetLeftPx, targetTopPx, index.viewportTransform);
 }
 
 // Phase 9.2 UI regression: pdfjs's getTextContent() can merge several

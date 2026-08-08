@@ -65,7 +65,7 @@ import {
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
-import { matchDetectedRunToOperator, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
+import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
 import type { ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
@@ -761,12 +761,20 @@ export default function EditPdfTool() {
         const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
         if (cancelled) return;
         setPageOperators(located);
+        // Built once per page, not once per run -- see
+        // buildOperatorSpatialIndex's own doc comment. Paired with a
+        // Map for O(1) operator -> LocatedTextOperator lookup below,
+        // replacing what was previously an O(operators) `.find()` call
+        // repeated for every run (a second, separate O(runs x operators)
+        // cost stacked on top of the matching itself).
         const flatOperators = located.map((item) => item.operator);
+        const operatorIndex = buildOperatorSpatialIndex(flatOperators, viewport.transform);
+        const locatedByOperator = new Map(located.map((item) => [item.operator, item] as const));
         setRunMatches(
           runs.map((run): RunMatch => {
-            const matchedOperator = matchDetectedRunToOperator(run, pageDisplaySize.width, pageDisplaySize.height, flatOperators, viewport.transform);
+            const matchedOperator = matchDetectedRunToOperatorIndexed(run, pageDisplaySize.width, pageDisplaySize.height, operatorIndex);
             if (!matchedOperator) return null;
-            const locatedOperator = located.find((item) => item.operator === matchedOperator);
+            const locatedOperator = locatedByOperator.get(matchedOperator);
             return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
           }),
         );
