@@ -1562,7 +1562,7 @@ export default function EditPdfTool() {
   // derivation, not a nested closure the React Compiler's static analysis
   // has to reason about.
   const inlineEditorVerticalPlacement = singleSelectedRun
-    ? pickVerticalPlacement(singleSelectedRun.yPct, singleSelectedRun.yPct + singleSelectedRun.heightPct, 24)
+    ? pickVerticalPlacement(singleSelectedRun.yPct, singleSelectedRun.yPct + singleSelectedRun.heightPct, 24, true)
     : "below";
   const inlineEditorHorizontalAlign = singleSelectedRun
     ? pickHorizontalAlign(singleSelectedRun.xPct, singleSelectedRun.xPct + singleSelectedRun.widthPct)

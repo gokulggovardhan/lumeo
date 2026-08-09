@@ -46,6 +46,33 @@ test("pickVerticalPlacement treats exactly-at-the-margin as enough room (boundar
   assert.equal(pickVerticalPlacement(11.9, 80), "below");
 });
 
+// Regression for the Phase 29 review finding: EditElementView.tsx's delete
+// pill and EditPdfTool.tsx's inline-editor toolbar have DIFFERENT original
+// defaults (above vs. below, respectively) -- reusing one hardcoded
+// "always prefer above" rule for both silently flipped the inline editor's
+// normal-case placement to above for any run outside roughly the top
+// quarter of the page, not just genuine bottom-edge cases. preferBelow
+// lets each caller keep its own actual default; these tests cover the
+// preferBelow:true path EditPdfTool.tsx's inline editor now uses (the
+// preferBelow:false/default tests above already cover EditElementView.tsx's
+// unchanged above-preferring path).
+
+test("pickVerticalPlacement with preferBelow:true returns 'below' when there is room both above and below", () => {
+  // A box in the middle of the page (yPct=50, bottomPct=53) has room on
+  // both sides -- with preferBelow:true this must pick 'below' (the inline
+  // editor's actual normal-case default), NOT 'above' (which the
+  // preferBelow:false default would have picked, and which is exactly the
+  // bug this parameter fixes).
+  assert.equal(pickVerticalPlacement(50, 53, 24, true), "below");
+});
+
+test("pickVerticalPlacement with preferBelow:true falls back to 'above' when there is insufficient room below", () => {
+  // A box near the bottom edge (yPct=85, bottomPct=88) has only 12% below
+  // it -- under the 24% margin the inline editor uses -- but 85% above,
+  // comfortably enough room, so it flips to 'above'.
+  assert.equal(pickVerticalPlacement(85, 88, 24, true), "above");
+});
+
 test("pickHorizontalAlign returns 'center' when there is room on both sides (default margin)", () => {
   // A box from 40 to 60 has 40% on the left and 40% on the right --
   // comfortably past the default 20% margin on both sides.

@@ -31,17 +31,32 @@ export const DEFAULT_VERTICAL_MARGIN_PCT = 12;
 export const DEFAULT_HORIZONTAL_MARGIN_PCT = 20;
 
 // topPct/bottomPct are the anchor box's own top and bottom edges in percent
-// (yPct and yPct+heightPct) -- NOT the control's. Decision order matches
-// the box's own natural reading order: prefer above (today's default for
-// both call sites) when there's room; fall back to below when there isn't;
-// if genuinely neither side has room (a box that's nearly the full page
-// height), keep the existing default (above) rather than inventing a third
-// behavior for an edge case neither call site can actually produce today.
+// (yPct and yPct+heightPct) -- NOT the control's.
+//
+// preferBelow distinguishes the two real callers' actually-different
+// original defaults: EditElementView.tsx's delete pill always rendered
+// ABOVE the element (preferBelow: false, the default -- unchanged
+// behavior for that caller), while EditPdfTool.tsx's inline-editor
+// Apply/Cancel toolbar always rendered BELOW the run (preferBelow: true).
+// Reusing one "always prefer above" rule for both callers was itself a
+// bug (Phase 29 review finding): it silently flipped the inline editor's
+// normal-case placement to above for any run outside roughly the top
+// quarter of the page, not just genuine bottom-edge cases. Each side of
+// this function mirrors the other exactly (check the preferred side
+// first, fall back to the other, and if neither has room keep the
+// preferred side -- the same "no third behavior for an untested edge
+// case" reasoning as before, just parameterized per caller now).
 export function pickVerticalPlacement(
   topPct: number,
   bottomPct: number,
   marginPct: number = DEFAULT_VERTICAL_MARGIN_PCT,
+  preferBelow: boolean = false,
 ): VerticalPlacement {
+  if (preferBelow) {
+    if (100 - bottomPct >= marginPct) return "below";
+    if (topPct >= marginPct) return "above";
+    return "below";
+  }
   if (topPct >= marginPct) return "above";
   if (100 - bottomPct >= marginPct) return "below";
   return "above";
