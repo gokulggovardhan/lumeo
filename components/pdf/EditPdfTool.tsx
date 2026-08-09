@@ -1687,11 +1687,11 @@ export default function EditPdfTool() {
         <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
 
         <div className="flex items-center gap-0.5">
-          <button type="button" onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))} aria-label="Zoom out" title="Zoom out" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
+          <button type="button" onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))} aria-label="Zoom out" title="Zoom out (or Ctrl/Cmd + scroll)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
             −
           </button>
           <span className="w-11 text-center text-xs font-bold tabular-nums text-[var(--text-secondary)]">{Math.round(zoom * 100)}%</span>
-          <button type="button" onClick={() => setZoom((z) => Math.min(2, z + 0.1))} aria-label="Zoom in" title="Zoom in" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
+          <button type="button" onClick={() => setZoom((z) => Math.min(2, z + 0.1))} aria-label="Zoom in" title="Zoom in (or Ctrl/Cmd + scroll)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
             +
           </button>
           <L2ToolbarButton onClick={() => setZoom(1)} className="ml-0.5">
@@ -1699,7 +1699,23 @@ export default function EditPdfTool() {
           </L2ToolbarButton>
         </div>
 
-        <L2ToolbarButton onClick={resetTool} className="ml-auto">
+        <L2ToolbarButton
+          onClick={() => {
+            // Phase 28: resetTool() wipes every placed element, every text
+            // edit, and the entire undo stack with no way back -- fine on a
+            // freshly uploaded, untouched file (no confirmation needed, per
+            // the same "don't add ceremony where nothing is at risk"
+            // reasoning the rest of this tool follows), but a real risk of
+            // silent data loss on a misclick once the user has actually done
+            // something. hasTextEdits/elements.length is the exact same
+            // "has this document changed" signal the Export button already
+            // uses -- no new state, just gating an existing destructive
+            // action on it.
+            if ((elements.length > 0 || hasTextEdits) && !window.confirm("Start a new PDF? Your current edits will be discarded.")) return;
+            resetTool();
+          }}
+          className="ml-auto"
+        >
           Start new
         </L2ToolbarButton>
       </div>
@@ -1712,7 +1728,21 @@ export default function EditPdfTool() {
             white page gives it real presence instead of sitting flush
             against the same glass tone as every other panel. */}
         <div className="aura-glass-thin min-w-0 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)] sm:p-5">
-            {pageLoading || !pageImageUrl || !pageDisplaySize ? (
+            {error ? (
+              // Phase 28: previously the loading skeleton (below) had no
+              // `error` check of its own, so a render failure/timeout left
+              // BOTH the "Loading page preview…" skeleton and this error
+              // message on screen at once (pageImageUrl/pageDisplaySize
+              // never populate on a failed render, so the skeleton's own
+              // condition stayed true forever) -- a visibly contradictory
+              // state, not just a slow one. Error now takes priority over
+              // the skeleton outright: loading, error, and the actual page
+              // are mutually exclusive states, matching how a real user
+              // reads this panel.
+              <div role="alert" className="flex h-64 flex-col items-center justify-center gap-2 rounded-[var(--radius-xl)] border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-center sm:h-96">
+                <span className="text-sm font-medium text-[var(--text-danger)]">{error}</span>
+              </div>
+            ) : pageLoading || !pageImageUrl || !pageDisplaySize ? (
               // Phase 12: an animated skeleton in place of a flat "Loading..."
               // box -- signals real, ongoing progress (a still, static
               // placeholder reads as stuck/broken on a slow connection or
@@ -1937,12 +1967,6 @@ export default function EditPdfTool() {
               </div>
               </div>
             )}
-
-            {error ? (
-              <div role="alert" className="mt-3 rounded-lg border border-[var(--border-danger)]/20 bg-[var(--surface-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
-                {error}
-              </div>
-            ) : null}
         </div>
 
         {/* Phase 27: tool rail + contextual controls. A single responsive
@@ -1972,6 +1996,19 @@ export default function EditPdfTool() {
               ))}
             </div>
           </div>
+
+          {activeTool === "text" ? (
+            // Phase 28: Shape/Draw/Whiteout all get a contextual card
+            // explaining themselves -- Text was the one creation tool with
+            // no guidance at all, so a first-time user had nothing telling
+            // them to click/tap the page. Same card chrome as the other
+            // three, just a hint instead of controls (there's nothing to
+            // configure before placing one).
+            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
+              <L2PanelLabel title="Text" />
+              <p className="mt-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">Click or tap the page to add a text box.</p>
+            </div>
+          ) : null}
 
           {activeTool === "shape" ? (
             <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
@@ -2034,6 +2071,22 @@ export default function EditPdfTool() {
             <p role="status" className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 text-[11px] leading-5 text-[var(--text-primary)]/50 shadow-[var(--v2-elevation-1)]">
               Preparing editable text…
             </p>
+          ) : null}
+
+          {activeTool === "select" && textDetectionReady && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
+            // Phase 28: once detection genuinely finishes with zero runs
+            // (a scanned/image-only page, most commonly), Select previously
+            // went silent -- no different from "still detecting." This is
+            // read-only text-layer detection (lib/pdf/edit/textRuns.ts,
+            // driven by pdfjs's own getTextContent()), NOT OCR -- an
+            // image-only page genuinely has no selectable text, so this
+            // says so plainly and points at the one tool that can still add
+            // content to a page like this, rather than implying a scan
+            // could somehow be made selectable.
+            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">No editable text found</span>
+              <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">This page doesn&rsquo;t contain selectable text. Use Text to add new text.</p>
+            </div>
           ) : null}
 
           {activeTool === "select" && selectedRunIndices.length > 0 ? (
@@ -2198,6 +2251,14 @@ export default function EditPdfTool() {
             type="button"
             disabled={(elements.length === 0 && !hasTextEdits) || isExporting}
             onClick={() => void generateEditedPdf()}
+            // Phase 28: the only reason this button is ever disabled OTHER
+            // than mid-export is "nothing has been edited yet" (same
+            // elements.length/hasTextEdits check the disabled condition
+            // itself uses) -- previously a new user just saw a greyed-out
+            // button with no explanation. isExporting already has its own
+            // visible spinner/label, so it doesn't need a redundant tooltip
+            // repeating that.
+            title={!isExporting && elements.length === 0 && !hasTextEdits ? "No edits to export yet." : undefined}
             className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
           >
             {isExporting ? (
