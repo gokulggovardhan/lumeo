@@ -717,6 +717,16 @@ export default function EditPdfTool() {
 
     void (async () => {
       setPageLoading(true);
+      // Phase 30: a page-render failure/timeout sets `error`, but nothing
+      // in this reset block ever cleared it -- so navigating to (or
+      // undoing/redoing into) a DIFFERENT page while a stale error from a
+      // previous one was showing left that stale message on screen for the
+      // entire duration of the new page's own render attempt, since the
+      // loading-vs-error ternary below (Phase 28) deliberately gives error
+      // priority over the loading skeleton. Confirmed live: Next Page
+      // after a failed page 1 showed page 1's error immediately, before
+      // page 2's own render had even had a chance to succeed or fail.
+      setError("");
       setSelectionAnchorIndex(null);
       setSelectedRunIndices([]);
       setHoveredRunIndex(-1);
