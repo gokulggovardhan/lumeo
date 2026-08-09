@@ -26,22 +26,16 @@ import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from "pdfjs-dist";
 import type { PDFDocument, PDFDict } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
-  L2FileCard,
   L2PanelLabel,
   L2PrivacyNote,
   L2ToolbarButton,
   L2UploadStage,
-  L2WorkspaceGrid,
   L2WorkspaceHeader,
-  L2WorkspaceInspector,
-  L2WorkspacePanel,
-  L2WorkspaceToolbar,
   ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { EditElementView } from "@/components/pdf/edit/EditElementView";
 import { InkCanvas } from "@/components/pdf/edit/InkCanvas";
 import { TextRunOverlay } from "@/components/pdf/edit/TextRunOverlay";
-import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
   createInkElement,
@@ -271,6 +265,103 @@ function EditIcon() {
     </svg>
   );
 }
+
+// Phase 27 workspace redesign: one stroke-based icon per tool, matching
+// EditIcon's own convention (currentColor, rounded joins/caps) so the tool
+// rail reads as a real editing tool system instead of five plain labeled
+// buttons. Kept as small standalone components (not inlined per-use) so the
+// desktop rail and mobile dock can render the exact same icon without
+// duplicating path data.
+function SelectToolIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
+      <path d="M6 4.5 18 12l-5.2 1.2L15 19l-2.4 1L10 14l-4 3.5V4.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function TextToolIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
+      <path d="M5 6.5h14M12 6.5V18M9 18h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function DrawToolIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
+      <path d="M14.5 5.5 18.5 9.5 8 20H4v-4L14.5 5.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M13 7 17 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ShapeToolIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
+      <rect x="4" y="4" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="16" cy="16" r="4.5" stroke="currentColor" strokeWidth="1.6" />
+    </svg>
+  );
+}
+
+// Deliberately NOT a red icon (Phase 27 UX note: whiteout must read as
+// "cover this content," not "delete") -- a masked rectangle in the same
+// neutral/gold vocabulary as every other tool icon, distinguished by shape
+// (a filled block with a corner fold, like a physical correction sticker)
+// rather than by an alarming color.
+function WhiteoutToolIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
+      <path d="M5 5h10.5L19 8.5V19H5V5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M15.5 5v3.5H19" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M8 12.5h8M8 15.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function UndoIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+      <path d="M7 7 4 10l3 3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4 10h9a6 6 0 1 1 0 12h-2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function RedoIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+      <path d="M17 7 20 10l-3 3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M20 10h-9a6 6 0 1 0 0 12h2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ChevronLeftIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+      <path d="M14.5 6 9 12l5.5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function ChevronRightIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none">
+      <path d="M9.5 6 15 12l-5.5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+const TOOL_META: Array<{ id: ActiveTool; label: string; Icon: () => React.JSX.Element }> = [
+  { id: "select", label: "Select", Icon: SelectToolIcon },
+  { id: "text", label: "Text", Icon: TextToolIcon },
+  { id: "draw", label: "Draw", Icon: DrawToolIcon },
+  { id: "shape", label: "Shape", Icon: ShapeToolIcon },
+  { id: "whiteout", label: "Whiteout", Icon: WhiteoutToolIcon },
+];
 
 export default function EditPdfTool() {
   const { availability, track } = useAnalytics();
@@ -1537,57 +1628,83 @@ export default function EditPdfTool() {
   }
 
   return (
-    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+    <section className="l2-workspace-deep grid gap-4 pb-40 lg:pb-6">
       <L2WorkspaceHeader
         title="Edit PDF"
-        description={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
+        description={`${pdf.file.name} · ${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
       />
 
-      <L2WorkspaceToolbar>
-        <L2ToolbarButton onClick={undo} disabled={!canUndo}>
-          Undo
+      {/* Phase 27: a coherent document toolbar -- undo/redo, page navigation,
+          and zoom each get their own visually grouped cluster (divider rules
+          between them) instead of one flat row of same-weight pill buttons,
+          so the toolbar reads as organized document controls, not a random
+          list. Icon buttons for the frequent actions; Fit/Start new stay as
+          labeled pills since they're occasional, not repeated, actions. */}
+      <div className="aura-glass-thin sticky top-[5.75rem] z-10 flex flex-wrap items-center gap-1.5 rounded-[var(--radius-xl)] px-2.5 py-2 shadow-[var(--v2-elevation-1)]">
+        <div className="flex items-center gap-0.5">
+          <button type="button" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
+            <UndoIcon />
+          </button>
+          <button type="button" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (Ctrl+Shift+Z)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
+            <RedoIcon />
+          </button>
+        </div>
+
+        <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
+
+        <div className="flex items-center gap-0.5">
+          <button type="button" disabled={pageIndex === 0} onClick={() => setPageIndex((c) => Math.max(0, c - 1))} aria-label="Previous page" title="Previous page (PageUp)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
+            <ChevronLeftIcon />
+          </button>
+          <span className="whitespace-nowrap px-0.5 text-xs font-bold tabular-nums text-[var(--text-secondary)]">
+            {pageIndex + 1} / {pdf.pageCount}
+          </span>
+          <button type="button" disabled={pageIndex === pdf.pageCount - 1} onClick={() => setPageIndex((c) => Math.min(pdf.pageCount - 1, c + 1))} aria-label="Next page" title="Next page (PageDown)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
+            <ChevronRightIcon />
+          </button>
+        </div>
+
+        <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
+
+        <div className="flex items-center gap-0.5">
+          <button type="button" onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))} aria-label="Zoom out" title="Zoom out" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
+            −
+          </button>
+          <span className="w-11 text-center text-xs font-bold tabular-nums text-[var(--text-secondary)]">{Math.round(zoom * 100)}%</span>
+          <button type="button" onClick={() => setZoom((z) => Math.min(2, z + 0.1))} aria-label="Zoom in" title="Zoom in" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
+            +
+          </button>
+          <L2ToolbarButton onClick={() => setZoom(1)} className="ml-0.5">
+            Fit
+          </L2ToolbarButton>
+        </div>
+
+        <L2ToolbarButton onClick={resetTool} className="ml-auto">
+          Start new
         </L2ToolbarButton>
-        <L2ToolbarButton onClick={redo} disabled={!canRedo}>
-          Redo
-        </L2ToolbarButton>
-        <L2ToolbarButton onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))}>−</L2ToolbarButton>
-        <span className="text-xs font-bold text-[var(--text-subtle)]">{Math.round(zoom * 100)}%</span>
-        <L2ToolbarButton onClick={() => setZoom((z) => Math.min(2, z + 0.1))}>+</L2ToolbarButton>
-        <L2ToolbarButton onClick={() => setZoom(1)}>Fit</L2ToolbarButton>
-        <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
-        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{pdf.file.name}</span>
-      </L2WorkspaceToolbar>
+      </div>
 
-      <L2WorkspaceGrid
-        main={
-          <L2WorkspacePanel>
-            <L2FileCard icon={<FileIcon />} name={pdf.file.name} meta={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`} />
-
-            <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/60 px-3 py-2">
-              <button type="button" disabled={pageIndex === 0} onClick={() => setPageIndex((c) => Math.max(0, c - 1))} className="min-h-11 rounded-full border border-[var(--text-primary)]/14 px-4 text-xs font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:opacity-35">
-                ← Prev
-              </button>
-              <span className="text-xs font-semibold text-[var(--text-primary)]/60">Page {pageIndex + 1} of {pdf.pageCount}</span>
-              <button type="button" disabled={pageIndex === pdf.pageCount - 1} onClick={() => setPageIndex((c) => Math.min(pdf.pageCount - 1, c + 1))} className="min-h-11 rounded-full border border-[var(--text-primary)]/14 px-4 text-xs font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:opacity-35">
-                Next →
-              </button>
-            </div>
-
-            <div className="mt-3">
-              <L2PanelLabel title="Preview" />
-            </div>
+      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
+        {/* Phase 27: the canvas panel is now the unambiguous hero -- no file
+            card, no secondary page-nav bar duplicating the toolbar's own
+            (that duplication was the single largest source of "sidebar
+            clutter" in the old layout). A darker inset backdrop behind the
+            white page gives it real presence instead of sitting flush
+            against the same glass tone as every other panel. */}
+        <div className="aura-glass-thin min-w-0 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)] sm:p-5">
             {pageLoading || !pageImageUrl || !pageDisplaySize ? (
               // Phase 12: an animated skeleton in place of a flat "Loading..."
               // box -- signals real, ongoing progress (a still, static
               // placeholder reads as stuck/broken on a slow connection or
               // large file) without needing a spinner asset. animate-pulse is
               // Tailwind's built-in opacity-breathing keyframe.
-              <div className="mt-3 flex h-64 flex-col items-center justify-center gap-3 overflow-hidden rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/40">
+              <div className="flex h-64 flex-col items-center justify-center gap-3 overflow-hidden rounded-[var(--radius-xl)] bg-[var(--atelier-surface-0)]/[0.35] sm:h-96">
                 <div className="h-40 w-32 animate-pulse rounded-md bg-[var(--text-primary)]/10" />
                 <span className="text-sm font-medium text-[var(--text-primary)]/40">Loading page preview…</span>
               </div>
             ) : (
-              <div className="mx-auto mt-3" style={{ width: `${zoom * 100}%` }}>
+              <div className="rounded-[var(--radius-xl)] bg-[var(--atelier-surface-0)]/[0.35] p-3 sm:p-6">
+              <div className="mx-auto" style={{ width: `${zoom * 100}%` }}>
                 <div
                   ref={stageRef}
                   onClick={handleStageClick}
@@ -1731,7 +1848,7 @@ export default function EditPdfTool() {
                           }
                         }}
                         aria-label="Edit text"
-                        className="h-full w-full rounded-[2px] border-2 border-dashed border-[var(--lumeo-gold)] bg-white/95 px-0.5 font-semibold text-[var(--text-primary)] outline-none"
+                        className="h-full w-full rounded-[3px] border border-[var(--lumeo-gold)] bg-white px-0.5 font-semibold text-[var(--text-primary)] shadow-[0_0_0_3px_rgba(var(--lumeo-gold-rgb),0.16)] outline-none"
                         style={{ fontSize: `${Math.max(10, (singleSelectedRun.fontSizePx / PAGE_RENDER_SCALE) * pixelsPerPoint)}px` }}
                       />
                       {/* Phase 12: icon-only pair (checkmark/X), matching the
@@ -1787,6 +1904,7 @@ export default function EditPdfTool() {
                   ) : null}
                 </div>
               </div>
+              </div>
             )}
 
             {error ? (
@@ -1794,27 +1912,40 @@ export default function EditPdfTool() {
                 {error}
               </div>
             ) : null}
-          </L2WorkspacePanel>
-        }
-        inspector={
-          <L2WorkspaceInspector title="Tools" description="Pick a tool, then click or drag on the page.">
-            <div className="mt-3 grid grid-cols-5 gap-1.5">
-              {(["select", "text", "draw", "shape", "whiteout"] as ActiveTool[]).map((tool) => (
+        </div>
+
+        {/* Phase 27: tool rail + contextual controls. A single responsive
+            block, not two separate desktop/mobile implementations: the rail
+            is a horizontal scrollable dock on narrow screens (flex-row) and
+            a vertical rail on desktop (lg:flex-col), sticky in the right
+            column there. The contextual card below it only renders when the
+            active tool actually has settings -- no permanent empty sidebar
+            space the way the old fixed-height inspector had. */}
+        <div className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-[9.5rem] lg:self-start">
+          <div className="aura-glass-regular rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-2)]">
+            <div className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+              {TOOL_META.map(({ id, label, Icon }) => (
                 <button
-                  key={tool}
+                  key={id}
                   type="button"
-                  aria-pressed={activeTool === tool}
-                  onClick={() => setActiveTool(tool)}
-                  title={`${tool[0].toUpperCase()}${tool.slice(1)} (${TOOL_SHORTCUT_LABELS[tool]})`}
-                  className={`min-h-11 rounded-lg border px-1.5 py-2 text-[11px] font-bold capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${activeTool === tool ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10 text-[var(--text-primary)]" : "border-[var(--text-primary)]/12 text-[var(--text-primary)]/60 hover:border-[var(--text-primary)]/24"}`}
+                  aria-pressed={activeTool === id}
+                  onClick={() => setActiveTool(id)}
+                  title={`${label} (${TOOL_SHORTCUT_LABELS[id]})`}
+                  className={`flex min-h-11 shrink-0 items-center gap-2.5 rounded-[var(--radius-lg)] px-3 py-2.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] lg:w-full ${activeTool === id ? "bg-[var(--lumeo-gold)]/[0.12] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--text-primary)]/[0.05] hover:text-[var(--text-primary)]"}`}
                 >
-                  {tool}
+                  <span className={activeTool === id ? "text-[var(--lumeo-gold)]" : ""}>
+                    <Icon />
+                  </span>
+                  {label}
                 </button>
               ))}
             </div>
+          </div>
 
-            {activeTool === "shape" ? (
-              <div className="mt-3 grid grid-cols-4 gap-1.5">
+          {activeTool === "shape" ? (
+            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
+              <L2PanelLabel title="Shape" />
+              <div className="mt-2.5 grid grid-cols-4 gap-1.5">
                 {(["rect", "ellipse", "line", "highlight"] as ShapeKind[]).map((kind) => (
                   <button
                     key={kind}
@@ -1827,10 +1958,13 @@ export default function EditPdfTool() {
                   </button>
                 ))}
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            {activeTool === "draw" ? (
-              <div className="mt-3 grid gap-2">
+          {activeTool === "draw" ? (
+            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
+              <L2PanelLabel title="Draw" />
+              <div className="mt-2.5 grid gap-2.5">
                 <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
                   Color
                   <input type="color" value={inkColor} onChange={(e) => setInkColor(e.target.value)} className="h-7 w-10 rounded border border-[var(--text-primary)]/14" />
@@ -1840,31 +1974,40 @@ export default function EditPdfTool() {
                   <input type="range" min={1} max={10} value={inkStrokeWidth} onChange={(e) => setInkStrokeWidth(Number(e.target.value))} className="w-24" />
                 </label>
               </div>
-            ) : null}
+            </div>
+          ) : null}
 
-            {activeTool === "whiteout" ? (
-              <p className="mt-3 rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] p-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
+          {activeTool === "whiteout" ? (
+            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
+              <div className="flex items-center gap-2">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[var(--text-primary)]/[0.06] text-[var(--text-secondary)]">
+                  <WhiteoutToolIcon />
+                </span>
+                <L2PanelLabel title="Whiteout" />
+              </div>
+              <p className="mt-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
                 Drag over the text or content you want to hide -- it snaps to a line of text automatically, or drag freely for anything else. Hides content visually only; for legal or compliance redaction, verify the underlying content is also removed before sharing.
               </p>
-            ) : null}
+            </div>
+          ) : null}
 
-            {activeTool === "select" && !textDetectionReady && selectedRunIndices.length === 0 && pageImageUrl ? (
-              // Phase 20: fast-first-paint UX -- the page itself became
-              // usable (image displayed, zoomable, navigable) the moment
-              // pageLoading cleared (#220), which can now happen BEFORE
-              // text-run detection finishes. Without this, tapping around
-              // on the Select tool during that window looked identical to
-              // "this page just has no text at all" -- silently wrong, not
-              // merely slow-looking. This note is the only UI difference;
-              // detection itself, and every other tool, is unaffected.
-              <p role="status" className="mt-3 rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] p-2.5 text-[11px] leading-5 text-[var(--text-primary)]/50">
-                Preparing editable text…
-              </p>
-            ) : null}
+          {activeTool === "select" && !textDetectionReady && selectedRunIndices.length === 0 && pageImageUrl ? (
+            // Phase 20: fast-first-paint UX -- the page itself became
+            // usable (image displayed, zoomable, navigable) the moment
+            // pageLoading cleared (#220), which can now happen BEFORE
+            // text-run detection finishes. Without this, tapping around
+            // on the Select tool during that window looked identical to
+            // "this page just has no text at all" -- silently wrong, not
+            // merely slow-looking. This note is the only UI difference;
+            // detection itself, and every other tool, is unaffected.
+            <p role="status" className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 text-[11px] leading-5 text-[var(--text-primary)]/50 shadow-[var(--v2-elevation-1)]">
+              Preparing editable text…
+            </p>
+          ) : null}
 
-            {activeTool === "select" && selectedRunIndices.length > 0 ? (
-              <div className="mt-3 grid gap-2 rounded-lg border border-[var(--text-primary)]/12 bg-[var(--text-primary)]/[0.04] p-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
-                <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
+          {activeTool === "select" && selectedRunIndices.length > 0 ? (
+            <div className="aura-glass-thin grid gap-2 rounded-[var(--radius-2xl)] p-3 text-[11px] leading-5 text-[var(--text-primary)]/60 shadow-[var(--v2-elevation-1)]">
+              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
                   {selectedRunIndices.length === 1 ? "Existing text" : `${selectedRunIndices.length} lines selected`}
                 </span>
                 {selectedRunIndices.length === 1 && detectedTextRuns[selectedRunIndices[0]] ? (
@@ -1947,8 +2090,10 @@ export default function EditPdfTool() {
               </div>
             ) : null}
 
-            {selectedElement && selectedElement.type === "text" ? (
-              <div className="mt-3 grid gap-2 border-t border-[var(--text-primary)]/10 pt-3">
+          {selectedElement && selectedElement.type === "text" ? (
+            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
+              <L2PanelLabel title="Text properties" />
+              <div className="mt-2.5 grid gap-2.5">
                 <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
                   Font size
                   <input
@@ -1988,25 +2133,25 @@ export default function EditPdfTool() {
                   </button>
                 </div>
               </div>
-            ) : null}
-
-            <div className="mt-3 border-t border-[var(--text-primary)]/10 pt-3">
-              <label className="block rounded-lg border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-1)]/50 p-2.5">
-                <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">File name</span>
-                <input
-                  value={outputName}
-                  onChange={(e) => {
-                    setOutputName(e.target.value);
-                    setDownloadUrl("");
-                  }}
-                  className="mt-1.5 w-full rounded-md border border-transparent bg-transparent px-0 py-1 text-sm font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-primary)]/26 focus:border-b-[var(--lumeo-gold)]/45"
-                  placeholder="lumeo-edited.pdf"
-                />
-              </label>
             </div>
-          </L2WorkspaceInspector>
-        }
-      />
+          ) : null}
+
+          <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
+            <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">File name</span>
+              <input
+                value={outputName}
+                onChange={(e) => {
+                  setOutputName(e.target.value);
+                  setDownloadUrl("");
+                }}
+                className="mt-1.5 w-full rounded-md border border-transparent bg-transparent px-0 py-1 text-sm font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-primary)]/26 focus:border-b-[var(--lumeo-gold)]/45"
+                placeholder="lumeo-edited.pdf"
+              />
+            </label>
+          </div>
+        </div>
+      </div>
 
       <ToolActionBar>
         {downloadUrl ? (
