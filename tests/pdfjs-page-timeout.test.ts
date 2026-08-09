@@ -10,7 +10,7 @@ if (typeof globalThis.window === "undefined") {
   (globalThis as unknown as { window: typeof globalThis }).window = globalThis;
 }
 
-const { withPageTimeout, renderPageWithTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, computeAdaptiveRenderScale } = await import("../lib/pdf/pdfjs.ts");
+const { withPageTimeout, renderPageWithTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget, computeAdaptiveRenderScale } = await import("../lib/pdf/pdfjs.ts");
 
 // Regression for Phase 9.3's production-readiness audit finding: EditPdfTool's
 // page-render effect used to await page.render().promise and
@@ -84,6 +84,54 @@ test("clampRenderScaleToMaxDimension uses whichever page dimension is longer, no
   // A tall/portrait oversized page -- height is the longer side here.
   const scale = clampRenderScaleToMaxDimension(1.3, 3000, 8000, 5200);
   assert.ok(Math.abs(8000 * scale - 5200) < 1e-9, "the taller dimension should be clamped to the cap");
+});
+
+// Phase 26: clampRenderScaleToMaxDimension alone only bounds the canvas's
+// LONGER side -- a page large on BOTH axes can still pass that check while
+// producing an enormous total pixel count (e.g. a ~5200x5200pt page clamps
+// to ~1.0x, a no-op relative to the dimension cap, yet still rasterizes a
+// 5200x5200 = ~27 megapixel canvas). clampRenderScaleToPixelBudget is a
+// standalone second safety net for exactly that gap.
+
+test("clampRenderScaleToPixelBudget is a no-op when the requested scale is already within budget", () => {
+  // US Letter at the ordinary 1.3x scale is ~819K px -- nowhere near a
+  // 20-million-pixel budget.
+  assert.equal(clampRenderScaleToPixelBudget(1.3, 612, 792, 20_000_000), 1.3);
+});
+
+test("clampRenderScaleToPixelBudget reduces scale so a near-square oversized page's total pixel count lands exactly on the budget", () => {
+  // A page that already passed clampRenderScaleToMaxDimension's own
+  // longer-side check (scale ~1.0 for a ~5200pt page) but would still
+  // produce ~27 million pixels at that scale.
+  const pageWidthPt = 5200;
+  const pageHeightPt = 5200;
+  const requestedScale = 1.0;
+  const budget = 20_000_000;
+  const scale = clampRenderScaleToPixelBudget(requestedScale, pageWidthPt, pageHeightPt, budget);
+  assert.ok(scale < requestedScale, "should reduce below the requested scale");
+  const totalPixels = pageWidthPt * scale * (pageHeightPt * scale);
+  assert.ok(Math.abs(totalPixels - budget) < 1, "total pixel count should land exactly on the budget");
+});
+
+test("clampRenderScaleToPixelBudget composed with clampRenderScaleToMaxDimension caps a near-square oversized page on both axes", () => {
+  // The exact composition EditPdfTool.tsx uses: dimension cap first, then
+  // pixel budget. A 6000x6000pt page would be 7800x7800 at 1.3x (clamped
+  // by dimension to ~5200x5200 = ~27M px), and the pixel budget must then
+  // reduce it further.
+  const pageWidthPt = 6000;
+  const pageHeightPt = 6000;
+  const dimensionScale = clampRenderScaleToMaxDimension(1.3, pageWidthPt, pageHeightPt, 5200);
+  const finalScale = clampRenderScaleToPixelBudget(dimensionScale, pageWidthPt, pageHeightPt, 20_000_000);
+  assert.ok(finalScale < dimensionScale, "pixel budget should reduce further below the dimension-capped scale");
+  const totalPixels = pageWidthPt * finalScale * (pageHeightPt * finalScale);
+  assert.ok(totalPixels <= 20_000_000 + 1, `expected total pixels within budget, got ${totalPixels}`);
+});
+
+test("clampRenderScaleToPixelBudget does not affect a large-format page within budget (ANSI E at PAGE_RENDER_SCALE)", () => {
+  // ANSI E (34x44in = 2448x3168pt) at the ordinary 1.3x scale -- a genuine
+  // large real-world document size that must NOT be degraded by this cap.
+  const scale = clampRenderScaleToPixelBudget(1.3, 2448, 3168, 20_000_000);
+  assert.equal(scale, 1.3);
 });
 
 // Phase 20: computeAdaptiveRenderScale -- prepared, tested infrastructure for

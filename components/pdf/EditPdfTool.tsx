@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import type { PDFDocumentProxy } from "pdfjs-dist";
+import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from "pdfjs-dist";
 // pdf-lib itself is NOT imported as a value here -- see loadEditEngine
 // below, which loads it (and every lib/pdf/edit/*.ts module that touches
 // it internally) lazily, on first actual need, instead of bundling a
@@ -65,13 +65,13 @@ import {
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
-import { matchDetectedRunToOperator, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
+import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
 import type { ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
-import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension } from "@/lib/pdf/pdfjs";
+import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
@@ -222,6 +222,17 @@ const EDIT_HISTORY_MAX_BYTES = 300 * 1024 * 1024;
 // render, a failed canvas allocation, or browser instability on
 // constrained devices.
 const MAX_CANVAS_DIMENSION_PX = 5200;
+// Phase 26: MAX_CANVAS_DIMENSION_PX alone only bounds the canvas's LONGER
+// side -- a page large on BOTH axes (e.g. near-square, close to the
+// dimension cap on each side) can still pass that check while producing a
+// canvas up to 5200x5200 = ~27 million pixels (a ~108MB RGBA backing
+// buffer for one canvas). See clampRenderScaleToPixelBudget's own doc
+// comment in lib/pdf/pdfjs.ts -- this budget is set well above any
+// realistic document (Letter/A4 and even large-format pages like ANSI E
+// at 34x44in stay under 15M px at PAGE_RENDER_SCALE) so it's a no-op for
+// every normal page, and only reduces scale further for the rare
+// pathological one.
+const MAX_CANVAS_TOTAL_PIXELS = 20_000_000;
 
 function clampPct(value: number) {
   return Math.min(100, Math.max(0, value));
@@ -412,6 +423,15 @@ export default function EditPdfTool() {
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
+  // Phase 22: the render effect below already fetches this exact page and
+  // computes its scaled viewport once per pageIndex -- the operator-matching
+  // effect used to independently re-fetch and re-derive both from scratch
+  // (a second doc.getPage() + two more getViewport() calls per page view,
+  // pure duplicated pdf.js/main-thread work) purely so it could read the
+  // same numbers a moment later. Cached here, keyed by pageIndex, so it can
+  // reuse them instead. Only ever read by the operator effect right after
+  // the render effect that populated it, for the SAME pageIndex.
+  const pageAndViewportRef = useRef<{ pageIndex: number; page: PDFPageProxy; viewport: PageViewport } | null>(null);
   const [docReady, setDocReady] = useState(0);
   // addFile() must open the file via pdfjs once up front to read its page
   // count (for the page-count limit check) before pdf state is even set --
@@ -626,13 +646,14 @@ export default function EditPdfTool() {
         // ordinary page (dimensionScale === PAGE_RENDER_SCALE, unchanged
         // behavior); only an oversized MediaBox has its render scale
         // reduced below the usual default.
-        const dimensionScale = clampRenderScaleToMaxDimension(
-          PAGE_RENDER_SCALE,
+        const dimensionScale = clampRenderScaleToPixelBudget(
+          clampRenderScaleToMaxDimension(PAGE_RENDER_SCALE, pointViewport.width, pointViewport.height, MAX_CANVAS_DIMENSION_PX),
           pointViewport.width,
           pointViewport.height,
-          MAX_CANVAS_DIMENSION_PX,
+          MAX_CANVAS_TOTAL_PIXELS,
         );
         const viewport = page.getViewport({ scale: dimensionScale });
+        pageAndViewportRef.current = { pageIndex, page, viewport };
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d", { alpha: false });
         if (!context) {
@@ -725,25 +746,46 @@ export default function EditPdfTool() {
 
     void (async () => {
       try {
-        const page = await doc.getPage(pageIndex + 1);
-        const pointViewport = page.getViewport({ scale: 1 });
-        const dimensionScale = clampRenderScaleToMaxDimension(
-          PAGE_RENDER_SCALE,
-          pointViewport.width,
-          pointViewport.height,
-          MAX_CANVAS_DIMENSION_PX,
-        );
-        const viewport = page.getViewport({ scale: dimensionScale });
+        // Reuse the render effect's already-fetched page/viewport for this
+        // same pageIndex instead of re-deriving them -- see
+        // pageAndViewportRef's own doc comment. The cached entry is
+        // guaranteed present by the time this effect can run: it depends on
+        // pageDisplaySize, which the render effect only sets AFTER
+        // populating this ref for the current pageIndex. The direct fetch
+        // stays as a defensive fallback in case that invariant ever changes.
+        const cached = pageAndViewportRef.current;
+        const { viewport } =
+          cached && cached.pageIndex === pageIndex
+            ? cached
+            : await (async () => {
+                const fetchedPage = await doc.getPage(pageIndex + 1);
+                const pointViewport = fetchedPage.getViewport({ scale: 1 });
+                const dimensionScale = clampRenderScaleToPixelBudget(
+                  clampRenderScaleToMaxDimension(PAGE_RENDER_SCALE, pointViewport.width, pointViewport.height, MAX_CANVAS_DIMENSION_PX),
+                  pointViewport.width,
+                  pointViewport.height,
+                  MAX_CANVAS_TOTAL_PIXELS,
+                );
+                return { viewport: fetchedPage.getViewport({ scale: dimensionScale }) };
+              })();
         if (cancelled || !pdfLibDocRef.current || !editEngineRef.current) return;
         const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
         if (cancelled) return;
         setPageOperators(located);
+        // Built once per page, not once per run -- see
+        // buildOperatorSpatialIndex's own doc comment. Paired with a
+        // Map for O(1) operator -> LocatedTextOperator lookup below,
+        // replacing what was previously an O(operators) `.find()` call
+        // repeated for every run (a second, separate O(runs x operators)
+        // cost stacked on top of the matching itself).
         const flatOperators = located.map((item) => item.operator);
+        const operatorIndex = buildOperatorSpatialIndex(flatOperators, viewport.transform);
+        const locatedByOperator = new Map(located.map((item) => [item.operator, item] as const));
         setRunMatches(
           runs.map((run): RunMatch => {
-            const matchedOperator = matchDetectedRunToOperator(run, pageDisplaySize.width, pageDisplaySize.height, flatOperators, viewport.transform);
+            const matchedOperator = matchDetectedRunToOperatorIndexed(run, pageDisplaySize.width, pageDisplaySize.height, operatorIndex);
             if (!matchedOperator) return null;
-            const locatedOperator = located.find((item) => item.operator === matchedOperator);
+            const locatedOperator = locatedByOperator.get(matchedOperator);
             return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
           }),
         );
