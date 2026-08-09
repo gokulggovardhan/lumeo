@@ -58,6 +58,7 @@ import {
 // in transitively regardless of the type-only import above. Their TYPE
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
+import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
 import type { ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
@@ -1550,6 +1551,25 @@ export default function EditPdfTool() {
   // selectedRunIndices[0] at each use site.
   const singleSelectedRun = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
   const singleSelectedRunMatch = selectedRunIndices.length === 1 ? runMatches[selectedRunIndices[0]] : null;
+  // Phase 29: the inline editor's Apply/Cancel toolbar (and its error
+  // tooltip further below) render below the run by default -- for a run
+  // near the bottom edge of the page, that can land outside the stage's
+  // own clipped bounds. A larger margin than the default (real room is
+  // needed for buttons + gap + tooltip, not just the buttons alone) flips
+  // the whole stack above the run instead when there isn't room below.
+  // Computed unconditionally (cheap; singleSelectedRun null-safe via ?.)
+  // rather than inside the JSX below, so it stays plain render-time
+  // derivation, not a nested closure the React Compiler's static analysis
+  // has to reason about.
+  const inlineEditorVerticalPlacement = singleSelectedRun
+    ? pickVerticalPlacement(singleSelectedRun.yPct, singleSelectedRun.yPct + singleSelectedRun.heightPct, 24, true)
+    : "below";
+  const inlineEditorHorizontalAlign = singleSelectedRun
+    ? pickHorizontalAlign(singleSelectedRun.xPct, singleSelectedRun.xPct + singleSelectedRun.widthPct)
+    : "start";
+  const inlineEditorToolbarPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-1" : "bottom-full mb-1";
+  const inlineEditorTooltipPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-11" : "bottom-full mb-11";
+  const inlineEditorHorizontalClass = inlineEditorHorizontalAlign === "end" ? "right-0" : "left-0";
 
   const generateEditedPdf = useCallback(async () => {
     if (!pdf) return;
@@ -1850,6 +1870,17 @@ export default function EditPdfTool() {
                     // required UI for finishing the edit; the sidebar's
                     // "Replace with" field (same editDraftText state) still
                     // works too, but is now optional, not the primary path.
+                    //
+                    // Phase 29: the Apply/Cancel pair (and its error tooltip
+                    // further below) render BELOW the run by default -- for
+                    // a run near the bottom edge of the page, that can land
+                    // outside the stage's own clipped bounds.
+                    // inlineEditorToolbarPositionClass/inlineEditorTooltipPositionClass/
+                    // inlineEditorHorizontalClass (computed above, outside
+                    // this JSX) flip the whole stack above/aside the run
+                    // instead when there isn't room -- see their own
+                    // comment for why they're derived up there and not
+                    // inline here.
                     <div
                       className="absolute z-30"
                       style={{
@@ -1890,7 +1921,7 @@ export default function EditPdfTool() {
                           toolbar, not a primary navigation control; 36px still
                           comfortably clears WCAG's minimum (24px) target-size
                           guidance. */}
-                      <div className="absolute left-0 top-full z-30 mt-1 flex gap-1.5 whitespace-nowrap">
+                      <div className={`absolute z-30 flex gap-1.5 whitespace-nowrap ${inlineEditorToolbarPositionClass} ${inlineEditorHorizontalClass}`}>
                         <button
                           type="button"
                           onClick={(event) => {
@@ -1926,7 +1957,7 @@ export default function EditPdfTool() {
                         </button>
                       </div>
                       {editApplyError || (editPreview.kind !== "empty" && !editPreview.editable && editPreview.reason) ? (
-                        <div role="alert" className="absolute left-0 top-full z-30 mt-11 max-w-[220px] rounded-md border border-[var(--border-danger)]/25 bg-[var(--surface-danger)] px-2 py-1 text-[10px] font-semibold leading-4 text-[var(--text-danger)] shadow-lg">
+                        <div role="alert" className={`absolute z-30 max-w-[220px] rounded-md border border-[var(--border-danger)]/25 bg-[var(--surface-danger)] px-2 py-1 text-[10px] font-semibold leading-4 text-[var(--text-danger)] shadow-lg ${inlineEditorTooltipPositionClass} ${inlineEditorHorizontalClass}`}>
                           {editApplyError || (editPreview.kind !== "empty" ? editPreview.reason : "")}
                         </div>
                       ) : null}

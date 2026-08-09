@@ -16,6 +16,7 @@
 
 import { memo, useRef } from "react";
 import { canResizeElement, isLineShape, moveElementByArrowKey, resizeElementByArrowKey, type EditElement } from "@/lib/pdf/edit/elements";
+import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 
 // Phase 9.3: keyboard-editing hardening -- Arrow keys move, Shift+Arrow
 // resizes, matching CropRectView.tsx's own MOVE_STEP_PCT precedent (this
@@ -210,6 +211,10 @@ function EditElementViewImpl({
 
   const resizable = canResizeElement(element);
   const isLine = isLineShape(element);
+  // Phase 29: computed once, reused by the delete pill's own placement
+  // classes below -- see floatingControlPlacement.ts for the math.
+  const deletePillVerticalPlacement = pickVerticalPlacement(element.yPct, element.yPct + element.heightPct);
+  const deletePillHorizontalAlign = pickHorizontalAlign(element.xPct, element.xPct + element.widthPct);
 
   // Arrow keys move; Shift+Arrow resizes (only when this element supports
   // resizing at all -- see canResizeElement, false for ink). Delete/
@@ -313,7 +318,22 @@ function EditElementViewImpl({
 
       {selected ? (
         <>
-          <div className="absolute -top-9 left-1/2 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 px-1.5 py-1 shadow-lg">
+          {/* Phase 29: floats above the element by default -- but for an
+              element placed near the top edge of the page, "-top-9" (36px
+              above) can land partly or fully outside the stage's own
+              clipped bounds, making the delete control unreachable. Flips
+              to below when there isn't room above (and clamps to the
+              element's own left/right edge instead of centering, for the
+              same reason near the left/right edges) -- pure percent-space
+              math (lib/pdf/edit/floatingControlPlacement.ts), no stage
+              measurement needed. */}
+          <div
+            className={`absolute flex items-center gap-1 whitespace-nowrap rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 px-1.5 py-1 shadow-lg ${
+              deletePillVerticalPlacement === "above" ? "-top-9" : "-bottom-9"
+            } ${
+              deletePillHorizontalAlign === "start" ? "left-0" : deletePillHorizontalAlign === "end" ? "right-0" : "left-1/2 -translate-x-1/2"
+            }`}
+          >
             <button
               type="button"
               data-handle="delete"
@@ -339,25 +359,40 @@ function EditElementViewImpl({
             </button>
           </div>
 
+          {/* Phase 29: the visible grip stays the same small 14px dot (an
+              intentional, deliberately-not-huge design choice) -- but it now
+              sits centered inside a 36px invisible hit target, the standard
+              "small visual, big touch target" pattern. onPointerDown/
+              data-handle live on the WRAPPER, not the dot, so the larger
+              area is what actually captures the gesture; handleResizeStart
+              only ever reads event.clientX/clientY (never the event
+              target's own geometry), so this is a pure DOM-structure change
+              with zero effect on the drag math itself. */}
           {resizable && isLine ? (
             <>
               <div
                 data-handle="resize-start"
                 onPointerDown={(event) => handleResizeStart(event, "start")}
-                className="absolute -left-1.5 -top-1.5 h-3.5 w-3.5 cursor-move rounded-full border-2 border-[var(--lumeo-gold)] bg-[var(--atelier-surface-1)]"
-              />
+                className="absolute -left-[18px] -top-[18px] grid h-9 w-9 cursor-move place-items-center"
+              >
+                <div className="h-3.5 w-3.5 rounded-full border-2 border-[var(--lumeo-gold)] bg-[var(--atelier-surface-1)]" />
+              </div>
               <div
                 data-handle="resize-end"
                 onPointerDown={(event) => handleResizeStart(event, "end")}
-                className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-move rounded-full border-2 border-[var(--lumeo-gold)] bg-[var(--atelier-surface-1)]"
-              />
+                className="absolute -bottom-[18px] -right-[18px] grid h-9 w-9 cursor-move place-items-center"
+              >
+                <div className="h-3.5 w-3.5 rounded-full border-2 border-[var(--lumeo-gold)] bg-[var(--atelier-surface-1)]" />
+              </div>
             </>
           ) : resizable ? (
             <div
               data-handle="resize-end"
               onPointerDown={(event) => handleResizeStart(event, "end")}
-              className="absolute -bottom-1.5 -right-1.5 h-3.5 w-3.5 cursor-nwse-resize rounded-full border-2 border-[var(--lumeo-gold)] bg-[var(--atelier-surface-1)]"
-            />
+              className="absolute -bottom-[18px] -right-[18px] grid h-9 w-9 cursor-nwse-resize place-items-center"
+            >
+              <div className="h-3.5 w-3.5 rounded-full border-2 border-[var(--lumeo-gold)] bg-[var(--atelier-surface-1)]" />
+            </div>
           ) : null}
         </>
       ) : null}
