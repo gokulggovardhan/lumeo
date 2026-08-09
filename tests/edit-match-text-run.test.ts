@@ -14,9 +14,14 @@ import {
   PDFDict,
 } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { textRunsFromContent } from "../lib/pdf/edit/textRuns.ts";
+import { textRunsFromContent, type DetectedTextRun } from "../lib/pdf/edit/textRuns.ts";
 import { walkTextShowOperators } from "../lib/pdf/edit/contentStream.ts";
-import { matchDetectedRunToOperator, runSpansMultipleOperators } from "../lib/pdf/edit/matchTextRun.ts";
+import {
+  matchDetectedRunToOperator,
+  matchDetectedRunToOperatorIndexed,
+  buildOperatorSpatialIndex,
+  runSpansMultipleOperators,
+} from "../lib/pdf/edit/matchTextRun.ts";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import { resolveFont } from "../lib/pdf/edit/fontEncoding.ts";
 import { resolveFontMetrics } from "../lib/pdf/edit/fontMetrics.ts";
@@ -201,6 +206,98 @@ test("runSpansMultipleOperators flags a run pdfjs merged from two back-to-back T
   // runSpansMultipleOperators must catch.
   assert.equal(plan.originalText, "Hello ");
   assert.equal(runSpansMultipleOperators(plan.originalText, runs[0].str), true);
+});
+
+// Phase 24: matchDetectedRunToOperatorIndexed's spatial-grid prefilter must
+// return EXACTLY what the brute-force matchDetectedRunToOperator returns
+// for the same inputs -- it's a performance-only change (O(runs x operators)
+// -> O(runs) after a one-time O(operators) index build), never a behavior
+// change. These synthetic operators/runs don't need a real PDF: matchTextRun
+// only ever looks at an operator's textRenderingMatrix and a run's
+// xPct/yPct/widthPct/heightPct, both of which are trivial to construct
+// directly, and doing so lets this test cover far denser
+// (100s-of-operators) scenarios than a real drawText()-built PDF practically
+// could.
+function makeFakeOperator(leftPx: number, topPx: number, label: string) {
+  // boxOriginFromTransform (called on viewportTransform . textRenderingMatrix)
+  // treats a non-rotated transform's [4],[5] as the box's own left/top
+  // directly when angle ~= 0 and fontHeight's ascent offset is folded in --
+  // to keep this test's math simple and exact, use fontSize 0 equivalent
+  // (identity scale, tx=[1,0,0,1,leftPx,topPx+ascentOffset]) so the resulting
+  // origin.top lands exactly on topPx. hypot(tx[2],tx[3]) with tx=[1,0,0,1,..]
+  // is hypot(0,1)=1, so fontAscent = 1*0.85 = 0.85 -- offset topPx by that
+  // fixed, known amount so origin.top === topPx exactly.
+  const ASCENT_OFFSET = 0.85;
+  return {
+    kind: "Tj" as const,
+    start: 0,
+    end: 0,
+    strings: [new TextEncoder().encode(label)],
+    fontResourceName: "F1",
+    fontSizePt: 12,
+    textRenderingMatrix: [1, 0, 0, 1, leftPx, topPx + ASCENT_OFFSET] as [number, number, number, number, number, number],
+    charSpacing: 0,
+    wordSpacing: 0,
+    horizontalScalingPct: 100,
+    leading: 0,
+    textRise: 0,
+    renderMode: 0,
+  };
+}
+
+function makeFakeRun(xPct: number, yPct: number): DetectedTextRun {
+  return { str: "x", fontName: "F1", xPct, yPct, widthPct: 1, heightPct: 1, fontSizePx: 12, rotated: false };
+}
+
+test("matchDetectedRunToOperatorIndexed matches matchDetectedRunToOperator exactly on a dense scattered grid", () => {
+  const pageWidthPx = 1000;
+  const pageHeightPx = 1000;
+  const viewportTransform: [number, number, number, number, number, number] = [1, 0, 0, 1, 0, 0];
+
+  // 400 operators scattered across a 20x20 grid (5px apart -- tighter than
+  // POSITION_TOLERANCE_PX's neighboring cells so some runs land ambiguously
+  // close to more than one operator, exercising the "closest wins" tie-break
+  // the same way both code paths must agree on).
+  const operators = [];
+  for (let gx = 0; gx < 20; gx += 1) {
+    for (let gy = 0; gy < 20; gy += 1) {
+      operators.push(makeFakeOperator(gx * 5, gy * 5, `op-${gx}-${gy}`));
+    }
+  }
+  const index = buildOperatorSpatialIndex(operators, viewportTransform);
+
+  // Runs: one exactly on each of a sample of grid points (should match),
+  // plus several deliberately far from every operator (should return null),
+  // plus a few sitting between two operators' tolerance circles (exercises
+  // the closest-wins comparison identically on both paths).
+  const runs: DetectedTextRun[] = [];
+  for (let gx = 0; gx < 20; gx += 2) {
+    for (let gy = 0; gy < 20; gy += 2) {
+      runs.push(makeFakeRun((gx * 5 / pageWidthPx) * 100, (gy * 5 / pageHeightPx) * 100));
+    }
+  }
+  // Far outside any operator's tolerance.
+  runs.push(makeFakeRun(50, 50));
+  runs.push(makeFakeRun(0, 0));
+  runs.push(makeFakeRun(99.9, 99.9));
+
+  for (const run of runs) {
+    const brute = matchDetectedRunToOperator(run, pageWidthPx, pageHeightPx, operators, viewportTransform);
+    const indexed = matchDetectedRunToOperatorIndexed(run, pageWidthPx, pageHeightPx, index);
+    assert.equal(indexed, brute, `mismatch for run at (${run.xPct}, ${run.yPct})`);
+  }
+});
+
+test("matchDetectedRunToOperatorIndexed returns null when the index has no operators near the run, same as brute force", () => {
+  const pageWidthPx = 1000;
+  const pageHeightPx = 1000;
+  const viewportTransform: [number, number, number, number, number, number] = [1, 0, 0, 1, 0, 0];
+  const operators = [makeFakeOperator(500, 500, "only-op")];
+  const index = buildOperatorSpatialIndex(operators, viewportTransform);
+  const farRun = makeFakeRun(10, 10);
+
+  assert.equal(matchDetectedRunToOperatorIndexed(farRun, pageWidthPx, pageHeightPx, index), null);
+  assert.equal(matchDetectedRunToOperator(farRun, pageWidthPx, pageHeightPx, operators, viewportTransform), null);
 });
 
 test("runSpansMultipleOperators does not flag a normal single-operator run", async () => {
