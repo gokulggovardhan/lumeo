@@ -59,6 +59,7 @@ import {
 // in transitively regardless of the type-only import above. Their TYPE
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
+import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
@@ -411,6 +412,10 @@ export default function EditPdfTool() {
   const [whiteoutDraft, setWhiteoutDraft] = useState<{ xPct: number; yPct: number; widthPct: number; heightPct: number; snapped: boolean } | null>(null);
   const whiteoutGestureRef = useRef<{ startXPct: number; startYPct: number; rect: DOMRect } | null>(null);
   const [shapeKind, setShapeKind] = useState<ShapeKind>(DEFAULT_SHAPE_KIND);
+  // Privacy Shield: matches from the last scan of the CURRENT page's
+  // detectedTextRuns, shown as dismissable highlight overlays until applied
+  // (converted to real whiteout elements) or individually dismissed.
+  const [privacyShieldMatches, setPrivacyShieldMatches] = useState<Array<PrivacyShieldMatch<DetectedTextRun>>>([]);
   const [inkColor, setInkColor] = useState("#12141a");
   const [inkStrokeWidth, setInkStrokeWidth] = useState(3);
   const [zoom, setZoom] = useState(1);
@@ -1066,6 +1071,31 @@ export default function EditPdfTool() {
     setElements((current) => [...current, element]);
     setSelectedId(id);
     setActiveTool("select");
+  }
+
+  // Privacy Shield: deterministic regex scan (lib/pdf/edit/privacyShield.ts)
+  // over the CURRENT page's detectedTextRuns only -- rescanning on every
+  // page change/tool click keeps results in sync with what's on screen
+  // without a separate invalidation path.
+  function handlePrivacyShieldScan() {
+    setPrivacyShieldMatches(scanForSensitiveInfo(detectedTextRuns));
+  }
+
+  function dismissPrivacyShieldMatch(index: number) {
+    setPrivacyShieldMatches((current) => current.filter((_, i) => i !== index));
+  }
+
+  function applyPrivacyShieldRedactions() {
+    setElements((current) => {
+      let next = current;
+      for (const match of privacyShieldMatches) {
+        const id = nextElementId();
+        const element = createWhiteoutElement(id, pageIndex, match.run.xPct, match.run.yPct, "white");
+        next = [...next, { ...element, widthPct: match.run.widthPct, heightPct: match.run.heightPct }];
+      }
+      return next;
+    });
+    setPrivacyShieldMatches([]);
   }
 
   // Phase 9.2: selects (or deselects, for index null) a detected text run
@@ -1771,6 +1801,36 @@ export default function EditPdfTool() {
                     </div>
                   ) : null}
 
+                  {privacyShieldMatches.length > 0 ? (
+                    <>
+                      {privacyShieldMatches.map((match, index) => (
+                        <button
+                          key={`${match.run.xPct}-${match.run.yPct}-${index}`}
+                          type="button"
+                          onClick={() => dismissPrivacyShieldMatch(index)}
+                          title={`${match.category} match -- click to exclude from redaction`}
+                          className="absolute z-20 rounded-[2px] border-2 border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10"
+                          style={{
+                            left: `${match.run.xPct}%`,
+                            top: `${match.run.yPct}%`,
+                            width: `${match.run.widthPct}%`,
+                            height: `${match.run.heightPct}%`,
+                          }}
+                        />
+                      ))}
+                      <div className="absolute z-30 bottom-24 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 px-3 py-2 shadow-lg">
+                        <span className="text-xs font-semibold text-[var(--text-primary)]/70">{privacyShieldMatches.length} match{privacyShieldMatches.length === 1 ? "" : "es"} found</span>
+                        <button
+                          type="button"
+                          onClick={applyPrivacyShieldRedactions}
+                          className="min-h-9 rounded-full bg-[var(--lumeo-gold)]/90 px-3 text-xs font-bold text-[var(--atelier-surface-0)] transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                        >
+                          Apply redactions
+                        </button>
+                      </div>
+                    </>
+                  ) : null}
+
                   {activeTool === "select" && singleSelectedRun && singleSelectedRunMatch ? (
                     // Phase 11: true inline editing -- a caret appears
                     // directly over the clicked text (positioned with the
@@ -1888,8 +1948,8 @@ export default function EditPdfTool() {
           onInkColorChange={setInkColor}
           inkStrokeWidth={inkStrokeWidth}
           onInkStrokeWidthChange={setInkStrokeWidth}
-          onPrivacyShieldClick={() => {}}
-          privacyShieldMatchCount={0}
+          onPrivacyShieldClick={handlePrivacyShieldScan}
+          privacyShieldMatchCount={privacyShieldMatches.length}
         />
 
         {selectedElement && selectedElement.type === "text" ? (
