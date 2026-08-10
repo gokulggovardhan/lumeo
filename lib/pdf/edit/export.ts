@@ -111,8 +111,20 @@ export async function exportEditedPdf(
   elements: EditElement[],
 ): Promise<{ bytes: Uint8Array; skippedPages: number[] }> {
   const doc = await PDFDocument.load(originalBytes);
-  const helvetica = await doc.embedFont(StandardFonts.Helvetica);
-  const helveticaBold = await doc.embedFont(StandardFonts.HelveticaBold);
+  // Embedded lazily, one per distinct bold/italic combination actually
+  // used -- embedFont() unconditionally adds a font object to the
+  // document, so eagerly embedding all four variants would bloat every
+  // export with unused font objects whenever a document has no bold or
+  // italic placed text at all (the common case).
+  const fontCache = new Map<StandardFonts, Awaited<ReturnType<typeof doc.embedFont>>>();
+  async function getFont(standardFont: StandardFonts) {
+    let font = fontCache.get(standardFont);
+    if (!font) {
+      font = await doc.embedFont(standardFont);
+      fontCache.set(standardFont, font);
+    }
+    return font;
+  }
   const pngCache = new Map<string, Uint8Array>();
   const skippedPages: number[] = [];
 
@@ -141,6 +153,16 @@ export async function exportEditedPdf(
         if (element.type === "text") {
           if (!element.text.trim()) continue;
           const { r, g, b } = hexToRgb01(element.color);
+          const color = rgb(r, g, b);
+          const font = await getFont(
+            element.bold && element.italic
+              ? StandardFonts.HelveticaBoldOblique
+              : element.bold
+                ? StandardFonts.HelveticaBold
+                : element.italic
+                  ? StandardFonts.HelveticaOblique
+                  : StandardFonts.Helvetica,
+          );
           // Anchor is the visual top-left corner, nudged down by the font
           // size to approximate the baseline -- matches the pre-rotation
           // formula exactly when rotation is 0.
@@ -149,10 +171,37 @@ export async function exportEditedPdf(
             x: anchor.x,
             y: anchor.y,
             size: element.fontSizePt,
-            font: element.bold ? helveticaBold : helvetica,
-            color: rgb(r, g, b),
+            font,
+            color,
             rotate: degrees(rotation),
           });
+          if (element.underline) {
+            // Line sits a small offset below the baseline anchor, in the
+            // same visual space as the text itself, then mapped through the
+            // same rotation so it tracks the glyphs exactly.
+            const underlineOffset = element.fontSizePt * 0.08;
+            const textWidth = font.widthOfTextAtSize(element.text, element.fontSizePt);
+            const lineStart = toNativePoint(
+              rotation,
+              nativeWidth,
+              nativeHeight,
+              visualX,
+              visualY + element.fontSizePt + underlineOffset,
+            );
+            const lineEnd = toNativePoint(
+              rotation,
+              nativeWidth,
+              nativeHeight,
+              visualX + textWidth,
+              visualY + element.fontSizePt + underlineOffset,
+            );
+            page.drawLine({
+              start: lineStart,
+              end: lineEnd,
+              thickness: Math.max(0.5, element.fontSizePt * 0.05),
+              color,
+            });
+          }
         } else if (element.type === "whiteout") {
           const { r, g, b } = element.color === "white" ? { r: 1, g: 1, b: 1 } : { r: 0, g: 0, b: 0 };
           const box = toNativeBox(rotation, nativeWidth, nativeHeight, visualX, visualY, visualElementWidth, visualElementHeight);

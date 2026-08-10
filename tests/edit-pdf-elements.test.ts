@@ -27,7 +27,15 @@ test("createTextElement produces sensible defaults", () => {
     assert.equal(el.text, "");
     assert.equal(el.bold, false);
     assert.equal(el.italic, false);
+    assert.equal(el.underline, false);
   }
+});
+
+test("underline survives a patchElement call", () => {
+  const el = createTextElement("el-underline", 0, 10, 10);
+  const patched = patchElement([el], "el-underline", { underline: true });
+  const found = patched.find((item) => item.id === "el-underline");
+  assert.ok(found?.type === "text" && found.underline === true);
 });
 
 test("createShapeElement carries the requested shapeKind", () => {

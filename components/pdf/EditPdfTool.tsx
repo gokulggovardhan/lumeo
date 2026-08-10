@@ -36,6 +36,7 @@ import {
 import { EditElementView } from "@/components/pdf/edit/EditElementView";
 import { InkCanvas } from "@/components/pdf/edit/InkCanvas";
 import { TextRunOverlay } from "@/components/pdf/edit/TextRunOverlay";
+import { SelectionFormatToolbar } from "@/components/pdf/edit/SelectionFormatToolbar";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
   createInkElement,
@@ -1590,6 +1591,29 @@ export default function EditPdfTool() {
   const inlineEditorTooltipPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-11" : "bottom-full mb-11";
   const inlineEditorHorizontalClass = inlineEditorHorizontalAlign === "end" ? "right-0" : "left-0";
 
+  // Phase 1 professional text editing: same edge-aware placement approach
+  // as the inline text-run editor above, reused (not forked) for the
+  // contextual formatting toolbar attached to a selected placed text
+  // element -- see SelectionFormatToolbar's own doc comment for why this
+  // is a distinct mode from the run-based one above.
+  const selectedTextElement = selectedElement && selectedElement.type === "text" ? selectedElement : null;
+  const elementToolbarVerticalPlacement = selectedTextElement
+    ? pickVerticalPlacement(selectedTextElement.yPct, selectedTextElement.yPct + selectedTextElement.heightPct, 24, true)
+    : "below";
+  const elementToolbarHorizontalAlign = selectedTextElement
+    ? pickHorizontalAlign(selectedTextElement.xPct, selectedTextElement.xPct + selectedTextElement.widthPct)
+    : "start";
+  const elementToolbarPositionClass = `${elementToolbarVerticalPlacement === "below" ? "top-full mt-1" : "bottom-full mb-1"} ${elementToolbarHorizontalAlign === "end" ? "right-0" : "left-0"}`;
+
+  // Read-only font name/size for an EXISTING PDF text-run selection --
+  // already resolved by resolvedEditContext above (needed for the edit
+  // itself), just never surfaced in the UI until now. Only shown for a
+  // single-run selection, matching the inline editor it sits next to.
+  const singleSelectedRunFontInfo =
+    resolvedEditContext.kind === "single"
+      ? { fontName: resolvedEditContext.resolvedFont.baseFont, fontSizePt: resolvedEditContext.operator.fontSizePt }
+      : null;
+
   const generateEditedPdf = useCallback(async () => {
     if (!pdf) return;
     setIsExporting(true);
@@ -1842,6 +1866,29 @@ export default function EditPdfTool() {
                     />
                   ))}
 
+                  {activeTool === "select" && selectedTextElement ? (
+                    <div
+                      className="absolute z-30"
+                      style={{
+                        left: `${selectedTextElement.xPct}%`,
+                        top: `${selectedTextElement.yPct}%`,
+                        width: `${selectedTextElement.widthPct}%`,
+                        height: `${selectedTextElement.heightPct}%`,
+                      }}
+                    >
+                      <SelectionFormatToolbar
+                        mode="element"
+                        element={selectedTextElement}
+                        positionClassName={elementToolbarPositionClass}
+                        onPatch={(patch) => setElements((current) => patchElement(current, selectedTextElement.id, patch as Partial<EditElement>))}
+                        onDelete={() => {
+                          setElements((current) => deleteElement(current, selectedTextElement.id));
+                          setSelectedId(null);
+                        }}
+                      />
+                    </div>
+                  ) : null}
+
                   {activeTool === "draw" && pageDisplaySize ? (
                     <InkCanvas
                       stageWidthPx={pageDisplaySize.width}
@@ -1947,7 +1994,15 @@ export default function EditPdfTool() {
                           toolbar, not a primary navigation control; 36px still
                           comfortably clears WCAG's minimum (24px) target-size
                           guidance. */}
-                      <div className={`absolute z-30 flex gap-1.5 whitespace-nowrap ${inlineEditorToolbarPositionClass} ${inlineEditorHorizontalClass}`}>
+                      <div className={`absolute z-30 flex items-center gap-1.5 whitespace-nowrap ${inlineEditorToolbarPositionClass} ${inlineEditorHorizontalClass}`}>
+                        {singleSelectedRunFontInfo ? (
+                          <SelectionFormatToolbar
+                            mode="run"
+                            fontName={singleSelectedRunFontInfo.fontName}
+                            fontSizePt={singleSelectedRunFontInfo.fontSizePt}
+                            positionClassName="relative"
+                          />
+                        ) : null}
                         <button
                           type="button"
                           onClick={(event) => {
@@ -2199,52 +2254,6 @@ export default function EditPdfTool() {
                 )}
               </div>
             ) : null}
-
-          {selectedElement && selectedElement.type === "text" ? (
-            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
-              <L2PanelLabel title="Text properties" />
-              <div className="mt-2.5 grid gap-2.5">
-                <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
-                  Font size
-                  <input
-                    type="number"
-                    min={8}
-                    max={72}
-                    value={selectedElement.fontSizePt}
-                    onChange={(e) => setElements((current) => patchElement(current, selectedElement.id, { fontSizePt: Number(e.target.value) } as Partial<EditElement>))}
-                    className="w-16 rounded border border-[var(--text-primary)]/14 bg-transparent px-2 py-1 text-right"
-                  />
-                </label>
-                <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
-                  Color
-                  <input
-                    type="color"
-                    value={selectedElement.color}
-                    onChange={(e) => setElements((current) => patchElement(current, selectedElement.id, { color: e.target.value } as Partial<EditElement>))}
-                    className="h-7 w-10 rounded border border-[var(--text-primary)]/14"
-                  />
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    aria-pressed={selectedElement.bold}
-                    onClick={() => setElements((current) => patchElement(current, selectedElement.id, { bold: !selectedElement.bold } as Partial<EditElement>))}
-                    className={`min-h-11 flex-1 rounded-lg border px-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${selectedElement.bold ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
-                  >
-                    Bold
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={selectedElement.italic}
-                    onClick={() => setElements((current) => patchElement(current, selectedElement.id, { italic: !selectedElement.italic } as Partial<EditElement>))}
-                    className={`min-h-11 flex-1 rounded-lg border px-2 text-xs italic transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${selectedElement.italic ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
-                  >
-                    Italic
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
 
           <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
             <label className="block">
