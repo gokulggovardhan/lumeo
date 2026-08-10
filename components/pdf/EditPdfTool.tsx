@@ -1823,7 +1823,7 @@ export default function EditPdfTool() {
                         <button
                           type="button"
                           onClick={applyPrivacyShieldRedactions}
-                          className="min-h-9 rounded-full bg-[var(--lumeo-gold)]/90 px-3 text-xs font-bold text-[var(--atelier-surface-0)] transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                          className="min-h-11 rounded-full bg-[var(--lumeo-gold)]/90 px-3 text-xs font-bold text-[var(--atelier-surface-0)] transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
                         >
                           Apply redactions
                         </button>
