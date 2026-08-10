@@ -26,7 +26,6 @@ import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from "pdfjs-dist";
 import type { PDFDocument, PDFDict } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import {
-  L2PanelLabel,
   L2PrivacyNote,
   L2ToolbarButton,
   L2UploadStage,
@@ -35,6 +34,7 @@ import {
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { EditElementView } from "@/components/pdf/edit/EditElementView";
 import { InkCanvas } from "@/components/pdf/edit/InkCanvas";
+import { MicroDock } from "@/components/pdf/edit/MicroDock";
 import { TextRunOverlay } from "@/components/pdf/edit/TextRunOverlay";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
@@ -123,7 +123,7 @@ type EditPreview =
 // action). So Shape's highlight kind is currently the ONLY way to highlight
 // existing content -- not a duplicate, the sole implementation. Revisit if
 // a dedicated text-highlight action is ever added to the Select tool.
-type ActiveTool = "select" | "text" | "draw" | "shape" | "whiteout";
+export type ActiveTool = "select" | "text" | "draw" | "shape" | "whiteout";
 
 // Phase 13: unmodified 1-5 tool shortcuts, shown as native tooltips on each
 // tool button (see the tool grid's title attribute below) -- a discrete
@@ -137,8 +137,6 @@ const TOOL_SHORTCUT_KEYS: Record<string, ActiveTool> = {
   "4": "shape",
   "5": "whiteout",
 };
-const TOOL_SHORTCUT_LABELS: Record<ActiveTool, string> = { select: "1", text: "2", draw: "3", shape: "4", whiteout: "5" };
-
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 
 // Lazy-loads pdf-lib itself plus every lib/pdf/edit/*.ts module whose OWN
@@ -267,61 +265,6 @@ function EditIcon() {
   );
 }
 
-// Phase 27 workspace redesign: one stroke-based icon per tool, matching
-// EditIcon's own convention (currentColor, rounded joins/caps) so the tool
-// rail reads as a real editing tool system instead of five plain labeled
-// buttons. Kept as small standalone components (not inlined per-use) so the
-// desktop rail and mobile dock can render the exact same icon without
-// duplicating path data.
-function SelectToolIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
-      <path d="M6 4.5 18 12l-5.2 1.2L15 19l-2.4 1L10 14l-4 3.5V4.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function TextToolIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
-      <path d="M5 6.5h14M12 6.5V18M9 18h6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function DrawToolIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
-      <path d="M14.5 5.5 18.5 9.5 8 20H4v-4L14.5 5.5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      <path d="M13 7 17 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ShapeToolIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
-      <rect x="4" y="4" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.6" />
-      <circle cx="16" cy="16" r="4.5" stroke="currentColor" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
-// Deliberately NOT a red icon (Phase 27 UX note: whiteout must read as
-// "cover this content," not "delete") -- a masked rectangle in the same
-// neutral/gold vocabulary as every other tool icon, distinguished by shape
-// (a filled block with a corner fold, like a physical correction sticker)
-// rather than by an alarming color.
-function WhiteoutToolIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-[18px] w-[18px]" fill="none">
-      <path d="M5 5h10.5L19 8.5V19H5V5Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      <path d="M15.5 5v3.5H19" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      <path d="M8 12.5h8M8 15.5h5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 function UndoIcon() {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none">
@@ -355,14 +298,6 @@ function ChevronRightIcon() {
     </svg>
   );
 }
-
-const TOOL_META: Array<{ id: ActiveTool; label: string; Icon: () => React.JSX.Element }> = [
-  { id: "select", label: "Select", Icon: SelectToolIcon },
-  { id: "text", label: "Text", Icon: TextToolIcon },
-  { id: "draw", label: "Draw", Icon: DrawToolIcon },
-  { id: "shape", label: "Shape", Icon: ShapeToolIcon },
-  { id: "whiteout", label: "Whiteout", Icon: WhiteoutToolIcon },
-];
 
 export default function EditPdfTool() {
   const { availability, track } = useAnalytics();
@@ -400,6 +335,7 @@ export default function EditPdfTool() {
   // itself (empty or populated) is the source of truth for the RESULT,
   // this is only about whether that result is final yet.
   const [textDetectionReady, setTextDetectionReady] = useState(false);
+  void textDetectionReady; // TODO(Task 4): consumed by FloatingIsland's inspector mode
   const [error, setError] = useState("");
 
   const {
@@ -1549,6 +1485,7 @@ export default function EditPdfTool() {
   const hasTextEdits = historyState.pdfBytes !== originalBytes;
   const currentPageElements = useMemo(() => elementsForPage(elements, pageIndex), [elements, pageIndex]);
   const selectedElement = useMemo(() => elements.find((item) => item.id === selectedId) ?? null, [elements, selectedId]);
+  void selectedElement; // TODO(Task 4): consumed by FloatingIsland's inspector mode
   // Falls back to PAGE_RENDER_SCALE (the ratio the canvas was rendered at
   // before pagePointSize is known) so text isn't briefly unsized on first
   // paint; once pagePointSize loads for the current page, this becomes the
@@ -1718,6 +1655,19 @@ export default function EditPdfTool() {
           </L2ToolbarButton>
         </div>
 
+        <label className="ml-auto flex items-center gap-1.5">
+          <span className="sr-only">File name</span>
+          <input
+            value={outputName}
+            onChange={(e) => {
+              setOutputName(e.target.value);
+              setDownloadUrl("");
+            }}
+            className="w-36 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-right text-xs font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-primary)]/26 focus:border-b-[var(--lumeo-gold)]/45 sm:w-48"
+            placeholder="lumeo-edited.pdf"
+          />
+        </label>
+
         <L2ToolbarButton
           onClick={() => {
             // Phase 28: resetTool() wipes every placed element, every text
@@ -1733,13 +1683,12 @@ export default function EditPdfTool() {
             if ((elements.length > 0 || hasTextEdits) && !window.confirm("Start a new PDF? Your current edits will be discarded.")) return;
             resetTool();
           }}
-          className="ml-auto"
         >
           Start new
         </L2ToolbarButton>
       </div>
 
-      <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
+      <div className="relative min-w-0">
         {/* Phase 27: the canvas panel is now the unambiguous hero -- no file
             card, no secondary page-nav bar duplicating the toolbar's own
             (that duplication was the single largest source of "sidebar
@@ -1995,272 +1944,18 @@ export default function EditPdfTool() {
             )}
         </div>
 
-        {/* Phase 27: tool rail + contextual controls. A single responsive
-            block, not two separate desktop/mobile implementations: the rail
-            is a horizontal scrollable dock on narrow screens (flex-row) and
-            a vertical rail on desktop (lg:flex-col), sticky in the right
-            column there. The contextual card below it only renders when the
-            active tool actually has settings -- no permanent empty sidebar
-            space the way the old fixed-height inspector had. */}
-        <div className="flex min-w-0 flex-col gap-3 lg:sticky lg:top-[9.5rem] lg:self-start">
-          <div className="aura-glass-regular rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-2)]">
-            <div className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
-              {TOOL_META.map(({ id, label, Icon }) => (
-                <button
-                  key={id}
-                  type="button"
-                  aria-pressed={activeTool === id}
-                  onClick={() => setActiveTool(id)}
-                  title={`${label} (${TOOL_SHORTCUT_LABELS[id]})`}
-                  className={`flex min-h-11 shrink-0 items-center gap-2.5 rounded-[var(--radius-lg)] px-3 py-2.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] lg:w-full ${activeTool === id ? "bg-[var(--lumeo-gold)]/[0.12] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:bg-[var(--text-primary)]/[0.05] hover:text-[var(--text-primary)]"}`}
-                >
-                  <span className={activeTool === id ? "text-[var(--lumeo-gold)]" : ""}>
-                    <Icon />
-                  </span>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {activeTool === "text" ? (
-            // Phase 28: Shape/Draw/Whiteout all get a contextual card
-            // explaining themselves -- Text was the one creation tool with
-            // no guidance at all, so a first-time user had nothing telling
-            // them to click/tap the page. Same card chrome as the other
-            // three, just a hint instead of controls (there's nothing to
-            // configure before placing one).
-            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
-              <L2PanelLabel title="Text" />
-              <p className="mt-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">Click or tap the page to add a text box.</p>
-            </div>
-          ) : null}
-
-          {activeTool === "shape" ? (
-            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
-              <L2PanelLabel title="Shape" />
-              <div className="mt-2.5 grid grid-cols-4 gap-1.5">
-                {(["rect", "ellipse", "line", "highlight"] as ShapeKind[]).map((kind) => (
-                  <button
-                    key={kind}
-                    type="button"
-                    aria-pressed={shapeKind === kind}
-                    onClick={() => setShapeKind(kind)}
-                    className={`min-h-11 rounded-lg border px-1.5 py-1.5 text-[10px] font-bold capitalize transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${shapeKind === kind ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12 text-[var(--text-primary)]/60"}`}
-                  >
-                    {kind}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          {activeTool === "draw" ? (
-            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
-              <L2PanelLabel title="Draw" />
-              <div className="mt-2.5 grid gap-2.5">
-                <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
-                  Color
-                  <input type="color" value={inkColor} onChange={(e) => setInkColor(e.target.value)} className="h-7 w-10 rounded border border-[var(--text-primary)]/14" />
-                </label>
-                <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
-                  Thickness
-                  <input type="range" min={1} max={10} value={inkStrokeWidth} onChange={(e) => setInkStrokeWidth(Number(e.target.value))} className="w-24" />
-                </label>
-              </div>
-            </div>
-          ) : null}
-
-          {activeTool === "whiteout" ? (
-            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
-              <div className="flex items-center gap-2">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-md)] bg-[var(--text-primary)]/[0.06] text-[var(--text-secondary)]">
-                  <WhiteoutToolIcon />
-                </span>
-                <L2PanelLabel title="Whiteout" />
-              </div>
-              <p className="mt-2.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
-                Drag over the text or content you want to hide -- it snaps to a line of text automatically, or drag freely for anything else. Hides content visually only; for legal or compliance redaction, verify the underlying content is also removed before sharing.
-              </p>
-            </div>
-          ) : null}
-
-          {activeTool === "select" && !textDetectionReady && selectedRunIndices.length === 0 && pageImageUrl ? (
-            // Phase 20: fast-first-paint UX -- the page itself became
-            // usable (image displayed, zoomable, navigable) the moment
-            // pageLoading cleared (#220), which can now happen BEFORE
-            // text-run detection finishes. Without this, tapping around
-            // on the Select tool during that window looked identical to
-            // "this page just has no text at all" -- silently wrong, not
-            // merely slow-looking. This note is the only UI difference;
-            // detection itself, and every other tool, is unaffected.
-            <p role="status" className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 text-[11px] leading-5 text-[var(--text-primary)]/50 shadow-[var(--v2-elevation-1)]">
-              Preparing editable text…
-            </p>
-          ) : null}
-
-          {activeTool === "select" && textDetectionReady && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
-            // Phase 28: once detection genuinely finishes with zero runs
-            // (a scanned/image-only page, most commonly), Select previously
-            // went silent -- no different from "still detecting." This is
-            // read-only text-layer detection (lib/pdf/edit/textRuns.ts,
-            // driven by pdfjs's own getTextContent()), NOT OCR -- an
-            // image-only page genuinely has no selectable text, so this
-            // says so plainly and points at the one tool that can still add
-            // content to a page like this, rather than implying a scan
-            // could somehow be made selectable.
-            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">No editable text found</span>
-              <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">This page doesn&rsquo;t contain selectable text. Use Text to add new text.</p>
-            </div>
-          ) : null}
-
-          {activeTool === "select" && selectedRunIndices.length > 0 ? (
-            <div className="aura-glass-thin grid gap-2 rounded-[var(--radius-2xl)] p-3 text-[11px] leading-5 text-[var(--text-primary)]/60 shadow-[var(--v2-elevation-1)]">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
-                  {selectedRunIndices.length === 1 ? "Existing text" : `${selectedRunIndices.length} lines selected`}
-                </span>
-                {selectedRunIndices.length === 1 && detectedTextRuns[selectedRunIndices[0]] ? (
-                  <span>
-                    Font: {detectedTextRuns[selectedRunIndices[0]].fontName} · ~{Math.round(detectedTextRuns[selectedRunIndices[0]].fontSizePx / PAGE_RENDER_SCALE)}pt
-                  </span>
-                ) : null}
-
-                {editPreview.kind === "empty" ? (
-                  <span>This text couldn&rsquo;t be matched to an editable location on the page (an unsupported font or text layout) -- add a new text box to annotate over it instead.</span>
-                ) : selectedRunIndices.length === 1 ? (
-                  // Phase 12: for a single run, the inline caret-over-the-PDF
-                  // editor (Phase 11) is now the primary way to edit -- this
-                  // sidebar field does the exact same thing (same
-                  // editDraftText state) but collapsed by default so it reads
-                  // as a secondary option, not a second required step.
-                  <details className="mt-1 group">
-                    <summary className="cursor-pointer select-none rounded text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40 outline-none transition hover:text-[var(--text-primary)]/60 focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
-                      Edit in sidebar instead
-                    </summary>
-                    <div className="mt-2 grid gap-2">
-                      <label className="grid gap-1">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with</span>
-                        <input
-                          value={editDraftText}
-                          onChange={(e) => {
-                            setEditDraftText(e.target.value);
-                            setEditApplyError("");
-                          }}
-                          className="w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
-                        />
-                      </label>
-                      <button
-                        type="button"
-                        disabled={!canApplyEdit}
-                        onClick={() => void applyTextRunEdit()}
-                        className="min-h-11 rounded-lg border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-2.5 text-xs font-bold text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        {isApplyingEdit ? "Applying..." : "Apply edit"}
-                      </button>
-                      {!editPreview.editable && editPreview.reason ? (
-                        <span role="alert" className="text-[var(--text-danger)]">{editPreview.reason}</span>
-                      ) : editApplyError ? (
-                        <span role="alert" className="text-[var(--text-danger)]">{editApplyError}</span>
-                      ) : null}
-                    </div>
-                  </details>
-                ) : (
-                  // Multi-run selection has no inline editor (Phase 11 scoped
-                  // that to a single run) -- this field is the ONLY way to
-                  // edit a multi-line selection, so it stays visible, not
-                  // collapsed.
-                  <>
-                    <label className="mt-1 grid gap-1">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with</span>
-                      <input
-                        value={editDraftText}
-                        onChange={(e) => {
-                          setEditDraftText(e.target.value);
-                          setEditApplyError("");
-                        }}
-                        className="w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      disabled={!canApplyEdit}
-                      onClick={() => void applyTextRunEdit()}
-                      className="min-h-11 rounded-lg border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-2.5 text-xs font-bold text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {isApplyingEdit ? "Applying..." : "Apply edit"}
-                    </button>
-                    {!editPreview.editable && editPreview.reason ? (
-                      <span role="alert" className="text-[var(--text-danger)]">{editPreview.reason}</span>
-                    ) : editApplyError ? (
-                      <span role="alert" className="text-[var(--text-danger)]">{editApplyError}</span>
-                    ) : null}
-                  </>
-                )}
-              </div>
-            ) : null}
-
-          {selectedElement && selectedElement.type === "text" ? (
-            <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
-              <L2PanelLabel title="Text properties" />
-              <div className="mt-2.5 grid gap-2.5">
-                <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
-                  Font size
-                  <input
-                    type="number"
-                    min={8}
-                    max={72}
-                    value={selectedElement.fontSizePt}
-                    onChange={(e) => setElements((current) => patchElement(current, selectedElement.id, { fontSizePt: Number(e.target.value) } as Partial<EditElement>))}
-                    className="w-16 rounded border border-[var(--text-primary)]/14 bg-transparent px-2 py-1 text-right"
-                  />
-                </label>
-                <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
-                  Color
-                  <input
-                    type="color"
-                    value={selectedElement.color}
-                    onChange={(e) => setElements((current) => patchElement(current, selectedElement.id, { color: e.target.value } as Partial<EditElement>))}
-                    className="h-7 w-10 rounded border border-[var(--text-primary)]/14"
-                  />
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    aria-pressed={selectedElement.bold}
-                    onClick={() => setElements((current) => patchElement(current, selectedElement.id, { bold: !selectedElement.bold } as Partial<EditElement>))}
-                    className={`min-h-11 flex-1 rounded-lg border px-2 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${selectedElement.bold ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
-                  >
-                    Bold
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={selectedElement.italic}
-                    onClick={() => setElements((current) => patchElement(current, selectedElement.id, { italic: !selectedElement.italic } as Partial<EditElement>))}
-                    className={`min-h-11 flex-1 rounded-lg border px-2 text-xs italic transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${selectedElement.italic ? "border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10" : "border-[var(--text-primary)]/12"}`}
-                  >
-                    Italic
-                  </button>
-                </div>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="aura-glass-thin rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)]">
-            <label className="block">
-              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--text-primary)]/34">File name</span>
-              <input
-                value={outputName}
-                onChange={(e) => {
-                  setOutputName(e.target.value);
-                  setDownloadUrl("");
-                }}
-                className="mt-1.5 w-full rounded-md border border-transparent bg-transparent px-0 py-1 text-sm font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-primary)]/26 focus:border-b-[var(--lumeo-gold)]/45"
-                placeholder="lumeo-edited.pdf"
-              />
-            </label>
-          </div>
-        </div>
+        <MicroDock
+          activeTool={activeTool}
+          onSelectTool={setActiveTool}
+          shapeKind={shapeKind}
+          onShapeKindChange={setShapeKind}
+          inkColor={inkColor}
+          onInkColorChange={setInkColor}
+          inkStrokeWidth={inkStrokeWidth}
+          onInkStrokeWidthChange={setInkStrokeWidth}
+          onPrivacyShieldClick={() => {}}
+          privacyShieldMatchCount={0}
+        />
       </div>
 
       <ToolActionBar>
