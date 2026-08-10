@@ -367,6 +367,12 @@ export default function EditPdfTool() {
   // much harder follow-up (matching a run back to the specific content-
   // stream operator that produced it so it can be rewritten in place).
   const [detectedTextRuns, setDetectedTextRuns] = useState<DetectedTextRun[]>([]);
+  // True once text-run detection has genuinely finished for the current
+  // page (successfully or with zero results) -- detectedTextRuns itself
+  // (empty or populated) is the source of truth for the RESULT, this is
+  // only about whether that result is final yet, so Select can tell "still
+  // detecting" apart from "genuinely has no text."
+  const [textDetectionReady, setTextDetectionReady] = useState(false);
   // Phase 9.1: the index-parallel matched-operator for each entry in
   // detectedTextRuns (lib/pdf/edit/matchTextRun.ts), computed once per page
   // load alongside detection itself -- cheap position-only matching, no
@@ -523,6 +529,8 @@ export default function EditPdfTool() {
     setPageOperators([]);
     setSelectionAnchorIndex(null);
     setSelectedRunIndices([]);
+    setPrivacyShieldMatches([]);
+    setTextDetectionReady(false);
     setHoveredRunIndex(-1);
     setFocusedRunIndex(null);
     setEditDraftText("");
@@ -652,6 +660,8 @@ export default function EditPdfTool() {
       // the previous page's matches while it's catching up.
       setRunMatches([]);
       setPageOperators([]);
+      setPrivacyShieldMatches([]);
+      setTextDetectionReady(false);
       try {
         const page = await doc.getPage(pageIndex + 1);
         const pointViewport = page.getViewport({ scale: 1 });
@@ -715,6 +725,8 @@ export default function EditPdfTool() {
         } catch {
           setDetectedTextRuns([]);
         }
+        // true means detection finished, successfully or not
+        setTextDetectionReady(true);
       } catch {
         // A cancelled render's promise rejects (RenderingCancelledException)
         // -- that's expected teardown, not a real preview failure.
@@ -1074,9 +1086,9 @@ export default function EditPdfTool() {
   }
 
   // Privacy Shield: deterministic regex scan (lib/pdf/edit/privacyShield.ts)
-  // over the CURRENT page's detectedTextRuns only -- rescanning on every
-  // page change/tool click keeps results in sync with what's on screen
-  // without a separate invalidation path.
+  // over the CURRENT page's detectedTextRuns, triggered only by an explicit
+  // click -- results are cleared (not re-scanned) on page change or reset,
+  // so a stale scan never survives past the page it was taken on.
   function handlePrivacyShieldScan() {
     setPrivacyShieldMatches(scanForSensitiveInfo(detectedTextRuns));
   }
@@ -1931,6 +1943,69 @@ export default function EditPdfTool() {
                           {editApplyError || (editPreview.kind !== "empty" ? editPreview.reason : "")}
                         </div>
                       ) : null}
+                    </div>
+                  ) : null}
+
+                  {activeTool === "select" && editPreview.kind === "multi" ? (
+                    // Multi-run selection has no per-run inline editor (that's
+                    // scoped to a single run) -- this compact floating panel,
+                    // anchored to the first selected run, is the only UI path
+                    // to apply a multi-run edit. Kept fully separate from
+                    // FloatingIsland/MicroDock: the spec requires FloatingIsland
+                    // to never activate for existing-PDF-text-run selections.
+                    <div
+                      className="absolute z-30"
+                      style={{
+                        left: `${detectedTextRuns[selectedRunIndices[0]].xPct}%`,
+                        top: `${detectedTextRuns[selectedRunIndices[0]].yPct}%`,
+                      }}
+                    >
+                      <div className="w-64 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 p-3 shadow-lg">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with ({selectedRunIndices.length} runs selected)</span>
+                        <input
+                          value={editDraftText}
+                          onChange={(event) => {
+                            setEditDraftText(event.target.value);
+                            setEditApplyError("");
+                          }}
+                          className="mt-1 w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
+                        />
+                        <div className="mt-2 flex gap-2">
+                          <button
+                            type="button"
+                            disabled={!canApplyEdit}
+                            onClick={() => void applyTextRunEdit()}
+                            className="min-h-11 flex-1 rounded-lg border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-2.5 text-xs font-bold text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {isApplyingEdit ? "Applying..." : "Apply edit"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => selectTextRun(null)}
+                            className="min-h-11 rounded-lg border border-[var(--text-primary)]/14 px-2.5 text-xs font-bold text-[var(--text-primary)]/70 transition hover:border-[var(--text-primary)]/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        {!editPreview.editable && editPreview.reason ? (
+                          <span role="alert" className="mt-1.5 block text-[10px] text-[var(--text-danger)]">{editPreview.reason}</span>
+                        ) : editApplyError ? (
+                          <span role="alert" className="mt-1.5 block text-[10px] text-[var(--text-danger)]">{editApplyError}</span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {activeTool === "select" && !textDetectionReady && selectedRunIndices.length === 0 && pageImageUrl ? (
+                    <p role="status" className="absolute left-3 top-3 z-20 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 px-3 py-1.5 text-[11px] leading-5 text-[var(--text-primary)]/50 shadow-lg">
+                      Preparing editable text…
+                    </p>
+                  ) : null}
+
+                  {activeTool === "select" && textDetectionReady && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
+                    <div className="absolute left-3 top-3 z-20 max-w-[240px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">No editable text found</span>
+                      <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">This page doesn&rsquo;t contain selectable text. Use Text to add new text.</p>
                     </div>
                   ) : null}
                 </div>

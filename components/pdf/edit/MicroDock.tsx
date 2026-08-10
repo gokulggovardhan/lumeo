@@ -120,7 +120,7 @@ export function MicroDock({
 
   return (
     <div
-      className="absolute z-30 flex flex-row items-center gap-3 top-2 left-1/2 -translate-x-1/2 sm:top-1/2 sm:left-4 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-col"
+      className="absolute z-30 flex flex-col items-center gap-3 top-2 left-1/2 -translate-x-1/2 sm:top-1/2 sm:left-4 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-row"
     >
       <div className="aura-glass-regular flex flex-row items-center gap-1 rounded-full p-1.5 shadow-[var(--v2-elevation-2)] sm:flex-col">
         {TOOL_META.map(({ id, label, shortcut, Icon }) => (
@@ -154,7 +154,7 @@ export function MicroDock({
       </div>
 
       {hasFlyout ? (
-        <div className="aura-glass-thin w-56 rounded-[var(--radius-xl)] p-3 shadow-[var(--v2-elevation-1)]">
+        <div className="aura-glass-thin w-[calc(100vw-2rem)] max-w-56 rounded-[var(--radius-xl)] p-3 shadow-[var(--v2-elevation-1)]">
           {activeTool === "text" ? (
             <p className="text-[11px] leading-5 text-[var(--text-primary)]/60">Click or tap the page to add a text box.</p>
           ) : null}
@@ -181,7 +181,7 @@ export function MicroDock({
             <div className="grid gap-2.5">
               <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
                 Color
-                <input type="color" value={inkColor} onChange={(e) => onInkColorChange(e.target.value)} className="h-7 w-10 rounded border border-[var(--text-primary)]/14" />
+                <input type="color" value={inkColor} onChange={(e) => onInkColorChange(e.target.value)} className="h-11 w-11 rounded border border-[var(--text-primary)]/14" />
               </label>
               <label className="flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]/60">
                 Thickness
