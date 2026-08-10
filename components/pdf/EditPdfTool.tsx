@@ -33,6 +33,7 @@ import {
   ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { EditElementView } from "@/components/pdf/edit/EditElementView";
+import { FloatingIsland } from "@/components/pdf/edit/FloatingIsland";
 import { InkCanvas } from "@/components/pdf/edit/InkCanvas";
 import { MicroDock } from "@/components/pdf/edit/MicroDock";
 import { TextRunOverlay } from "@/components/pdf/edit/TextRunOverlay";
@@ -283,22 +284,6 @@ function RedoIcon() {
   );
 }
 
-function ChevronLeftIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none">
-      <path d="M14.5 6 9 12l5.5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4" fill="none">
-      <path d="M9.5 6 15 12l-5.5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 export default function EditPdfTool() {
   const { availability, track } = useAnalytics();
   const openedTrackedRef = useRef(false);
@@ -324,18 +309,6 @@ export default function EditPdfTool() {
   // `pixelsPerPoint` prop.
   const [pagePointSize, setPagePointSize] = useState<{ width: number; height: number } | null>(null);
   const [pageLoading, setPageLoading] = useState(false);
-  // Phase 20: distinct from pageLoading (which now flips false as soon as
-  // the page IMAGE is ready, per #220) -- this specifically tracks whether
-  // text-run detection has finished for the CURRENT page, so the Select
-  // tool can show "Preparing editable text..." instead of silently looking
-  // like there's simply no text on the page while detection is still in
-  // flight (getTextContent can take real time on a text-heavy/complex-font
-  // page). False means "still detecting OR not started yet for this page";
-  // true means detection finished, successfully or not -- detectedTextRuns
-  // itself (empty or populated) is the source of truth for the RESULT,
-  // this is only about whether that result is final yet.
-  const [textDetectionReady, setTextDetectionReady] = useState(false);
-  void textDetectionReady; // TODO(Task 4): consumed by FloatingIsland's inspector mode
   const [error, setError] = useState("");
 
   const {
@@ -541,7 +514,6 @@ export default function EditPdfTool() {
     resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0) });
     setSelectedId(null);
     setDetectedTextRuns([]);
-    setTextDetectionReady(false);
     setRunMatches([]);
     setPageOperators([]);
     setSelectionAnchorIndex(null);
@@ -675,7 +647,6 @@ export default function EditPdfTool() {
       // the previous page's matches while it's catching up.
       setRunMatches([]);
       setPageOperators([]);
-      setTextDetectionReady(false);
       try {
         const page = await doc.getPage(pageIndex + 1);
         const pointViewport = page.getViewport({ scale: 1 });
@@ -738,14 +709,6 @@ export default function EditPdfTool() {
           setDetectedTextRuns(runs);
         } catch {
           setDetectedTextRuns([]);
-        } finally {
-          // Detection is "done" here whether it succeeded, found nothing, or
-          // failed -- all three are a final answer, not a still-in-progress
-          // state. Not gated on `cancelled` like pageLoading above: this
-          // flag only matters as a display concern for the CURRENT page's
-          // sidebar, and if the effect was cancelled a fresh run for the
-          // new page has already reset it back to false anyway.
-          setTextDetectionReady(true);
         }
       } catch {
         // A cancelled render's promise rejects (RenderingCancelledException)
@@ -1485,7 +1448,6 @@ export default function EditPdfTool() {
   const hasTextEdits = historyState.pdfBytes !== originalBytes;
   const currentPageElements = useMemo(() => elementsForPage(elements, pageIndex), [elements, pageIndex]);
   const selectedElement = useMemo(() => elements.find((item) => item.id === selectedId) ?? null, [elements, selectedId]);
-  void selectedElement; // TODO(Task 4): consumed by FloatingIsland's inspector mode
   // Falls back to PAGE_RENDER_SCALE (the ratio the canvas was rendered at
   // before pagePointSize is known) so text isn't briefly unsized on first
   // paint; once pagePointSize loads for the current page, this becomes the
@@ -1627,33 +1589,6 @@ export default function EditPdfTool() {
         </div>
 
         <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
-
-        <div className="flex items-center gap-0.5">
-          <button type="button" disabled={pageIndex === 0} onClick={() => setPageIndex((c) => Math.max(0, c - 1))} aria-label="Previous page" title="Previous page (PageUp)" className="grid h-9 !w-9 shrink-0 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
-            <ChevronLeftIcon />
-          </button>
-          <span className="whitespace-nowrap px-0.5 text-xs font-bold tabular-nums text-[var(--text-secondary)]">
-            {pageIndex + 1} / {pdf.pageCount}
-          </span>
-          <button type="button" disabled={pageIndex === pdf.pageCount - 1} onClick={() => setPageIndex((c) => Math.min(pdf.pageCount - 1, c + 1))} aria-label="Next page" title="Next page (PageDown)" className="grid h-9 !w-9 shrink-0 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
-            <ChevronRightIcon />
-          </button>
-        </div>
-
-        <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
-
-        <div className="flex items-center gap-0.5">
-          <button type="button" onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))} aria-label="Zoom out" title="Zoom out (or Ctrl/Cmd + scroll)" className="grid h-9 !w-9 shrink-0 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
-            −
-          </button>
-          <span className="w-11 text-center text-xs font-bold tabular-nums text-[var(--text-secondary)]">{Math.round(zoom * 100)}%</span>
-          <button type="button" onClick={() => setZoom((z) => Math.min(2, z + 0.1))} aria-label="Zoom in" title="Zoom in (or Ctrl/Cmd + scroll)" className="grid h-9 !w-9 shrink-0 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
-            +
-          </button>
-          <L2ToolbarButton onClick={() => setZoom(1)} className="ml-0.5">
-            Fit
-          </L2ToolbarButton>
-        </div>
 
         <label className="ml-auto flex items-center gap-1.5">
           <span className="sr-only">File name</span>
@@ -1956,6 +1891,26 @@ export default function EditPdfTool() {
           onPrivacyShieldClick={() => {}}
           privacyShieldMatchCount={0}
         />
+
+        {selectedElement && selectedElement.type === "text" ? (
+          <FloatingIsland
+            mode="text-inspector"
+            element={selectedElement}
+            onPatch={(patch) => setElements((current) => patchElement(current, selectedElement.id, patch as Partial<EditElement>))}
+          />
+        ) : (
+          <FloatingIsland
+            mode="default"
+            pageIndex={pageIndex}
+            pageCount={pdf.pageCount}
+            onPrevPage={() => setPageIndex((c) => Math.max(0, c - 1))}
+            onNextPage={() => setPageIndex((c) => Math.min(pdf.pageCount - 1, c + 1))}
+            zoom={zoom}
+            onZoomOut={() => setZoom((z) => Math.max(0.5, z - 0.1))}
+            onZoomIn={() => setZoom((z) => Math.min(2, z + 0.1))}
+            onFit={() => setZoom(1)}
+          />
+        )}
       </div>
 
       <ToolActionBar>
