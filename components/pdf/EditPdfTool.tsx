@@ -123,7 +123,7 @@ type EditPreview =
 // action). So Shape's highlight kind is currently the ONLY way to highlight
 // existing content -- not a duplicate, the sole implementation. Revisit if
 // a dedicated text-highlight action is ever added to the Select tool.
-type ActiveTool = "select" | "text" | "draw" | "shape" | "whiteout";
+export type ActiveTool = "select" | "text" | "draw" | "shape" | "whiteout";
 
 // Phase 13: unmodified 1-5 tool shortcuts, shown as native tooltips on each
 // tool button (see the tool grid's title attribute below) -- a discrete
