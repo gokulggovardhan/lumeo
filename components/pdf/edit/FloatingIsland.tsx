@@ -126,6 +126,16 @@ export function FloatingIsland(props: FloatingIslandProps) {
           >
             I
           </button>
+          <button
+            type="button"
+            aria-pressed={props.element.underline}
+            onClick={() => props.onPatch({ underline: !props.element.underline })}
+            aria-label="Underline"
+            title="Underline"
+            className={`${toggleClass(props.element.underline)} underline`}
+          >
+            U
+          </button>
         </>
       )}
     </div>

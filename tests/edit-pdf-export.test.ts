@@ -109,6 +109,67 @@ test("exportEditedPdf ignores an empty text element (nothing to draw)", async ()
 });
 
 // ---------------------------------------------------------------------------
+// Phase 1 professional text editing: bold/italic/underline export correctness
+//
+// pdf-lib names each embedded font's content-stream resource after its own
+// /BaseFont plus a unique suffix (e.g. "/Helvetica-BoldOblique-7098480789
+// 12 Tf"), so the Tf operator inside the decoded content stream is a direct,
+// independent signal of which of the four standard-font variants was
+// actually selected and referenced -- not just that export succeeded.
+function tfFontName(ops: string): string {
+  const match = ops.match(/\/(Helvetica[\w-]*)\s+[\d.]+\s+Tf/);
+  return match ? match[1] : "";
+}
+
+test("exportEditedPdf: unformatted placed text embeds plain Helvetica only", async () => {
+  const original = await makeBlankPdf(1);
+  const element = { ...createTextElement("t1", 0, 20, 20), text: "Plain" };
+  const { bytes } = await exportEditedPdf(original, [element]);
+  const fontName = tfFontName(decodeContentStreams(bytes));
+  assert.ok(fontName.startsWith("Helvetica-"), `expected plain Helvetica, got "${fontName}"`);
+  assert.ok(!fontName.includes("Bold"));
+  assert.ok(!fontName.includes("Oblique"));
+});
+
+test("exportEditedPdf: bold placed text embeds Helvetica-Bold", async () => {
+  const original = await makeBlankPdf(1);
+  const element = { ...createTextElement("t1", 0, 20, 20), text: "Bold", bold: true };
+  const { bytes } = await exportEditedPdf(original, [element]);
+  const fontName = tfFontName(decodeContentStreams(bytes));
+  assert.ok(fontName.startsWith("Helvetica-Bold-"), `expected Helvetica-Bold, got "${fontName}"`);
+  assert.ok(!fontName.includes("Oblique"));
+});
+
+test("exportEditedPdf: italic placed text embeds Helvetica-Oblique", async () => {
+  const original = await makeBlankPdf(1);
+  const element = { ...createTextElement("t1", 0, 20, 20), text: "Italic", italic: true };
+  const { bytes } = await exportEditedPdf(original, [element]);
+  const fontName = tfFontName(decodeContentStreams(bytes));
+  assert.ok(fontName.startsWith("Helvetica-Oblique-"), `expected Helvetica-Oblique, got "${fontName}"`);
+  assert.ok(!fontName.includes("Bold"));
+});
+
+test("exportEditedPdf: bold+italic placed text embeds Helvetica-BoldOblique", async () => {
+  const original = await makeBlankPdf(1);
+  const element = { ...createTextElement("t1", 0, 20, 20), text: "Both", bold: true, italic: true };
+  const { bytes } = await exportEditedPdf(original, [element]);
+  const fontName = tfFontName(decodeContentStreams(bytes));
+  assert.ok(fontName.startsWith("Helvetica-BoldOblique-"), `expected Helvetica-BoldOblique, got "${fontName}"`);
+});
+
+test("exportEditedPdf: underline draws an extra stroked line under the text", async () => {
+  const original = await makeBlankPdf(1);
+  const plain = { ...createTextElement("t1", 0, 20, 20), text: "Plain" };
+  const underlined = { ...createTextElement("t2", 0, 20, 20), text: "Plain", underline: true };
+  const plainExport = await exportEditedPdf(original, [plain]);
+  const underlinedExport = await exportEditedPdf(original, [underlined]);
+  const plainOps = decodeContentStreams(plainExport.bytes);
+  const underlinedOps = decodeContentStreams(underlinedExport.bytes);
+  const countStrokes = (ops: string) => (ops.match(/\sS\b/g) ?? []).length;
+  assert.ok(countStrokes(underlinedOps) > countStrokes(plainOps));
+});
+
+// ---------------------------------------------------------------------------
 // Rotation-aware export
 //
 // Native page is always 612x792 (portrait). For rotation 90/270, pdfjs's

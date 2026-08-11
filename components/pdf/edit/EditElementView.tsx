@@ -284,6 +284,7 @@ function EditElementViewImpl({
             color: element.color,
             fontWeight: element.bold ? 700 : 400,
             fontStyle: element.italic ? "italic" : "normal",
+            textDecoration: element.underline ? "underline" : "none",
           }}
         />
       ) : element.type === "ink" ? (
