@@ -60,6 +60,7 @@ import {
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
+import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
@@ -1089,6 +1090,39 @@ export default function EditPdfTool() {
   // over the CURRENT page's detectedTextRuns, triggered only by an explicit
   // click -- results are cleared (not re-scanned) on page change or reset,
   // so a stale scan never survives past the page it was taken on.
+  // Converts the selected existing text run into a whiteout + editable text
+  // box pair (geometry from lib/pdf/edit/restyleRun.ts), then selects the new
+  // box so FloatingIsland's inspector opens on it straight away -- the user's
+  // next click is already on the formatting controls they came for.
+  //
+  // Both halves go in through the ordinary element path, so from here on this
+  // is indistinguishable from a manually drawn whiteout with a text box on
+  // top: same undo (one step, since both are added in a single setElements
+  // call), same delete, same export.
+  function restyleSelectedRun() {
+    const run = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
+    if (!run) return;
+
+    const plan = planRunRestyle(run, pixelsPerPoint);
+    const whiteoutId = nextElementId();
+    const textId = nextElementId();
+
+    setElements((current) => [
+      ...current,
+      { ...createWhiteoutElement(whiteoutId, pageIndex, plan.whiteout.xPct, plan.whiteout.yPct, "white"), widthPct: plan.whiteout.widthPct, heightPct: plan.whiteout.heightPct },
+      {
+        ...createTextElement(textId, pageIndex, plan.text.xPct, plan.text.yPct),
+        text: plan.text.text,
+        fontSizePt: plan.text.fontSizePt,
+        widthPct: plan.text.widthPct,
+        heightPct: plan.text.heightPct,
+      },
+    ]);
+
+    selectTextRun(null);
+    setSelectedId(textId);
+  }
+
   function handlePrivacyShieldScan() {
     setPrivacyShieldMatches(scanForSensitiveInfo(detectedTextRuns));
   }
@@ -1102,7 +1136,18 @@ export default function EditPdfTool() {
       let next = current;
       for (const match of privacyShieldMatches) {
         const id = nextElementId();
-        const element = createWhiteoutElement(id, pageIndex, match.run.xPct, match.run.yPct, "white");
+        // Black, not white. A white box over text on a white page is
+        // indistinguishable from a field that was simply left blank -- a
+        // reader cannot tell whether anything was removed, which is the
+        // opposite of what a redaction is for. Black is the universal
+        // convention precisely because it is unmistakably deliberate.
+        //
+        // Deliberately NOT a colour/weight match to the surrounding text:
+        // a redaction that blends into the document reads as genuine
+        // content, so a doctored value could be taken at face value
+        // downstream. The manual Whiteout tool keeps its white default --
+        // that one exists to cover and correct, a different intent.
+        const element = createWhiteoutElement(id, pageIndex, match.run.xPct, match.run.yPct, "black");
         next = [...next, { ...element, widthPct: match.run.widthPct, heightPct: match.run.heightPct }];
       }
       return next;
@@ -1698,8 +1743,29 @@ export default function EditPdfTool() {
                 <span className="text-sm font-medium text-[var(--text-primary)]/40">Loading page preview…</span>
               </div>
             ) : (
-              <div className="rounded-[var(--radius-xl)] bg-[var(--atelier-surface-0)]/[0.35] p-3 sm:p-6">
+              // The page's own scroll viewport. The stage below is sized
+              // purely by its aspect ratio, so a portrait page on a wide
+              // screen is taller than the window -- this scrolls it instead
+              // of clipping it, and is also what makes zooming past 100%
+              // pannable rather than cropping the page's right/bottom edge.
+              // Capped against the viewport (not a fixed pixel height) so the
+              // page uses whatever vertical room the window actually has; the
+              // subtracted space is the app header + document toolbar stacked
+              // above it.
+              <div
+                className="overflow-auto overscroll-contain rounded-[var(--radius-xl)] bg-[var(--atelier-surface-0)]/[0.35] p-3 sm:p-6"
+                style={{ maxHeight: "calc(100vh - 15rem)" }}
+              >
               <div className="mx-auto" style={{ width: `${zoom * 100}%` }}>
+                {/* Deliberately has no max-height: combined with aspectRatio
+                    and w-full, a height cap squashes the page out of its true
+                    proportions (the img inside is h-full w-full, so it
+                    stretches to fill whatever the capped box becomes) instead
+                    of scaling it down. The scroll viewport above bounds the
+                    visible area instead, keeping the real aspect ratio intact
+                    at every zoom level. overflow-hidden stays -- that's the
+                    page's own content boundary, the one floating controls are
+                    placed against (lib/pdf/edit/floatingControlPlacement.ts). */}
                 <div
                   ref={stageRef}
                   onClick={handleStageClick}
@@ -1721,7 +1787,7 @@ export default function EditPdfTool() {
                     event.preventDefault();
                     setZoom((z) => Math.min(2, Math.max(0.5, z - event.deltaY * 0.001)));
                   }}
-                  className={`relative mx-auto max-h-[32rem] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""} ${activeTool === "whiteout" ? "touch-none" : ""}`}
+                  className={`relative mx-auto w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""} ${activeTool === "whiteout" ? "touch-none" : ""}`}
                   style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1830,15 +1896,26 @@ export default function EditPdfTool() {
                           }}
                         />
                       ))}
-                      <div className="absolute z-30 bottom-24 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 px-3 py-2 shadow-lg">
-                        <span className="text-xs font-semibold text-[var(--text-primary)]/70">{privacyShieldMatches.length} match{privacyShieldMatches.length === 1 ? "" : "es"} found</span>
-                        <button
-                          type="button"
-                          onClick={applyPrivacyShieldRedactions}
-                          className="min-h-11 rounded-full bg-[var(--lumeo-gold)]/90 px-3 text-xs font-bold text-[var(--atelier-surface-0)] transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
-                        >
-                          Apply redactions
-                        </button>
+                      {/* The compliance caveat belongs here more than
+                          anywhere else in this tool: the Whiteout tool
+                          already carries it, and this feature applies the
+                          very same visual-only cover while calling the
+                          result a redaction. Saying so at the moment of
+                          the action, not buried in a tool description. */}
+                      <div className="absolute z-30 bottom-24 left-1/2 flex max-w-[min(92vw,30rem)] -translate-x-1/2 flex-col items-center gap-1.5 rounded-[var(--radius-xl)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 px-3 py-2 shadow-lg">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[var(--text-primary)]/70">{privacyShieldMatches.length} match{privacyShieldMatches.length === 1 ? "" : "es"} found</span>
+                          <button
+                            type="button"
+                            onClick={applyPrivacyShieldRedactions}
+                            className="min-h-11 rounded-full bg-[var(--lumeo-gold)]/90 px-3 text-xs font-bold text-[var(--atelier-surface-0)] transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                          >
+                            Apply redactions
+                          </button>
+                        </div>
+                        <p className="text-center text-[10px] leading-4 text-[var(--text-primary)]/50">
+                          Pattern matching, not a guarantee — check the page yourself. Redactions cover content visually; the original text remains in the file.
+                        </p>
                       </div>
                     </>
                   ) : null}
@@ -1936,6 +2013,27 @@ export default function EditPdfTool() {
                           <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
                             <path d="M5 5 15 15M15 5 5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                           </svg>
+                        </button>
+                        {/* The in-place editor above can only swap the words:
+                            it rewrites glyph codes inside the original
+                            content-stream operator, which is exactly why font,
+                            size and colour survive untouched -- and exactly why
+                            it can't change them. Restyle is the deliberate
+                            trade: cover the original and drop an editable text
+                            box in its place, giving full formatting freedom at
+                            the cost of the original glyphs remaining hidden
+                            underneath rather than replaced. */}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            restyleSelectedRun();
+                          }}
+                          aria-label="Restyle this text"
+                          title="Restyle -- convert to an editable text box you can restyle (font size, colour, bold, italic)"
+                          className="grid h-9 shrink-0 place-items-center rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/70 shadow-lg transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                        >
+                          Restyle
                         </button>
                       </div>
                       {editApplyError || (editPreview.kind !== "empty" && !editPreview.editable && editPreview.reason) ? (

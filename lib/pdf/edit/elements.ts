@@ -30,6 +30,7 @@ export type TextEditElement = EditElementBase & {
   color: string;
   bold: boolean;
   italic: boolean;
+  underline: boolean;
 };
 
 export type ShapeEditElement = EditElementBase & {
@@ -75,6 +76,7 @@ export function createTextElement(id: string, pageIndex: number, xPct: number, y
     color: "#12141a",
     bold: false,
     italic: false,
+    underline: false,
   };
 }
 
