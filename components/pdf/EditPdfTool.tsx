@@ -60,6 +60,7 @@ import {
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
+import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
@@ -1089,6 +1090,39 @@ export default function EditPdfTool() {
   // over the CURRENT page's detectedTextRuns, triggered only by an explicit
   // click -- results are cleared (not re-scanned) on page change or reset,
   // so a stale scan never survives past the page it was taken on.
+  // Converts the selected existing text run into a whiteout + editable text
+  // box pair (geometry from lib/pdf/edit/restyleRun.ts), then selects the new
+  // box so FloatingIsland's inspector opens on it straight away -- the user's
+  // next click is already on the formatting controls they came for.
+  //
+  // Both halves go in through the ordinary element path, so from here on this
+  // is indistinguishable from a manually drawn whiteout with a text box on
+  // top: same undo (one step, since both are added in a single setElements
+  // call), same delete, same export.
+  function restyleSelectedRun() {
+    const run = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
+    if (!run) return;
+
+    const plan = planRunRestyle(run, pixelsPerPoint);
+    const whiteoutId = nextElementId();
+    const textId = nextElementId();
+
+    setElements((current) => [
+      ...current,
+      { ...createWhiteoutElement(whiteoutId, pageIndex, plan.whiteout.xPct, plan.whiteout.yPct, "white"), widthPct: plan.whiteout.widthPct, heightPct: plan.whiteout.heightPct },
+      {
+        ...createTextElement(textId, pageIndex, plan.text.xPct, plan.text.yPct),
+        text: plan.text.text,
+        fontSizePt: plan.text.fontSizePt,
+        widthPct: plan.text.widthPct,
+        heightPct: plan.text.heightPct,
+      },
+    ]);
+
+    selectTextRun(null);
+    setSelectedId(textId);
+  }
+
   function handlePrivacyShieldScan() {
     setPrivacyShieldMatches(scanForSensitiveInfo(detectedTextRuns));
   }
@@ -1936,6 +1970,27 @@ export default function EditPdfTool() {
                           <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
                             <path d="M5 5 15 15M15 5 5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                           </svg>
+                        </button>
+                        {/* The in-place editor above can only swap the words:
+                            it rewrites glyph codes inside the original
+                            content-stream operator, which is exactly why font,
+                            size and colour survive untouched -- and exactly why
+                            it can't change them. Restyle is the deliberate
+                            trade: cover the original and drop an editable text
+                            box in its place, giving full formatting freedom at
+                            the cost of the original glyphs remaining hidden
+                            underneath rather than replaced. */}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            restyleSelectedRun();
+                          }}
+                          aria-label="Restyle this text"
+                          title="Restyle -- convert to an editable text box you can restyle (font size, colour, bold, italic)"
+                          className="grid h-9 shrink-0 place-items-center rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/70 shadow-lg transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                        >
+                          Restyle
                         </button>
                       </div>
                       {editApplyError || (editPreview.kind !== "empty" && !editPreview.editable && editPreview.reason) ? (
