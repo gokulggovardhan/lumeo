@@ -8,16 +8,21 @@
 // read, modified, or produced by this module; it only reasons about
 // values already resolved by the earlier slices.
 //
-// Deliberately does not implement a fallback-font path: if the current
-// font can't safely render the replacement text, the plan says so and
-// stops there (editable: false), rather than guessing at a substitute
-// font. That's real, separate, later work.
+// The fallback-font path this module originally left out ("real, separate,
+// later work") now exists in lib/pdf/edit/fallbackFont.ts and is wired in
+// below -- but strictly OPT-IN, via the fallbackStyleHints parameter. A
+// caller that doesn't pass it gets byte-for-byte the previous behaviour:
+// if the run's own font can't safely render the replacement text, the plan
+// says so and stops there (editable: false), rather than quietly changing
+// the typeface of the user's document without being asked to.
 
 import type { TextShowOperator, TextShowOperatorKind } from "./contentStream.ts";
+import type { FallbackFontFamily, FallbackStyleHints } from "./fallbackFont.ts";
+import { encodeWithFallbackFont, fallbackFontMetrics, firstUnencodableChar, pickFallbackFont } from "./fallbackFont.ts";
 import type { ResolvedFont } from "./fontEncoding.ts";
 import { classifyReplacementChar } from "./fontEncoding.ts";
 import type { FontMetrics } from "./fontMetrics.ts";
-import { compareAdvance, type TextShowState } from "./fontMetrics.ts";
+import { compareAdvance, compareAdvanceAcrossFonts, type TextShowState } from "./fontMetrics.ts";
 
 // All four PDF text-showing operators are in scope for in-place editing:
 // Tj, TJ (#197, #198), and ' and " (this slice). ' and " each also
@@ -55,6 +60,29 @@ function decodeCodes(codes: number[], font: ResolvedFont): { text: string; allDe
   return { text, allDecoded };
 }
 
+/**
+ * Set on a plan whose replacement text is shown in a SUBSTITUTE standard
+ * font rather than the run's own (lib/pdf/edit/fallbackFont.ts). Null on
+ * every same-font plan, which is still the normal case.
+ *
+ * When this is set, replacementGlyphCodes are single-byte WinAnsi codes
+ * for `family`, NOT codes in the run's own font -- so the rewrite must
+ * encode them one byte per code regardless of what the original font
+ * used, and must switch the font on and back off around the operator (see
+ * lib/pdf/edit/applyEditPlan.ts's buildReplacementOperatorText).
+ */
+export type FallbackFontUse = {
+  family: FallbackFontFamily;
+  /**
+   * The resource name the run's own Tf had selected, restored by a second
+   * Tf immediately after the rewritten operator so nothing downstream in
+   * the content stream sees the substitute font.
+   */
+  originalFontResourceName: string;
+  /** Always 1: a standard font with /WinAnsiEncoding is single-byte. */
+  bytesPerCode: 1;
+};
+
 export type EditPlan = {
   pageIndex: number;
   contentStreamIndex: number;
@@ -90,9 +118,20 @@ export type EditPlan = {
   tjSpacingDelta: number;
   byteOffset: number;
   byteLength: number;
+  /** See FallbackFontUse -- null on every same-font plan. */
+  fallbackFont: FallbackFontUse | null;
   editable: boolean;
   reason: string | null;
 };
+
+// The message a rejected character produces when no fallback was offered
+// (or when the fallback couldn't help either) -- kept in one place so the
+// same wording is reused by every branch that needs it.
+function rejectionReasonFor(char: string, classification: "requires-fallback" | "impossible"): string {
+  return classification === "requires-fallback"
+    ? `Character "${char}" is not a verified glyph in this font (would need a fallback font, which this planner does not implement).`
+    : `Character "${char}" cannot be encoded in this font at all.`;
+}
 
 // Builds a dry-run EditPlan for replacing one matched text-show operator's
 // string content with `replacementText`. Never touches PDF bytes -- every
@@ -107,6 +146,7 @@ export function buildEditPlan({
   replacementText,
   resolvedFont,
   fontMetrics,
+  fallbackStyleHints = null,
 }: {
   pageIndex: number;
   contentStreamIndex: number;
@@ -116,6 +156,14 @@ export function buildEditPlan({
   replacementText: string;
   resolvedFont: ResolvedFont;
   fontMetrics: FontMetrics;
+  /**
+   * Opt in to lib/pdf/edit/fallbackFont.ts's substitute-font path for
+   * characters the run's own font can't be proven to render: pass the
+   * font's own style hints (readFallbackStyleHints) so a visually-matched
+   * standard font can be chosen. Omit (the default) to keep the strict
+   * same-font-only behaviour, where such a character is rejected outright.
+   */
+  fallbackStyleHints?: FallbackStyleHints | null;
 }): EditPlan {
   const originalCodes = operator.strings.flatMap((bytes) => bytesToCodes(bytes, resolvedFont.bytesPerCode));
   const { text: originalText, allDecoded: originalFullyDecoded } = decodeCodes(originalCodes, resolvedFont);
@@ -143,6 +191,10 @@ export function buildEditPlan({
     originalWidthPt: 0, // filled in below, after we know originalCodes is safe to measure
     byteOffset: operator.start,
     byteLength: operator.end - operator.start,
+    // Overridden only by the substitute-font branch at the very bottom;
+    // every rejection path below therefore reports "no fallback used"
+    // without having to say so individually.
+    fallbackFont: null,
   };
 
   // --- Safety invariant checks, in a fixed, deterministic order --------
@@ -219,35 +271,82 @@ export function buildEditPlan({
   }
 
   const replacementGlyphCodes: number[] = [];
+  let blocked: { char: string; classification: "requires-fallback" | "impossible" } | null = null;
   for (const char of replacementText) {
     const classification = classifyReplacementChar(resolvedFont, char);
     if (classification !== "editable") {
-      return {
-        ...base,
-        originalWidthPt: 0,
-        replacementGlyphCodes: [],
-        replacementWidthPt: 0,
-        tjSpacingDelta: 0,
-        editable: false,
-        reason:
-          classification === "requires-fallback"
-            ? `Character "${char}" is not a verified glyph in this font (would need a fallback font, which this planner does not implement).`
-            : `Character "${char}" cannot be encoded in this font at all.`,
-      };
+      blocked = { char, classification };
+      break;
     }
     const code = resolvedFont.unicodeToGlyphCode.get(char);
     // classifyReplacementChar already proved this exists for "editable".
     replacementGlyphCodes.push(code as number);
   }
 
-  const comparison = compareAdvance(originalCodes, replacementGlyphCodes, fontMetrics, state);
+  if (!blocked) {
+    const comparison = compareAdvance(originalCodes, replacementGlyphCodes, fontMetrics, state);
+    return {
+      ...base,
+      originalWidthPt: comparison.originalAdvancePt,
+      replacementGlyphCodes,
+      replacementWidthPt: comparison.replacementAdvancePt,
+      tjSpacingDelta: comparison.tjAdjustment,
+      editable: true,
+      reason: null,
+    };
+  }
+
+  // --- Substitute-font path (lib/pdf/edit/fallbackFont.ts) -------------
+  // Reached only when the run's own font can't be trusted with at least
+  // one character AND the caller opted in by supplying style hints. Note
+  // that this replaces the WHOLE run's text with the substitute, not just
+  // the offending character: Tf selects a font for an entire text-showing
+  // operator, so there is no way to mix two fonts inside one Tj/TJ without
+  // splitting it into several operators -- and a run rendered half in the
+  // original face and half in a substitute would look worse than one
+  // rendered consistently in a well-matched substitute.
+
+  const rejection = { ...base, originalWidthPt: 0, replacementGlyphCodes: [], replacementWidthPt: 0, tjSpacingDelta: 0, editable: false };
+
+  if (!fallbackStyleHints) {
+    return { ...rejection, reason: rejectionReasonFor(blocked.char, blocked.classification) };
+  }
+
+  // Without a resource name for the run's own font there is nothing to
+  // restore it to after the substitute's Tf, so everything downstream in
+  // the content stream would keep rendering in the substitute.
+  if (!operator.fontResourceName) {
+    return {
+      ...rejection,
+      reason: `Character "${blocked.char}" needs a substitute font, but this text's own font resource couldn't be identified, so the substitute couldn't be switched back off afterwards.`,
+    };
+  }
+
+  const fallbackCodes = encodeWithFallbackFont(replacementText);
+  if (!fallbackCodes) {
+    const unencodable = firstUnencodableChar(replacementText) ?? blocked.char;
+    return {
+      ...rejection,
+      reason: `Character "${unencodable}" isn't available in this font, and none of the standard substitute fonts can show it either.`,
+    };
+  }
+
+  const family = pickFallbackFont(fallbackStyleHints);
+  const comparison = compareAdvanceAcrossFonts(
+    originalCodes,
+    fontMetrics,
+    fallbackCodes,
+    fallbackFontMetrics(family),
+    state,
+  );
 
   return {
     ...base,
     originalWidthPt: comparison.originalAdvancePt,
-    replacementGlyphCodes,
+    replacementGlyphCodes: fallbackCodes,
     replacementWidthPt: comparison.replacementAdvancePt,
     tjSpacingDelta: comparison.tjAdjustment,
+    fallbackFont: { family, originalFontResourceName: operator.fontResourceName, bytesPerCode: 1 },
     editable: true,
     reason: null,
   };

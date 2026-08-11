@@ -227,8 +227,36 @@ export function compareAdvance(
   metrics: FontMetrics,
   state: TextShowState,
 ): SpacingComparison {
-  const originalAdvancePt = stringAdvancePt(originalCodes, metrics, state);
-  const replacementAdvancePt = stringAdvancePt(replacementCodes, metrics, state);
+  return compareAdvanceAcrossFonts(originalCodes, metrics, replacementCodes, metrics, state);
+}
+
+// The two-font form of compareAdvance, for lib/pdf/edit/fallbackFont.ts's
+// substitute-font path: the original run is measured in its OWN font's
+// metrics while the replacement is measured in the substitute's, because
+// after the rewrite each really is shown in a different font. Every
+// number below means exactly what it does in compareAdvance -- the only
+// change is which metrics each side is measured against.
+//
+// The tjAdjustment stays correct across the switch because a TJ number is
+// interpreted in thousandths of the CURRENT font size, and the font size
+// is unchanged by the substitution: only the typeface differs, so the same
+// (deltaPt / (Tfs * Th)) * 1000 conversion applies.
+//
+// One real semantic difference is folded in rather than hidden: word
+// spacing (Tw) applies only to single-byte code 32, so replacing a
+// composite (2-byte) run with a single-byte substitute makes a nonzero Tw
+// in the graphics state start applying to that run's spaces when it
+// previously did not. stringAdvancePt models that for each side using its
+// own bytesPerCode, so the delta already accounts for the extra width.
+export function compareAdvanceAcrossFonts(
+  originalCodes: number[],
+  originalMetrics: FontMetrics,
+  replacementCodes: number[],
+  replacementMetrics: FontMetrics,
+  state: TextShowState,
+): SpacingComparison {
+  const originalAdvancePt = stringAdvancePt(originalCodes, originalMetrics, state);
+  const replacementAdvancePt = stringAdvancePt(replacementCodes, replacementMetrics, state);
   const deltaPt = replacementAdvancePt - originalAdvancePt;
   const scale = state.horizontalScalingPct / 100;
   const tjAdjustment = scale === 0 ? 0 : (deltaPt / (state.fontSizePt * scale)) * 1000;

@@ -206,6 +206,7 @@ test("applyEditPlanToBytes rejects a plan whose editable flag is false (invalid-
     tjSpacingDelta: 0,
     byteOffset: 0,
     byteLength: 10,
+    fallbackFont: null,
     editable: false,
     reason: "Character \"Z\" cannot be encoded in this font at all.",
   };
@@ -236,6 +237,7 @@ test("applyEditPlanToBytes rejects a subset-font requires-fallback plan the same
     tjSpacingDelta: 0,
     byteOffset: 0,
     byteLength: 10,
+    fallbackFont: null,
     editable: false,
     reason: "Character \"A\" is not a verified glyph in this font (would need a fallback font, which this planner does not implement).",
   };
@@ -276,6 +278,7 @@ test("applyEditPlanToBytes replaces exactly the operator's byte range and nothin
     tjSpacingDelta: 0,
     byteOffset: start,
     byteLength: end - start,
+    fallbackFont: null,
     editable: true,
     reason: null,
   };

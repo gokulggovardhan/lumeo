@@ -110,9 +110,25 @@ type EditHistorySnapshot = { elements: EditElement[]; pdfBytes: ArrayBuffer };
 // graph when it decides to clone, so it is deliberately NOT called
 // speculatively here; that one case is still surfaced honestly, just at
 // Apply time via the catch block instead of live.
+//
+// `substituteFont` (single-run only) names the standard font a
+// lib/pdf/edit/fallbackFont.ts substitution WOULD use, and is set only
+// when the run's own font was rejected but a substitute would work. It's
+// deliberately an offer rather than something applied automatically:
+// silently changing the typeface of someone's document is not a decision
+// this tool gets to make on their behalf, so the UI names the substitute
+// and waits to be asked.
 type EditPreview =
   | { kind: "empty" }
-  | { kind: "single"; editable: boolean; reason: string | null; plan: EditPlan; resolvedFont: ResolvedFont; locatedOperator: LocatedTextOperator }
+  | {
+      kind: "single";
+      editable: boolean;
+      reason: string | null;
+      plan: EditPlan;
+      resolvedFont: ResolvedFont;
+      locatedOperator: LocatedTextOperator;
+      substituteFont: string | null;
+    }
   | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont };
 
 // Phase 11 UX audit -- Shape tool's place in Edit PDF, decided: KEEP.
@@ -126,6 +142,21 @@ type EditPreview =
 // action). So Shape's highlight kind is currently the ONLY way to highlight
 // existing content -- not a duplicate, the sole implementation. Revisit if
 // a dedicated text-highlight action is ever added to the Select tool.
+// A standard PDF font name as a person would say it: "Times-BoldItalic"
+// reads as "Times Bold Italic", "Helvetica-BoldOblique" as "Helvetica Bold
+// Italic". "Oblique" is the PDF-internal word for a slanted sans face and
+// means nothing outside typography, so it's said as "Italic"; "Times-Roman"
+// is just "Times", since "Roman" here only means "not italic".
+function readableFontName(standardFontName: string): string {
+  const [family, style = ""] = standardFontName.split("-");
+  const words = style
+    .replace(/Bold/g, " Bold")
+    .replace(/(Oblique|Italic)/g, " Italic")
+    .replace(/Roman/g, "")
+    .trim();
+  return words ? `${family} ${words}` : family;
+}
+
 export type ActiveTool = "select" | "text" | "draw" | "shape" | "whiteout";
 
 // Phase 13: unmodified 1-5 tool shortcuts, shown as native tooltips on each
@@ -162,6 +193,7 @@ let editEngineModulePromise: Promise<{
   collectPageTextOperators: (typeof import("@/lib/pdf/edit/formXObjects"))["collectPageTextOperators"];
   resolveFont: (typeof import("@/lib/pdf/edit/fontEncoding"))["resolveFont"];
   resolveFontMetrics: (typeof import("@/lib/pdf/edit/fontMetrics"))["resolveFontMetrics"];
+  readFallbackStyleHints: (typeof import("@/lib/pdf/edit/fallbackFont"))["readFallbackStyleHints"];
   applyEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyEditPlanToDocument"];
   applyMultiRunEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyMultiRunEditPlanToDocument"];
   PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
@@ -178,11 +210,13 @@ function loadEditEngine() {
       import("@/lib/pdf/edit/fontMetrics"),
       import("@/lib/pdf/edit/applyEditPlan"),
       import("pdf-lib"),
-    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod]) => ({
+      import("@/lib/pdf/edit/fallbackFont"),
+    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod]) => ({
       exportEditedPdf: exportMod.exportEditedPdf,
       collectPageTextOperators: formXObjectsMod.collectPageTextOperators,
       resolveFont: fontEncodingMod.resolveFont,
       resolveFontMetrics: fontMetricsMod.resolveFontMetrics,
+      readFallbackStyleHints: fallbackFontMod.readFallbackStyleHints,
       applyEditPlanToDocument: applyEditPlanMod.applyEditPlanToDocument,
       applyMultiRunEditPlanToDocument: applyEditPlanMod.applyMultiRunEditPlanToDocument,
       PDFDocument: pdfLibMod.PDFDocument,
@@ -403,6 +437,11 @@ export default function EditPdfTool() {
   const [hoveredRunIndex, setHoveredRunIndex] = useState<number>(-1);
   const [focusedRunIndex, setFocusedRunIndex] = useState<number | null>(null);
   const [editDraftText, setEditDraftText] = useState("");
+  // Whether the user has accepted the substitute-font offer for the CURRENT
+  // selection (see EditPreview's substituteFont field). Reset by every
+  // selection change, never by typing -- re-offering mid-word would make
+  // the control flicker while someone is still deciding what to type.
+  const [useSubstituteFont, setUseSubstituteFont] = useState(false);
   const [editApplyError, setEditApplyError] = useState("");
   const [isApplyingEdit, setIsApplyingEdit] = useState(false);
   const runOverlayNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -536,6 +575,7 @@ export default function EditPdfTool() {
     setFocusedRunIndex(null);
     setEditDraftText("");
     setEditApplyError("");
+    setUseSubstituteFont(false);
     runOverlayNodesRef.current.clear();
     setActiveTool("select");
     setZoom(1);
@@ -655,6 +695,7 @@ export default function EditPdfTool() {
       setFocusedRunIndex(null);
       setEditDraftText("");
       setEditApplyError("");
+      setUseSubstituteFont(false);
       runOverlayNodesRef.current.clear();
       // Cleared here (rather than left stale) so the operator-matching
       // effect below never briefly pairs a new page's detected runs with
@@ -1183,6 +1224,7 @@ export default function EditPdfTool() {
       setSelectedRunIndices([]);
       setEditDraftText("");
       setEditApplyError("");
+      setUseSubstituteFont(false);
       return;
     }
     const range =
@@ -1196,6 +1238,7 @@ export default function EditPdfTool() {
     setSelectedRunIndices(range);
     setEditDraftText(range.map((i) => detectedTextRuns[i]?.str ?? "").join(""));
     setEditApplyError("");
+    setUseSubstituteFont(false);
   }
 
   // Bug fix (reported from iPhone 15 Plus / Safari): tapping editable text
@@ -1355,12 +1398,19 @@ export default function EditPdfTool() {
   type ResolvedEditContext =
     | { kind: "empty" }
     | { kind: "error"; reason: string; multi: boolean }
-    | { kind: "single"; resolvedFont: ResolvedFont; fontMetrics: FontMetrics; locatedOperator: LocatedTextOperator; operator: LocatedTextOperator["operator"] }
+    | {
+        kind: "single";
+        resolvedFont: ResolvedFont;
+        fontMetrics: FontMetrics;
+        locatedOperator: LocatedTextOperator;
+        operator: LocatedTextOperator["operator"];
+        fallbackStyleHints: import("@/lib/pdf/edit/fallbackFont").FallbackStyleHints;
+      }
     | { kind: "multi"; resolvedFont: ResolvedFont; fontMetrics: FontMetrics; validation: Extract<MultiRunValidation, { kind: "valid" }> };
 
   const resolvedEditContext = useMemo((): ResolvedEditContext => {
     if (!pdfLibDoc || !editEngine || selectedRunIndices.length === 0) return { kind: "empty" };
-    const { PDFName, PDFDict, resolveFont, resolveFontMetrics } = editEngine;
+    const { PDFName, PDFDict, resolveFont, resolveFontMetrics, readFallbackStyleHints } = editEngine;
 
     try {
       if (selectedRunIndices.length === 1) {
@@ -1372,7 +1422,8 @@ export default function EditPdfTool() {
         if (!fontDict) throw new Error("Could not resolve this text's font.");
         const resolvedFont = resolveFont(fontDict, pdfLibDoc.context);
         const fontMetrics = resolveFontMetrics(fontDict, pdfLibDoc.context, resolvedFont);
-        return { kind: "single", resolvedFont, fontMetrics, locatedOperator, operator };
+        const fallbackStyleHints = readFallbackStyleHints(fontDict, pdfLibDoc.context);
+        return { kind: "single", resolvedFont, fontMetrics, locatedOperator, operator, fallbackStyleHints };
       }
 
       const validation = validateMultiRunSelection(selectedRunIndices);
@@ -1407,8 +1458,8 @@ export default function EditPdfTool() {
     }
 
     if (resolvedEditContext.kind === "single") {
-      const { resolvedFont, fontMetrics, locatedOperator, operator } = resolvedEditContext;
-      const plan = buildEditPlan({
+      const { resolvedFont, fontMetrics, locatedOperator, operator, fallbackStyleHints } = resolvedEditContext;
+      const planInputs = {
         pageIndex,
         contentStreamIndex: locatedOperator.locator.kind === "page" ? locatedOperator.locator.contentStreamIndex : 0,
         formPath: locatedOperator.locator.kind === "xobject" ? locatedOperator.locator.formPath : null,
@@ -1417,7 +1468,19 @@ export default function EditPdfTool() {
         replacementText: editDraftText,
         resolvedFont,
         fontMetrics,
-      });
+      };
+      // Always planned strictly first, in the run's OWN font. A substitute
+      // is only ever considered when the real font genuinely can't do the
+      // job -- so text that fits the original font keeps it, every time,
+      // and the substitution path can never quietly pre-empt a perfect
+      // same-font edit.
+      const strictPlan = buildEditPlan(planInputs);
+      const substitutePlan = strictPlan.editable
+        ? null
+        : buildEditPlan({ ...planInputs, fallbackStyleHints });
+      const substituteAvailable = substitutePlan?.editable ? substitutePlan : null;
+      const plan = useSubstituteFont && substituteAvailable ? substituteAvailable : strictPlan;
+
       // Real bug, found via live browser testing: see
       // lib/pdf/edit/matchTextRun.ts's runSpansMultipleOperators for the
       // full root cause (pdfjs merging several operators into one visual
@@ -1433,9 +1496,18 @@ export default function EditPdfTool() {
           plan,
           resolvedFont,
           locatedOperator,
+          substituteFont: null,
         };
       }
-      return { kind: "single", editable: plan.editable, reason: plan.reason, plan, resolvedFont, locatedOperator };
+      return {
+        kind: "single",
+        editable: plan.editable,
+        reason: plan.reason,
+        plan,
+        resolvedFont,
+        locatedOperator,
+        substituteFont: substituteAvailable?.fallbackFont?.family ?? null,
+      };
     }
 
     const { resolvedFont, fontMetrics, validation } = resolvedEditContext;
@@ -1454,7 +1526,7 @@ export default function EditPdfTool() {
       const reason = previewError instanceof Error ? previewError.message : "Could not validate this edit.";
       return { kind: "multi", editable: false, reason, plan: null as never, resolvedFont: null as never };
     }
-  }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex]);
+  }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont]);
 
   // Phase 9.2: the actual write-back for whatever editPreview currently
   // says is ready (single-operator via lib/pdf/edit/applyEditPlan.ts's
@@ -2036,9 +2108,47 @@ export default function EditPdfTool() {
                           Restyle
                         </button>
                       </div>
-                      {editApplyError || (editPreview.kind !== "empty" && !editPreview.editable && editPreview.reason) ? (
+                      {/* Three mutually exclusive states, in priority order:
+                          an error from the last Apply; the substitute-font
+                          offer (a rejection the user CAN act on); and a plain
+                          rejection they can't. The offer is styled as a
+                          neutral notice rather than an error because it isn't
+                          a dead end -- there's a button right there. */}
+                      {editApplyError ? (
                         <div role="alert" className={`absolute z-30 max-w-[220px] rounded-md border border-[var(--border-danger)]/25 bg-[var(--surface-danger)] px-2 py-1 text-[10px] font-semibold leading-4 text-[var(--text-danger)] shadow-lg ${inlineEditorTooltipPositionClass} ${inlineEditorHorizontalClass}`}>
-                          {editApplyError || (editPreview.kind !== "empty" ? editPreview.reason : "")}
+                          {editApplyError}
+                        </div>
+                      ) : editPreview.kind === "single" && editPreview.substituteFont ? (
+                        <div className={`absolute z-30 max-w-[240px] rounded-md border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-2 py-1.5 text-[10px] leading-4 text-[var(--text-primary)]/75 shadow-lg ${inlineEditorTooltipPositionClass} ${inlineEditorHorizontalClass}`}>
+                          {useSubstituteFont ? (
+                            <span>
+                              This line will be set in{" "}
+                              <strong className="font-semibold text-[var(--text-primary)]">{readableFontName(editPreview.substituteFont)}</strong>, a
+                              close match. The rest of the page is unchanged.
+                            </span>
+                          ) : (
+                            <>
+                              <span className="block">
+                                This font doesn&apos;t include every character you typed. Lumeo can set just this line in{" "}
+                                <strong className="font-semibold text-[var(--text-primary)]">{readableFontName(editPreview.substituteFont)}</strong>, a
+                                close match.
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setUseSubstituteFont(true);
+                                }}
+                                className="mt-1.5 inline-flex min-h-8 items-center rounded-full border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/90 px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--atelier-surface-0)] transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                              >
+                                Use {readableFontName(editPreview.substituteFont)}
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      ) : editPreview.kind !== "empty" && !editPreview.editable && editPreview.reason ? (
+                        <div role="alert" className={`absolute z-30 max-w-[220px] rounded-md border border-[var(--border-danger)]/25 bg-[var(--surface-danger)] px-2 py-1 text-[10px] font-semibold leading-4 text-[var(--text-danger)] shadow-lg ${inlineEditorTooltipPositionClass} ${inlineEditorHorizontalClass}`}>
+                          {editPreview.reason}
                         </div>
                       ) : null}
                     </div>
