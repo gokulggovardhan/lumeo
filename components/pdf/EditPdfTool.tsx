@@ -1732,8 +1732,29 @@ export default function EditPdfTool() {
                 <span className="text-sm font-medium text-[var(--text-primary)]/40">Loading page preview…</span>
               </div>
             ) : (
-              <div className="rounded-[var(--radius-xl)] bg-[var(--atelier-surface-0)]/[0.35] p-3 sm:p-6">
+              // The page's own scroll viewport. The stage below is sized
+              // purely by its aspect ratio, so a portrait page on a wide
+              // screen is taller than the window -- this scrolls it instead
+              // of clipping it, and is also what makes zooming past 100%
+              // pannable rather than cropping the page's right/bottom edge.
+              // Capped against the viewport (not a fixed pixel height) so the
+              // page uses whatever vertical room the window actually has; the
+              // subtracted space is the app header + document toolbar stacked
+              // above it.
+              <div
+                className="overflow-auto overscroll-contain rounded-[var(--radius-xl)] bg-[var(--atelier-surface-0)]/[0.35] p-3 sm:p-6"
+                style={{ maxHeight: "calc(100vh - 15rem)" }}
+              >
               <div className="mx-auto" style={{ width: `${zoom * 100}%` }}>
+                {/* Deliberately has no max-height: combined with aspectRatio
+                    and w-full, a height cap squashes the page out of its true
+                    proportions (the img inside is h-full w-full, so it
+                    stretches to fill whatever the capped box becomes) instead
+                    of scaling it down. The scroll viewport above bounds the
+                    visible area instead, keeping the real aspect ratio intact
+                    at every zoom level. overflow-hidden stays -- that's the
+                    page's own content boundary, the one floating controls are
+                    placed against (lib/pdf/edit/floatingControlPlacement.ts). */}
                 <div
                   ref={stageRef}
                   onClick={handleStageClick}
@@ -1755,7 +1776,7 @@ export default function EditPdfTool() {
                     event.preventDefault();
                     setZoom((z) => Math.min(2, Math.max(0.5, z - event.deltaY * 0.001)));
                   }}
-                  className={`relative mx-auto max-h-[32rem] w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""} ${activeTool === "whiteout" ? "touch-none" : ""}`}
+                  className={`relative mx-auto w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""} ${activeTool === "whiteout" ? "touch-none" : ""}`}
                   style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
