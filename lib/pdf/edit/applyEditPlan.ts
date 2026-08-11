@@ -19,13 +19,22 @@
 // - A " rewrite preserves its own aw/ac (word/char spacing) operands
 //   verbatim -- they're never recomputed, only carried through from the
 //   matched EditPlan (see EditPlan.wordSpacing/charSpacing's doc comment).
-// - No fallback-font path -- an EditPlan that isn't already `editable`
-//   (built by editPlan.ts, which already enforces this) is rejected here
-//   too, as a second, independent check rather than trusting the caller.
+// - An EditPlan that isn't already `editable` (built by editPlan.ts, which
+//   already enforces this) is rejected here too, as a second, independent
+//   check rather than trusting the caller.
+// - A plan carrying a substitute font (EditPlan.fallbackFont, see
+//   lib/pdf/edit/fallbackFont.ts) additionally wraps the rewritten
+//   operator in a Tf pair -- switch to the substitute, show the text,
+//   switch straight back -- and registers that font in whichever
+//   /Resources /Font dictionary the target stream resolves names against.
+//   Still a single-operator, single-byte-range rewrite: the Tf pair goes
+//   INSIDE the replaced range, so nothing outside it changes and no
+//   later operator can inherit the substitute.
 
 import { PDFArray, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFStream, decodePDFRawStream } from "pdf-lib";
-import type { PDFContext, PDFPage } from "pdf-lib";
+import type { PDFContext, PDFDict, PDFPage } from "pdf-lib";
 import type { EditPlan } from "./editPlan.ts";
+import { ensureFallbackFontResource, resolveFallbackFontsDict } from "./fallbackFont.ts";
 import type { MultiRunEditPlan } from "./multiRunEditPlan.ts";
 import { resolveStreamTarget, resolveIsolatedStreamTarget } from "./formXObjects.ts";
 
@@ -75,6 +84,69 @@ function formatPdfNumber(value: number): string {
 // naturally produces the cleanest possible array: just the new string,
 // no adjustment number.
 const TJ_DELTA_EPSILON = 0.01;
+
+// Writes a resource name back into content-stream syntax. Necessary rather
+// than cosmetic: lib/pdf/edit/contentStream.ts's tokenizer DECODES a name's
+// #xx escapes when it reads one, so a font named `/F#231` in the stream
+// arrives here as the three characters `F#1`. Emitting that verbatim would
+// produce `/F#1`, which re-reads as `F\x01` -- a different font, silently.
+// Escapes `#` itself, every delimiter and whitespace character, and
+// anything outside printable ASCII, per PDF 32000-1 7.3.5.
+function encodePdfName(name: string): string {
+  let out = "/";
+  for (let i = 0; i < name.length; i += 1) {
+    const code = name.charCodeAt(i);
+    const char = name[i];
+    const isRegular = code > 0x20 && code < 0x7f && char !== "#" && !"()<>[]{}/%".includes(char);
+    out += isRegular ? char : `#${code.toString(16).padStart(2, "0")}`;
+  }
+  return out;
+}
+
+// The replacement operator for a plan that renders its text in a
+// substitute font (EditPlan.fallbackFont, lib/pdf/edit/fallbackFont.ts):
+//
+//   /Substitute <size> Tf  <the show operator>  /Original <size> Tf
+//
+// The trailing Tf is what keeps this a genuinely local edit. Tf sets the
+// font in the text state, which persists until the next Tf or the enclosing
+// q/Q restore -- so without it, every later text run in the same BT/ET
+// block would silently switch typeface too. Restoring with the plan's own
+// fontSizePt is exact, not approximate: fontSizePt IS the size the
+// applicable Tf had set (contentStream.ts tracks it into the operator), and
+// the substitution changes only the typeface, never the size.
+//
+// A Tj is deliberately promoted to a single-element TJ here, unlike the
+// same-font path which leaves Tj alone. `<hex> Tj` and `[<hex>] TJ` are
+// exactly equivalent per spec 9.4.3, but only the TJ form has anywhere to
+// put the spacing adjustment -- and a substitute font is precisely the case
+// where the replacement's natural width is most likely to differ from the
+// original's (measured across the standard families: -7.1% to +22.0%), so
+// having somewhere to absorb that difference matters most here. ' and " are
+// left in their own form for the reason the same-font path already gives:
+// each performs its own text-line move before showing, so what follows
+// starts a fresh line and has no horizontal position to preserve.
+function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string): string {
+  const fallback = plan.fallbackFont;
+  if (!fallback) throw new EditPlanRejectedError("This plan does not use a substitute font.");
+
+  const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, fallback.bytesPerCode);
+  const size = formatPdfNumber(plan.fontSizePt);
+  const selectSubstitute = `${encodePdfName(fallbackResourceName)} ${size} Tf`;
+  const restoreOriginal = `${encodePdfName(fallback.originalFontResourceName)} ${size} Tf`;
+
+  let show: string;
+  if (plan.operatorType === "'") {
+    show = `<${hex}> '`;
+  } else if (plan.operatorType === '"') {
+    show = `${formatPdfNumber(plan.wordSpacing)} ${formatPdfNumber(plan.charSpacing)} <${hex}> "`;
+  } else {
+    const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
+    show = needsAdjustment ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ` : `[<${hex}>] TJ`;
+  }
+
+  return `${selectSubstitute} ${show} ${restoreOriginal}`;
+}
 
 // Builds the exact replacement operator invocation text for `plan`:
 // - Tj: `<hex> Tj`.
@@ -130,10 +202,32 @@ function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): stri
 // per spec, and hex avoids the literal-string escaping rules entirely
 // (no risk of an unescaped '(' or ')' in re-encoded glyph bytes breaking
 // the stream's balanced-parens structure).
-export function applyEditPlanToBytes(contentStreamBytes: Uint8Array, plan: EditPlan, bytesPerCode: 1 | 2): Uint8Array {
+export function applyEditPlanToBytes(
+  contentStreamBytes: Uint8Array,
+  plan: EditPlan,
+  bytesPerCode: 1 | 2,
+  options: { fallbackResourceName?: string } = {},
+): Uint8Array {
   assertApplicable(plan);
 
-  const newOperatorBytes = new TextEncoder().encode(buildReplacementOperatorText(plan, bytesPerCode));
+  // A substitute-font plan ignores the caller's bytesPerCode entirely: its
+  // replacementGlyphCodes are WinAnsi codes for a standard font, which is
+  // always single-byte, no matter what the run's own font used. Taking the
+  // caller's value here would write 2-byte codes for a Type0 original and
+  // render mojibake.
+  let operatorText: string;
+  if (plan.fallbackFont) {
+    if (!options.fallbackResourceName) {
+      throw new EditPlanRejectedError(
+        "This edit needs a substitute font, but no resource name was supplied for it -- the font must be registered in the target stream's /Resources /Font first.",
+      );
+    }
+    operatorText = buildFallbackOperatorText(plan, options.fallbackResourceName);
+  } else {
+    operatorText = buildReplacementOperatorText(plan, bytesPerCode);
+  }
+
+  const newOperatorBytes = new TextEncoder().encode(operatorText);
 
   const before = contentStreamBytes.subarray(0, plan.byteOffset);
   const after = contentStreamBytes.subarray(plan.byteOffset + plan.byteLength);
@@ -304,7 +398,15 @@ export async function applyEditPlanToDocument(
     const target = options.isolate
       ? resolveIsolatedStreamTarget(doc, plan.pageIndex, plan.contentStreamIndex, plan.formPath)
       : resolveStreamTarget(doc, plan.pageIndex, plan.contentStreamIndex, plan.formPath);
-    const newBytes = applyEditPlanToBytes(target.decodedBytes, plan, bytesPerCode);
+    // Registered against the Form's OWN stream dictionary, so a Form that
+    // carries its own /Resources gets the substitute in the name space its
+    // Tf will actually be resolved in (resolveFallbackFontsDict falls back
+    // to the page for a Form that inherits instead). Safe to do before the
+    // clone: the dict entry is copied to the replacement stream below by
+    // copyStreamDictExceptLengthAndFilter, and adding one font name to a
+    // shared Form's resources is purely additive for every other site.
+    const fallbackResourceName = await registerFallbackFont(doc, plan, target.originalStream.dict);
+    const newBytes = applyEditPlanToBytes(target.decodedBytes, plan, bytesPerCode, { fallbackResourceName });
     const wasFlate = isFlateEncoded(target.originalStream);
     const newStream = wasFlate ? target.context.flateStream(newBytes) : target.context.stream(newBytes);
     copyStreamDictExceptLengthAndFilter(target.originalStream, newStream);
@@ -314,8 +416,24 @@ export async function applyEditPlanToDocument(
 
   const page = doc.getPages()[plan.pageIndex];
   const located = locateContentStream(doc, plan.pageIndex, plan.contentStreamIndex);
-  const newBytes = applyEditPlanToBytes(located.decodedBytes, plan, bytesPerCode);
+  const fallbackResourceName = await registerFallbackFont(doc, plan, null);
+  const newBytes = applyEditPlanToBytes(located.decodedBytes, plan, bytesPerCode, { fallbackResourceName });
   replaceContentStream(page, located, plan.contentStreamIndex, newBytes);
+}
+
+// Embeds and registers the substitute font a plan asks for, returning the
+// resource name to write into its Tf -- or undefined for the ordinary
+// same-font plan, which needs nothing. Split out so both the page-content
+// and Form-XObject branches above resolve the resource dictionary through
+// the same rule (lib/pdf/edit/fallbackFont.ts's resolveFallbackFontsDict).
+async function registerFallbackFont(
+  doc: PDFDocument,
+  plan: EditPlan,
+  formStreamDict: PDFDict | null,
+): Promise<string | undefined> {
+  if (!plan.fallbackFont) return undefined;
+  const fontsDict = resolveFallbackFontsDict(doc, plan.pageIndex, formStreamDict);
+  return ensureFallbackFontResource(doc, fontsDict, plan.fallbackFont.family);
 }
 
 // Applies a verified MultiRunEditPlan (lib/pdf/edit/multiRunEditPlan.ts)
@@ -338,6 +456,15 @@ export async function applyMultiRunEditPlanToDocument(
     throw new EditPlanRejectedError(plan.reason ?? "This multi-run edit plan is not editable.");
   }
   for (const subPlan of plan.subPlans) assertApplicable(subPlan);
+  // buildMultiRunEditPlan never opts into the substitute-font path (it
+  // calls buildEditPlan without style hints), so this can't currently
+  // trigger -- it's here so that if it ever starts to, the mismatch is a
+  // loud rejection rather than a silent one: this function rewrites
+  // several operators against a single shared buffer and has no
+  // per-operator place to register a substitute's resource name.
+  if (plan.subPlans.some((subPlan) => subPlan.fallbackFont)) {
+    throw new EditPlanRejectedError("Multi-line edits can't use a substitute font -- edit these lines one at a time.");
+  }
 
   const page = doc.getPages()[plan.pageIndex];
   const located = locateContentStream(doc, plan.pageIndex, plan.contentStreamIndex);
