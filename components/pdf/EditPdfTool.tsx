@@ -717,6 +717,16 @@ export default function EditPdfTool() {
 
     void (async () => {
       setPageLoading(true);
+      // Phase 30: a page-render failure/timeout sets `error`, but nothing
+      // in this reset block ever cleared it -- so navigating to (or
+      // undoing/redoing into) a DIFFERENT page while a stale error from a
+      // previous one was showing left that stale message on screen for the
+      // entire duration of the new page's own render attempt, since the
+      // loading-vs-error ternary below (Phase 28) deliberately gives error
+      // priority over the loading skeleton. Confirmed live: Next Page
+      // after a failed page 1 showed page 1's error immediately, before
+      // page 2's own render had even had a chance to succeed or fail.
+      setError("");
       setSelectionAnchorIndex(null);
       setSelectedRunIndices([]);
       setHoveredRunIndex(-1);
@@ -1173,6 +1183,15 @@ export default function EditPdfTool() {
   // content stream) is a separate question, answered by editPreview below,
   // never assumed here.
   function selectTextRun(index: number | null, extend = false) {
+    // Phase 31: text-run selection and placed-element selection (selectedId)
+    // are two independent pieces of state that were never made mutually
+    // exclusive -- selecting a run while a placed element was already
+    // selected (or vice versa, see the onSelect wiring below) left BOTH
+    // "selected" at once, with both floating-control sets (the run's inline
+    // Apply/Cancel toolbar and the element's delete pill/resize handles)
+    // rendering simultaneously. Only one thing should ever read as
+    // "selected" in this editor.
+    setSelectedId(null);
     if (index === null) {
       setSelectionAnchorIndex(null);
       setSelectedRunIndices([]);
@@ -1662,10 +1681,10 @@ export default function EditPdfTool() {
           labeled pills since they're occasional, not repeated, actions. */}
       <div className="aura-glass-thin sticky top-[5.75rem] z-10 flex flex-wrap items-center gap-1.5 rounded-[var(--radius-xl)] px-2.5 py-2 shadow-[var(--v2-elevation-1)]">
         <div className="flex items-center gap-0.5">
-          <button type="button" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
+          <button type="button" onClick={undo} disabled={!canUndo} aria-label="Undo" title="Undo (Ctrl+Z)" className="grid h-9 !w-9 shrink-0 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
             <UndoIcon />
           </button>
-          <button type="button" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (Ctrl+Shift+Z)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
+          <button type="button" onClick={redo} disabled={!canRedo} aria-label="Redo" title="Redo (Ctrl+Shift+Z)" className="grid h-9 !w-9 shrink-0 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
             <RedoIcon />
           </button>
         </div>
@@ -1673,13 +1692,13 @@ export default function EditPdfTool() {
         <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
 
         <div className="flex items-center gap-0.5">
-          <button type="button" disabled={pageIndex === 0} onClick={() => setPageIndex((c) => Math.max(0, c - 1))} aria-label="Previous page" title="Previous page (PageUp)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
+          <button type="button" disabled={pageIndex === 0} onClick={() => setPageIndex((c) => Math.max(0, c - 1))} aria-label="Previous page" title="Previous page (PageUp)" className="grid h-9 !w-9 shrink-0 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
             <ChevronLeftIcon />
           </button>
           <span className="whitespace-nowrap px-0.5 text-xs font-bold tabular-nums text-[var(--text-secondary)]">
             {pageIndex + 1} / {pdf.pageCount}
           </span>
-          <button type="button" disabled={pageIndex === pdf.pageCount - 1} onClick={() => setPageIndex((c) => Math.min(pdf.pageCount - 1, c + 1))} aria-label="Next page" title="Next page (PageDown)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
+          <button type="button" disabled={pageIndex === pdf.pageCount - 1} onClick={() => setPageIndex((c) => Math.min(pdf.pageCount - 1, c + 1))} aria-label="Next page" title="Next page (PageDown)" className="grid h-9 !w-9 shrink-0 place-items-center rounded-[var(--radius-md)] text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-30">
             <ChevronRightIcon />
           </button>
         </div>
@@ -1687,11 +1706,11 @@ export default function EditPdfTool() {
         <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
 
         <div className="flex items-center gap-0.5">
-          <button type="button" onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))} aria-label="Zoom out" title="Zoom out (or Ctrl/Cmd + scroll)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
+          <button type="button" onClick={() => setZoom((z) => Math.max(0.5, z - 0.1))} aria-label="Zoom out" title="Zoom out (or Ctrl/Cmd + scroll)" className="grid h-9 !w-9 shrink-0 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
             −
           </button>
           <span className="w-11 text-center text-xs font-bold tabular-nums text-[var(--text-secondary)]">{Math.round(zoom * 100)}%</span>
-          <button type="button" onClick={() => setZoom((z) => Math.min(2, z + 0.1))} aria-label="Zoom in" title="Zoom in (or Ctrl/Cmd + scroll)" className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
+          <button type="button" onClick={() => setZoom((z) => Math.min(2, z + 0.1))} aria-label="Zoom in" title="Zoom in (or Ctrl/Cmd + scroll)" className="grid h-9 !w-9 shrink-0 place-items-center rounded-[var(--radius-md)] text-base font-bold text-[var(--text-secondary)] transition hover:bg-[var(--text-primary)]/[0.06] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]">
             +
           </button>
           <L2ToolbarButton onClick={() => setZoom(1)} className="ml-0.5">
@@ -1805,7 +1824,14 @@ export default function EditPdfTool() {
                       element={element}
                       selected={selectedId === element.id}
                       stageRef={stageRef}
-                      onSelect={() => setSelectedId(element.id)}
+                      onSelect={() => {
+                        // Phase 31: mirrors selectTextRun's own mutual-
+                        // exclusivity fix -- selecting a placed element must
+                        // clear any active text-run selection too, or both
+                        // could show their own floating controls at once.
+                        selectTextRun(null);
+                        setSelectedId(element.id);
+                      }}
                       onChange={(patch) => setElements((current) => patchElement(current, element.id, patch))}
                       onDelete={() => {
                         setElements((current) => deleteElement(current, element.id));
@@ -1931,7 +1957,7 @@ export default function EditPdfTool() {
                           disabled={!canApplyEdit}
                           aria-label={isApplyingEdit ? "Applying edit" : "Apply edit"}
                           title="Apply (Enter)"
-                          className="grid h-9 w-9 place-items-center rounded-full border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/90 text-[var(--atelier-surface-0)] shadow-lg transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
+                          className="grid h-9 !w-9 shrink-0 place-items-center rounded-full border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/90 text-[var(--atelier-surface-0)] shadow-lg transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {isApplyingEdit ? (
                             <span aria-hidden="true" className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--atelier-surface-0)]/30 border-t-[var(--atelier-surface-0)]" />
@@ -1949,7 +1975,7 @@ export default function EditPdfTool() {
                           }}
                           aria-label="Cancel edit"
                           title="Cancel (Esc)"
-                          className="grid h-9 w-9 place-items-center rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 text-[var(--text-primary)]/70 shadow-lg transition hover:border-[var(--text-primary)]/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                          className="grid h-9 !w-9 shrink-0 place-items-center rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 text-[var(--text-primary)]/70 shadow-lg transition hover:border-[var(--text-primary)]/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
                         >
                           <svg aria-hidden="true" viewBox="0 0 20 20" className="h-4 w-4" fill="none">
                             <path d="M5 5 15 15M15 5 5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
