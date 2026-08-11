@@ -1136,7 +1136,18 @@ export default function EditPdfTool() {
       let next = current;
       for (const match of privacyShieldMatches) {
         const id = nextElementId();
-        const element = createWhiteoutElement(id, pageIndex, match.run.xPct, match.run.yPct, "white");
+        // Black, not white. A white box over text on a white page is
+        // indistinguishable from a field that was simply left blank -- a
+        // reader cannot tell whether anything was removed, which is the
+        // opposite of what a redaction is for. Black is the universal
+        // convention precisely because it is unmistakably deliberate.
+        //
+        // Deliberately NOT a colour/weight match to the surrounding text:
+        // a redaction that blends into the document reads as genuine
+        // content, so a doctored value could be taken at face value
+        // downstream. The manual Whiteout tool keeps its white default --
+        // that one exists to cover and correct, a different intent.
+        const element = createWhiteoutElement(id, pageIndex, match.run.xPct, match.run.yPct, "black");
         next = [...next, { ...element, widthPct: match.run.widthPct, heightPct: match.run.heightPct }];
       }
       return next;
@@ -1885,15 +1896,26 @@ export default function EditPdfTool() {
                           }}
                         />
                       ))}
-                      <div className="absolute z-30 bottom-24 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 px-3 py-2 shadow-lg">
-                        <span className="text-xs font-semibold text-[var(--text-primary)]/70">{privacyShieldMatches.length} match{privacyShieldMatches.length === 1 ? "" : "es"} found</span>
-                        <button
-                          type="button"
-                          onClick={applyPrivacyShieldRedactions}
-                          className="min-h-11 rounded-full bg-[var(--lumeo-gold)]/90 px-3 text-xs font-bold text-[var(--atelier-surface-0)] transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
-                        >
-                          Apply redactions
-                        </button>
+                      {/* The compliance caveat belongs here more than
+                          anywhere else in this tool: the Whiteout tool
+                          already carries it, and this feature applies the
+                          very same visual-only cover while calling the
+                          result a redaction. Saying so at the moment of
+                          the action, not buried in a tool description. */}
+                      <div className="absolute z-30 bottom-24 left-1/2 flex max-w-[min(92vw,30rem)] -translate-x-1/2 flex-col items-center gap-1.5 rounded-[var(--radius-xl)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 px-3 py-2 shadow-lg">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-[var(--text-primary)]/70">{privacyShieldMatches.length} match{privacyShieldMatches.length === 1 ? "" : "es"} found</span>
+                          <button
+                            type="button"
+                            onClick={applyPrivacyShieldRedactions}
+                            className="min-h-11 rounded-full bg-[var(--lumeo-gold)]/90 px-3 text-xs font-bold text-[var(--atelier-surface-0)] transition hover:bg-[var(--lumeo-gold)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                          >
+                            Apply redactions
+                          </button>
+                        </div>
+                        <p className="text-center text-[10px] leading-4 text-[var(--text-primary)]/50">
+                          Pattern matching, not a guarantee — check the page yourself. Redactions cover content visually; the original text remains in the file.
+                        </p>
                       </div>
                     </>
                   ) : null}
