@@ -772,7 +772,14 @@ export default function EditPdfTool() {
         // not block the preview or export from working.
         try {
           const content = await withPageTimeout(page.getTextContent(), pageIndex + 1, PAGE_RENDER_TIMEOUT_MS, "extract text from");
-          const runs = textRunsFromContent(content.items as never, viewport.transform, canvas.width, canvas.height);
+          // Detection runs against the page's own POINT-space viewport
+          // (pointViewport, scale 1), never the raster viewport. Every
+          // DetectedTextRun field is then resolution-independent -- the
+          // percentages always were, and fontSizePt now is too -- so
+          // changing how sharply the page is rasterized (which is what
+          // zooming will do) cannot invalidate a single detected run, a
+          // matched operator, or a Privacy Shield hit.
+          const runs = textRunsFromContent(content.items as never, pointViewport.transform, pointViewport.width, pointViewport.height);
           setDetectedTextRuns(runs);
         } catch {
           setDetectedTextRuns([]);
@@ -836,35 +843,31 @@ export default function EditPdfTool() {
   // only disables in-place editing, never the read-only preview/highlight
   // this depends on.
   useEffect(() => {
-    if (!pdf || !pdfJsDocRef.current || !pdfLibDoc || detectedTextRuns.length === 0 || !pageDisplaySize) return;
+    if (!pdf || !pdfJsDocRef.current || !pdfLibDoc || detectedTextRuns.length === 0 || !pagePointSize) return;
     const doc = pdfJsDocRef.current;
     const runs = detectedTextRuns;
     let cancelled = false;
 
     void (async () => {
       try {
-        // Reuse the render effect's already-fetched page/viewport for this
-        // same pageIndex instead of re-deriving them -- see
-        // pageAndViewportRef's own doc comment. The cached entry is
-        // guaranteed present by the time this effect can run: it depends on
-        // pageDisplaySize, which the render effect only sets AFTER
-        // populating this ref for the current pageIndex. The direct fetch
-        // stays as a defensive fallback in case that invariant ever changes.
+        // Matching happens in the SAME point space detection used (see the
+        // render effect's own comment). matchTextRun.ts is scale-relative
+        // by construction -- it converts a run's percentages through
+        // whatever page dimensions it's handed and computes operator
+        // origins through whatever viewport transform it's handed -- so it
+        // is correct at any scale provided both sides agree. Point space is
+        // the one choice that never changes, which is what keeps this
+        // effect (and every match it produces) independent of the raster
+        // scale zoom is about to start varying.
+        //
+        // Reuses the render effect's already-fetched page for this same
+        // pageIndex rather than re-fetching -- see pageAndViewportRef's own
+        // doc comment. getViewport({ scale: 1 }) on an already-loaded page
+        // is pure arithmetic, no I/O and no rasterization.
         const cached = pageAndViewportRef.current;
-        const { viewport } =
-          cached && cached.pageIndex === pageIndex
-            ? cached
-            : await (async () => {
-                const fetchedPage = await doc.getPage(pageIndex + 1);
-                const pointViewport = fetchedPage.getViewport({ scale: 1 });
-                const dimensionScale = clampRenderScaleToPixelBudget(
-                  clampRenderScaleToMaxDimension(PAGE_RENDER_SCALE, pointViewport.width, pointViewport.height, MAX_CANVAS_DIMENSION_PX),
-                  pointViewport.width,
-                  pointViewport.height,
-                  MAX_CANVAS_TOTAL_PIXELS,
-                );
-                return { viewport: fetchedPage.getViewport({ scale: dimensionScale }) };
-              })();
+        const page =
+          cached && cached.pageIndex === pageIndex ? cached.page : await doc.getPage(pageIndex + 1);
+        const viewport = page.getViewport({ scale: 1 });
         if (cancelled || !pdfLibDocRef.current || !editEngineRef.current) return;
         const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
         if (cancelled) return;
@@ -880,7 +883,7 @@ export default function EditPdfTool() {
         const locatedByOperator = new Map(located.map((item) => [item.operator, item] as const));
         setRunMatches(
           runs.map((run): RunMatch => {
-            const matchedOperator = matchDetectedRunToOperatorIndexed(run, pageDisplaySize.width, pageDisplaySize.height, operatorIndex);
+            const matchedOperator = matchDetectedRunToOperatorIndexed(run, pagePointSize.width, pagePointSize.height, operatorIndex);
             if (!matchedOperator) return null;
             const locatedOperator = locatedByOperator.get(matchedOperator);
             return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
@@ -897,7 +900,13 @@ export default function EditPdfTool() {
     return () => {
       cancelled = true;
     };
-  }, [pdf, pdfLibDoc, pageIndex, detectedTextRuns, pageDisplaySize]);
+    // Keyed on pagePointSize, NOT pageDisplaySize: the page's point size is
+    // a property of the document and changes only when the page does, while
+    // the raster size changes whenever the page is re-rasterized. Depending
+    // on the raster size would re-run this whole match (and reset every
+    // RunMatch the UI relies on) on every future zoom-driven re-render, for
+    // a result that is by construction identical.
+  }, [pdf, pdfLibDoc, pageIndex, detectedTextRuns, pagePointSize]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -1181,7 +1190,7 @@ export default function EditPdfTool() {
     const run = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
     if (!run) return;
 
-    const plan = planRunRestyle(run, pixelsPerPoint);
+    const plan = planRunRestyle(run);
     const whiteoutId = nextElementId();
     const textId = nextElementId();
 
@@ -1644,12 +1653,24 @@ export default function EditPdfTool() {
   const hasTextEdits = historyState.pdfBytes !== originalBytes;
   const currentPageElements = useMemo(() => elementsForPage(elements, pageIndex), [elements, pageIndex]);
   const selectedElement = useMemo(() => elements.find((item) => item.id === selectedId) ?? null, [elements, selectedId]);
-  // Falls back to PAGE_RENDER_SCALE (the ratio the canvas was rendered at
-  // before pagePointSize is known) so text isn't briefly unsized on first
-  // paint; once pagePointSize loads for the current page, this becomes the
-  // exact px-per-point ratio for that page.
-  const pixelsPerPoint = pageDisplaySize && pagePointSize && pagePointSize.width > 0
-    ? pageDisplaySize.width / pagePointSize.width
+  // DISPLAYED CSS pixels per PDF point -- what EditElementView needs to size
+  // a placed text element's glyphs to match the page under them
+  // (`element.fontSizePt * pixelsPerPoint`).
+  //
+  // Was derived from the RASTER size (pageDisplaySize.width /
+  // pagePointSize.width), which is the same defect the inline editor's own
+  // font size had: the raster scale describes how sharply the page was
+  // rendered, not how large it is being shown. Placed and restyled text
+  // therefore stayed one fixed size while the page zoomed underneath it,
+  // and would have been wrong at every zoom level once the raster scale
+  // itself becomes dynamic. Measuring against the stage's live CSS width
+  // fixes both at once, and keeps placed text consistent with the inline
+  // editor (lib/pdf/edit/textRuns.ts's overlayFontSizePx, same ratio).
+  //
+  // Falls back to PAGE_RENDER_SCALE until the stage has been measured, so
+  // text is never briefly unsized on first paint.
+  const pixelsPerPoint = stageWidthPx && pagePointSize && pagePointSize.width > 0
+    ? stageWidthPx / pagePointSize.width
     : PAGE_RENDER_SCALE;
   // Phase 11: single source of truth for "is there an edit ready to apply,"
   // shared by both the inline on-page toolbar and the sidebar panel -- was
@@ -2092,7 +2113,7 @@ export default function EditPdfTool() {
                         // placed text element, so a run being edited in place
                         // and a text box dropped next to it read identically.
                         className="lumeo-page-overlay-input h-full w-full rounded-[3px] border border-[var(--lumeo-gold)] bg-white px-0.5 font-semibold text-[#12141a] shadow-[0_0_0_3px_rgba(var(--lumeo-gold-rgb),0.16)] outline-none"
-                        style={{ fontSize: `${overlayFontSizePx(singleSelectedRun.fontSizePx, pageDisplaySize.width, stageWidthPx)}px` }}
+                        style={{ fontSize: `${overlayFontSizePx(singleSelectedRun.fontSizePt, pagePointSize?.width ?? 0, stageWidthPx)}px` }}
                       />
                       {/* Phase 12: icon-only pair (checkmark/X), matching the
                           compact inline-toolbar convention professional PDF/doc

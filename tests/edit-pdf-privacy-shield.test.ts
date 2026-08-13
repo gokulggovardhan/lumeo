@@ -4,7 +4,7 @@ import { scanForSensitiveInfo } from "../lib/pdf/edit/privacyShield.ts";
 import type { DetectedTextRun } from "../lib/pdf/edit/textRuns.ts";
 
 function makeRun(str: string): DetectedTextRun {
-  return { str, fontName: "Helvetica", xPct: 10, yPct: 10, widthPct: 20, heightPct: 4, fontSizePx: 12, rotated: false };
+  return { str, fontName: "Helvetica", xPct: 10, yPct: 10, widthPct: 20, heightPct: 4, fontSizePt: 12, rotated: false };
 }
 
 test("scanForSensitiveInfo matches a currency amount", () => {

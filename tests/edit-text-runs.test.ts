@@ -29,7 +29,7 @@ test("textRunsFromContent places an unrotated run at the expected screen positio
   assert.equal(run.str, "Hello World");
   assert.equal(run.rotated, false);
   // Font size in device px should scale with the viewport's scale factor.
-  assert.ok(Math.abs(run.fontSizePx - 18 * scale) < 1, `expected ~${18 * scale}px, got ${run.fontSizePx}`);
+  assert.ok(Math.abs(run.fontSizePt - 18 * scale) < 1, `expected ~${18 * scale}px, got ${run.fontSizePt}`);
   // x=50pt at scale 2 -> 100px from the left edge.
   assert.ok(Math.abs((run.xPct / 100) * viewport.width - 100) < 2);
   // Page is 792pt tall; text baseline at y=700 is near the top, so yPct
@@ -121,7 +121,7 @@ test("textRunsFromContent skips whitespace-only items and returns nothing for a 
 
 test("findTextRunAtPoint hit-tests a point against a run's box and misses outside it", () => {
   const runs = [
-    { str: "Hello", fontName: "F1", xPct: 10, yPct: 10, widthPct: 20, heightPct: 5, fontSizePx: 16, rotated: false },
+    { str: "Hello", fontName: "F1", xPct: 10, yPct: 10, widthPct: 20, heightPct: 5, fontSizePt: 16, rotated: false },
   ];
 
   const hit = findTextRunAtPoint(runs, 15, 12);
@@ -133,8 +133,8 @@ test("findTextRunAtPoint hit-tests a point against a run's box and misses outsid
 
 test("findTextRunAtPoint prefers the last (visually topmost) run when boxes overlap", () => {
   const runs = [
-    { str: "Bottom", fontName: "F1", xPct: 10, yPct: 10, widthPct: 20, heightPct: 5, fontSizePx: 16, rotated: false },
-    { str: "Top", fontName: "F1", xPct: 10, yPct: 10, widthPct: 20, heightPct: 5, fontSizePx: 16, rotated: false },
+    { str: "Bottom", fontName: "F1", xPct: 10, yPct: 10, widthPct: 20, heightPct: 5, fontSizePt: 16, rotated: false },
+    { str: "Top", fontName: "F1", xPct: 10, yPct: 10, widthPct: 20, heightPct: 5, fontSizePt: 16, rotated: false },
   ];
 
   const hit = findTextRunAtPoint(runs, 15, 12);
@@ -144,10 +144,10 @@ test("findTextRunAtPoint prefers the last (visually topmost) run when boxes over
 // --- overlayFontSizePx -------------------------------------------------
 //
 // Regression coverage for the inline editor's font sizing, which used to
-// read `(run.fontSizePx / PAGE_RENDER_SCALE) * pixelsPerPoint`. That
+// read `(run.fontSizePt / PAGE_RENDER_SCALE) * pixelsPerPoint`. That
 // expression is dimensionally incoherent -- it divides a raster-pixel size
 // by a scale CONSTANT and multiplies by the LIVE px-per-point ratio -- and
-// happens to cancel to exactly `fontSizePx` only while those two are
+// happens to cancel to exactly `fontSizePt` only while those two are
 // equal. It therefore mis-sized every oversized page (where the render
 // scale is clamped below the constant) and, more importantly, never
 // tracked zoom at all: the stage grows but a px font-size does not.
@@ -199,4 +199,64 @@ test("overlayFontSizePx is unaffected by the render scale the raster used", () =
   const clamped = overlayFontSizePx(20, 1000, 1500);
   assert.equal(ordinary, clamped);
   assert.equal(ordinary, 30);
+});
+
+// --- Scale independence (high-zoom step 2) -----------------------------
+//
+// The property the whole high-zoom plan rests on: a run's geometry must not
+// depend on how sharply the page happens to be rasterized. Percentages
+// always had this; fontSizePt now does too. That is what lets the raster
+// scale change for zoom without re-running detection, and without
+// invalidating any operator match or Privacy Shield hit derived from it.
+test("textRunsFromContent reports identical geometry regardless of the viewport scale used", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("Total Amount 1350.00", { x: 50, y: 640, size: 13, font });
+  page.drawText("Second line for good measure", { x: 50, y: 600, size: 9, font });
+  const bytes = await doc.save();
+
+  const pdfjsPage = await loadPdfjsPage(bytes);
+  const content = await pdfjsPage.getTextContent();
+
+  const at = (scale: number) => {
+    const viewport = pdfjsPage.getViewport({ scale });
+    return textRunsFromContent(content.items as never, viewport.transform, viewport.width, viewport.height);
+  };
+
+  const base = at(1);
+  assert.equal(base.length, 2);
+
+  for (const scale of [1.3, 2, 4, 0.5]) {
+    const scaled = at(scale);
+    assert.equal(scaled.length, base.length, `run count changed at scale ${scale}`);
+    for (let i = 0; i < base.length; i += 1) {
+      for (const key of ["xPct", "yPct", "widthPct", "heightPct"] as const) {
+        assert.ok(
+          Math.abs(scaled[i][key] - base[i][key]) < 1e-6,
+          `${key} drifted at scale ${scale}: ${base[i][key]} vs ${scaled[i][key]}`,
+        );
+      }
+    }
+  }
+});
+
+// fontSizePt is the one field that is NOT a percentage, so it needs its own
+// guard: it is reported in the caller's viewport units, and callers pass a
+// scale-1 viewport precisely so those units are points. This pins the
+// contract that a 13pt run detected through a scale-1 viewport reads back
+// as ~13, not as 13 x some render scale.
+test("textRunsFromContent's fontSizePt reads back in real PDF points through a scale-1 viewport", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("Thirteen point text", { x: 50, y: 640, size: 13, font });
+  const bytes = await doc.save();
+
+  const pdfjsPage = await loadPdfjsPage(bytes);
+  const viewport = pdfjsPage.getViewport({ scale: 1 });
+  const content = await pdfjsPage.getTextContent();
+
+  const [run] = textRunsFromContent(content.items as never, viewport.transform, viewport.width, viewport.height);
+  assert.ok(Math.abs(run.fontSizePt - 13) < 0.5, `expected ~13pt, got ${run.fontSizePt}`);
 });

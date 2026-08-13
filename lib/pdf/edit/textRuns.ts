@@ -91,8 +91,21 @@ export type DetectedTextRun = {
   yPct: number;
   widthPct: number;
   heightPct: number;
-  /** Font size in device pixels at the viewport's scale, not PDF points. */
-  fontSizePx: number;
+  /**
+   * Font size in PDF points -- i.e. resolution-independent, exactly like
+   * this type's xPct/yPct/widthPct/heightPct. Detection is therefore
+   * completely decoupled from whatever scale the page bitmap happens to
+   * be rasterized at, which is what lets the raster scale change (for
+   * zoom) without re-running detection or invalidating anything already
+   * matched to an operator.
+   *
+   * Was `fontSizePx` (device pixels at the raster viewport's scale) until
+   * the high-zoom work. Renamed rather than silently redefined so every
+   * consumer had to be revisited by the compiler -- a quiet unit change
+   * here is precisely the class of bug that made the inline editor's font
+   * size wrong in the first place.
+   */
+  fontSizePt: number;
   /**
    * True when the run isn't axis-aligned (rotated page or rotated text).
    * The box is still computed and roughly right, but callers that need an
@@ -148,7 +161,9 @@ export function textRunsFromContent(
       yPct: (top / pageHeightPx) * 100,
       widthPct: (widthPx / pageWidthPx) * 100,
       heightPct: (heightPx / pageHeightPx) * 100,
-      fontSizePx: fontHeight,
+      // fontHeight is in the caller's viewport units; callers pass a
+      // scale-1 (point-space) viewport so this is PDF points.
+      fontSizePt: fontHeight,
       rotated,
     });
   }
@@ -160,38 +175,39 @@ export function textRunsFromContent(
 // editor that replaces a run while it's being edited), so its glyphs stay
 // the same size as the rendered page text underneath them.
 //
-// DetectedTextRun.fontSizePx is in the RASTER bitmap's own device pixels
-// (see its doc comment above). The stage displays that bitmap scaled to
-// the stage's CSS width, which changes with zoom and with the window --
-// so the two coincide only when the stage happens to be exactly the
-// bitmap's pixel width. A CSS `font-size` in px does NOT scale with a
-// percent-positioned ancestor, so without this conversion an inline
+// DetectedTextRun.fontSizePt is in PDF points. The stage displays the page
+// at whatever CSS width it currently has, which changes with zoom and with
+// the window -- so the displayed size of one point is exactly
+// stageWidthPx / pageWidthPt. A CSS `font-size` in px does NOT scale with
+// a percent-positioned ancestor, so without this conversion an inline
 // editor's text keeps one fixed size while the page it sits on zooms
 // underneath it.
 //
-// Deliberately NOT expressed via a px-per-point ratio: fontSizePx and the
-// raster width are both already in the same raster-pixel space, so their
-// ratio to the stage width is the whole conversion. Mixing in a
-// points-based scale (as an earlier version of this call site did, by
-// dividing by a fixed render-scale CONSTANT and multiplying by the live
-// px-per-point ratio) cancels to a no-op whenever those two happen to be
-// equal and silently mis-sizes the text whenever they aren't -- which is
-// every oversized page today, and would be every zoom level once the
-// raster scale itself becomes dynamic.
+// Deliberately expressed against the page's POINT width, never the raster
+// bitmap's pixel width: the bitmap's scale is an implementation detail of
+// how sharply the page happens to be rendered right now, and is about to
+// become dynamic for high zoom. Tying on-screen text size to it would
+// re-introduce, in a subtler form, exactly the bug this replaced -- an
+// expression that mixed a fixed render-scale CONSTANT with the live
+// px-per-point ratio, cancelling to a no-op whenever those two were equal
+// and silently mis-sizing the text whenever they weren't.
 //
-// Falls back to the raw raster size when the stage hasn't been measured
-// yet (first paint, before any ResizeObserver callback), which is exactly
-// the size that was correct before this conversion existed.
+// Falls back to the raw point size when the stage hasn't been measured yet
+// (first paint, before any ResizeObserver callback). Note that
+// ResizeObserver callbacks are delivered during the event loop's rendering
+// steps, so in a non-compositing/background tab this fallback can persist
+// until something forces a paint -- the value is still sane, just not yet
+// zoom-aware.
 export function overlayFontSizePx(
-  runFontSizePx: number,
-  rasterWidthPx: number,
+  runFontSizePt: number,
+  pageWidthPt: number,
   stageWidthPx: number | null,
   minimumPx = 10,
 ): number {
-  if (!stageWidthPx || stageWidthPx <= 0 || rasterWidthPx <= 0) {
-    return Math.max(minimumPx, runFontSizePx);
+  if (!stageWidthPx || stageWidthPx <= 0 || pageWidthPt <= 0) {
+    return Math.max(minimumPx, runFontSizePt);
   }
-  return Math.max(minimumPx, runFontSizePx * (stageWidthPx / rasterWidthPx));
+  return Math.max(minimumPx, runFontSizePt * (stageWidthPx / pageWidthPt));
 }
 
 // Percent-space point-in-box hit test, matching the xPct/yPct/widthPct/
