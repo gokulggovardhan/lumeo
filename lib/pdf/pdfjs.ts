@@ -180,6 +180,28 @@ export function clampRenderScaleToPixelBudget(
 //   clampRenderScaleToMaxDimension already enforces, which alone can't
 //   catch a wide-aspect page that stays under the longer-side cap but
 //   would still blow a memory budget) caps the final scale.
+// Snaps a continuously-varying desired render scale onto a small ladder of
+// discrete steps, so a zoom gesture re-rasterizes once (or not at all)
+// instead of on every wheel tick. Returns the SMALLEST step that is at
+// least `desiredScale` -- rounding up, never down, so quantisation can only
+// ever make the raster sharper than asked for, never blurrier. A desired
+// scale above the top step saturates there; the caller's own pixel budget
+// (clampRenderScaleToPixelBudget) is what actually bounds memory, and is
+// applied after this.
+//
+// `steps` must be ascending. An empty ladder returns desiredScale
+// unchanged, which degrades to "no quantisation" rather than to zero.
+export function quantizeRenderScale(desiredScale: number, steps: readonly number[]): number {
+  if (steps.length === 0) return desiredScale;
+  for (const step of steps) {
+    // Epsilon so a desired scale that lands microscopically above a step
+    // (floating-point drift from a width/point-size division) doesn't jump
+    // a whole rung and double the raster for nothing.
+    if (desiredScale <= step + 1e-6) return step;
+  }
+  return steps[steps.length - 1];
+}
+
 const MAX_EFFECTIVE_DPR = 2;
 
 export function computeAdaptiveRenderScale({

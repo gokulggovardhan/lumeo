@@ -45,8 +45,8 @@ export type DetectedRunGeometry = {
   yPct: number;
   widthPct: number;
   heightPct: number;
-  /** Font size in device pixels at the viewport's render scale, not points. */
-  fontSizePx: number;
+  /** Font size in PDF points (see lib/pdf/edit/textRuns.ts's DetectedTextRun). */
+  fontSizePt: number;
 };
 
 export type RestylePlan = {
@@ -69,15 +69,15 @@ function clampPct(value: number, min: number, max: number): number {
  * Computes where to place the whiteout and the replacement text box so the
  * restyled text lands visually on top of the run it replaces.
  *
- * `pixelsPerPoint` converts the run's device-pixel font size into the PDF
- * points that TextEditElement.fontSizePt is measured in -- the same ratio
- * EditPdfTool.tsx already computes for EditElementView's WYSIWYG sizing.
+ * Took a `pixelsPerPoint` ratio until the high-zoom work, to convert the
+ * run's then-device-pixel font size into the PDF points
+ * TextEditElement.fontSizePt is measured in. Detection now reports points
+ * directly (see DetectedTextRun.fontSizePt), so there is nothing left to
+ * convert -- and, more to the point, nothing left that could go stale when
+ * the raster scale changes for zoom.
  */
-export function planRunRestyle(run: DetectedRunGeometry, pixelsPerPoint: number): RestylePlan {
-  // Guard against a zero/garbage ratio (page metrics not loaded yet) rather
-  // than emitting Infinity and placing an invisible element off-page.
-  const safeRatio = pixelsPerPoint > 0 ? pixelsPerPoint : 1;
-  const fontSizePt = run.fontSizePx / safeRatio;
+export function planRunRestyle(run: DetectedRunGeometry): RestylePlan {
+  const fontSizePt = run.fontSizePt;
 
   const padPct = run.heightPct * WHITEOUT_PAD_RATIO;
 

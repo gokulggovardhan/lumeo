@@ -246,7 +246,7 @@ function makeFakeOperator(leftPx: number, topPx: number, label: string) {
 }
 
 function makeFakeRun(xPct: number, yPct: number): DetectedTextRun {
-  return { str: "x", fontName: "F1", xPct, yPct, widthPct: 1, heightPct: 1, fontSizePx: 12, rotated: false };
+  return { str: "x", fontName: "F1", xPct, yPct, widthPct: 1, heightPct: 1, fontSizePt: 12, rotated: false };
 }
 
 test("matchDetectedRunToOperatorIndexed matches matchDetectedRunToOperator exactly on a dense scattered grid", () => {

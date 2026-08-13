@@ -58,7 +58,7 @@ import {
 // level. Statically importing any of THEM here would pull pdf-lib back
 // in transitively regardless of the type-only import above. Their TYPE
 // exports are unaffected (same erased-at-compile-time reasoning).
-import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
+import { findTextRunAtPoint, overlayFontSizePx, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
@@ -69,7 +69,7 @@ import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
-import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget } from "@/lib/pdf/pdfjs";
+import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget, computeAdaptiveRenderScale, quantizeRenderScale } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
@@ -263,6 +263,29 @@ const MAX_CANVAS_DIMENSION_PX = 5200;
 // every normal page, and only reduces scale further for the rare
 // pathological one.
 const MAX_CANVAS_TOTAL_PIXELS = 20_000_000;
+
+// The discrete raster scales the page is ever rendered at. Ascending, and
+// starting at PAGE_RENDER_SCALE so the unzoomed default is unchanged. The
+// top rung is what a Letter page can afford at MAX_CANVAS_TOTAL_PIXELS
+// (612x792pt at 6x is ~17.4M px, just inside the budget); anything asking
+// for more is clamped down by clampRenderScaleToPixelBudget rather than
+// being allowed to allocate it.
+const RASTER_SCALE_STEPS = [PAGE_RENDER_SCALE, 2, 3, 4, 6] as const;
+
+// Long enough that a zoom drag or a run of +/- taps settles into a single
+// re-render, short enough that a deliberate zoom sharpens up without the
+// user noticing a wait.
+const RASTER_SCALE_DEBOUNCE_MS = 180;
+
+// Maximum zoom. Raised from 2 once zooming actually re-rasterizes: at the
+// old cap the page was a 1.3x bitmap stretched to 2.6x, and raising the cap
+// without re-rendering would only have made it blurrier. 4 rather than 5
+// deliberately -- past roughly 4x a Letter page runs into
+// MAX_CANVAS_TOTAL_PIXELS, so a "500%" would be delivered as a soft,
+// budget-clamped raster and would be advertising sharpness the engine can't
+// actually produce.
+const MAX_ZOOM = 4;
+const MIN_ZOOM = 0.5;
 
 function clampPct(value: number) {
   return Math.min(100, Math.max(0, value));
@@ -472,6 +495,27 @@ export default function EditPdfTool() {
   const [outputName, setOutputName] = useState("lumeo-edited.pdf");
 
   const stageRef = useRef<HTMLDivElement | null>(null);
+  // The stage's live CSS width. Needed because a px `font-size` does not
+  // scale with a percent-positioned ancestor: the inline text editor sits
+  // inside a percent-sized box over the page, so its font has to be
+  // computed in DISPLAYED pixels, not the raster bitmap's own (see
+  // lib/pdf/edit/textRuns.ts's overlayFontSizePx). Measured rather than
+  // derived because the stage's width follows zoom, the window, and the
+  // surrounding layout all at once -- there is no single state value that
+  // already implies it. null until first measurement, which overlayFontSizePx
+  // treats as "fall back to the raster size."
+  const [stageWidthPx, setStageWidthPx] = useState<number | null>(null);
+  // The scale the page bitmap is currently rasterized at. Starts at the
+  // fixed default so the very first render is byte-for-byte what it always
+  // was, then follows the stage's real displayed size (see
+  // targetRasterScale below). Debounced, so a zoom drag re-rasterizes once
+  // it settles rather than on every intermediate value.
+  const [rasterScale, setRasterScale] = useState(PAGE_RENDER_SCALE);
+  // Which page the CURRENT page image actually belongs to, so a re-raster
+  // can tell "I am sharpening a page already on screen" from "I am drawing
+  // a page for the first time." Only the second case may surface a render
+  // failure as an error -- see the raster effect's catch.
+  const renderedPageRef = useRef<number | null>(null);
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
@@ -659,13 +703,79 @@ export default function EditPdfTool() {
     };
   }, [pdf]);
 
-  // Renders the current page to a background image for the placement stage,
-  // and detects its text runs. Deliberately NOT keyed on pdfLibDoc -- that
-  // doc loads independently (effect above) and often arrives after this one
-  // has already rasterized the page; re-running the canvas render/toBlob
-  // work (the expensive part) just because pdfLibDoc changed would be pure
-  // waste. Operator-matching, which does need pdfLibDoc, is a separate
-  // effect below.
+  // EFFECT A -- page identity. Everything that must be forgotten when the
+  // user is looking at a DIFFERENT page (or a newly-edited copy of this
+  // one), and nothing else.
+  //
+  // Split out of the render effect for high zoom: rasterizing now re-runs
+  // whenever the raster scale changes, and a zoom step must never discard
+  // the user's selection or the replacement text they are halfway through
+  // typing. Keying this on page identity alone is what guarantees that.
+  //
+  // Owns pageLoading deliberately. If the raster effect below raised the
+  // loading flag on every re-render, a zoom step would unmount the whole
+  // stage (the loading-vs-stage ternary swaps them), destroying the inline
+  // editor and the stage's own ResizeObserver mid-interaction. Raising it
+  // only on a page change, and lowering it when the raster lands, means a
+  // re-raster swaps the image underneath a stage that never goes away.
+  //
+  // The setState calls below trip react-hooks/set-state-in-effect, which
+  // can't distinguish this ("reset state when identity changes") from an
+  // accidental render loop. React's two sanctioned alternatives don't fit:
+  // a `key` prop would mean restructuring this component around a remount,
+  // throwing away the loaded pdfjs/pdf-lib documents (the expensive part),
+  // and setting during render would put a dozen setState calls in the
+  // render path. The dependency array is page identity alone, so this runs
+  // once per page change and cannot loop. The previous version passed lint
+  // only because the identical calls sat inside an async IIFE -- deferring
+  // them by a microtask, which risks a frame rendering the new page against
+  // the old page's selection.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    if (!pdf) return;
+    setPageLoading(true);
+    // Phase 30: a page-render failure/timeout sets `error`, but nothing
+    // in this reset block ever cleared it -- so navigating to (or
+    // undoing/redoing into) a DIFFERENT page while a stale error from a
+    // previous one was showing left that stale message on screen for the
+    // entire duration of the new page's own render attempt, since the
+    // loading-vs-error ternary (Phase 28) deliberately gives error
+    // priority over the loading skeleton. Confirmed live: Next Page
+    // after a failed page 1 showed page 1's error immediately, before
+    // page 2's own render had even had a chance to succeed or fail.
+    setError("");
+    setSelectionAnchorIndex(null);
+    setSelectedRunIndices([]);
+    setHoveredRunIndex(-1);
+    setFocusedRunIndex(null);
+    setEditDraftText("");
+    setEditApplyError("");
+    setUseSubstituteFont(false);
+    runOverlayNodesRef.current.clear();
+    // Cleared here (rather than left stale) so the operator-matching
+    // effect never briefly pairs a new page's detected runs with the
+    // previous page's matches while it's catching up.
+    setRunMatches([]);
+    setPageOperators([]);
+    setPrivacyShieldMatches([]);
+    setTextDetectionReady(false);
+    // Cleared so the raster effect's "is this just a re-sharpen?" check is
+    // exact. This effect runs whenever the PAGE or the DOCUMENT BYTES
+    // change, so afterwards any render failure is a genuine failure to draw
+    // content the user hasn't seen yet, and must be surfaced. Without this,
+    // a failed re-raster right after a text edit would silently leave the
+    // PRE-edit image on screen -- strictly worse than an error, because it
+    // looks like the edit didn't apply.
+    renderedPageRef.current = null;
+  }, [pdf, pageIndex]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
+  // EFFECT B -- rasterize. The only expensive step, and the only one keyed
+  // on rasterScale. Deliberately NOT keyed on pdfLibDoc -- that doc loads
+  // independently and often arrives after this one has already rasterized
+  // the page; re-running the canvas render/toBlob work just because
+  // pdfLibDoc changed would be pure waste. Operator-matching, which does
+  // need pdfLibDoc, is its own effect further below.
   useEffect(() => {
     if (!pdf || !pdfJsDocRef.current) return;
     const doc = pdfJsDocRef.current;
@@ -678,42 +788,17 @@ export default function EditPdfTool() {
     let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
 
     void (async () => {
-      setPageLoading(true);
-      // Phase 30: a page-render failure/timeout sets `error`, but nothing
-      // in this reset block ever cleared it -- so navigating to (or
-      // undoing/redoing into) a DIFFERENT page while a stale error from a
-      // previous one was showing left that stale message on screen for the
-      // entire duration of the new page's own render attempt, since the
-      // loading-vs-error ternary below (Phase 28) deliberately gives error
-      // priority over the loading skeleton. Confirmed live: Next Page
-      // after a failed page 1 showed page 1's error immediately, before
-      // page 2's own render had even had a chance to succeed or fail.
-      setError("");
-      setSelectionAnchorIndex(null);
-      setSelectedRunIndices([]);
-      setHoveredRunIndex(-1);
-      setFocusedRunIndex(null);
-      setEditDraftText("");
-      setEditApplyError("");
-      setUseSubstituteFont(false);
-      runOverlayNodesRef.current.clear();
-      // Cleared here (rather than left stale) so the operator-matching
-      // effect below never briefly pairs a new page's detected runs with
-      // the previous page's matches while it's catching up.
-      setRunMatches([]);
-      setPageOperators([]);
-      setPrivacyShieldMatches([]);
-      setTextDetectionReady(false);
       try {
         const page = await doc.getPage(pageIndex + 1);
         const pointViewport = page.getViewport({ scale: 1 });
-        // See MAX_CANVAS_DIMENSION_PX's own doc comment -- mirrors
-        // CompressPdfTool.tsx's dimensionScale exactly. A no-op for every
-        // ordinary page (dimensionScale === PAGE_RENDER_SCALE, unchanged
-        // behavior); only an oversized MediaBox has its render scale
-        // reduced below the usual default.
+        // The raster scale is now an input (see rasterScale's own comment),
+        // not a constant derived here -- it rises with zoom so high-zoom
+        // text stays sharp instead of being a stretched low-res bitmap.
+        // Both clamps still apply on top of it, so an oversized MediaBox or
+        // a scale the pixel budget can't afford is reduced exactly as
+        // before.
         const dimensionScale = clampRenderScaleToPixelBudget(
-          clampRenderScaleToMaxDimension(PAGE_RENDER_SCALE, pointViewport.width, pointViewport.height, MAX_CANVAS_DIMENSION_PX),
+          clampRenderScaleToMaxDimension(rasterScale, pointViewport.width, pointViewport.height, MAX_CANVAS_DIMENSION_PX),
           pointViewport.width,
           pointViewport.height,
           MAX_CANVAS_TOTAL_PIXELS,
@@ -735,12 +820,19 @@ export default function EditPdfTool() {
 
         const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
         if (cancelled || !blob) return;
-        if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
+        // Revoke the PREVIOUS url only after the new one is in state.
+        // Revoking first (as this used to) blanks the <img> for a frame,
+        // which was invisible when a re-render only ever happened on a page
+        // change -- but is a visible flash now that a zoom step re-renders
+        // the same page in place.
+        const previousUrl = pageImageUrlRef.current;
         const url = URL.createObjectURL(blob);
         pageImageUrlRef.current = url;
         setPageImageUrl(url);
         setPageDisplaySize({ width: canvas.width, height: canvas.height });
         setPagePointSize({ width: pointViewport.width, height: pointViewport.height });
+        renderedPageRef.current = pageIndex;
+        if (previousUrl) URL.revokeObjectURL(previousUrl);
         // Phase 16: the rendered page image is fully usable right here --
         // flip pageLoading off NOW instead of waiting for the finally block
         // below, which previously only ran after getTextContent() below it
@@ -756,23 +848,28 @@ export default function EditPdfTool() {
         // tool's highlighting appears as soon as they do -- nothing about
         // detection itself changed, only when the page stops being "loading".
         if (!cancelled) setPageLoading(false);
-
-        // Best-effort: a page's existing text is a bonus (lets the select
-        // tool highlight it), never a requirement -- a failure here must
-        // not block the preview or export from working.
-        try {
-          const content = await withPageTimeout(page.getTextContent(), pageIndex + 1, PAGE_RENDER_TIMEOUT_MS, "extract text from");
-          const runs = textRunsFromContent(content.items as never, viewport.transform, canvas.width, canvas.height);
-          setDetectedTextRuns(runs);
-        } catch {
-          setDetectedTextRuns([]);
-        }
-        // true means detection finished, successfully or not
-        setTextDetectionReady(true);
       } catch {
         // A cancelled render's promise rejects (RenderingCancelledException)
         // -- that's expected teardown, not a real preview failure.
-        if (!cancelled) setError("This page could not be previewed. Try a different page.");
+        //
+        // A failed RE-raster must not destroy a page that is already on
+        // screen and working. Since zoom now re-rasterizes, this branch can
+        // be reached while the user is looking at a perfectly good image;
+        // surfacing the error would swap the whole stage out for an error
+        // message (the render branch gives error priority) and throw away
+        // their view, their selection, and their in-progress edit -- over a
+        // failed attempt to draw the SAME page slightly sharper. Keeping the
+        // existing raster degrades to "stayed at the previous sharpness,"
+        // which is invisible and harmless. Proven live, not theorised: the
+        // first re-raster to fail did exactly this, replacing a working page
+        // with "This page could not be previewed."
+        //
+        // No retry loop: rasterScale is unchanged by the failure, so this
+        // effect will not re-run until something else actually changes.
+        const isRefreshOfVisiblePage = renderedPageRef.current === pageIndex && pageImageUrlRef.current !== "";
+        if (!cancelled && !isRefreshOfVisiblePage) {
+          setError("This page could not be previewed. Try a different page.");
+        }
       } finally {
         // Safety net for every path that returns/throws BEFORE the image is
         // ready (context allocation failure, render failure/timeout, a
@@ -787,7 +884,113 @@ export default function EditPdfTool() {
       cancelled = true;
       renderTask?.cancel();
     };
+  }, [pdf, pageIndex, docReady, rasterScale]);
+
+  // EFFECT C -- detect this page's text runs. Best-effort: a page's
+  // existing text is a bonus (it lets the select tool highlight and edit
+  // it), never a requirement -- a failure here must not block the preview
+  // or the export.
+  //
+  // Deliberately NOT keyed on rasterScale. getTextContent()'s output is a
+  // property of the document, and textRunsFromContent is fed the page's own
+  // scale-1 viewport, so every run this produces is identical at every
+  // raster scale (locked in by test). Re-running it per zoom step would
+  // burn a real amount of time on a text-heavy page and, worse, churn
+  // detectedTextRuns -- which the operator-matching effect depends on, so
+  // every RunMatch the UI needs would be discarded and rebuilt for a result
+  // that cannot differ.
+  useEffect(() => {
+    if (!pdf || !pdfJsDocRef.current) return;
+    const doc = pdfJsDocRef.current;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const page = await doc.getPage(pageIndex + 1);
+        const pointViewport = page.getViewport({ scale: 1 });
+        const content = await withPageTimeout(page.getTextContent(), pageIndex + 1, PAGE_RENDER_TIMEOUT_MS, "extract text from");
+        if (cancelled) return;
+        // Point space, never the raster viewport -- see
+        // lib/pdf/edit/textRuns.ts's DetectedTextRun.fontSizePt.
+        const runs = textRunsFromContent(content.items as never, pointViewport.transform, pointViewport.width, pointViewport.height);
+        setDetectedTextRuns(runs);
+      } catch {
+        if (!cancelled) setDetectedTextRuns([]);
+      } finally {
+        // true means detection finished, successfully or not
+        if (!cancelled) setTextDetectionReady(true);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [pdf, pageIndex, docReady]);
+
+  // What the raster scale SHOULD be for how large the page is currently
+  // being shown. stageWidthPx already includes zoom (the zoom wrapper sets
+  // the stage's width), so this needs no separate zoom term.
+  //
+  // computeAdaptiveRenderScale is existing, already-tested infrastructure
+  // that was written for exactly this and left unwired because verifying it
+  // needed a real device and a compositing browser (see its own doc
+  // comment). It caps devicePixelRatio at 2, never returns below baseScale,
+  // and falls back to precisely today's fixed scale when the stage hasn't
+  // been measured -- so an unmeasured stage renders exactly as before.
+  //
+  // Quantised so a zoom drag lands on a handful of distinct rasters instead
+  // of a new one per wheel tick, and rounded UP so quantisation can only
+  // sharpen. The pixel budget is applied last, inside the raster effect,
+  // and always wins.
+  const targetRasterScale = useMemo(() => {
+    if (!pagePointSize || pagePointSize.width <= 0) return PAGE_RENDER_SCALE;
+    const adaptive = computeAdaptiveRenderScale({
+      pageWidthPt: pagePointSize.width,
+      pageHeightPt: pagePointSize.height,
+      cssDisplayWidthPx: stageWidthPx,
+      devicePixelRatio: typeof window === "undefined" ? 1 : window.devicePixelRatio,
+      baseScale: PAGE_RENDER_SCALE,
+      maxDimensionPx: MAX_CANVAS_DIMENSION_PX,
+      maxTotalPixels: MAX_CANVAS_TOTAL_PIXELS,
+    });
+    return quantizeRenderScale(adaptive, RASTER_SCALE_STEPS);
+  }, [pagePointSize, stageWidthPx]);
+
+  // Debounce: a zoom gesture walks targetRasterScale through several values
+  // in quick succession, and each committed change re-rasterizes the whole
+  // page. Waiting for it to settle turns a drag into one render.
+  useEffect(() => {
+    if (targetRasterScale === rasterScale) return;
+    const id = window.setTimeout(() => setRasterScale(targetRasterScale), RASTER_SCALE_DEBOUNCE_MS);
+    return () => window.clearTimeout(id);
+  }, [targetRasterScale, rasterScale]);
+
+  // Tracks the stage's displayed CSS width (see stageWidthPx's own comment
+  // for why it can't be derived). Keyed on pageImageUrl, not on zoom: the
+  // stage element is only mounted once a page image exists, so this has to
+  // re-attach whenever that element is created or replaced -- and once
+  // attached, ResizeObserver already reports every later width change
+  // (zoom, window resize, layout shifts) without this effect re-running.
+  //
+  // Skips redundant state writes: ResizeObserver fires on sub-pixel changes,
+  // and re-rendering the whole workspace for a 0.2px difference would be
+  // pure churn while someone drags a zoom slider.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || typeof ResizeObserver === "undefined") return;
+
+    const measure = (width: number) => {
+      setStageWidthPx((current) => (current !== null && Math.abs(current - width) < 0.5 ? current : width));
+    };
+    measure(stage.getBoundingClientRect().width);
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) measure(entry.contentRect.width);
+    });
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, [pageImageUrl]);
 
   // Phase 9.1: matches each run the effect above detected to its
   // content-stream operator (lib/pdf/edit/matchTextRun.ts), so the select
@@ -799,35 +1002,31 @@ export default function EditPdfTool() {
   // only disables in-place editing, never the read-only preview/highlight
   // this depends on.
   useEffect(() => {
-    if (!pdf || !pdfJsDocRef.current || !pdfLibDoc || detectedTextRuns.length === 0 || !pageDisplaySize) return;
+    if (!pdf || !pdfJsDocRef.current || !pdfLibDoc || detectedTextRuns.length === 0 || !pagePointSize) return;
     const doc = pdfJsDocRef.current;
     const runs = detectedTextRuns;
     let cancelled = false;
 
     void (async () => {
       try {
-        // Reuse the render effect's already-fetched page/viewport for this
-        // same pageIndex instead of re-deriving them -- see
-        // pageAndViewportRef's own doc comment. The cached entry is
-        // guaranteed present by the time this effect can run: it depends on
-        // pageDisplaySize, which the render effect only sets AFTER
-        // populating this ref for the current pageIndex. The direct fetch
-        // stays as a defensive fallback in case that invariant ever changes.
+        // Matching happens in the SAME point space detection used (see the
+        // render effect's own comment). matchTextRun.ts is scale-relative
+        // by construction -- it converts a run's percentages through
+        // whatever page dimensions it's handed and computes operator
+        // origins through whatever viewport transform it's handed -- so it
+        // is correct at any scale provided both sides agree. Point space is
+        // the one choice that never changes, which is what keeps this
+        // effect (and every match it produces) independent of the raster
+        // scale zoom is about to start varying.
+        //
+        // Reuses the render effect's already-fetched page for this same
+        // pageIndex rather than re-fetching -- see pageAndViewportRef's own
+        // doc comment. getViewport({ scale: 1 }) on an already-loaded page
+        // is pure arithmetic, no I/O and no rasterization.
         const cached = pageAndViewportRef.current;
-        const { viewport } =
-          cached && cached.pageIndex === pageIndex
-            ? cached
-            : await (async () => {
-                const fetchedPage = await doc.getPage(pageIndex + 1);
-                const pointViewport = fetchedPage.getViewport({ scale: 1 });
-                const dimensionScale = clampRenderScaleToPixelBudget(
-                  clampRenderScaleToMaxDimension(PAGE_RENDER_SCALE, pointViewport.width, pointViewport.height, MAX_CANVAS_DIMENSION_PX),
-                  pointViewport.width,
-                  pointViewport.height,
-                  MAX_CANVAS_TOTAL_PIXELS,
-                );
-                return { viewport: fetchedPage.getViewport({ scale: dimensionScale }) };
-              })();
+        const page =
+          cached && cached.pageIndex === pageIndex ? cached.page : await doc.getPage(pageIndex + 1);
+        const viewport = page.getViewport({ scale: 1 });
         if (cancelled || !pdfLibDocRef.current || !editEngineRef.current) return;
         const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
         if (cancelled) return;
@@ -843,7 +1042,7 @@ export default function EditPdfTool() {
         const locatedByOperator = new Map(located.map((item) => [item.operator, item] as const));
         setRunMatches(
           runs.map((run): RunMatch => {
-            const matchedOperator = matchDetectedRunToOperatorIndexed(run, pageDisplaySize.width, pageDisplaySize.height, operatorIndex);
+            const matchedOperator = matchDetectedRunToOperatorIndexed(run, pagePointSize.width, pagePointSize.height, operatorIndex);
             if (!matchedOperator) return null;
             const locatedOperator = locatedByOperator.get(matchedOperator);
             return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
@@ -860,7 +1059,13 @@ export default function EditPdfTool() {
     return () => {
       cancelled = true;
     };
-  }, [pdf, pdfLibDoc, pageIndex, detectedTextRuns, pageDisplaySize]);
+    // Keyed on pagePointSize, NOT pageDisplaySize: the page's point size is
+    // a property of the document and changes only when the page does, while
+    // the raster size changes whenever the page is re-rasterized. Depending
+    // on the raster size would re-run this whole match (and reset every
+    // RunMatch the UI relies on) on every future zoom-driven re-render, for
+    // a result that is by construction identical.
+  }, [pdf, pdfLibDoc, pageIndex, detectedTextRuns, pagePointSize]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -884,10 +1089,10 @@ export default function EditPdfTool() {
         // Acrobat/Chrome-PDF-viewer convention -- same clamp bounds and step
         // the on-screen -/+/Fit buttons already use.
         event.preventDefault();
-        setZoom((z) => Math.min(2, z + 0.1));
+        setZoom((z) => Math.min(MAX_ZOOM, z + 0.1));
       } else if (command && event.key === "-") {
         event.preventDefault();
-        setZoom((z) => Math.max(0.5, z - 0.1));
+        setZoom((z) => Math.max(MIN_ZOOM, z - 0.1));
       } else if (command && event.key === "0") {
         event.preventDefault();
         setZoom(1);
@@ -1144,7 +1349,7 @@ export default function EditPdfTool() {
     const run = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
     if (!run) return;
 
-    const plan = planRunRestyle(run, pixelsPerPoint);
+    const plan = planRunRestyle(run);
     const whiteoutId = nextElementId();
     const textId = nextElementId();
 
@@ -1607,12 +1812,24 @@ export default function EditPdfTool() {
   const hasTextEdits = historyState.pdfBytes !== originalBytes;
   const currentPageElements = useMemo(() => elementsForPage(elements, pageIndex), [elements, pageIndex]);
   const selectedElement = useMemo(() => elements.find((item) => item.id === selectedId) ?? null, [elements, selectedId]);
-  // Falls back to PAGE_RENDER_SCALE (the ratio the canvas was rendered at
-  // before pagePointSize is known) so text isn't briefly unsized on first
-  // paint; once pagePointSize loads for the current page, this becomes the
-  // exact px-per-point ratio for that page.
-  const pixelsPerPoint = pageDisplaySize && pagePointSize && pagePointSize.width > 0
-    ? pageDisplaySize.width / pagePointSize.width
+  // DISPLAYED CSS pixels per PDF point -- what EditElementView needs to size
+  // a placed text element's glyphs to match the page under them
+  // (`element.fontSizePt * pixelsPerPoint`).
+  //
+  // Was derived from the RASTER size (pageDisplaySize.width /
+  // pagePointSize.width), which is the same defect the inline editor's own
+  // font size had: the raster scale describes how sharply the page was
+  // rendered, not how large it is being shown. Placed and restyled text
+  // therefore stayed one fixed size while the page zoomed underneath it,
+  // and would have been wrong at every zoom level once the raster scale
+  // itself becomes dynamic. Measuring against the stage's live CSS width
+  // fixes both at once, and keeps placed text consistent with the inline
+  // editor (lib/pdf/edit/textRuns.ts's overlayFontSizePx, same ratio).
+  //
+  // Falls back to PAGE_RENDER_SCALE until the stage has been measured, so
+  // text is never briefly unsized on first paint.
+  const pixelsPerPoint = stageWidthPx && pagePointSize && pagePointSize.width > 0
+    ? stageWidthPx / pagePointSize.width
     : PAGE_RENDER_SCALE;
   // Phase 11: single source of truth for "is there an edit ready to apply,"
   // shared by both the inline on-page toolbar and the sidebar panel -- was
@@ -1857,7 +2074,7 @@ export default function EditPdfTool() {
                     // viewports) is completely unaffected.
                     if (!event.ctrlKey && !event.metaKey) return;
                     event.preventDefault();
-                    setZoom((z) => Math.min(2, Math.max(0.5, z - event.deltaY * 0.001)));
+                    setZoom((z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z - event.deltaY * 0.001)));
                   }}
                   className={`relative mx-auto w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""} ${activeTool === "whiteout" ? "touch-none" : ""}`}
                   style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
@@ -2055,7 +2272,7 @@ export default function EditPdfTool() {
                         // placed text element, so a run being edited in place
                         // and a text box dropped next to it read identically.
                         className="lumeo-page-overlay-input h-full w-full rounded-[3px] border border-[var(--lumeo-gold)] bg-white px-0.5 font-semibold text-[#12141a] shadow-[0_0_0_3px_rgba(var(--lumeo-gold-rgb),0.16)] outline-none"
-                        style={{ fontSize: `${Math.max(10, (singleSelectedRun.fontSizePx / PAGE_RENDER_SCALE) * pixelsPerPoint)}px` }}
+                        style={{ fontSize: `${overlayFontSizePx(singleSelectedRun.fontSizePt, pagePointSize?.width ?? 0, stageWidthPx)}px` }}
                       />
                       {/* Phase 12: icon-only pair (checkmark/X), matching the
                           compact inline-toolbar convention professional PDF/doc
@@ -2263,8 +2480,8 @@ export default function EditPdfTool() {
             onPrevPage={() => setPageIndex((c) => Math.max(0, c - 1))}
             onNextPage={() => setPageIndex((c) => Math.min(pdf.pageCount - 1, c + 1))}
             zoom={zoom}
-            onZoomOut={() => setZoom((z) => Math.max(0.5, z - 0.1))}
-            onZoomIn={() => setZoom((z) => Math.min(2, z + 0.1))}
+            onZoomOut={() => setZoom((z) => Math.max(MIN_ZOOM, z - 0.1))}
+            onZoomIn={() => setZoom((z) => Math.min(MAX_ZOOM, z + 0.1))}
             onFit={() => setZoom(1)}
           />
         )}
