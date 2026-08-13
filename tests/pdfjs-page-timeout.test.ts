@@ -10,7 +10,7 @@ if (typeof globalThis.window === "undefined") {
   (globalThis as unknown as { window: typeof globalThis }).window = globalThis;
 }
 
-const { withPageTimeout, renderPageWithTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget, computeAdaptiveRenderScale } = await import("../lib/pdf/pdfjs.ts");
+const { withPageTimeout, renderPageWithTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget, computeAdaptiveRenderScale, quantizeRenderScale } = await import("../lib/pdf/pdfjs.ts");
 
 // Regression for Phase 9.3's production-readiness audit finding: EditPdfTool's
 // page-render effect used to await page.render().promise and
@@ -247,4 +247,52 @@ test("computeAdaptiveRenderScale enforces a hard total-pixel budget independent 
   });
   const totalPixels = 2000 * scale * (100 * scale);
   assert.ok(totalPixels <= 500_000 + 1, `expected total pixels within budget, got ${totalPixels}`);
+});
+
+// --- quantizeRenderScale (high-zoom step 4) ----------------------------
+//
+// Without quantisation, a continuously-varying zoom would ask for a
+// slightly different raster scale on every wheel tick and re-rasterize the
+// whole page each time.
+
+test("quantizeRenderScale rounds UP to the nearest step, never down", () => {
+  const steps = [1.3, 2, 3, 4, 6];
+  // Rounding down would make the raster blurrier than asked for -- the one
+  // direction that is never acceptable, since the whole point is sharpness.
+  assert.equal(quantizeRenderScale(1.0, steps), 1.3);
+  assert.equal(quantizeRenderScale(1.31, steps), 2);
+  assert.equal(quantizeRenderScale(2.01, steps), 3);
+  assert.equal(quantizeRenderScale(3.99, steps), 4);
+});
+
+test("quantizeRenderScale returns a step exactly when the desired scale is one", () => {
+  const steps = [1.3, 2, 3, 4, 6];
+  for (const step of steps) assert.equal(quantizeRenderScale(step, steps), step);
+});
+
+test("quantizeRenderScale absorbs floating-point drift instead of jumping a rung", () => {
+  const steps = [1.3, 2, 3, 4, 6];
+  // A width/point-size division can land a hair above a step; jumping to
+  // the next rung would double the raster's memory for nothing visible.
+  assert.equal(quantizeRenderScale(2 + 1e-9, steps), 2);
+  assert.equal(quantizeRenderScale(1.3 + 1e-12, steps), 1.3);
+});
+
+test("quantizeRenderScale saturates at the top step rather than growing without bound", () => {
+  const steps = [1.3, 2, 3, 4, 6];
+  assert.equal(quantizeRenderScale(50, steps), 6);
+  assert.equal(quantizeRenderScale(Number.MAX_SAFE_INTEGER, steps), 6);
+});
+
+test("quantizeRenderScale degrades to no-quantisation on an empty ladder", () => {
+  assert.equal(quantizeRenderScale(2.7, []), 2.7);
+});
+
+test("quantizeRenderScale collapses a zoom sweep to a handful of distinct rasters", () => {
+  // The property that actually matters at runtime: dragging zoom across a
+  // wide range must not produce a new raster scale per step.
+  const steps = [1.3, 2, 3, 4, 6];
+  const sweep: number[] = [];
+  for (let desired = 1; desired <= 6; desired += 0.05) sweep.push(quantizeRenderScale(desired, steps));
+  assert.deepEqual([...new Set(sweep)], steps);
 });
