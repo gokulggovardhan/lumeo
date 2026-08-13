@@ -277,7 +277,12 @@ function EditElementViewImpl({
           onPointerDown={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
           placeholder="Type here"
-          className={`h-full w-full resize-none rounded-sm bg-transparent px-1 outline-none ${selected ? "ring-2 ring-[var(--lumeo-gold)]" : "hover:ring-1 hover:ring-[var(--text-primary)]/20"}`}
+          // lumeo-page-overlay-input opts this out of the app-chrome input
+          // styling in globals.css. Without it, that rule's themed
+          // --surface-input beat this bg-transparent on specificity and
+          // painted a dark box behind the element's own dark ink -- and on
+          // phones also forced 16px/44px over the page-matched size.
+          className={`lumeo-page-overlay-input h-full w-full resize-none rounded-sm bg-transparent px-1 outline-none ${selected ? "ring-2 ring-[var(--lumeo-gold)]" : "hover:ring-1 hover:ring-[var(--text-primary)]/20"}`}
           style={{
             fontSize: `${element.fontSizePt * pixelsPerPoint}px`,
             lineHeight: 1.15,

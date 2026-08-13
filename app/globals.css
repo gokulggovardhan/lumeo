@@ -477,20 +477,35 @@ a:active {
   min-height: 44px;
 }
 
-.l2-live-tool-workspace :is(input, select, textarea) {
+/* App-chrome form controls (sidebar, toolbars, panels).
+ *
+ * Every rule in this group excludes .lumeo-page-overlay-input. Those are
+ * the inputs rendered ON TOP of a rasterized PDF page -- the placed text
+ * element (components/pdf/edit/EditElementView.tsx) and the inline
+ * text-run editor (components/pdf/EditPdfTool.tsx). They are not app
+ * chrome: they have to look like text sitting on a white document, and
+ * their font size is computed to match the page's own glyphs.
+ *
+ * Without the exclusion these rules win on specificity (0,1,1) over the
+ * Tailwind utilities those components set (0,1,0), so `bg-transparent` and
+ * `bg-white` were both silently overridden by the themed --surface-input.
+ * Measured live: the placed text element computed
+ * background-color: rgb(33,36,32) against its own dark #12141a ink --
+ * dark-on-dark, over a white page. */
+.l2-live-tool-workspace :is(input, select, textarea):not(.lumeo-page-overlay-input) {
   border-radius: var(--radius-md);
   border-color: var(--border-default);
   background: var(--surface-input);
   color: var(--text-primary);
 }
 
-.l2-live-tool-workspace :is(input, select, textarea):focus {
+.l2-live-tool-workspace :is(input, select, textarea):not(.lumeo-page-overlay-input):focus {
   border-color: var(--border-focus);
   outline: none;
   box-shadow: var(--shadow-focus);
 }
 
-.l2-live-tool-workspace :is(input, select, textarea)::placeholder {
+.l2-live-tool-workspace :is(input, select, textarea):not(.lumeo-page-overlay-input)::placeholder {
   color: var(--text-subtle);
 }
 
@@ -594,7 +609,15 @@ a:active {
     width: 100%;
   }
 
-  .l2-live-tool-workspace :is(input, select, textarea) {
+  /* Same exclusion as the app-chrome rules above, and the most damaging of
+   * the group if it applies to an overlay: forcing 16px and a 44px floor
+   * onto an on-page text element would override the size computed to match
+   * the page's own glyphs, so a 9pt annotation would render at 16px and no
+   * text box could be shorter than 44px -- silently breaking WYSIWYG on
+   * phones only. The iOS zoom-on-focus problem this 16px exists to prevent
+   * doesn't apply here either: the overlay's own font size is already well
+   * above 16px whenever the page is zoomed enough to type into. */
+  .l2-live-tool-workspace :is(input, select, textarea):not(.lumeo-page-overlay-input) {
     min-height: 44px;
     font-size: 16px;
   }
