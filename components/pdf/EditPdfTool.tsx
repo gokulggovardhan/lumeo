@@ -58,7 +58,7 @@ import {
 // level. Statically importing any of THEM here would pull pdf-lib back
 // in transitively regardless of the type-only import above. Their TYPE
 // exports are unaffected (same erased-at-compile-time reasoning).
-import { findTextRunAtPoint, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
+import { findTextRunAtPoint, overlayFontSizePx, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
@@ -472,6 +472,16 @@ export default function EditPdfTool() {
   const [outputName, setOutputName] = useState("lumeo-edited.pdf");
 
   const stageRef = useRef<HTMLDivElement | null>(null);
+  // The stage's live CSS width. Needed because a px `font-size` does not
+  // scale with a percent-positioned ancestor: the inline text editor sits
+  // inside a percent-sized box over the page, so its font has to be
+  // computed in DISPLAYED pixels, not the raster bitmap's own (see
+  // lib/pdf/edit/textRuns.ts's overlayFontSizePx). Measured rather than
+  // derived because the stage's width follows zoom, the window, and the
+  // surrounding layout all at once -- there is no single state value that
+  // already implies it. null until first measurement, which overlayFontSizePx
+  // treats as "fall back to the raster size."
+  const [stageWidthPx, setStageWidthPx] = useState<number | null>(null);
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
@@ -788,6 +798,33 @@ export default function EditPdfTool() {
       renderTask?.cancel();
     };
   }, [pdf, pageIndex, docReady]);
+
+  // Tracks the stage's displayed CSS width (see stageWidthPx's own comment
+  // for why it can't be derived). Keyed on pageImageUrl, not on zoom: the
+  // stage element is only mounted once a page image exists, so this has to
+  // re-attach whenever that element is created or replaced -- and once
+  // attached, ResizeObserver already reports every later width change
+  // (zoom, window resize, layout shifts) without this effect re-running.
+  //
+  // Skips redundant state writes: ResizeObserver fires on sub-pixel changes,
+  // and re-rendering the whole workspace for a 0.2px difference would be
+  // pure churn while someone drags a zoom slider.
+  useEffect(() => {
+    const stage = stageRef.current;
+    if (!stage || typeof ResizeObserver === "undefined") return;
+
+    const measure = (width: number) => {
+      setStageWidthPx((current) => (current !== null && Math.abs(current - width) < 0.5 ? current : width));
+    };
+    measure(stage.getBoundingClientRect().width);
+
+    const observer = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (entry) measure(entry.contentRect.width);
+    });
+    observer.observe(stage);
+    return () => observer.disconnect();
+  }, [pageImageUrl]);
 
   // Phase 9.1: matches each run the effect above detected to its
   // content-stream operator (lib/pdf/edit/matchTextRun.ts), so the select
@@ -2055,7 +2092,7 @@ export default function EditPdfTool() {
                         // placed text element, so a run being edited in place
                         // and a text box dropped next to it read identically.
                         className="lumeo-page-overlay-input h-full w-full rounded-[3px] border border-[var(--lumeo-gold)] bg-white px-0.5 font-semibold text-[#12141a] shadow-[0_0_0_3px_rgba(var(--lumeo-gold-rgb),0.16)] outline-none"
-                        style={{ fontSize: `${Math.max(10, (singleSelectedRun.fontSizePx / PAGE_RENDER_SCALE) * pixelsPerPoint)}px` }}
+                        style={{ fontSize: `${overlayFontSizePx(singleSelectedRun.fontSizePx, pageDisplaySize.width, stageWidthPx)}px` }}
                       />
                       {/* Phase 12: icon-only pair (checkmark/X), matching the
                           compact inline-toolbar convention professional PDF/doc

@@ -156,6 +156,44 @@ export function textRunsFromContent(
   return runs;
 }
 
+// The CSS pixel size to render an on-page overlay's text at (the inline
+// editor that replaces a run while it's being edited), so its glyphs stay
+// the same size as the rendered page text underneath them.
+//
+// DetectedTextRun.fontSizePx is in the RASTER bitmap's own device pixels
+// (see its doc comment above). The stage displays that bitmap scaled to
+// the stage's CSS width, which changes with zoom and with the window --
+// so the two coincide only when the stage happens to be exactly the
+// bitmap's pixel width. A CSS `font-size` in px does NOT scale with a
+// percent-positioned ancestor, so without this conversion an inline
+// editor's text keeps one fixed size while the page it sits on zooms
+// underneath it.
+//
+// Deliberately NOT expressed via a px-per-point ratio: fontSizePx and the
+// raster width are both already in the same raster-pixel space, so their
+// ratio to the stage width is the whole conversion. Mixing in a
+// points-based scale (as an earlier version of this call site did, by
+// dividing by a fixed render-scale CONSTANT and multiplying by the live
+// px-per-point ratio) cancels to a no-op whenever those two happen to be
+// equal and silently mis-sizes the text whenever they aren't -- which is
+// every oversized page today, and would be every zoom level once the
+// raster scale itself becomes dynamic.
+//
+// Falls back to the raw raster size when the stage hasn't been measured
+// yet (first paint, before any ResizeObserver callback), which is exactly
+// the size that was correct before this conversion existed.
+export function overlayFontSizePx(
+  runFontSizePx: number,
+  rasterWidthPx: number,
+  stageWidthPx: number | null,
+  minimumPx = 10,
+): number {
+  if (!stageWidthPx || stageWidthPx <= 0 || rasterWidthPx <= 0) {
+    return Math.max(minimumPx, runFontSizePx);
+  }
+  return Math.max(minimumPx, runFontSizePx * (stageWidthPx / rasterWidthPx));
+}
+
 // Percent-space point-in-box hit test, matching the xPct/yPct/widthPct/
 // heightPct convention textRunsFromContent returns and elements.ts already
 // uses for overlay elements.

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument, StandardFonts, degrees } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { textRunsFromContent, findTextRunAtPoint } from "../lib/pdf/edit/textRuns.ts";
+import { textRunsFromContent, findTextRunAtPoint, overlayFontSizePx } from "../lib/pdf/edit/textRuns.ts";
 
 async function loadPdfjsPage(bytes: Uint8Array, pageNumber = 1) {
   const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
@@ -139,4 +139,64 @@ test("findTextRunAtPoint prefers the last (visually topmost) run when boxes over
 
   const hit = findTextRunAtPoint(runs, 15, 12);
   assert.equal(hit?.str, "Top");
+});
+
+// --- overlayFontSizePx -------------------------------------------------
+//
+// Regression coverage for the inline editor's font sizing, which used to
+// read `(run.fontSizePx / PAGE_RENDER_SCALE) * pixelsPerPoint`. That
+// expression is dimensionally incoherent -- it divides a raster-pixel size
+// by a scale CONSTANT and multiplies by the LIVE px-per-point ratio -- and
+// happens to cancel to exactly `fontSizePx` only while those two are
+// equal. It therefore mis-sized every oversized page (where the render
+// scale is clamped below the constant) and, more importantly, never
+// tracked zoom at all: the stage grows but a px font-size does not.
+
+test("overlayFontSizePx scales the run's raster font size by the stage/raster ratio", () => {
+  // Stage displayed at 2x the bitmap's own width -- the glyphs on screen are
+  // twice their raster size, so the editor's text must be too.
+  assert.equal(overlayFontSizePx(20, 800, 1600), 40);
+  // ...and at half, correspondingly smaller.
+  assert.equal(overlayFontSizePx(20, 800, 400), 10);
+});
+
+test("overlayFontSizePx tracks zoom: the same run grows as the stage grows", () => {
+  const rasterWidth = 795; // a Letter page rendered at 1.3x
+  const runFontSizePx = 15.6;
+  const atFit = overlayFontSizePx(runFontSizePx, rasterWidth, 1073);
+  const at200 = overlayFontSizePx(runFontSizePx, rasterWidth, 1073 * 2);
+  const at400 = overlayFontSizePx(runFontSizePx, rasterWidth, 1073 * 4);
+
+  assert.ok(at200 > atFit, "200% zoom must render larger than fit");
+  assert.ok(at400 > at200, "400% zoom must render larger than 200%");
+  // Exactly proportional -- doubling the stage doubles the on-screen glyph.
+  assert.ok(Math.abs(at200 - atFit * 2) < 1e-9);
+  assert.ok(Math.abs(at400 - atFit * 4) < 1e-9);
+});
+
+test("overlayFontSizePx falls back to the raw raster size when the stage isn't measured yet", () => {
+  // First paint, before any ResizeObserver callback has run. This is
+  // exactly the value the call site produced before the conversion existed,
+  // so an unmeasured stage can never render text at a NEW wrong size.
+  assert.equal(overlayFontSizePx(18, 800, null), 18);
+  assert.equal(overlayFontSizePx(18, 800, 0), 18);
+  assert.equal(overlayFontSizePx(18, 0, 1600), 18);
+});
+
+test("overlayFontSizePx never returns a font too small to read or edit", () => {
+  // A 4px run on a stage displayed at a quarter of its raster size would
+  // compute to 1px -- unreadable and effectively un-editable.
+  assert.equal(overlayFontSizePx(4, 800, 200), 10);
+  assert.equal(overlayFontSizePx(4, 800, 200, 14), 14);
+});
+
+test("overlayFontSizePx is unaffected by the render scale the raster used", () => {
+  // The old expression's bug in one assertion: two pages whose bitmaps are
+  // the same pixel width must size identically, no matter what scale
+  // produced them (an oversized MediaBox clamps to a lower render scale,
+  // which the old constant-based formula silently mis-handled).
+  const ordinary = overlayFontSizePx(20, 1000, 1500);
+  const clamped = overlayFontSizePx(20, 1000, 1500);
+  assert.equal(ordinary, clamped);
+  assert.equal(ordinary, 30);
 });
