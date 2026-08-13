@@ -2040,7 +2040,21 @@ export default function EditPdfTool() {
                           }
                         }}
                         aria-label="Edit text"
-                        className="h-full w-full rounded-[3px] border border-[var(--lumeo-gold)] bg-white px-0.5 font-semibold text-[var(--text-primary)] shadow-[0_0_0_3px_rgba(var(--lumeo-gold-rgb),0.16)] outline-none"
+                        // lumeo-page-overlay-input opts out of the app-chrome
+                        // input styling in globals.css, whose themed
+                        // --surface-input was beating this bg-white on
+                        // specificity and rendering a dark pill on the page.
+                        //
+                        // Ink is an explicit dark value, NOT --text-primary:
+                        // that token is ivory (this app has one palette, no
+                        // light variant), which was only readable before
+                        // because the same rule that forced it also forced a
+                        // dark background. Against the white page this editor
+                        // actually sits on it would be invisible. #12141a is
+                        // the same ink lib/pdf/edit/elements.ts gives a newly
+                        // placed text element, so a run being edited in place
+                        // and a text box dropped next to it read identically.
+                        className="lumeo-page-overlay-input h-full w-full rounded-[3px] border border-[var(--lumeo-gold)] bg-white px-0.5 font-semibold text-[#12141a] shadow-[0_0_0_3px_rgba(var(--lumeo-gold-rgb),0.16)] outline-none"
                         style={{ fontSize: `${Math.max(10, (singleSelectedRun.fontSizePx / PAGE_RENDER_SCALE) * pixelsPerPoint)}px` }}
                       />
                       {/* Phase 12: icon-only pair (checkmark/X), matching the
