@@ -466,6 +466,10 @@ export default function EditPdfTool() {
   // the control flicker while someone is still deciding what to type.
   const [useSubstituteFont, setUseSubstituteFont] = useState(false);
   const [editApplyError, setEditApplyError] = useState("");
+  // True when the last Restyle could not blank the original glyphs from the
+  // content stream, so the covered text is still in the exported file. Drives
+  // the disclosure notice -- see restyleSelectedRun for when that happens.
+  const [restyleKeptOriginalText, setRestyleKeptOriginalText] = useState(false);
   const [isApplyingEdit, setIsApplyingEdit] = useState(false);
   const runOverlayNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
   // Phase 11: the inline caret-over-the-PDF input for a single selected,
@@ -620,6 +624,7 @@ export default function EditPdfTool() {
     setEditDraftText("");
     setEditApplyError("");
     setUseSubstituteFont(false);
+    setRestyleKeptOriginalText(false);
     runOverlayNodesRef.current.clear();
     setActiveTool("select");
     setZoom(1);
@@ -751,6 +756,10 @@ export default function EditPdfTool() {
     setEditDraftText("");
     setEditApplyError("");
     setUseSubstituteFont(false);
+    // Deliberately NOT cleared by selectTextRun: restyleSelectedRun sets this
+    // and then immediately deselects, so clearing on deselect would hide the
+    // notice the instant it appeared. Page identity is the right lifetime.
+    setRestyleKeptOriginalText(false);
     runOverlayNodesRef.current.clear();
     // Cleared here (rather than left stale) so the operator-matching
     // effect never briefly pairs a new page's detected runs with the
@@ -1345,29 +1354,6 @@ export default function EditPdfTool() {
   // is indistinguishable from a manually drawn whiteout with a text box on
   // top: same undo (one step, since both are added in a single setElements
   // call), same delete, same export.
-  function restyleSelectedRun() {
-    const run = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
-    if (!run) return;
-
-    const plan = planRunRestyle(run);
-    const whiteoutId = nextElementId();
-    const textId = nextElementId();
-
-    setElements((current) => [
-      ...current,
-      { ...createWhiteoutElement(whiteoutId, pageIndex, plan.whiteout.xPct, plan.whiteout.yPct, "white"), widthPct: plan.whiteout.widthPct, heightPct: plan.whiteout.heightPct },
-      {
-        ...createTextElement(textId, pageIndex, plan.text.xPct, plan.text.yPct),
-        text: plan.text.text,
-        fontSizePt: plan.text.fontSizePt,
-        widthPct: plan.text.widthPct,
-        heightPct: plan.text.heightPct,
-      },
-    ]);
-
-    selectTextRun(null);
-    setSelectedId(textId);
-  }
 
   function handlePrivacyShieldScan() {
     setPrivacyShieldMatches(scanForSensitiveInfo(detectedTextRuns));
@@ -1792,6 +1778,93 @@ export default function EditPdfTool() {
       setIsApplyingEdit(false);
     }
   }, [editPreview, setHistoryState]);
+
+  // Restyle covers a run with a whiteout and drops an editable text box in
+  // its place. The whiteout hides the original glyphs, but hiding is not
+  // removing: the original text stays in the content stream, so the exported
+  // file carries BOTH strings in its text layer. Measured directly -- an
+  // amount restyled from 1350.00 to 9999.99 extracted as
+  // ["Total Amount 1350.00", "Total Amount 9999.99"], meaning copy-paste,
+  // Ctrl+F, and any downstream parser see the value the user believed they
+  // had replaced, sitting next to its replacement.
+  //
+  // So a restyle now also BLANKS the original operator through the same
+  // in-place engine the inline editor uses (replacementText: ""), turning
+  // the whiteout into a second line of defence rather than the only one.
+  // Both changes go into a single history entry, so one Undo reverses the
+  // whole restyle rather than leaving blanked text behind.
+  //
+  // Blanking is best-effort by design, and its failure cases are exactly the
+  // ones the inline editor already refuses: a run pdfjs merged from several
+  // operators (rewriting one would leave the rest), a font whose encoding
+  // can't be resolved, or an operator that can't be located. When it can't
+  // run, the restyle still happens -- the user gets what they asked for --
+  // and restyleKeptOriginalText drives an honest notice instead, matching
+  // the caveat Privacy Shield already shows for the same property.
+  async function restyleSelectedRun() {
+    const run = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
+    if (!run) return;
+
+    const plan = planRunRestyle(run);
+    const whiteoutId = nextElementId();
+    const textId = nextElementId();
+    const added: EditElement[] = [
+      { ...createWhiteoutElement(whiteoutId, pageIndex, plan.whiteout.xPct, plan.whiteout.yPct, "white"), widthPct: plan.whiteout.widthPct, heightPct: plan.whiteout.heightPct },
+      {
+        ...createTextElement(textId, pageIndex, plan.text.xPct, plan.text.yPct),
+        text: plan.text.text,
+        fontSizePt: plan.text.fontSizePt,
+        widthPct: plan.text.widthPct,
+        heightPct: plan.text.heightPct,
+      },
+    ];
+
+    let blankedBytes: ArrayBuffer | null = null;
+    const doc = pdfLibDocRef.current;
+    const engine = editEngineRef.current;
+    if (doc && engine && resolvedEditContext.kind === "single") {
+      const { resolvedFont, fontMetrics, locatedOperator, operator } = resolvedEditContext;
+      const blankPlan = buildEditPlan({
+        pageIndex,
+        contentStreamIndex: locatedOperator.locator.kind === "page" ? locatedOperator.locator.contentStreamIndex : 0,
+        formPath: locatedOperator.locator.kind === "xobject" ? locatedOperator.locator.formPath : null,
+        operatorIndex: locatedOperator.operatorIndex,
+        operator,
+        replacementText: "",
+        resolvedFont,
+        fontMetrics,
+      });
+      // Same guard the inline editor applies: if pdfjs merged this visual run
+      // from several operators, emptying the one we matched would delete part
+      // of the line and leave the rest sitting under the whiteout.
+      if (blankPlan.editable && !runSpansMultipleOperators(blankPlan.originalText, run.str)) {
+        try {
+          await engine.applyEditPlanToDocument(doc, blankPlan, resolvedFont.bytesPerCode, {
+            isolate: locatedOperator.locator.kind === "xobject",
+          });
+          const saved = await doc.save();
+          blankedBytes = saved.buffer.slice(saved.byteOffset, saved.byteOffset + saved.byteLength) as ArrayBuffer;
+        } catch {
+          // Leave the original text in place rather than half-applying an
+          // edit; the notice below tells the user what actually happened.
+          blankedBytes = null;
+        }
+      }
+    }
+
+    setHistoryState((current) => ({
+      elements: [...current.elements, ...added],
+      pdfBytes: blankedBytes ?? current.pdfBytes,
+    }));
+    setRestyleKeptOriginalText(blankedBytes === null);
+    // A restyle changes the output whether or not blanking succeeded -- the
+    // replacement text box is added either way -- so any PDF already
+    // generated is stale and must not stay downloadable.
+    setDownloadUrl("");
+
+    selectTextRun(null);
+    setSelectedId(textId);
+  }
 
   function handleInkStroke(result: { pngDataUrl: string; xPct: number; yPct: number; widthPct: number; heightPct: number }) {
     const id = nextElementId();
@@ -2330,7 +2403,7 @@ export default function EditPdfTool() {
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
-                            restyleSelectedRun();
+                            void restyleSelectedRun();
                           }}
                           aria-label="Restyle this text"
                           title="Restyle -- convert to an editable text box you can restyle (font size, colour, bold, italic)"
@@ -2382,6 +2455,39 @@ export default function EditPdfTool() {
                           {editPreview.reason}
                         </div>
                       ) : null}
+                    </div>
+                  ) : null}
+
+                  {/* Shown only when a Restyle could NOT blank the original
+                      glyphs (see restyleSelectedRun). In the common case the
+                      text really is gone from the file and there is nothing
+                      to disclose, so this stays hidden -- it is not blanket
+                      boilerplate on every restyle. Wording deliberately
+                      mirrors Privacy Shield's own caveat, since this is the
+                      same property: covered visually, still present in the
+                      file. */}
+                  {restyleKeptOriginalText ? (
+                    <div
+                      role="status"
+                      className="absolute left-1/2 top-3 z-30 flex max-w-[min(22rem,calc(100%-1.5rem))] -translate-x-1/2 items-start gap-2 rounded-lg border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-3 py-2 text-[11px] leading-4 text-[var(--text-primary)]/80 shadow-lg"
+                    >
+                      <span>
+                        This line was covered, but its original text couldn&apos;t be removed from the file — it can still be
+                        found by search or copy-paste. Use Whiteout plus a new text box if that matters.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setRestyleKeptOriginalText(false);
+                        }}
+                        aria-label="Dismiss notice"
+                        className="grid h-5 !w-5 shrink-0 place-items-center rounded-full text-[var(--text-primary)]/50 transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
+                      >
+                        <svg aria-hidden="true" viewBox="0 0 20 20" className="h-3 w-3" fill="none">
+                          <path d="M5 5 15 15M15 5 5 15" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+                        </svg>
+                      </button>
                     </div>
                   ) : null}
 
