@@ -370,11 +370,16 @@ export default function EditPdfTool() {
   const [pageLoading, setPageLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // Declared up here, ahead of the history hook, because the wrappers just
+  // below close over setDownloadUrl -- the rest of the export state
+  // (isExporting/downloadName/outputName) stays grouped further down.
+  const [downloadUrl, setDownloadUrl] = useState("");
+
   const {
     state: historyState,
-    set: setHistoryState,
-    undo,
-    redo,
+    set: setHistoryStateRaw,
+    undo: undoRaw,
+    redo: redoRaw,
     canUndo,
     canRedo,
     reset: resetHistory,
@@ -382,6 +387,29 @@ export default function EditPdfTool() {
     { elements: [], pdfBytes: new ArrayBuffer(0) },
     { maxTotalSize: EDIT_HISTORY_MAX_BYTES, sizeOf: (snapshot) => snapshot.pdfBytes.byteLength },
   );
+  // Every document mutation -- placing, moving, restyling or deleting an
+  // element, applying a text edit, or undoing/redoing any of those -- makes
+  // an already-exported PDF stale. These three wrappers are the single choke
+  // point all of them pass through (setElements below delegates to
+  // setHistoryState), so clearing the download URL here swaps the Download
+  // button back to Export instead of leaving a blob that predates the change
+  // downloadable. Doing it at the choke point rather than per call site is
+  // what makes it hold for call sites added later.
+  //
+  // resetHistory is deliberately NOT wrapped: its only callers, resetTool and
+  // addFile, revoke the URL and clear it themselves as part of a wider reset.
+  const setHistoryState = useCallback((updater: EditHistorySnapshot | ((current: EditHistorySnapshot) => EditHistorySnapshot)) => {
+    setHistoryStateRaw(updater);
+    setDownloadUrl("");
+  }, [setHistoryStateRaw]);
+  const undo = useCallback(() => {
+    undoRaw();
+    setDownloadUrl("");
+  }, [undoRaw]);
+  const redo = useCallback(() => {
+    redoRaw();
+    setDownloadUrl("");
+  }, [redoRaw]);
   const elements = historyState.elements;
   // Adapter preserving setElements' EXACT prior call signature (a bare
   // EditElement[] array or updater over one) -- every existing overlay-
@@ -494,7 +522,6 @@ export default function EditPdfTool() {
   const [zoom, setZoom] = useState(1);
 
   const [isExporting, setIsExporting] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState("");
   const [downloadName, setDownloadName] = useState("lumeo-edited.pdf");
   const [outputName, setOutputName] = useState("lumeo-edited.pdf");
 
@@ -1763,7 +1790,6 @@ export default function EditPdfTool() {
       const newBytes = await doc.save();
       const buffer = newBytes.buffer.slice(newBytes.byteOffset, newBytes.byteOffset + newBytes.byteLength) as ArrayBuffer;
       setHistoryState((current) => ({ ...current, pdfBytes: buffer }));
-      setDownloadUrl("");
       // The page-render effect (triggered by pdf.bytes changing, via the
       // sync effect above) will reset selection/hover/focus/draft state
       // itself once the refreshed preview and re-matched runs are ready --
@@ -1857,10 +1883,8 @@ export default function EditPdfTool() {
       pdfBytes: blankedBytes ?? current.pdfBytes,
     }));
     setRestyleKeptOriginalText(blankedBytes === null);
-    // A restyle changes the output whether or not blanking succeeded -- the
-    // replacement text box is added either way -- so any PDF already
-    // generated is stale and must not stay downloadable.
-    setDownloadUrl("");
+    // The download URL is cleared by setHistoryState itself -- see its
+    // wrapper near the top of this component.
 
     selectTextRun(null);
     setSelectedId(textId);
