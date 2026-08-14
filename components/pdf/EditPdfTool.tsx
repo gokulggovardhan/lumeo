@@ -1857,7 +1857,10 @@ export default function EditPdfTool() {
       pdfBytes: blankedBytes ?? current.pdfBytes,
     }));
     setRestyleKeptOriginalText(blankedBytes === null);
-    if (blankedBytes) setDownloadUrl("");
+    // A restyle changes the output whether or not blanking succeeded -- the
+    // replacement text box is added either way -- so any PDF already
+    // generated is stale and must not stay downloadable.
+    setDownloadUrl("");
 
     selectTextRun(null);
     setSelectedId(textId);
