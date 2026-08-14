@@ -46,13 +46,15 @@ Measured with `tesseract.js@7.0.0` in real Chrome, via a throwaway `/bench-ocr` 
 
 Cached afterwards — `.traineddata` in IndexedDB by the library itself, the core via HTTP cache. A second run with a warm cache dropped init from 865 ms to 261 ms.
 
-**Wall clock, self-hosted, cold IndexedDB:**
+**Wall clock, self-hosted, cold IndexedDB, assets over loopback:**
 
 | Phase | Time |
 |---|---|
 | Load core + language data | 865 ms |
 | Recognise one 300-DPI A4 page | 2318 ms |
 | **Total to first result** | **3183 ms** |
+
+**This is not a first-run number.** IndexedDB was cleared, but the ~3.9 MB came from `localhost`, so the download is effectively free in that 865 ms. A real first-time user pays the transfer on top — roughly +4 s on a 10 Mbit connection, more on mobile. Quote 3183 ms as warm-network cold-cache; a genuine cold first run is closer to 7 s and needs measuring on a throttled connection before any first-page-visible promise is made.
 
 Warm repeat runs: 1816–2318 ms recognise, 261–445 ms init. Recognition time is the floor and it is per page, so a 20-page scan is roughly 40 s of compute — which is a progress-bar problem, not a blocker, and exactly what `runInWorker`'s progress callback exists for.
 
