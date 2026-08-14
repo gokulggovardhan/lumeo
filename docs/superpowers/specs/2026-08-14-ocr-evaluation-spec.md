@@ -3,6 +3,7 @@
 **Date:** 2026-08-14
 **Status:** Evaluation, not an implementation plan
 **Decides:** whether to build OCR at all, and if so where it runs
+**Gates:** 1 and 3 measured and passing; 1a measured and constraining; 2 (accuracy) still open
 
 ---
 
@@ -30,15 +31,57 @@ That string is the entire product case for OCR in one sentence, and it is where 
 
 ## 3. The three gates
 
-### Gate 1 — Does client-side Tesseract fit the budget? (unmeasured)
+### Gate 1 — Does client-side Tesseract fit the budget? (**measured — passes**)
 
-The decision that everything else follows from. `tesseract.js` ships a WASM core plus per-language `.traineddata`; both are downloads the user pays for on first use, and the language data is the larger of the two.
+Measured with `tesseract.js@7.0.0` in real Chrome, via a throwaway `/bench-ocr` route, on a synthetic 300-DPI A4 invoice page (2480×3508, 14 lines).
 
-**Method:** install `tesseract.js`, load the WASM core and `eng.traineddata` in a real browser, record (a) transferred bytes for core + one language, (b) wall-clock time to recognise one 300-DPI A4 page on a mid-range machine, (c) peak memory. Run it under `runInWorker` so the measurement reflects the real deployment shape.
+**Asset budget, first use:**
 
-**Pass condition:** first-page-visible time stays inside what the tool catalog's perf posture allows, and the download is cacheable across sessions.
+| Asset | Transfer | Notes |
+|---|---|---|
+| `tesseract-core-simd-lstm.wasm` | ~1.01 MB gzipped | 2.73 MB raw |
+| `eng.traineddata.gz` | 2.82 MB | already compressed; does not shrink further |
+| `worker.min.js` | 0.11 MB | |
+| **Total** | **~3.9 MB** | once per user per language |
 
-Client-side is strongly preferred if it passes — it keeps Recognize inside the no-upload guarantee, needs no Supabase bucket, no route, no external service, and no `maxDuration` ceiling. If it fails, the fallback is the word-to-pdf shape, and the catalog's existing `processing: "server"` was right by accident rather than by analysis.
+Cached afterwards — `.traineddata` in IndexedDB by the library itself, the core via HTTP cache. A second run with a warm cache dropped init from 865 ms to 261 ms.
+
+**Wall clock, self-hosted, cold IndexedDB:**
+
+| Phase | Time |
+|---|---|
+| Load core + language data | 865 ms |
+| Recognise one 300-DPI A4 page | 2318 ms |
+| **Total to first result** | **3183 ms** |
+
+Warm repeat runs: 1816–2318 ms recognise, 261–445 ms init. Recognition time is the floor and it is per page, so a 20-page scan is roughly 40 s of compute — which is a progress-bar problem, not a blocker, and exactly what `runInWorker`'s progress callback exists for.
+
+**Peak memory: not measured.** `performance.memory` reads the page's heap, and tesseract.js runs the core inside its own Web Worker, so the figure stayed flat at 37–45 MB across every run and reflects the page, not the OCR. Measuring the worker's heap needs a different instrument; recorded here as an open number rather than a passing one.
+
+**Verdict: client-side is viable.** ~3.9 MB one-off and ~2 s per page is a real cost but a payable one, and it keeps Recognize inside the no-upload guarantee. `processing: "server"` in the catalog should be corrected to `"browser"`.
+
+#### Gate 1a — the CDN default (**measured — must be overridden**)
+
+Left at its defaults, `tesseract.js` fetches all three assets from `cdn.jsdelivr.net`:
+
+- `workerPath` → `node_modules/tesseract.js/src/worker/browser/defaultOptions.js:11`
+- `corePath` → `node_modules/tesseract.js/src/worker-script/browser/getCore.js:14`
+- `langPath` → `node_modules/tesseract.js/src/worker-script/index.js:130`
+
+That means the out-of-the-box integration sends three third-party requests at the moment a user OCRs a document — carrying their IP to jsdelivr, and directly undercutting the privacy posture that is this product's whole positioning. The first benchmark run did exactly this before it was caught.
+
+All three are overridable, and the measured numbers above come from the self-hosted configuration:
+
+```ts
+await createWorker("eng", undefined, {
+  workerPath: "/tesseract/worker.min.js",
+  corePath: "/tesseract/tesseract-core-simd-lstm.wasm.js",
+  langPath: "/tessdata",
+  gzip: true,
+});
+```
+
+Confirmed working, with zero requests to any CDN. **Self-hosting is a hard requirement, not a preference** — and it means the ~3.9 MB is served from Lumeo's own origin, which is a bandwidth cost worth noting before "Multi-language" is promised.
 
 ### Gate 2 — Is the accuracy worth shipping? (unmeasured)
 
@@ -77,7 +120,9 @@ Extractable, in the right reading order, with the page's visual output unchanged
 
 **Non-goals:** layout reconstruction, table recognition, handwriting, and any model that is not a local free engine. Per the standing product constraint — free backends, no AI services — a cloud OCR API is out of scope regardless of accuracy.
 
-**Catalog implications.** `processing: "server"` on the Recognize entry is currently an unbacked claim. It must be corrected to whatever gate 1 decides, and "Multi-language" needs re-costing — each language is another `.traineddata` download against the gate 1 budget, not a free toggle.
+**Catalog implications.** `processing: "server"` on the Recognize entry is wrong — gate 1 measured client-side as viable, so it should read `"browser"`. "Multi-language" needs re-costing: each language is another ~3 MB `.traineddata`, self-hosted and served from Lumeo's origin, not a free toggle.
+
+**Security-page implications.** If Recognize ships client-side and self-hosted, `app/security/page.tsx:117` can drop its "current supported workflows" qualifier for OCR entirely — the stronger claim becomes true. That only holds as long as the CDN defaults stay overridden, which makes gate 1a's config something to guard with a test rather than a comment.
 
 ## 5. Test plan
 
