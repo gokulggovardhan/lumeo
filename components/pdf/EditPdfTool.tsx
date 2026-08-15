@@ -79,6 +79,16 @@ import {
   type PageMap,
 } from "@/lib/pdf/edit/pageOps";
 import PageThumbnailSidebar from "@/components/pdf/edit/PageThumbnailSidebar";
+import RedactionLayer from "@/components/pdf/edit/RedactionLayer";
+import { applyRedaction, type RedactionOutcome } from "@/lib/pdf/edit/applyRedaction";
+import {
+  describeCoverageWarning,
+  findSensitiveMatches,
+  maskBoxFor,
+  removeSpans,
+  runsIntersectingBoxes,
+  type RedactionBox,
+} from "@/lib/pdf/edit/redaction";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget, computeAdaptiveRenderScale, quantizeRenderScale } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
@@ -586,6 +596,15 @@ export default function EditPdfTool() {
   // never changes identity, so the child could not tell a swap had
   // happened) -- docReady is what signals that.
   const getPdfJsDocument = useCallback(() => pdfJsDocRef.current, []);
+  // Redaction state. `redactMode` gates the drag surface; boxes are the
+  // user's drawn rectangles in percent space; outcome is what the last run
+  // could and could not remove, kept on screen until dismissed because its
+  // warnings are the whole safety story.
+  const [redactMode, setRedactMode] = useState(false);
+  const [redactionBoxes, setRedactionBoxes] = useState<RedactionBox[]>([]);
+  const [redactionConfirmOpen, setRedactionConfirmOpen] = useState(false);
+  const [redactionOutcome, setRedactionOutcome] = useState<RedactionOutcome | null>(null);
+  const [redactionBusy, setRedactionBusy] = useState(false);
   // addFile() must open the file via pdfjs once up front to read its page
   // count (for the page-count limit check) before pdf state is even set --
   // the [pdf]-keyed effect below would otherwise open the SAME bytes a
@@ -2062,6 +2081,73 @@ export default function EditPdfTool() {
   // user undoes every text edit back to the original.
   const hasTextEdits = historyState.pdfBytes !== originalBytes;
   const currentPageElements = useMemo(() => elementsForPage(elements, pageIndex), [elements, pageIndex]);
+
+  // What the drawn boxes actually cover. Recomputed on every box change so
+  // the review list is never a frame behind what is on screen -- a stale
+  // count here would understate what is about to be removed.
+  const redactionTargets = useMemo(
+    () => (redactionBoxes.length === 0 ? [] : runsIntersectingBoxes(detectedTextRuns, redactionBoxes)),
+    [detectedTextRuns, redactionBoxes],
+  );
+
+  // Detection is an AID, offered as boxes the user reviews -- never applied
+  // on its own say-so. A regex that misses one SSN in a document someone
+  // believed was scrubbed is the exact harm this feature must not cause.
+  function handleDetectSensitive() {
+    const found: RedactionBox[] = [];
+    for (const run of detectedTextRuns) {
+      if (findSensitiveMatches(run.str).length > 0) found.push(maskBoxFor(run, []));
+    }
+    if (found.length === 0) {
+      setPageOpNotice("No SSNs, emails, card numbers or IBANs found on this page. Draw boxes manually for anything else.");
+      return;
+    }
+    setRedactionBoxes((current) => [...current, ...found]);
+    setPageOpNotice(`Found ${found.length} likely sensitive value${found.length === 1 ? "" : "s"} — review before redacting.`);
+  }
+
+  async function handleApplyRedaction() {
+    const cached = pageAndViewportRef.current;
+    if (!cached || cached.pageIndex !== pageIndex || redactionTargets.length === 0) return;
+    setRedactionConfirmOpen(false);
+    setRedactionBusy(true);
+    setError("");
+    try {
+      // Each targeted run keeps everything except its detected sensitive
+      // spans. A run the box merely clips has no such spans, so it is
+      // removed whole -- over-redaction, the safe direction, per
+      // redaction.ts.
+      const targets = redactionTargets.map((run) => {
+        const matches = findSensitiveMatches(run.str);
+        return { ...run, replacementText: matches.length > 0 ? removeSpans(run.str, matches) : "" };
+      });
+
+      const outcome = await applyRedaction(historyState.pdfBytes, pageIndex, targets, {
+        width: cached.viewport.width,
+        height: cached.viewport.height,
+        transform: cached.viewport.transform,
+      });
+
+      // The black masks go on as real drawn elements, in the SAME history
+      // entry as the stripped bytes, so one Undo reverses the whole
+      // redaction rather than leaving masks over already-removed text.
+      const masks = redactionTargets.map((run) => {
+        const box = maskBoxFor(run, redactionBoxes);
+        const mask = createWhiteoutElement(nextElementId(), pageIndex, box.xPct, box.yPct, "black");
+        return { ...mask, widthPct: box.widthPct, heightPct: box.heightPct };
+      });
+
+      setHistoryState((current) => ({ elements: [...current.elements, ...masks], pdfBytes: outcome.bytes }));
+      setRedactionOutcome(outcome);
+      setRedactionBoxes([]);
+      setSelectedId(null);
+      selectTextRun(null);
+    } catch (redactionError) {
+      setError(redactionError instanceof Error ? redactionError.message : "The redaction could not be applied.");
+    } finally {
+      setRedactionBusy(false);
+    }
+  }
   const selectedElement = useMemo(() => elements.find((item) => item.id === selectedId) ?? null, [elements, selectedId]);
   // DISPLAYED CSS pixels per PDF point -- what EditElementView needs to size
   // a placed text element's glyphs to match the page under them
@@ -2752,6 +2838,15 @@ export default function EditPdfTool() {
                       <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">This page doesn&rsquo;t contain selectable text. Use Text to add new text.</p>
                     </div>
                   ) : null}
+                  {redactMode ? (
+                    <RedactionLayer
+                      boxes={redactionBoxes}
+                      targetedRuns={redactionTargets}
+                      disabled={redactionBusy}
+                      onAddBox={(box) => setRedactionBoxes((current) => [...current, box])}
+                      onRemoveBox={(index) => setRedactionBoxes((current) => current.filter((_, i) => i !== index))}
+                    />
+                  ) : null}
                 </div>
               </div>
               </div>
@@ -2805,9 +2900,134 @@ export default function EditPdfTool() {
                 {pageOpNotice ? (
                   <span role="status" className="text-[11px] text-[var(--text-secondary)]">{pageOpNotice}</span>
                 ) : null}
+
+                <span className="mx-1 h-5 w-px bg-[var(--text-primary)]/10" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRedactMode((current) => !current);
+                    setRedactionBoxes([]);
+                    setRedactionOutcome(null);
+                  }}
+                  aria-pressed={redactMode}
+                  className={`rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] transition ${
+                    redactMode
+                      ? "border-[#ff4d4d]/60 bg-[#ff4d4d]/10 text-[#ff8080]"
+                      : "border-[var(--text-primary)]/14 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {redactMode ? "Exit redact" : "Redact"}
+                </button>
+                {redactMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleDetectSensitive}
+                      disabled={redactionBusy || !textDetectionReady}
+                      className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:opacity-40"
+                    >
+                      Find sensitive data
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRedactionConfirmOpen(true)}
+                      disabled={redactionBusy || redactionTargets.length === 0}
+                      className="rounded-full border border-[#ff4d4d]/60 bg-[#ff4d4d]/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[#ff8080] transition disabled:opacity-40"
+                    >
+                      {redactionBusy ? "Redacting…" : `Redact ${redactionTargets.length} run${redactionTargets.length === 1 ? "" : "s"}`}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* The outcome panel is the safety story, so it is NOT a toast:
+                it stays until dismissed, and it leads with what was not
+                removed rather than burying it under a success message. */}
+            {redactionOutcome ? (
+              <div
+                role="alert"
+                className={`mt-3 rounded-[var(--radius-lg)] border p-3 ${
+                  redactionOutcome.complete
+                    ? "border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/70"
+                    : "border-[#ff4d4d]/50 bg-[#ff4d4d]/[0.07]"
+                }`}
+              >
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-primary)]/70">
+                  {redactionOutcome.complete
+                    ? `Removed ${redactionOutcome.strippedRuns.length} text run${redactionOutcome.strippedRuns.length === 1 ? "" : "s"} from the file`
+                    : "Redaction incomplete — read this before sharing the file"}
+                </p>
+                {redactionOutcome.unremovedRuns.length > 0 ? (
+                  <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/75">
+                    {redactionOutcome.unremovedRuns.length} run
+                    {redactionOutcome.unremovedRuns.length === 1 ? " was" : "s were"} masked but <strong>not removed</strong>:{" "}
+                    {redactionOutcome.unremovedRuns.slice(0, 3).map((run) => `“${run}”`).join(", ")}
+                    {redactionOutcome.unremovedRuns.length > 3 ? ", …" : ""}
+                  </p>
+                ) : null}
+                {redactionOutcome.warnings.map((warning, index) => (
+                  <p key={index} className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/75">
+                    {describeCoverageWarning(warning)}
+                  </p>
+                ))}
+                {redactionOutcome.metadataScrubbed ? (
+                  <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/55">
+                    Document metadata (title, author, subject, keywords, producer, creator and the XMP packet) was cleared.
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setRedactionOutcome(null)}
+                  className="mt-2 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] underline"
+                >
+                  Dismiss
+                </button>
               </div>
             ) : null}
         </div>
+
+        {/* Confirmation states the boundaries BEFORE the irreversible-feeling
+            action, not after. Redaction is undoable here, but the file a
+            user downloads is not, and the limits are what they need in
+            order to decide whether this output is safe to share. */}
+        {redactionConfirmOpen ? (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="redact-confirm-title" className="max-w-md rounded-[var(--radius-xl)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)] p-5 shadow-2xl">
+              <h2 id="redact-confirm-title" className="text-sm font-bold text-[var(--text-primary)]">
+                Redact {redactionTargets.length} text run{redactionTargets.length === 1 ? "" : "s"}?
+              </h2>
+              <p className="mt-2 text-[12px] leading-5 text-[var(--text-primary)]/75">
+                The characters will be removed from the file&rsquo;s text, not just covered. A black box is drawn over each one.
+              </p>
+              <p className="mt-2 text-[12px] font-semibold leading-5 text-[var(--text-primary)]/85">This does not remove:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[12px] leading-5 text-[var(--text-primary)]/70">
+                <li>Text inside images. On a scanned page a black box covers a picture; the pixels stay in the file.</li>
+                <li>Vector artwork, such as a signature drawn as a path.</li>
+                <li>Annotations, form field values, or embedded attachments.</li>
+              </ul>
+              <p className="mt-2 text-[12px] leading-5 text-[var(--text-primary)]/70">
+                Anything that could not be removed is listed afterwards. Check that list before sharing the file.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRedactionConfirmOpen(false)}
+                  className="rounded-full border border-[var(--text-primary)]/14 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleApplyRedaction()}
+                  className="rounded-full border border-[#ff4d4d]/60 bg-[#ff4d4d]/15 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] text-[#ff8080]"
+                >
+                  Redact
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <MicroDock
           activeTool={activeTool}

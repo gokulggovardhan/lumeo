@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PDFDocument, StandardFonts, PDFName, PDFDict } from "pdf-lib";
+import { PDFDocument, StandardFonts, PDFName } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import { applyRedaction } from "../lib/pdf/edit/applyRedaction.ts";
 import {
   assessRedactionCoverage,
   boxesOverlap,
@@ -13,12 +14,6 @@ import {
 } from "../lib/pdf/edit/redaction.ts";
 import { scrubDocumentMetadata } from "../lib/pdf/edit/scrubMetadata.ts";
 import { textRunsFromContent } from "../lib/pdf/edit/textRuns.ts";
-import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
-import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "../lib/pdf/edit/matchTextRun.ts";
-import { resolveFont } from "../lib/pdf/edit/fontEncoding.ts";
-import { resolveFontMetrics } from "../lib/pdf/edit/fontMetrics.ts";
-import { buildEditPlan } from "../lib/pdf/edit/editPlan.ts";
-import { applyEditPlanToDocument } from "../lib/pdf/edit/applyEditPlan.ts";
 
 // The single claim redaction makes: the characters are GONE from the file,
 // not covered up. Everything else here supports that one assertion, which is
@@ -37,60 +32,31 @@ async function sensitivePdf(): Promise<Uint8Array> {
   return doc.save();
 }
 
-/** The redaction pipeline, minus React: locate runs, strip them, save. */
+/**
+ * Drives the REAL pipeline (applyRedaction), not a copy of it. A test that
+ * reimplements the thing under test proves the test's copy works, which is
+ * the wrong thing to learn about a security feature.
+ */
 async function redact(bytes: Uint8Array, shouldRedact: (runText: string) => string | null) {
   const pdfjsDoc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
   const page = await pdfjsDoc.getPage(1);
   const viewport = page.getViewport({ scale: 1 });
   const runs = textRunsFromContent((await page.getTextContent()).items as never, viewport.transform, viewport.width, viewport.height);
 
-  const doc = await PDFDocument.load(bytes);
-  const located = collectPageTextOperators(doc, 0);
-  const index = buildOperatorSpatialIndex(located.map((l) => l.operator), viewport.transform);
+  const targets = runs
+    .map((run) => {
+      const replacementText = shouldRedact(run.str);
+      return replacementText === null ? null : { ...run, replacementText };
+    })
+    .filter((target): target is NonNullable<typeof target> => target !== null);
 
-  const stripped: string[] = [];
-  const unmatched: string[] = [];
-
-  for (const run of runs) {
-    const replacement = shouldRedact(run.str);
-    if (replacement === null) continue;
-
-    const operator = matchDetectedRunToOperatorIndexed(run, viewport.width, viewport.height, index);
-    if (!operator) {
-      unmatched.push(run.str);
-      continue;
-    }
-    const locatedOperator = located.find((l) => l.operator === operator)!;
-    const fontDict = locatedOperator.resources
-      .lookup(PDFName.of("Font"), PDFDict)
-      .lookup(PDFName.of(operator.fontResourceName!), PDFDict);
-    const resolvedFont = resolveFont(fontDict, doc.context);
-    const plan = buildEditPlan({
-      pageIndex: 0,
-      contentStreamIndex: locatedOperator.locator.kind === "page" ? locatedOperator.locator.contentStreamIndex : 0,
-      formPath: locatedOperator.locator.kind === "xobject" ? locatedOperator.locator.formPath : null,
-      operatorIndex: locatedOperator.operatorIndex,
-      operator,
-      replacementText: replacement,
-      resolvedFont,
-      fontMetrics: resolveFontMetrics(fontDict, doc.context, resolvedFont),
-    });
-    // The multi-operator check has to come AFTER the plan is built: the
-    // operator's own decoded text is what tells us whether one operator
-    // covers the whole visual run, and only the plan carries it. Checking
-    // before (against an empty string) rejects everything.
-    if (!plan.editable || runSpansMultipleOperators(plan.originalText, run.str)) {
-      unmatched.push(run.str);
-      continue;
-    }
-    await applyEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode, {
-      isolate: locatedOperator.locator.kind === "xobject",
-    });
-    stripped.push(run.str);
-  }
-
-  scrubDocumentMetadata(doc);
-  return { bytes: await doc.save(), stripped, unmatched };
+  const source = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const outcome = await applyRedaction(source, 0, targets, {
+    width: viewport.width,
+    height: viewport.height,
+    transform: viewport.transform,
+  });
+  return { bytes: new Uint8Array(outcome.bytes), stripped: outcome.strippedRuns, unmatched: outcome.unremovedRuns, outcome };
 }
 
 async function extractedText(bytes: Uint8Array): Promise<string> {
