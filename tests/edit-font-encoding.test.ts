@@ -183,6 +183,91 @@ test("resolveFont detects a subset-embedded font and downgrades classification t
   assert.equal(classifyReplacementChar(resolved, "A"), "requires-fallback");
 });
 
+test("resolveFont degrades gracefully instead of throwing when /Encoding is an indirect ref to the wrong type", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  // A malformed PDF: /Encoding is an indirect reference, but it resolves to
+  // a PDFNumber, not a PDFDict/PDFName -- pdf-lib's context.lookupMaybe(ref,
+  // PDFDict) would throw UnexpectedObjectTypeError here instead of
+  // returning undefined as its name implies.
+  const wrongTypeRef = context.register(context.obj(42));
+  const fontDict = context.obj({
+    Type: "Font",
+    Subtype: "Type1",
+    BaseFont: "Helvetica",
+    Encoding: wrongTypeRef,
+  });
+
+  const resolved = resolveFont(fontDict, context);
+  assert.equal(resolved.encodingSource, "Unknown");
+  assert.equal(classifyReplacementChar(resolved, "A"), "impossible");
+});
+
+test("resolveFont degrades gracefully instead of throwing when /ToUnicode is an indirect ref to the wrong type", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  // /ToUnicode is supposed to be a stream, but here it resolves to a dict.
+  const wrongTypeRef = context.register(context.obj({ Not: "AStream" }));
+
+  const cidFontDict = context.obj({
+    Type: "Font",
+    Subtype: "CIDFontType2",
+    BaseFont: "MyCIDFont",
+    CIDSystemInfo: { Registry: "Adobe", Ordering: "Identity", Supplement: 0 },
+    CIDToGIDMap: "Identity",
+  });
+  const cidFontRef = context.register(cidFontDict);
+
+  const type0Dict = context.obj({
+    Type: "Font",
+    Subtype: "Type0",
+    BaseFont: "MyCIDFont",
+    Encoding: "Identity-H",
+    DescendantFonts: [cidFontRef],
+    ToUnicode: wrongTypeRef,
+  });
+
+  const resolved = resolveFont(type0Dict, context);
+  assert.equal(resolved.kind, "Type0");
+  assert.equal(resolved.encodingSource, "Unknown");
+  assert.equal(resolved.glyphCodeToUnicode.size, 0);
+});
+
+test("resolveFont degrades gracefully instead of throwing when /FontDescriptor is an indirect ref to the wrong type", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const wrongTypeRef = context.register(context.obj(42));
+  const fontDict = context.obj({
+    Type: "Font",
+    Subtype: "Type1",
+    BaseFont: "Helvetica",
+    Encoding: "WinAnsiEncoding",
+    FontDescriptor: wrongTypeRef,
+  });
+
+  const resolved = resolveFont(fontDict, context);
+  assert.equal(resolved.isEmbedded, false);
+  assert.equal(resolved.encodingSource, "WinAnsi");
+});
+
+test("resolveFont degrades gracefully instead of throwing when DescendantFonts[0] is an indirect ref to the wrong type", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const wrongTypeRef = context.register(context.obj(42));
+
+  const type0Dict = context.obj({
+    Type: "Font",
+    Subtype: "Type0",
+    BaseFont: "MyCIDFont",
+    Encoding: "Identity-H",
+    DescendantFonts: [wrongTypeRef],
+  });
+
+  const resolved = resolveFont(type0Dict, context);
+  assert.equal(resolved.kind, "Type0");
+  assert.equal(resolved.isEmbedded, false);
+});
+
 test("resolveFont on a font with no recognized encoding at all is classified impossible", async () => {
   const doc = await PDFDocument.create();
   const context = doc.context;

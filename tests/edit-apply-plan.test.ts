@@ -287,3 +287,44 @@ test("applyEditPlanToBytes replaces exactly the operator's byte range and nothin
   const resultText = new TextDecoder().decode(result);
   assert.equal(resultText, "q\nBT\n/F1 12 Tf\n1 0 0 1 50 700 Tm\n<42> Tj\nET\nQ");
 });
+
+test("applyEditPlanToDocument degrades gracefully instead of throwing when /Contents is an indirect ref directly to a single stream (not array-wrapped)", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("A", { x: 50, y: 700, size: 12, font });
+
+  const bytes = await doc.save();
+  const loaded = await PDFDocument.load(bytes);
+  const loadedPage = loaded.getPages()[0];
+  const context = loaded.context;
+
+  // Collapse /Contents down to an indirect ref pointing directly at a
+  // single raw stream (not array-wrapped) -- the exact malformed-but-legal
+  // shape that made context.lookupMaybe(ref, PDFArray) throw
+  // UnexpectedObjectTypeError instead of gracefully falling through to the
+  // single-stream case, per the pdf-lib bug documented in applyEditPlan.ts.
+  const streamBytes = await decodedContentStreamBytes(bytes);
+  const contentStreamRef = context.register(context.flateStream(streamBytes));
+  loadedPage.node.set(PDFName.of("Contents"), contentStreamRef);
+
+  const fontDict = firstFontDict(loadedPage.node.Resources()!, context);
+  const resolvedFont = resolveFont(fontDict, context);
+  const fontMetrics = resolveFontMetrics(fontDict, context, resolvedFont);
+  const operators = walkTextShowOperators(streamBytes);
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: operators[0],
+    replacementText: "B",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  await applyEditPlanToDocument(loaded, plan, 1);
+
+  const outBytes = await loaded.save();
+  const text = await extractPageText(outBytes);
+  assert.equal(text, "B");
+});
