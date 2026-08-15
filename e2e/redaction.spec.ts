@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   LAYER_SELECTOR,
-  RUN_SELECTOR,
+  runSelectorFor,
   applyRedactionThroughModal,
   blackMaskCount,
   detectedRunTexts,
@@ -60,7 +60,7 @@ test.describe("redaction on a page containing an image", () => {
     await enterRedactMode(page);
     // Every run at once, so any that cannot be stripped shows up by name.
     for (const needle of ["Employee record", "123-45-6789", "ada@example.com", "84500"]) {
-      const run = page.locator(RUN_SELECTOR, { hasText: needle }).first();
+      const run = page.locator(runSelectorFor(needle)).first();
       const box = await run.boundingBox();
       if (!box) continue;
       await page.mouse.move(box.x + 2, box.y + 1);
@@ -149,7 +149,7 @@ test("a box drawn with coalesced pointermove and pointerup still commits", async
   await openWithPdf(page, TEXT_ONLY_PDF);
   await enterRedactMode(page);
 
-  const run = page.locator(RUN_SELECTOR, { hasText: "123-45-6789" }).first();
+  const run = page.locator(runSelectorFor("123-45-6789")).first();
   const box = await run.boundingBox();
   expect(box).not.toBeNull();
 

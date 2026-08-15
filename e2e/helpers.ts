@@ -6,6 +6,17 @@
 import { expect, type Page } from "@playwright/test";
 
 export const RUN_SELECTOR = 'div[role="button"][aria-label^="Editable text"]';
+
+/**
+ * Locates a detected run by its text.
+ *
+ * NOT `.filter({ hasText })`: the run overlays are transparent positioned
+ * divs with no text content at all -- the run's text lives only in the
+ * aria-label -- so a text filter can never match and simply times out.
+ */
+export function runSelectorFor(needle: string): string {
+  return `div[role="button"][aria-label^="Editable text"][aria-label*="${needle}"]`;
+}
 export const LAYER_SELECTOR = '[aria-label="Draw a box over text to redact it"]';
 
 export async function openWithPdf(page: Page, pdfPath: string): Promise<void> {
@@ -27,7 +38,7 @@ export async function enterRedactMode(page: Page): Promise<void> {
  * input so the component's own pointer handling is what is exercised.
  */
 export async function dragBoxOverRun(page: Page, needle: string): Promise<void> {
-  const run = page.locator(RUN_SELECTOR, { hasText: needle }).first();
+  const run = page.locator(runSelectorFor(needle)).first();
   const box = await run.boundingBox();
   if (!box) throw new Error(`run containing "${needle}" has no box`);
 
