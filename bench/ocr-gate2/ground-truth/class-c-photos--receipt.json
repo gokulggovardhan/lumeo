@@ -1,0 +1,16 @@
+{
+  "id": "class-c-photos--receipt",
+  "corpusClass": "class-c-photos",
+  "image": "receipt.jpg",
+  "text": "GROVE STREET GROCERS\n88 Grove Street, Manchester M4 1PW\nTel 0161 496 0180\nReceipt 4471  Till 3  15/08/2026 09:42\nWholemeal loaf 800g 1.85\nFree range eggs x6 2.40\nSemi-skimmed milk 2L 1.65\nCheddar mature 400g 4.20\nTomatoes on the vine 1.99\nCoffee beans 227g 6.75\nItems 6\nSubtotal 18.84\nDiscount applied -1.50\nTotal 17.34\nPaid by card ending 4419\nAuthorisation 004718\nThank you for shopping with us.",
+  "origin": "synthetic-degraded",
+  "degradations": [
+    "framed-to-content",
+    "skew-1.4deg",
+    "anisotropic-scale",
+    "blur-radius-2",
+    "vignette-0.34",
+    "noise-sigma-8",
+    "jpeg-q42"
+  ]
+}

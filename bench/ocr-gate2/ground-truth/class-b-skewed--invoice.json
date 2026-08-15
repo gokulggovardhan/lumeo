@@ -1,0 +1,12 @@
+{
+  "id": "class-b-skewed--invoice",
+  "corpusClass": "class-b-skewed",
+  "image": "invoice.png",
+  "text": "INVOICE 2026-0147\nNorthwind Design Studio\n14 Harbour Road, Bristol BS1 4RN\nVAT 412 7788 21\nBilled to: Acme Corporation Ltd\nIssued: 14 August 2026\nDue: 13 September 2026\nDescription Qty Unit Amount\nBrand identity retainer 1 900.00 900.00\nAdditional revision rounds 3 150.00 450.00\nPrint-ready artwork export 2 135.00 270.00\nSubtotal 1620.00\nVAT at 20% 324.00\nTotal Amount Due 1944.00\nPayment due within 30 days of the invoice date.\nBank transfer to sort code 20-00-00, account 55345010.\nLate payment interest accrues at 8% above base rate.",
+  "origin": "synthetic-degraded",
+  "degradations": [
+    "skew-2.6deg",
+    "paper-tint",
+    "noise-sigma-10"
+  ]
+}

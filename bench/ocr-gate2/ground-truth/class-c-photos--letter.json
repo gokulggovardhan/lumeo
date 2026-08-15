@@ -1,0 +1,16 @@
+{
+  "id": "class-c-photos--letter",
+  "corpusClass": "class-c-photos",
+  "image": "letter.jpg",
+  "text": "Bramley & Fitch Solicitors\n27 Chancery Walk, London WC2A 1JL\n12 August 2026\nDear Ms Okafor,\nRe: Property at 41 Elmfield Avenue, reference BF/2026/0912\nThank you for your letter of 4 August. We have now received the\ncompleted title documents from the vendor's solicitors and have\nraised three additional enquiries, which are set out in the\nschedule enclosed with this letter.\nWe expect a response within fourteen days. Should the replies\nprove satisfactory, we anticipate being in a position to exchange\ncontracts by 5 September 2026.\nPlease confirm that the deposit of 24,500.00 will be available\non that date.\nYours sincerely,\nH. Bramley\nPartner",
+  "origin": "synthetic-degraded",
+  "degradations": [
+    "framed-to-content",
+    "skew-1.4deg",
+    "anisotropic-scale",
+    "blur-radius-2",
+    "vignette-0.34",
+    "noise-sigma-8",
+    "jpeg-q42"
+  ]
+}

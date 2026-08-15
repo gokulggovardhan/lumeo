@@ -1,0 +1,300 @@
+{
+  "generatedAt": "2026-08-15T02:27:08.894Z",
+  "gate": "2 -- accuracy",
+  "engine": {
+    "library": "tesseract.js",
+    "language": "eng",
+    "model": "4.0.0_best_int",
+    "host": "node",
+    "assetSource": "self-hosted (bench/ocr-gate2/assets/tessdata)"
+  },
+  "externalRequestsDuringRun": [],
+  "zeroExternalRequests": true,
+  "normalization": {
+    "form": "NFC",
+    "collapseWhitespace": true,
+    "ignoreCase": false
+  },
+  "thresholdsAreProposals": true,
+  "classes": [
+    {
+      "corpusClass": "class-a-clean",
+      "fixtures": 3,
+      "cer": 0,
+      "wer": 0,
+      "meanConfidence": 94.7,
+      "meanRecognizeMs": 1787,
+      "threshold": {
+        "cer": 0.02,
+        "wer": 0.05
+      },
+      "meetsCer": true,
+      "meetsWer": true
+    },
+    {
+      "corpusClass": "class-b-skewed",
+      "fixtures": 3,
+      "cer": 0.00253324889170361,
+      "wer": 0.011673151750972763,
+      "meanConfidence": 92.3,
+      "meanRecognizeMs": 1634,
+      "threshold": {
+        "cer": 0.05,
+        "wer": 0.12
+      },
+      "meetsCer": true,
+      "meetsWer": true
+    },
+    {
+      "corpusClass": "class-c-photos",
+      "fixtures": 3,
+      "cer": 0.046865104496516784,
+      "wer": 0.07392996108949416,
+      "meanConfidence": 90,
+      "meanRecognizeMs": 962,
+      "threshold": {
+        "cer": 0.15,
+        "wer": 0.3
+      },
+      "meetsCer": true,
+      "meetsWer": true
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "class-a-clean--invoice",
+      "corpusClass": "class-a-clean",
+      "image": "invoice.png",
+      "origin": "synthetic",
+      "degradations": [],
+      "recognizeMs": 2137,
+      "confidence": 95,
+      "cer": {
+        "rate": 0,
+        "edits": 0,
+        "referenceLength": 538,
+        "hypothesisLength": 538
+      },
+      "wer": {
+        "rate": 0,
+        "edits": 0,
+        "referenceLength": 86,
+        "hypothesisLength": 86
+      },
+      "outputPreview": "INVOICE 2026-0147 Northwind Design Studio 14 Harbour Road, Bristol BS1 4RN VAT 412 7788 21 Billed to: Acme Corporation Ltd Issued: 14 August 2026 Due: 13 September 2026 Description Qty Unit Amount Brand identity retainer 1 900.00 900.00 Add"
+    },
+    {
+      "id": "class-a-clean--letter",
+      "corpusClass": "class-a-clean",
+      "image": "letter.png",
+      "origin": "synthetic",
+      "degradations": [],
+      "recognizeMs": 1826,
+      "confidence": 95,
+      "cer": {
+        "rate": 0,
+        "edits": 0,
+        "referenceLength": 646,
+        "hypothesisLength": 646
+      },
+      "wer": {
+        "rate": 0,
+        "edits": 0,
+        "referenceLength": 104,
+        "hypothesisLength": 104
+      },
+      "outputPreview": "Bramley & Fitch Solicitors 27 Chancery Walk, London WC2A 1JL 12 August 2026 Dear Ms Okafor, Re: Property at 41 Elmfield Avenue, reference BF/2026/0912 Thank you for your letter of 4 August. We have now received the completed title documents"
+    },
+    {
+      "id": "class-a-clean--receipt",
+      "corpusClass": "class-a-clean",
+      "image": "receipt.png",
+      "origin": "synthetic",
+      "degradations": [],
+      "recognizeMs": 1398,
+      "confidence": 94,
+      "cer": {
+        "rate": 0,
+        "edits": 0,
+        "referenceLength": 395,
+        "hypothesisLength": 395
+      },
+      "wer": {
+        "rate": 0,
+        "edits": 0,
+        "referenceLength": 67,
+        "hypothesisLength": 67
+      },
+      "outputPreview": "GROVE STREET GROCERS 88 Grove Street, Manchester M4 1PW Tel 0161 496 0180 Receipt 4471 Till 3 15/08/2026 09:42 Wholemeal loaf 800g 1.85 Free range eggs x6 2.40 Semi-skimmed milk 2L 1.65 Cheddar mature 400g 4.20 Tomatoes on the vine 1.99 Cof"
+    },
+    {
+      "id": "class-b-skewed--invoice",
+      "corpusClass": "class-b-skewed",
+      "image": "invoice.png",
+      "origin": "synthetic-degraded",
+      "degradations": [
+        "skew-2.6deg",
+        "paper-tint",
+        "noise-sigma-10"
+      ],
+      "recognizeMs": 1664,
+      "confidence": 94,
+      "cer": {
+        "rate": 0,
+        "edits": 0,
+        "referenceLength": 538,
+        "hypothesisLength": 538
+      },
+      "wer": {
+        "rate": 0,
+        "edits": 0,
+        "referenceLength": 86,
+        "hypothesisLength": 86
+      },
+      "outputPreview": "INVOICE 2026-0147 Northwind Design Studio 14 Harbour Road, Bristol BS1 4RN VAT 412 7788 21 Billed to: Acme Corporation Ltd Issued: 14 August 2026 Due: 13 September 2026 Description Qty Unit Amount Brand identity retainer 1 900.00 900.00 Add"
+    },
+    {
+      "id": "class-b-skewed--letter",
+      "corpusClass": "class-b-skewed",
+      "image": "letter.png",
+      "origin": "synthetic-degraded",
+      "degradations": [
+        "skew-2.6deg",
+        "paper-tint",
+        "noise-sigma-10"
+      ],
+      "recognizeMs": 1816,
+      "confidence": 93,
+      "cer": {
+        "rate": 0,
+        "edits": 0,
+        "referenceLength": 646,
+        "hypothesisLength": 646
+      },
+      "wer": {
+        "rate": 0,
+        "edits": 0,
+        "referenceLength": 104,
+        "hypothesisLength": 104
+      },
+      "outputPreview": "Bramley & Fitch Solicitors 27 Chancery Walk, London WC2A 1JL 12 August 2026 Dear Ms Okafor, Re: Property at 41 Elmfield Avenue, reference BF/2026/0912 Thank you for your letter of 4 August. We have now received the completed title documents"
+    },
+    {
+      "id": "class-b-skewed--receipt",
+      "corpusClass": "class-b-skewed",
+      "image": "receipt.png",
+      "origin": "synthetic-degraded",
+      "degradations": [
+        "skew-2.6deg",
+        "paper-tint",
+        "noise-sigma-10"
+      ],
+      "recognizeMs": 1423,
+      "confidence": 90,
+      "cer": {
+        "rate": 0.010126582278481013,
+        "edits": 4,
+        "referenceLength": 395,
+        "hypothesisLength": 396
+      },
+      "wer": {
+        "rate": 0.04477611940298507,
+        "edits": 3,
+        "referenceLength": 67,
+        "hypothesisLength": 67
+      },
+      "outputPreview": "GROVE STREET GROCERS 88 Grove Street, Manchester M4 1pWw Tel 0161 496 0180 Receipt 4471 Till 3 15/08/2026 09:42 Wholemeal loaf 800g 1.85 Free range eggs x6 2.40 Semi-skimmed milk 21 1.65 Cheddar mature 400g 4.20 Tomatoes on the vine 1.99 Co"
+    },
+    {
+      "id": "class-c-photos--invoice",
+      "corpusClass": "class-c-photos",
+      "image": "invoice.jpg",
+      "origin": "synthetic-degraded",
+      "degradations": [
+        "framed-to-content",
+        "skew-1.4deg",
+        "anisotropic-scale",
+        "blur-radius-2",
+        "vignette-0.34",
+        "noise-sigma-8",
+        "jpeg-q42"
+      ],
+      "recognizeMs": 975,
+      "confidence": 93,
+      "cer": {
+        "rate": 0.02973977695167286,
+        "edits": 16,
+        "referenceLength": 538,
+        "hypothesisLength": 534
+      },
+      "wer": {
+        "rate": 0.05813953488372093,
+        "edits": 5,
+        "referenceLength": 86,
+        "hypothesisLength": 88
+      },
+      "outputPreview": "INVOICE 2026-0147 Northwind Design Studio 14 Harbour Road, Bristol BS1 4RN VAT 412 7788 21 Billed to: Acme Corporation Ltd Issued: 14 August 2026 Due: 13 September 2026 Description Qty Unit Amount Brand identity retainer 1 900.00 900.00 Add"
+    },
+    {
+      "id": "class-c-photos--letter",
+      "corpusClass": "class-c-photos",
+      "image": "letter.jpg",
+      "origin": "synthetic-degraded",
+      "degradations": [
+        "framed-to-content",
+        "skew-1.4deg",
+        "anisotropic-scale",
+        "blur-radius-2",
+        "vignette-0.34",
+        "noise-sigma-8",
+        "jpeg-q42"
+      ],
+      "recognizeMs": 1114,
+      "confidence": 91,
+      "cer": {
+        "rate": 0.015479876160990712,
+        "edits": 10,
+        "referenceLength": 646,
+        "hypothesisLength": 643
+      },
+      "wer": {
+        "rate": 0.028846153846153848,
+        "edits": 3,
+        "referenceLength": 104,
+        "hypothesisLength": 105
+      },
+      "outputPreview": "Bramley & Fitch Solicitors 27 Chancery Walk, London WC2A 1JL 12 August 2026 Dear Ms Okafor, Re: Property at 41 Eimfield Avenue, reference BF/2026/0912 Thank you for your letter of 4 August. We have now received the completed title documents"
+    },
+    {
+      "id": "class-c-photos--receipt",
+      "corpusClass": "class-c-photos",
+      "image": "receipt.jpg",
+      "origin": "synthetic-degraded",
+      "degradations": [
+        "framed-to-content",
+        "skew-1.4deg",
+        "anisotropic-scale",
+        "blur-radius-2",
+        "vignette-0.34",
+        "noise-sigma-8",
+        "jpeg-q42"
+      ],
+      "recognizeMs": 797,
+      "confidence": 86,
+      "cer": {
+        "rate": 0.12151898734177215,
+        "edits": 48,
+        "referenceLength": 395,
+        "hypothesisLength": 383
+      },
+      "wer": {
+        "rate": 0.16417910447761194,
+        "edits": 11,
+        "referenceLength": 67,
+        "hypothesisLength": 67
+      },
+      "outputPreview": "LJ SETESS—— GROVE STREET GROCERS 88 Grove Street, Manchester M4 1PW | Tel 0161 496 0180 Receipt 4471 Till 3 15/08/2026 09:42 Wholemeal loaf 800g 1.85 Free range eggs x6 2.40 Semi-skimmed milk 2L 1.65 Cheddar mature 400g 4.20 Tomatoes on the"
+    }
+  ],
+  "caveat": "class-b and class-c fixtures are SIMULATED degradation, not real scanner or camera captures. These rates are sound for comparing configurations and for showing how error scales with quality; they are not a basis for a shippable absolute threshold on real-world photos."
+}

@@ -1,0 +1,12 @@
+# Fixture images and the language model are GENERATED, not authored, and
+# they are large (class-b alone is ~19 MB of incompressible noise). The
+# generator is deterministic -- same seed, same pixels -- so regenerating is
+# equivalent to checking them in, without the repo carrying them forever.
+#
+# Ground truth JSON and reports/ ARE committed: they are small, they are the
+# contract the harness scores against, and they let the schema test run
+# without generating anything.
+class-a-clean/*.png
+class-b-skewed/*.png
+class-c-photos/*.jpg
+assets/
