@@ -2462,6 +2462,16 @@ export default function EditPdfTool() {
                     />
                   ) : null}
 
+                  {/* Placed elements are INERT while redact mode owns the
+                      page. Unlike the inline editor -- which is closed
+                      outright because a dead-looking editor is its own
+                      confusion -- a redaction mask must stay VISIBLE; it is
+                      the redaction. What it must not be is interactive.
+                      Without this the mask kept role="button" and tabindex
+                      0 behind the drag surface, so it was focusable AND
+                      activatable from the keyboard while unreachable by
+                      mouse -- the same split that let Tab fire Restyle. */}
+                  <div inert={redactMode} className="contents">
                   {currentPageElements.map((element) => (
                     <EditElementView
                       key={element.id}
@@ -2485,6 +2495,7 @@ export default function EditPdfTool() {
                       pixelsPerPoint={pixelsPerPoint}
                     />
                   ))}
+                  </div>
 
                   {activeTool === "draw" && pageDisplaySize ? (
                     <InkCanvas

@@ -85,6 +85,10 @@ async function occludedControls(page: Page): Promise<string[]> {
       if (node.hasAttribute("inert") || node.closest("[inert]")) continue;
       if (node.closest('[aria-hidden="true"]')) continue;
       if ((node as HTMLButtonElement).disabled) continue;
+      // Non-focusable controls cannot be reached by keyboard either, so a
+      // mouse-unreachable one does not break the both-halves-agree
+      // invariant. Focusability is probed, not inferred from an attribute.
+      if ((node as HTMLElement).tabIndex < 0) continue;
       // sr-only inputs (the merge file picker) are clipped to a pixel behind
       // their own trigger by design.
       if (style.opacity === "0" || style.clip === "rect(0px, 0px, 0px, 0px)" || rect.width <= 1 || rect.height <= 1) continue;
@@ -167,7 +171,12 @@ test("no mouse-unreachable editing control can be reached by keyboard in redact 
   await openWithPdf(page, TEXT_ONLY_PDF);
   await enterRedactMode(page);
 
+  // Placed elements are included: a redaction mask kept role="button" and
+  // tabindex 0 behind the drag surface, so it was focusable AND activatable
+  // from the keyboard while unreachable by mouse -- the same split as
+  // Restyle, on an element that is itself the redaction.
   const forbidden = ["Restyle this text", "Cancel edit", "Apply edit", "Edit text"];
+  const forbiddenPrefixes = ["whiteout element.", "text element.", "shape element.", "ink element."];
   const reached: string[] = [];
 
   await page.locator("body").click({ position: { x: 5, y: 5 } });
@@ -177,7 +186,8 @@ test("no mouse-unreachable editing control can be reached by keyboard in redact 
       const active = document.activeElement as HTMLElement | null;
       return active?.getAttribute("aria-label") ?? active?.textContent?.trim().slice(0, 30) ?? "";
     });
-    if (forbidden.includes(label) && !reached.includes(label)) reached.push(label);
+    const banned = forbidden.includes(label) || forbiddenPrefixes.some((prefix) => label.startsWith(prefix));
+    if (banned && !reached.includes(label)) reached.push(label);
   }
 
   expect(reached, `keyboard reached mouse-unreachable controls: ${reached.join(", ")}`).toEqual([]);

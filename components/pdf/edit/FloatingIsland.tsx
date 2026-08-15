@@ -63,12 +63,22 @@ export type FloatingIslandProps =
 
 export function FloatingIsland(props: FloatingIslandProps) {
   return (
-    // The pill floats over the canvas and, at some viewport sizes, over
-    // the page-action bar below it. Its transparent gutter -- the glass
-    // padding and the gaps between controls -- must never swallow a click
-    // meant for what is underneath. Only the real controls take pointer
-    // events; the chrome around them is inert.
-    <div className="pointer-events-none [&_button]:pointer-events-auto [&_input]:pointer-events-auto [&_select]:pointer-events-auto [&_label]:pointer-events-auto aura-glass-regular absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-1 rounded-full px-2 py-1.5 shadow-[var(--v2-elevation-2)] sm:flex-nowrap">
+    // DOCKED, not floating. This was `absolute bottom-6 left-1/2 z-30`, an
+    // overlay centred over the workspace -- and it covered a different
+    // control at every width: "Exit redact" at 1280-1600, and the "Redact"
+    // button itself at 1024, where the action bar wraps. Three fixes aimed
+    // at offsets and stacking contexts all failed, because an overlay's
+    // position is a moving target once content reflows.
+    //
+    // In normal flow it cannot occlude a sibling at all -- the invariant
+    // holds by construction rather than by tuning. `mx-auto` with `w-fit`
+    // keeps it centred and pill-shaped; only the layout mode changed.
+    //
+    // No pointer-events guard here any more: it existed solely to stop this
+    // overlay's transparent gutter swallowing clicks meant for the controls
+    // underneath, and in flow there is nothing underneath. Keeping it would
+    // be dead defensive CSS implying a hazard that no longer exists.
+    <div className="aura-glass-regular mx-auto flex w-fit max-w-full flex-wrap items-center justify-center gap-1 rounded-full px-2 py-1.5 shadow-[var(--v2-elevation-2)] sm:flex-nowrap">
       {props.mode === "default" ? (
         <>
           <button type="button" disabled={props.pageIndex === 0} onClick={props.onPrevPage} aria-label="Previous page" title="Previous page (PageUp)" className={ISLAND_BUTTON_CLASS}>
