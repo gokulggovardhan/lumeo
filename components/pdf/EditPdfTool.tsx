@@ -2947,6 +2947,13 @@ export default function EditPdfTool() {
             {redactionOutcome ? (
               <div
                 role="alert"
+                data-testid="redaction-outcome"
+                // Machine-readable coverage, driven by the SAME condition
+                // that colours the panel. Tests assert on this rather than
+                // on hex values, so a theme pass can never silently flip a
+                // security assertion to green -- or break it for a reason
+                // that has nothing to do with redaction.
+                data-coverage={redactionOutcome.complete ? "complete" : "incomplete"}
                 className={`mt-3 rounded-[var(--radius-lg)] border p-3 ${
                   redactionOutcome.complete
                     ? "border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/70"
@@ -2962,7 +2969,12 @@ export default function EditPdfTool() {
                   <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/75">
                     {redactionOutcome.unremovedRuns.length} run
                     {redactionOutcome.unremovedRuns.length === 1 ? " was" : "s were"} masked but <strong>not removed</strong>:{" "}
-                    {redactionOutcome.unremovedRuns.slice(0, 3).map((run) => `“${run}”`).join(", ")}
+                    {redactionOutcome.unremovedRuns.slice(0, 3).map((run, index) => (
+                      <span key={index} data-testid="redaction-unremoved-run">
+                        {index > 0 ? ", " : ""}
+                        &ldquo;{run}&rdquo;
+                      </span>
+                    ))}
                     {redactionOutcome.unremovedRuns.length > 3 ? ", …" : ""}
                   </p>
                 ) : null}

@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 import {
   LAYER_SELECTOR,
   runSelectorFor,
+  outcomePanel,
+  unremovedRuns,
   applyRedactionThroughModal,
   blackMaskCount,
   detectedRunTexts,
@@ -40,19 +42,15 @@ test.describe("redaction on a page containing an image", () => {
 
     await dialog.getByRole("button", { name: "Redact", exact: true }).click();
 
-    const panel = page.getByRole("alert");
+    const panel = outcomePanel(page);
     await expect(panel).toBeVisible({ timeout: 60_000 });
     await expect(panel).toContainText("read this before sharing the file");
     await expect(panel).toContainText("Text inside an image is part of the picture");
 
-    // Red, not the neutral complete-coverage styling. Asserted on the
-    // computed colour rather than a class name so a restyle that keeps the
-    // class but loses the colour still fails.
-    const borderColour = await panel.evaluate((node) => getComputedStyle(node).borderTopColor);
-    const [r, g, b] = borderColour.match(/\d+/g)!.map(Number);
-    expect(r, `border should be red, got ${borderColour}`).toBeGreaterThan(150);
-    expect(g).toBeLessThan(120);
-    expect(b).toBeLessThan(120);
+    // The incomplete state, asserted on the attribute the component derives
+    // from its own coverage result -- not on colours. A theme pass must not
+    // be able to break a security assertion, nor silently satisfy one.
+    await expect(panel).toHaveAttribute("data-coverage", "incomplete");
   });
 
   test("an un-removable run is named individually rather than only counted", async ({ page }) => {
@@ -71,15 +69,21 @@ test.describe("redaction on a page containing an image", () => {
     }
     await applyRedactionThroughModal(page);
 
-    const panel = page.getByRole("alert");
+    const panel = outcomePanel(page);
+    await expect(panel).toBeVisible({ timeout: 60_000 });
     const text = await panel.innerText();
-    // Either everything was removed (then the image warning still fires and
-    // the panel is red), or something was not -- and if so it must be named,
-    // never reported as a bare count.
+    // Either everything was removed (the image warning still fires, so the
+    // panel is still incomplete), or something was not -- and if so each one
+    // must be NAMED, never reported as a bare count.
     if (/not removed/i.test(text)) {
-      expect(text, "un-removed runs must be quoted, not just counted").toMatch(/“[^”]+”/);
+      const named = unremovedRuns(page);
+      expect(await named.count(), "un-removed runs must be named, not just counted").toBeGreaterThan(0);
+      for (const entry of await named.allInnerTexts()) {
+        expect(entry.replace(/[“”,\s]/g, ""), "each named run must carry actual text").not.toBe("");
+      }
     }
     await expect(panel).toContainText("Text inside an image is part of the picture");
+    await expect(panel).toHaveAttribute("data-coverage", "incomplete");
   });
 });
 

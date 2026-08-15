@@ -19,6 +19,24 @@ export function runSelectorFor(needle: string): string {
 }
 export const LAYER_SELECTOR = '[aria-label="Draw a box over text to redact it"]';
 
+/**
+ * The redaction outcome panel.
+ *
+ * By test id, NOT getByRole("alert"): Next.js injects its own route
+ * announcer with role="alert", so the role locator is ambiguous and every
+ * spec died on a strict-mode violation before reaching an assertion. The
+ * panel keeps role="alert" for screen readers -- the test id is additional,
+ * not a replacement.
+ */
+export function outcomePanel(page: Page) {
+  return page.getByTestId("redaction-outcome");
+}
+
+/** Individually-named runs that were masked but NOT removed. */
+export function unremovedRuns(page: Page) {
+  return page.getByTestId("redaction-unremoved-run");
+}
+
 export async function openWithPdf(page: Page, pdfPath: string): Promise<void> {
   await page.goto("/pdf/edit");
   await page.locator('input[type="file"]').first().setInputFiles(pdfPath);
@@ -58,7 +76,7 @@ export async function applyRedactionThroughModal(page: Page): Promise<void> {
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Redact", exact: true }).click();
-  await expect(page.getByRole("alert")).toBeVisible({ timeout: 60_000 });
+  await expect(outcomePanel(page)).toBeVisible({ timeout: 60_000 });
 }
 
 /** What pdfjs can extract from the page currently on screen. */
