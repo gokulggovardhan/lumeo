@@ -15,6 +15,7 @@ export const TMP_DIR = path.join(process.cwd(), "e2e", ".tmp");
 export const TEXT_ONLY_PDF = path.join(TMP_DIR, "text-only.pdf");
 export const WITH_IMAGE_PDF = path.join(TMP_DIR, "with-image.pdf");
 export const SPLIT_RUN_PDF = path.join(TMP_DIR, "split-run.pdf");
+export const TWO_PAGE_PDF = path.join(TMP_DIR, "two-page.pdf");
 
 /** Widely spaced so each line is its own detected run and boxes cannot straddle two. */
 function drawSensitiveText(page: import("pdf-lib").PDFPage, font: import("pdf-lib").PDFFont) {
@@ -136,6 +137,18 @@ async function assertGenuinelySplit(bytes: Uint8Array): Promise<void> {
   }
 }
 
+/** Two pages, so the PAGES rail renders -- it is hidden for a single page. */
+async function twoPage(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  for (const label of ["Employee record", "Second page record"]) {
+    const page = doc.addPage([595, 842]);
+    page.drawText(label, { x: 60, y: 740, size: 18, font, color: rgb(0, 0, 0) });
+    page.drawText("SSN 123-45-6789", { x: 60, y: 680, size: 16, font, color: rgb(0, 0, 0) });
+  }
+  return doc.save();
+}
+
 export async function writeFixtures(): Promise<void> {
   await mkdir(TMP_DIR, { recursive: true });
   await writeFile(TEXT_ONLY_PDF, await textOnly());
@@ -143,4 +156,5 @@ export async function writeFixtures(): Promise<void> {
   const split = await splitRun();
   await assertGenuinelySplit(split);
   await writeFile(SPLIT_RUN_PDF, split);
+  await writeFile(TWO_PAGE_PDF, await twoPage());
 }
