@@ -26,10 +26,15 @@ export default defineConfig({
     viewport: { width: 1600, height: 1000 },
     trace: "retain-on-failure",
   },
+  // E2E_PROD=1 runs the suite against a production build instead of the dev
+  // server. That distinction matters for anything involving React's
+  // StrictMode double-invocation, which only happens in development -- a
+  // defect that reproduces in dev alone needs saying so, and one that
+  // reproduces in both is unambiguous.
   webServer: {
-    command: "npm run dev",
+    command: process.env.E2E_PROD ? "npm run start" : "npm run dev",
     url: "http://localhost:3000/pdf/edit",
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.E2E_PROD,
     timeout: 180_000,
   },
 });
