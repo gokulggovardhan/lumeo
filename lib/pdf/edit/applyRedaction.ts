@@ -9,7 +9,7 @@
 // does and does not guarantee, and this module inherits every one of those
 // limits.
 
-import { PDFDocument, PDFDict, PDFName } from "pdf-lib";
+import { PDFDocument, PDFDict, PDFName, PDFRef } from "pdf-lib";
 import { buildEditPlan } from "./editPlan.ts";
 import { applyEditPlanToDocument } from "./applyEditPlan.ts";
 import { resolveFont } from "./fontEncoding.ts";
@@ -55,8 +55,27 @@ export type RedactionOutcome = {
 export function pageDrawsImages(doc: PDFDocument, pageIndex: number): boolean {
   const page = doc.getPage(pageIndex);
   const resources = page.node.Resources();
-  const xobjects = resources?.lookupMaybe(PDFName.of("XObject"), PDFDict);
-  return xobjects !== undefined && xobjects.keys().length > 0;
+  if (!resources) return false;
+
+  // NOT lookupMaybe(key, Type). pdf-lib's lookupMaybe throws
+  // UnexpectedObjectTypeError when the entry resolves to the WRONG type --
+  // it returns undefined only for a MISSING one. A malformed /XObject (an
+  // indirect ref pointing at, say, a number) therefore threw straight out
+  // of applyRedaction, and since this runs outside the per-run try/catch it
+  // took the whole redaction with it. Same trap formXObjects.ts documents.
+  const entry = resources.get(PDFName.of("XObject"));
+  const resolved = entry instanceof PDFRef ? doc.context.lookup(entry) : entry;
+
+  if (resolved === undefined || resolved === null) return false;
+  if (resolved instanceof PDFDict) return resolved.keys().length > 0;
+
+  // Present but not a dict: we cannot tell what this page draws. Report
+  // images PRESENT rather than absent. Unknown-as-no-images would fail OPEN
+  // -- a clean-looking coverage panel over a page that may well carry an
+  // image nobody checked, which is the one outcome redaction must never
+  // produce. Reporting it present fires the incomplete-coverage warning,
+  // which over-warns at worst.
+  return true;
 }
 
 /**

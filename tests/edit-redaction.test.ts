@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PDFDocument, StandardFonts, PDFName } from "pdf-lib";
+import { PDFDocument, StandardFonts, PDFName, PDFNumber } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { applyRedaction } from "../lib/pdf/edit/applyRedaction.ts";
+import { applyRedaction, pageDrawsImages } from "../lib/pdf/edit/applyRedaction.ts";
 import {
   assessRedactionCoverage,
   boxesOverlap,
@@ -297,4 +297,48 @@ test("a redacted document can still be reopened and drawn", async () => {
   // render performs -- the closest proxy without a DOM canvas.
   const ops = await page.getOperatorList();
   assert.ok(ops.fnArray.length > 0, "redacted page should still produce drawing operators");
+});
+
+// A malformed /XObject -- present, but an indirect ref to something that is
+// not a dict -- used to throw straight out of applyRedaction, because
+// pageDrawsImages ran outside the per-run try/catch and pdf-lib's
+// lookupMaybe(key, Type) throws on the WRONG type rather than returning
+// undefined. The whole redaction failed with a generic message.
+//
+// The fix must also choose the right side of "we cannot tell". Reporting
+// no-images would fail OPEN: a clean-looking coverage panel over a page that
+// may carry an image nobody checked. It reports images PRESENT instead.
+test("a malformed /XObject does not abort the redaction, and reports images present", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("SSN 123-45-6789", { x: 50, y: 700, size: 14, font });
+  // /XObject is an indirect ref to a number, not a dict.
+  page.node.Resources()!.set(PDFName.of("XObject"), doc.context.register(PDFNumber.of(42)));
+  const source = await doc.save();
+
+  const { bytes, outcome } = await redact(source, (runText) => {
+    const matches = findSensitiveMatches(runText);
+    return matches.length > 0 ? removeSpans(runText, matches) : null;
+  });
+
+  // Completed rather than threw, and the SSN is genuinely gone.
+  assert.doesNotMatch(await extractedText(bytes), /123-45-6789/);
+  // And the user is warned rather than told everything is fine.
+  assert.equal(outcome.complete, false, "unknown page content must not report complete coverage");
+  assert.ok(
+    outcome.warnings.some((warning) => warning.kind === "page-has-images"),
+    `expected the image caveat, got ${JSON.stringify(outcome.warnings)}`,
+  );
+});
+
+test("pageDrawsImages reports false only when /XObject is genuinely absent or empty", async () => {
+  const empty = await PDFDocument.create();
+  empty.addPage([200, 200]);
+  assert.equal(pageDrawsImages(empty, 0), false, "no /XObject at all");
+
+  const emptyDict = await PDFDocument.create();
+  const page = emptyDict.addPage([200, 200]);
+  page.node.Resources()!.set(PDFName.of("XObject"), emptyDict.context.obj({}));
+  assert.equal(pageDrawsImages(emptyDict, 0), false, "an empty /XObject dict draws nothing");
 });
