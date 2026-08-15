@@ -1483,6 +1483,11 @@ export default function EditPdfTool() {
   // content stream) is a separate question, answered by editPreview below,
   // never assumed here.
   function selectTextRun(index: number | null, extend = false) {
+    // Closing the editor on mode entry is not enough on its own: a run
+    // overlay is still keyboard-focusable, so Enter could reopen the editor
+    // underneath the redaction surface and restore exactly the reachable-by-
+    // keyboard-only state that was just removed. Deselection still works.
+    if (redactMode && index !== null) return;
     // Phase 31: text-run selection and placed-element selection (selectedId)
     // are two independent pieces of state that were never made mutually
     // exclusive -- selecting a run while a placed element was already
@@ -2905,6 +2910,30 @@ export default function EditPdfTool() {
                 <button
                   type="button"
                   onClick={() => {
+                    if (!redactMode) {
+                      // The inline text editor is CLOSED on entering redact
+                      // mode rather than left inert behind the drag surface.
+                      //
+                      // Inert would have worked mechanically, but it leaves an
+                      // editor that looks live and does nothing -- and it is
+                      // an attribute the next overlay can forget. Closing
+                      // removes the ambiguity structurally. It matters here
+                      // because those controls were reachable by keyboard
+                      // while unreachable by mouse: Tab could still fire
+                      // Restyle, a document-mutating action, inside the mode
+                      // whose entire purpose is a confirmed destructive one.
+                      //
+                      // An unsaved draft is never silently discarded -- entry
+                      // is refused instead, and the user decides whether to
+                      // apply or cancel.
+                      const originalText = detectedTextRuns[selectedRunIndices[0]]?.str ?? "";
+                      const hasUnsavedDraft = selectedRunIndices.length === 1 && editDraftText !== "" && editDraftText !== originalText;
+                      if (hasUnsavedDraft) {
+                        setPageOpNotice("Apply or cancel your text edit before redacting.");
+                        return;
+                      }
+                      selectTextRun(null);
+                    }
                     setRedactMode((current) => !current);
                     setRedactionBoxes([]);
                     setRedactionOutcome(null);
