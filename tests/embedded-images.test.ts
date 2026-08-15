@@ -67,7 +67,8 @@ test("swapping a page's image XObject and deleting the old stream produces a val
 
   const replacementImage = await doc.embedJpg(TINY_JPEG_BASE64);
   const resources = page.node.Resources();
-  const xObjects = resources?.lookupMaybe(PDFName.of("XObject"), PDFDict);
+  const xObjectsEntry = resources?.get(PDFName.of("XObject"));
+  const xObjects = xObjectsEntry instanceof PDFDict ? xObjectsEntry : undefined;
   xObjects?.set(PDFName.of(name), replacementImage.ref);
   page.node.context.delete(oldRef);
 

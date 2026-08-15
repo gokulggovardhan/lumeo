@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFStream, decodePDFRawStream } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFStream, decodePDFRawStream } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { walkTextShowOperators } from "../lib/pdf/edit/contentStream.ts";
 import { readFallbackStyleHints } from "../lib/pdf/edit/fallbackFont.ts";
@@ -103,7 +103,11 @@ async function makeType0SubsetPdf(): Promise<Uint8Array> {
 
   // lookupMaybe, not lookup: a freshly created page has no /Font entry yet
   // and lookup throws on a missing key rather than returning undefined.
-  const fonts = page.node.Resources()!.lookupMaybe(PDFName.of("Font"), PDFDict) ?? context.obj({});
+  // Untyped lookup + instanceof: lookupMaybe(key, Type) throws on a
+  // wrong-type entry rather than returning undefined.
+  const fontsEntry = page.node.Resources()!.get(PDFName.of("Font"));
+  const fontsResolved = fontsEntry instanceof PDFRef ? context.lookup(fontsEntry) : fontsEntry;
+  const fonts = fontsResolved instanceof PDFDict ? fontsResolved : context.obj({});
   page.node.Resources()!.set(PDFName.of("Font"), fonts);
   fonts.set(PDFName.of("FSub"), context.register(type0));
   fonts.set(PDFName.of("FStd"), helvetica.ref);

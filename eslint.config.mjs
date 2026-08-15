@@ -27,8 +27,11 @@ const eslintConfig = defineConfig([
   // and again in applyRedaction.ts. Every one of those was a malformed PDF
   // throwing where the author expected a graceful undefined. The lint rule
   // is what stops a fourth.
+  // Repo-wide, no path exceptions. Scoping it to lib/pdf/** would have left
+  // known instances standing in components/ and tests/ -- an inconsistent
+  // signal, and "fix it later" has a measured track record here: the last
+  // fix sat unmerged for ten days while the same bug was written twice more.
   {
-    files: ["lib/pdf/**/*.ts", "lib/pdf/**/*.tsx"],
     rules: {
       "no-restricted-syntax": [
         "error",

@@ -817,8 +817,26 @@ export default function CompressPdfTool() {
 
         const newImage = await output.embedJpg(newBytes);
         const resources = page.node.Resources();
-        const xObjects = resources?.lookupMaybe(PDFName.of("XObject"), PDFDict);
-        xObjects?.set(PDFName.of(name), newImage.ref);
+        // Untyped lookup + instanceof, not lookupMaybe(key, Type): the typed
+        // overload THROWS on a wrong-type entry and returns undefined only
+        // for a missing one.
+        //
+        // The conversion has a trap. Previously the throw was swallowed by
+        // the catch below, so the delete never ran. Simply letting this go
+        // undefined would let `?.set` silently no-op and then still run
+        // context.delete(ref) -- removing the original image while the
+        // page's /XObject entry still names it, leaving a dangling
+        // reference. That turns "could not compress an image" into a
+        // corrupted document.
+        //
+        // Safe direction for compression is to SKIP: leaving an image
+        // uncompressed costs bytes, dangling a ref costs the file. Never
+        // delete a ref that could not be repointed.
+        const xObjectsEntry = resources?.get(PDFName.of("XObject"));
+        const xObjectsResolved = xObjectsEntry instanceof PDFRef ? page.node.context.lookup(xObjectsEntry) : xObjectsEntry;
+        if (!(xObjectsResolved instanceof PDFDict)) continue;
+
+        xObjectsResolved.set(PDFName.of(name), newImage.ref);
         page.node.context.delete(ref);
       } catch {
         // Best-effort: an image this pass can't safely decode/recompress is
