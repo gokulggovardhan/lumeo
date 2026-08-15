@@ -276,3 +276,25 @@ test("coverage is complete only when everything targeted was stripped and nothin
   assert.equal(assessment.complete, true);
   assert.deepEqual(assessment.warnings, []);
 });
+
+// The bytes the UI hands back are immediately re-rasterized by the page
+// render effect. If a redacted document could not be reopened and drawn, the
+// user would see "This page could not be previewed" the moment they redacted
+// -- with the edit applied, so a successful redaction would look like it
+// destroyed the document. Proven here rather than in a browser, because a
+// backgrounded window produces the identical symptom for unrelated reasons.
+test("a redacted document can still be reopened and drawn", async () => {
+  const source = await sensitivePdf();
+  const { bytes } = await redact(source, (runText) => {
+    const matches = findSensitiveMatches(runText);
+    return matches.length > 0 ? removeSpans(runText, matches) : null;
+  });
+
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  assert.equal(doc.numPages, 1);
+  const page = await doc.getPage(1);
+  // Same content-stream parse, font load and resource resolution a canvas
+  // render performs -- the closest proxy without a DOM canvas.
+  const ops = await page.getOperatorList();
+  assert.ok(ops.fnArray.length > 0, "redacted page should still produce drawing operators");
+});

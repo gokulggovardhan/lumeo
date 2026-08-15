@@ -34,6 +34,14 @@ export default function RedactionLayer({ boxes, targetedRuns, disabled, onAddBox
   const surfaceRef = useRef<HTMLDivElement | null>(null);
   const [draft, setDraft] = useState<RedactionBox | null>(null);
   const originRef = useRef<{ xPct: number; yPct: number } | null>(null);
+  // The draft is mirrored into a ref because pointerup must read the box the
+  // last pointermove computed, and the handler bound to the element belongs
+  // to the PREVIOUS render -- its `draft` closure is only fresh if React has
+  // re-rendered in between. That usually happens (separate native events are
+  // separate tasks) but it is not guaranteed: coalesced move+up events land
+  // in one batch and the box is silently lost. Reading the ref makes the
+  // commit independent of render timing.
+  const draftRef = useRef<RedactionBox | null>(null);
 
   const toPercent = useCallback((event: { clientX: number; clientY: number }) => {
     const rect = surfaceRef.current?.getBoundingClientRect();
@@ -53,7 +61,8 @@ export default function RedactionLayer({ boxes, targetedRuns, disabled, onAddBox
       // rather than being abandoned mid-box.
       event.currentTarget.setPointerCapture(event.pointerId);
       originRef.current = point;
-      setDraft({ xPct: point.xPct, yPct: point.yPct, widthPct: 0, heightPct: 0 });
+      draftRef.current = { xPct: point.xPct, yPct: point.yPct, widthPct: 0, heightPct: 0 };
+      setDraft(draftRef.current);
     },
     [disabled, toPercent],
   );
@@ -64,25 +73,27 @@ export default function RedactionLayer({ boxes, targetedRuns, disabled, onAddBox
       if (!origin) return;
       const point = toPercent(event);
       if (!point) return;
-      setDraft({
+      draftRef.current = {
         xPct: Math.min(origin.xPct, point.xPct),
         yPct: Math.min(origin.yPct, point.yPct),
         widthPct: Math.abs(point.xPct - origin.xPct),
         heightPct: Math.abs(point.yPct - origin.yPct),
-      });
+      };
+      setDraft(draftRef.current);
     },
     [toPercent],
   );
 
   const handlePointerUp = useCallback(() => {
-    const box = draft;
+    const box = draftRef.current;
     originRef.current = null;
+    draftRef.current = null;
     setDraft(null);
     // A stray click is not a redaction. Without this floor, tapping the page
     // silently adds a zero-area box that redacts nothing and clutters the
     // review list.
     if (box && box.widthPct >= MIN_BOX_PCT && box.heightPct >= MIN_BOX_PCT) onAddBox(box);
-  }, [draft, onAddBox]);
+  }, [onAddBox]);
 
   return (
     <>
