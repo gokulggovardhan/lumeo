@@ -120,7 +120,7 @@ export function MicroDock({
 
   return (
     <div
-      className="absolute z-30 flex flex-col items-center gap-3 top-2 left-1/2 -translate-x-1/2 sm:top-1/2 sm:left-4 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-row"
+      className="pointer-events-none [&_button]:pointer-events-auto [&_input]:pointer-events-auto [&_select]:pointer-events-auto [&_label]:pointer-events-auto absolute z-30 flex flex-col items-center gap-3 top-2 left-1/2 -translate-x-1/2 sm:top-1/2 sm:left-4 sm:-translate-x-0 sm:-translate-y-1/2 sm:flex-row"
     >
       <div className="aura-glass-regular flex flex-row items-center gap-1 rounded-full p-1.5 shadow-[var(--v2-elevation-2)] sm:flex-col">
         {TOOL_META.map(({ id, label, shortcut, Icon }) => (

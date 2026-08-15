@@ -63,7 +63,12 @@ export type FloatingIslandProps =
 
 export function FloatingIsland(props: FloatingIslandProps) {
   return (
-    <div className="aura-glass-regular absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-1 rounded-full px-2 py-1.5 shadow-[var(--v2-elevation-2)] sm:flex-nowrap">
+    // The pill floats over the canvas and, at some viewport sizes, over
+    // the page-action bar below it. Its transparent gutter -- the glass
+    // padding and the gaps between controls -- must never swallow a click
+    // meant for what is underneath. Only the real controls take pointer
+    // events; the chrome around them is inert.
+    <div className="pointer-events-none [&_button]:pointer-events-auto [&_input]:pointer-events-auto [&_select]:pointer-events-auto [&_label]:pointer-events-auto aura-glass-regular absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 flex-wrap items-center justify-center gap-1 rounded-full px-2 py-1.5 shadow-[var(--v2-elevation-2)] sm:flex-nowrap">
       {props.mode === "default" ? (
         <>
           <button type="button" disabled={props.pageIndex === 0} onClick={props.onPrevPage} aria-label="Previous page" title="Previous page (PageUp)" className={ISLAND_BUTTON_CLASS}>
