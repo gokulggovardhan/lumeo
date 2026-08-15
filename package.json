@@ -42,11 +42,14 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/react": "^16.3.2",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "^24.13.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.0",
+    "jsdom": "^30.0.1",
     "supabase": "^2.111.0",
     "tailwindcss": "^4.3.2",
     "typescript": "^5"

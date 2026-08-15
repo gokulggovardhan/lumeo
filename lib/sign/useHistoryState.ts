@@ -66,59 +66,78 @@ export function useHistoryState<T>(initial: T, options?: HistorySizeOptions<T>) 
     return trimHistoryToSizeBudget(stack, opts.maxTotalSize, opts.sizeOf);
   }, []);
 
+  // The three pieces of history are mirrored into refs and the refs are the
+  // AUTHORITY; the useState copies exist only so React re-renders.
+  //
+  // This replaced an implementation where undo() pushed to the redo stack
+  // from inside a setState updater (and redo() to the undo stack from inside
+  // its own). State updaters must be pure. React re-invokes them -- under
+  // StrictMode in development, and during concurrent rendering -- so a single
+  // Undo pushed the same snapshot onto the redo stack twice. The first Redo
+  // then popped a duplicate and restored the state already on screen: a
+  // visible no-op that took two clicks to get past. Found by an e2e test that
+  // asserted a redaction came back after Undo/Redo; it reproduced against the
+  // dev server and not against a production build, which is exactly the shape
+  // an impure updater produces.
+  //
+  // Writing the refs synchronously also keeps two calls in the same tick
+  // composing correctly, which is what the functional updaters used to buy.
+  const stateRef = useRef<T>(initial);
+  const undoRef = useRef<T[]>([]);
+  const redoRef = useRef<T[]>([]);
+
+  const applyHistory = useCallback((next: T, nextUndo: T[], nextRedo: T[]) => {
+    stateRef.current = next;
+    undoRef.current = nextUndo;
+    redoRef.current = nextRedo;
+    setState(next);
+    setUndoStack(nextUndo);
+    setRedoStack(nextRedo);
+  }, []);
+
   const set = useCallback((updater: T | ((current: T) => T)) => {
-    setState((current) => {
-      const next = typeof updater === "function" ? (updater as (current: T) => T)(current) : updater;
-      setUndoStack((stack) => trimToSizeBudget([...stack.slice(-(MAX_HISTORY - 1)), current]));
-      setRedoStack([]);
-      return next;
-    });
-  }, [trimToSizeBudget]);
+    const current = stateRef.current;
+    const next = typeof updater === "function" ? (updater as (current: T) => T)(current) : updater;
+    applyHistory(next, trimToSizeBudget([...undoRef.current.slice(-(MAX_HISTORY - 1)), current]), []);
+  }, [applyHistory, trimToSizeBudget]);
 
   // Updates the live value only -- no history entry. Meant for continuous
   // updates (drag/resize frames) where pushing on every frame would flood
   // the undo stack; pair with `commit` once the gesture ends.
   const setLive = useCallback((updater: T | ((current: T) => T)) => {
-    setState((current) => (typeof updater === "function" ? (updater as (current: T) => T)(current) : updater));
+    const next = typeof updater === "function" ? (updater as (current: T) => T)(stateRef.current) : updater;
+    stateRef.current = next;
+    setState(next);
   }, []);
 
   // Pushes `previous` onto the undo stack without touching the live value --
   // call once a drag/resize gesture ends, with the state captured before the
   // gesture started.
   const commit = useCallback((previous: T) => {
-    setUndoStack((stack) => trimToSizeBudget([...stack.slice(-(MAX_HISTORY - 1)), previous]));
+    const nextUndo = trimToSizeBudget([...undoRef.current.slice(-(MAX_HISTORY - 1)), previous]);
+    undoRef.current = nextUndo;
+    redoRef.current = [];
+    setUndoStack(nextUndo);
     setRedoStack([]);
   }, [trimToSizeBudget]);
 
   const undo = useCallback(() => {
-    setUndoStack((stack) => {
-      if (stack.length === 0) return stack;
-      const previous = stack[stack.length - 1];
-      setState((current) => {
-        setRedoStack((redo) => [...redo, current]);
-        return previous;
-      });
-      return stack.slice(0, -1);
-    });
-  }, []);
+    const stack = undoRef.current;
+    if (stack.length === 0) return;
+    const previous = stack[stack.length - 1];
+    applyHistory(previous, stack.slice(0, -1), [...redoRef.current, stateRef.current]);
+  }, [applyHistory]);
 
   const redo = useCallback(() => {
-    setRedoStack((stack) => {
-      if (stack.length === 0) return stack;
-      const next = stack[stack.length - 1];
-      setState((current) => {
-        setUndoStack((undo) => [...undo, current]);
-        return next;
-      });
-      return stack.slice(0, -1);
-    });
-  }, []);
+    const stack = redoRef.current;
+    if (stack.length === 0) return;
+    const next = stack[stack.length - 1];
+    applyHistory(next, [...undoRef.current, stateRef.current], stack.slice(0, -1));
+  }, [applyHistory]);
 
   const reset = useCallback((next: T) => {
-    setUndoStack([]);
-    setRedoStack([]);
-    setState(next);
-  }, []);
+    applyHistory(next, [], []);
+  }, [applyHistory]);
 
   return {
     state,
