@@ -6,7 +6,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { PDFDocument, PDFDict, PDFName, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, PDFName, StandardFonts, rgb } from "pdf-lib";
 import { createCanvas } from "@napi-rs/canvas";
 
 // Playwright transpiles specs to CJS, where import.meta is a syntax error --
@@ -72,22 +72,75 @@ async function splitRun(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([595, 842]);
   const font = await doc.embedFont(StandardFonts.Helvetica);
-  page.drawText("Employee record", { x: 60, y: 740, size: 18, font, color: rgb(0, 0, 0) });
 
   const context = doc.context;
   const fonts = context.obj({});
   fonts.set(PDFName.of("F1"), font.ref);
   page.node.Resources()!.set(PDFName.of("Font"), fonts);
 
-  // Two show operators back to back with no positioning between them.
-  const body = ["BT", "/F1 16 Tf", "1 0 0 1 60 680 Tm", "(SSN 123-45-) Tj (6789) Tj", "ET"].join("\n");
+  // The WHOLE page is written by hand, both lines in one stream. The earlier
+  // version called drawText and then replaced /Contents, which silently threw
+  // that line away -- the fixture looked right and was missing half of itself.
+  // Appending to pdf-lib's own stream would work too, but hand-writing both
+  // keeps the split entirely under this file's control rather than depending
+  // on how pdf-lib happens to emit its half.
+  //
+  // "SSN 123-45-" and "6789" are separate show operators with no positioning
+  // between them, so pdfjs merges them into ONE visual run that no single
+  // operator covers -- which is exactly what runSpansMultipleOperators
+  // rejects, making the run masked-but-not-removed.
+  const body = [
+    "BT",
+    "/F1 18 Tf",
+    "1 0 0 1 60 740 Tm",
+    "(Employee record) Tj",
+    "ET",
+    "BT",
+    "/F1 16 Tf",
+    "1 0 0 1 60 680 Tm",
+    "(SSN 123-45-) Tj (6789) Tj",
+    "ET",
+  ].join("\n");
   page.node.set(PDFName.of("Contents"), context.register(context.flateStream(new TextEncoder().encode(body))));
   return doc.save();
+}
+
+/**
+ * Proves the split-run fixture is actually split before any test relies on
+ * it. A fixture that quietly stopped being split would make the
+ * "named individually" test pass for the wrong reason -- it would assert
+ * against an empty list and find nothing to complain about.
+ */
+async function assertGenuinelySplit(bytes: Uint8Array): Promise<void> {
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const page = await doc.getPage(1);
+  const items = (await page.getTextContent()).items as { str?: string }[];
+  const strings = items.map((item) => item.str ?? "");
+
+  // The split is only real if pdfjs MERGES the two show operators into one
+  // visual run: that mismatch between what the user sees and what any single
+  // operator covers is the whole condition runSpansMultipleOperators rejects.
+  // If pdfjs reported them separately, each half would be independently
+  // strippable and the fixture would prove nothing.
+  const merged = strings.find((value) => value.includes("123-45-6789"));
+  if (!merged) {
+    throw new Error(`split-run fixture: pdfjs did not merge the SSN into one run, got ${JSON.stringify(strings)}`);
+  }
+  // Neither half may stand alone as its own run.
+  if (strings.some((value) => value.trim() === "SSN 123-45-" || value.trim() === "6789")) {
+    throw new Error(`split-run fixture: the halves did not merge, got ${JSON.stringify(strings)}`);
+  }
+  if (!strings.some((value) => value.includes("Employee record"))) {
+    throw new Error(`split-run fixture: lost the Employee record line, got ${JSON.stringify(strings)}`);
+  }
 }
 
 export async function writeFixtures(): Promise<void> {
   await mkdir(TMP_DIR, { recursive: true });
   await writeFile(TEXT_ONLY_PDF, await textOnly());
   await writeFile(WITH_IMAGE_PDF, await withImage());
-  await writeFile(SPLIT_RUN_PDF, await splitRun());
+  const split = await splitRun();
+  await assertGenuinelySplit(split);
+  await writeFile(SPLIT_RUN_PDF, split);
 }
