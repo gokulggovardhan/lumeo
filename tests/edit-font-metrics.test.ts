@@ -142,6 +142,136 @@ test("resolveFontMetrics honestly reports Unknown for a subset font with neither
   assert.equal(metrics.source, "Unknown");
 });
 
+test("resolveFontMetrics degrades gracefully instead of throwing when /Widths is an indirect ref to the wrong type", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  // Malformed: /Widths is an indirect ref, but resolves to a PDFNumber, not
+  // a PDFArray -- pdf-lib's lookupMaybe(ref, PDFArray) would throw
+  // UnexpectedObjectTypeError here instead of returning undefined.
+  const wrongTypeRef = context.register(context.obj(42));
+  const fontDict = context.obj({
+    Type: "Font",
+    Subtype: "Type1",
+    BaseFont: "SomeCustomFont",
+    Encoding: "WinAnsiEncoding",
+    FirstChar: 65,
+    Widths: wrongTypeRef,
+  });
+
+  const resolvedFont = resolveFont(fontDict, context);
+  const metrics = resolveFontMetrics(fontDict, context, resolvedFont);
+  assert.equal(metrics.source, "Unknown");
+});
+
+test("resolveFontMetrics degrades gracefully instead of throwing when /FontDescriptor is an indirect ref to the wrong type", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const wrongTypeRef = context.register(context.obj(42));
+  const fontDict = context.obj({
+    Type: "Font",
+    Subtype: "Type1",
+    BaseFont: "CustomFont",
+    Encoding: "WinAnsiEncoding",
+    FirstChar: 65,
+    LastChar: 65,
+    Widths: [700],
+    FontDescriptor: wrongTypeRef,
+  });
+
+  const resolvedFont = resolveFont(fontDict, context);
+  const metrics = resolveFontMetrics(fontDict, context, resolvedFont);
+  // MissingWidth falls back to its spec default (0) rather than throwing.
+  assert.equal(metrics.source, "Widths");
+  assert.equal(metrics.defaultWidth, 0);
+});
+
+test("resolveFontMetrics degrades gracefully instead of throwing when /W is an indirect ref to the wrong type", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const wrongTypeRef = context.register(context.obj(42));
+
+  const cidFontDict = context.obj({
+    Type: "Font",
+    Subtype: "CIDFontType2",
+    BaseFont: "MyCIDFont",
+    CIDSystemInfo: { Registry: "Adobe", Ordering: "Identity", Supplement: 0 },
+    CIDToGIDMap: "Identity",
+    DW: 1000,
+    W: wrongTypeRef,
+  });
+  const cidFontRef = context.register(cidFontDict);
+
+  const type0Dict = context.obj({
+    Type: "Font",
+    Subtype: "Type0",
+    BaseFont: "MyCIDFont",
+    Encoding: "Identity-H",
+    DescendantFonts: [cidFontRef],
+  });
+
+  const resolvedFont = resolveFont(type0Dict, context);
+  const metrics = resolveFontMetrics(type0Dict, context, resolvedFont);
+  // No usable /W: falls back to /DW for every CID, same as if /W were absent.
+  assert.equal(metrics.source, "W");
+  assert.equal(metrics.defaultWidth, 1000);
+  assert.equal(metrics.glyphWidths.size, 0);
+});
+
+test("resolveFontMetrics degrades gracefully instead of throwing when a /W range's width-list entry is an indirect ref to the wrong type", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const wrongTypeRef = context.register(context.obj(42));
+
+  const cidFontDict = context.obj({
+    Type: "Font",
+    Subtype: "CIDFontType2",
+    BaseFont: "MyCIDFont",
+    CIDSystemInfo: { Registry: "Adobe", Ordering: "Identity", Supplement: 0 },
+    CIDToGIDMap: "Identity",
+    DW: 1000,
+    // CID 3's width-list entry resolves to a PDFNumber instead of a
+    // PDFArray.
+    W: [3, wrongTypeRef, 10, 15, 800],
+  });
+  const cidFontRef = context.register(cidFontDict);
+
+  const type0Dict = context.obj({
+    Type: "Font",
+    Subtype: "Type0",
+    BaseFont: "MyCIDFont",
+    Encoding: "Identity-H",
+    DescendantFonts: [cidFontRef],
+  });
+
+  const resolvedFont = resolveFont(type0Dict, context);
+  const metrics = resolveFontMetrics(type0Dict, context, resolvedFont);
+  // The malformed CID 3 entry is skipped rather than aborting the whole
+  // array -- the well-formed CID 10-15 range still parses correctly.
+  assert.equal(metrics.glyphWidths.get(10), 800);
+  assert.equal(metrics.glyphWidths.get(15), 800);
+});
+
+test("resolveFontMetrics degrades gracefully instead of throwing when DescendantFonts[0] is an indirect ref to the wrong type", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const wrongTypeRef = context.register(context.obj(42));
+
+  const type0Dict = context.obj({
+    Type: "Font",
+    Subtype: "Type0",
+    BaseFont: "MyCIDFont",
+    Encoding: "Identity-H",
+    DescendantFonts: [wrongTypeRef],
+  });
+
+  const resolvedFont = resolveFont(type0Dict, context);
+  const metrics = resolveFontMetrics(type0Dict, context, resolvedFont);
+  // No descendantDict at all: /DW's spec default (1000) applies.
+  assert.equal(metrics.source, "W");
+  assert.equal(metrics.defaultWidth, 1000);
+  assert.equal(metrics.glyphWidths.size, 0);
+});
+
 test("compareAdvance: equal-width, shorter, and longer replacements", () => {
   const metrics = {
     bytesPerCode: 1 as const,

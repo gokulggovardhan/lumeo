@@ -270,7 +270,11 @@ function nameString(obj: unknown): string | null {
 
 function resolveDict(value: unknown, context: PDFContext): PDFDict | undefined {
   if (value instanceof PDFDict) return value;
-  return value instanceof PDFRef ? context.lookupMaybe(value, PDFDict) : undefined;
+  // Untyped lookup + instanceof, never lookupMaybe(ref, Type): the latter
+  // throws on the WRONG type and returns undefined only for a MISSING one.
+  // This file postdates c202541's sweep, so it reintroduced the pattern.
+  const resolved = value instanceof PDFRef ? context.lookup(value) : undefined;
+  return resolved instanceof PDFDict ? resolved : undefined;
 }
 
 /**
@@ -285,7 +289,8 @@ export function readFallbackStyleHints(fontDict: PDFDict, context: PDFContext): 
   let descriptorHost: PDFDict | undefined = fontDict;
   if (nameString(fontDict.get(PDFName.of("Subtype"))) === "Type0") {
     const descendants = fontDict.get(PDFName.of("DescendantFonts"));
-    const resolvedDescendants = descendants instanceof PDFRef ? context.lookupMaybe(descendants, PDFArray) : descendants;
+    const descendantsResolved = descendants instanceof PDFRef ? context.lookup(descendants) : descendants;
+    const resolvedDescendants = descendantsResolved instanceof PDFArray ? descendantsResolved : undefined;
     descriptorHost =
       resolvedDescendants instanceof PDFArray && resolvedDescendants.size() > 0
         ? resolveDict(resolvedDescendants.get(0), context)

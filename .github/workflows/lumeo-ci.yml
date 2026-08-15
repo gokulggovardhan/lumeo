@@ -5,9 +5,14 @@ on:
     branches:
       - main
 
+  # Stacked PRs target a feature branch, not main. Without these patterns
+  # `pull_request` never fires for them, so a stacked PR shows no checks at
+  # all -- and a missing check is far easier to merge past than a red one.
   pull_request:
     branches:
       - main
+      - 'fix/**'
+      - 'feature/**'
 
   workflow_dispatch:
 
