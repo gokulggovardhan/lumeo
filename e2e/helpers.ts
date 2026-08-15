@@ -37,6 +37,31 @@ export function unremovedRuns(page: Page) {
   return page.getByTestId("redaction-unremoved-run");
 }
 
+/**
+ * Blocks until the stage is genuinely rendered: the loading skeleton gone
+ * AND at least one detected run present.
+ *
+ * This exists because of a false green. After an action that re-rasterizes
+ * the page, the whole stage is replaced by "Loading page preview…" -- no
+ * runs, no placed elements, nothing. A poll for "the SSN is gone" is
+ * satisfied by that empty stage, so the assertion passed while proving
+ * nothing. An assertion about absence is only meaningful once presence has
+ * been established.
+ *
+ * Gates on observable state, never a fixed sleep: the raster time varies
+ * with page complexity and machine load, and a timeout that is long enough
+ * to be safe is long enough to hide a regression.
+ */
+export async function waitForStageReady(page: Page): Promise<void> {
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, { timeout: 90_000 });
+  await expect
+    .poll(async () => page.locator(RUN_SELECTOR).count(), {
+      timeout: 90_000,
+      message: "stage should have rendered detected text runs",
+    })
+    .toBeGreaterThan(0);
+}
+
 export async function openWithPdf(page: Page, pdfPath: string): Promise<void> {
   await page.goto("/pdf/edit");
   await page.locator('input[type="file"]').first().setInputFiles(pdfPath);
@@ -44,6 +69,7 @@ export async function openWithPdf(page: Page, pdfPath: string): Promise<void> {
   // run means the raster, the pdf-lib load and the operator match are all
   // done -- a single wait that covers the whole chain.
   await expect(page.locator(RUN_SELECTOR).first()).toBeVisible({ timeout: 90_000 });
+  await waitForStageReady(page);
 }
 
 export async function enterRedactMode(page: Page): Promise<void> {
@@ -77,6 +103,9 @@ export async function applyRedactionThroughModal(page: Page): Promise<void> {
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "Redact", exact: true }).click();
   await expect(outcomePanel(page)).toBeVisible({ timeout: 60_000 });
+  // Redaction replaces pdfBytes, which re-rasterizes the page. Nothing that
+  // reads the stage is trustworthy until that finishes.
+  await waitForStageReady(page);
 }
 
 /** What pdfjs can extract from the page currently on screen. */

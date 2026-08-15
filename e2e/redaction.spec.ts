@@ -3,6 +3,7 @@ import {
   LAYER_SELECTOR,
   runSelectorFor,
   outcomePanel,
+  waitForStageReady,
   unremovedRuns,
   applyRedactionThroughModal,
   blackMaskCount,
@@ -11,7 +12,7 @@ import {
   enterRedactMode,
   openWithPdf,
 } from "./helpers.ts";
-import { TEXT_ONLY_PDF, WITH_IMAGE_PDF, writeFixtures } from "./fixtures.ts";
+import { SPLIT_RUN_PDF, TEXT_ONLY_PDF, WITH_IMAGE_PDF, writeFixtures } from "./fixtures.ts";
 
 // These cover the three things Node cannot: the drag surface, the
 // confirmation modal, and the outcome panel's incomplete-coverage state.
@@ -53,37 +54,35 @@ test.describe("redaction on a page containing an image", () => {
     await expect(panel).toHaveAttribute("data-coverage", "incomplete");
   });
 
-  test("an un-removable run is named individually rather than only counted", async ({ page }) => {
-    await openWithPdf(page, WITH_IMAGE_PDF);
+  test("a run that cannot be stripped is named individually, not just counted", async ({ page }) => {
+    // The image fixture cannot exercise this: every targeted run there IS
+    // strippable, so unremovedRuns is legitimately empty and the naming path
+    // never runs. This fixture splits the SSN across two show operators, which
+    // runSpansMultipleOperators rejects -- masked, not removed.
+    await openWithPdf(page, SPLIT_RUN_PDF);
     await enterRedactMode(page);
-    // Every run at once, so any that cannot be stripped shows up by name.
-    for (const needle of ["Employee record", "123-45-6789", "ada@example.com", "84500"]) {
-      const run = page.locator(runSelectorFor(needle)).first();
-      const box = await run.boundingBox();
-      if (!box) continue;
-      await page.mouse.move(box.x + 2, box.y + 1);
-      await page.mouse.down();
-      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-      await page.mouse.move(box.x + box.width - 2, box.y + box.height - 1);
-      await page.mouse.up();
-    }
+    await dragBoxOverRun(page, "123-45-6789");
     await applyRedactionThroughModal(page);
 
     const panel = outcomePanel(page);
-    await expect(panel).toBeVisible({ timeout: 60_000 });
-    const text = await panel.innerText();
-    // Either everything was removed (the image warning still fires, so the
-    // panel is still incomplete), or something was not -- and if so each one
-    // must be NAMED, never reported as a bare count.
-    if (/not removed/i.test(text)) {
-      const named = unremovedRuns(page);
-      expect(await named.count(), "un-removed runs must be named, not just counted").toBeGreaterThan(0);
-      for (const entry of await named.allInnerTexts()) {
-        expect(entry.replace(/[“”,\s]/g, ""), "each named run must carry actual text").not.toBe("");
-      }
-    }
-    await expect(panel).toContainText("Text inside an image is part of the picture");
+    await expect(panel).toBeVisible();
     await expect(panel).toHaveAttribute("data-coverage", "incomplete");
+
+    // Asserted on the per-run hook directly. The previous version matched
+    // /not removed/i against the panel's whole text, which the image-warning
+    // sentence also satisfies -- so it demanded a list that correctly did not
+    // exist, and would have passed for the wrong reason on another fixture.
+    const named = unremovedRuns(page);
+    await expect(named).toHaveCount(1);
+    await expect(named.first()).toContainText("123-45-6789");
+
+    // The document must still be readable -- absence of the panel's claim is
+    // not evidence, so check the stage rendered with its other run intact.
+    await waitForStageReady(page);
+    const runs = await detectedRunTexts(page);
+    expect(runs.some((run) => run.includes("Employee record"))).toBe(true);
+    // And the honest part: it was NOT removed, so it is still there.
+    expect(runs.some((run) => run.includes("123-45-6789"))).toBe(true);
   });
 });
 
@@ -97,15 +96,19 @@ test.describe("undo and redo move the mask and the stripped text together", () =
     await dragBoxOverRun(page, "123-45-6789");
     await applyRedactionThroughModal(page);
 
-    await expect
-      .poll(async () => (await detectedRunTexts(page)).some((run) => run.includes("123-45-6789")), {
-        timeout: 60_000,
-        message: "the SSN should be gone from the document after redacting",
-      })
-      .toBe(false);
+    // applyRedactionThroughModal already gated on the stage being ready, so
+    // what follows reads a real stage rather than a loading skeleton. That
+    // matters: an empty stage satisfies "the SSN is gone" while proving
+    // nothing, which is how this assertion used to pass.
+    const afterRedaction = await detectedRunTexts(page);
+    expect(afterRedaction.length, "stage must have rendered before asserting absence").toBeGreaterThan(0);
+    expect(afterRedaction.some((run) => run.includes("123-45-6789"))).toBe(false);
+    // Other content still present -- absence is only meaningful alongside it.
+    expect(afterRedaction.some((run) => run.includes("Employee record"))).toBe(true);
     expect(await blackMaskCount(page)).toBeGreaterThan(0);
 
     await page.getByRole("button", { name: "Undo" }).click();
+    await waitForStageReady(page);
 
     // ONE assertion block, because the defect this guards against is the two
     // halves moving independently: a mask left over text that is already
@@ -127,11 +130,13 @@ test.describe("undo and redo move the mask and the stripped text together", () =
     await dragBoxOverRun(page, "123-45-6789");
     await applyRedactionThroughModal(page);
     await page.getByRole("button", { name: "Undo" }).click();
+    await waitForStageReady(page);
     await expect
       .poll(async () => (await detectedRunTexts(page)).some((run) => run.includes("123-45-6789")), { timeout: 60_000 })
       .toBe(true);
 
     await page.getByRole("button", { name: "Redo" }).click();
+    await waitForStageReady(page);
     await expect
       .poll(
         async () => ({
