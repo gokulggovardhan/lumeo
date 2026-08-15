@@ -65,6 +65,28 @@ function nameString(obj: unknown): string | null {
   return obj instanceof PDFName ? obj.asString().replace(/^\//, "") : null;
 }
 
+// pdf-lib's context.lookupMaybe(ref, Type) throws UnexpectedObjectTypeError
+// (same as the strict lookup(ref, Type)) when the ref resolves to an object
+// of the WRONG type -- it only returns undefined for a missing/null object.
+// Every call site below uses the type-less lookup(ref) instead and
+// instanceof-checks the result itself, so a malformed PDF (an indirect
+// reference pointing at an unexpected type) degrades gracefully instead of
+// throwing. See lib/pdf/edit/formXObjects.ts's resolveMaybe for the same fix.
+function lookupDict(ref: PDFRef, context: PDFContext): PDFDict | undefined {
+  const resolved = context.lookup(ref);
+  return resolved instanceof PDFDict ? resolved : undefined;
+}
+
+function resolveDictMaybe(entry: unknown, context: PDFContext): PDFDict | undefined {
+  const resolved = entry instanceof PDFRef ? context.lookup(entry) : entry;
+  return resolved instanceof PDFDict ? resolved : undefined;
+}
+
+function lookupStream(ref: PDFRef, context: PDFContext): PDFStream | undefined {
+  const resolved = context.lookup(ref);
+  return resolved instanceof PDFStream ? resolved : undefined;
+}
+
 function buildWinAnsiTable(): { codeToUnicode: Map<number, string>; nameToUnicode: Map<string, string> } {
   const codeToUnicode = new Map<number, string>();
   for (let code = 0; code < 256; code += 1) {
@@ -144,7 +166,7 @@ function resolveSimpleFontEncoding(fontDict: PDFDict, context: PDFContext): {
   }
 
   if (encodingEntry instanceof PDFRef) {
-    const resolved = context.lookupMaybe(encodingEntry, PDFDict);
+    const resolved = lookupDict(encodingEntry, context);
     if (resolved) return resolveSimpleFontEncodingDict(resolved);
   }
   if (encodingEntry instanceof PDFDict) {
@@ -280,8 +302,7 @@ function parseToUnicodeCMap(bytes: Uint8Array): Map<number, string> {
 
 function findToUnicodeMap(fontDict: PDFDict, context: PDFContext): Map<number, string> | null {
   const toUnicodeEntry = fontDict.get(PDFName.of("ToUnicode"));
-  const streamCandidate =
-    toUnicodeEntry instanceof PDFRef ? context.lookupMaybe(toUnicodeEntry, PDFStream) : undefined;
+  const streamCandidate = toUnicodeEntry instanceof PDFRef ? lookupStream(toUnicodeEntry, context) : undefined;
   if (!streamCandidate || !(streamCandidate instanceof PDFRawStream)) return null;
   const stream = streamCandidate;
   try {
@@ -303,7 +324,7 @@ function isEmbedded(descriptor: PDFDict | undefined): boolean {
 
 function fontDescriptorOf(fontDict: PDFDict, context: PDFContext): PDFDict | undefined {
   const ref = fontDict.get(PDFName.of("FontDescriptor"));
-  return ref instanceof PDFRef ? context.lookupMaybe(ref, PDFDict) : undefined;
+  return ref instanceof PDFRef ? lookupDict(ref, context) : undefined;
 }
 
 // Resolves a font resource dictionary (the object a matched
@@ -319,7 +340,7 @@ export function resolveFont(fontDict: PDFDict, context: PDFContext): ResolvedFon
     const descendantFonts = fontDict.get(PDFName.of("DescendantFonts"));
     const descendantDict =
       descendantFonts instanceof PDFArray && descendantFonts.size() > 0
-        ? context.lookupMaybe(descendantFonts.get(0), PDFDict)
+        ? resolveDictMaybe(descendantFonts.get(0), context)
         : undefined;
     const descriptor = descendantDict ? fontDescriptorOf(descendantDict, context) : undefined;
     const embedded = isEmbedded(descriptor);

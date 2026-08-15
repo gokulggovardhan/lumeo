@@ -27,14 +27,20 @@ function isDctDecodeFilter(filter: ReturnType<PDFDict["get"]>): boolean {
   // is more than this conservative pass attempts, so only a bare single
   // DCTDecode (array of exactly one) is treated as safe to recompress.
   if (filter instanceof PDFArray && filter.size() === 1) {
-    return filter.lookupMaybe(0, PDFName) === PDFName.of("DCTDecode");
+    // Untyped lookup + instanceof. lookupMaybe(index, Type) throws on the
+    // WRONG type and returns undefined only for a MISSING entry, so a
+    // /Filter array holding something unexpected threw here instead of
+    // reporting "not a plain DCTDecode".
+    const only = filter.lookup(0);
+    return only instanceof PDFName && only === PDFName.of("DCTDecode");
   }
   return false;
 }
 
 function isPlainDctDecodeJpeg(stream: PDFRawStream): boolean {
   const dict = stream.dict;
-  const subtype = dict.lookupMaybe(PDFName.of("Subtype"), PDFName);
+  const subtypeEntry = dict.lookup(PDFName.of("Subtype"));
+  const subtype = subtypeEntry instanceof PDFName ? subtypeEntry : undefined;
   if (!subtype || subtype !== PDFName.of("Image")) return false;
   if (!isDctDecodeFilter(dict.get(PDFName.of("Filter")))) return false;
 
@@ -57,7 +63,8 @@ export function findEmbeddedJpegs(page: PDFPage): EmbeddedJpegXObject[] {
   const resources = page.node.Resources();
   if (!resources) return [];
 
-  const xObjects = resources.lookupMaybe(PDFName.of("XObject"), PDFDict);
+  const xObjectsEntry = resources.lookup(PDFName.of("XObject"));
+  const xObjects = xObjectsEntry instanceof PDFDict ? xObjectsEntry : undefined;
   if (!xObjects) return [];
 
   const found: EmbeddedJpegXObject[] = [];

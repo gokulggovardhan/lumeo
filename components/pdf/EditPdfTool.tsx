@@ -68,6 +68,27 @@ import type { ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
+import {
+  countElementsOnRemovedPages,
+  deletePages,
+  mergePdf,
+  remapElements,
+  remapPageIndex,
+  reorderPages,
+  splitPdf,
+  type PageMap,
+} from "@/lib/pdf/edit/pageOps";
+import PageThumbnailSidebar from "@/components/pdf/edit/PageThumbnailSidebar";
+import RedactionLayer from "@/components/pdf/edit/RedactionLayer";
+import { applyRedaction, type RedactionOutcome } from "@/lib/pdf/edit/applyRedaction";
+import {
+  describeCoverageWarning,
+  findSensitiveMatches,
+  maskBoxFor,
+  removeSpans,
+  runsIntersectingBoxes,
+  type RedactionBox,
+} from "@/lib/pdf/edit/redaction";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget, computeAdaptiveRenderScale, quantizeRenderScale } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
@@ -560,6 +581,30 @@ export default function EditPdfTool() {
   // the render effect that populated it, for the SAME pageIndex.
   const pageAndViewportRef = useRef<{ pageIndex: number; page: PDFPageProxy; viewport: PageViewport } | null>(null);
   const [docReady, setDocReady] = useState(0);
+  // Page-structure state. selectedPages is the rail's tick boxes (delete /
+  // extract act on it); pageOpBusy serialises operations, because two
+  // rebuilds racing on the same bytes would have one silently overwrite the
+  // other's result.
+  const [selectedPages, setSelectedPages] = useState<ReadonlySet<number>>(() => new Set());
+  const [pageOpBusy, setPageOpBusy] = useState(false);
+  const [pageOpNotice, setPageOpNotice] = useState("");
+  const lastSelectedPageRef = useRef<number | null>(null);
+  const mergeInputRef = useRef<HTMLInputElement | null>(null);
+  // The rail needs the live pdfjs document, which lives in a ref so page
+  // turns do not re-render this component. A stable getter hands it over
+  // without making the ref itself part of the child's props (a ref object
+  // never changes identity, so the child could not tell a swap had
+  // happened) -- docReady is what signals that.
+  const getPdfJsDocument = useCallback(() => pdfJsDocRef.current, []);
+  // Redaction state. `redactMode` gates the drag surface; boxes are the
+  // user's drawn rectangles in percent space; outcome is what the last run
+  // could and could not remove, kept on screen until dismissed because its
+  // warnings are the whole safety story.
+  const [redactMode, setRedactMode] = useState(false);
+  const [redactionBoxes, setRedactionBoxes] = useState<RedactionBox[]>([]);
+  const [redactionConfirmOpen, setRedactionConfirmOpen] = useState(false);
+  const [redactionOutcome, setRedactionOutcome] = useState<RedactionOutcome | null>(null);
+  const [redactionBusy, setRedactionBusy] = useState(false);
   // addFile() must open the file via pdfjs once up front to read its page
   // count (for the page-count limit check) before pdf state is even set --
   // the [pdf]-keyed effect below would otherwise open the SAME bytes a
@@ -674,11 +719,22 @@ export default function EditPdfTool() {
       // Reuse the doc addFile() already opened (to read the page count
       // before pdf state existed) instead of parsing the same bytes again --
       // only valid when it was opened from this exact ArrayBuffer instance.
+      // Page-structure operations (reorder/delete/merge) change how many
+      // pages the live document has, and so does undoing one. pdfMeta's
+      // count is set once at upload, so it is re-synced from the document
+      // that was actually opened -- deriving it here rather than at each
+      // call site means undo/redo cannot leave it stale, since this effect
+      // re-runs on every pdfBytes change.
+      const adopt = (doc: PDFDocumentProxy) => {
+        pdfJsDocRef.current = doc;
+        setDocReady((current) => current + 1);
+        setPdfMeta((current) => (current && current.pageCount !== doc.numPages ? { ...current, pageCount: doc.numPages } : current));
+      };
+
       const pending = pendingInitialDocRef.current;
       if (pending && pending.bytes === pdf.bytes) {
         pendingInitialDocRef.current = null;
-        pdfJsDocRef.current = pending.doc;
-        setDocReady((current) => current + 1);
+        adopt(pending.doc);
         return;
       }
       if (pending) {
@@ -692,8 +748,7 @@ export default function EditPdfTool() {
           void (doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
           return;
         }
-        pdfJsDocRef.current = doc;
-        setDocReady((current) => current + 1);
+        adopt(doc);
       } catch {
         setError("This file could not be read for preview.");
       }
@@ -1428,6 +1483,11 @@ export default function EditPdfTool() {
   // content stream) is a separate question, answered by editPreview below,
   // never assumed here.
   function selectTextRun(index: number | null, extend = false) {
+    // Closing the editor on mode entry is not enough on its own: a run
+    // overlay is still keyboard-focusable, so Enter could reopen the editor
+    // underneath the redaction surface and restore exactly the reachable-by-
+    // keyboard-only state that was just removed. Deselection still works.
+    if (redactMode && index !== null) return;
     // Phase 31: text-run selection and placed-element selection (selectedId)
     // are two independent pieces of state that were never made mutually
     // exclusive -- selecting a run while a placed element was already
@@ -1896,6 +1956,124 @@ export default function EditPdfTool() {
     setElements((current) => [...current, element]);
   }
 
+  // --- Page structure ------------------------------------------------------
+  //
+  // Every operation here commits BOTH halves of the snapshot in a single
+  // setHistoryState call: the rebuilt bytes and the elements remapped onto
+  // their new page indices. Splitting them across two updates would create
+  // a frame -- and an undo entry -- where annotations point at pages that
+  // no longer hold them. One call, one undo step, always consistent.
+  //
+  // The download URL needs no handling here: setHistoryState is the choke
+  // point that clears it (see its wrapper near the top of this component),
+  // so a restructured document can never stay downloadable at its old
+  // shape. That is the whole reason the invalidation was centralised.
+  async function runPageOperation(
+    operation: () => Promise<{ bytes: ArrayBuffer; pageMap: PageMap; pageCount: number }>,
+    describe: (droppedElements: number) => string,
+  ) {
+    if (pageOpBusy) return;
+    setPageOpBusy(true);
+    setPageOpNotice("");
+    setError("");
+    try {
+      const { bytes, pageMap, pageCount } = await operation();
+      const dropped = countElementsOnRemovedPages(elements, pageMap);
+
+      setHistoryState((current) => ({
+        elements: remapElements(current.elements, pageMap),
+        pdfBytes: bytes,
+      }));
+      setPageIndex((current) => remapPageIndex(current, pageMap, pageCount));
+      setSelectedPages(new Set());
+      setSelectedId(null);
+      selectTextRun(null);
+      setPageOpNotice(describe(dropped));
+    } catch (operationError) {
+      setError(operationError instanceof Error ? operationError.message : "That page operation could not be completed.");
+    } finally {
+      setPageOpBusy(false);
+    }
+  }
+
+  function handleReorderPages(fromIndex: number, toIndex: number) {
+    const order = Array.from({ length: pdfMeta?.pageCount ?? 0 }, (_, i) => i);
+    const [moved] = order.splice(fromIndex, 1);
+    order.splice(toIndex, 0, moved);
+    void runPageOperation(
+      () => reorderPages(historyState.pdfBytes, order),
+      () => `Moved page ${fromIndex + 1} to position ${toIndex + 1}.`,
+    );
+  }
+
+  function handleDeleteSelectedPages() {
+    const targets = [...selectedPages];
+    if (targets.length === 0) return;
+    void runPageOperation(
+      () => deletePages(historyState.pdfBytes, targets),
+      (dropped) =>
+        `Removed ${targets.length} page${targets.length === 1 ? "" : "s"}` +
+        // Named explicitly rather than left to be discovered: the elements
+        // are gone from the document and only Undo brings them back.
+        (dropped > 0 ? `, along with ${dropped} placed item${dropped === 1 ? "" : "s"} on them.` : "."),
+    );
+  }
+
+  async function handleMergeFile(file: File) {
+    const incoming = await file.arrayBuffer();
+    // Insert after the page being viewed, which is what "add pages here"
+    // means to someone looking at it. Appending to the end would be simpler
+    // and would ignore where they are.
+    const insertAt = pageIndex + 1;
+    void runPageOperation(
+      () => mergePdf(historyState.pdfBytes, incoming, insertAt),
+      () => `Added ${sanitizePdfFileName(file.name)} after page ${pageIndex + 1}.`,
+    );
+  }
+
+  // Extract does NOT modify the document being edited -- it hands the user a
+  // new file. Routed through the same download plumbing as Export so the
+  // blob URL is owned and revoked in one place rather than leaked here.
+  async function handleExtractSelectedPages() {
+    const targets = [...selectedPages].sort((a, b) => a - b);
+    if (targets.length === 0 || pageOpBusy) return;
+    setPageOpBusy(true);
+    setPageOpNotice("");
+    setError("");
+    try {
+      const { bytes } = await splitPdf(historyState.pdfBytes, targets);
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      downloadUrlRef.current = url;
+      setDownloadUrl(url);
+      setDownloadName(sanitizePdfFileName(`${outputName.replace(/\.pdf$/i, "")}-pages-${targets.map((i) => i + 1).join("-")}.pdf`));
+      setPageOpNotice(`Extracted ${targets.length} page${targets.length === 1 ? "" : "s"} — ready to download.`);
+    } catch (extractError) {
+      setError(extractError instanceof Error ? extractError.message : "Those pages could not be extracted.");
+    } finally {
+      setPageOpBusy(false);
+    }
+  }
+
+  function togglePageSelected(target: number, additive: boolean) {
+    setSelectedPages((current) => {
+      const next = new Set(current);
+      if (additive && lastSelectedPageRef.current !== null) {
+        // Shift-click extends from the last tick, the behaviour every file
+        // list has trained people to expect.
+        const [from, to] = [lastSelectedPageRef.current, target].sort((a, b) => a - b);
+        for (let i = from; i <= to; i += 1) next.add(i);
+      } else if (next.has(target)) {
+        next.delete(target);
+      } else {
+        next.add(target);
+      }
+      lastSelectedPageRef.current = target;
+      return next;
+    });
+  }
+
   // Phase 9.2: a real, previously-existing UX gap fixed as part of wiring up
   // true text edits -- the Export button below used to be gated purely on
   // `elements.length > 0` (overlay annotations), since that was the only
@@ -1908,6 +2086,73 @@ export default function EditPdfTool() {
   // user undoes every text edit back to the original.
   const hasTextEdits = historyState.pdfBytes !== originalBytes;
   const currentPageElements = useMemo(() => elementsForPage(elements, pageIndex), [elements, pageIndex]);
+
+  // What the drawn boxes actually cover. Recomputed on every box change so
+  // the review list is never a frame behind what is on screen -- a stale
+  // count here would understate what is about to be removed.
+  const redactionTargets = useMemo(
+    () => (redactionBoxes.length === 0 ? [] : runsIntersectingBoxes(detectedTextRuns, redactionBoxes)),
+    [detectedTextRuns, redactionBoxes],
+  );
+
+  // Detection is an AID, offered as boxes the user reviews -- never applied
+  // on its own say-so. A regex that misses one SSN in a document someone
+  // believed was scrubbed is the exact harm this feature must not cause.
+  function handleDetectSensitive() {
+    const found: RedactionBox[] = [];
+    for (const run of detectedTextRuns) {
+      if (findSensitiveMatches(run.str).length > 0) found.push(maskBoxFor(run, []));
+    }
+    if (found.length === 0) {
+      setPageOpNotice("No SSNs, emails, card numbers or IBANs found on this page. Draw boxes manually for anything else.");
+      return;
+    }
+    setRedactionBoxes((current) => [...current, ...found]);
+    setPageOpNotice(`Found ${found.length} likely sensitive value${found.length === 1 ? "" : "s"} — review before redacting.`);
+  }
+
+  async function handleApplyRedaction() {
+    const cached = pageAndViewportRef.current;
+    if (!cached || cached.pageIndex !== pageIndex || redactionTargets.length === 0) return;
+    setRedactionConfirmOpen(false);
+    setRedactionBusy(true);
+    setError("");
+    try {
+      // Each targeted run keeps everything except its detected sensitive
+      // spans. A run the box merely clips has no such spans, so it is
+      // removed whole -- over-redaction, the safe direction, per
+      // redaction.ts.
+      const targets = redactionTargets.map((run) => {
+        const matches = findSensitiveMatches(run.str);
+        return { ...run, replacementText: matches.length > 0 ? removeSpans(run.str, matches) : "" };
+      });
+
+      const outcome = await applyRedaction(historyState.pdfBytes, pageIndex, targets, {
+        width: cached.viewport.width,
+        height: cached.viewport.height,
+        transform: cached.viewport.transform,
+      });
+
+      // The black masks go on as real drawn elements, in the SAME history
+      // entry as the stripped bytes, so one Undo reverses the whole
+      // redaction rather than leaving masks over already-removed text.
+      const masks = redactionTargets.map((run) => {
+        const box = maskBoxFor(run, redactionBoxes);
+        const mask = createWhiteoutElement(nextElementId(), pageIndex, box.xPct, box.yPct, "black");
+        return { ...mask, widthPct: box.widthPct, heightPct: box.heightPct };
+      });
+
+      setHistoryState((current) => ({ elements: [...current.elements, ...masks], pdfBytes: outcome.bytes }));
+      setRedactionOutcome(outcome);
+      setRedactionBoxes([]);
+      setSelectedId(null);
+      selectTextRun(null);
+    } catch (redactionError) {
+      setError(redactionError instanceof Error ? redactionError.message : "The redaction could not be applied.");
+    } finally {
+      setRedactionBusy(false);
+    }
+  }
   const selectedElement = useMemo(() => elements.find((item) => item.id === selectedId) ?? null, [elements, selectedId]);
   // DISPLAYED CSS pixels per PDF point -- what EditElementView needs to size
   // a placed text element's glyphs to match the page under them
@@ -2039,7 +2284,7 @@ export default function EditPdfTool() {
   }
 
   return (
-    <section className="l2-workspace-deep grid gap-4 pb-40 lg:pb-6">
+    <section className="relative l2-workspace-deep grid gap-4 pb-40 lg:pb-28">
       <L2WorkspaceHeader
         title="Edit PDF"
         description={`${pdf.file.name} · ${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
@@ -2104,6 +2349,27 @@ export default function EditPdfTool() {
             white page gives it real presence instead of sitting flush
             against the same glass tone as every other panel. */}
         <div className="aura-glass-thin min-w-0 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)] sm:p-5">
+            {/* The page rail is desktop-only (`hidden lg:flex` on its
+                wrapper): a 124px column plus the stage does not fit a phone
+                without shrinking the page to the point of uselessness, and
+                page reordering by drag is a pointer interaction anyway. */}
+            <div className="flex gap-3 sm:pl-[68px]">
+              {pdfMeta && pdfMeta.pageCount > 1 ? (
+                <div className="hidden max-h-[70vh] lg:flex">
+                  <PageThumbnailSidebar
+                    pageCount={pdfMeta.pageCount}
+                    activePageIndex={pageIndex}
+                    docReady={docReady}
+                    getDocument={getPdfJsDocument}
+                    selected={selectedPages}
+                    busy={pageOpBusy}
+                    onSelectPage={setPageIndex}
+                    onToggleSelected={togglePageSelected}
+                    onReorder={handleReorderPages}
+                  />
+                </div>
+              ) : null}
+              <div className="min-w-0 flex-1">
             {error ? (
               // Phase 28: previously the loading skeleton (below) had no
               // `error` check of its own, so a render failure/timeout left
@@ -2139,7 +2405,7 @@ export default function EditPdfTool() {
               // subtracted space is the app header + document toolbar stacked
               // above it.
               <div
-                className="overflow-auto overscroll-contain rounded-[var(--radius-xl)] bg-[var(--atelier-surface-0)]/[0.35] p-3 sm:p-6"
+                className="lumeo-canvas-scroll overflow-auto overscroll-contain rounded-[var(--radius-xl)] bg-[var(--atelier-surface-0)]/[0.35] p-3 sm:p-6"
                 style={{ maxHeight: "calc(100vh - 15rem)" }}
               >
               <div className="mx-auto" style={{ width: `${zoom * 100}%` }}>
@@ -2196,6 +2462,16 @@ export default function EditPdfTool() {
                     />
                   ) : null}
 
+                  {/* Placed elements are INERT while redact mode owns the
+                      page. Unlike the inline editor -- which is closed
+                      outright because a dead-looking editor is its own
+                      confusion -- a redaction mask must stay VISIBLE; it is
+                      the redaction. What it must not be is interactive.
+                      Without this the mask kept role="button" and tabindex
+                      0 behind the drag surface, so it was focusable AND
+                      activatable from the keyboard while unreachable by
+                      mouse -- the same split that let Tab fire Restyle. */}
+                  <div inert={redactMode} className="contents">
                   {currentPageElements.map((element) => (
                     <EditElementView
                       key={element.id}
@@ -2219,6 +2495,7 @@ export default function EditPdfTool() {
                       pixelsPerPoint={pixelsPerPoint}
                     />
                   ))}
+                  </div>
 
                   {activeTool === "draw" && pageDisplaySize ? (
                     <InkCanvas
@@ -2577,11 +2854,232 @@ export default function EditPdfTool() {
                       <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">This page doesn&rsquo;t contain selectable text. Use Text to add new text.</p>
                     </div>
                   ) : null}
+                  {redactMode ? (
+                    <RedactionLayer
+                      boxes={redactionBoxes}
+                      targetedRuns={redactionTargets}
+                      disabled={redactionBusy}
+                      onAddBox={(box) => setRedactionBoxes((current) => [...current, box])}
+                      onRemoveBox={(index) => setRedactionBoxes((current) => current.filter((_, i) => i !== index))}
+                    />
+                  ) : null}
                 </div>
               </div>
               </div>
             )}
+              </div>
+            </div>
+
+            {pdfMeta && pdfMeta.pageCount > 0 ? (
+              <div className="mt-3 hidden max-w-full flex-wrap items-center gap-2 overflow-x-auto lg:flex">
+                <input
+                  ref={mergeInputRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    // Reset first: picking the same file twice in a row
+                    // fires no change event otherwise, and "nothing
+                    // happened" is indistinguishable from a bug.
+                    event.target.value = "";
+                    if (file) void handleMergeFile(file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => mergeInputRef.current?.click()}
+                  disabled={pageOpBusy}
+                  className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:opacity-40"
+                >
+                  Add pages
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteSelectedPages}
+                  disabled={pageOpBusy || selectedPages.size === 0}
+                  className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:opacity-40"
+                >
+                  Delete selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleExtractSelectedPages()}
+                  disabled={pageOpBusy || selectedPages.size === 0}
+                  className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:opacity-40"
+                >
+                  Extract selected
+                </button>
+                {selectedPages.size > 0 ? (
+                  <span className="text-[11px] text-[var(--text-secondary)]">{selectedPages.size} selected</span>
+                ) : null}
+                {pageOpNotice ? (
+                  <span role="status" className="text-[11px] text-[var(--text-secondary)]">{pageOpNotice}</span>
+                ) : null}
+
+                <span className="mx-1 h-5 w-px bg-[var(--text-primary)]/10" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!redactMode) {
+                      // The inline text editor is CLOSED on entering redact
+                      // mode rather than left inert behind the drag surface.
+                      //
+                      // Inert would have worked mechanically, but it leaves an
+                      // editor that looks live and does nothing -- and it is
+                      // an attribute the next overlay can forget. Closing
+                      // removes the ambiguity structurally. It matters here
+                      // because those controls were reachable by keyboard
+                      // while unreachable by mouse: Tab could still fire
+                      // Restyle, a document-mutating action, inside the mode
+                      // whose entire purpose is a confirmed destructive one.
+                      //
+                      // An unsaved draft is never silently discarded -- entry
+                      // is refused instead, and the user decides whether to
+                      // apply or cancel.
+                      const originalText = detectedTextRuns[selectedRunIndices[0]]?.str ?? "";
+                      const hasUnsavedDraft = selectedRunIndices.length === 1 && editDraftText !== "" && editDraftText !== originalText;
+                      if (hasUnsavedDraft) {
+                        setPageOpNotice("Apply or cancel your text edit before redacting.");
+                        return;
+                      }
+                      selectTextRun(null);
+                    }
+                    setRedactMode((current) => !current);
+                    setRedactionBoxes([]);
+                    setRedactionOutcome(null);
+                  }}
+                  aria-pressed={redactMode}
+                  className={`rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] transition ${
+                    redactMode
+                      ? "border-[#ff4d4d]/60 bg-[#ff4d4d]/10 text-[#ff8080]"
+                      : "border-[var(--text-primary)]/14 text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                  }`}
+                >
+                  {redactMode ? "Exit redact" : "Redact"}
+                </button>
+                {redactMode ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleDetectSensitive}
+                      disabled={redactionBusy || !textDetectionReady}
+                      className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:opacity-40"
+                    >
+                      Find sensitive data
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRedactionConfirmOpen(true)}
+                      disabled={redactionBusy || redactionTargets.length === 0}
+                      className="rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] transition enabled:border-[#ff4d4d]/60 enabled:bg-[#ff4d4d]/10 enabled:text-[#ff8080] disabled:border-[var(--text-primary)]/12 disabled:text-[var(--text-secondary)]/50"
+                    >
+                      {redactionBusy ? "Redacting…" : `Redact ${redactionTargets.length} run${redactionTargets.length === 1 ? "" : "s"}`}
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
+
+            {/* The outcome panel is the safety story, so it is NOT a toast:
+                it stays until dismissed, and it leads with what was not
+                removed rather than burying it under a success message. */}
+            {redactionOutcome ? (
+              <div
+                role="alert"
+                data-testid="redaction-outcome"
+                // Machine-readable coverage, driven by the SAME condition
+                // that colours the panel. Tests assert on this rather than
+                // on hex values, so a theme pass can never silently flip a
+                // security assertion to green -- or break it for a reason
+                // that has nothing to do with redaction.
+                data-coverage={redactionOutcome.complete ? "complete" : "incomplete"}
+                className={`mt-3 rounded-[var(--radius-lg)] border p-3 ${
+                  redactionOutcome.complete
+                    ? "border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/70"
+                    : "border-[#ff4d4d]/50 bg-[#ff4d4d]/[0.07]"
+                }`}
+              >
+                <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-primary)]/70">
+                  {redactionOutcome.complete
+                    ? `Removed ${redactionOutcome.strippedRuns.length} text run${redactionOutcome.strippedRuns.length === 1 ? "" : "s"} from the file`
+                    : "Redaction incomplete — read this before sharing the file"}
+                </p>
+                {redactionOutcome.unremovedRuns.length > 0 ? (
+                  <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/75">
+                    {redactionOutcome.unremovedRuns.length} run
+                    {redactionOutcome.unremovedRuns.length === 1 ? " was" : "s were"} masked but <strong>not removed</strong>:{" "}
+                    {redactionOutcome.unremovedRuns.slice(0, 3).map((run, index) => (
+                      <span key={index} data-testid="redaction-unremoved-run">
+                        {index > 0 ? ", " : ""}
+                        &ldquo;{run}&rdquo;
+                      </span>
+                    ))}
+                    {redactionOutcome.unremovedRuns.length > 3 ? ", …" : ""}
+                  </p>
+                ) : null}
+                {redactionOutcome.warnings.map((warning, index) => (
+                  <p key={index} className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/75">
+                    {describeCoverageWarning(warning)}
+                  </p>
+                ))}
+                {redactionOutcome.metadataScrubbed ? (
+                  <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/55">
+                    Document metadata (title, author, subject, keywords, producer, creator and the XMP packet) was cleared.
+                  </p>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setRedactionOutcome(null)}
+                  className="mt-2 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] underline"
+                >
+                  Dismiss
+                </button>
+              </div>
+            ) : null}
         </div>
+
+        {/* Confirmation states the boundaries BEFORE the irreversible-feeling
+            action, not after. Redaction is undoable here, but the file a
+            user downloads is not, and the limits are what they need in
+            order to decide whether this output is safe to share. */}
+        {redactionConfirmOpen ? (
+          <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">
+            <div role="dialog" aria-modal="true" aria-labelledby="redact-confirm-title" className="max-w-md rounded-[var(--radius-xl)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)] p-5 shadow-2xl">
+              <h2 id="redact-confirm-title" className="text-sm font-bold text-[var(--text-primary)]">
+                Redact {redactionTargets.length} text run{redactionTargets.length === 1 ? "" : "s"}?
+              </h2>
+              <p className="mt-2 text-[12px] leading-5 text-[var(--text-primary)]/75">
+                The characters will be removed from the file&rsquo;s text, not just covered. A black box is drawn over each one.
+              </p>
+              <p className="mt-2 text-[12px] font-semibold leading-5 text-[var(--text-primary)]/85">This does not remove:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5 text-[12px] leading-5 text-[var(--text-primary)]/70">
+                <li>Text inside images. On a scanned page a black box covers a picture; the pixels stay in the file.</li>
+                <li>Vector artwork, such as a signature drawn as a path.</li>
+                <li>Annotations, form field values, or embedded attachments.</li>
+              </ul>
+              <p className="mt-2 text-[12px] leading-5 text-[var(--text-primary)]/70">
+                Anything that could not be removed is listed afterwards. Check that list before sharing the file.
+              </p>
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setRedactionConfirmOpen(false)}
+                  className="rounded-full border border-[var(--text-primary)]/14 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleApplyRedaction()}
+                  className="rounded-full border border-[#ff4d4d]/60 bg-[#ff4d4d]/15 px-4 py-2 text-[11px] font-bold uppercase tracking-[0.1em] text-[#ff8080]"
+                >
+                  Redact
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <MicroDock
           activeTool={activeTool}
@@ -2622,7 +3120,7 @@ export default function EditPdfTool() {
           <button
             type="button"
             onClick={downloadEditedPdf}
-            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--lumeo-gold)] px-5 text-sm font-bold text-[var(--atelier-surface-0)] transition hover:-translate-y-0.5 hover:bg-[var(--lumeo-gold)]/85 active:scale-[0.98] sm:w-auto"
           >
             Download edited PDF
           </button>
@@ -2639,7 +3137,7 @@ export default function EditPdfTool() {
             // visible spinner/label, so it doesn't need a redundant tooltip
             // repeating that.
             title={!isExporting && elements.length === 0 && !hasTextEdits ? "No edits to export yet." : undefined}
-            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--lumeo-gold)] px-5 text-sm font-bold text-[var(--atelier-surface-0)] transition hover:-translate-y-0.5 hover:bg-[var(--lumeo-gold)]/85 disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
           >
             {isExporting ? (
               <>
