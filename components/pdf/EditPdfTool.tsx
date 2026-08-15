@@ -68,6 +68,17 @@ import type { ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
+import {
+  countElementsOnRemovedPages,
+  deletePages,
+  mergePdf,
+  remapElements,
+  remapPageIndex,
+  reorderPages,
+  splitPdf,
+  type PageMap,
+} from "@/lib/pdf/edit/pageOps";
+import PageThumbnailSidebar from "@/components/pdf/edit/PageThumbnailSidebar";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget, computeAdaptiveRenderScale, quantizeRenderScale } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
@@ -560,6 +571,21 @@ export default function EditPdfTool() {
   // the render effect that populated it, for the SAME pageIndex.
   const pageAndViewportRef = useRef<{ pageIndex: number; page: PDFPageProxy; viewport: PageViewport } | null>(null);
   const [docReady, setDocReady] = useState(0);
+  // Page-structure state. selectedPages is the rail's tick boxes (delete /
+  // extract act on it); pageOpBusy serialises operations, because two
+  // rebuilds racing on the same bytes would have one silently overwrite the
+  // other's result.
+  const [selectedPages, setSelectedPages] = useState<ReadonlySet<number>>(() => new Set());
+  const [pageOpBusy, setPageOpBusy] = useState(false);
+  const [pageOpNotice, setPageOpNotice] = useState("");
+  const lastSelectedPageRef = useRef<number | null>(null);
+  const mergeInputRef = useRef<HTMLInputElement | null>(null);
+  // The rail needs the live pdfjs document, which lives in a ref so page
+  // turns do not re-render this component. A stable getter hands it over
+  // without making the ref itself part of the child's props (a ref object
+  // never changes identity, so the child could not tell a swap had
+  // happened) -- docReady is what signals that.
+  const getPdfJsDocument = useCallback(() => pdfJsDocRef.current, []);
   // addFile() must open the file via pdfjs once up front to read its page
   // count (for the page-count limit check) before pdf state is even set --
   // the [pdf]-keyed effect below would otherwise open the SAME bytes a
@@ -674,11 +700,22 @@ export default function EditPdfTool() {
       // Reuse the doc addFile() already opened (to read the page count
       // before pdf state existed) instead of parsing the same bytes again --
       // only valid when it was opened from this exact ArrayBuffer instance.
+      // Page-structure operations (reorder/delete/merge) change how many
+      // pages the live document has, and so does undoing one. pdfMeta's
+      // count is set once at upload, so it is re-synced from the document
+      // that was actually opened -- deriving it here rather than at each
+      // call site means undo/redo cannot leave it stale, since this effect
+      // re-runs on every pdfBytes change.
+      const adopt = (doc: PDFDocumentProxy) => {
+        pdfJsDocRef.current = doc;
+        setDocReady((current) => current + 1);
+        setPdfMeta((current) => (current && current.pageCount !== doc.numPages ? { ...current, pageCount: doc.numPages } : current));
+      };
+
       const pending = pendingInitialDocRef.current;
       if (pending && pending.bytes === pdf.bytes) {
         pendingInitialDocRef.current = null;
-        pdfJsDocRef.current = pending.doc;
-        setDocReady((current) => current + 1);
+        adopt(pending.doc);
         return;
       }
       if (pending) {
@@ -692,8 +729,7 @@ export default function EditPdfTool() {
           void (doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
           return;
         }
-        pdfJsDocRef.current = doc;
-        setDocReady((current) => current + 1);
+        adopt(doc);
       } catch {
         setError("This file could not be read for preview.");
       }
@@ -1896,6 +1932,124 @@ export default function EditPdfTool() {
     setElements((current) => [...current, element]);
   }
 
+  // --- Page structure ------------------------------------------------------
+  //
+  // Every operation here commits BOTH halves of the snapshot in a single
+  // setHistoryState call: the rebuilt bytes and the elements remapped onto
+  // their new page indices. Splitting them across two updates would create
+  // a frame -- and an undo entry -- where annotations point at pages that
+  // no longer hold them. One call, one undo step, always consistent.
+  //
+  // The download URL needs no handling here: setHistoryState is the choke
+  // point that clears it (see its wrapper near the top of this component),
+  // so a restructured document can never stay downloadable at its old
+  // shape. That is the whole reason the invalidation was centralised.
+  async function runPageOperation(
+    operation: () => Promise<{ bytes: ArrayBuffer; pageMap: PageMap; pageCount: number }>,
+    describe: (droppedElements: number) => string,
+  ) {
+    if (pageOpBusy) return;
+    setPageOpBusy(true);
+    setPageOpNotice("");
+    setError("");
+    try {
+      const { bytes, pageMap, pageCount } = await operation();
+      const dropped = countElementsOnRemovedPages(elements, pageMap);
+
+      setHistoryState((current) => ({
+        elements: remapElements(current.elements, pageMap),
+        pdfBytes: bytes,
+      }));
+      setPageIndex((current) => remapPageIndex(current, pageMap, pageCount));
+      setSelectedPages(new Set());
+      setSelectedId(null);
+      selectTextRun(null);
+      setPageOpNotice(describe(dropped));
+    } catch (operationError) {
+      setError(operationError instanceof Error ? operationError.message : "That page operation could not be completed.");
+    } finally {
+      setPageOpBusy(false);
+    }
+  }
+
+  function handleReorderPages(fromIndex: number, toIndex: number) {
+    const order = Array.from({ length: pdfMeta?.pageCount ?? 0 }, (_, i) => i);
+    const [moved] = order.splice(fromIndex, 1);
+    order.splice(toIndex, 0, moved);
+    void runPageOperation(
+      () => reorderPages(historyState.pdfBytes, order),
+      () => `Moved page ${fromIndex + 1} to position ${toIndex + 1}.`,
+    );
+  }
+
+  function handleDeleteSelectedPages() {
+    const targets = [...selectedPages];
+    if (targets.length === 0) return;
+    void runPageOperation(
+      () => deletePages(historyState.pdfBytes, targets),
+      (dropped) =>
+        `Removed ${targets.length} page${targets.length === 1 ? "" : "s"}` +
+        // Named explicitly rather than left to be discovered: the elements
+        // are gone from the document and only Undo brings them back.
+        (dropped > 0 ? `, along with ${dropped} placed item${dropped === 1 ? "" : "s"} on them.` : "."),
+    );
+  }
+
+  async function handleMergeFile(file: File) {
+    const incoming = await file.arrayBuffer();
+    // Insert after the page being viewed, which is what "add pages here"
+    // means to someone looking at it. Appending to the end would be simpler
+    // and would ignore where they are.
+    const insertAt = pageIndex + 1;
+    void runPageOperation(
+      () => mergePdf(historyState.pdfBytes, incoming, insertAt),
+      () => `Added ${sanitizePdfFileName(file.name)} after page ${pageIndex + 1}.`,
+    );
+  }
+
+  // Extract does NOT modify the document being edited -- it hands the user a
+  // new file. Routed through the same download plumbing as Export so the
+  // blob URL is owned and revoked in one place rather than leaked here.
+  async function handleExtractSelectedPages() {
+    const targets = [...selectedPages].sort((a, b) => a - b);
+    if (targets.length === 0 || pageOpBusy) return;
+    setPageOpBusy(true);
+    setPageOpNotice("");
+    setError("");
+    try {
+      const { bytes } = await splitPdf(historyState.pdfBytes, targets);
+      const blob = new Blob([bytes], { type: "application/pdf" });
+      if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
+      const url = URL.createObjectURL(blob);
+      downloadUrlRef.current = url;
+      setDownloadUrl(url);
+      setDownloadName(sanitizePdfFileName(`${outputName.replace(/\.pdf$/i, "")}-pages-${targets.map((i) => i + 1).join("-")}.pdf`));
+      setPageOpNotice(`Extracted ${targets.length} page${targets.length === 1 ? "" : "s"} — ready to download.`);
+    } catch (extractError) {
+      setError(extractError instanceof Error ? extractError.message : "Those pages could not be extracted.");
+    } finally {
+      setPageOpBusy(false);
+    }
+  }
+
+  function togglePageSelected(target: number, additive: boolean) {
+    setSelectedPages((current) => {
+      const next = new Set(current);
+      if (additive && lastSelectedPageRef.current !== null) {
+        // Shift-click extends from the last tick, the behaviour every file
+        // list has trained people to expect.
+        const [from, to] = [lastSelectedPageRef.current, target].sort((a, b) => a - b);
+        for (let i = from; i <= to; i += 1) next.add(i);
+      } else if (next.has(target)) {
+        next.delete(target);
+      } else {
+        next.add(target);
+      }
+      lastSelectedPageRef.current = target;
+      return next;
+    });
+  }
+
   // Phase 9.2: a real, previously-existing UX gap fixed as part of wiring up
   // true text edits -- the Export button below used to be gated purely on
   // `elements.length > 0` (overlay annotations), since that was the only
@@ -2104,6 +2258,27 @@ export default function EditPdfTool() {
             white page gives it real presence instead of sitting flush
             against the same glass tone as every other panel. */}
         <div className="aura-glass-thin min-w-0 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-1)] sm:p-5">
+            {/* The page rail is desktop-only (`hidden lg:flex` on its
+                wrapper): a 124px column plus the stage does not fit a phone
+                without shrinking the page to the point of uselessness, and
+                page reordering by drag is a pointer interaction anyway. */}
+            <div className="flex gap-3">
+              {pdfMeta && pdfMeta.pageCount > 1 ? (
+                <div className="hidden max-h-[70vh] lg:flex">
+                  <PageThumbnailSidebar
+                    pageCount={pdfMeta.pageCount}
+                    activePageIndex={pageIndex}
+                    docReady={docReady}
+                    getDocument={getPdfJsDocument}
+                    selected={selectedPages}
+                    busy={pageOpBusy}
+                    onSelectPage={setPageIndex}
+                    onToggleSelected={togglePageSelected}
+                    onReorder={handleReorderPages}
+                  />
+                </div>
+              ) : null}
+              <div className="min-w-0 flex-1">
             {error ? (
               // Phase 28: previously the loading skeleton (below) had no
               // `error` check of its own, so a render failure/timeout left
@@ -2581,6 +2756,57 @@ export default function EditPdfTool() {
               </div>
               </div>
             )}
+              </div>
+            </div>
+
+            {pdfMeta && pdfMeta.pageCount > 0 ? (
+              <div className="mt-3 hidden flex-wrap items-center gap-2 lg:flex">
+                <input
+                  ref={mergeInputRef}
+                  type="file"
+                  accept="application/pdf,.pdf"
+                  className="sr-only"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    // Reset first: picking the same file twice in a row
+                    // fires no change event otherwise, and "nothing
+                    // happened" is indistinguishable from a bug.
+                    event.target.value = "";
+                    if (file) void handleMergeFile(file);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => mergeInputRef.current?.click()}
+                  disabled={pageOpBusy}
+                  className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:opacity-40"
+                >
+                  Add pages
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteSelectedPages}
+                  disabled={pageOpBusy || selectedPages.size === 0}
+                  className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:opacity-40"
+                >
+                  Delete selected
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleExtractSelectedPages()}
+                  disabled={pageOpBusy || selectedPages.size === 0}
+                  className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:opacity-40"
+                >
+                  Extract selected
+                </button>
+                {selectedPages.size > 0 ? (
+                  <span className="text-[11px] text-[var(--text-secondary)]">{selectedPages.size} selected</span>
+                ) : null}
+                {pageOpNotice ? (
+                  <span role="status" className="text-[11px] text-[var(--text-secondary)]">{pageOpNotice}</span>
+                ) : null}
+              </div>
+            ) : null}
         </div>
 
         <MicroDock
