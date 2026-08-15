@@ -2279,7 +2279,7 @@ export default function EditPdfTool() {
   }
 
   return (
-    <section className="l2-workspace-deep grid gap-4 pb-40 lg:pb-6">
+    <section className="relative l2-workspace-deep grid gap-4 pb-40 lg:pb-28">
       <L2WorkspaceHeader
         title="Edit PDF"
         description={`${pdf.file.name} · ${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
@@ -2348,7 +2348,7 @@ export default function EditPdfTool() {
                 wrapper): a 124px column plus the stage does not fit a phone
                 without shrinking the page to the point of uselessness, and
                 page reordering by drag is a pointer interaction anyway. */}
-            <div className="flex gap-3">
+            <div className="flex gap-3 sm:pl-[68px]">
               {pdfMeta && pdfMeta.pageCount > 1 ? (
                 <div className="hidden max-h-[70vh] lg:flex">
                   <PageThumbnailSidebar
@@ -2400,7 +2400,7 @@ export default function EditPdfTool() {
               // subtracted space is the app header + document toolbar stacked
               // above it.
               <div
-                className="overflow-auto overscroll-contain rounded-[var(--radius-xl)] bg-[var(--atelier-surface-0)]/[0.35] p-3 sm:p-6"
+                className="lumeo-canvas-scroll overflow-auto overscroll-contain rounded-[var(--radius-xl)] bg-[var(--atelier-surface-0)]/[0.35] p-3 sm:p-6"
                 style={{ maxHeight: "calc(100vh - 15rem)" }}
               >
               <div className="mx-auto" style={{ width: `${zoom * 100}%` }}>
@@ -2855,7 +2855,7 @@ export default function EditPdfTool() {
             </div>
 
             {pdfMeta && pdfMeta.pageCount > 0 ? (
-              <div className="mt-3 hidden flex-wrap items-center gap-2 lg:flex">
+              <div className="mt-3 hidden max-w-full flex-wrap items-center gap-2 overflow-x-auto lg:flex">
                 <input
                   ref={mergeInputRef}
                   type="file"
@@ -2932,7 +2932,7 @@ export default function EditPdfTool() {
                       type="button"
                       onClick={() => setRedactionConfirmOpen(true)}
                       disabled={redactionBusy || redactionTargets.length === 0}
-                      className="rounded-full border border-[#ff4d4d]/60 bg-[#ff4d4d]/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[#ff8080] transition disabled:opacity-40"
+                      className="rounded-full border px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] transition enabled:border-[#ff4d4d]/60 enabled:bg-[#ff4d4d]/10 enabled:text-[#ff8080] disabled:border-[var(--text-primary)]/12 disabled:text-[var(--text-secondary)]/50"
                     >
                       {redactionBusy ? "Redacting…" : `Redact ${redactionTargets.length} run${redactionTargets.length === 1 ? "" : "s"}`}
                     </button>
@@ -3068,7 +3068,7 @@ export default function EditPdfTool() {
           <button
             type="button"
             onClick={downloadEditedPdf}
-            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--lumeo-gold)] px-5 text-sm font-bold text-[var(--atelier-surface-0)] transition hover:-translate-y-0.5 hover:bg-[var(--lumeo-gold)]/85 active:scale-[0.98] sm:w-auto"
           >
             Download edited PDF
           </button>
@@ -3085,7 +3085,7 @@ export default function EditPdfTool() {
             // visible spinner/label, so it doesn't need a redundant tooltip
             // repeating that.
             title={!isExporting && elements.length === 0 && !hasTextEdits ? "No edits to export yet." : undefined}
-            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
+            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--lumeo-gold)] px-5 text-sm font-bold text-[var(--atelier-surface-0)] transition hover:-translate-y-0.5 hover:bg-[var(--lumeo-gold)]/85 disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
           >
             {isExporting ? (
               <>

@@ -21,7 +21,8 @@
     "test:compression-target": "node --no-warnings --test --experimental-strip-types tests/compression-target.test.ts",
     "db:migrate": "node scripts/db-migrate.mjs",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@pdf-lib/standard-fonts": "^1.0.0",
@@ -41,6 +42,7 @@
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/react": "^16.3.2",
     "@types/jsdom": "^30.0.0",
