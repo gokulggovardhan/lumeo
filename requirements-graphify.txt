@@ -1,0 +1,36 @@
+# Graph tooling environment. ONE version number, ONE place -- CI installs
+# from this file and so should you. See CLAUDE.md for the install command.
+#
+# Why this file exists at all:
+#
+# graphify picks its community partitioner by import probe --
+# `from graspologic.partition import leiden`, falling back to networkx
+# Louvain on ImportError (cluster.py:47-77). The two produce DIFFERENT
+# clusterings of the same graph. Since graphify-out/graph.json is committed,
+# an environment that reaches for the other partitioner silently regenerates
+# a different partition, and its PRs fight the refresh bot's forever.
+#
+# The version number does the same thing by a different route: a different
+# extractor release changes node and link extraction, which IS what the
+# workflow's guard keys on, so a mismatched version produces a real PR every
+# single run.
+#
+# Neither failure announces itself. Both look like "the graph is churning".
+
+graphifyy[sql]==0.9.20
+
+# DO NOT add the [leiden] or [all] extras. Both pull graspologic:
+#
+#     Requires-Dist: graspologic; python_version < "3.13" and extra == "leiden"
+#     Requires-Dist: graspologic; python_version < "3.13" and extra == "all"
+#
+# [sql] is the only extra this repo wants -- it pulls tree-sitter-sql, without
+# which graphify silently drops all 30 supabase/migrations .sql files.
+#
+# There is no pip mechanism for "this package must never be installed", so
+# this is a comment plus an enforced check rather than a resolver constraint.
+# scripts/graphify_env_check.py runs the same import probe graphify does and
+# fails loudly; the workflow runs it before every rebuild.
+#
+# Belt and braces: run this on Python >= 3.13, where the marker above makes
+# graspologic uninstallable even via [all]. Local is 3.14.6 and CI matches.

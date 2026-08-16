@@ -910,8 +910,8 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1786542504.8096766,
-    "ast_hash": "92db7ebfbf6f39d398c8466f7ba1b641",
+    "mtime": 1786849709.621592,
+    "ast_hash": "83e2f3eb1be52185037276ec4df7937a",
     "semantic_hash": ""
   },
   "README.md": {
@@ -2175,8 +2175,18 @@
     "semantic_hash": ""
   },
   ".github/workflows/graphify-refresh.yml": {
-    "mtime": 1786849002.1514006,
-    "ast_hash": "ef13ba2364fbe546427ba750f4f98250",
+    "mtime": 1786849695.5668375,
+    "ast_hash": "5aa3ab8dd83df474da78e8849ba3d134",
+    "semantic_hash": ""
+  },
+  "scripts/graphify_env_check.py": {
+    "mtime": 1786849654.3757865,
+    "ast_hash": "952feab62e913b61f5ee4d4c2041705e",
+    "semantic_hash": ""
+  },
+  "requirements-graphify.txt": {
+    "mtime": 1786849632.576271,
+    "ast_hash": "0539dd3679baafd57d6756ca52cef9b9",
     "semantic_hash": ""
   }
 }

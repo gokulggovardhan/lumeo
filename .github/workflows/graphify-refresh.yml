@@ -53,28 +53,28 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      # 3.14 to match local, and not incidentally: graspologic's dependency
+      # marker is `python_version < "3.13"`, so on 3.13+ it cannot be
+      # installed even via graphifyy[all]. That makes "everyone uses the same
+      # partitioner" a structural property of the interpreter rather than
+      # something each environment has to get right.
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: '3.14'
 
-      # Pinned to the version actually installed locally (0.9.20), NOT to
-      # PyPI latest. An unpinned extractor would let an upstream release
-      # rewrite the whole graph under a commit message that says "refresh",
-      # and a version ahead of local would make CI and developers disagree
-      # permanently -- each run reverting the other's graph. Bump this and
-      # the local install together, never one alone.
-      #
-      # The [sql] extra pulls tree_sitter_sql; without it graphify drops all
-      # 30 supabase/migrations .sql files with a warning rather than an error.
-      #
-      # graspologic is deliberately NOT installed. graphify prefers Leiden
-      # when it is importable and falls back to networkx Louvain otherwise;
-      # local has no graspologic, so installing it here would put CI on a
-      # different partitioner and guarantee a different clustering from every
-      # developer machine.
+      # From the spec file, never an inline pin. CI and developers must read
+      # the same source of truth -- one version number, one place. The file
+      # documents why the version and the partitioner both matter.
       - name: Install graphify
-        run: pip install "graphifyy[sql]==0.9.20"
+        run: pip install -r requirements-graphify.txt
+
+      # Before anything is generated, not after. Asserts the pinned version is
+      # what is actually installed, and runs graphify's own graspologic import
+      # probe so a Leiden/Louvain switch fails loudly here instead of silently
+      # producing a graph that disagrees with everyone else's.
+      - name: Verify graph tooling environment
+        run: python scripts/graphify_env_check.py
 
       # The fingerprint of what is currently committed, captured BEFORE the
       # rebuild overwrites it. This is the guard's baseline.
