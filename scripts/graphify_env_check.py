@@ -13,9 +13,12 @@ change the output silently:
    before the fact, by running the same import probe graphify runs, which is
    what this does.
 
-2. The extractor version. A different graphifyy release changes node and link
-   extraction, which is precisely what the refresh workflow's guard keys on,
-   so a mismatch produces a real PR on every run.
+2. The extractor version AND its extras. A different graphifyy release
+   changes node and link extraction, which is precisely what the refresh
+   workflow's guard keys on. A missing extra is worse, because it is silent:
+   graphify warns and builds a smaller graph rather than failing, so an
+   environment can be on the right release and still drop every file the
+   absent extractor would have read.
 
 3. The input set. graphify indexes the working tree; CI checks out only
    tracked files. An untracked, unignored file is therefore in every local
@@ -40,15 +43,31 @@ from pathlib import Path
 SPEC = Path(__file__).resolve().parent.parent / "requirements-graphify.txt"
 
 
-def pinned_version() -> str:
-    """The single source of truth, read rather than duplicated."""
+# Each extra in the spec enables an extractor. Having the extra ABSENT does
+# not error -- graphify prints a warning and produces a smaller graph, which
+# is why this went unnoticed: local was missing [sql], so 30 tracked
+# supabase/migrations files contributed 0 nodes locally and 80 in CI. The
+# version matched, the partitioner matched, the input set matched, and the
+# graphs still disagreed.
+EXTRA_MODULES = {"sql": "tree_sitter_sql"}
+
+
+def pinned_spec() -> tuple[str, list[str]]:
+    """The single source of truth, read rather than duplicated.
+
+    Returns (version, extras).
+    """
     for line in SPEC.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if line.startswith("#") or not line:
             continue
-        match = re.match(r"graphifyy(?:\[[^\]]*\])?==(?P<version>[\w.]+)", line)
+        match = re.match(
+            r"graphifyy(?:\[(?P<extras>[^\]]*)\])?==(?P<version>[\w.]+)", line
+        )
         if match:
-            return match.group("version")
+            raw = match.group("extras") or ""
+            extras = [item.strip() for item in raw.split(",") if item.strip()]
+            return match.group("version"), extras
     raise SystemExit(f"No pinned graphifyy version found in {SPEC}")
 
 
@@ -77,7 +96,7 @@ def main() -> int:
         )
 
     # 2. The extractor version.
-    expected = pinned_version()
+    expected, extras = pinned_spec()
     try:
         installed = metadata.version("graphifyy")
     except metadata.PackageNotFoundError:
@@ -96,6 +115,32 @@ def main() -> int:
                 f"  Fix: pip install -r {SPEC.name}\n"
                 "  To move to a newer version, change the pin AND regenerate, so CI\n"
                 "  and every developer move together."
+            )
+
+    # 2b. The extras the version pin does not cover.
+    #
+    # A missing extra is silent by design: graphify warns and carries on with
+    # a smaller graph rather than failing. Asserting the version is therefore
+    # not enough -- an environment can be on the right release with the wrong
+    # extractors and produce a graph that differs by exactly the files that
+    # extractor would have read.
+    for extra in extras:
+        module = EXTRA_MODULES.get(extra)
+        if module is None:
+            print(f"note: no module known for extra [{extra}]; not checked", file=sys.stderr)
+            continue
+        try:
+            __import__(module)
+        except ImportError:
+            failures.append(
+                f"the spec pins graphifyy[{extra}] but `{module}` does not import,\n"
+                f"  so the [{extra}] extractor is missing. graphify does NOT fail on\n"
+                "  this -- it warns and builds a smaller graph, so your rebuild will\n"
+                "  quietly drop every file that extractor handles.\n"
+                "\n"
+                "  Fix: pip install -r requirements-graphify.txt\n"
+                "  With a uv-managed install, the extras are not added in place:\n"
+                f'    uv tool install --force "graphifyy[{",".join(extras)}]=={expected}"'
             )
 
     # 3. The input set.
