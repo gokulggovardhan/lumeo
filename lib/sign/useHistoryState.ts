@@ -47,7 +47,7 @@ export function useHistoryState<T>(initial: T, options?: HistorySizeOptions<T>) 
   const [state, setState] = useState<T>(initial);
   const [undoStack, setUndoStack] = useState<T[]>([]);
   const [redoStack, setRedoStack] = useState<T[]>([]);
-  // Read via ref (not closed over directly) so set/commit/undo/redo below
+  // Read via ref (not closed over directly) so set/undo/redo below
   // stay referentially stable across renders regardless of whether the
   // caller passes a fresh options object/sizeOf closure each render --
   // matches this hook's existing "stable callback identity" contract, which
@@ -58,7 +58,7 @@ export function useHistoryState<T>(initial: T, options?: HistorySizeOptions<T>) 
   });
 
   // Wrapped in useCallback (empty deps -- it only ever touches optionsRef,
-  // itself stable) so referencing it from set/commit's own dep arrays below
+  // itself stable) so referencing it from set's own dep array below
   // doesn't make THEIR identity change every render either.
   const trimToSizeBudget = useCallback((stack: T[]): T[] => {
     const opts = optionsRef.current;
@@ -101,26 +101,6 @@ export function useHistoryState<T>(initial: T, options?: HistorySizeOptions<T>) 
     applyHistory(next, trimToSizeBudget([...undoRef.current.slice(-(MAX_HISTORY - 1)), current]), []);
   }, [applyHistory, trimToSizeBudget]);
 
-  // Updates the live value only -- no history entry. Meant for continuous
-  // updates (drag/resize frames) where pushing on every frame would flood
-  // the undo stack; pair with `commit` once the gesture ends.
-  const setLive = useCallback((updater: T | ((current: T) => T)) => {
-    const next = typeof updater === "function" ? (updater as (current: T) => T)(stateRef.current) : updater;
-    stateRef.current = next;
-    setState(next);
-  }, []);
-
-  // Pushes `previous` onto the undo stack without touching the live value --
-  // call once a drag/resize gesture ends, with the state captured before the
-  // gesture started.
-  const commit = useCallback((previous: T) => {
-    const nextUndo = trimToSizeBudget([...undoRef.current.slice(-(MAX_HISTORY - 1)), previous]);
-    undoRef.current = nextUndo;
-    redoRef.current = [];
-    setUndoStack(nextUndo);
-    setRedoStack([]);
-  }, [trimToSizeBudget]);
-
   const undo = useCallback(() => {
     const stack = undoRef.current;
     if (stack.length === 0) return;
@@ -142,8 +122,6 @@ export function useHistoryState<T>(initial: T, options?: HistorySizeOptions<T>) 
   return {
     state,
     set,
-    setLive,
-    commit,
     undo,
     redo,
     reset,

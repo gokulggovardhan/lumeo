@@ -102,20 +102,6 @@ test("a set after an undo clears the redo stack", async () => {
   assert.equal(result.current.state.value, "c");
 });
 
-test("commit pushes an undo entry and clears redo without touching the live value", async () => {
-  const { result } = renderHistory();
-  act(() => result.current.set({ value: "b" }));
-  act(() => result.current.undo());
-  assert.equal(result.current.canRedo, true);
-
-  act(() => result.current.commit({ value: "gesture-start" }));
-  assert.equal(result.current.state.value, "a", "commit must not change the live value");
-  assert.equal(result.current.canRedo, false);
-  assert.equal(result.current.canUndo, true);
-
-  act(() => result.current.undo());
-  assert.equal(result.current.state.value, "gesture-start");
-});
 
 test("undo and redo on empty stacks are no-ops", async () => {
   const { result } = renderHistory();
@@ -144,12 +130,6 @@ test("canUndo and canRedo track the stacks", async () => {
   assert.deepEqual({ undo: result.current.canUndo, redo: result.current.canRedo }, { undo: true, redo: false });
 });
 
-test("setLive changes the value without creating a history entry", async () => {
-  const { result } = renderHistory();
-  act(() => result.current.setLive({ value: "dragging" }));
-  assert.equal(result.current.state.value, "dragging");
-  assert.equal(result.current.canUndo, false, "a drag frame must not become an undo step");
-});
 
 // The property the ref-based rewrite deliberately preserved. The previous
 // implementation got it from functional updaters; the current one gets it by
