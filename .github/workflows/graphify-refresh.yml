@@ -3,29 +3,33 @@
 # CLAUDE.md instructs every reader -- human and agent -- to consult the graph
 # BEFORE reading source. That makes it load-bearing documentation, and it was
 # being refreshed by hand: last rebuild 2026-08-11, five days and four merged
-# PRs behind by the time anyone noticed.
+# PRs behind by the time anyone noticed. The staleness was the symptom; the
+# defect is that a generated artifact depended on someone remembering.
 #
-# Rebuild-and-commit rather than fail-the-build, deliberately. Failing a PR
-# when the graph is stale keeps the human in the loop, which is the exact
-# thing that was already failing -- it converts "someone forgets" into
-# "someone forgets and is then blocked", and the fastest way past a blocking
-# check is to regenerate without looking. Committing on merge removes the
-# person from the loop entirely, which is the only version that actually
-# fixes the defect.
+# Rebuild-and-open-a-PR, not fail-the-build. Failing a PR on a stale graph
+# keeps the human in the loop, which is the exact thing that was already not
+# working -- it turns "someone forgets" into "someone forgets and is then
+# blocked", and the quickest way past a blocking check is to regenerate
+# without reading the diff. Regenerating here reduces the human's job to one
+# click on a clearly labelled bot PR.
 #
-# The tradeoff, stated plainly: graph.json is ~3.5 MB, so every merge that
-# touches code adds a blob of that order to history. If the repo size becomes
-# a problem, the fallback is to stop committing the artifact and publish it
-# from CI instead -- but that is a bigger change than this defect warrants.
+# It is a PR rather than a push to main because the "Protect main" ruleset
+# (id 18807648) has bypass_actors: [] -- github-actions[bot] is no more exempt
+# than a person, and a direct push is rejected with GH013. See the note at the
+# foot of this file for the one-time change that removes the click entirely.
+#
+# The tradeoff, stated plainly: graph.json is ~3.5 MB, so every code-touching
+# merge adds a blob of that order to history. If repo size becomes the larger
+# problem, stop committing the artifact and publish it from CI instead.
 
 name: Refresh graphify graph
 
 on:
   push:
     branches: [main]
-    # Without this the bot's own commit re-triggers the workflow. The bot only
-    # ever writes under graphify-out/, so ignoring that path is a complete
-    # loop guard and does not need a [skip ci] convention or an actor check.
+    # Without this the merged refresh commit re-triggers the workflow. The
+    # bot only ever writes under graphify-out/, so ignoring that path is a
+    # complete loop guard -- no [skip ci] convention, no actor check.
     paths-ignore:
       - 'graphify-out/**'
 
@@ -33,6 +37,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: graphify-refresh
@@ -54,31 +59,35 @@ jobs:
           python-version: '3.12'
 
       # Pinned. An unpinned extractor would let an upstream release rewrite
-      # the whole graph in a commit whose message says "refresh".
+      # the whole graph under a commit message that says "refresh".
       # The [sql] extra pulls tree_sitter_sql; without it graphify drops all
       # 30 supabase/migrations .sql files with a warning rather than an error.
       - name: Install graphify
         run: pip install "graphifyy[sql]==0.9.44"
 
-      # --force is required, not optional: the default refuses to write a
+      # --force is required, not cosmetic: the default refuses to write a
       # graph with fewer nodes than the last one, which is exactly what a PR
       # that deletes code produces.
       - name: Rebuild graph
         run: graphify update . --force
 
       # Community names come from an LLM and are the ONLY part of the graph
-      # that needs one. Edges, nodes and traversal are pure AST, so they must
-      # refresh whether or not a key is configured -- they are the part that
-      # was already useful. Without GEMINI_API_KEY the labels fall back to
-      # each community's largest member filename ("page.tsx"); weak, but
-      # honest and app-scoped, and never a reason to skip the rebuild.
+      # that needs one. Nodes, edges and traversal are pure AST, so they
+      # refresh whether or not a key is configured -- and they are the part
+      # that was already carrying the weight. Without a GEMINI_API_KEY repo
+      # secret the labels stay on their fallback (each community's largest
+      # member filename, e.g. "page.tsx"): weak, but honest and app-scoped,
+      # and never a reason to skip the rebuild.
       - name: Name communities
         if: ${{ secrets.GEMINI_API_KEY != '' }}
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: graphify label .
 
-      - name: Commit refreshed graph
+      - name: Open or update the refresh PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIGGER_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
@@ -92,10 +101,45 @@ jobs:
                   graphify-out/manifest.json
 
           if git diff --cached --quiet; then
-            echo "Graph already current for ${GITHUB_SHA}; nothing to commit."
+            echo "Graph already current for ${TRIGGER_SHA}; nothing to do."
             exit 0
           fi
 
-          git commit -m "chore(graphify): refresh graph for ${GITHUB_SHA:0:7}" \
+          SHORT="${TRIGGER_SHA:0:7}"
+          BRANCH=chore/graphify-auto-refresh
+
+          git checkout -B "$BRANCH"
+          git commit -m "chore(graphify): refresh graph for ${SHORT}" \
                      -m "Generated by .github/workflows/graphify-refresh.yml. Do not hand-edit."
-          git push
+
+          # Force-push: this branch holds a regenerated artifact and is never
+          # somewhere anyone commits by hand, so there is no history worth
+          # keeping and successive refreshes should replace, not stack.
+          git push --force origin "$BRANCH"
+
+          if gh pr view "$BRANCH" --json state -q .state 2>/dev/null | grep -q OPEN; then
+            echo "PR already open for $BRANCH; the force-push updated it."
+            exit 0
+          fi
+
+          cat > /tmp/pr-body.md <<BODY
+          Regenerated by \`.github/workflows/graphify-refresh.yml\` after \`${SHORT}\` landed on main.
+
+          \`graphify-out/\` is a committed artifact that CLAUDE.md tells readers to
+          consult before source, so a stale graph is wrong documentation rather than
+          a missing convenience.
+
+          Nothing here is hand-written. Review the node and edge counts, not the JSON.
+          BODY
+
+          gh pr create --base main --head "$BRANCH" \
+            --title "chore(graphify): refresh code graph" \
+            --body-file /tmp/pr-body.md
+
+# FULLY HANDS-OFF OPERATION -- one-time, needs repo admin:
+#   Settings > Rules > Rulesets > "Protect main" > Bypass list > Add bypass
+#   > select github-actions
+# With that in place the final step can commit straight to main and the PR
+# disappears. Left undone deliberately: it opens a hole in the ruleset for the
+# sake of a chore, and one click on a labelled bot PR is a fair price for
+# keeping bypass_actors empty.
