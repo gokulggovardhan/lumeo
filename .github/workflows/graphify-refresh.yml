@@ -49,6 +49,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
+    # Job-level so the labelling step can test it in an `if`. A step-level if
+    # cannot read the secrets context; env is the supported route.
+    env:
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -102,10 +107,16 @@ jobs:
       # secret the labels stay on their fallback (each community's largest
       # member filename, e.g. "page.tsx"): weak, but honest and app-scoped,
       # and never a reason to skip the rebuild.
+      #
+      # The `if` tests env, NOT secrets. `secrets` is not an available context
+      # in a step-level if -- GitHub rejects the whole file with
+      # "Unrecognized named-value: 'secrets'", which surfaces as a run with 0
+      # jobs, no logs and no check runs, on every push regardless of the
+      # branch filter (startup failures happen before filtering). Mapping the
+      # secret into job-level env first is the supported way to make a step
+      # conditional on a secret being set.
       - name: Name communities
-        if: ${{ secrets.GEMINI_API_KEY != '' }}
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        if: env.GEMINI_API_KEY != ''
         run: graphify label .
 
       # THE DETERMINISM GUARD.
