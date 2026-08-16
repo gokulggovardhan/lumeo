@@ -2168,5 +2168,15 @@
     "mtime": 1786673041.7092395,
     "ast_hash": "e633e5e915d81f6ffb21ff3555acb847",
     "semantic_hash": ""
+  },
+  "scripts/graphify_fingerprint.py": {
+    "mtime": 1786848849.7984717,
+    "ast_hash": "435a1642fc6fa14ab3d35a9fcd6f0511",
+    "semantic_hash": ""
+  },
+  ".github/workflows/graphify-refresh.yml": {
+    "mtime": 1786849002.1514006,
+    "ast_hash": "ef13ba2364fbe546427ba750f4f98250",
+    "semantic_hash": ""
   }
 }
