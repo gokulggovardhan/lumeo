@@ -1,0 +1,25 @@
+# Kept out of the knowledge graph, NOT out of git.
+#
+# These are agent tooling, not Lumeo. They were 4,047 of 7,111 nodes (57%) and
+# they dominated community labelling: `graphify query` on a PDF question came
+# back with SignPdfTool.tsx tagged "V3 Swarm Coordination" and fontEncoding.ts
+# tagged "Quick Command Guide". The map has to point at the app.
+#
+# .gitignore stays as-is on purpose -- .claude/skills is shared and committed
+# (see .gitignore:47). Graph membership and git membership are separate calls.
+
+.claude/
+.claude-flow/
+.swarm/
+.superpowers/
+
+# graphify's own output and dated backups
+graphify-out/
+app/graphify-out/
+
+# generated / binary
+ruvector.db
+supabase/.temp/
+e2e/.tmp/
+test-results/
+playwright-report/
