@@ -1,0 +1,230 @@
+# Keeps graphify-out/ current without anyone having to remember.
+#
+# CLAUDE.md instructs every reader -- human and agent -- to consult the graph
+# BEFORE reading source. That makes it load-bearing documentation, and it was
+# being refreshed by hand: last rebuild 2026-08-11, five days and four merged
+# PRs behind by the time anyone noticed. The staleness was the symptom; the
+# defect is that a generated artifact depended on someone remembering.
+#
+# Rebuild-and-open-a-PR, not fail-the-build. Failing a PR on a stale graph
+# keeps the human in the loop, which is the exact thing that was already not
+# working -- it turns "someone forgets" into "someone forgets and is then
+# blocked", and the quickest way past a blocking check is to regenerate
+# without reading the diff. Regenerating here reduces the human's job to one
+# click on a clearly labelled bot PR.
+#
+# It is a PR rather than a push to main because the "Protect main" ruleset
+# (id 18807648) has bypass_actors: [] -- github-actions[bot] is no more exempt
+# than a person, and a direct push is rejected with GH013. See the note at the
+# foot of this file for the one-time change that removes the click entirely.
+#
+# The tradeoff, stated plainly: graph.json is ~3.5 MB, so every code-touching
+# merge adds a blob of that order to history. If repo size becomes the larger
+# problem, stop committing the artifact and publish it from CI instead.
+
+name: Refresh graphify graph
+
+on:
+  push:
+    branches: [main]
+    # Without this the merged refresh commit re-triggers the workflow. The
+    # bot only ever writes under graphify-out/, so ignoring that path is a
+    # complete loop guard -- no [skip ci] convention, no actor check.
+    paths-ignore:
+      - 'graphify-out/**'
+
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: graphify-refresh
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    name: Rebuild code graph
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # 3.14 to match local, and not incidentally: graspologic's dependency
+      # marker is `python_version < "3.13"`, so on 3.13+ it cannot be
+      # installed even via graphifyy[all]. That makes "everyone uses the same
+      # partitioner" a structural property of the interpreter rather than
+      # something each environment has to get right.
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.14'
+
+      # From the spec file, never an inline pin. CI and developers must read
+      # the same source of truth -- one version number, one place. The file
+      # documents why the version and the partitioner both matter.
+      - name: Install graphify
+        run: pip install -r requirements-graphify.txt
+
+      # Before anything is generated, not after. Asserts the pinned version is
+      # what is actually installed, and runs graphify's own graspologic import
+      # probe so a Leiden/Louvain switch fails loudly here instead of silently
+      # producing a graph that disagrees with everyone else's.
+      - name: Verify graph tooling environment
+        run: python scripts/graphify_env_check.py
+
+      # The fingerprint of what is currently committed, captured BEFORE the
+      # rebuild overwrites it. This is the guard's baseline.
+      - name: Fingerprint committed graph
+        run: |
+          python scripts/graphify_fingerprint.py graphify-out/graph.json \
+            > "${RUNNER_TEMP}/before.json"
+          cat "${RUNNER_TEMP}/before.json"
+
+      # --force is required, not cosmetic: the default refuses to write a
+      # graph with fewer nodes than the last one, which is exactly what a PR
+      # that deletes code produces.
+      #
+      # GRAPHIFY_VIZ_NODE_LIMIT=1 suppresses graph.html. Nothing reads it and
+      # it cost 141 KB of every refresh; it is gitignored as of this change.
+      - name: Rebuild graph
+        env:
+          GRAPHIFY_VIZ_NODE_LIMIT: '1'
+        run: graphify update . --force
+
+      # Community names come from an LLM and are the ONLY part of the graph
+      # that needs one. Nodes, edges and traversal are pure AST, so they
+      # refresh whether or not a key is configured -- and they are the part
+      # that was already carrying the weight. Without a GEMINI_API_KEY repo
+      # secret the labels stay on their fallback (each community's largest
+      # member filename, e.g. "page.tsx"): weak, but honest and app-scoped,
+      # and never a reason to skip the rebuild.
+      - name: Name communities
+        if: ${{ secrets.GEMINI_API_KEY != '' }}
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: graphify label .
+
+      # THE DETERMINISM GUARD.
+      #
+      # Rebuilding an unchanged tree does not reproduce the previous graph.
+      # Measured: identical nodes (3,004) and links (6,417) but 182
+      # communities on one build and 180 on the next, because incremental and
+      # full extraction reach different clusterings. CI always runs cold, so
+      # every run would re-cluster and open a PR whose entire content is a
+      # reshuffled partition -- 17% of 107k lines, none of it meaning
+      # anything.
+      #
+      # The guard compares topology only: node identity plus links, both
+      # straight from the AST. Communities and built_at_commit are excluded
+      # by scripts/graphify_fingerprint.py, which documents why.
+      #
+      # Note what this is NOT: it is not "detect ID renumbering over stable
+      # membership". That guard is not implementable here, because membership
+      # itself moves between runs -- there is no renumbering-only state to
+      # find. Topology is the separable part.
+      - name: Skip when only the clustering moved
+        id: guard
+        run: |
+          set +e
+          python scripts/graphify_fingerprint.py graphify-out/graph.json \
+            > "${RUNNER_TEMP}/after.json"
+          python - "${RUNNER_TEMP}/before.json" "${RUNNER_TEMP}/after.json" <<'PY'
+          import json, os, sys
+          before = json.load(open(sys.argv[1]))
+          after = json.load(open(sys.argv[2]))
+          changed = before["topology"] != after["topology"]
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"changed={'true' if changed else 'false'}\n")
+              for key in ("nodes", "links", "communities"):
+                  out.write(f"before_{key}={before[key]}\n")
+                  out.write(f"after_{key}={after[key]}\n")
+          verb = "CHANGED" if changed else "unchanged"
+          print(f"topology {verb}: "
+                f"{before['nodes']}n/{before['links']}l -> "
+                f"{after['nodes']}n/{after['links']}l "
+                f"(communities {before['communities']} -> {after['communities']}, "
+                f"not part of the hash)")
+          PY
+
+      - name: Open or update the refresh PR
+        if: steps.guard.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIGGER_SHA: ${{ github.sha }}
+          B_NODES: ${{ steps.guard.outputs.before_nodes }}
+          A_NODES: ${{ steps.guard.outputs.after_nodes }}
+          B_LINKS: ${{ steps.guard.outputs.before_links }}
+          A_LINKS: ${{ steps.guard.outputs.after_links }}
+          B_COMMS: ${{ steps.guard.outputs.before_communities }}
+          A_COMMS: ${{ steps.guard.outputs.after_communities }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Only the curated outputs. cache/, dated snapshots, .graphify_*
+          # scratch and graph.html are gitignored and must stay that way.
+          git add graphify-out/graph.json \
+                  graphify-out/GRAPH_REPORT.md \
+                  graphify-out/manifest.json
+
+          if git diff --cached --quiet; then
+            echo "Topology changed but no file diff; nothing to commit."
+            exit 0
+          fi
+
+          SHORT="${TRIGGER_SHA:0:7}"
+          BRANCH=chore/graphify-auto-refresh
+
+          git checkout -B "$BRANCH"
+          git commit -m "chore(graphify): refresh graph for ${SHORT}" \
+                     -m "${A_NODES} nodes, ${A_LINKS} links, ${A_COMMS} communities." \
+                     -m "Generated by .github/workflows/graphify-refresh.yml. Do not hand-edit."
+
+          # Force-push: this branch holds a regenerated artifact and is never
+          # somewhere anyone commits by hand, so there is no history worth
+          # keeping and successive refreshes should replace, not stack.
+          git push --force origin "$BRANCH"
+
+          # Counts lead, because the diff is not reviewable: a 0.4% content
+          # change rewrites ~17% of the file's 107k lines.
+          cat > "${RUNNER_TEMP}/pr-body.md" <<BODY
+          | | before | after | delta |
+          |---|---|---|---|
+          | nodes | ${B_NODES} | ${A_NODES} | $(( A_NODES - B_NODES )) |
+          | links | ${B_LINKS} | ${A_LINKS} | $(( A_LINKS - B_LINKS )) |
+          | communities | ${B_COMMS} | ${A_COMMS} | $(( A_COMMS - B_COMMS )) |
+
+          **Review the counts above, not the diff.** A 0.4% content change rewrites
+          roughly 17% of this file's 107k lines, because clustering renumbers
+          globally. The diff carries no reviewable signal.
+
+          Community counts are reported but excluded from the change detection --
+          they are not reproducible between builds. This PR exists because node or
+          link topology actually moved.
+
+          Regenerated by \`.github/workflows/graphify-refresh.yml\` after \`${SHORT}\`
+          landed on main. Nothing here is hand-written.
+          BODY
+
+          if gh pr view "$BRANCH" --json state -q .state 2>/dev/null | grep -q OPEN; then
+            echo "PR already open for $BRANCH; force-push updated it. Refreshing body."
+            gh pr edit "$BRANCH" --body-file "${RUNNER_TEMP}/pr-body.md"
+            exit 0
+          fi
+
+          gh pr create --base main --head "$BRANCH" \
+            --title "chore(graphify): refresh code graph (${A_NODES}n/${A_LINKS}l)" \
+            --body-file "${RUNNER_TEMP}/pr-body.md"
+
+# FULLY HANDS-OFF OPERATION -- one-time, needs repo admin:
+#   Settings > Rules > Rulesets > "Protect main" > Bypass list > Add bypass
+#   > select github-actions
+# With that in place the final step can commit straight to main and the PR
+# disappears. Left undone deliberately: it opens a hole in the ruleset for the
+# sake of a chore, and one click on a labelled bot PR is a fair price for
+# keeping bypass_actors empty.

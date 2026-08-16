@@ -50,9 +50,16 @@ __pycache__/
 *.pyc
 
 # graphify: regenerable extraction cache and dated snapshots -- only the
-# current graph.json/GRAPH_REPORT.md/graph.html/manifest.json are committed
+# current graph.json/GRAPH_REPORT.md/manifest.json are committed
 graphify-out/cache/
 graphify-out/20*/
+graphify-out/.graphify_*
+# graph.html was 141 KB of every refresh (2.8 MB in the tree) for a file
+# nothing references -- not CLAUDE.md, not the query hook, not any script.
+# graphify already declines to emit it above 5,000 nodes, so it was never
+# reliably present anyway. CI suppresses it with GRAPHIFY_VIZ_NODE_LIMIT=1;
+# generate it locally on demand if you want the interactive view.
+graphify-out/graph.html
 
 # superpowers workflow scratch (task briefs, review packages, progress ledger)
 .superpowers/
