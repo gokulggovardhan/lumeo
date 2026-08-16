@@ -1,16 +1,16 @@
 # Graph Report - lumeo-app  (2026-08-16)
 
 ## Corpus Check
-- 411 files · ~541,220 words
+- 410 files · ~541,627 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 3013 nodes · 6426 edges · 185 communities (163 shown, 22 thin omitted)
+- 3004 nodes · 6418 edges · 183 communities (160 shown, 23 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 65 edges (avg confidence: 0.64)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `db54b47e`
+- Built from commit: `241c31d7`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -125,7 +125,6 @@
 - PHASE 2 — DESIGN TOKENS (design only, not implemented)
 - Lumeo PDF Workspace
 - ToolWorkspace.tsx
-- Context-Aware Multi-Line Text Reflow — Design Spec
 - toolWorkerClient.ts
 - verify-control-center.mjs
 - package.json
@@ -182,13 +181,13 @@
 - next.config.ts
 - tailwindcss
 - @types/react-dom
-- ToolGlyph.tsx
 - export.ts
 - index.ts
 - page.tsx
 - page.tsx
 - page.tsx
 - page.tsx
+- watermark-export.test.ts
 - pinned_version
 
 ## God Nodes (most connected - your core abstractions)
@@ -206,63 +205,63 @@
 ## Surprising Connections (you probably didn't know these)
 - `HomepagePage()` --calls--> `requireAdmin()`  [EXTRACTED]
   app/admin/(protected)/homepage/page.tsx → lib/admin/auth.ts
+- `POST()` --calls--> `createClient()`  [EXTRACTED]
+  app/admin/logout/route.ts → lib/supabase/server.ts
 - `generateMetadata()` --calls--> `withSeoOverride()`  [EXTRACTED]
   app/page.tsx → lib/public-site/seo.ts
 - `generateMetadata()` --calls--> `withSeoOverride()`  [EXTRACTED]
   app/pdf-tools/[category]/page.tsx → lib/public-site/seo.ts
 - `generateMetadata()` --calls--> `withSeoOverride()`  [EXTRACTED]
   app/pdf-tools/page.tsx → lib/public-site/seo.ts
-- `generateMetadata()` --calls--> `withSeoOverride()`  [EXTRACTED]
-  app/pdf/crop/page.tsx → lib/public-site/seo.ts
 
 ## Import Cycles
 - None detected.
 
-## Communities (185 total, 22 thin omitted)
+## Communities (183 total, 23 thin omitted)
 
 ### Community 0 - "EditPdfTool.tsx"
-Cohesion: 0.19
-Nodes (21): ANCHOR_GRID, ANCHOR_LABELS, ContentMode, estimateContentSizePct(), LoadedPdf, runWithTimeout(), sanitizePdfFileName(), WatermarkTool() (+13 more)
+Cohesion: 0.21
+Nodes (20): ANCHOR_GRID, ANCHOR_LABELS, ContentMode, estimateContentSizePct(), LoadedPdf, runWithTimeout(), sanitizePdfFileName(), WatermarkTool() (+12 more)
 
 ### Community 1 - "data.ts"
 Cohesion: 0.07
 Nodes (54): breadcrumbSchema, CompressPdfPage(), CompressPdfTool, softwareSchema, breadcrumbSchema, EditPdfPage(), EditPdfTool, generateMetadata() (+46 more)
 
 ### Community 2 - "page.tsx"
-Cohesion: 0.11
-Nodes (41): deleteAnnouncement(), saveAnnouncement(), toggleAnnouncement(), tones, AnnouncementsPage(), deleteSeoSetting(), saveSeoSetting(), publicRoutes (+33 more)
+Cohesion: 0.13
+Nodes (39): POST(), deleteAnnouncement(), saveAnnouncement(), toggleAnnouncement(), tones, AnnouncementsPage(), saveFeatureFlag(), addAdminMember() (+31 more)
 
 ### Community 3 - "createClient"
 Cohesion: 0.06
-Nodes (46): CompressAnalysis, CompressPdfTool(), CompressResult, CompressStage, DocumentRisk, ExpertMode, Opportunity, PageInfo (+38 more)
+Nodes (44): CompressAnalysis, CompressResult, CompressStage, DocumentRisk, ExpertMode, Opportunity, PageInfo, qualityOptions (+36 more)
 
 ### Community 4 - "requireAdmin"
 Cohesion: 0.05
-Nodes (55): AdminError(), GlobalError(), fraunces, inter, metadata, plexMono, viewport, PdfToolError() (+47 more)
+Nodes (51): AdminError(), GlobalError(), fraunces, inter, metadata, plexMono, viewport, PdfToolError() (+43 more)
 
 ### Community 5 - "page.tsx"
 Cohesion: 0.07
-Nodes (35): PublicNavLink(), AuraCheckbox(), AuraFormField(), AuraIconButton(), AuraInput(), AuraLabeledControl(), AuraOptionCard(), AuraRadioGroup() (+27 more)
+Nodes (35): PublicNavLink(), AuraBadge(), AuraCheckbox(), AuraFormField(), AuraIconButton(), AuraInput(), AuraLabeledControl(), AuraOptionCard() (+27 more)
 
 ### Community 6 - "edit-page-ops.test.ts"
-Cohesion: 0.15
-Nodes (22): ignoreErrorLog(), reopenErrorLog(), resolveErrorLog(), setErrorStatus(), buildQuery(), ErrorsPage(), severities, severityTone (+14 more)
+Cohesion: 0.17
+Nodes (21): ignoreErrorLog(), reopenErrorLog(), resolveErrorLog(), setErrorStatus(), buildQuery(), ErrorsPage(), severities, severityTone (+13 more)
 
 ### Community 7 - "PublicCatalogPageShell.tsx"
-Cohesion: 0.12
-Nodes (26): ARROW_DELTAS, clamp(), LiveGeometry, PlacedElementView(), SignatureLibraryPanel(), LoadedPdf, PageSize, Toast (+18 more)
+Cohesion: 0.09
+Nodes (35): ARROW_DELTAS, clamp(), LiveGeometry, PlacedElementView(), canvasToSignature(), CreatedSignature, DrawTab(), HANDWRITING_FONTS (+27 more)
 
 ### Community 8 - "PublicPdfChrome.tsx"
-Cohesion: 0.07
-Nodes (44): useAnalytics(), ALIGNMENTS, estimateLabelSizePct(), HeaderFooterTool(), LoadedPdf, runWithTimeout(), sanitizePdfFileName(), OrganizePdfTool() (+36 more)
+Cohesion: 0.09
+Nodes (29): ALIGNMENTS, estimateLabelSizePct(), HeaderFooterTool(), LoadedPdf, runWithTimeout(), sanitizePdfFileName(), CORNER_PRESETS, estimateLabelSizePct() (+21 more)
 
 ### Community 9 - "config.ts"
 Cohesion: 0.11
 Nodes (29): aboutSchema, generateMetadata(), accessibilitySchema, generateMetadata(), contactSchema, generateMetadata(), generateMetadata(), generateMetadata() (+21 more)
 
 ### Community 10 - "page.tsx"
-Cohesion: 0.07
-Nodes (57): AdminPage(), formatDate(), AdminMemberView, AnalyticsSummary, AuditLogFilters, DataResult, getAnalyticsSummary(), getAnnouncements() (+49 more)
+Cohesion: 0.08
+Nodes (48): AdminMemberView, AnalyticsSummary, AuditLogFilters, DataResult, isPublicAnalyticsEnabled(), isRecord(), numberValue(), OverviewData (+40 more)
 
 ### Community 11 - "page.tsx"
 Cohesion: 0.09
@@ -270,27 +269,27 @@ Nodes (26): AdminLoginPage(), getSafeMessage(), LoginMessageKey, metadata, safeM
 
 ### Community 12 - "EditElementView.tsx"
 Cohesion: 0.07
-Nodes (26): colourTokens, ToolActionBar(), ToolDocumentSummary(), ToolModeCard(), ToolOptionRow(), ToolPrivacyNote(), ToolProcessingStage(), ToolResultStage() (+18 more)
+Nodes (27): colourTokens, ToolActionBar(), ToolDocumentSummary(), ToolModeCard(), ToolOptionRow(), ToolPrivacyNote(), ToolProcessingStage(), ToolResultStage() (+19 more)
 
 ### Community 13 - "Aura.tsx"
-Cohesion: 0.09
-Nodes (33): clamp(), CropRectView(), describeRect(), Handle, resizeFromHandle(), ASPECT_PRESETS, CropPdfTool(), LoadedPdf (+25 more)
+Cohesion: 0.07
+Nodes (42): clamp(), CropRectView(), describeRect(), Handle, resizeFromHandle(), applyAspectPreset(), centerCropRect(), clampCropRect() (+34 more)
 
 ### Community 14 - "ControlCenterMobileNav.tsx"
 Cohesion: 0.20
 Nodes (14): handleInkStroke(), clampPct(), createInkElement(), createShapeElement(), deleteElement(), EditElementBase, EditElementType, elementsForPage() (+6 more)
 
 ### Community 15 - "AnalyticsProvider.tsx"
-Cohesion: 0.22
-Nodes (12): CommandPaletteDialog(), buildCommandPaletteIndex(), CommandPaletteItem, normalize(), searchCommandPaletteIndex(), STATIC_PAGES, TOOL_ALIASES, Tile (+4 more)
+Cohesion: 0.18
+Nodes (16): CommandPaletteDialog(), ContinueWorking(), QUICK_ACTION_SLUGS, RecentFileLink(), buildCommandPaletteIndex(), CommandPaletteItem, normalize(), searchCommandPaletteIndex() (+8 more)
 
 ### Community 16 - "MicroDock.tsx"
-Cohesion: 0.10
-Nodes (20): PdfToolDefinition, pdfTools, PdfToolSlug, PdfToolStatus, groupActions(), ToolCategoryDetail(), actionMatches(), PROCESSING_TAG (+12 more)
+Cohesion: 0.12
+Nodes (21): base, shard(), ShardStyle, ToolGlyph(), groupActions(), ToolCategoryDetail(), actionMatches(), PROCESSING_TAG (+13 more)
 
 ### Community 17 - "export.ts"
-Cohesion: 0.40
-Nodes (4): CORE_STEPS, DEPRECATED_SCRIPTS, results, VERIFY_SCRIPTS
+Cohesion: 0.15
+Nodes (22): restyleSelectedRun(), buildEditPlan(), createTextElement(), createWhiteoutElement(), resolveFont(), resolveFontMetrics(), collectPageTextOperators(), buildOperatorSpatialIndex() (+14 more)
 
 ### Community 18 - "page.tsx"
 Cohesion: 0.06
@@ -301,16 +300,16 @@ Cohesion: 0.13
 Nodes (28): assertGenuinelySplit(), drawSensitiveText(), SPLIT_RUN_PDF, splitRun(), TEXT_ONLY_PDF, textOnly(), TMP_DIR, TWO_PAGE_PDF (+20 more)
 
 ### Community 20 - "page.tsx"
-Cohesion: 0.26
-Nodes (11): InboxPage(), updateTool(), ToolsPage(), getFeedbackQueries(), getPdfTools(), getToolCategories(), canManageInbox(), canManageTools() (+3 more)
+Cohesion: 0.27
+Nodes (9): deleteFeedbackQuery(), InboxPage(), absoluteTime(), InboxClient(), relativeTime(), TypeFilter, getFeedbackQueries(), canManageInbox() (+1 more)
 
 ### Community 21 - "client.ts"
-Cohesion: 0.13
-Nodes (23): CleanupMessage, computeRotatedPreviewBox(), ConvertStatus, correctImageOrientation(), createFileId(), getDisplayDimensions(), getPageSizeLabel(), JpgToPdfTool() (+15 more)
+Cohesion: 0.12
+Nodes (27): CleanupMessage, computeRotatedPreviewBox(), ConvertStatus, correctImageOrientation(), createFileId(), getDisplayDimensions(), getPageSizeLabel(), JpgToPdfTool() (+19 more)
 
 ### Community 22 - "getToolBlockedState"
 Cohesion: 0.08
-Nodes (24): compressPagesToRange(), createPdfFromPages(), densityClasses, densityPreviewClasses, friendlyPageError(), getSuggestions(), PageInfo, ParsedRange (+16 more)
+Nodes (28): deleteUpload(), POST(), trimmed(), sanitizePdfFileName(), compressPagesToRange(), densityClasses, densityPreviewClasses, ensureExtension() (+20 more)
 
 ### Community 23 - "page.tsx"
 Cohesion: 0.06
@@ -321,8 +320,8 @@ Cohesion: 0.06
 Nodes (31): 10. Buttons, 11. Form Controls, 12. Cards, 13. Navigation, 14. Tool Workspaces, 15. Control Center, 16. Guidance System, 17. Accessibility (+23 more)
 
 ### Community 25 - "edit-fallback-font-apply.test.ts"
-Cohesion: 0.19
-Nodes (19): makeCorruptedPdfBytes(), makeFormFieldPdf(), makeImageOnlyPdf(), makeLandscapePdf(), makeLargePdf(), makeMediumPdf(), makeMetadataPdf(), makeMixedPageSizesPdf() (+11 more)
+Cohesion: 0.09
+Nodes (20): ConversionResult, SelectedFile, Stage, ConversionResult, SelectedFile, Stage, L2UploadStage(), L2WorkspaceGrid() (+12 more)
 
 ### Community 26 - "FloatingIsland.tsx"
 Cohesion: 0.29
@@ -333,24 +332,24 @@ Cohesion: 0.07
 Nodes (29): dom, dom.iterable, esnext, **/*.mts, .next/dev/types/**/*.ts, next-env.d.ts, .next/types/**/*.ts, node_modules (+21 more)
 
 ### Community 28 - "page.tsx"
-Cohesion: 0.24
-Nodes (8): canvasToSignature(), CreatedSignature, DrawTab(), HANDWRITING_FONTS, SignatureCreator(), Stroke, TypeTab(), AuraSegmentedControl()
+Cohesion: 0.11
+Nodes (18): TextShowOperator, bestOperatorAmong(), cellKey(), matchDetectedRunToOperator(), MatchedTextRun, operatorOriginPx(), OperatorSpatialIndex, boxOriginFromTransform() (+10 more)
 
 ### Community 29 - "page.tsx"
-Cohesion: 0.06
-Nodes (49): handleApplyRedaction(), handleDetectSensitive(), restyleSelectedRun(), RFC-5322, applyRedaction(), pageDrawsImages(), RedactionTargetRun, createTextElement() (+41 more)
+Cohesion: 0.11
+Nodes (27): handleApplyRedaction(), handleDetectSensitive(), RFC-5322, applyRedaction(), pageDrawsImages(), RedactionTargetRun, assessRedactionCoverage(), boxesOverlap() (+19 more)
 
 ### Community 30 - "page.tsx"
-Cohesion: 0.11
-Nodes (27): CleanupMessage, createFileId(), destroyPdfJsDoc(), getOutputPageSize(), getOutputStyleLabel(), getPageSizeType(), getSizeSignature(), isSmartFitFormat() (+19 more)
+Cohesion: 0.12
+Nodes (23): CleanupMessage, createFileId(), destroyPdfJsDoc(), getOutputPageSize(), getOutputStyleLabel(), getPageSizeType(), getSizeSignature(), isSmartFitFormat() (+15 more)
 
 ### Community 31 - "page.tsx"
-Cohesion: 0.10
-Nodes (34): asNumber(), ContentStreamToken, defaultTextState(), IDENTITY_MATRIX, isDelimiter(), isWhitespace(), Matrix2x3, multiplyMatrix() (+26 more)
+Cohesion: 0.12
+Nodes (30): asNumber(), ContentStreamToken, defaultTextState(), IDENTITY_MATRIX, isDelimiter(), isWhitespace(), Matrix2x3, multiplyMatrix() (+22 more)
 
 ### Community 32 - "JpgToPdfTool.tsx"
-Cohesion: 0.29
-Nodes (4): CommandPaletteDialog, CommandPaletteTrigger(), PublicPageShell(), L2PublicHeader()
+Cohesion: 0.15
+Nodes (10): CommandPaletteDialog, CommandPaletteTrigger(), PublicPdfToolsMenuClient(), PublicPageShell(), L2MenuSurface, L2PublicHeader(), TILE_DESCRIPTION, TILE_LABEL (+2 more)
 
 ### Community 33 - "page.tsx"
 Cohesion: 0.18
@@ -369,16 +368,16 @@ Cohesion: 0.10
 Nodes (26): EditPdfTool(), ConvertStatus, DpiPreset, dpiPresets, JpgPageResult, OutputFormat, parsePageSelection(), parsePageToken() (+18 more)
 
 ### Community 37 - "pdfToWordStorage.ts"
-Cohesion: 0.11
-Nodes (23): applyDifferences(), classifyReplacementChar(), EncodingSource, findToUnicodeMap(), fontDescriptorOf(), FontKind, hexStringToCode(), hexStringToCodePoint() (+15 more)
+Cohesion: 0.12
+Nodes (21): applyDifferences(), classifyReplacementChar(), EncodingSource, findToUnicodeMap(), fontDescriptorOf(), FontKind, hexStringToCode(), hexStringToCodePoint() (+13 more)
 
 ### Community 38 - "edit-rotated-text.test.ts"
 Cohesion: 0.08
 Nodes (24): Abuse-Control Limitations, Admin Analytics Views, Analytics V1 Scope, Anonymous Session Design, Architecture, Collection Setting, Daily Metric Refresh, Data Collected (+16 more)
 
 ### Community 39 - "SplitPdfTool.tsx"
-Cohesion: 0.18
-Nodes (21): applyEditPlanToBytes(), applyEditPlanToDocument(), applyMultiRunEditPlanToDocument(), assertApplicable(), buildFallbackOperatorText(), buildReplacementOperatorText(), copyStreamDictExceptLengthAndFilter(), EditPlanRejectedError (+13 more)
+Cohesion: 0.19
+Nodes (20): applyEditPlanToBytes(), applyEditPlanToDocument(), applyMultiRunEditPlanToDocument(), assertApplicable(), buildFallbackOperatorText(), buildReplacementOperatorText(), copyStreamDictExceptLengthAndFilter(), EditPlanRejectedError (+12 more)
 
 ### Community 40 - "PageNumbersTool.tsx"
 Cohesion: 0.10
@@ -386,7 +385,7 @@ Nodes (20): acquireSlot(), busyError(), convertPdfToWord(), convertWordToPdf(), 
 
 ### Community 41 - "PageThumbnailSidebar.tsx"
 Cohesion: 0.10
-Nodes (31): AnalyticsActivityPage(), AnalyticsPage(), formatDate(), AuditPage(), buildQuery(), entityTypes, HomepagePage(), AdminDataTable() (+23 more)
+Nodes (31): AnalyticsActivityPage(), AnalyticsPage(), formatDate(), AuditPage(), buildQuery(), entityTypes, HealthPage(), statusLabel (+23 more)
 
 ### Community 42 - "edit-pdf-privacy-shield.test.ts"
 Cohesion: 0.43
@@ -397,8 +396,8 @@ Cohesion: 0.08
 Nodes (24): Accordion (disclosure), Button **[carry forward, mostly]**, Card, Checkbox / Switch, Command Palette (genuinely new pattern for Lumeo), Dialog (modal), Dropdown / Select, Empty / Error / Success states **[carry forward]** (+16 more)
 
 ### Community 44 - "OrganizePdfTool.tsx"
-Cohesion: 0.07
-Nodes (41): loadEditEngine(), TextShowOperator, buildEditPlan(), bytesToCodes(), decodeCodes(), FallbackFontUse, rejectionReasonFor(), SUPPORTED_OPERATOR_KINDS (+33 more)
+Cohesion: 0.11
+Nodes (28): registerFallbackFont(), TextShowOperatorKind, bytesToCodes(), decodeCodes(), FallbackFontUse, rejectionReasonFor(), SUPPORTED_OPERATOR_KINDS, asNumber() (+20 more)
 
 ### Community 45 - "compilerOptions"
 Cohesion: 0.08
@@ -421,8 +420,8 @@ Cohesion: 0.19
 Nodes (15): ExportFormat, ExtractTextTool(), FORMAT_EXTENSION, FORMAT_MIME, buildCsvFromEntries(), buildJsonFromEntries(), buildTxtFromEntries(), csvEscape() (+7 more)
 
 ### Community 50 - "@vercel/functions"
-Cohesion: 0.15
-Nodes (17): Draft, ExportSurface, HtmlToPdfTool(), loadDraft(), saveDraft(), TEMPLATES, L2ActionArea(), L2PrivacyNote() (+9 more)
+Cohesion: 0.10
+Nodes (27): AnalyticsPageView(), PUBLIC_PAGE_ROUTES, useAnalytics(), CompressPdfTool(), profileExplanation(), Draft, ExportSurface, HtmlToPdfTool() (+19 more)
 
 ### Community 51 - "tailwindcss"
 Cohesion: 0.16
@@ -437,12 +436,12 @@ Cohesion: 0.10
 Nodes (21): firebase-admin, html2pdf.js, lucide-react, next, dependencies, firebase-admin, html2pdf.js, lucide-react (+13 more)
 
 ### Community 54 - "typescript"
-Cohesion: 0.43
-Nodes (5): buildMultiOperatorFixture(), buildMultiRunPlanForIndices(), decodedContentStreamBytes(), firstFontDict(), hexOf()
+Cohesion: 0.40
+Nodes (9): deleteSeoSetting(), saveSeoSetting(), publicRoutes, SeoPage(), getSeoSettings(), canManageSeo(), validateRoute(), validateSeoDescription() (+1 more)
 
 ### Community 55 - "Browser Certification"
-Cohesion: 0.18
-Nodes (19): asNumber(), compareAdvance(), compareAdvanceAcrossFonts(), FontMetricsSource, glyphAdvancePt(), parseCidWidthsArray(), resolveArrayMaybe(), resolveCidFontWidths() (+11 more)
+Cohesion: 0.10
+Nodes (27): loadEditEngine(), ResolvedFont, asNumber(), compareAdvance(), compareAdvanceAcrossFonts(), FontMetrics, FontMetricsSource, glyphAdvancePt() (+19 more)
 
 ### Community 56 - "verify-lumeo-2-foundation.mjs"
 Cohesion: 0.10
@@ -453,8 +452,8 @@ Cohesion: 0.10
 Nodes (17): chrome, compressTool, css, directory, docs, errorPage, footer, homepage (+9 more)
 
 ### Community 58 - "dompurify"
-Cohesion: 0.30
-Nodes (12): deleteFeatureFlag(), saveFeatureFlag(), toggleFeatureFlag(), effectiveStatus(), FeatureFlagsPage(), AdminFormAction, asAdminFormAction(), canManageFeatureFlags() (+4 more)
+Cohesion: 0.15
+Nodes (22): deleteFeatureFlag(), toggleFeatureFlag(), effectiveStatus(), FeatureFlagsPage(), booleanSettings, settingDisplay(), settingMessageValue(), SettingsPage() (+14 more)
 
 ### Community 59 - "tiles.ts"
 Cohesion: 0.16
@@ -525,8 +524,8 @@ Cohesion: 0.12
 Nodes (12): css, guidance, guidanceFoundations, layout, nav, packageJson, requiredComponents, requiredTokens (+4 more)
 
 ### Community 76 - "parseDocumentXml.ts"
-Cohesion: 0.22
-Nodes (12): deleteUpload(), POST(), trimmed(), sanitizePdfFileName(), sanitizePdfFileName(), ensureExtension(), converterBaseUrl(), convertPdfToWord() (+4 more)
+Cohesion: 0.29
+Nodes (4): makeType0SubsetPdf(), planFor(), PreparedEdit, toUnicodeCMapFor()
 
 ### Community 77 - "verify-lumeo-2-workspaces.mjs"
 Cohesion: 0.13
@@ -550,11 +549,11 @@ Nodes (14): Accessibility, Admin, Analytics, Deployment, Final certification ver
 
 ### Community 82 - "client.ts"
 Cohesion: 0.15
-Nodes (15): HeaderFooterPreview(), ZoneOverlay(), PageRangeSelector, PlacementCorner, alignmentToCorner(), createDefaultHeaderFooterConfig(), createDefaultZone(), HeaderFooterConfig (+7 more)
+Nodes (12): HeaderFooterPreview(), ZoneOverlay(), PageRangeSelector, PlacementCorner, alignmentToCorner(), createDefaultZone(), HeaderFooterConfig, PlaceholderContext (+4 more)
 
 ### Community 83 - "permissions.ts"
-Cohesion: 0.07
-Nodes (43): GET(), GET(), isAuthorized(), deleteUpload(), GET(), POST(), trimmed(), converterBaseUrl() (+35 more)
+Cohesion: 0.08
+Nodes (38): deleteUpload(), GET(), POST(), trimmed(), GET(), isAuthorized(), GET(), converterBaseUrl() (+30 more)
 
 ### Community 84 - "AURA_OS_V2_DESIGN_SPEC.md"
 Cohesion: 0.17
@@ -589,8 +588,8 @@ Cohesion: 0.17
 Nodes (11): Architecture, Context, Data model & undo/redo, Edit PDF tool — design, Element interaction model, Export & error handling, Out-of-scope follow-ups (explicitly deferred, not forgotten), Prior art this design builds on (+3 more)
 
 ### Community 92 - "ENGINEERING_EXCELLENCE_AUDIT.md"
-Cohesion: 0.16
-Nodes (14): describePosition(), PageNumberPreview(), createDefaultPageNumbersConfig(), formatNumeral(), formatPageLabel(), NumberFormat, NumeralStyle, PageNumbersConfig (+6 more)
+Cohesion: 0.21
+Nodes (11): createDefaultPageNumbersConfig(), formatNumeral(), formatPageLabel(), NumberFormat, NumeralStyle, PageNumbersSinglePlacement, ROMAN_VALUES, toAlpha() (+3 more)
 
 ### Community 93 - "SignPdfTool.tsx"
 Cohesion: 0.18
@@ -605,16 +604,16 @@ Cohesion: 0.18
 Nodes (10): Edit PDF Tool Implementation Plan, Global Constraints, Self-review notes, Task 1: Element data model & pure array operations, Task 2: PDF export/flatten logic, Task 3: Ink capture component, Task 4: Placed-element view (select/move/resize/line-endpoints), Task 5: Main Edit PDF tool component (+2 more)
 
 ### Community 96 - "Design: Page Organizer, HTML to PDF, Text Extractor"
-Cohesion: 0.20
-Nodes (15): HealthPage(), statusLabel, statusTone, AdminMetricCard(), BuildInfo, checkLibreOfficeConverter(), checkSupabaseDatabase(), checkSupabaseStorage() (+7 more)
+Cohesion: 0.29
+Nodes (4): PdfToolDefinition, pdfTools, PdfToolSlug, PdfToolStatus
 
 ### Community 97 - "Edit PDF tool — design"
 Cohesion: 0.25
 Nodes (10): buildIdPath, imageRoutes, main(), nextBin, projectRoot, reservePort(), routes, stopServer() (+2 more)
 
 ### Community 98 - "PDF Workspace Rollout"
-Cohesion: 0.17
-Nodes (21): getFormValue(), signInAdmin(), POST(), deleteFeedbackQuery(), metadata, ProtectedAdminLayout(), addAdminMember(), allowedRoles (+13 more)
+Cohesion: 0.11
+Nodes (31): getFormValue(), signInAdmin(), metadata, ProtectedAdminLayout(), AdminPage(), formatDate(), ControlCenterShell(), getAdminContext() (+23 more)
 
 ### Community 99 - "devDependencies"
 Cohesion: 0.20
@@ -653,16 +652,12 @@ Cohesion: 0.20
 Nodes (9): description, engines, node, main, name, private, scripts, start (+1 more)
 
 ### Community 108 - "Lumeo PDF Workspace"
-Cohesion: 0.18
-Nodes (13): describePosition(), WatermarkPreview(), parsePageRangeInput(), computeTilePositions(), cornerAnchorPct(), createDefaultImageWatermarkConfig(), WatermarkConfig, WatermarkContent (+5 more)
+Cohesion: 0.31
+Nodes (8): describePosition(), PageNumberPreview(), describePosition(), WatermarkPreview(), computeTilePositions(), cornerAnchorPct(), PageNumbersConfig, WatermarkConfig
 
 ### Community 109 - "ToolWorkspace.tsx"
 Cohesion: 0.22
 Nodes (8): Accessibility rules, Aura OS v2 — Workspace Standard, Component hierarchy, Layout rules, Responsive rules, Spacing rules, When NOT to reuse, When to reuse
-
-### Community 110 - "Context-Aware Multi-Line Text Reflow — Design Spec"
-Cohesion: 0.22
-Nodes (8): CLAUDE_FLOW_HOOKS_ENABLED, CLAUDE_FLOW_MAX_AGENTS, CLAUDE_FLOW_MEMORY_BACKEND, CLAUDE_FLOW_MODE, CLAUDE_FLOW_TOPOLOGY, npm_config_update_notifier, cmd, claude-flow
 
 ### Community 111 - "toolWorkerClient.ts"
 Cohesion: 0.33
@@ -673,8 +668,8 @@ Cohesion: 0.39
 Nodes (8): decodeXmlEntities(), DocxParagraph, DocxRun, findElements(), hasSelfClosingOrEmptyElement(), parseParagraph(), parseRun(), runPropertyIsOn()
 
 ### Community 113 - "package.json"
-Cohesion: 0.38
-Nodes (4): buildDoc(), buildRotatedTextPage(), editFirstOperator(), fmt()
+Cohesion: 0.47
+Nodes (3): buildDoc(), buildRotatedTextPage(), fmt()
 
 ### Community 114 - "export.ts"
 Cohesion: 0.29
@@ -745,8 +740,8 @@ Cohesion: 0.33
 Nodes (5): breadcrumbSchema, generateMetadata(), PdfToJpgPage(), PdfToJpgTool, softwareSchema
 
 ### Community 131 - "embeddedImages.ts"
-Cohesion: 0.20
-Nodes (7): Anchor, anchorFractions(), anchorPointFromTopLeft(), nativeAnchorForCenter(), topLeftFromAnchorPoint(), WatermarkAnchor, ALL_ANCHORS
+Cohesion: 0.14
+Nodes (14): Anchor, anchorFractions(), anchorPointFromTopLeft(), nativeAnchorForCenter(), topLeftFromAnchorPoint(), WatermarkAnchor, WatermarkContent, WatermarkImageContent (+6 more)
 
 ### Community 132 - "Lumeo Control Center Admin Authentication"
 Cohesion: 0.33
@@ -804,17 +799,13 @@ Nodes (3): graphify, Regenerating the graph, This is NOT the Next.js you know
 Cohesion: 0.67
 Nodes (3): createExportSurface(), dompurify, dompurify
 
-### Community 176 - "ToolGlyph.tsx"
-Cohesion: 0.24
-Nodes (7): base, shard(), ShardStyle, ToolGlyph(), PublicPdfToolsMenuClient(), L2MenuSurface, ToolGlyphName
-
 ### Community 177 - "export.ts"
 Cohesion: 0.24
 Nodes (7): exportEditedPdf(), hexToRgb01(), normalizePageRotation(), PageRotation, toNativeBox(), toNativePoint(), visualPageSize()
 
 ### Community 178 - "index.ts"
-Cohesion: 0.26
-Nodes (10): ContinueWorking(), QUICK_ACTION_SLUGS, RecentFileLink(), getRecentFiles(), isValidItem(), RecentFileItem, EMPTY_SNAPSHOT, getServerSnapshot() (+2 more)
+Cohesion: 0.16
+Nodes (17): ASPECT_PRESETS, CropPdfTool(), LoadedPdf, runWithTimeout(), sanitizePdfFileName(), createDefaultCropConfig(), isCropRectValid(), cachedSnapshot (+9 more)
 
 ### Community 180 - "page.tsx"
 Cohesion: 0.33
@@ -833,24 +824,24 @@ Cohesion: 0.67
 Nodes (3): main(), pinned_version(), The single source of truth, read rather than duplicated.
 
 ## Knowledge Gaps
-- **1216 isolated node(s):** `cmd`, `npm_config_update_notifier`, `CLAUDE_FLOW_MODE`, `CLAUDE_FLOW_HOOKS_ENABLED`, `CLAUDE_FLOW_TOPOLOGY` (+1211 more)
+- **1209 isolated node(s):** `aboutSchema`, `accessibilitySchema`, `tones`, `entityTypes`, `colourTokens` (+1204 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **22 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **23 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `createClient()` connect `PDF Workspace Rollout` to `Design: Page Organizer, HTML to PDF, Text Extractor`, `page.tsx`, `dompurify`, `edit-page-ops.test.ts`, `PageThumbnailSidebar.tsx`, `page.tsx`, `page.tsx`, `config.ts`, `permissions.ts`, `page.tsx`, `FloatingIsland.tsx`?**
-  _High betweenness centrality (0.056) - this node is a cross-community bridge._
-- **Why does `dependencies` connect `@types/react-dom` to `eslint.config.mjs`, `toolWorkerClient.ts`, `elements.ts`, `page.tsx`, `verify-release.mjs`, `tokens.ts`?**
-  _High betweenness centrality (0.041) - this node is a cross-community bridge._
+- **Why does `createClient()` connect `PDF Workspace Rollout` to `page.tsx`, `FloatingIsland.tsx`, `edit-page-ops.test.ts`, `PageThumbnailSidebar.tsx`, `page.tsx`, `page.tsx`, `config.ts`, `permissions.ts`, `page.tsx`, `typescript`, `dompurify`?**
+  _High betweenness centrality (0.049) - this node is a cross-community bridge._
+- **Why does `withSeoOverride()` connect `config.ts` to `page.tsx`, `data.ts`, `verify-lumeo-aura.mjs`, `restyleRun.ts`, `PDF Workspace Rollout`, `edit-shared-forms.test.ts`, `tailwindcss`, `page.tsx`, `page.tsx`, `page.tsx`, `package.json`?**
+  _High betweenness centrality (0.033) - this node is a cross-community bridge._
 - **Why does `createExportSurface()` connect `verify-release.mjs` to `@vercel/functions`?**
-  _High betweenness centrality (0.041) - this node is a cross-community bridge._
-- **What connects `cmd`, `npm_config_update_notifier`, `CLAUDE_FLOW_MODE` to the rest of the system?**
-  _1216 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _High betweenness centrality (0.028) - this node is a cross-community bridge._
+- **What connects `aboutSchema`, `accessibilitySchema`, `tones` to the rest of the system?**
+  _1209 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `data.ts` be split into smaller, more focused modules?**
   _Cohesion score 0.06564364876385337 - nodes in this community are weakly interconnected._
 - **Should `page.tsx` be split into smaller, more focused modules?**
-  _Cohesion score 0.11372549019607843 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.13333333333333333 - nodes in this community are weakly interconnected._
 - **Should `createClient` be split into smaller, more focused modules?**
-  _Cohesion score 0.05605499735589635 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.05536723163841808 - nodes in this community are weakly interconnected._

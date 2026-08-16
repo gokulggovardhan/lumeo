@@ -784,11 +784,6 @@
     "ast_hash": "e91c2fd285db06bbeb7317329d52908b",
     "semantic_hash": "e91c2fd285db06bbeb7317329d52908b"
   },
-  ".mcp.json": {
-    "mtime": 1786457433.9454017,
-    "ast_hash": "03463a7ac70080bc963dded9a6e334f3",
-    "semantic_hash": "03463a7ac70080bc963dded9a6e334f3"
-  },
   "app/api/tools/word-to-pdf/route.ts": {
     "mtime": 1784771620.379985,
     "ast_hash": "8b981153eae9f687f1bfc0116b7d8c5f",
@@ -910,7 +905,7 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1786861440.5556161,
+    "mtime": 1786861967.7222586,
     "ast_hash": "e92a756f56e160594ce49664c92269a3",
     "semantic_hash": ""
   },
@@ -2170,23 +2165,23 @@
     "semantic_hash": ""
   },
   "scripts/graphify_fingerprint.py": {
-    "mtime": 1786848849.7984717,
-    "ast_hash": "435a1642fc6fa14ab3d35a9fcd6f0511",
+    "mtime": 1786861967.7429366,
+    "ast_hash": "6f86b66c2c492add9755441f525d1b9a",
     "semantic_hash": ""
   },
   ".github/workflows/graphify-refresh.yml": {
-    "mtime": 1786849695.5668375,
-    "ast_hash": "5aa3ab8dd83df474da78e8849ba3d134",
+    "mtime": 1786862394.9569683,
+    "ast_hash": "f674aec289582c5c88f36627be042ad2",
     "semantic_hash": ""
   },
   "scripts/graphify_env_check.py": {
-    "mtime": 1786849654.3757865,
-    "ast_hash": "952feab62e913b61f5ee4d4c2041705e",
+    "mtime": 1786862717.955469,
+    "ast_hash": "caf13c43320240d89af06c6b761b0596",
     "semantic_hash": ""
   },
   "requirements-graphify.txt": {
-    "mtime": 1786849632.576271,
-    "ast_hash": "0539dd3679baafd57d6756ca52cef9b9",
+    "mtime": 1786861967.7429366,
+    "ast_hash": "10fb40b68947202837f16900fc581a2e",
     "semantic_hash": ""
   }
 }

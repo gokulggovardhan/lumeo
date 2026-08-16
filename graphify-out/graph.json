@@ -4,132 +4,6 @@
   "graph": {},
   "nodes": [
     {
-      "label": ".mcp.json",
-      "file_type": "code",
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "metadata": {
-        "mcp_kind": "mcp_config_file"
-      },
-      "_origin": "ast",
-      "id": "mcp",
-      "community": 110,
-      "community_name": "Context-Aware Multi-Line Text Reflow \u2014 Design Spec",
-      "norm_label": ".mcp.json"
-    },
-    {
-      "label": "claude-flow",
-      "file_type": "code",
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "metadata": {
-        "mcp_kind": "mcp_server"
-      },
-      "_origin": "ast",
-      "id": "mcp_mcp_server_claude_flow",
-      "community": 110,
-      "community_name": "Context-Aware Multi-Line Text Reflow \u2014 Design Spec",
-      "norm_label": "claude-flow"
-    },
-    {
-      "label": "cmd",
-      "file_type": "code",
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "metadata": {
-        "mcp_kind": "mcp_command"
-      },
-      "_origin": "ast",
-      "id": "mcp_command_cmd",
-      "community": 110,
-      "community_name": "Context-Aware Multi-Line Text Reflow \u2014 Design Spec",
-      "norm_label": "cmd"
-    },
-    {
-      "label": "npm_config_update_notifier",
-      "file_type": "code",
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "metadata": {
-        "mcp_kind": "env_var"
-      },
-      "_origin": "ast",
-      "id": "env_var_npm_config_update_notifier",
-      "community": 110,
-      "community_name": "Context-Aware Multi-Line Text Reflow \u2014 Design Spec",
-      "norm_label": "npm_config_update_notifier"
-    },
-    {
-      "label": "CLAUDE_FLOW_MODE",
-      "file_type": "code",
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "metadata": {
-        "mcp_kind": "env_var"
-      },
-      "_origin": "ast",
-      "id": "env_var_claude_flow_mode",
-      "community": 110,
-      "community_name": "Context-Aware Multi-Line Text Reflow \u2014 Design Spec",
-      "norm_label": "claude_flow_mode"
-    },
-    {
-      "label": "CLAUDE_FLOW_HOOKS_ENABLED",
-      "file_type": "code",
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "metadata": {
-        "mcp_kind": "env_var"
-      },
-      "_origin": "ast",
-      "id": "env_var_claude_flow_hooks_enabled",
-      "community": 110,
-      "community_name": "Context-Aware Multi-Line Text Reflow \u2014 Design Spec",
-      "norm_label": "claude_flow_hooks_enabled"
-    },
-    {
-      "label": "CLAUDE_FLOW_TOPOLOGY",
-      "file_type": "code",
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "metadata": {
-        "mcp_kind": "env_var"
-      },
-      "_origin": "ast",
-      "id": "env_var_claude_flow_topology",
-      "community": 110,
-      "community_name": "Context-Aware Multi-Line Text Reflow \u2014 Design Spec",
-      "norm_label": "claude_flow_topology"
-    },
-    {
-      "label": "CLAUDE_FLOW_MAX_AGENTS",
-      "file_type": "code",
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "metadata": {
-        "mcp_kind": "env_var"
-      },
-      "_origin": "ast",
-      "id": "env_var_claude_flow_max_agents",
-      "community": 110,
-      "community_name": "Context-Aware Multi-Line Text Reflow \u2014 Design Spec",
-      "norm_label": "claude_flow_max_agents"
-    },
-    {
-      "label": "CLAUDE_FLOW_MEMORY_BACKEND",
-      "file_type": "code",
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "metadata": {
-        "mcp_kind": "env_var"
-      },
-      "_origin": "ast",
-      "id": "env_var_claude_flow_memory_backend",
-      "community": 110,
-      "community_name": "Context-Aware Multi-Line Text Reflow \u2014 Design Spec",
-      "norm_label": "claude_flow_memory_backend"
-    },
-    {
       "label": "page.tsx",
       "file_type": "code",
       "source_file": "app/about/page.tsx",
@@ -587,8 +461,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_feature_flags_actions",
-      "community": 58,
-      "community_name": "dompurify",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "actions.ts"
     },
     {
@@ -598,8 +472,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "app_admin_protected_feature_flags_actions_savefeatureflag",
-      "community": 58,
-      "community_name": "dompurify",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "savefeatureflag()"
     },
     {
@@ -697,8 +571,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_health_page",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 41,
+      "community_name": "PageThumbnailSidebar.tsx",
       "norm_label": "page.tsx"
     },
     {
@@ -708,8 +582,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "app_admin_protected_health_page_statustone",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 41,
+      "community_name": "PageThumbnailSidebar.tsx",
       "norm_label": "statustone"
     },
     {
@@ -719,8 +593,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "app_admin_protected_health_page_statuslabel",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 41,
+      "community_name": "PageThumbnailSidebar.tsx",
       "norm_label": "statuslabel"
     },
     {
@@ -730,8 +604,8 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "app_admin_protected_health_page_healthpage",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 41,
+      "community_name": "PageThumbnailSidebar.tsx",
       "norm_label": "healthpage()"
     },
     {
@@ -763,8 +637,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_inbox_actions",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 20,
+      "community_name": "page.tsx",
       "norm_label": "actions.ts"
     },
     {
@@ -774,8 +648,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "app_admin_protected_inbox_actions_deletefeedbackquery",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 20,
+      "community_name": "page.tsx",
       "norm_label": "deletefeedbackquery()"
     },
     {
@@ -862,8 +736,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_members_actions",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "actions.ts"
     },
     {
@@ -873,8 +747,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "app_admin_protected_members_actions_allowedroles",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "allowedroles"
     },
     {
@@ -884,8 +758,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "app_admin_protected_members_actions_addadminmember",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "addadminmember()"
     },
     {
@@ -895,8 +769,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "app_admin_protected_members_actions_updateadminmember",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "updateadminmember()"
     },
     {
@@ -906,8 +780,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_members_page",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "page.tsx"
     },
     {
@@ -917,8 +791,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "app_admin_protected_members_page_formatdate",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "formatdate()"
     },
     {
@@ -928,8 +802,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "app_admin_protected_members_page_memberspage",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "memberspage()"
     },
     {
@@ -961,8 +835,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_page",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "page.tsx"
     },
     {
@@ -972,8 +846,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "app_admin_protected_page_metriclink",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "metriclink()"
     },
     {
@@ -983,8 +857,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "app_admin_protected_page_formatdate",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "formatdate()"
     },
     {
@@ -994,8 +868,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "app_admin_protected_page_adminpage",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "adminpage()"
     },
     {
@@ -1005,8 +879,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_seo_actions",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "actions.ts"
     },
     {
@@ -1016,8 +890,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "app_admin_protected_seo_actions_saveseosetting",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "saveseosetting()"
     },
     {
@@ -1027,8 +901,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "app_admin_protected_seo_actions_deleteseosetting",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "deleteseosetting()"
     },
     {
@@ -1038,8 +912,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_seo_page",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "page.tsx"
     },
     {
@@ -1049,8 +923,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "app_admin_protected_seo_page_publicroutes",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "publicroutes"
     },
     {
@@ -1060,8 +934,8 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "app_admin_protected_seo_page_seopage",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "seopage()"
     },
     {
@@ -1104,8 +978,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_settings_page",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "page.tsx"
     },
     {
@@ -1115,8 +989,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "app_admin_protected_settings_page_booleansettings",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "booleansettings"
     },
     {
@@ -1126,8 +1000,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "app_admin_protected_settings_page_settingmessagevalue",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "settingmessagevalue()"
     },
     {
@@ -1137,8 +1011,8 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "app_admin_protected_settings_page_settingdisplay",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "settingdisplay()"
     },
     {
@@ -1148,8 +1022,8 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "app_admin_protected_settings_page_settingspage",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "settingspage()"
     },
     {
@@ -1159,8 +1033,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_tools_actions",
-      "community": 20,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "actions.ts"
     },
     {
@@ -1170,8 +1044,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "app_admin_protected_tools_actions_updatetool",
-      "community": 20,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "updatetool()"
     },
     {
@@ -1181,8 +1055,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_protected_tools_page",
-      "community": 20,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "page.tsx"
     },
     {
@@ -1192,8 +1066,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "app_admin_protected_tools_page_toolspage",
-      "community": 20,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "toolspage()"
     },
     {
@@ -1302,8 +1176,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_admin_logout_route",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "route.ts"
     },
     {
@@ -1313,8 +1187,8 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "app_admin_logout_route_post",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "post()"
     },
     {
@@ -1379,8 +1253,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_tools_pdf_to_word_route",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 83,
+      "community_name": "permissions.ts",
       "norm_label": "route.ts"
     },
     {
@@ -1401,8 +1275,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "app_api_tools_pdf_to_word_route_trimmed",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 83,
+      "community_name": "permissions.ts",
       "norm_label": "trimmed()"
     },
     {
@@ -1412,8 +1286,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "app_api_tools_pdf_to_word_route_deleteupload",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 83,
+      "community_name": "permissions.ts",
       "norm_label": "deleteupload()"
     },
     {
@@ -1423,8 +1297,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "app_api_tools_pdf_to_word_route_post",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 83,
+      "community_name": "permissions.ts",
       "norm_label": "post()"
     },
     {
@@ -1467,8 +1341,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "app_api_tools_word_to_pdf_route",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 22,
+      "community_name": "getToolBlockedState",
       "norm_label": "route.ts"
     },
     {
@@ -1489,8 +1363,8 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "app_api_tools_word_to_pdf_route_trimmed",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 22,
+      "community_name": "getToolBlockedState",
       "norm_label": "trimmed()"
     },
     {
@@ -1500,8 +1374,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "app_api_tools_word_to_pdf_route_deleteupload",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 22,
+      "community_name": "getToolBlockedState",
       "norm_label": "deleteupload()"
     },
     {
@@ -1511,8 +1385,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "app_api_tools_word_to_pdf_route_post",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 22,
+      "community_name": "getToolBlockedState",
       "norm_label": "post()"
     },
     {
@@ -3645,8 +3519,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_continueworking",
-      "community": 178,
-      "community_name": "index.ts",
+      "community": 15,
+      "community_name": "AnalyticsProvider.tsx",
       "norm_label": "continueworking.tsx"
     },
     {
@@ -3656,8 +3530,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "components_continueworking_quick_action_slugs",
-      "community": 178,
-      "community_name": "index.ts",
+      "community": 15,
+      "community_name": "AnalyticsProvider.tsx",
       "norm_label": "quick_action_slugs"
     },
     {
@@ -3667,8 +3541,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "components_continueworking_recentfilelink",
-      "community": 178,
-      "community_name": "index.ts",
+      "community": 15,
+      "community_name": "AnalyticsProvider.tsx",
       "norm_label": "recentfilelink()"
     },
     {
@@ -3678,8 +3552,8 @@
       "source_location": "L42",
       "_origin": "ast",
       "id": "components_continueworking_continueworking",
-      "community": 178,
-      "community_name": "index.ts",
+      "community": 15,
+      "community_name": "AnalyticsProvider.tsx",
       "norm_label": "continueworking()"
     },
     {
@@ -3953,8 +3827,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_admin_adminformfield",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "adminformfield.tsx"
     },
     {
@@ -3964,8 +3838,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "components_admin_adminformfield_adminformfield",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "adminformfield()"
     },
     {
@@ -4008,8 +3882,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_admin_adminmetriccard",
-      "community": 6,
-      "community_name": "edit-page-ops.test.ts",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "adminmetriccard.tsx"
     },
     {
@@ -4019,8 +3893,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "components_admin_adminmetriccard_adminmetriccard",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 41,
+      "community_name": "PageThumbnailSidebar.tsx",
       "norm_label": "adminmetriccard()"
     },
     {
@@ -4129,8 +4003,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_admin_adminstatusbadge",
-      "community": 6,
-      "community_name": "edit-page-ops.test.ts",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "adminstatusbadge.tsx"
     },
     {
@@ -4140,8 +4014,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_admin_adminstatusbadge_adminstatusbadge",
-      "community": 6,
-      "community_name": "edit-page-ops.test.ts",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "adminstatusbadge()"
     },
     {
@@ -4151,8 +4025,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_admin_adminsubmitbutton",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "adminsubmitbutton.tsx"
     },
     {
@@ -4162,8 +4036,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "components_admin_adminsubmitbutton_adminsubmitbutton",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "adminsubmitbutton()"
     },
     {
@@ -4206,8 +4080,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "components_admin_controlcentershell_controlcentershell",
-      "community": 11,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "controlcentershell()"
     },
     {
@@ -4239,8 +4113,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_admin_inboxclient",
-      "community": 41,
-      "community_name": "PageThumbnailSidebar.tsx",
+      "community": 20,
+      "community_name": "page.tsx",
       "norm_label": "inboxclient.tsx"
     },
     {
@@ -4250,8 +4124,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "components_admin_inboxclient_typefilter",
-      "community": 41,
-      "community_name": "PageThumbnailSidebar.tsx",
+      "community": 20,
+      "community_name": "page.tsx",
       "norm_label": "typefilter"
     },
     {
@@ -4261,8 +4135,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "components_admin_inboxclient_relativetime",
-      "community": 41,
-      "community_name": "PageThumbnailSidebar.tsx",
+      "community": 20,
+      "community_name": "page.tsx",
       "norm_label": "relativetime()"
     },
     {
@@ -4272,8 +4146,8 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "components_admin_inboxclient_absolutetime",
-      "community": 41,
-      "community_name": "PageThumbnailSidebar.tsx",
+      "community": 20,
+      "community_name": "page.tsx",
       "norm_label": "absolutetime()"
     },
     {
@@ -4283,8 +4157,8 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "components_admin_inboxclient_inboxclient",
-      "community": 41,
-      "community_name": "PageThumbnailSidebar.tsx",
+      "community": 20,
+      "community_name": "page.tsx",
       "norm_label": "inboxclient()"
     },
     {
@@ -4591,8 +4465,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_analytics_analyticspageview",
-      "community": 4,
-      "community_name": "requireAdmin",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "analyticspageview.tsx"
     },
     {
@@ -4602,8 +4476,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "components_analytics_analyticspageview_public_page_routes",
-      "community": 4,
-      "community_name": "requireAdmin",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "public_page_routes"
     },
     {
@@ -4613,8 +4487,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "components_analytics_analyticspageview_analyticspageview",
-      "community": 4,
-      "community_name": "requireAdmin",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "analyticspageview()"
     },
     {
@@ -4701,8 +4575,8 @@
       "source_location": "L147",
       "_origin": "ast",
       "id": "components_analytics_analyticsprovider_useanalytics",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "useanalytics()"
     },
     {
@@ -4998,8 +4872,8 @@
       "source_location": "L230",
       "_origin": "ast",
       "id": "components_pdf_compresspdftool_profileexplanation",
-      "community": 3,
-      "community_name": "createClient",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "profileexplanation()"
     },
     {
@@ -5042,8 +4916,8 @@
       "source_location": "L274",
       "_origin": "ast",
       "id": "components_pdf_compresspdftool_compresspdftool",
-      "community": 3,
-      "community_name": "createClient",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "compresspdftool()"
     },
     {
@@ -5053,8 +4927,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_pdf_croppdftool",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "croppdftool.tsx"
     },
     {
@@ -5064,8 +4938,8 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "components_pdf_croppdftool_loadedpdf",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "loadedpdf"
     },
     {
@@ -5075,8 +4949,8 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "components_pdf_croppdftool_runwithtimeout",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "runwithtimeout()"
     },
     {
@@ -5086,8 +4960,8 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "components_pdf_croppdftool_sanitizepdffilename",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "sanitizepdffilename()"
     },
     {
@@ -5097,8 +4971,8 @@
       "source_location": "L81",
       "_origin": "ast",
       "id": "components_pdf_croppdftool_aspect_presets",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "aspect_presets"
     },
     {
@@ -5108,8 +4982,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "components_pdf_croppdftool_cropicon",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "cropicon()"
     },
     {
@@ -5119,8 +4993,8 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "components_pdf_croppdftool_croppdftool",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "croppdftool()"
     },
     {
@@ -5218,8 +5092,8 @@
       "source_location": "L225",
       "_origin": "ast",
       "id": "components_pdf_editpdftool_loadeditengine",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "loadeditengine()"
     },
     {
@@ -5372,8 +5246,8 @@
       "source_location": "L1890",
       "_origin": "ast",
       "id": "components_pdf_editpdftool_restyleselectedrun",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "restyleselectedrun()"
     },
     {
@@ -6230,8 +6104,8 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "components_pdf_mergepdftool_sanitizepdffilename",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 30,
+      "community_name": "page.tsx",
       "norm_label": "sanitizepdffilename()"
     },
     {
@@ -6439,8 +6313,8 @@
       "source_location": "L182",
       "_origin": "ast",
       "id": "components_pdf_organizepdftool_organizepdftool",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "organizepdftool()"
     },
     {
@@ -6802,8 +6676,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_pdf_pdftowordtool",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "pdftowordtool.tsx"
     },
     {
@@ -6813,8 +6687,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "components_pdf_pdftowordtool_stage",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "stage"
     },
     {
@@ -6824,8 +6698,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "components_pdf_pdftowordtool_selectedfile",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "selectedfile"
     },
     {
@@ -6835,8 +6709,8 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "components_pdf_pdftowordtool_conversionresult",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "conversionresult"
     },
     {
@@ -6846,8 +6720,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "components_pdf_pdftowordtool_downloadblob",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "downloadblob()"
     },
     {
@@ -6857,8 +6731,8 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "components_pdf_pdftowordtool_pdficon",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "pdficon()"
     },
     {
@@ -6868,8 +6742,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "components_pdf_pdftowordtool_warmconverter",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "warmconverter()"
     },
     {
@@ -6879,8 +6753,8 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "components_pdf_pdftowordtool_serverprivacynote",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "serverprivacynote()"
     },
     {
@@ -6890,8 +6764,8 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "components_pdf_pdftowordtool_pdftowordtool",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "pdftowordtool()"
     },
     {
@@ -6945,8 +6819,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_pdf_pdftoolregistry",
-      "community": 16,
-      "community_name": "MicroDock.tsx",
+      "community": 96,
+      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
       "norm_label": "pdftoolregistry.tsx"
     },
     {
@@ -6956,8 +6830,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_pdf_pdftoolregistry_pdftoolstatus",
-      "community": 16,
-      "community_name": "MicroDock.tsx",
+      "community": 96,
+      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
       "norm_label": "pdftoolstatus"
     },
     {
@@ -6967,8 +6841,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "components_pdf_pdftoolregistry_pdftoolslug",
-      "community": 16,
-      "community_name": "MicroDock.tsx",
+      "community": 96,
+      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
       "norm_label": "pdftoolslug"
     },
     {
@@ -6978,8 +6852,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "components_pdf_pdftoolregistry_pdftooldefinition",
-      "community": 16,
-      "community_name": "MicroDock.tsx",
+      "community": 96,
+      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
       "norm_label": "pdftooldefinition"
     },
     {
@@ -6989,8 +6863,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "components_pdf_pdftoolregistry_pdftools",
-      "community": 16,
-      "community_name": "MicroDock.tsx",
+      "community": 96,
+      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
       "norm_label": "pdftools"
     },
     {
@@ -7000,8 +6874,8 @@
       "source_location": "L262",
       "_origin": "ast",
       "id": "components_pdf_pdftoolregistry_getpdftool",
-      "community": 16,
-      "community_name": "MicroDock.tsx",
+      "community": 96,
+      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
       "norm_label": "getpdftool()"
     },
     {
@@ -7011,8 +6885,8 @@
       "source_location": "L272",
       "_origin": "ast",
       "id": "components_pdf_pdftoolregistry_getstatuslabel",
-      "community": 16,
-      "community_name": "MicroDock.tsx",
+      "community": 96,
+      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
       "norm_label": "getstatuslabel()"
     },
     {
@@ -7066,8 +6940,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "components_pdf_signpdftool_sanitizepdffilename",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 22,
+      "community_name": "getToolBlockedState",
       "norm_label": "sanitizepdffilename()"
     },
     {
@@ -7099,8 +6973,8 @@
       "source_location": "L110",
       "_origin": "ast",
       "id": "components_pdf_signpdftool_signpdftool",
-      "community": 30,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "signpdftool()"
     },
     {
@@ -7253,8 +7127,8 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "components_pdf_splitpdftool_ensureextension",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 22,
+      "community_name": "getToolBlockedState",
       "norm_label": "ensureextension()"
     },
     {
@@ -7363,8 +7237,8 @@
       "source_location": "L300",
       "_origin": "ast",
       "id": "components_pdf_splitpdftool_createpdffrompages",
-      "community": 22,
-      "community_name": "getToolBlockedState",
+      "community": 30,
+      "community_name": "page.tsx",
       "norm_label": "createpdffrompages()"
     },
     {
@@ -7462,8 +7336,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_pdf_toolglyph",
-      "community": 176,
-      "community_name": "ToolGlyph.tsx",
+      "community": 16,
+      "community_name": "MicroDock.tsx",
       "norm_label": "toolglyph.tsx"
     },
     {
@@ -7473,8 +7347,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "components_pdf_toolglyph_shardstyle",
-      "community": 176,
-      "community_name": "ToolGlyph.tsx",
+      "community": 16,
+      "community_name": "MicroDock.tsx",
       "norm_label": "shardstyle"
     },
     {
@@ -7484,8 +7358,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "components_pdf_toolglyph_shard",
-      "community": 176,
-      "community_name": "ToolGlyph.tsx",
+      "community": 16,
+      "community_name": "MicroDock.tsx",
       "norm_label": "shard()"
     },
     {
@@ -7495,8 +7369,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "components_pdf_toolglyph_base",
-      "community": 176,
-      "community_name": "ToolGlyph.tsx",
+      "community": 16,
+      "community_name": "MicroDock.tsx",
       "norm_label": "base"
     },
     {
@@ -7506,8 +7380,8 @@
       "source_location": "L24",
       "_origin": "ast",
       "id": "components_pdf_toolglyph_toolglyph",
-      "community": 176,
-      "community_name": "ToolGlyph.tsx",
+      "community": 16,
+      "community_name": "MicroDock.tsx",
       "norm_label": "toolglyph()"
     },
     {
@@ -7660,8 +7534,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_pdf_wordtopdftool",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "wordtopdftool.tsx"
     },
     {
@@ -7671,8 +7545,8 @@
       "source_location": "L29",
       "_origin": "ast",
       "id": "components_pdf_wordtopdftool_stage",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "stage"
     },
     {
@@ -7682,8 +7556,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "components_pdf_wordtopdftool_selectedfile",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "selectedfile"
     },
     {
@@ -7693,8 +7567,8 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "components_pdf_wordtopdftool_conversionresult",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "conversionresult"
     },
     {
@@ -7704,8 +7578,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "components_pdf_wordtopdftool_downloadblob",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "downloadblob()"
     },
     {
@@ -7715,8 +7589,8 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "components_pdf_wordtopdftool_wordicon",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "wordicon()"
     },
     {
@@ -7726,8 +7600,8 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "components_pdf_wordtopdftool_warmconverter",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "warmconverter()"
     },
     {
@@ -7737,8 +7611,8 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "components_pdf_wordtopdftool_serverprivacynote",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "serverprivacynote()"
     },
     {
@@ -7748,8 +7622,8 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "components_pdf_wordtopdftool_wordtopdftool",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "wordtopdftool()"
     },
     {
@@ -8265,8 +8139,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_pdf_pagenumbers_pagenumberpreview",
-      "community": 92,
-      "community_name": "ENGINEERING_EXCELLENCE_AUDIT.md",
+      "community": 108,
+      "community_name": "Lumeo PDF Workspace",
       "norm_label": "pagenumberpreview.tsx"
     },
     {
@@ -8276,8 +8150,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "components_pdf_pagenumbers_pagenumberpreview_describeposition",
-      "community": 92,
-      "community_name": "ENGINEERING_EXCELLENCE_AUDIT.md",
+      "community": 108,
+      "community_name": "Lumeo PDF Workspace",
       "norm_label": "describeposition()"
     },
     {
@@ -8287,8 +8161,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "components_pdf_pagenumbers_pagenumberpreview_pagenumberpreview",
-      "community": 92,
-      "community_name": "ENGINEERING_EXCELLENCE_AUDIT.md",
+      "community": 108,
+      "community_name": "Lumeo PDF Workspace",
       "norm_label": "pagenumberpreview()"
     },
     {
@@ -8353,8 +8227,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_pdf_sign_signaturecreator",
-      "community": 28,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "signaturecreator.tsx"
     },
     {
@@ -8364,8 +8238,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "components_pdf_sign_signaturecreator_stroke",
-      "community": 28,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "stroke"
     },
     {
@@ -8375,8 +8249,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "components_pdf_sign_signaturecreator_handwriting_fonts",
-      "community": 28,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "handwriting_fonts"
     },
     {
@@ -8386,8 +8260,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "components_pdf_sign_signaturecreator_createdsignature",
-      "community": 28,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "createdsignature"
     },
     {
@@ -8397,8 +8271,8 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "components_pdf_sign_signaturecreator_canvastosignature",
-      "community": 28,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "canvastosignature()"
     },
     {
@@ -8408,8 +8282,8 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "components_pdf_sign_signaturecreator_drawtab",
-      "community": 28,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "drawtab()"
     },
     {
@@ -8419,8 +8293,8 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "components_pdf_sign_signaturecreator_typetab",
-      "community": 28,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "typetab()"
     },
     {
@@ -8430,8 +8304,8 @@
       "source_location": "L243",
       "_origin": "ast",
       "id": "components_pdf_sign_signaturecreator_uploadtab",
-      "community": 28,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "uploadtab()"
     },
     {
@@ -8441,8 +8315,8 @@
       "source_location": "L386",
       "_origin": "ast",
       "id": "components_pdf_sign_signaturecreator_signaturecreator",
-      "community": 28,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "signaturecreator()"
     },
     {
@@ -8815,8 +8689,8 @@
       "source_location": "L199",
       "_origin": "ast",
       "id": "components_pdf_workspace_toolworkspace_l2workspaceheader",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "l2workspaceheader()"
     },
     {
@@ -8826,8 +8700,8 @@
       "source_location": "L224",
       "_origin": "ast",
       "id": "components_pdf_workspace_toolworkspace_l2workspacetoolbar",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "l2workspacetoolbar()"
     },
     {
@@ -8881,8 +8755,8 @@
       "source_location": "L328",
       "_origin": "ast",
       "id": "components_pdf_workspace_toolworkspace_l2workspacegrid",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "l2workspacegrid()"
     },
     {
@@ -8936,8 +8810,8 @@
       "source_location": "L412",
       "_origin": "ast",
       "id": "components_pdf_workspace_toolworkspace_l2uploadstage",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "l2uploadstage()"
     },
     {
@@ -9057,8 +8931,8 @@
       "source_location": "L781",
       "_origin": "ast",
       "id": "components_pdf_workspace_toolworkspace_l2privacynote",
-      "community": 50,
-      "community_name": "@vercel/functions",
+      "community": 8,
+      "community_name": "PublicPdfChrome.tsx",
       "norm_label": "l2privacynote()"
     },
     {
@@ -9123,8 +8997,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_public_publicpdftoolsmenuclient",
-      "community": 176,
-      "community_name": "ToolGlyph.tsx",
+      "community": 32,
+      "community_name": "JpgToPdfTool.tsx",
       "norm_label": "publicpdftoolsmenuclient.tsx"
     },
     {
@@ -9134,8 +9008,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "components_public_publicpdftoolsmenuclient_chevron",
-      "community": 176,
-      "community_name": "ToolGlyph.tsx",
+      "community": 32,
+      "community_name": "JpgToPdfTool.tsx",
       "norm_label": "chevron()"
     },
     {
@@ -9145,8 +9019,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "components_public_publicpdftoolsmenuclient_publicpdftoolsmenuclient",
-      "community": 176,
-      "community_name": "ToolGlyph.tsx",
+      "community": 32,
+      "community_name": "JpgToPdfTool.tsx",
       "norm_label": "publicpdftoolsmenuclient()"
     },
     {
@@ -9420,7 +9294,7 @@
       "source_location": "L120",
       "_origin": "ast",
       "id": "components_ui_aura_aurapanel",
-      "community": 64,
+      "community": 5,
       "community_name": "page.tsx",
       "norm_label": "aurapanel()"
     },
@@ -9530,8 +9404,8 @@
       "source_location": "L259",
       "_origin": "ast",
       "id": "components_ui_aura_aurasegmentedcontrol",
-      "community": 28,
-      "community_name": "page.tsx",
+      "community": 12,
+      "community_name": "EditElementView.tsx",
       "norm_label": "aurasegmentedcontrol()"
     },
     {
@@ -9552,8 +9426,8 @@
       "source_location": "L366",
       "_origin": "ast",
       "id": "components_ui_aura_aurabadge",
-      "community": 12,
-      "community_name": "EditElementView.tsx",
+      "community": 5,
+      "community_name": "page.tsx",
       "norm_label": "aurabadge()"
     },
     {
@@ -9651,8 +9525,8 @@
       "source_location": "L513",
       "_origin": "ast",
       "id": "components_ui_aura_auraskeleton",
-      "community": 5,
-      "community_name": "page.tsx",
+      "community": 12,
+      "community_name": "EditElementView.tsx",
       "norm_label": "auraskeleton()"
     },
     {
@@ -9673,8 +9547,8 @@
       "source_location": "L529",
       "_origin": "ast",
       "id": "components_ui_aura_auranotice",
-      "community": 12,
-      "community_name": "EditElementView.tsx",
+      "community": 64,
+      "community_name": "page.tsx",
       "norm_label": "auranotice()"
     },
     {
@@ -9750,8 +9624,8 @@
       "source_location": "L609",
       "_origin": "ast",
       "id": "components_ui_aura_aurauploadsurface",
-      "community": 5,
-      "community_name": "page.tsx",
+      "community": 12,
+      "community_name": "EditElementView.tsx",
       "norm_label": "aurauploadsurface()"
     },
     {
@@ -9849,8 +9723,8 @@
       "source_location": "L874",
       "_origin": "ast",
       "id": "components_ui_aura_l2menusurface",
-      "community": 176,
-      "community_name": "ToolGlyph.tsx",
+      "community": 32,
+      "community_name": "JpgToPdfTool.tsx",
       "norm_label": "l2menusurface"
     },
     {
@@ -10036,8 +9910,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_ui_fileicon",
-      "community": 7,
-      "community_name": "PublicCatalogPageShell.tsx",
+      "community": 8,
+      "community_name": "PublicPdfChrome.tsx",
       "norm_label": "fileicon.tsx"
     },
     {
@@ -10047,8 +9921,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "components_ui_fileicon_fileicon",
-      "community": 7,
-      "community_name": "PublicCatalogPageShell.tsx",
+      "community": 8,
+      "community_name": "PublicPdfChrome.tsx",
       "norm_label": "fileicon()"
     },
     {
@@ -10465,8 +10339,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_admin_audit",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "audit.ts"
     },
     {
@@ -10476,8 +10350,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "lib_admin_audit_writeauditlog",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "writeauditlog()"
     },
     {
@@ -10542,8 +10416,8 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "lib_admin_auth_requireadmin",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "requireadmin()"
     },
     {
@@ -10619,8 +10493,8 @@
       "source_location": "L96",
       "_origin": "ast",
       "id": "lib_admin_data_safe",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "safe()"
     },
     {
@@ -10674,8 +10548,8 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "lib_admin_data_gettoolcategories",
-      "community": 20,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "gettoolcategories()"
     },
     {
@@ -10685,8 +10559,8 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "lib_admin_data_getpdftools",
-      "community": 20,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "getpdftools()"
     },
     {
@@ -10696,8 +10570,8 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "lib_admin_data_getfeatureflags",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "getfeatureflags()"
     },
     {
@@ -10707,8 +10581,8 @@
       "source_location": "L167",
       "_origin": "ast",
       "id": "lib_admin_data_getannouncements",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "getannouncements()"
     },
     {
@@ -10718,8 +10592,8 @@
       "source_location": "L177",
       "_origin": "ast",
       "id": "lib_admin_data_getseosettings",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "getseosettings()"
     },
     {
@@ -10729,8 +10603,8 @@
       "source_location": "L187",
       "_origin": "ast",
       "id": "lib_admin_data_getsitesettings",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "getsitesettings()"
     },
     {
@@ -10751,8 +10625,8 @@
       "source_location": "L204",
       "_origin": "ast",
       "id": "lib_admin_data_getauditlogs",
-      "community": 41,
-      "community_name": "PageThumbnailSidebar.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "getauditlogs()"
     },
     {
@@ -10894,8 +10768,8 @@
       "source_location": "L498",
       "_origin": "ast",
       "id": "lib_admin_data_getanalyticssummary",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "getanalyticssummary()"
     },
     {
@@ -10960,8 +10834,8 @@
       "source_location": "L635",
       "_origin": "ast",
       "id": "lib_admin_data_getoverviewdata",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "getoverviewdata()"
     },
     {
@@ -10971,8 +10845,8 @@
       "source_location": "L680",
       "_origin": "ast",
       "id": "lib_admin_data_getsystemstatus",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "getsystemstatus()"
     },
     {
@@ -11004,8 +10878,8 @@
       "source_location": "L771",
       "_origin": "ast",
       "id": "lib_admin_data_getadminmembers",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "getadminmembers()"
     },
     {
@@ -11026,8 +10900,8 @@
       "source_location": "L797",
       "_origin": "ast",
       "id": "lib_admin_data_getunreadinboxcount",
-      "community": 10,
-      "community_name": "page.tsx",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "getunreadinboxcount()"
     },
     {
@@ -11147,8 +11021,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_admin_health",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "health.ts"
     },
     {
@@ -11158,8 +11032,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "lib_admin_health_healthcheckstatus",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "healthcheckstatus"
     },
     {
@@ -11169,8 +11043,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "lib_admin_health_healthcheck",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "healthcheck"
     },
     {
@@ -11180,8 +11054,8 @@
       "source_location": "L14",
       "_origin": "ast",
       "id": "lib_admin_health_buildinfo",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "buildinfo"
     },
     {
@@ -11191,8 +11065,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "lib_admin_health_healthsnapshot",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "healthsnapshot"
     },
     {
@@ -11202,8 +11076,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "lib_admin_health_timed",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "timed()"
     },
     {
@@ -11213,8 +11087,8 @@
       "source_location": "L37",
       "_origin": "ast",
       "id": "lib_admin_health_checksupabasedatabase",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "checksupabasedatabase()"
     },
     {
@@ -11224,8 +11098,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "lib_admin_health_checksupabasestorage",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "checksupabasestorage()"
     },
     {
@@ -11235,8 +11109,8 @@
       "source_location": "L66",
       "_origin": "ast",
       "id": "lib_admin_health_checklibreofficeconverter",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "checklibreofficeconverter()"
     },
     {
@@ -11246,8 +11120,8 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "lib_admin_health_getbuildinfo",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "getbuildinfo()"
     },
     {
@@ -11257,8 +11131,8 @@
       "source_location": "L107",
       "_origin": "ast",
       "id": "lib_admin_health_gethealthsnapshot",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 98,
+      "community_name": "PDF Workspace Rollout",
       "norm_label": "gethealthsnapshot()"
     },
     {
@@ -11356,8 +11230,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_admin_permissions_canmanagetools",
-      "community": 20,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "canmanagetools()"
     },
     {
@@ -11389,8 +11263,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_admin_permissions_canmanageseo",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "canmanageseo()"
     },
     {
@@ -11400,8 +11274,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "lib_admin_permissions_canmanagesettings",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "canmanagesettings()"
     },
     {
@@ -11411,8 +11285,8 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "lib_admin_permissions_canmanagemembers",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "canmanagemembers()"
     },
     {
@@ -11466,8 +11340,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "lib_admin_permissions_canviewhealth",
-      "community": 96,
-      "community_name": "Design: Page Organizer, HTML to PDF, Text Extractor",
+      "community": 41,
+      "community_name": "PageThumbnailSidebar.tsx",
       "norm_label": "canviewhealth()"
     },
     {
@@ -11521,8 +11395,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_admin_timezone_formatadmindate",
-      "community": 20,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "formatadmindate()"
     },
     {
@@ -11598,8 +11472,8 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "lib_admin_types_admincontext",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 11,
+      "community_name": "page.tsx",
       "norm_label": "admincontext"
     },
     {
@@ -11708,8 +11582,8 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "lib_admin_validation_formnumber",
-      "community": 58,
-      "community_name": "dompurify",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "formnumber()"
     },
     {
@@ -11719,8 +11593,8 @@
       "source_location": "L51",
       "_origin": "ast",
       "id": "lib_admin_validation_validateslug",
-      "community": 58,
-      "community_name": "dompurify",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "validateslug()"
     },
     {
@@ -11730,8 +11604,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "lib_admin_validation_validateroute",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "validateroute()"
     },
     {
@@ -11741,8 +11615,8 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "lib_admin_validation_validatetoolstatus",
-      "community": 20,
-      "community_name": "page.tsx",
+      "community": 58,
+      "community_name": "dompurify",
       "norm_label": "validatetoolstatus()"
     },
     {
@@ -11752,8 +11626,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "lib_admin_validation_validateenvironment",
-      "community": 58,
-      "community_name": "dompurify",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "validateenvironment()"
     },
     {
@@ -11763,8 +11637,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "lib_admin_validation_parsejsonconfig",
-      "community": 58,
-      "community_name": "dompurify",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "parsejsonconfig()"
     },
     {
@@ -11796,8 +11670,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "lib_admin_validation_validateseotitle",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "validateseotitle()"
     },
     {
@@ -11807,8 +11681,8 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "lib_admin_validation_validateseodescription",
-      "community": 2,
-      "community_name": "page.tsx",
+      "community": 54,
+      "community_name": "typescript",
       "norm_label": "validateseodescription()"
     },
     {
@@ -12093,8 +11967,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_analytics_state",
-      "community": 4,
-      "community_name": "requireAdmin",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "state.ts"
     },
     {
@@ -12104,8 +11978,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "lib_analytics_state_allowedevents",
-      "community": 4,
-      "community_name": "requireAdmin",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "allowedevents"
     },
     {
@@ -12126,8 +12000,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "lib_analytics_state_shouldattemptonce",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "shouldattemptonce()"
     },
     {
@@ -12225,8 +12099,8 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "lib_analytics_types_analyticsavailability",
-      "community": 4,
-      "community_name": "requireAdmin",
+      "community": 50,
+      "community_name": "@vercel/functions",
       "norm_label": "analyticsavailability"
     },
     {
@@ -12632,8 +12506,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_converters_pdf_to_word",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 83,
+      "community_name": "permissions.ts",
       "norm_label": "pdf-to-word.ts"
     },
     {
@@ -12643,8 +12517,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "lib_converters_pdf_to_word_pdftowordconversionerror",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 83,
+      "community_name": "permissions.ts",
       "norm_label": "pdftowordconversionerror"
     },
     {
@@ -12654,8 +12528,8 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "lib_converters_pdf_to_word_pdftowordresult",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 83,
+      "community_name": "permissions.ts",
       "norm_label": "pdftowordresult"
     },
     {
@@ -12665,8 +12539,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_converters_pdf_to_word_converterbaseurl",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 83,
+      "community_name": "permissions.ts",
       "norm_label": "converterbaseurl()"
     },
     {
@@ -12676,8 +12550,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "lib_converters_pdf_to_word_docxfilenamefor",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 83,
+      "community_name": "permissions.ts",
       "norm_label": "docxfilenamefor()"
     },
     {
@@ -12687,8 +12561,8 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "lib_converters_pdf_to_word_convertpdftoword",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 83,
+      "community_name": "permissions.ts",
       "norm_label": "convertpdftoword()"
     },
     {
@@ -13325,8 +13199,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "lib_pdf_core_pageranges_parsepagerangeinput",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 184,
+      "community_name": "watermark-export.test.ts",
       "norm_label": "parsepagerangeinput()"
     },
     {
@@ -13655,8 +13529,8 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "lib_pdf_crop_config_createdefaultcropconfig",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "createdefaultcropconfig()"
     },
     {
@@ -13710,8 +13584,8 @@
       "source_location": "L99",
       "_origin": "ast",
       "id": "lib_pdf_crop_config_iscroprectvalid",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "iscroprectvalid()"
     },
     {
@@ -14007,8 +13881,8 @@
       "source_location": "L429",
       "_origin": "ast",
       "id": "lib_pdf_edit_applyeditplan_registerfallbackfont",
-      "community": 39,
-      "community_name": "SplitPdfTool.tsx",
+      "community": 44,
+      "community_name": "OrganizePdfTool.tsx",
       "norm_label": "registerfallbackfont()"
     },
     {
@@ -14172,8 +14046,8 @@
       "source_location": "L251",
       "_origin": "ast",
       "id": "lib_pdf_edit_contentstream_textshowoperatorkind",
-      "community": 31,
-      "community_name": "page.tsx",
+      "community": 44,
+      "community_name": "OrganizePdfTool.tsx",
       "norm_label": "textshowoperatorkind"
     },
     {
@@ -14183,8 +14057,8 @@
       "source_location": "L253",
       "_origin": "ast",
       "id": "lib_pdf_edit_contentstream_textshowoperator",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 28,
+      "community_name": "page.tsx",
       "norm_label": "textshowoperator"
     },
     {
@@ -14315,8 +14189,8 @@
       "source_location": "L140",
       "_origin": "ast",
       "id": "lib_pdf_edit_editplan_buildeditplan",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "buildeditplan()"
     },
     {
@@ -14425,8 +14299,8 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "lib_pdf_edit_elements_createtextelement",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "createtextelement()"
     },
     {
@@ -14447,8 +14321,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "lib_pdf_edit_elements_createwhiteoutelement",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "createwhiteoutelement()"
     },
     {
@@ -14975,8 +14849,8 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "lib_pdf_edit_fontencoding_resolvedfont",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "resolvedfont"
     },
     {
@@ -15195,8 +15069,8 @@
       "source_location": "L333",
       "_origin": "ast",
       "id": "lib_pdf_edit_fontencoding_resolvefont",
-      "community": 37,
-      "community_name": "pdfToWordStorage.ts",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "resolvefont()"
     },
     {
@@ -15250,8 +15124,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "lib_pdf_edit_fontmetrics_fontmetrics",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "fontmetrics"
     },
     {
@@ -15349,8 +15223,8 @@
       "source_location": "L171",
       "_origin": "ast",
       "id": "lib_pdf_edit_fontmetrics_resolvefontmetrics",
-      "community": 55,
-      "community_name": "Browser Certification",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "resolvefontmetrics()"
     },
     {
@@ -15371,8 +15245,8 @@
       "source_location": "L196",
       "_origin": "ast",
       "id": "lib_pdf_edit_fontmetrics_textshowstate",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "textshowstate"
     },
     {
@@ -15459,7 +15333,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "lib_pdf_edit_formxobjects_locatedtextoperator",
-      "community": 18,
+      "community": 31,
       "community_name": "page.tsx",
       "norm_label": "locatedtextoperator"
     },
@@ -15569,8 +15443,8 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "lib_pdf_edit_formxobjects_collectpagetextoperators",
-      "community": 31,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "collectpagetextoperators()"
     },
     {
@@ -15635,7 +15509,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_pdf_edit_matchtextrun",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "matchtextrun.ts"
     },
@@ -15646,7 +15520,7 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "lib_pdf_edit_matchtextrun_matchedtextrun",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "matchedtextrun"
     },
@@ -15657,7 +15531,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "lib_pdf_edit_matchtextrun_operatororiginpx",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "operatororiginpx()"
     },
@@ -15668,7 +15542,7 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "lib_pdf_edit_matchtextrun_bestoperatoramong",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "bestoperatoramong()"
     },
@@ -15679,7 +15553,7 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "lib_pdf_edit_matchtextrun_matchdetectedruntooperator",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "matchdetectedruntooperator()"
     },
@@ -15690,7 +15564,7 @@
       "source_location": "L121",
       "_origin": "ast",
       "id": "lib_pdf_edit_matchtextrun_operatorspatialindex",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "operatorspatialindex"
     },
@@ -15701,7 +15575,7 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "lib_pdf_edit_matchtextrun_cellkey",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "cellkey()"
     },
@@ -15712,8 +15586,8 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "lib_pdf_edit_matchtextrun_buildoperatorspatialindex",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "buildoperatorspatialindex()"
     },
     {
@@ -15723,8 +15597,8 @@
       "source_location": "L145",
       "_origin": "ast",
       "id": "lib_pdf_edit_matchtextrun_matchdetectedruntooperatorindexed",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "matchdetectedruntooperatorindexed()"
     },
     {
@@ -15734,8 +15608,8 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "lib_pdf_edit_matchtextrun_runspansmultipleoperators",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "runspansmultipleoperators()"
     },
     {
@@ -15745,8 +15619,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_pdf_edit_multiruneditplan",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "multiruneditplan.ts"
     },
     {
@@ -15756,8 +15630,8 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "lib_pdf_edit_multiruneditplan_multiruneditplan",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "multiruneditplan"
     },
     {
@@ -15767,8 +15641,8 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "lib_pdf_edit_multiruneditplan_rejected",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "rejected()"
     },
     {
@@ -15778,8 +15652,8 @@
       "source_location": "L65",
       "_origin": "ast",
       "id": "lib_pdf_edit_multiruneditplan_isconsecutiveascending",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "isconsecutiveascending()"
     },
     {
@@ -15789,8 +15663,8 @@
       "source_location": "L83",
       "_origin": "ast",
       "id": "lib_pdf_edit_multiruneditplan_buildmultiruneditplan",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "buildmultiruneditplan()"
     },
     {
@@ -16130,7 +16004,7 @@
       "source_location": "L218",
       "_origin": "ast",
       "id": "lib_pdf_edit_redaction_describecoveragewarning",
-      "community": 29,
+      "community": 18,
       "community_name": "page.tsx",
       "norm_label": "describecoveragewarning()"
     },
@@ -16251,7 +16125,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "textruns.ts"
     },
@@ -16262,7 +16136,7 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_pdftextitem",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "pdftextitem"
     },
@@ -16273,7 +16147,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_pdftextmarkedcontent",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "pdftextmarkedcontent"
     },
@@ -16284,7 +16158,7 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_pdfviewporttransform",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "pdfviewporttransform"
     },
@@ -16295,7 +16169,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_transformpoint2x3",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "transformpoint2x3()"
     },
@@ -16306,7 +16180,7 @@
       "source_location": "L59",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_transformboxorigin",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "transformboxorigin"
     },
@@ -16317,7 +16191,7 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_boxoriginfromtransform",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "boxoriginfromtransform()"
     },
@@ -16328,7 +16202,7 @@
       "source_location": "L87",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_detectedtextrun",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "detectedtextrun"
     },
@@ -16339,7 +16213,7 @@
       "source_location": "L119",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_istextitem",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "istextitem()"
     },
@@ -16350,7 +16224,7 @@
       "source_location": "L123",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_textrunsfromcontent",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "textrunsfromcontent()"
     },
@@ -16361,7 +16235,7 @@
       "source_location": "L201",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_overlayfontsizepx",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "overlayfontsizepx()"
     },
@@ -16372,7 +16246,7 @@
       "source_location": "L216",
       "_origin": "ast",
       "id": "lib_pdf_edit_textruns_findtextrunatpoint",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "findtextrunatpoint()"
     },
@@ -16438,8 +16312,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_pdf_formatbytes",
-      "community": 30,
-      "community_name": "page.tsx",
+      "community": 21,
+      "community_name": "client.ts",
       "norm_label": "formatbytes.ts"
     },
     {
@@ -16449,8 +16323,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_pdf_formatbytes_formatbytes",
-      "community": 30,
-      "community_name": "page.tsx",
+      "community": 21,
+      "community_name": "client.ts",
       "norm_label": "formatbytes()"
     },
     {
@@ -16526,8 +16400,8 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "lib_pdf_headerfooter_config_createdefaultheaderfooterconfig",
-      "community": 82,
-      "community_name": "client.ts",
+      "community": 8,
+      "community_name": "PublicPdfChrome.tsx",
       "norm_label": "createdefaultheaderfooterconfig()"
     },
     {
@@ -16548,8 +16422,8 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "lib_pdf_headerfooter_config_resolveplaceholders",
-      "community": 82,
-      "community_name": "client.ts",
+      "community": 8,
+      "community_name": "PublicPdfChrome.tsx",
       "norm_label": "resolveplaceholders()"
     },
     {
@@ -16559,8 +16433,8 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "lib_pdf_headerfooter_config_renderzonetext",
-      "community": 82,
-      "community_name": "client.ts",
+      "community": 8,
+      "community_name": "PublicPdfChrome.tsx",
       "norm_label": "renderzonetext()"
     },
     {
@@ -16746,8 +16620,8 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "lib_pdf_pagenumbers_config_pagenumbersconfig",
-      "community": 92,
-      "community_name": "ENGINEERING_EXCELLENCE_AUDIT.md",
+      "community": 108,
+      "community_name": "Lumeo PDF Workspace",
       "norm_label": "pagenumbersconfig"
     },
     {
@@ -17109,8 +16983,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_pdf_rotation",
-      "community": 22,
-      "community_name": "getToolBlockedState",
+      "community": 30,
+      "community_name": "page.tsx",
       "norm_label": "rotation.ts"
     },
     {
@@ -17120,8 +16994,8 @@
       "source_location": "L3",
       "_origin": "ast",
       "id": "lib_pdf_rotation_normalizerotation",
-      "community": 22,
-      "community_name": "getToolBlockedState",
+      "community": 30,
+      "community_name": "page.tsx",
       "norm_label": "normalizerotation()"
     },
     {
@@ -17131,8 +17005,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_pdf_sanitizefilename",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 22,
+      "community_name": "getToolBlockedState",
       "norm_label": "sanitizefilename.ts"
     },
     {
@@ -17142,8 +17016,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "lib_pdf_sanitizefilename_sanitizefilestem",
-      "community": 76,
-      "community_name": "parseDocumentXml.ts",
+      "community": 22,
+      "community_name": "getToolBlockedState",
       "norm_label": "sanitizefilestem()"
     },
     {
@@ -17285,8 +17159,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_pdf_uploadvalidation",
-      "community": 30,
-      "community_name": "page.tsx",
+      "community": 21,
+      "community_name": "client.ts",
       "norm_label": "uploadvalidation.ts"
     },
     {
@@ -17296,8 +17170,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "lib_pdf_uploadvalidation_haspdfmagicbytes",
-      "community": 30,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "haspdfmagicbytes()"
     },
     {
@@ -17307,8 +17181,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "lib_pdf_uploadvalidation_ispdfnamedfile",
-      "community": 30,
-      "community_name": "page.tsx",
+      "community": 7,
+      "community_name": "PublicCatalogPageShell.tsx",
       "norm_label": "ispdfnamedfile()"
     },
     {
@@ -17318,8 +17192,8 @@
       "source_location": "L20",
       "_origin": "ast",
       "id": "lib_pdf_uploadvalidation_checkpdffilesize",
-      "community": 30,
-      "community_name": "page.tsx",
+      "community": 21,
+      "community_name": "client.ts",
       "norm_label": "checkpdffilesize()"
     },
     {
@@ -17351,8 +17225,8 @@
       "source_location": "L68",
       "_origin": "ast",
       "id": "lib_pdf_uploadvalidation_checkimagefilesize",
-      "community": 30,
-      "community_name": "page.tsx",
+      "community": 21,
+      "community_name": "client.ts",
       "norm_label": "checkimagefilesize()"
     },
     {
@@ -17373,8 +17247,8 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "lib_pdf_uploadvalidation_checktotalimagessize",
-      "community": 30,
-      "community_name": "page.tsx",
+      "community": 21,
+      "community_name": "client.ts",
       "norm_label": "checktotalimagessize()"
     },
     {
@@ -17384,8 +17258,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_pdf_watermark_config",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 131,
+      "community_name": "embeddedImages.ts",
       "norm_label": "config.ts"
     },
     {
@@ -17428,8 +17302,8 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "lib_pdf_watermark_config_watermarkplacementcorner",
-      "community": 0,
-      "community_name": "EditPdfTool.tsx",
+      "community": 131,
+      "community_name": "embeddedImages.ts",
       "norm_label": "watermarkplacementcorner"
     },
     {
@@ -17439,8 +17313,8 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "lib_pdf_watermark_config_watermarkpagerange",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 131,
+      "community_name": "embeddedImages.ts",
       "norm_label": "watermarkpagerange"
     },
     {
@@ -17450,8 +17324,8 @@
       "source_location": "L78",
       "_origin": "ast",
       "id": "lib_pdf_watermark_config_watermarkplacementmode",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 131,
+      "community_name": "embeddedImages.ts",
       "norm_label": "watermarkplacementmode"
     },
     {
@@ -17461,8 +17335,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "lib_pdf_watermark_config_watermarksingleplacement",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 131,
+      "community_name": "embeddedImages.ts",
       "norm_label": "watermarksingleplacement"
     },
     {
@@ -17472,8 +17346,8 @@
       "source_location": "L94",
       "_origin": "ast",
       "id": "lib_pdf_watermark_config_watermarktextcontent",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 131,
+      "community_name": "embeddedImages.ts",
       "norm_label": "watermarktextcontent"
     },
     {
@@ -17483,8 +17357,8 @@
       "source_location": "L103",
       "_origin": "ast",
       "id": "lib_pdf_watermark_config_watermarkimagecontent",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 131,
+      "community_name": "embeddedImages.ts",
       "norm_label": "watermarkimagecontent"
     },
     {
@@ -17494,8 +17368,8 @@
       "source_location": "L109",
       "_origin": "ast",
       "id": "lib_pdf_watermark_config_watermarkcontent",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 131,
+      "community_name": "embeddedImages.ts",
       "norm_label": "watermarkcontent"
     },
     {
@@ -17527,8 +17401,8 @@
       "source_location": "L163",
       "_origin": "ast",
       "id": "lib_pdf_watermark_config_createdefaultimagewatermarkconfig",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 184,
+      "community_name": "watermark-export.test.ts",
       "norm_label": "createdefaultimagewatermarkconfig()"
     },
     {
@@ -18022,8 +17896,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_recent_files_index",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "index.ts"
     },
     {
@@ -18033,8 +17907,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_recent_files_index_recentfileitem",
-      "community": 178,
-      "community_name": "index.ts",
+      "community": 15,
+      "community_name": "AnalyticsProvider.tsx",
       "norm_label": "recentfileitem"
     },
     {
@@ -18044,8 +17918,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "lib_recent_files_index_isbrowser",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "isbrowser()"
     },
     {
@@ -18066,8 +17940,8 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "lib_recent_files_index_cachedsnapshot",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "cachedsnapshot"
     },
     {
@@ -18088,8 +17962,8 @@
       "source_location": "L82",
       "_origin": "ast",
       "id": "lib_recent_files_index_recordrecentfileinput",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "recordrecentfileinput"
     },
     {
@@ -18099,8 +17973,8 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "lib_recent_files_index_recordrecentfile",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "recordrecentfile()"
     },
     {
@@ -18110,8 +17984,8 @@
       "source_location": "L108",
       "_origin": "ast",
       "id": "lib_recent_files_index_clearrecentfiles",
-      "community": 8,
-      "community_name": "PublicPdfChrome.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "clearrecentfiles()"
     },
     {
@@ -18121,8 +17995,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_recent_files_userecentfiles",
-      "community": 178,
-      "community_name": "index.ts",
+      "community": 15,
+      "community_name": "AnalyticsProvider.tsx",
       "norm_label": "userecentfiles.ts"
     },
     {
@@ -18132,8 +18006,8 @@
       "source_location": "L6",
       "_origin": "ast",
       "id": "lib_recent_files_userecentfiles_empty_snapshot",
-      "community": 178,
-      "community_name": "index.ts",
+      "community": 15,
+      "community_name": "AnalyticsProvider.tsx",
       "norm_label": "empty_snapshot"
     },
     {
@@ -18143,8 +18017,8 @@
       "source_location": "L8",
       "_origin": "ast",
       "id": "lib_recent_files_userecentfiles_subscribe",
-      "community": 178,
-      "community_name": "index.ts",
+      "community": 15,
+      "community_name": "AnalyticsProvider.tsx",
       "norm_label": "subscribe()"
     },
     {
@@ -18154,8 +18028,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "lib_recent_files_userecentfiles_getserversnapshot",
-      "community": 178,
-      "community_name": "index.ts",
+      "community": 15,
+      "community_name": "AnalyticsProvider.tsx",
       "norm_label": "getserversnapshot()"
     },
     {
@@ -18165,8 +18039,8 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "lib_recent_files_userecentfiles_userecentfiles",
-      "community": 178,
-      "community_name": "index.ts",
+      "community": 15,
+      "community_name": "AnalyticsProvider.tsx",
       "norm_label": "userecentfiles()"
     },
     {
@@ -18396,8 +18270,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_sign_usehistorystate",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "usehistorystate.ts"
     },
     {
@@ -18407,8 +18281,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "lib_sign_usehistorystate_historysizeoptions",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "historysizeoptions"
     },
     {
@@ -18418,8 +18292,8 @@
       "source_location": "L36",
       "_origin": "ast",
       "id": "lib_sign_usehistorystate_trimhistorytosizebudget",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "trimhistorytosizebudget()"
     },
     {
@@ -18429,8 +18303,8 @@
       "source_location": "L46",
       "_origin": "ast",
       "id": "lib_sign_usehistorystate_usehistorystate",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "usehistorystate()"
     },
     {
@@ -18946,8 +18820,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_supabase_server",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "server.ts"
     },
     {
@@ -18957,8 +18831,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "lib_supabase_server_isservercomponentcookiewriteerror",
-      "community": 98,
-      "community_name": "PDF Workspace Rollout",
+      "community": 2,
+      "community_name": "page.tsx",
       "norm_label": "isservercomponentcookiewriteerror()"
     },
     {
@@ -19023,8 +18897,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "wordtopdfstorage.ts"
     },
     {
@@ -19034,8 +18908,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage_iswordnamedfile",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "iswordnamedfile()"
     },
     {
@@ -19045,8 +18919,8 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage_checkwordfilesize",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "checkwordfilesize()"
     },
     {
@@ -19056,8 +18930,8 @@
       "source_location": "L43",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage_worduploadresult",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "worduploadresult"
     },
     {
@@ -19067,8 +18941,8 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage_uploadfailure",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "uploadfailure"
     },
     {
@@ -19078,8 +18952,8 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage_failurestatus",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "failurestatus()"
     },
     {
@@ -19089,8 +18963,8 @@
       "source_location": "L67",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage_istransientfailure",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "istransientfailure()"
     },
     {
@@ -19100,8 +18974,8 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage_uploadfailuremessage",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "uploadfailuremessage()"
     },
     {
@@ -19111,8 +18985,8 @@
       "source_location": "L92",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage_wait",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "wait()"
     },
     {
@@ -19122,8 +18996,8 @@
       "source_location": "L98",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage_uploadwordfileforconversion",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "uploadwordfileforconversion()"
     },
     {
@@ -19133,8 +19007,8 @@
       "source_location": "L137",
       "_origin": "ast",
       "id": "lib_supabase_wordtopdfstorage_removewordupload",
-      "community": 83,
-      "community_name": "permissions.ts",
+      "community": 25,
+      "community_name": "edit-fallback-font-apply.test.ts",
       "norm_label": "removewordupload()"
     },
     {
@@ -19254,8 +19128,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "lib_tools_catalog_toolglyphname",
-      "community": 176,
-      "community_name": "ToolGlyph.tsx",
+      "community": 16,
+      "community_name": "MicroDock.tsx",
       "norm_label": "toolglyphname"
     },
     {
@@ -19364,8 +19238,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "lib_tools_tiles",
-      "community": 15,
-      "community_name": "AnalyticsProvider.tsx",
+      "community": 32,
+      "community_name": "JpgToPdfTool.tsx",
       "norm_label": "tiles.ts"
     },
     {
@@ -19375,8 +19249,8 @@
       "source_location": "L13",
       "_origin": "ast",
       "id": "lib_tools_tiles_tileaccent",
-      "community": 15,
-      "community_name": "AnalyticsProvider.tsx",
+      "community": 32,
+      "community_name": "JpgToPdfTool.tsx",
       "norm_label": "tileaccent"
     },
     {
@@ -19386,8 +19260,8 @@
       "source_location": "L15",
       "_origin": "ast",
       "id": "lib_tools_tiles_tile_label",
-      "community": 15,
-      "community_name": "AnalyticsProvider.tsx",
+      "community": 32,
+      "community_name": "JpgToPdfTool.tsx",
       "norm_label": "tile_label"
     },
     {
@@ -19397,8 +19271,8 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "lib_tools_tiles_tile_description",
-      "community": 15,
-      "community_name": "AnalyticsProvider.tsx",
+      "community": 32,
+      "community_name": "JpgToPdfTool.tsx",
       "norm_label": "tile_description"
     },
     {
@@ -19408,8 +19282,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "lib_tools_tiles_tool_accent",
-      "community": 15,
-      "community_name": "AnalyticsProvider.tsx",
+      "community": 32,
+      "community_name": "JpgToPdfTool.tsx",
       "norm_label": "tool_accent"
     },
     {
@@ -20659,7 +20533,7 @@
       "label": "pinned_version()",
       "file_type": "code",
       "source_file": "scripts/graphify_env_check.py",
-      "source_location": "L36",
+      "source_location": "L43",
       "_origin": "ast",
       "id": "scripts_graphify_env_check_pinned_version",
       "community": 186,
@@ -20670,7 +20544,7 @@
       "label": "main()",
       "file_type": "code",
       "source_file": "scripts/graphify_env_check.py",
-      "source_location": "L48",
+      "source_location": "L55",
       "_origin": "ast",
       "id": "scripts_graphify_env_check_main",
       "community": 186,
@@ -20681,9 +20555,9 @@
       "label": "The single source of truth, read rather than duplicated.",
       "file_type": "rationale",
       "source_file": "scripts/graphify_env_check.py",
-      "source_location": "L37",
+      "source_location": "L44",
       "_origin": "ast",
-      "id": "scripts_graphify_env_check_rationale_37",
+      "id": "scripts_graphify_env_check_rationale_44",
       "community": 186,
       "community_name": "pinned_version",
       "norm_label": "the single source of truth, read rather than duplicated."
@@ -22312,8 +22186,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "scripts_verify_release",
-      "community": 17,
-      "community_name": "export.ts",
+      "community": 29,
+      "community_name": "page.tsx",
       "norm_label": "verify-release.mjs"
     },
     {
@@ -22323,8 +22197,8 @@
       "source_location": "L16",
       "_origin": "ast",
       "id": "scripts_verify_release_deprecated_scripts",
-      "community": 17,
-      "community_name": "export.ts",
+      "community": 29,
+      "community_name": "page.tsx",
       "norm_label": "deprecated_scripts"
     },
     {
@@ -22334,8 +22208,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "scripts_verify_release_core_steps",
-      "community": 17,
-      "community_name": "export.ts",
+      "community": 29,
+      "community_name": "page.tsx",
       "norm_label": "core_steps"
     },
     {
@@ -22345,8 +22219,8 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "scripts_verify_release_verify_scripts",
-      "community": 17,
-      "community_name": "export.ts",
+      "community": 29,
+      "community_name": "page.tsx",
       "norm_label": "verify_scripts"
     },
     {
@@ -22367,8 +22241,8 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "scripts_verify_release_results",
-      "community": 17,
-      "community_name": "export.ts",
+      "community": 29,
+      "community_name": "page.tsx",
       "norm_label": "results"
     },
     {
@@ -23555,8 +23429,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_edit_clipped_text_test",
-      "community": 37,
-      "community_name": "pdfToWordStorage.ts",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "edit-clipped-text.test.ts"
     },
     {
@@ -23566,8 +23440,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tests_edit_clipped_text_test_extractpagestrings",
-      "community": 37,
-      "community_name": "pdfToWordStorage.ts",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "extractpagestrings()"
     },
     {
@@ -23577,8 +23451,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "tests_edit_clipped_text_test_buildpage",
-      "community": 37,
-      "community_name": "pdfToWordStorage.ts",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "buildpage()"
     },
     {
@@ -23588,8 +23462,8 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "tests_edit_clipped_text_test_editfirstoperator",
-      "community": 37,
-      "community_name": "pdfToWordStorage.ts",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "editfirstoperator()"
     },
     {
@@ -23621,8 +23495,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_edit_fallback_font_apply_test",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 76,
+      "community_name": "parseDocumentXml.ts",
       "norm_label": "edit-fallback-font-apply.test.ts"
     },
     {
@@ -23632,8 +23506,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "tests_edit_fallback_font_apply_test_tounicodecmapfor",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 76,
+      "community_name": "parseDocumentXml.ts",
       "norm_label": "tounicodecmapfor()"
     },
     {
@@ -23643,8 +23517,8 @@
       "source_location": "L57",
       "_origin": "ast",
       "id": "tests_edit_fallback_font_apply_test_maketype0subsetpdf",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 76,
+      "community_name": "parseDocumentXml.ts",
       "norm_label": "maketype0subsetpdf()"
     },
     {
@@ -23654,8 +23528,8 @@
       "source_location": "L133",
       "_origin": "ast",
       "id": "tests_edit_fallback_font_apply_test_makesimplesubsetpdf",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 76,
+      "community_name": "parseDocumentXml.ts",
       "norm_label": "makesimplesubsetpdf()"
     },
     {
@@ -23665,8 +23539,8 @@
       "source_location": "L174",
       "_origin": "ast",
       "id": "tests_edit_fallback_font_apply_test_decodedpagecontent",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 76,
+      "community_name": "parseDocumentXml.ts",
       "norm_label": "decodedpagecontent()"
     },
     {
@@ -23676,8 +23550,8 @@
       "source_location": "L190",
       "_origin": "ast",
       "id": "tests_edit_fallback_font_apply_test_extractedstrings",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 76,
+      "community_name": "parseDocumentXml.ts",
       "norm_label": "extractedstrings()"
     },
     {
@@ -23687,8 +23561,8 @@
       "source_location": "L201",
       "_origin": "ast",
       "id": "tests_edit_fallback_font_apply_test_preparededit",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 76,
+      "community_name": "parseDocumentXml.ts",
       "norm_label": "preparededit"
     },
     {
@@ -23698,8 +23572,8 @@
       "source_location": "L203",
       "_origin": "ast",
       "id": "tests_edit_fallback_font_apply_test_prepareedit",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "prepareedit()"
     },
     {
@@ -23709,8 +23583,8 @@
       "source_location": "L226",
       "_origin": "ast",
       "id": "tests_edit_fallback_font_apply_test_planfor",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 76,
+      "community_name": "parseDocumentXml.ts",
       "norm_label": "planfor()"
     },
     {
@@ -23819,7 +23693,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_edit_match_text_run_test",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "edit-match-text-run.test.ts"
     },
@@ -23830,7 +23704,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "tests_edit_match_text_run_test_decodedcontentstreambytes",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "decodedcontentstreambytes()"
     },
@@ -23841,7 +23715,7 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "tests_edit_match_text_run_test_loadpdfjspage",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "loadpdfjspage()"
     },
@@ -23852,7 +23726,7 @@
       "source_location": "L156",
       "_origin": "ast",
       "id": "tests_edit_match_text_run_test_getfont",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "getfont()"
     },
@@ -23863,7 +23737,7 @@
       "source_location": "L157",
       "_origin": "ast",
       "id": "tests_edit_match_text_run_test_getcontentstream",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "getcontentstream()"
     },
@@ -23874,7 +23748,7 @@
       "source_location": "L221",
       "_origin": "ast",
       "id": "tests_edit_match_text_run_test_makefakeoperator",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "makefakeoperator()"
     },
@@ -23885,7 +23759,7 @@
       "source_location": "L248",
       "_origin": "ast",
       "id": "tests_edit_match_text_run_test_makefakerun",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "makefakerun()"
     },
@@ -23896,8 +23770,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_edit_multi_run_plan_test",
-      "community": 54,
-      "community_name": "typescript",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "edit-multi-run-plan.test.ts"
     },
     {
@@ -23907,8 +23781,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "tests_edit_multi_run_plan_test_decodedcontentstreambytes",
-      "community": 54,
-      "community_name": "typescript",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "decodedcontentstreambytes()"
     },
     {
@@ -23918,8 +23792,8 @@
       "source_location": "L53",
       "_origin": "ast",
       "id": "tests_edit_multi_run_plan_test_firstfontdict",
-      "community": 54,
-      "community_name": "typescript",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "firstfontdict()"
     },
     {
@@ -23929,8 +23803,8 @@
       "source_location": "L58",
       "_origin": "ast",
       "id": "tests_edit_multi_run_plan_test_hexof",
-      "community": 54,
-      "community_name": "typescript",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "hexof()"
     },
     {
@@ -23940,8 +23814,8 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "tests_edit_multi_run_plan_test_extractpagestrings",
-      "community": 54,
-      "community_name": "typescript",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "extractpagestrings()"
     },
     {
@@ -23951,8 +23825,8 @@
       "source_location": "L75",
       "_origin": "ast",
       "id": "tests_edit_multi_run_plan_test_buildmultioperatorfixture",
-      "community": 54,
-      "community_name": "typescript",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "buildmultioperatorfixture()"
     },
     {
@@ -23962,8 +23836,8 @@
       "source_location": "L114",
       "_origin": "ast",
       "id": "tests_edit_multi_run_plan_test_buildmultirunplanforindices",
-      "community": 54,
-      "community_name": "typescript",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "buildmultirunplanforindices()"
     },
     {
@@ -24127,8 +24001,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_edit_plan_test",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "edit-plan.test.ts"
     },
     {
@@ -24138,8 +24012,8 @@
       "source_location": "L18",
       "_origin": "ast",
       "id": "tests_edit_plan_test_decodedcontentstreambytes",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "decodedcontentstreambytes()"
     },
     {
@@ -24149,8 +24023,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "tests_edit_plan_test_firstfontdict",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "firstfontdict()"
     },
     {
@@ -24160,8 +24034,8 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "tests_edit_plan_test_fixedwidthsfont",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "fixedwidthsfont()"
     },
     {
@@ -24171,8 +24045,8 @@
       "source_location": "L84",
       "_origin": "ast",
       "id": "tests_edit_plan_test_fixedoperator",
-      "community": 44,
-      "community_name": "OrganizePdfTool.tsx",
+      "community": 55,
+      "community_name": "Browser Certification",
       "norm_label": "fixedoperator()"
     },
     {
@@ -24226,8 +24100,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_edit_restyle_blanked_render_test",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "edit-restyle-blanked-render.test.ts"
     },
     {
@@ -24237,8 +24111,8 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "tests_edit_restyle_blanked_render_test_invoicepdf",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "invoicepdf()"
     },
     {
@@ -24248,8 +24122,8 @@
       "source_location": "L31",
       "_origin": "ast",
       "id": "tests_edit_restyle_blanked_render_test_blankedbytes",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "blankedbytes()"
     },
     {
@@ -24259,8 +24133,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_edit_restyle_blanking_test",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "edit-restyle-blanking.test.ts"
     },
     {
@@ -24270,8 +24144,8 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "tests_edit_restyle_blanking_test_invoicepdf",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "invoicepdf()"
     },
     {
@@ -24281,8 +24155,8 @@
       "source_location": "L41",
       "_origin": "ast",
       "id": "tests_edit_restyle_blanking_test_restyle",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "restyle()"
     },
     {
@@ -24292,8 +24166,8 @@
       "source_location": "L91",
       "_origin": "ast",
       "id": "tests_edit_restyle_blanking_test_extract",
-      "community": 29,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "extract()"
     },
     {
@@ -24369,8 +24243,8 @@
       "source_location": "L72",
       "_origin": "ast",
       "id": "tests_edit_rotated_text_test_editfirstoperator",
-      "community": 113,
-      "community_name": "package.json",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "editfirstoperator()"
     },
     {
@@ -24380,8 +24254,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_edit_shared_form_cross_page_hardening_test",
-      "community": 55,
-      "community_name": "Browser Certification",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "edit-shared-form-cross-page-hardening.test.ts"
     },
     {
@@ -24391,8 +24265,8 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "tests_edit_shared_form_cross_page_hardening_test_hexof",
-      "community": 55,
-      "community_name": "Browser Certification",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "hexof()"
     },
     {
@@ -24402,8 +24276,8 @@
       "source_location": "L52",
       "_origin": "ast",
       "id": "tests_edit_shared_form_cross_page_hardening_test_extractallpagestrings",
-      "community": 55,
-      "community_name": "Browser Certification",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "extractallpagestrings()"
     },
     {
@@ -24413,8 +24287,8 @@
       "source_location": "L63",
       "_origin": "ast",
       "id": "tests_edit_shared_form_cross_page_hardening_test_buildformxobject",
-      "community": 55,
-      "community_name": "Browser Certification",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "buildformxobject()"
     },
     {
@@ -24424,8 +24298,8 @@
       "source_location": "L76",
       "_origin": "ast",
       "id": "tests_edit_shared_form_cross_page_hardening_test_buildtwopagedocwithsharedheader",
-      "community": 55,
-      "community_name": "Browser Certification",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "buildtwopagedocwithsharedheader()"
     },
     {
@@ -24435,8 +24309,8 @@
       "source_location": "L90",
       "_origin": "ast",
       "id": "tests_edit_shared_form_cross_page_hardening_test_editfirstformoperator",
-      "community": 55,
-      "community_name": "Browser Certification",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "editfirstformoperator()"
     },
     {
@@ -24446,8 +24320,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_edit_shared_forms_test",
-      "community": 31,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "edit-shared-forms.test.ts"
     },
     {
@@ -24457,8 +24331,8 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "tests_edit_shared_forms_test_hexof",
-      "community": 31,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "hexof()"
     },
     {
@@ -24468,8 +24342,8 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "tests_edit_shared_forms_test_extractallpagestrings",
-      "community": 31,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "extractallpagestrings()"
     },
     {
@@ -24479,8 +24353,8 @@
       "source_location": "L60",
       "_origin": "ast",
       "id": "tests_edit_shared_forms_test_buildformxobject",
-      "community": 31,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "buildformxobject()"
     },
     {
@@ -24490,8 +24364,8 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "tests_edit_shared_forms_test_editfirstformoperator",
-      "community": 31,
-      "community_name": "page.tsx",
+      "community": 17,
+      "community_name": "export.ts",
       "norm_label": "editfirstformoperator()"
     },
     {
@@ -24501,7 +24375,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_edit_text_runs_test",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "edit-text-runs.test.ts"
     },
@@ -24512,7 +24386,7 @@
       "source_location": "L7",
       "_origin": "ast",
       "id": "tests_edit_text_runs_test_loadpdfjspage",
-      "community": 29,
+      "community": 28,
       "community_name": "page.tsx",
       "norm_label": "loadpdfjspage()"
     },
@@ -24545,8 +24419,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_smoke_test",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "pdffixtures.smoke.test.ts"
     },
     {
@@ -24556,8 +24430,8 @@
       "source_location": "L10",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_smoke_test_generators",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "generators"
     },
     {
@@ -24567,8 +24441,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "pdffixtures.ts"
     },
     {
@@ -24578,8 +24452,8 @@
       "source_location": "L17",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_page_sizes",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "page_sizes"
     },
     {
@@ -24589,8 +24463,8 @@
       "source_location": "L27",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_toarraybuffer",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "toarraybuffer()"
     },
     {
@@ -24600,8 +24474,8 @@
       "source_location": "L33",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makesinglepagepdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makesinglepagepdf()"
     },
     {
@@ -24611,8 +24485,8 @@
       "source_location": "L40",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makemediumpdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makemediumpdf()"
     },
     {
@@ -24622,8 +24496,8 @@
       "source_location": "L47",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makelargepdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makelargepdf()"
     },
     {
@@ -24633,8 +24507,8 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makelandscapepdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makelandscapepdf()"
     },
     {
@@ -24644,8 +24518,8 @@
       "source_location": "L62",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makemixedpagesizespdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makemixedpagesizespdf()"
     },
     {
@@ -24655,8 +24529,8 @@
       "source_location": "L69",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makemixedrotationspdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makemixedrotationspdf()"
     },
     {
@@ -24666,8 +24540,8 @@
       "source_location": "L79",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_maketextheavypdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "maketextheavypdf()"
     },
     {
@@ -24677,8 +24551,8 @@
       "source_location": "L104",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makeunicodemetadatapdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makeunicodemetadatapdf()"
     },
     {
@@ -24688,8 +24562,8 @@
       "source_location": "L113",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makemetadatapdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makemetadatapdf()"
     },
     {
@@ -24699,8 +24573,8 @@
       "source_location": "L126",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_maketransparencypdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "maketransparencypdf()"
     },
     {
@@ -24710,8 +24584,8 @@
       "source_location": "L135",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makevectorpdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makevectorpdf()"
     },
     {
@@ -24721,8 +24595,8 @@
       "source_location": "L151",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makeimageonlypdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makeimageonlypdf()"
     },
     {
@@ -24732,8 +24606,8 @@
       "source_location": "L167",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makeformfieldpdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makeformfieldpdf()"
     },
     {
@@ -24743,8 +24617,8 @@
       "source_location": "L178",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makecorruptedpdfbytes",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makecorruptedpdfbytes()"
     },
     {
@@ -24754,8 +24628,8 @@
       "source_location": "L185",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makenonpdfbytes",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makenonpdfbytes()"
     },
     {
@@ -24765,8 +24639,8 @@
       "source_location": "L192",
       "_origin": "ast",
       "id": "tests_fixtures_pdffixtures_makezeropagepdf",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "makezeropagepdf()"
     },
     {
@@ -24776,8 +24650,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_header_footer_config_test",
-      "community": 82,
-      "community_name": "client.ts",
+      "community": 8,
+      "community_name": "PublicPdfChrome.tsx",
       "norm_label": "header-footer-config.test.ts"
     },
     {
@@ -24842,8 +24716,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_history_size_cap_test",
-      "community": 13,
-      "community_name": "Aura.tsx",
+      "community": 178,
+      "community_name": "index.ts",
       "norm_label": "history-size-cap.test.ts"
     },
     {
@@ -24963,8 +24837,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_pdf_output_validation_test",
-      "community": 25,
-      "community_name": "edit-fallback-font-apply.test.ts",
+      "community": 13,
+      "community_name": "Aura.tsx",
       "norm_label": "pdf-output-validation.test.ts"
     },
     {
@@ -25095,8 +24969,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "tests_watermark_config_test",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 184,
+      "community_name": "watermark-export.test.ts",
       "norm_label": "watermark-config.test.ts"
     },
     {
@@ -25106,8 +24980,8 @@
       "source_location": "L12",
       "_origin": "ast",
       "id": "tests_watermark_config_test_assertpctclose",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 184,
+      "community_name": "watermark-export.test.ts",
       "norm_label": "assertpctclose()"
     },
     {
@@ -25117,8 +24991,8 @@
       "source_location": "L77",
       "_origin": "ast",
       "id": "tests_watermark_config_test_realexportnativebbox",
-      "community": 108,
-      "community_name": "Lumeo PDF Workspace",
+      "community": 184,
+      "community_name": "watermark-export.test.ts",
       "norm_label": "realexportnativebbox()"
     },
     {
@@ -33175,95 +33049,6 @@
     }
   ],
   "links": [
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "mcp",
-      "target": "mcp_mcp_server_claude_flow"
-    },
-    {
-      "relation": "requires_env",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "mcp_mcp_server_claude_flow",
-      "target": "env_var_claude_flow_hooks_enabled"
-    },
-    {
-      "relation": "requires_env",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "mcp_mcp_server_claude_flow",
-      "target": "env_var_claude_flow_max_agents"
-    },
-    {
-      "relation": "requires_env",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "mcp_mcp_server_claude_flow",
-      "target": "env_var_claude_flow_memory_backend"
-    },
-    {
-      "relation": "requires_env",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "mcp_mcp_server_claude_flow",
-      "target": "env_var_claude_flow_mode"
-    },
-    {
-      "relation": "requires_env",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "mcp_mcp_server_claude_flow",
-      "target": "env_var_claude_flow_topology"
-    },
-    {
-      "relation": "requires_env",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "weight": 1.0,
-      "_origin": "ast",
-      "source": "mcp_mcp_server_claude_flow",
-      "target": "env_var_npm_config_update_notifier"
-    },
-    {
-      "relation": "references",
-      "confidence": "EXTRACTED",
-      "confidence_score": 1.0,
-      "source_file": ".mcp.json",
-      "source_location": "L1",
-      "weight": 1.0,
-      "context": "command",
-      "_origin": "ast",
-      "source": "mcp_mcp_server_claude_flow",
-      "target": "mcp_command_cmd"
-    },
     {
       "relation": "contains",
       "confidence": "EXTRACTED",
@@ -95579,7 +95364,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/graphify_env_check.py",
-      "source_location": "L48",
+      "source_location": "L55",
       "weight": 1.0,
       "_origin": "ast",
       "source": "scripts_graphify_env_check",
@@ -95590,7 +95375,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "scripts/graphify_env_check.py",
-      "source_location": "L36",
+      "source_location": "L43",
       "weight": 1.0,
       "_origin": "ast",
       "source": "scripts_graphify_env_check",
@@ -95602,7 +95387,7 @@
       "context": "call",
       "confidence": "EXTRACTED",
       "source_file": "scripts/graphify_env_check.py",
-      "source_location": "L73",
+      "source_location": "L80",
       "weight": 1.0,
       "_origin": "ast",
       "source": "scripts_graphify_env_check_main",
@@ -95613,10 +95398,10 @@
       "relation": "rationale_for",
       "confidence": "EXTRACTED",
       "source_file": "scripts/graphify_env_check.py",
-      "source_location": "L37",
+      "source_location": "L44",
       "weight": 1.0,
       "_origin": "ast",
-      "source": "scripts_graphify_env_check_rationale_37",
+      "source": "scripts_graphify_env_check_rationale_44",
       "target": "scripts_graphify_env_check_pinned_version",
       "confidence_score": 1.0
     },
@@ -107711,5 +107496,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "db54b47ea52facfb1925bec2b3e13df3e9d32243"
+  "built_at_commit": "241c31d76a87ea605ff2cd2d432c05a3fa5124ad"
 }

@@ -17,6 +17,12 @@
 graphify-out/
 app/graphify-out/
 
+# MCP server config for claude-flow/ruflo -- the same class of agent tooling
+# as .claude/ above, and Windows-only besides ("command": "cmd"), so it is
+# deliberately not tracked. Excluded here so that staying untracked does not
+# make local and CI graphs disagree.
+.mcp.json
+
 # generated / binary
 ruvector.db
 supabase/.temp/
