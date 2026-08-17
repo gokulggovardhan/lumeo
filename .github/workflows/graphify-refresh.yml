@@ -64,7 +64,7 @@ jobs:
       # partitioner" a structural property of the interpreter rather than
       # something each environment has to get right.
       - name: Set up Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: '3.14'
 
