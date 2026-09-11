@@ -3,17 +3,12 @@
 // The permanent pre-release quality gate (docs/RELEASE_CERTIFICATION.md,
 // Part 3 + Part 11). Orchestrates the checks that already exist rather than
 // reimplementing any of their logic: the core test/lint/typecheck/build
-// sequence, then every scripts/verify-*.mjs script in turn. Two scripts
-// (verify:aura-rollout, verify:lumeo2-public-experience) are documented as
-// deprecated in their own files -- their failures are reported but do not
-// fail the overall gate, since they check a since-completed rollout
-// milestone's hardcoded content markers, not current production behavior.
+// sequence, then every scripts/verify-*.mjs script in turn. Every listed
+// verifier reflects current production behavior and is release-fatal.
 //
 // Usage: npm run verify:release
 
 import { execSync } from "node:child_process";
-
-const DEPRECATED_SCRIPTS = new Set(["verify:aura-rollout", "verify:lumeo2-public-experience"]);
 
 const CORE_STEPS = [
   { label: "Tests", command: "npm run test" },
@@ -64,14 +59,11 @@ for (const step of CORE_STEPS) {
 
 if (!fatalFailure) {
   for (const scriptName of VERIFY_SCRIPTS) {
-    const isDeprecated = DEPRECATED_SCRIPTS.has(scriptName);
-    console.log(`--- ${scriptName}${isDeprecated ? " (deprecated, non-fatal)" : ""} ---`);
+    console.log(`--- ${scriptName} ---`);
     const result = run(`npm run ${scriptName}`);
-    results.push({ label: scriptName, ok: result.ok, fatal: !isDeprecated });
+    results.push({ label: scriptName, ok: result.ok, fatal: true });
     if (result.ok) {
       console.log(`PASS: ${scriptName}\n`);
-    } else if (isDeprecated) {
-      console.warn(`FAIL (known, non-fatal): ${scriptName}\n`);
     } else {
       fatalFailure = true;
       console.error(`FAIL: ${scriptName}\n`);
@@ -81,7 +73,7 @@ if (!fatalFailure) {
 
 console.log("=== Summary ===");
 for (const result of results) {
-  const status = result.ok ? "PASS" : result.fatal ? "FAIL" : "FAIL (non-fatal)";
+  const status = result.ok ? "PASS" : "FAIL";
   console.log(`${status.padEnd(18)} ${result.label}`);
 }
 
