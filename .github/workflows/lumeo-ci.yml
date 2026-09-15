@@ -57,6 +57,9 @@ jobs:
           app/security/page.tsx
           app/terms/page.tsx
           app/pdf/page.tsx
+          app/heic-to-jpeg/page.tsx
+          components/heic/HeicToJpegTool.tsx
+          lib/heic-to-jpeg
           app/pdf/merge/page.tsx
           app/pdf/split/page.tsx
           app/pdf/compress/page.tsx
