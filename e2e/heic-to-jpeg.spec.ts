@@ -17,6 +17,7 @@ test("mobile batch converts a JPEG still, isolates corrupt HEIC, and downloads",
     { name: "BROKEN.HEIC", mimeType: "image/heic", buffer: Buffer.from("corrupt input") },
   ]);
   await expect(page.getByRole("heading", { name: "2 photos detected" })).toBeVisible();
+  await expect(page.getByText("Your photos are processed in your browser.", { exact: false })).toBeVisible();
   await page.getByRole("button", { name: "Convert to JPEG" }).click();
   await expect(page.getByText("1 converted, 1 failed.", { exact: false })).toBeVisible({ timeout: 120_000 });
   const download = page.waitForEvent("download");
@@ -35,6 +36,15 @@ test("mobile batch converts a JPEG still, isolates corrupt HEIC, and downloads",
   expect((await chooser).isMultiple()).toBe(true);
   await page.screenshot({ path: "test-results/heic-mobile-empty.png", fullPage: true });
 });
+
+for (const width of [390, 393, 430]) {
+  test(`workspace has no horizontal overflow at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/heic-to-jpeg");
+    await expect(page.getByRole("button", { name: "Choose photos", exact: true })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
+}
 
 test("desktop drop imports a photo batch and ZIP preserves unique JPEG names", async ({ page }) => {
   await page.goto("/heic-to-jpeg");

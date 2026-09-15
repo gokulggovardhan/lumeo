@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { Camera, Download, ShieldCheck, Image as ImageIcon } from "lucide-react";
 import { AuraButton } from "@/components/ui/Aura";
@@ -51,8 +51,9 @@ export default function HeicToJpegTool() {
   function update(id: string, patch: Partial<Row>) { setRows((current) => current.map((row) => row.id === id ? { ...row, ...patch } : row)); }
   async function convert() {
     if (controller.current) return;
-    const run = new AbortController(); controller.current = run; setBusy(true);
     const pending = rows.filter((row) => row.source && row.status === "queued");
+    if (!pending.length) return;
+    const run = new AbortController(); controller.current = run; setBusy(true);
     const started = performance.now();
     track({ eventName: "processing_started", toolSlug: "heic-to-jpeg" });
     let failures = 0;
@@ -65,7 +66,9 @@ export default function HeicToJpegTool() {
     }, (row, error) => { failures++; update(row.id, { status: "failed", message: error instanceof Error ? error.message : "This photo could not be converted." }); }, run.signal);
     if (run.signal.aborted) return;
     controller.current = null; setBusy(false);
-    track({ eventName: failures ? "processing_failed" : "processing_succeeded", toolSlug: "heic-to-jpeg", durationMs: Math.round(performance.now() - started), success: failures === 0, ...(failures ? { errorCode: "processing_error" as const } : {}) });
+    const durationMs = Math.round(performance.now() - started);
+    if (failures) track({ eventName: "processing_failed", toolSlug: "heic-to-jpeg", durationMs, success: false, errorCode: "processing_error" });
+    else track({ eventName: "processing_succeeded", toolSlug: "heic-to-jpeg", durationMs, success: true });
   }
   function download(url: string, name: string) {
     const a = document.createElement("a"); a.href = url; a.download = name;
@@ -88,25 +91,34 @@ export default function HeicToJpegTool() {
     } catch { if (mounted.current) setNotice("The download bundle could not be created. Download the completed JPEGs individually."); }
     finally { if (mounted.current) setZipping(false); }
   }
-  const done = rows.filter((row) => row.status === "done");
-  const failed = rows.filter((row) => row.status === "failed");
-  const photos = rows.filter((row) => row.source);
-  const queued = rows.filter((row) => row.status === "queued");
-  return <div className="mt-6 space-y-6">
+  const summary = useMemo(() => {
+    const counts: Record<PhotoStatus, number> = { queued: 0, inspecting: 0, decoding: 0, processing: 0, encoding: 0, done: 0, failed: 0, "needs-review": 0 };
+    const done: Row[] = [];
+    const photos: Row[] = [];
+    for (const row of rows) {
+      counts[row.status] += 1;
+      if (row.status === "done") done.push(row);
+      if (row.source) photos.push(row);
+    }
+    return { counts, done, photos, completed: counts.done + counts.failed, outputBytes: done.reduce((total, row) => total + (row.result?.blob.size ?? 0), 0) };
+  }, [rows]);
+  const failedCount = summary.counts.failed;
+  const queuedCount = summary.counts.queued;
+  return <div className="mt-6 space-y-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
     {!rows.length ? <L2UploadStage inputId="heic-photo-upload" title="Drop iPhone photos here" description="Choose photos and their companion files together" acceptedNote="HEIC, HEIF and JPEG. Apple companions are recognized; ProRAW is not converted." accept={PHOTO_ACCEPT} multiple buttonLabel="Choose photos" icon={<Camera aria-hidden="true" size={28} />} onFilesSelected={select} /> : <>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div><h2 className="text-xl font-semibold">{photos.length} photo{photos.length === 1 ? "" : "s"} detected</h2><p className="mt-1 text-sm text-[var(--text-secondary)]">Companions are grouped by name. Original files are unchanged.</p></div>
+        <div><h2 className="text-xl font-semibold">{summary.photos.length} photo{summary.photos.length === 1 ? "" : "s"} detected</h2><p className="mt-1 text-sm text-[var(--text-secondary)]">Companions are grouped conservatively. Original files are unchanged.</p></div>
         <AuraButton type="button" variant="secondary" disabled={zipping} onClick={reset}>{busy ? "Cancel and start new" : "Start new"}</AuraButton>
       </div>
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <ul className="min-w-0 space-y-3" aria-label="Photo assets">
-          {rows.map((row) => <li key={row.id} className="min-w-0 rounded-lg bg-[var(--surface-raised)] p-4 shadow-[var(--shadow-sm)]">
+          {rows.map((row, index) => <li key={row.id} data-photo-asset data-status={row.status} data-output-dimensions={row.result ? `${row.result.width}x${row.result.height}` : ""} className="min-w-0 rounded-lg bg-[var(--surface-raised)] p-4 shadow-[var(--shadow-sm)]" style={{ contentVisibility: "auto", containIntrinsicSize: "88px" }}>
             <div className="flex min-w-0 items-start gap-3">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--surface-base)]">
-                {row.url ? <Image unoptimized src={row.url} width={56} height={56} alt="Converted photo preview" className="h-full w-full object-contain" /> : <ImageIcon aria-hidden="true" className="text-[var(--text-accent)]" />}
+                {row.url && index < 12 ? <Image unoptimized src={row.url} width={56} height={56} alt="Converted photo preview" className="h-full w-full object-contain" /> : <ImageIcon aria-hidden="true" className="text-[var(--text-accent)]" />}
               </div>
               <div className="min-w-0 flex-1"><h3 className="break-all font-semibold">{row.name}</h3><p className="mt-1 text-sm text-[var(--text-secondary)]">{row.source ? size(row.source.size) : "Companion / unsupported file"}{row.result ? ` → ${size(row.result.blob.size)} JPEG · ${row.result.width} × ${row.result.height}` : ""}</p>
-                <p className="mt-2 text-sm font-medium">{labels[row.status]}{row.companions.length && row.source ? " · Companion detected" : ""}{row.result?.evidence.hdr ? " · HDR evidence" : ""}{row.result?.evidence.depth ? " · Depth evidence" : ""}</p>
+                <p className="mt-2 text-sm font-medium">{labels[row.status]}{row.companions.length && row.source ? " · Companion detected" : ""}{row.result?.evidence.live === "confirmed" ? " · Live Photo confirmed" : row.result?.evidence.live === "probable" ? " · Possible Live Photo" : ""}{row.result?.evidence.hdr ? " · HDR evidence" : ""}{row.result?.evidence.depth ? " · Portrait data" : ""}</p>
               </div>
             </div>
             {row.warning || row.message ? <p className="mt-3 text-sm text-[var(--text-warning)]">{row.message ?? row.warning}</p> : null}
@@ -117,16 +129,17 @@ export default function HeicToJpegTool() {
         <aside className="h-fit space-y-4 rounded-lg bg-[var(--surface-raised)] p-5 lg:sticky lg:top-24">
           <h2 className="text-lg font-semibold">JPEG output</h2>
           <label htmlFor="heic-quality" className="block text-sm font-semibold">Quality</label>
-          <select id="heic-quality" value={quality} disabled={busy || done.length > 0} onChange={(e) => setQuality(Number(e.target.value))} className="min-h-11 w-full rounded-md bg-[var(--surface-input)] px-3 text-base focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]"><option value={92}>High · 92</option><option value={96}>Maximum · 96</option></select>
+          <select id="heic-quality" value={quality} disabled={busy || summary.done.length > 0} onChange={(e) => setQuality(Number(e.target.value))} className="min-h-11 w-full rounded-md bg-[var(--surface-input)] px-3 text-base focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]"><option value={92}>High · 92</option><option value={96}>Maximum · 96</option></select>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">Converts the selected still. Apple sidecar edits, motion, depth and HDR reconstruction are not applied. JPEG exports omit location and camera metadata.</p>
-          {busy ? <div role="status" className="space-y-2"><p>{done.length + failed.length} of {photos.length} processed</p><progress aria-label="Photos processed" className="h-2 w-full accent-[var(--action-primary)]" max={photos.length || 1} value={done.length + failed.length} /></div> : null}
-          {queued.length > 0 ? <AuraButton type="button" className="w-full" onClick={() => void convert()} loading={busy}>Convert to JPEG</AuraButton> : null}
-          {!busy && done.length > 1 ? <AuraButton type="button" className="w-full" loading={zipping} onClick={() => void downloadAll()}>Download all ({done.length})</AuraButton> : null}
-          {!busy && done.length === 1 ? <AuraButton type="button" className="w-full" onClick={() => download(done[0].url!, done[0].outputName)}>Download JPEG</AuraButton> : null}
+          {busy ? <div role="status" className="space-y-2"><p>{summary.completed} of {summary.photos.length} processed</p><p className="text-xs text-[var(--text-muted)]">{summary.counts.inspecting} inspecting · {summary.counts.decoding} decoding · {summary.counts.processing} processing · {summary.counts.encoding} encoding</p><progress aria-label="Photos processed" className="h-2 w-full accent-[var(--action-primary)]" max={summary.photos.length || 1} value={summary.completed} /></div> : null}
+          {queuedCount > 0 ? <AuraButton type="button" className="w-full" onClick={() => void convert()} loading={busy}>Convert to JPEG</AuraButton> : null}
+          {!busy && summary.done.length > 1 ? <AuraButton type="button" className="w-full" loading={zipping} onClick={() => void downloadAll()}>Download all ({summary.done.length})</AuraButton> : null}
+          {!busy && summary.done.length === 1 ? <AuraButton type="button" className="w-full" onClick={() => download(summary.done[0].url!, summary.done[0].outputName)}>Download JPEG</AuraButton> : null}
+          {!busy && summary.outputBytes > 256 * 1024 * 1024 ? <p className="text-sm text-[var(--text-warning)]">This download bundle is large. Individual downloads may use less memory on iPhone.</p> : null}
         </aside>
       </div>
     </>}
-    <div aria-live="polite" aria-atomic="true" className="text-sm text-[var(--text-secondary)]">{notice || (!busy && (done.length || failed.length) ? `${done.length} converted${failed.length ? `, ${failed.length} failed. Successful photos are available to download.` : ". Ready to download."}` : "")}</div>
-    <p className="flex items-center justify-center gap-2 text-center text-sm leading-6 text-[var(--text-secondary)]"><ShieldCheck size={18} aria-hidden="true" />Processed in your browser. Your photos are not uploaded for conversion.</p>
+    <div aria-live="polite" aria-atomic="true" className="text-sm text-[var(--text-secondary)]">{notice || (!busy && (summary.done.length || failedCount) ? `${summary.done.length} converted${failedCount ? `, ${failedCount} failed. Successful photos are available to download.` : ". Ready to download."}` : "")}</div>
+    <p className="flex items-center justify-center gap-2 text-center text-sm leading-6 text-[var(--text-secondary)]"><ShieldCheck size={18} aria-hidden="true" />Your photos are processed in your browser. They are not uploaded for conversion.</p>
   </div>;
 }

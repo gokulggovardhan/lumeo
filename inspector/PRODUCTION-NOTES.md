@@ -18,4 +18,8 @@ Synthetic grouping, primary selection, orientation matrices, cancellation, failu
 
 Analytics uses existing approved tool_opened, processing_started/succeeded/failed and download_started events only. The existing server RPC may reject an unknown tool slug until an active catalog row exists; no database policy or migration was changed here. Browser conversion is independent of analytics.
 
+## Real-sample harness
+
+Keep private exports under ignored `/samples`. Start the built or development app on port 3000, then run `npm run verify:heic-samples -- samples/<set>`. The harness performs the Phase 0 structural inspection, processes the same files through Chromium without uploading them, and writes ignored `inspector-output/report.json` plus `inspector-output/conversion-report.json`. Compare those results and downloaded JPEG appearance manually against Apple Photos; the harness does not certify visual parity.
+
 Decoder source/license: https://github.com/catdad-experiments/libheif-js (LGPL-3.0); underlying libheif: https://github.com/strukturag/libheif. Distribution must retain license notices and corresponding source availability. The dependency is unmodified and pinned in the lockfile.

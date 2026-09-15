@@ -120,6 +120,34 @@ function parseFtyp(box: Box, bytes: Uint8Array): string[] {
   return [...new Set(brands.filter((brand) => /^[\x20-\x7e]{4}$/.test(brand)))];
 }
 
+function parseIpmaPropertyIndexes(box: Box, bytes: Uint8Array, view: DataView, targetItemId: number): number[] | null {
+  if (box.dataStart + 8 > box.end) return null;
+  const version = bytes[box.dataStart] ?? 0;
+  const flags = ((bytes[box.dataStart + 1] ?? 0) << 16) | ((bytes[box.dataStart + 2] ?? 0) << 8) | (bytes[box.dataStart + 3] ?? 0);
+  const wideAssociation = Boolean(flags & 1);
+  let cursor = box.dataStart + 4;
+  const entryCount = view.getUint32(cursor);
+  cursor += 4;
+  for (let entry = 0; entry < entryCount; entry += 1) {
+    const idSize = version < 1 ? 2 : 4;
+    if (cursor + idSize + 1 > box.end) return null;
+    const itemId = idSize === 2 ? view.getUint16(cursor) : view.getUint32(cursor);
+    cursor += idSize;
+    const associationCount = bytes[cursor++] ?? 0;
+    const indexes: number[] = [];
+    for (let association = 0; association < associationCount; association += 1) {
+      const associationSize = wideAssociation ? 2 : 1;
+      if (cursor + associationSize > box.end) return null;
+      const value = associationSize === 2 ? view.getUint16(cursor) : (bytes[cursor] ?? 0);
+      cursor += associationSize;
+      const index = value & (wideAssociation ? 0x7fff : 0x7f);
+      if (index > 0) indexes.push(index);
+    }
+    if (itemId === targetItemId) return indexes;
+  }
+  return null;
+}
+
 export function findAsciiEvidence(bytes: Uint8Array, needles: readonly string[]): string[] {
   const evidence: string[] = [];
   for (const needle of needles) {
@@ -185,12 +213,23 @@ export function inspectHeifStructure(bytes: Uint8Array): HeifEvidence {
     const itemInfo = boxes.flatMap((box) => (box.type === "infe" ? [parseInfe(box, bytes, view)].filter((item): item is NonNullable<typeof item> => item !== null) : []));
     const pitm = boxes.find((box) => box.type === "pitm");
     let primaryItemId: number | null = null;
-    if (pitm && pitm.dataStart + 6 <= pitm.end) {
+    if (pitm && pitm.dataStart + 4 < pitm.end) {
       const version = bytes[pitm.dataStart] ?? 0;
-      primaryItemId = version === 0 ? view.getUint16(pitm.dataStart + 4) : view.getUint32(pitm.dataStart + 4);
+      const idSize = version === 0 ? 2 : 4;
+      if (pitm.dataStart + 4 + idSize <= pitm.end) primaryItemId = idSize === 2 ? view.getUint16(pitm.dataStart + 4) : view.getUint32(pitm.dataStart + 4);
     }
 
-    const dimensions = boxes.flatMap((box) => {
+    const propertyContainer = boxes.find((box) => box.type === "ipco");
+    const primaryPropertyIndexes = primaryItemId === null ? null : boxes
+      .filter((box) => box.type === "ipma")
+      .map((box) => parseIpmaPropertyIndexes(box, bytes, view, primaryItemId!))
+      .find((indexes) => indexes !== null) ?? null;
+    const primaryProperties = propertyContainer && primaryPropertyIndexes
+      ? primaryPropertyIndexes.flatMap((index) => propertyContainer.children[index - 1] ? [propertyContainer.children[index - 1]] : [])
+      : null;
+    const imageProperties = primaryProperties ?? boxes;
+
+    const dimensions = imageProperties.flatMap((box) => {
       if (box.type !== "ispe" || box.dataStart + 12 > box.end) return [];
       return [{ width: view.getUint32(box.dataStart + 4), height: view.getUint32(box.dataStart + 8) }];
     });
@@ -200,7 +239,7 @@ export function inspectHeifStructure(bytes: Uint8Array): HeifEvidence {
       return [{ auxiliaryType, evidence: `auxC property declares ${auxiliaryType || "an unnamed auxiliary image type"}.` }];
     });
     const references = [...new Set(boxes.filter((box) => ["auxl", "dimg", "thmb", "cdsc"].includes(box.type)).map((box) => box.type))];
-    const colorProfiles = boxes.flatMap((box): Array<Record<string, string | number | boolean>> => {
+    const colorProfiles = imageProperties.flatMap((box): Array<Record<string, string | number | boolean>> => {
       if (box.type !== "colr" || box.dataStart + 4 > box.end) return [];
       const colorType = readType(bytes, box.dataStart);
       if (colorType === "nclx" && box.dataStart + 11 <= box.end) {
@@ -215,7 +254,7 @@ export function inspectHeifStructure(bytes: Uint8Array): HeifEvidence {
       return [{ type: colorType }];
     });
     const orientation: Array<{ rotationDegrees?: number; mirrorAxis?: "horizontal" | "vertical" }> = [];
-    for (const box of boxes) {
+    for (const box of imageProperties) {
       if (box.type === "irot" && box.dataStart < box.end) orientation.push({ rotationDegrees: (bytes[box.dataStart] & 0x03) * 90 });
       if (box.type === "imir" && box.dataStart < box.end) orientation.push({ mirrorAxis: (bytes[box.dataStart] & 0x01) === 0 ? "vertical" : "horizontal" });
     }
@@ -238,6 +277,7 @@ export function inspectHeifStructure(bytes: Uint8Array): HeifEvidence {
       evidence: [
         `Observed HEIF brands: ${brands.join(", ")}.`,
         `${itemInfo.length} item-info entries parsed.`,
+        primaryProperties ? `${primaryProperties.length} properties associated with the primary image.` : "Primary property associations were unavailable; structural properties are reported conservatively.",
         ...directHdrIdentifiers.map((identifier) => `Observed HDR identifier: ${identifier}.`),
         ...parsed.warnings,
       ],
