@@ -3,8 +3,27 @@ import path from "node:path";
 import process from "node:process";
 import { chromium } from "@playwright/test";
 import { inspectSampleDirectory } from "../lib/heic-to-jpeg/inspection/index.ts";
+import type { GroupReport } from "../lib/heic-to-jpeg/inspection/types.ts";
 
 const INCLUDED = /\.(heic|heif|jpe?g|aae|mov|dng)$/i;
+
+function diagnosticEvidence(group: GroupReport) {
+  const portraitDepthEvidence = group.heif.auxiliaryImages
+    .filter(({ auxiliaryType, evidence }) => /depth|disparity|portrait/i.test(`${auxiliaryType} ${evidence}`));
+  return {
+    sourceFiles: group.files.map(({ name, extension }) => ({ name, type: extension })),
+    logicalAsset: group.basename,
+    primaryDimensions: group.heif.dimensions,
+    selectedPrimaryImage: group.heif.primaryItemId,
+    orientationEvidence: { structural: group.heif.orientation, metadata: group.metadata.orientation },
+    aae: group.aae,
+    livePhoto: group.livePhoto,
+    hdr: group.hdr,
+    portraitDepthEvidence,
+    colorSpaceEvidence: { heif: group.heif.colorProfiles, metadata: group.metadata.colorProfile },
+    warnings: group.warnings,
+  };
+}
 
 async function discover(folder: string): Promise<string[]> {
   const entries = await readdir(folder, { recursive: true, withFileTypes: true });
@@ -41,12 +60,21 @@ async function main(): Promise<void> {
     }
     if (unexpectedPosts.length) throw new Error("The browser attempted a non-analytics POST request during local conversion.");
     const conversion = await page.locator("[data-photo-asset]").evaluateAll((rows) => rows.map((row) => ({
-      name: row.querySelector("h3")?.textContent?.trim() ?? "unknown",
+      sourceFilename: row.querySelector("h3")?.textContent?.trim() ?? "unknown",
+      logicalAsset: row.getAttribute("data-logical-asset") ?? "unknown",
       status: row.dataset.status ?? "unknown",
-      outputDimensions: row.dataset.outputDimensions || null,
-      summary: row.textContent?.replace(/\s+/g, " ").trim() ?? "",
+      jpegDimensions: row.getAttribute("data-output-dimensions") || null,
+      jpegFilename: row.getAttribute("data-output-name") || null,
+      warningOrFallback: row.getAttribute("data-warning") || null,
     })));
-    const result = { generatedAt: new Date().toISOString(), sourceFolder, url, inspection: inspection.summary, conversion };
+    const result = {
+      generatedAt: new Date().toISOString(),
+      sourceFolder,
+      url,
+      summary: inspection.summary,
+      samples: inspection.groups.map(diagnosticEvidence),
+      conversion,
+    };
     await mkdir(outputFolder, { recursive: true });
     await writeFile(path.join(outputFolder, "conversion-report.json"), `${JSON.stringify(result, null, 2)}\n`, "utf8");
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);

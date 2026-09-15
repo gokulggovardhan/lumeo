@@ -112,7 +112,7 @@ export default function HeicToJpegTool() {
       </div>
       <div className="grid min-w-0 gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
         <ul className="min-w-0 space-y-3" aria-label="Photo assets">
-          {rows.map((row, index) => <li key={row.id} data-photo-asset data-status={row.status} data-output-dimensions={row.result ? `${row.result.width}x${row.result.height}` : ""} className="min-w-0 rounded-lg bg-[var(--surface-raised)] p-4 shadow-[var(--shadow-sm)]" style={{ contentVisibility: "auto", containIntrinsicSize: "88px" }}>
+          {rows.map((row, index) => <li key={row.id} data-photo-asset data-logical-asset={row.id.split(":")[0]} data-status={row.status} data-output-dimensions={row.result ? `${row.result.width}x${row.result.height}` : ""} data-output-name={row.result ? row.outputName : ""} data-warning={row.message ?? row.warning ?? ""} className="min-w-0 rounded-lg bg-[var(--surface-raised)] p-4 shadow-[var(--shadow-sm)]" style={{ contentVisibility: "auto", containIntrinsicSize: "88px" }}>
             <div className="flex min-w-0 items-start gap-3">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--surface-base)]">
                 {row.url && index < 12 ? <Image unoptimized src={row.url} width={56} height={56} alt="Converted photo preview" className="h-full w-full object-contain" /> : <ImageIcon aria-hidden="true" className="text-[var(--text-accent)]" />}
