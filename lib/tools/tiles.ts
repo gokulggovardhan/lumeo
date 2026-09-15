@@ -17,6 +17,7 @@ const TILE_LABEL: Record<string, string> = {
 };
 
 const TILE_DESCRIPTION: Record<string, string> = {
+  "heic-to-jpeg": "Convert iPhone photos to JPEG in your browser.",
   merge: "Combine multiple PDFs into one.",
   split: "Split, reorder, rotate or remove pages.",
   compress: "Shrink file size without losing quality.",

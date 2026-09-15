@@ -4,6 +4,7 @@ import { createServer } from "node:net";
 import path from "node:path";
 
 const routes = [
+  "/heic-to-jpeg",
   "/",
   "/pdf",
   "/pdf-tools",
