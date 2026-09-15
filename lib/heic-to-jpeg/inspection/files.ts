@@ -1,13 +1,10 @@
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 import { SUPPORTED_EXTENSIONS, type AssetGroup, type SourceFile, type SupportedExtension } from "./types.ts";
+import { normalizeBasename } from "./names.ts";
+export { normalizeBasename } from "./names.ts";
 
 const supported = new Set<string>(SUPPORTED_EXTENSIONS);
-
-export function normalizeBasename(fileName: string): string {
-  const extension = path.extname(fileName);
-  return fileName.slice(0, -extension.length).normalize("NFC").trim().toLocaleUpperCase("en-US");
-}
 
 export async function discoverSampleFiles(root: string): Promise<SourceFile[]> {
   const absoluteRoot = path.resolve(root);

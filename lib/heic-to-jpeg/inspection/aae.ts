@@ -65,13 +65,16 @@ export function inspectAaeXml(xml: string): AaeEvidence {
     evidence: [],
   };
 
+  if (xml.length > 1024 * 1024 || /<!ENTITY/i.test(xml)) {
+    return { ...base, parseStatus: "failed", evidence: ["AAE exceeds the safe XML budget or declares custom entities."] };
+  }
   const validation = XMLValidator.validate(xml);
   if (validation !== true) {
     return { ...base, parseStatus: "malformed", evidence: ["AAE XML validation failed; the group was retained and inspection continued."] };
   }
 
   try {
-    const parser = new XMLParser({ preserveOrder: true, ignoreAttributes: false, parseTagValue: false, trimValues: true });
+    const parser = new XMLParser({ preserveOrder: true, ignoreAttributes: false, parseTagValue: false, trimValues: true, processEntities: false });
     const parsed: unknown = parser.parse(xml);
     const pairs = collectPlistPairs(parsed);
     const operations = operationKeys(pairs);
