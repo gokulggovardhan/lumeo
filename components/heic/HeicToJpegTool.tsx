@@ -106,7 +106,12 @@ export default function HeicToJpegTool() {
   const failedCount = summary.counts.failed;
   const queuedCount = summary.counts.queued;
   return <div className="mt-6 space-y-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-    {!rows.length ? <L2UploadStage inputId="heic-photo-upload" title="Drop iPhone photos here" description="Choose photos and their companion files together" acceptedNote="HEIC, HEIF and JPEG. Apple companions are recognized; ProRAW is not converted." accept={PHOTO_ACCEPT} multiple buttonLabel="Choose photos" icon={<Camera aria-hidden="true" size={28} />} onFilesSelected={select} /> : <>
+    {!rows.length ? <L2UploadStage inputId="heic-photo-upload" title="Drop iPhone photos here" description="Choose photos and their companion files together" acceptedNote="HEIC, HEIF and JPEG. Apple companions are recognized; ProRAW is not converted." accept={`${PHOTO_ACCEPT},image/heic,image/heif,image/jpeg,video/quicktime`} multiple icon={<Camera aria-hidden="true" size={28} />} onFilesSelected={select} action={<label htmlFor="heic-photo-upload" role="button" tabIndex={0} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.currentTarget.control?.click();
+    }} className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:scale-[0.98]">Choose photos</label>} /> : <>
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div><h2 className="text-xl font-semibold">{summary.photos.length} photo{summary.photos.length === 1 ? "" : "s"} detected</h2><p className="mt-1 text-sm text-[var(--text-secondary)]">Companions are grouped conservatively. Original files are unchanged.</p></div>
         <AuraButton type="button" variant="secondary" disabled={zipping} onClick={reset}>{busy ? "Cancel and start new" : "Start new"}</AuraButton>
