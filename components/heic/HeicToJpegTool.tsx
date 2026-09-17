@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Image from "next/image";
 import { Camera, Download, ShieldCheck, Image as ImageIcon } from "lucide-react";
 import { AuraButton } from "@/components/ui/Aura";
@@ -13,6 +13,9 @@ import { convertPhoto, type PhotoResult } from "@/lib/heic-to-jpeg/worker-client
 type Row = PhotoAsset<File> & { status: PhotoStatus; message?: string; result?: PhotoResult; url?: string };
 const labels: Record<PhotoStatus, string> = { queued: "Ready", inspecting: "Inspecting", decoding: "Decoding", processing: "Preparing pixels", encoding: "Creating JPEG", done: "Done", failed: "Failed", "needs-review": "Needs review" };
 const size = (bytes: number) => bytes < 1024 * 1024 ? `${Math.round(bytes / 1024)} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+const subscribeHydration = () => () => {};
+const clientReady = () => true;
+const serverReady = () => false;
 
 export default function HeicToJpegTool() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -20,6 +23,7 @@ export default function HeicToJpegTool() {
   const [busy, setBusy] = useState(false);
   const [zipping, setZipping] = useState(false);
   const [notice, setNotice] = useState("");
+  const pickerReady = useSyncExternalStore(subscribeHydration, clientReady, serverReady);
   const controller = useRef<AbortController | null>(null);
   const urls = useRef(new Set<string>());
   const opened = useRef(false);
@@ -106,7 +110,7 @@ export default function HeicToJpegTool() {
   const failedCount = summary.counts.failed;
   const queuedCount = summary.counts.queued;
   return <div className="mt-6 space-y-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
-    {!rows.length ? <L2UploadStage inputId="heic-photo-upload" title="Drop iPhone photos here" description="Choose photos and their companion files together" acceptedNote="HEIC, HEIF and JPEG. Apple companions are recognized; ProRAW is not converted." accept={`${PHOTO_ACCEPT},image/heic,image/heif,image/jpeg,video/quicktime`} multiple icon={<Camera aria-hidden="true" size={28} />} onFilesSelected={select} action={<label htmlFor="heic-photo-upload" role="button" tabIndex={0} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => {
+    {!rows.length ? <L2UploadStage inputId="heic-photo-upload" title="Drop iPhone photos here" description="Choose photos and their companion files together" acceptedNote="HEIC, HEIF and JPEG. Apple companions are recognized; ProRAW is not converted." accept={`${PHOTO_ACCEPT},image/heic,image/heif,image/jpeg,video/quicktime`} multiple disabled={!pickerReady} icon={<Camera aria-hidden="true" size={28} />} onFilesSelected={select} action={<label htmlFor="heic-photo-upload" role="button" tabIndex={pickerReady ? 0 : -1} aria-disabled={!pickerReady} onClick={(event) => event.stopPropagation()} onKeyDown={(event) => {
       if (event.key !== "Enter" && event.key !== " ") return;
       event.preventDefault();
       event.stopPropagation();

@@ -1,5 +1,62 @@
 import { test, expect } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import path from "node:path";
+
+const localJpegSample = path.resolve("samples/IMG_1864.JPG");
+
+test("picker cannot accept a file before its change handler hydrates", async ({ page }) => {
+  await page.route(/\/_next\/static\/.*\.js(?:\?.*)?$/, (route) => route.abort());
+  await page.goto("/heic-to-jpeg", { waitUntil: "domcontentloaded" });
+  const trigger = page.locator('label[for="heic-photo-upload"]');
+  await expect(trigger).toBeVisible();
+  const chooserOpened = page.waitForEvent("filechooser", { timeout: 1000 }).then(() => true, () => false);
+  await trigger.click({ force: true });
+  expect(await chooserOpened).toBe(false);
+});
+
+test("real uppercase JPG selected through the native picker renders as a photo asset", async ({ page }) => {
+  test.skip(!existsSync(localJpegSample), "Private local iPhone sample is not available on this machine.");
+  await page.goto("/heic-to-jpeg");
+  const chooserPromise = page.waitForEvent("filechooser");
+  await page.locator('label[for="heic-photo-upload"]').click();
+  await (await chooserPromise).setFiles(localJpegSample);
+  await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
+  await expect(page.locator("[data-photo-asset]")).toContainText("IMG_1864.JPG");
+});
+
+test("supported extension variants and companions reach rendered asset rows", async ({ page }) => {
+  await page.goto("/heic-to-jpeg");
+  for (const name of ["IMG_1864.JPG", "photo.JPG", "photo.JPEG", "photo.jpg", "photo.jpeg", "photo.HEIC", "photo.heic"]) {
+    const chooserPromise = page.waitForEvent("filechooser");
+    await page.locator('label[for="heic-photo-upload"]').click();
+    await (await chooserPromise).setFiles({ name, mimeType: "application/octet-stream", buffer: Buffer.from("fixture") });
+    await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
+    await expect(page.locator('[data-photo-asset][data-status="queued"]')).toContainText(name);
+    await page.getByRole("button", { name: "Start new" }).click();
+  }
+
+  const pairChooser = page.waitForEvent("filechooser");
+  await page.locator('label[for="heic-photo-upload"]').click();
+  await (await pairChooser).setFiles([
+    { name: "photo.JPG", mimeType: "image/jpeg", buffer: Buffer.from("fixture") },
+    { name: "photo.AAE", mimeType: "application/octet-stream", buffer: Buffer.from("fixture") },
+  ]);
+  await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
+  await expect(page.locator("[data-photo-asset]")).toHaveCount(1);
+  await expect(page.locator("[data-photo-asset]")).toContainText("Companion detected");
+  await page.getByRole("button", { name: "Start new" }).click();
+
+  const mixedChooser = page.waitForEvent("filechooser");
+  await page.locator('label[for="heic-photo-upload"]').click();
+  await (await mixedChooser).setFiles([
+    { name: "photo.JPG", mimeType: "image/jpeg", buffer: Buffer.from("fixture") },
+    { name: "notes.txt", mimeType: "text/plain", buffer: Buffer.from("unsupported") },
+  ]);
+  await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
+  await expect(page.locator('[data-photo-asset][data-status="queued"]')).toContainText("photo.JPG");
+  await expect(page.locator('[data-photo-asset][data-status="needs-review"]')).toContainText("notes.txt");
+});
 
 test("mobile batch converts a JPEG still, isolates corrupt HEIC, and downloads", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 812 });
