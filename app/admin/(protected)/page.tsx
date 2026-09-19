@@ -116,37 +116,26 @@ export default async function AdminPage() {
         </div>
       </AdminSectionCard>
 
-      <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <AdminSectionCard
-          title="Most recent administrative actions"
-          description="Latest audit records, when administrators begin making changes."
-          action={<Link href="/admin/audit" className="text-sm font-semibold text-[var(--text-accent)] hover:underline">View all</Link>}
-        >
-          <AdminDataTable
-            columns={["Time", "Action", "Summary"]}
-            rows={data.recentAuditLogs.map((log) => [
-              formatDate(log.created_at),
-              log.action,
-              log.summary,
-            ])}
-            empty={
-              <AdminEmptyState
-                title="No audit actions yet"
-                description="Audit records will appear after Control Center actions are used."
-              />
-            }
-          />
-        </AdminSectionCard>
-
-        <AdminSectionCard title="Analytics V1" description="Discovery analytics only. No fake charts or lifecycle placeholders.">
-          <div className="rounded-[1.2rem] border border-dashed border-[#CBA052]/20 bg-[var(--surface-elevated)] p-6">
-            <p className="text-sm font-semibold text-[#F0EAD6]">Analytics V1 measures public page visits, tool discovery, and coarse platform usage.</p>
-            <p className="mt-3 text-sm leading-6 text-[#F0EAD6]/54">
-              Processing lifecycle analytics will be added later through the shared browser-tool framework so every current and future PDF tool reports events consistently.
-            </p>
-          </div>
-        </AdminSectionCard>
-      </div>
+      <AdminSectionCard
+        title="Most recent administrative actions"
+        description="Latest audit records for meaningful Control Center changes."
+        action={<Link href="/admin/audit" className="text-sm font-semibold text-[var(--text-accent)] hover:underline">View all</Link>}
+      >
+        <AdminDataTable
+          columns={["Time", "Action", "Summary"]}
+          rows={data.recentAuditLogs.map((log) => [
+            formatDate(log.created_at),
+            log.action,
+            log.summary,
+          ])}
+          empty={
+            <AdminEmptyState
+              title="No audit actions yet"
+              description="Audit records will appear after Control Center actions are used."
+            />
+          }
+        />
+      </AdminSectionCard>
     </div>
   );
 }
