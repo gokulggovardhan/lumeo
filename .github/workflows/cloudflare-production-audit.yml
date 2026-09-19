@@ -34,6 +34,8 @@ jobs:
 
     steps:
       - name: Verify DNS and canonical host routing
+        id: routing
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -72,6 +74,8 @@ jobs:
           echo "PASS: www redirects to canonical apex."
 
       - name: Verify Cloudflare edge and security headers
+        id: edge
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -97,6 +101,8 @@ jobs:
           echo "PASS: Cloudflare edge and baseline security headers verified."
 
       - name: Verify representative production routes
+        id: routes
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -107,6 +113,8 @@ jobs:
           done
 
       - name: Verify canonical metadata, robots and sitemap
+        id: seo
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -126,6 +134,8 @@ jobs:
           echo "PASS: canonical metadata, robots and sitemap use lumeo.in."
 
       - name: Verify Admin is redirect-protected and non-cacheable
+        id: admin
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -139,6 +149,8 @@ jobs:
           echo "PASS: Admin redirect and no-store policy verified."
 
       - name: Verify current static JavaScript chunk is fetchable
+        id: assets
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -152,3 +164,16 @@ jobs:
           [ "$status" = "200" ] || { echo "FAIL: JS chunk returned HTTP $status"; exit 1; }
           printf '%s' "$content_type" | grep -Eq 'javascript|ecmascript' || { echo "FAIL: JS chunk content type is $content_type"; exit 1; }
           echo "PASS: current JavaScript chunk is fetchable with a JavaScript MIME type."
+
+      - name: Fail if any production audit section failed
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          outcomes="routing=${{ steps.routing.outcome }} edge=${{ steps.edge.outcome }} routes=${{ steps.routes.outcome }} seo=${{ steps.seo.outcome }} admin=${{ steps.admin.outcome }} assets=${{ steps.assets.outcome }}"
+          echo "$outcomes"
+          if printf '%s' "$outcomes" | grep -q 'failure'; then
+            echo "One or more Cloudflare production audit sections failed."
+            exit 1
+          fi
+          echo "All Cloudflare production audit sections passed."
