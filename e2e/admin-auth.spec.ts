@@ -41,15 +41,41 @@ test.describe("Control Center authentication", () => {
     await page.reload();
     await expect(page).toHaveURL(/\/admin$/);
 
-    const analyticsLink = page.getByRole("link", { name: "Analytics" }).first();
-    await analyticsLink.click();
+    const menuButton = page.getByRole("button", {
+      name: "Open Control Center navigation",
+    });
+    await menuButton.click();
+    await expect(
+      page.getByRole("button", { name: "Close Control Center navigation" }),
+    ).toBeVisible();
+
+    await page.getByRole("link", { name: "Analytics" }).last().click();
     await expect(page).toHaveURL(/\/admin\/analytics/);
-    await expect(page.getByRole("heading", { name: /analytics/i })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /analytics/i }),
+    ).toBeVisible();
+
+    const rangeSelect = page.getByLabel("Range");
+    await expect(rangeSelect).toHaveCSS("font-size", "16px");
+    await rangeSelect.selectOption("30d");
+    await page.getByRole("button", { name: "Apply" }).click();
+    await expect(page).toHaveURL(/\/admin\/analytics\?range=30d/);
+    await expect(page.getByText("Selected: Last 30 days")).toBeVisible();
+
+    const adminOverflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth >
+        document.documentElement.clientWidth,
+    );
+    expect(adminOverflow).toBe(false);
 
     await page.reload();
-    await expect(page).toHaveURL(/\/admin\/analytics/);
+    await expect(page).toHaveURL(/\/admin\/analytics\?range=30d/);
 
-    await page.getByRole("button", { name: "Sign out" }).first().click();
+    await page
+      .getByRole("button", { name: "Open Control Center navigation" })
+      .click();
+    await page.getByRole("button", { name: "Sign out" }).last().click();
     await expect(page).toHaveURL(/\/admin\/login\?message=signed-out$/);
 
     await page.goBack();
