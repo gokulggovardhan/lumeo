@@ -462,9 +462,30 @@ export function L2UploadStage({
   }
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
-    const selectedFiles = event.currentTarget.files;
-    if (selectedFiles?.length) onFilesSelected?.(selectedFiles);
+    // Snapshot the FileList synchronously. iOS/WebKit may clear or mutate the
+    // live input FileList after the picker closes or once the event unwinds.
+    const selectedFiles = event.currentTarget.files ? Array.from(event.currentTarget.files) : [];
     event.currentTarget.value = "";
+    if (!selectedFiles.length) return;
+
+    // Preserve the existing FileList-shaped callback contract for shared PDF
+    // workspaces while giving consumers stable File objects that survive async
+    // React work. DataTransfer is unavailable in some Safari contexts, so fall
+    // back to the original FileList only when necessary.
+    try {
+      const transfer = new DataTransfer();
+      for (const file of selectedFiles) transfer.items.add(file);
+      onFilesSelected?.(transfer.files);
+    } catch {
+      const original = event.currentTarget.files;
+      if (original?.length) onFilesSelected?.(original);
+      else {
+        // HEIC uses its own immediate snapshot in the callback; this path is
+        // retained only for older browsers where DataTransfer construction is unavailable.
+        const list = selectedFiles as unknown as FileList;
+        onFilesSelected?.(list);
+      }
+    }
   }
 
   function handleDragEnter(event: DragEvent<HTMLDivElement>) {
@@ -496,16 +517,32 @@ export function L2UploadStage({
     if (event.dataTransfer.files.length) onFilesSelected?.(event.dataTransfer.files);
   }
 
-  const defaultAction = (
-    <button
-      type="button"
-      disabled={!canSelect}
+  const defaultAction = canSelect ? (
+    <label
+      htmlFor={resolvedInputId}
+      role="button"
+      tabIndex={0}
       aria-controls={resolvedInputId}
       onClick={(event) => {
+        // Pointer activation is native label -> input. Do not synthesize click().
+        event.stopPropagation();
+        onActivate?.();
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
         event.stopPropagation();
         openFileChooser();
       }}
-      className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] sm:w-auto"
+      className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:scale-[0.98] sm:w-auto"
+    >
+      {buttonLabel ?? (multiple ? "Select PDFs" : "Select PDF")}
+    </label>
+  ) : (
+    <button
+      type="button"
+      disabled
+      className="lumeo-primary-action inline-flex min-h-11 w-full cursor-not-allowed items-center justify-center rounded-[var(--radius-md)] px-6 py-3 text-sm font-extrabold opacity-[var(--v2-interactive-disabled-opacity)] sm:w-auto"
     >
       {buttonLabel ?? (multiple ? "Select PDFs" : "Select PDF")}
     </button>
