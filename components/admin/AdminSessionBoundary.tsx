@@ -48,11 +48,11 @@ function isBackForwardNavigation() {
 
   if (entry?.type === "back_forward") return true;
 
-  // Older WebKit/Chromium builds can expose only the legacy navigation type.
-  return (
-    "navigation" in performance &&
-    performance.navigation?.type === PerformanceNavigation.TYPE_BACK_FORWARD
-  );
+  // Older engines can expose only the legacy numeric navigation type.
+  const legacyPerformance = performance as Performance & {
+    navigation?: { type?: number };
+  };
+  return legacyPerformance.navigation?.type === 2;
 }
 
 export function AdminSessionBoundary({ children }: { children: ReactNode }) {
