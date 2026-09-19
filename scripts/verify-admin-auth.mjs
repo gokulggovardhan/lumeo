@@ -4,7 +4,7 @@ import { join } from "node:path";
 const root = process.cwd();
 const requiredFiles = [
   "supabase/migrations/20260712001_admin_members.sql",
-  "supabase/migrations/20260919001_admin_security_hardening.sql",
+  "supabase/migrations/20260919160000_admin_security_hardening.sql",
   "lib/supabase/proxy.ts",
   "lib/admin/auth.ts",
   "lib/admin/types.ts",
@@ -49,7 +49,7 @@ try {
   assert(/create table if not exists public\.admin_members/i.test(baseMigration), "admin_members table migration is missing.");
   assert(/enable row level security/i.test(baseMigration), "admin_members RLS is not enabled.");
 
-  const hardeningMigration = read("supabase/migrations/20260919001_admin_security_hardening.sql");
+  const hardeningMigration = read("supabase/migrations/20260919160000_admin_security_hardening.sql");
   for (const helper of [
     "current_admin_role",
     "is_active_admin",
