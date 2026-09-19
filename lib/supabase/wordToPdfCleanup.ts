@@ -1,5 +1,5 @@
-import { createStorageServerClient } from "@/lib/supabase/storageServerClient";
-import { WORD_TO_PDF_BUCKET } from "@/lib/supabase/wordToPdfStorage";
+import { createStorageServerClient } from "./storageServerClient.ts";
+import { WORD_TO_PDF_BUCKET } from "./wordToPdfStorage.ts";
 
 export const WORD_TO_PDF_STALE_CUTOFF_MS = 2 * 60 * 60 * 1000;
 export const WORD_TO_PDF_CLEANUP_LIST_LIMIT = 1000;
