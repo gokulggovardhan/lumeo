@@ -53,7 +53,7 @@ export default async function AnalyticsPage({
   const periodDetail = `${range.startDate} to ${range.endDate} · IST`;
 
   return (
-    <div className="space-y-7">
+    <div className="min-w-0 max-w-full space-y-7">
       <AdminPageHeader
         eyebrow="Analytics"
         title="Discovery & operation analytics"
