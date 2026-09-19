@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { ControlCenterMobileNav } from "@/components/admin/ControlCenterMobileNav";
 import { ControlCenterSidebar } from "@/components/admin/ControlCenterSidebar";
 import { InboxCountProvider } from "@/components/admin/InboxCountBadge";
+import { AdminSessionBoundary } from "@/components/admin/AdminSessionBoundary";
 import type { AdminRole } from "@/lib/admin/types";
 
 export function ControlCenterShell({
@@ -16,7 +17,8 @@ export function ControlCenterShell({
   unreadInboxCount?: number;
 }) {
   return (
-    <main className="admin-control-center min-h-dvh bg-[var(--surface-canvas)] text-[var(--lumeo-paper-100)]">
+    <AdminSessionBoundary>
+      <main className="admin-control-center min-h-dvh bg-[var(--surface-canvas)] text-[var(--lumeo-paper-100)]">
       <div className="pointer-events-none fixed inset-0 opacity-70">
         <div className="absolute left-[8%] top-[10%] h-64 w-64 rounded-full bg-[rgba(var(--lumeo-aura-rgb),0.14)] blur-3xl" />
         <div className="absolute bottom-[12%] right-[8%] h-72 w-72 rounded-full bg-[rgba(var(--lumeo-seal-rgb),0.12)] blur-3xl" />
@@ -40,6 +42,7 @@ export function ControlCenterShell({
           </section>
         </InboxCountProvider>
       </div>
-    </main>
+      </main>
+    </AdminSessionBoundary>
   );
 }
