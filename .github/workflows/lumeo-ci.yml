@@ -94,6 +94,12 @@ jobs:
       - name: Build production application
         run: npm run build
 
+      - name: Build Cloudflare Worker
+        run: npm run build:vinext
+
+      - name: Validate Cloudflare Worker bundle
+        run: npx vinext-cloudflare deploy --dry-run --config dist/server/wrangler.json
+
       - name: Verify public routes
         run: npm run verify:public
 
