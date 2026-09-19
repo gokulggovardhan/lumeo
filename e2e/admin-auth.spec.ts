@@ -28,6 +28,22 @@ function collectUnexpectedBrowserErrors(page: Page) {
   return errors;
 }
 
+async function getAdminSessionState(page: Page) {
+  return page.evaluate(async () => {
+    const response = await fetch("/admin/session", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    });
+
+    return (await response.json()) as {
+      authenticated: boolean;
+      authorized: boolean;
+    };
+  });
+}
+
 async function openMobileNavigation(page: Page) {
   const openButton = page.getByRole("button", {
     name: "Open Control Center navigation",
@@ -135,35 +151,27 @@ test.describe("Control Center authentication", () => {
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
 
     await openMobileNavigation(page);
+    const protectedOrigin = new URL(page.url()).origin;
     await page
       .locator("#control-center-mobile-menu")
       .getByRole("button", { name: "Sign out" })
       .click();
     await expect(page).toHaveURL(/\/admin\/login\?message=signed-out$/);
+    expect(new URL(page.url()).origin).toBe(protectedOrigin);
 
-    const signedOutSessionStatus = await page.evaluate(async () => {
-      const response = await fetch("/admin/session", {
-        method: "GET",
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      return response.status;
+    expect(await getAdminSessionState(page)).toEqual({
+      authenticated: false,
+      authorized: false,
     });
-    expect(signedOutSessionStatus).toBe(401);
 
     await page.goBack();
     await expect(page).toHaveURL(/\/admin\/login(?:\?.*)?$/);
     await expect(page.getByRole("heading", { name: "Inbox" })).toHaveCount(0);
 
-    const restoredSessionStatus = await page.evaluate(async () => {
-      const response = await fetch("/admin/session", {
-        method: "GET",
-        cache: "no-store",
-        credentials: "same-origin",
-      });
-      return response.status;
+    expect(await getAdminSessionState(page)).toEqual({
+      authenticated: false,
+      authorized: false,
     });
-    expect(restoredSessionStatus).toBe(401);
 
     // Go back through another protected history entry. The BFCache/history
     // guard must again fail closed instead of revealing stale admin UI.
