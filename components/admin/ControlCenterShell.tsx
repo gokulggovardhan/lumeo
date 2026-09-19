@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ControlCenterMobileNav } from "@/components/admin/ControlCenterMobileNav";
 import { ControlCenterSidebar } from "@/components/admin/ControlCenterSidebar";
+import { InboxCountProvider } from "@/components/admin/InboxCountBadge";
 import type { AdminRole } from "@/lib/admin/types";
 
 export function ControlCenterShell({
@@ -29,13 +30,15 @@ export function ControlCenterShell({
           paddingRight: "max(1rem, env(safe-area-inset-right))",
         }}
       >
-        <ControlCenterSidebar email={email} role={role} unreadInboxCount={unreadInboxCount} />
-        <section className="flex min-h-0 flex-1 flex-col">
-          <ControlCenterMobileNav email={email} role={role} unreadInboxCount={unreadInboxCount} />
-          <div id="main-content" className="mt-4 flex-1 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-[var(--shadow-lg)] sm:p-6 lg:mt-0 lg:p-7">
-            {children}
-          </div>
-        </section>
+        <InboxCountProvider initialCount={unreadInboxCount}>
+          <ControlCenterSidebar email={email} role={role} />
+          <section className="flex min-h-0 flex-1 flex-col">
+            <ControlCenterMobileNav email={email} role={role} />
+            <div id="main-content" className="mt-4 flex-1 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-[var(--shadow-lg)] sm:p-6 lg:mt-0 lg:p-7">
+              {children}
+            </div>
+          </section>
+        </InboxCountProvider>
       </div>
     </main>
   );
