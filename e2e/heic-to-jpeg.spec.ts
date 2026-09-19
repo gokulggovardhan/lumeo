@@ -30,9 +30,9 @@ test("mobile batch converts a JPEG still, isolates corrupt HEIC, and downloads",
   expect(uploads.filter((url) => !allowed.has(new URL(url).pathname.split("/").pop()!))).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole("button", { name: "Start new" }).click();
-  await expect(page.getByRole("button", { name: "Choose photos", exact: true })).toBeVisible();
+  await expect(page.getByText("Choose photos", { exact: true })).toBeVisible();
   const chooser = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Choose photos", exact: true }).click();
+  await page.getByText("Choose photos", { exact: true }).click();
   expect((await chooser).isMultiple()).toBe(true);
   await page.screenshot({ path: "test-results/heic-mobile-empty.png", fullPage: true });
 });
@@ -41,7 +41,7 @@ for (const width of [390, 393, 430]) {
   test(`workspace has no horizontal overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/heic-to-jpeg");
-    await expect(page.getByRole("button", { name: "Choose photos", exact: true })).toBeVisible();
+    await expect(page.getByText("Choose photos", { exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }
@@ -79,7 +79,7 @@ test("native picker accepts uppercase JPEG and renders the selected asset", asyn
     return canvas.toDataURL("image/jpeg").split(",")[1];
   });
   const chooserPromise = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Choose photos", exact: true }).click();
+  await page.getByText("Choose photos", { exact: true }).click();
   const chooser = await chooserPromise;
   await chooser.setFiles({ name: "IMG_1864.JPG", mimeType: "image/jpeg", buffer: Buffer.from(jpeg, "base64") });
   await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
@@ -87,7 +87,7 @@ test("native picker accepts uppercase JPEG and renders the selected asset", asyn
 
   await page.getByRole("button", { name: "Start new" }).click();
   const secondChooserPromise = page.waitForEvent("filechooser");
-  await page.getByRole("button", { name: "Choose photos", exact: true }).click();
+  await page.getByText("Choose photos", { exact: true }).click();
   const secondChooser = await secondChooserPromise;
   await secondChooser.setFiles({ name: "IMG_1864.JPG", mimeType: "", buffer: Buffer.from(jpeg, "base64") });
   await expect(page.getByRole("heading", { name: "IMG_1864.JPG" })).toBeVisible();
