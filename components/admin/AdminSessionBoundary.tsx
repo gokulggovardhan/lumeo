@@ -1,24 +1,58 @@
 "use client";
 
 import { useEffect, useRef, type ReactNode } from "react";
+import { ADMIN_SIGNED_OUT_MARKER } from "@/components/admin/AdminSignOutButton";
 
 const signedOutDestination = "/admin/login?message=session-ended";
+
+type SessionState = {
+  authenticated: boolean;
+  authorized: boolean;
+};
 
 function setSuspended(element: HTMLDivElement | null, suspended: boolean) {
   if (!element) return;
 
   if (suspended) {
-    element.style.visibility = "hidden";
-    element.style.pointerEvents = "none";
+    element.style.display = "none";
     element.setAttribute("aria-hidden", "true");
     element.dataset.adminHistorySuspended = "true";
     return;
   }
 
-  element.style.removeProperty("visibility");
-  element.style.removeProperty("pointer-events");
+  element.style.removeProperty("display");
   element.removeAttribute("aria-hidden");
   delete element.dataset.adminHistorySuspended;
+}
+
+function hasSignedOutMarker() {
+  try {
+    return window.sessionStorage.getItem(ADMIN_SIGNED_OUT_MARKER) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function clearSignedOutMarker() {
+  try {
+    window.sessionStorage.removeItem(ADMIN_SIGNED_OUT_MARKER);
+  } catch {
+    // Storage is defense in depth only.
+  }
+}
+
+function isBackForwardNavigation() {
+  const [entry] = performance.getEntriesByType(
+    "navigation",
+  ) as PerformanceNavigationTiming[];
+
+  if (entry?.type === "back_forward") return true;
+
+  // Older WebKit/Chromium builds can expose only the legacy navigation type.
+  return (
+    "navigation" in performance &&
+    performance.navigation?.type === PerformanceNavigation.TYPE_BACK_FORWARD
+  );
 }
 
 export function AdminSessionBoundary({ children }: { children: ReactNode }) {
@@ -26,11 +60,14 @@ export function AdminSessionBoundary({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+    let verificationInFlight = false;
 
     const suspend = () => setSuspended(rootRef.current, true);
     const resume = () => setSuspended(rootRef.current, false);
 
     const verifyRestoredSession = async () => {
+      if (verificationInFlight) return;
+      verificationInFlight = true;
       suspend();
 
       try {
@@ -40,35 +77,47 @@ export function AdminSessionBoundary({ children }: { children: ReactNode }) {
           credentials: "same-origin",
           headers: { Accept: "application/json" },
         });
+        const state = (await response.json()) as SessionState;
 
         if (!mounted) return;
 
-        if (!response.ok) {
+        if (
+          !response.ok ||
+          state.authenticated !== true ||
+          state.authorized !== true
+        ) {
           window.location.replace(signedOutDestination);
           return;
         }
 
-        // A BFCache entry contains a frozen React / Server Component tree.
-        // Even after the session probe succeeds, reload so the protected
-        // layout authorizes again and dynamic admin data is rendered fresh.
+        // The server has re-authorized this restored history entry. Clear a
+        // logout marker only after that proof, then reload so the protected
+        // layout and dynamic Server Components render fresh data.
+        clearSignedOutMarker();
         window.location.reload();
       } catch {
         if (mounted) {
           // History restoration is security-sensitive. A failed verification
-          // must never reveal the frozen protected tree.
+          // must never reveal a frozen/cached protected tree.
           window.location.replace(signedOutDestination);
         }
+      } finally {
+        verificationInFlight = false;
       }
     };
 
     const handlePageHide = (event: PageTransitionEvent) => {
-      if (event.persisted) {
+      if (event.persisted || hasSignedOutMarker()) {
         suspend();
       }
     };
 
     const handlePageShow = (event: PageTransitionEvent) => {
-      if (event.persisted) {
+      if (
+        event.persisted ||
+        hasSignedOutMarker() ||
+        isBackForwardNavigation()
+      ) {
         void verifyRestoredSession();
         return;
       }
@@ -76,13 +125,33 @@ export function AdminSessionBoundary({ children }: { children: ReactNode }) {
       resume();
     };
 
+    const handlePopState = () => {
+      // Chromium can restore a protected history entry without reporting
+      // pageshow.persisted. Popstate is the deterministic browser-history
+      // boundary for that path.
+      void verifyRestoredSession();
+    };
+
     window.addEventListener("pagehide", handlePageHide);
     window.addEventListener("pageshow", handlePageShow);
+    window.addEventListener("popstate", handlePopState);
+
+    // If the browser performed a full back/forward document navigation,
+    // pageshow can occur before React effects attach. Verify immediately from
+    // Navigation Timing in that case. A fresh server-authorized page can clear
+    // any old logout marker because requireAdmin() already ran for this HTML.
+    if (isBackForwardNavigation()) {
+      void verifyRestoredSession();
+    } else {
+      clearSignedOutMarker();
+      resume();
+    }
 
     return () => {
       mounted = false;
       window.removeEventListener("pagehide", handlePageHide);
       window.removeEventListener("pageshow", handlePageShow);
+      window.removeEventListener("popstate", handlePopState);
     };
   }, []);
 
