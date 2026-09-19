@@ -37,7 +37,7 @@ test("mobile batch converts a JPEG still, isolates corrupt HEIC, and downloads",
   await page.screenshot({ path: "test-results/heic-mobile-empty.png", fullPage: true });
 });
 
-for (const width of [390, 393, 430]) {
+for (const width of [320, 360, 390, 393, 414, 430]) {
   test(`workspace has no horizontal overflow at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/heic-to-jpeg");
