@@ -36,7 +36,7 @@ export default async function AdminPage() {
       <AdminPageHeader
         eyebrow="Operations desk"
         title="Lumeo Control Center"
-        description="A calm private workspace for managing Lumeo PDF configuration, catalog readiness, and operational foundations."
+        description="Private operations for live tools, analytics, messages, incidents, SEO, announcements, and owner controls."
         meta={
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-4 text-sm">
             <p className="text-[#F0EAD6]/52">Signed in</p>
@@ -60,8 +60,8 @@ export default async function AdminPage() {
         <MetricLink href="/admin/announcements">
           <AdminMetricCard label="Active Announcements" value={data.activeAnnouncements} detail="Announcements currently marked active." tone="neutral" />
         </MetricLink>
-        <MetricLink href="/admin/feature-flags">
-          <AdminMetricCard label="Enabled Feature Flags" value={data.enabledFeatureFlags} detail="Flags currently enabled in the database." tone="gold" />
+        <MetricLink href="/admin/tools">
+          <AdminMetricCard label="Maintenance Tools" value={data.maintenanceTools} detail="Tools intentionally unavailable for maintenance." tone={data.maintenanceTools > 0 ? "warning" : "success"} />
         </MetricLink>
         <MetricLink href="/admin/analytics">
           <AdminMetricCard label="Events Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsEventsToday} detail="Privacy-preserving analytics events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
