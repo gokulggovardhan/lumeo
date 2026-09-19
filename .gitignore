@@ -70,3 +70,6 @@ playwright-report/
 # HEIC Phase 0: local iPhone exports and generated diagnostic reports.
 /samples/
 /inspector-output/
+/dist/
+.vinext/
+.wrangler/

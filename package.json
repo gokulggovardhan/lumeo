@@ -26,13 +26,20 @@
     "test:e2e:admin": "playwright test --config=playwright.admin.config.ts",
     "inspect:heic-samples": "node --no-warnings --experimental-strip-types inspector/inspect-heic-samples.ts",
     "verify:heic-samples": "node --no-warnings --experimental-strip-types inspector/verify-heic-conversion.ts",
-    "test:heic-inspection": "node --no-warnings --test --experimental-strip-types inspector/*.test.ts"
+    "test:heic-inspection": "node --no-warnings --test --experimental-strip-types inspector/*.test.ts",
+    "dev:vinext": "vinext dev --port 3001",
+    "build:vinext": "vinext build",
+    "start:vinext": "wrangler dev --config dist/server/wrangler.json",
+    "deploy:vinext": "vinext-cloudflare deploy --config dist/server/wrangler.json",
+    "deploy:response-store": "wrangler deploy --config wrangler.response-store.jsonc"
   },
   "dependencies": {
+    "@cloudflare/workers-response-store": "^0.1.0-beta.0",
     "@pdf-lib/standard-fonts": "^1.0.0",
     "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.2",
     "@vercel/functions": "^3.8.0",
+    "@vinext/cloudflare": "^1.0.0-beta.8",
     "dompurify": "^3.4.13",
     "exifr": "7.1.3",
     "fast-xml-parser": "5.10.1",
@@ -46,9 +53,12 @@
     "pdf-lib": "^1.17.1",
     "pdfjs-dist": "^6.2.108",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "react-server-dom-webpack": "^19.3.0",
+    "vinext": "^1.0.0-beta.10"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.56.0",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/react": "^16.3.2",
@@ -56,16 +66,21 @@
     "@types/node": "^24.13.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitejs/plugin-rsc": "^0.5.35",
     "eslint": "^9.39.5",
     "eslint-config-next": "^16.3.0",
     "jsdom": "^30.0.1",
     "supabase": "^2.111.0",
     "tailwindcss": "^4.3.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^8.3.0",
+    "wrangler": "^4.135.0"
   },
   "overrides": {
     "postcss": "^8.5.18",
     "sharp": "^0.35.0",
     "uuid": "12.0.1"
-  }
+  },
+  "type": "module"
 }
