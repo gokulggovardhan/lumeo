@@ -1,3 +1,4 @@
+import { revalidatePath } from "next/cache";
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,6 +10,8 @@ export async function POST(request: NextRequest) {
   } catch {
     // Keep logout responses generic; do not expose provider internals.
   }
+
+  revalidatePath("/admin", "layout");
 
   return NextResponse.redirect(
     new URL("/admin/login?message=signed-out", request.url),
