@@ -15,6 +15,8 @@ on:
       - "package.json"
       - "package-lock.json"
       - "worker/**"
+      - "e2e/cloudflare-production.spec.ts"
+      - "playwright.cloudflare-production.config.ts"
   workflow_dispatch:
   schedule:
     - cron: "15 1 * * *"
@@ -203,3 +205,56 @@ jobs:
             exit 1
           fi
           echo "All Cloudflare production audit sections passed."
+
+
+  browser-production:
+    name: Browser smoke — PDF.js + HEIC
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Generate real high-resolution HEIC fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends imagemagick libheif-examples libheif-plugin-x265
+          mkdir -p /tmp/lumeo-cloudflare-fixtures
+          convert -size 6048x8064 gradient:'#203858-#e9bf78' \
+            -fill '#e54868' -draw 'rectangle 0,0 900,1100' \
+            -fill '#34b985' -draw 'rectangle 5000,6900 6047,8063' \
+            /tmp/lumeo-cloudflare-fixtures/source.png
+          heif-enc -q 55 -t 1536 /tmp/lumeo-cloudflare-fixtures/source.png \
+            -o /tmp/lumeo-cloudflare-fixtures/fullres.heic
+          heif-info /tmp/lumeo-cloudflare-fixtures/fullres.heic | tee /tmp/lumeo-cloudflare-fixtures/heif-info.txt
+          grep -Eq 'image: 6048x8064 .*primary' /tmp/lumeo-cloudflare-fixtures/heif-info.txt
+          echo "HEIC_RESOLUTION_FIXTURE=/tmp/lumeo-cloudflare-fixtures/fullres.heic" >> "$GITHUB_ENV"
+
+      - name: Install Chromium, WebKit and Firefox
+        run: npx playwright install --with-deps chromium webkit firefox
+
+      - name: Test deployed PDF.js and HEIC/HEIF paths
+        run: npx playwright test --config=playwright.cloudflare-production.config.ts
+
+      - name: Upload browser traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cloudflare-production-browser-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
