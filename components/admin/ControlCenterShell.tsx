@@ -32,9 +32,9 @@ export function ControlCenterShell({
       >
         <InboxCountProvider initialCount={unreadInboxCount}>
           <ControlCenterSidebar email={email} role={role} />
-          <section className="flex min-h-0 flex-1 flex-col">
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col">
             <ControlCenterMobileNav email={email} role={role} />
-            <div id="main-content" className="mt-4 flex-1 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-[var(--shadow-lg)] sm:p-6 lg:mt-0 lg:p-7">
+            <div id="main-content" className="mt-4 min-w-0 flex-1 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-[var(--shadow-lg)] sm:p-6 lg:mt-0 lg:p-7">
               {children}
             </div>
           </section>
