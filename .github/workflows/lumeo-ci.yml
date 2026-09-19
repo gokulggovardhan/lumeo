@@ -82,19 +82,11 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      - name: Lint admin authentication changes
-        run: >
-          npm exec eslint --
-          lib/supabase/proxy.ts
-          lib/admin/auth.ts
-          app/admin/login/page.tsx
-          app/admin/login/actions.ts
-          app/admin/logout/route.ts
-          components/admin/AdminLoginSubmitButton.tsx
-          components/admin/ControlCenterMobileNav.tsx
-          components/admin/ControlCenterShell.tsx
-          e2e/admin-auth.spec.ts
-          playwright.admin.config.ts
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint application
+        run: npm run lint
 
       - name: Build production application
         run: npm run build
