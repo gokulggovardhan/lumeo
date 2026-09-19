@@ -99,7 +99,10 @@ test.describe("Control Center authentication", () => {
     await mobileNavigation.getByRole("link", { name: "Analytics" }).click();
     await expect(page).toHaveURL(/\/admin\/analytics/);
     await expect(
-      page.getByRole("heading", { name: /analytics/i }),
+      page.getByRole("heading", {
+        name: "Discovery & operation analytics",
+        exact: true,
+      }),
     ).toBeVisible();
 
     const rangeSelect = page.getByLabel("Range");
