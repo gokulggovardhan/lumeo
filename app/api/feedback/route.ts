@@ -6,10 +6,8 @@ import {
   readCloudflareApproximateLocation,
 } from "@/lib/cloudflare/request-location";
 
-// Edge runtime: cold starts are dramatically faster here than Node.js
-// serverless (the prior default), which is what made submissions take
-// several seconds. Nothing in this route uses a Node-only API.
-export const runtime = "edge";
+// This route uses only web-standard APIs so vinext can execute it directly in
+// the Cloudflare Worker runtime without a Vercel/Next Edge Runtime override.
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phonePattern = /^[+]?[\d\s().-]{7,20}$/;
