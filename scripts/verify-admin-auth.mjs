@@ -13,7 +13,9 @@ const requiredFiles = [
   "app/admin/(protected)/layout.tsx",
   "app/admin/(protected)/page.tsx",
   "app/admin/logout/route.ts",
+  "app/admin/session/route.ts",
   "components/admin/AdminLoginSubmitButton.tsx",
+  "components/admin/AdminSessionBoundary.tsx",
   "components/admin/ControlCenterShell.tsx",
   "docs/ADMIN_AUTH.md",
 ];
@@ -95,6 +97,23 @@ try {
   assert(logoutSource.includes("signOut()"), "Admin logout must call Supabase signOut().");
   assert(logoutSource.includes('revalidatePath("/admin", "layout")'), "Logout must revalidate protected admin state.");
 
+  const sessionRoute = read("app/admin/session/route.ts");
+  assert(sessionRoute.includes("getAdminContext()"), "Session probe must use server-side admin authorization.");
+  assert(sessionRoute.includes("status: 401"), "Session probe must reject signed-out requests.");
+  assert(sessionRoute.includes("status: 403"), "Session probe must reject authenticated non-admin requests.");
+  assert(sessionRoute.includes("private, no-store"), "Session probe must never be cached.");
+
+  const historyBoundary = read("components/admin/AdminSessionBoundary.tsx");
+  assert(historyBoundary.includes('"pagehide"'), "Admin history boundary must observe pagehide.");
+  assert(historyBoundary.includes('"pageshow"'), "Admin history boundary must observe pageshow.");
+  assert(historyBoundary.includes("event.persisted"), "Admin history boundary must detect BFCache restoration.");
+  assert(historyBoundary.includes('fetch("/admin/session"'), "BFCache restoration must revalidate against the server.");
+  assert(historyBoundary.includes("window.location.replace"), "Failed history revalidation must replace the protected history entry.");
+  assert(!historyBoundary.includes("getSession("), "History protection must not trust a client-only session read.");
+
+  const shellSource = read("components/admin/ControlCenterShell.tsx");
+  assert(shellSource.includes("AdminSessionBoundary"), "Protected admin shell must mount the history/session boundary.");
+
   const nextConfig = read("next.config.ts");
   assert(nextConfig.includes('source: "/admin/:path*"'), "Admin routes need an explicit cache policy.");
   assert(nextConfig.includes("private, no-store"), "Admin responses must be non-cacheable.");
@@ -113,6 +132,7 @@ try {
   console.log("PASS login/logout revalidate protected state");
   console.log("PASS iPhone-safe login fields and safe areas are present");
   console.log("PASS admin responses are marked private/no-store");
+  console.log("PASS BFCache restoration revalidates server authorization and fails closed");
   console.log("PASS anonymous execution is revoked from internal admin helpers");
   console.log("PASS no service role or secret key usage in admin application source");
 } catch (error) {
