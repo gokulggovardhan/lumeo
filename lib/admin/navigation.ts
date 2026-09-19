@@ -17,7 +17,7 @@ export const adminNavigation: AdminNavItem[] = [
   { label: "Analytics", href: "/admin/analytics", icon: "analytics" },
   { label: "Errors", href: "/admin/errors", icon: "errors" },
   { label: "Health", href: "/admin/health", icon: "health" },
-  { label: "PDF Tools", href: "/admin/tools", icon: "tools" },
+  { label: "Tools", href: "/admin/tools", icon: "tools" },
   { label: "Homepage", href: "/admin/homepage", icon: "homepage" },
   { label: "Feature Flags", href: "/admin/feature-flags", icon: "flags" },
   { label: "Announcements", href: "/admin/announcements", icon: "announcements" },
