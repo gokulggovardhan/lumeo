@@ -9,7 +9,6 @@ import type {
   AdminAnalyticsSummaryResult,
   AuditLog,
   DailyToolMetric,
-  FeatureFlag,
   FeedbackQuery,
   PdfTool,
   SeoSetting,
@@ -31,7 +30,6 @@ export type OverviewData = {
   enabledTools: number;
   maintenanceTools: number;
   activeAnnouncements: number;
-  enabledFeatureFlags: number;
   auditActions24h: number;
   analyticsEventsToday: number;
   analyticsPageViewsToday: number;
@@ -151,17 +149,6 @@ export async function getPdfTools(): Promise<DataResult<ToolWithCategory[]>> {
   });
 
   return safe(tools, error);
-}
-
-export async function getFeatureFlags(): Promise<DataResult<FeatureFlag[]>> {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("feature_flags")
-    .select("*")
-    .order("environment", { ascending: true })
-    .order("key", { ascending: true });
-
-  return safe((data ?? []) as FeatureFlag[], error);
 }
 
 export async function getAnnouncements(): Promise<DataResult<Announcement[]>> {
@@ -662,18 +649,16 @@ export function collapseUnknownLocationRuns(events: RecentAnalyticsEvent[]): Rec
 
 export async function getOverviewData(): Promise<DataResult<OverviewData>> {
   const supabase = await createClient();
-  const [toolsResult, announcementsResult, flagsResult, auditResult, analyticsResult] =
+  const [toolsResult, announcementsResult, auditResult, analyticsResult] =
     await Promise.all([
       getPdfTools(),
       getAnnouncements(),
-      getFeatureFlags(),
       getAuditLogs(5),
       getAnalyticsSummary(),
     ]);
 
   const tools = toolsResult.data;
   const announcements = announcementsResult.data;
-  const flags = flagsResult.data;
   const since = yesterdayIso();
   const { count: auditActions24h, error: auditCountError } = await supabase
     .from("audit_logs")
@@ -685,7 +670,6 @@ export async function getOverviewData(): Promise<DataResult<OverviewData>> {
       enabledTools: tools.filter((tool) => tool.is_enabled).length,
       maintenanceTools: tools.filter((tool) => tool.status === "maintenance").length,
       activeAnnouncements: announcements.filter((announcement) => announcement.is_active).length,
-      enabledFeatureFlags: flags.filter((flag) => flag.is_enabled).length,
       auditActions24h: auditActions24h ?? 0,
       analyticsEventsToday: analyticsResult.data.eventsToday,
       analyticsPageViewsToday: analyticsResult.data.pageViewsToday,
@@ -698,7 +682,6 @@ export async function getOverviewData(): Promise<DataResult<OverviewData>> {
     },
     toolsResult.error ??
       announcementsResult.error ??
-      flagsResult.error ??
       auditResult.error ??
       analyticsResult.error ??
       auditCountError,
