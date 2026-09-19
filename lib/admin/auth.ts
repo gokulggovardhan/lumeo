@@ -7,6 +7,8 @@ type VerifiedClaims = {
   email?: unknown;
 };
 
+type AdminSupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
 function isAdminRole(value: unknown): value is AdminRole {
   return value === "owner" || value === "admin" || value === "analyst";
 }
@@ -15,8 +17,9 @@ function getClaimString(value: unknown) {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-export async function getAdminContext(): Promise<AdminContext> {
-  const supabase = await createClient();
+export async function getAdminContextWithClient(
+  supabase: AdminSupabaseClient,
+): Promise<AdminContext> {
   const { data, error } = await supabase.auth.getClaims();
 
   if (error || !data?.claims) {
@@ -72,6 +75,11 @@ export async function getAdminContext(): Promise<AdminContext> {
     email,
     role: membership.role,
   };
+}
+
+export async function getAdminContext(): Promise<AdminContext> {
+  const supabase = await createClient();
+  return getAdminContextWithClient(supabase);
 }
 
 export async function requireAdmin() {
