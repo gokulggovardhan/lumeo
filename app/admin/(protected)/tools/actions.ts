@@ -52,7 +52,6 @@ export async function updateTool(formData: FormData) {
     changes: { category_id: categoryId, status, is_enabled: isEnabled },
   });
   revalidatePath("/admin/tools");
-  revalidatePath("/admin/homepage");
   // getToolBlockedState/resolveLumeoTools read this row through
   // getPublicPdfCatalog, an unstable_cache with a 5-minute revalidate --
   // revalidatePath alone doesn't reach that cache entry (it only re-renders
