@@ -50,11 +50,11 @@ function previousMonthRange(value: string) {
   return { startDate, endDate: next.toISOString().slice(0, 10) };
 }
 
-function customRange(start: string | undefined, end: string | undefined): AnalyticsRange | null {
+function customRange(start: string | undefined, end: string | undefined, today: string): AnalyticsRange | null {
   if (!start || !end) return null;
   const startDate = parseCalendarDate(start);
   const endDate = parseCalendarDate(end);
-  if (!startDate || !endDate || startDate > endDate) return null;
+  if (!startDate || !endDate || startDate > endDate || end > today) return null;
   const spanDays = Math.floor((endDate.getTime() - startDate.getTime()) / DAY_MS) + 1;
   if (spanDays > 90) return null;
   return {
@@ -88,14 +88,14 @@ export function resolveAnalyticsRange(
       return { key: "previous-month", label: "Previous month", ...previous, warning: null };
     }
     case "custom": {
-      const custom = customRange(params.start, params.end);
+      const custom = customRange(params.start, params.end, today);
       if (custom) return custom;
       return {
         key: "7d",
         label: "Last 7 days",
         startDate: shiftIsoDate(today, -6),
         endDate: today,
-        warning: "Custom dates must be valid, ordered, and no more than 90 days apart.",
+        warning: "Custom dates must be valid, ordered, not in the future, and span no more than 90 calendar days.",
       };
     }
     case "7d":
