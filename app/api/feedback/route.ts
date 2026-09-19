@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { geolocation } from "@vercel/functions";
 import { createClient } from "@/lib/supabase/server";
 import { captureServerError, withRouteHandlerCapture } from "@/lib/errors/server";
+import {
+  formatApproximateLocation,
+  readCloudflareApproximateLocation,
+} from "@/lib/cloudflare/request-location";
 
 // Edge runtime: cold starts are dramatically faster here than Node.js
 // serverless (the prior default), which is what made submissions take
@@ -16,15 +19,11 @@ function trimmed(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
-// City/region only, via Vercel's own geolocation() helper (the currently
-// recommended way to read this -- more robust than parsing x-vercel-ip-*
-// headers by hand). No IP address is ever read or stored, no external
-// geolocation service is called. Returns nothing outside Vercel deployments
-// (e.g. local dev), which is expected.
+// Approximate city/region/country comes from Cloudflare's inbound Request.cf
+// data, with Cloudflare location headers as a fallback. No IP address is read
+// or stored and no external geolocation service is called.
 function readApproxLocation(request: NextRequest) {
-  const { city, countryRegion, country } = geolocation(request);
-  const parts = [city, countryRegion, country].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : null;
+  return formatApproximateLocation(readCloudflareApproximateLocation(request));
 }
 
 export const POST = withRouteHandlerCapture("/api/feedback", async (request: NextRequest) => {
