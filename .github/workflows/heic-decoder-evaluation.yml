@@ -89,6 +89,12 @@ jobs:
       - name: Candidate production build
         run: npm run build
 
+      - name: Candidate Cloudflare/vinext build
+        run: npm run build:vinext
+
+      - name: Candidate Cloudflare deployment dry-run
+        run: npx vinext-cloudflare deploy --dry-run --config dist/server/wrangler.json
+
       - name: Upload candidate evidence
         if: always()
         uses: actions/upload-artifact@v7
@@ -96,6 +102,7 @@ jobs:
           name: heic-patched-wasm-evaluation
           path: |
             .heic-decoder-candidate/PROVENANCE.txt
+            .heic-decoder-candidate/libheif-js.package-lock.json
             .heic-decoder-candidate/LICENSE.libheif
             .heic-decoder-candidate/LICENSE.libde265
             /tmp/official-size.txt
