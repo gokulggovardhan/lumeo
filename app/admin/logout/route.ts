@@ -6,7 +6,7 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient();
 
   try {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "local" });
   } catch {
     // Keep logout responses generic; do not expose provider internals.
   }
