@@ -47,12 +47,6 @@ self.onmessage = async ({ data }: MessageEvent<Input>) => {
       if (structure.inspectionStatus !== "complete" || structure.primaryItemId === null) {
         fail("This HEIC container is damaged, unusually complex, or unsupported. Try exporting the photo again.");
       }
-      if (structure.brands.includes("msf1")) {
-        fail("HEIF image sequences are not supported by this photo converter.");
-      }
-      if (structure.itemTypes.some((type) => type === "unci" || type === "uncv")) {
-        fail("Uncompressed HEIF variants are temporarily disabled for safe browser conversion.");
-      }
       for (const declared of structure.dimensions) assertDimensions(declared.width, declared.height);
     }
     const evidence: PhotoEvidence = { hdr: false, depth: false, edit: "unknown", live: "unknown", notices: [] };
