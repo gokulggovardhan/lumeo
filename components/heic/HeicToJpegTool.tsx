@@ -41,10 +41,10 @@ export default function HeicToJpegTool() {
     releasePhotoUrls(urls.current); urls.current.clear();
     setRows([]); setBusy(false); setNotice("");
   }
-  function select(files: FileList) {
+  function select(files: FileList | readonly File[]) {
     if (controller.current || zipping) return;
     reset();
-    const { assets, ignored } = groupPhotos(Array.from(files));
+    const snapshot = Array.from(files);\n    const { assets, ignored } = groupPhotos(snapshot);
     setRows(assets.map((asset) => ({ ...asset, status: asset.source ? "queued" : "needs-review" })));
     setNotice([ignored ? `${ignored} macOS housekeeping file(s) ignored.` : "", assets.length > 50 ? "Large batches take time and retain completed JPEGs in browser memory. For high-resolution photos, smaller batches work best." : ""].filter(Boolean).join(" "));
   }
