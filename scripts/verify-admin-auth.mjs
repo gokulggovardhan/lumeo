@@ -83,6 +83,7 @@ try {
   assert(proxySource.includes("setAll(cookiesToSet, headers)"), "Supabase proxy must accept auth response headers.");
   assert(proxySource.includes("applySessionHeaders(response, headers)"), "Supabase proxy must preserve auth cache-control metadata.");
   assert(proxySource.includes("await supabase.auth.getClaims()"), "Supabase proxy must validate/refresh claims.");
+  assert(proxySource.includes("applyAdminCachePolicy"), "Supabase proxy must enforce the admin no-store policy at the request boundary.");
 
   const loginPage = read("app/admin/login/page.tsx");
   assert(loginPage.includes('autoComplete="username"'), "Login email must support username autofill semantics.");
@@ -95,19 +96,28 @@ try {
   assert(/export async function POST/.test(logoutSource), "Admin logout must expose POST.");
   assert(!/export async function GET/.test(logoutSource), "Admin logout must not expose GET.");
   assert(logoutSource.includes('signOut({ scope: "local" })'), "Admin logout must revoke only the current Supabase session.");
+  assert(logoutSource.includes('Location: "/admin/login?message=signed-out"'), "Logout redirect must stay relative to the current origin.");
   assert(logoutSource.includes('revalidatePath("/admin", "layout")'), "Logout must revalidate protected admin state.");
 
   const sessionRoute = read("app/admin/session/route.ts");
   assert(sessionRoute.includes("getAdminContext()"), "Session probe must use server-side admin authorization.");
-  assert(sessionRoute.includes("status: 401"), "Session probe must reject signed-out requests.");
-  assert(sessionRoute.includes("status: 403"), "Session probe must reject authenticated non-admin requests.");
+  assert(sessionRoute.includes("authenticated: admin.authenticated"), "Session probe must report server-authenticated state.");
+  assert(sessionRoute.includes("authorized: admin.authorized"), "Session probe must report server authorization state.");
+  assert(sessionRoute.includes("status: 200"), "Expected signed-out session probes must not create browser console errors.");
   assert(sessionRoute.includes("private, no-store"), "Session probe must never be cached.");
+
+  const signOutButton = read("components/admin/AdminSignOutButton.tsx");
+  assert(signOutButton.includes("ADMIN_SIGNED_OUT_MARKER"), "Sign-out must mark the current tab before navigation.");
+  assert(signOutButton.includes("onSubmit={markSignedOut}"), "Sign-out marker must be set before the logout POST.");
 
   const historyBoundary = read("components/admin/AdminSessionBoundary.tsx");
   assert(historyBoundary.includes('"pagehide"'), "Admin history boundary must observe pagehide.");
   assert(historyBoundary.includes('"pageshow"'), "Admin history boundary must observe pageshow.");
+  assert(historyBoundary.includes('"popstate"'), "Admin history boundary must observe browser Back/Forward navigation.");
   assert(historyBoundary.includes("event.persisted"), "Admin history boundary must detect BFCache restoration.");
-  assert(historyBoundary.includes('fetch("/admin/session"'), "BFCache restoration must revalidate against the server.");
+  assert(historyBoundary.includes("isBackForwardNavigation()"), "Admin history boundary must detect full back/forward document restores.");
+  assert(historyBoundary.includes("ADMIN_SIGNED_OUT_MARKER"), "Admin history boundary must honor the same-tab logout marker.");
+  assert(historyBoundary.includes('fetch("/admin/session"'), "History restoration must revalidate against the server.");
   assert(historyBoundary.includes("window.location.replace"), "Failed history revalidation must replace the protected history entry.");
   assert(!historyBoundary.includes("getSession("), "History protection must not trust a client-only session read.");
 
@@ -133,7 +143,8 @@ try {
   console.log("PASS logout revokes only the current administrator session");
   console.log("PASS iPhone-safe login fields and safe areas are present");
   console.log("PASS admin responses are marked private/no-store");
-  console.log("PASS BFCache restoration revalidates server authorization and fails closed");
+  console.log("PASS BFCache and Back/Forward restoration revalidate server authorization and fail closed");
+  console.log("PASS logout redirect remains same-origin and marks the current tab");
   console.log("PASS anonymous execution is revoked from internal admin helpers");
   console.log("PASS no service role or secret key usage in admin application source");
 } catch (error) {
