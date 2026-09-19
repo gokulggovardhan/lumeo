@@ -165,6 +165,32 @@ jobs:
           printf '%s' "$content_type" | grep -Eq 'javascript|ecmascript' || { echo "FAIL: JS chunk content type is $content_type"; exit 1; }
           echo "PASS: current JavaScript chunk is fetchable with a JavaScript MIME type."
 
+      - name: Report Cloudflare routing and header diagnostics
+        if: always()
+        shell: bash
+        run: |
+          set -u
+
+          echo "--- apex HTTPS headers ---"
+          apex_headers="$(curl --silent --show-error --head --max-time 30 https://lumeo.in/ || true)"
+          for name in server cf-ray strict-transport-security x-frame-options x-content-type-options referrer-policy permissions-policy cache-control; do
+            value="$(printf '%s' "$apex_headers" | awk -F': ' -v wanted="$name" 'tolower($1)==tolower(wanted) {value=$2} END {gsub("\r","",value); print value}')"
+            echo "$name=${value:-<missing>}"
+          done
+
+          echo "--- www HTTPS ---"
+          www_headers="$(curl --silent --show-error --head --max-time 30 https://www.lumeo.in/ || true)"
+          www_status="$(printf '%s' "$www_headers" | awk '/^HTTP\// {code=$2} END {print code}')"
+          www_location="$(printf '%s' "$www_headers" | awk -F': ' 'tolower($1)=="location" {gsub("\r","",$2); value=$2} END {print value}')"
+          echo "status=${www_status:-<unreachable>}"
+          echo "location=${www_location:-<missing>}"
+
+          echo "--- apex HTTP ---"
+          http_headers="$(curl --silent --show-error --head --max-time 30 http://lumeo.in/ || true)"
+          http_status="$(printf '%s' "$http_headers" | awk '/^HTTP\// {code=$2} END {print code}')"
+          http_location="$(printf '%s' "$http_headers" | awk -F': ' 'tolower($1)=="location" {gsub("\r","",$2); value=$2} END {print value}')"
+          echo "status=${http_status:-<unreachable>}"
+          echo "location=${http_location:-<missing>}"
       - name: Fail if any production audit section failed
         if: always()
         shell: bash
