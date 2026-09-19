@@ -1,13 +1,9 @@
-import { createStorageServerClient } from "./storageServerClient.ts";
-import { WORD_TO_PDF_BUCKET } from "./wordToPdfStorage.ts";
-
-export const WORD_TO_PDF_STALE_CUTOFF_MS = 2 * 60 * 60 * 1000;
-export const WORD_TO_PDF_CLEANUP_LIST_LIMIT = 1000;
-
-type CleanupStorageObject = {
-  name: string;
-  created_at?: string | null;
-};
+import { createStorageServerClient } from "@/lib/supabase/storageServerClient";
+import { WORD_TO_PDF_BUCKET } from "@/lib/supabase/wordToPdfStorage";
+import {
+  selectStaleWordToPdfObjectNames,
+  WORD_TO_PDF_CLEANUP_LIST_LIMIT,
+} from "./wordToPdfCleanupPolicy.ts";
 
 export type WordToPdfCleanupResult = {
   scanned: number;
