@@ -462,30 +462,11 @@ export function L2UploadStage({
   }
 
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
-    // Snapshot the FileList synchronously. iOS/WebKit may clear or mutate the
-    // live input FileList after the picker closes or once the event unwinds.
-    const selectedFiles = event.currentTarget.files ? Array.from(event.currentTarget.files) : [];
+    // Snapshot before clearing: WebKit's FileList is live and may be emptied
+    // when the input value is reset after the picker closes.
+    const selectedFiles = event.currentTarget.files;
+    if (selectedFiles?.length) onFilesSelected?.(selectedFiles);
     event.currentTarget.value = "";
-    if (!selectedFiles.length) return;
-
-    // Preserve the existing FileList-shaped callback contract for shared PDF
-    // workspaces while giving consumers stable File objects that survive async
-    // React work. DataTransfer is unavailable in some Safari contexts, so fall
-    // back to the original FileList only when necessary.
-    try {
-      const transfer = new DataTransfer();
-      for (const file of selectedFiles) transfer.items.add(file);
-      onFilesSelected?.(transfer.files);
-    } catch {
-      const original = event.currentTarget.files;
-      if (original?.length) onFilesSelected?.(original);
-      else {
-        // HEIC uses its own immediate snapshot in the callback; this path is
-        // retained only for older browsers where DataTransfer construction is unavailable.
-        const list = selectedFiles as unknown as FileList;
-        onFilesSelected?.(list);
-      }
-    }
   }
 
   function handleDragEnter(event: DragEvent<HTMLDivElement>) {
