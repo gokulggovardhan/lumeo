@@ -79,6 +79,9 @@ jobs:
       - name: Verify admin authentication architecture
         run: npm run verify:admin-auth
 
+      - name: Verify Control Center architecture
+        run: npm run verify:control-center
+
       - name: Run unit tests
         run: npm test
 
