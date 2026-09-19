@@ -17,7 +17,7 @@ import {
   getAnalyticsSummary,
   getRecentAnalyticsEvents,
 } from "@/lib/admin/data";
-import { formatAdminDateTime } from "@/lib/admin/timezone";
+import { formatAdminDateTime, istIsoDate } from "@/lib/admin/timezone";
 
 function formatDate(value: string | null) {
   return value ? formatAdminDateTime(value) : "None yet";
@@ -33,7 +33,9 @@ export default async function AnalyticsPage({
   }>;
 }) {
   const params = (await searchParams) ?? {};
-  const range = resolveAnalyticsRange(params);
+  const now = new Date();
+  const range = resolveAnalyticsRange(params, now);
+  const maxDate = istIsoDate(now);
 
   const [summary, recentEvents] = await Promise.all([
     getAnalyticsSummary({
@@ -91,6 +93,7 @@ export default async function AnalyticsPage({
               type="date"
               name="start"
               defaultValue={params.start ?? range.startDate}
+              max={maxDate}
               className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)]"
             />
           </label>
@@ -101,6 +104,7 @@ export default async function AnalyticsPage({
               type="date"
               name="end"
               defaultValue={params.end ?? range.endDate}
+              max={maxDate}
               className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)]"
             />
           </label>
