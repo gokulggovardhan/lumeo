@@ -1,0 +1,149 @@
+name: Cloudflare Release Integrity
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/api/build-info/**"
+      - "vite.config.ts"
+      - ".github/workflows/cloudflare-release-integrity.yml"
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: read
+
+concurrency:
+  group: cloudflare-release-integrity-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-worker-build:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Build Cloudflare Worker with immutable SHA metadata
+        run: npm run build:vinext
+
+      - name: Validate Cloudflare deployment bundle
+        run: npx vinext-cloudflare deploy --dry-run --config dist/server/wrangler.json
+
+  verify-production:
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PRODUCTION_BUILD_INFO_URL: https://lumeo.in/api/build-info
+      PRODUCTION_HEALTH_URL: https://lumeo.in/
+      CLOUDFLARE_CHECK_NAME: "Workers Builds: lumeo-app"
+    steps:
+      - name: Resolve expected main SHA
+        id: expected
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "push" ]]; then
+            expected="${GITHUB_SHA}"
+          else
+            expected="$(gh api "repos/${GITHUB_REPOSITORY}/commits/main" --jq '.sha')"
+          fi
+          if [[ ! "$expected" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Could not resolve a valid 40-character Git SHA."
+            exit 10
+          fi
+          echo "sha=$expected" >> "$GITHUB_OUTPUT"
+          echo "EXPECTED_MAIN_SHA=$expected"
+
+      - name: Wait for Cloudflare Workers deployment result
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ steps.expected.outputs.sha }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..36}; do
+            row="$(
+              gh api                 -H "Accept: application/vnd.github+json"                 -H "X-GitHub-Api-Version: 2022-11-28"                 "repos/${GITHUB_REPOSITORY}/commits/${EXPECTED_SHA}/check-runs"                 --jq '.check_runs[] | select(.name == env.CLOUDFLARE_CHECK_NAME) | [.status, (.conclusion // "")] | @tsv'                 | head -n 1
+            )"
+
+            status="${row%%$'\t'*}"
+            conclusion=""
+            if [[ "$row" == *$'\t'* ]]; then
+              conclusion="${row#*$'\t'}"
+            fi
+
+            if [[ "$status" == "completed" ]]; then
+              if [[ "$conclusion" == "success" ]]; then
+                echo "CLOUDFLARE_DEPLOYMENT=SUCCESS"
+                exit 0
+              fi
+              echo "::error::CLOUDFLARE_DEPLOYMENT_FAILURE: check concluded '${conclusion:-unknown}'."
+              exit 20
+            fi
+
+            echo "Cloudflare deployment not complete yet (attempt $attempt/36, status=${status:-not-created})."
+            sleep 10
+          done
+
+          echo "::error::CLOUDFLARE_DEPLOYMENT_STATUS_TIMEOUT: no successful Cloudflare check appeared for ${EXPECTED_SHA}."
+          exit 21
+
+      - name: Verify production application health
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! curl --fail --silent --show-error --location --max-time 30 "$PRODUCTION_HEALTH_URL" >/dev/null; then
+            echo "::error::APPLICATION_HEALTH_FAILURE: production homepage is not returning a successful response."
+            exit 30
+          fi
+          echo "APPLICATION_HEALTH=SUCCESS"
+
+      - name: Verify exact production revision
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ steps.expected.outputs.sha }}
+        run: |
+          set -euo pipefail
+          response="$(mktemp)"
+          if ! curl             --fail             --silent             --show-error             --location             --max-time 30             -H "Cache-Control: no-cache"             "$PRODUCTION_BUILD_INFO_URL" >"$response"; then
+            echo "::error::APPLICATION_METADATA_FAILURE: build-info endpoint is unavailable."
+            exit 31
+          fi
+
+          live_sha="$(jq -er '.commit | select(type == "string" and test("^[0-9a-f]{40}$"))' "$response" 2>/dev/null || true)"
+          environment="$(jq -er '.environment | select(type == "string")' "$response" 2>/dev/null || true)"
+
+          if [[ -z "$live_sha" ]]; then
+            echo "::error::APPLICATION_METADATA_FAILURE: production did not expose a valid immutable commit SHA."
+            exit 32
+          fi
+
+          if [[ "$environment" != "production" ]]; then
+            echo "::error::WRONG_ENVIRONMENT_SERVING: expected production metadata, got '${environment:-missing}'."
+            exit 41
+          fi
+
+          if [[ "$live_sha" != "$EXPECTED_SHA" ]]; then
+            echo "::error::WRONG_REVISION_SERVING: expected $EXPECTED_SHA but production reports $live_sha."
+            exit 40
+          fi
+
+          echo "EXPECTED_SHA=$EXPECTED_SHA"
+          echo "LIVE_SHA=$live_sha"
+          echo "ENVIRONMENT=$environment"
+          echo "EXACT_SHA_VERIFICATION=SUCCESS"
