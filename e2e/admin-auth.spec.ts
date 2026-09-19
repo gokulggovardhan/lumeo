@@ -146,9 +146,10 @@ test.describe("Control Center authentication", () => {
     await expect(page).toHaveURL(/\/admin\/inbox/);
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
 
-    await page.reload();
+    const inboxReload = await page.reload();
     await expect(page).toHaveURL(/\/admin\/inbox/);
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
+    expect(inboxReload?.headers()["cache-control"]).toContain("no-store");
 
     await openMobileNavigation(page);
     const protectedOrigin = new URL(page.url()).origin;
