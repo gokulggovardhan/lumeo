@@ -15,12 +15,12 @@ export type WordToPdfCleanupResult = {
 };
 
 export class WordToPdfCleanupError extends Error {
-  constructor(
-    public readonly stage: "list" | "remove",
-    detail: string,
-  ) {
+  readonly stage: "list" | "remove";
+
+  constructor(stage: "list" | "remove", detail: string) {
     super(`Word-to-PDF cleanup ${stage} failed: ${detail}`);
     this.name = "WordToPdfCleanupError";
+    this.stage = stage;
   }
 }
 
