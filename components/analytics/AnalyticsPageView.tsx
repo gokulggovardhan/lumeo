@@ -6,6 +6,7 @@ import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
 const PUBLIC_PAGE_ROUTES = new Set([
+  "/heic-to-jpeg",
   "/",
   "/pdf-tools",
   "/pdf/merge",

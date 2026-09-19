@@ -106,6 +106,7 @@ export const lumeoTools: LumeoTool[] = [
       { label: "PNG to PDF", slug: "png-to-pdf", route: "/pdf/jpg-to-pdf", live: true },
       { label: "WEBP to PDF", slug: "webp-to-pdf", route: "/pdf/jpg-to-pdf", live: true },
       { label: "HEIC to PDF", slug: "heic-to-pdf", live: false },
+      { label: "HEIC to JPEG", slug: "heic-to-jpeg", route: "/heic-to-jpeg", live: true },
     ],
   },
   {

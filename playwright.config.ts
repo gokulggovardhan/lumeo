@@ -22,10 +22,13 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: "http://localhost:3000",
-    ...devices["Desktop Chrome"],
     viewport: { width: 1600, height: 1000 },
     trace: "retain-on-failure",
   },
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+  ],
   // E2E_PROD=1 runs the suite against a production build instead of the dev
   // server. That distinction matters for anything involving React's
   // StrictMode double-invocation, which only happens in development -- a
