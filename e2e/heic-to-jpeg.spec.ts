@@ -92,3 +92,39 @@ test("native picker accepts uppercase JPEG and renders the selected asset", asyn
   await secondChooser.setFiles({ name: "IMG_1864.JPG", mimeType: "", buffer: Buffer.from(jpeg, "base64") });
   await expect(page.getByRole("heading", { name: "IMG_1864.JPG" })).toBeVisible();
 });
+
+
+test("batch controls remove a selected file and convert-more resets cleanly", async ({ page }) => {
+  await page.goto("/heic-to-jpeg");
+  const jpeg = await page.evaluate(() => {
+    const canvas = document.createElement("canvas"); canvas.width = 20; canvas.height = 12;
+    canvas.getContext("2d")!.fillRect(0, 0, 20, 12);
+    return canvas.toDataURL("image/jpeg").split(",")[1];
+  });
+  const input = page.locator('input[type="file"]');
+  await input.setInputFiles([
+    { name: "keep.JPG", mimeType: "image/jpeg", buffer: Buffer.from(jpeg, "base64") },
+    { name: "remove.JPG", mimeType: "", buffer: Buffer.from(jpeg, "base64") },
+  ]);
+  await expect(page.getByRole("heading", { name: "2 photos detected" })).toBeVisible();
+  await page.getByRole("button", { name: "Remove remove.JPG" }).click();
+  await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "remove.JPG" })).toHaveCount(0);
+  await page.getByLabel("Quality").selectOption("85");
+  await page.getByRole("button", { name: "Convert to JPEG" }).click();
+  await expect(page.getByRole("button", { name: "Convert more photos" })).toBeVisible();
+  await page.getByRole("button", { name: "Convert more photos" }).click();
+  await expect(page.getByText("Choose photos", { exact: true })).toBeVisible();
+  await input.setInputFiles({ name: "keep.JPG", mimeType: "", buffer: Buffer.from(jpeg, "base64") });
+  await expect(page.getByRole("heading", { name: "keep.JPG" })).toBeVisible();
+});
+
+test("unsupported drop is explained instead of disappearing silently", async ({ page }) => {
+  await page.goto("/heic-to-jpeg");
+  await page.locator(".l2-upload-stage").evaluate((element) => {
+    const transfer = new DataTransfer();
+    transfer.items.add(new File(["not an image"], "notes.txt", { type: "text/plain" }));
+    element.dispatchEvent(new DragEvent("drop", { bubbles: true, cancelable: true, dataTransfer: transfer }));
+  });
+  await expect(page.getByText("Unsupported file. Choose HEIC, HEIF or JPEG photos.")).toBeVisible();
+});
