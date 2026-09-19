@@ -68,6 +68,14 @@ function bypassesMaintenanceMode(pathname: string) {
   return pathname.startsWith("/admin") || pathname.startsWith("/maintenance");
 }
 
+function applyAdminCachePolicy(response: NextResponse, pathname: string) {
+  if (!pathname.startsWith("/admin")) return;
+  response.headers.set(
+    "Cache-Control",
+    "private, no-store, max-age=0, must-revalidate",
+  );
+}
+
 export async function updateSession(request: NextRequest) {
   let env;
 
@@ -78,9 +86,11 @@ export async function updateSession(request: NextRequest) {
       throw error;
     }
 
-    return NextResponse.next({
+    const fallbackResponse = NextResponse.next({
       request,
     });
+    applyAdminCachePolicy(fallbackResponse, request.nextUrl.pathname);
+    return fallbackResponse;
   }
 
   const { url, publishableKey } = env;
@@ -146,5 +156,6 @@ export async function updateSession(request: NextRequest) {
   }
 
   applyGeoCookie(response, geoCookieValue);
+  applyAdminCachePolicy(response, request.nextUrl.pathname);
   return response;
 }
