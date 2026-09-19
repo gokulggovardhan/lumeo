@@ -94,7 +94,7 @@ try {
   const logoutSource = read("app/admin/logout/route.ts");
   assert(/export async function POST/.test(logoutSource), "Admin logout must expose POST.");
   assert(!/export async function GET/.test(logoutSource), "Admin logout must not expose GET.");
-  assert(logoutSource.includes("signOut()"), "Admin logout must call Supabase signOut().");
+  assert(logoutSource.includes('signOut({ scope: "local" })'), "Admin logout must revoke only the current Supabase session.");
   assert(logoutSource.includes('revalidatePath("/admin", "layout")'), "Logout must revalidate protected admin state.");
 
   const sessionRoute = read("app/admin/session/route.ts");
@@ -130,6 +130,7 @@ try {
   console.log("PASS login authorizes on the same Supabase client");
   console.log("PASS Supabase SSR cache headers are preserved");
   console.log("PASS login/logout revalidate protected state");
+  console.log("PASS logout revokes only the current administrator session");
   console.log("PASS iPhone-safe login fields and safe areas are present");
   console.log("PASS admin responses are marked private/no-store");
   console.log("PASS BFCache restoration revalidates server authorization and fails closed");
