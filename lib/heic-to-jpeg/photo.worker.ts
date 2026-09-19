@@ -43,7 +43,18 @@ self.onmessage = async ({ data }: MessageEvent<Input>) => {
     const jpeg = [".jpg", ".jpeg"].includes(photoExtension(data.source.name));
     const structure = jpeg ? null : inspectHeifStructure(bytes);
     if (jpeg && !(bytes[0] === 255 && bytes[1] === 216 && bytes[2] === 255)) fail("This file is not a readable JPEG photo.");
-    if (structure && (["failed", "unsupported"].includes(structure.inspectionStatus) || structure.primaryItemId === null)) fail("This HEIC container is damaged or unsupported. Try exporting the photo again.");
+    if (structure) {
+      if (structure.inspectionStatus !== "complete" || structure.primaryItemId === null) {
+        fail("This HEIC container is damaged, unusually complex, or unsupported. Try exporting the photo again.");
+      }
+      if (structure.brands.includes("msf1")) {
+        fail("HEIF image sequences are not supported by this photo converter.");
+      }
+      if (structure.itemTypes.some((type) => type === "unci" || type === "uncv")) {
+        fail("Uncompressed HEIF variants are temporarily disabled for safe browser conversion.");
+      }
+      for (const declared of structure.dimensions) assertDimensions(declared.width, declared.height);
+    }
     const evidence: PhotoEvidence = { hdr: false, depth: false, edit: "unknown", live: "unknown", notices: [] };
     const sourceIdentity = inspectContainerIdentifiers(bytes);
     const sourceIdentifiers = sourceIdentity.keys.length > 0 ? sourceIdentity.identifiers : [];
