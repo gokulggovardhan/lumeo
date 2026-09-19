@@ -18,16 +18,12 @@ export const adminNavigation: AdminNavItem[] = [
   { label: "Errors", href: "/admin/errors", icon: "errors" },
   { label: "Health", href: "/admin/health", icon: "health" },
   { label: "Tools", href: "/admin/tools", icon: "tools" },
-  { label: "Homepage", href: "/admin/homepage", icon: "homepage" },
-  { label: "Feature Flags", href: "/admin/feature-flags", icon: "flags" },
   { label: "Announcements", href: "/admin/announcements", icon: "announcements" },
   { label: "Inbox", href: "/admin/inbox", icon: "inbox" },
   { label: "SEO", href: "/admin/seo", icon: "seo" },
   { label: "Audit Log", href: "/admin/audit", icon: "audit" },
   { label: "Settings", href: "/admin/settings", icon: "settings", roles: ["owner"] },
   { label: "Administrators", href: "/admin/members", icon: "members", roles: ["owner"] },
-  { label: "Design System", href: "/admin/design-system", icon: "design", group: "reference" },
-  { label: "Guide", href: "/admin/guide", icon: "guide", group: "reference" },
 ];
 
 export function visibleAdminNavigation(role: AdminRole | null): AdminNavItem[] {
