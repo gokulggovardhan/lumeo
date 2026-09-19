@@ -19,7 +19,7 @@ test("adds baseline security headers on production responses without changing ca
   assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
   assert.equal(
     response.headers.get("strict-transport-security"),
-    "max-age=31536000; includeSubDomains",
+    "max-age=31536000",
   );
 });
 
