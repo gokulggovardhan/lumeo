@@ -3,7 +3,7 @@ import * as exifr from "exifr";
 import { inspectContainerIdentifiers, inspectHeifStructure } from "./inspection/bmff.ts";
 import { inspectAaeXml } from "./inspection/aae.ts";
 import { photoExtension } from "./inspection/names.ts";
-import { assessLivePhotoPairing, classifyColorSafety, jpegQuality, orientationTransform, selectPrimary, type LiveState, type PhotoEvidence, type PhotoStatus } from "./pipeline.ts";
+import { assessLivePhotoPairing, classifyColorSafety, dimensionsPreserved, jpegQuality, orientationTransform, selectPrimary, type LiveState, type PhotoEvidence, type PhotoStatus } from "./pipeline.ts";
 
 type Input = { source: File; companions: File[]; quality: number };
 function stage(status: PhotoStatus) { self.postMessage({ status }); }
@@ -124,6 +124,9 @@ self.onmessage = async ({ data }: MessageEvent<Input>) => {
         decodedWidth = width;
         decodedHeight = height;
         assertDimensions(decodedWidth, decodedHeight);
+        if (!dimensionsPreserved(primaryWidth, primaryHeight, decodedWidth, decodedHeight)) {
+          fail("The decoder returned a reduced-resolution image instead of the full-resolution primary photo.");
+        }
         let rgba = new Uint8ClampedArray(width * height * 4);
         for (let y = 0; y < height; y++) rgba.set(channel!.data.subarray(y * stride, y * stride + width * 4), y * width * 4);
         stage("processing");
@@ -164,6 +167,9 @@ self.onmessage = async ({ data }: MessageEvent<Input>) => {
     bytes = new Uint8Array(0);
     stage("encoding");
     const width = canvas!.width, height = canvas!.height;
+    if (!dimensionsPreserved(decodedWidth, decodedHeight, width, height)) {
+      fail("The export canvas changed the photo resolution unexpectedly. No JPEG was created.");
+    }
     let blob: Blob;
     try { blob = await canvas!.convertToBlob({ type: "image/jpeg", quality: jpegQuality(data.quality) }); }
     finally { canvas!.width = canvas!.height = 1; }
