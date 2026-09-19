@@ -119,12 +119,11 @@ Before declaring the release production-ready:
 
 - Required Supabase URL/publishable-key environment variables are configured.
 - The administrator account and active membership exist.
-- `20260919001_admin_security_hardening.sql` has been applied through the
+- `20260919160000_admin_security_hardening.sql` has been applied through the
   approved post-merge migration workflow.
 - Supabase security advisors are rerun after the migration and internal
   anonymous SECURITY DEFINER warnings are resolved as expected.
-- Supabase Auth leaked-password protection is enabled for administrator
-  password security.
+- Supabase Auth leaked-password protection is enabled when the project plan supports it; otherwise the plan limitation is documented explicitly.
 - Unauthenticated `/admin` redirects to `/admin/login`.
 - Chromium and WebKit/iPhone pass login, persistence, mobile navigation,
   Realtime, logout, repeated Back/Forward protection, and re-login.
