@@ -14,7 +14,7 @@ export function withProductionSecurityHeaders(
   headers.set("X-Frame-Options", "DENY");
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  headers.set("Strict-Transport-Security", "max-age=31536000");
 
   return new Response(response.body, {
     status: response.status,
