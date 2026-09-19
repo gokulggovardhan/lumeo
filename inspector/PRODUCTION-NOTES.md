@@ -20,6 +20,8 @@ The HEIC release gate generates a non-private 6048x8064 HEIC whose embedded thum
 
 The browser converter currently uses `libheif-js 1.23.2`, whose Emscripten artifact embeds upstream libheif 1.23.2. The wrapper build enables libde265, disables WebCodecs and the uncompressed codec by default, disables libheif multithreading, and runs inside Lumeo's fresh per-file Web Worker.
 
+The packaged Emscripten build enables libde265 but disables the uncompressed codec and WebCodecs, and libheif multithreading is off. That makes the current uncompressed-codec and WebCodecs advisories outside this artifact's compiled feature set, while parser-level item/reference issues and single-thread decode-reference cycles remain relevant.
+
 Until an official wrapper containing upstream libheif 1.23.4 or newer is available, Lumeo performs a bounded ISO-BMFF preflight before entering WASM. The preflight mirrors libheif's default `max_items=1000` ceiling for declared `iinf` items, total `iref` entries, and targets per reference entry; it also rejects malformed reference counts and cyclic `dimg`/`auxl` decode graphs. A generous total-reference budget prevents the JavaScript preflight itself from becoming an allocation-amplification path.
 
 Structurally partial/over-complex containers and declared primary dimensions outside Lumeo's existing 64 MP limit are rejected before the WASM parser. These controls reduce exposure to the parser-amplification and reference-cycle advisories fixed upstream after 1.23.2, but they are containment rather than a substitute for a patched libheif build.
