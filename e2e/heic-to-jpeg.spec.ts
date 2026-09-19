@@ -69,3 +69,26 @@ test("desktop drop imports a photo batch and ZIP preserves unique JPEG names", a
   expect(Object.keys(zip.files).sort()).toEqual(["PHOTO (2).jpg", "PHOTO.jpg"]);
   await page.screenshot({ path: "test-results/heic-desktop-results.png", fullPage: true });
 });
+
+
+test("native picker accepts uppercase JPEG and renders the selected asset", async ({ page }) => {
+  await page.goto("/heic-to-jpeg");
+  const jpeg = await page.evaluate(() => {
+    const canvas = document.createElement("canvas"); canvas.width = 24; canvas.height = 16;
+    canvas.getContext("2d")!.fillRect(0, 0, 24, 16);
+    return canvas.toDataURL("image/jpeg").split(",")[1];
+  });
+  const chooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Choose photos", exact: true }).click();
+  const chooser = await chooserPromise;
+  await chooser.setFiles({ name: "IMG_1864.JPG", mimeType: "image/jpeg", buffer: Buffer.from(jpeg, "base64") });
+  await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "IMG_1864.JPG" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Start new" }).click();
+  const secondChooserPromise = page.waitForEvent("filechooser");
+  await page.getByRole("button", { name: "Choose photos", exact: true }).click();
+  const secondChooser = await secondChooserPromise;
+  await secondChooser.setFiles({ name: "IMG_1864.JPG", mimeType: "", buffer: Buffer.from(jpeg, "base64") });
+  await expect(page.getByRole("heading", { name: "IMG_1864.JPG" })).toBeVisible();
+});
