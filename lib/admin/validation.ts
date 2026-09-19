@@ -24,13 +24,8 @@ const allowedEnvironments = new Set<FeatureEnvironment>([
   "all",
 ]);
 const allowedSettings = new Set([
-  "workspace_display_name",
-  "support_email",
-  "contact_page_enabled",
   "maintenance_mode",
   "public_analytics_enabled",
-  "homepage_privacy_message",
-  "default_seo_suffix",
 ]);
 
 export function formString(formData: FormData, key: string, maxLength = 500) {
