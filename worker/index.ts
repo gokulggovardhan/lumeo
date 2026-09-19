@@ -1,4 +1,5 @@
 import handler from "vinext/server/fetch-handler";
+import { canonicalRedirectUrl } from "./canonical-routing";
 import {
   cleanupWordToPdfUploads,
   WordToPdfCleanupError,
@@ -56,6 +57,16 @@ async function runScheduledCleanup(controller: ScheduledControllerLike): Promise
 
 export default {
   fetch(...args: FetchArgs) {
+    const request = args[0];
+    const redirectUrl = canonicalRedirectUrl(
+      request.url,
+      request.headers.get("x-forwarded-proto"),
+    );
+
+    if (redirectUrl) {
+      return Response.redirect(redirectUrl, 308);
+    }
+
     return handler.fetch(...args);
   },
 
