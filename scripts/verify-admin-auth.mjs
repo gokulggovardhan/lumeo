@@ -17,6 +17,7 @@ const requiredFiles = [
   "components/admin/AdminLoginSubmitButton.tsx",
   "components/admin/AdminSessionBoundary.tsx",
   "components/admin/ControlCenterShell.tsx",
+  "playwright.admin.config.ts",
   "docs/ADMIN_AUTH.md",
 ];
 
@@ -128,6 +129,12 @@ try {
   assert(nextConfig.includes('source: "/admin/:path*"'), "Admin routes need an explicit cache policy.");
   assert(nextConfig.includes("private, no-store"), "Admin responses must be non-cacheable.");
 
+  const playwrightConfig = read("playwright.admin.config.ts");
+  assert(
+    playwrightConfig.includes("npm run build && npm run start"),
+    "Admin browser E2E must run against a production Next.js server.",
+  );
+
   const adminSources = requiredFiles
     .filter((file) => /\.(ts|tsx)$/.test(file))
     .map(read)
@@ -143,6 +150,7 @@ try {
   console.log("PASS logout revokes only the current administrator session");
   console.log("PASS iPhone-safe login fields and safe areas are present");
   console.log("PASS admin responses are marked private/no-store");
+  console.log("PASS admin browser E2E runs against production Next.js output");
   console.log("PASS BFCache and Back/Forward restoration revalidate server authorization and fail closed");
   console.log("PASS logout redirect remains same-origin and marks the current tab");
   console.log("PASS anonymous execution is revoked from internal admin helpers");
