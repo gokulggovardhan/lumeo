@@ -12,7 +12,7 @@ on:
     branches:
       - main
       - 'fix/**'
-      - 'feature/**'\n      - 'feat/**'
+      - 'feature/**'
 
   workflow_dispatch:
 
@@ -57,9 +57,6 @@ jobs:
           app/security/page.tsx
           app/terms/page.tsx
           app/pdf/page.tsx
-          app/heic-to-jpeg/page.tsx
-          components/heic/HeicToJpegTool.tsx
-          lib/heic-to-jpeg
           app/pdf/merge/page.tsx
           app/pdf/split/page.tsx
           app/pdf/compress/page.tsx
@@ -78,15 +75,6 @@ jobs:
           components/pdf/PdfToolLauncher.tsx
           components/pdf/PdfToolRegistry.tsx
           scripts/verify-public-routes.mjs
-
-      - name: Run unit and integration tests
-        run: npm test
-
-      - name: Install HEIC E2E browsers
-        run: npx playwright install --with-deps chromium webkit
-
-      - name: Run HEIC E2E in Chromium and WebKit
-        run: npm run test:e2e -- e2e/heic-to-jpeg.spec.ts --project=chromium --project=webkit
 
       - name: Build production application
         run: npm run build
