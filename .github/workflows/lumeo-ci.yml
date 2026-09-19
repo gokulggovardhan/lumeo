@@ -12,7 +12,7 @@ on:
     branches:
       - main
       - 'fix/**'
-      - 'feature/**'
+      - 'feature/**'\n      - 'feat/**'
 
   workflow_dispatch:
 
