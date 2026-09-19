@@ -195,26 +195,25 @@ test("admin analytics reads use the aggregate RPC instead of direct event table 
   assert.match(dataLayer, /"unavailable"/);
 });
 
-test("Analytics V1 dashboard shows real operation lifecycle metric cards", () => {
-  // Operation lifecycle metrics were originally postponed past Analytics
-  // V1, but were verified live in production as of 2026-07-29 -- the
-  // dashboard now shows real, non-placeholder cards fed by
-  // processing_started/succeeded/failed and download_started events, so
-  // this test was updated from "must not show" to "must show" to match
-  // reality (see the matching fix in scripts/verify-control-center.mjs).
+test("admin analytics dashboard exposes current range controls and lifecycle metrics", () => {
   const page = readFileSync("app/admin/(protected)/analytics/page.tsx", "utf8");
 
-  assert.match(page, /Analytics V1/);
-  assert.match(page, /Discovery & operation analytics/);
-  assert.match(page, /Page Views Today/);
-  assert.match(page, /Tool Opens Today/);
-  assert.match(page, /Most Opened Tool/);
-  assert.match(page, /Operation analytics/);
+  assert.match(page, /eyebrow="Analytics"/);
+  assert.match(page, /title="Discovery & operation analytics"/);
+  assert.match(page, /title="Date range"/);
+  assert.match(page, /name="range"/);
+  assert.match(page, /<option value="30d">Last 30 days<\/option>/);
+  assert.match(page, /<option value="custom">Custom<\/option>/);
+  assert.match(page, /label="Page Views"/);
+  assert.match(page, /label="Tool Opens"/);
+  assert.match(page, /label="Most Opened Tool"/);
+  assert.match(page, /title="Operation analytics"/);
   assert.match(page, /label="Processing Started"/);
   assert.match(page, /label="Processing Succeeded"/);
   assert.match(page, /label="Processing Failed"/);
   assert.match(page, /label="Downloads Started"/);
-  assert.match(page, /Success Rate/);
+  assert.match(page, /label="Success Rate"/);
+  assert.doesNotMatch(page, /Analytics V1/);
 });
 
 test("core processing algorithms remain unchanged by lifecycle analytics instrumentation", () => {
