@@ -1,4 +1,4 @@
-import { istIsoDate } from "@/lib/admin/timezone";
+import { istIsoDate } from "./timezone.ts";
 
 export type AnalyticsRangeKey =
   | "today"
