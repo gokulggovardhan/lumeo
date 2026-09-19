@@ -1,0 +1,48 @@
+name: HEIC Release Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'app/heic-to-jpeg/**'
+      - 'components/heic/**'
+      - 'lib/heic-to-jpeg/**'
+      - 'components/pdf/workspace/ToolWorkspace.tsx'
+      - 'e2e/heic-to-jpeg.spec.ts'
+      - 'playwright.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/heic-release.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heic-release-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify HEIC Chromium and WebKit
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+      - run: npm ci
+      - name: HEIC unit and inspection tests
+        run: node --no-warnings --test --experimental-strip-types tests/heic-to-jpeg.test.ts inspector/*.test.ts
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: HEIC lint
+        run: npm exec eslint -- app/heic-to-jpeg/page.tsx components/heic/HeicToJpegTool.tsx components/pdf/workspace/ToolWorkspace.tsx lib/heic-to-jpeg e2e/heic-to-jpeg.spec.ts
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+      - name: HEIC browser E2E
+        run: npm run test:e2e -- e2e/heic-to-jpeg.spec.ts --project=chromium --project=webkit
+      - name: Production build
+        run: npm run build
