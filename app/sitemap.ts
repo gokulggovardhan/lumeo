@@ -5,6 +5,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
 
   return [
+    { url: `${baseUrl}/heic-to-jpeg`, lastModified, changeFrequency: "monthly", priority: 0.8 },
     {
       url: `${baseUrl}/`,
       lastModified,

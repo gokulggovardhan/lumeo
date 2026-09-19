@@ -16,15 +16,15 @@ export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/", {
     title: {
       absolute:
-        "Lumeo PDF - Merge, Split, Compress & Convert PDFs Privately in Your Browser",
+        "Lumeo PDF - Merge, Split, Compress & Convert PDFs",
     },
     description:
-      "Merge, split, compress, and convert PDFs and images privately in your browser. Lumeo is a calm, professional document workspace with no account required.",
+      "Merge, split, compress, and convert PDFs and images with browser-first tools and clearly disclosed server-assisted Word conversion. No account required.",
     alternates: { canonical: "/" },
     openGraph: {
-      title: "Lumeo PDF - Private Browser PDF Tools",
+      title: "Lumeo PDF - Browser-First PDF Tools",
       description:
-        "Merge, split, compress, and convert PDFs and images in a private browser-first workspace.",
+        "A browser-first PDF workspace with clearly disclosed server-assisted Word conversion.",
       url: "https://lumeo.in",
       siteName: "Lumeo PDF",
       type: "website",
@@ -32,7 +32,7 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "Lumeo PDF Workspace",
-      description: "Private PDF tools that run in your browser.",
+      description: "Browser-first PDF tools with clear processing details.",
     },
   });
 }
@@ -53,7 +53,7 @@ const structuredData = [
     applicationCategory: "BusinessApplication",
     operatingSystem: "Any modern browser",
     description:
-      "A browser-first PDF workspace for private document merging, splitting, compression, signing, and conversion.",
+      "A browser-first PDF workspace for merging, splitting, compression, signing, and conversion, with server-assisted Word conversion clearly identified.",
     featureList: [
       "Merge PDF",
       "Split PDF",
@@ -112,8 +112,8 @@ const trustItems = [
 const whyItems = [
   {
     icon: TrustShieldIcon,
-    title: "Nothing is stored",
-    description: "Each file is processed for the task at hand, then cleared — no drafts, no cached copies.",
+    title: "Clear file handling",
+    description: "Most tools process files on your device. Word conversion clearly identifies when server assistance is required.",
   },
   {
     icon: () => (
@@ -131,8 +131,8 @@ const whyItems = [
         <path d="M12 7v5l3 3" />
       </svg>
     ),
-    title: "Fast, without the wait",
-    description: "No queues, no upload bars — results are ready right away.",
+    title: "Clear from the start",
+    description: "Each workspace explains how processing works before you begin.",
   },
 ];
 
@@ -160,7 +160,7 @@ export default async function Home() {
           <header className="lumeo-fade-up mx-auto max-w-[36rem] text-center">
             <p className="aura-text-label inline-flex items-center gap-2 text-[var(--text-accent)]">
               <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--text-accent)]" />
-              Runs entirely in your browser
+              Browser-first document workspace
             </p>
             <h1
               id="tool-heading"
@@ -205,7 +205,7 @@ export default async function Home() {
 
           <div className="my-16 rounded-[22px] border border-[var(--border-hairline)] bg-[linear-gradient(135deg,var(--surface-raised),var(--surface-base))] p-10 text-center sm:p-12">
             <h2 className="font-serif font-semibold text-2xl text-[var(--text-primary)] sm:text-[1.7rem]">Your next PDF task, sorted in seconds.</h2>
-            <p className="mx-auto mt-3 max-w-md text-[var(--text-secondary)]">No forms, no waiting. Drop a file in and get your result.</p>
+            <p className="mx-auto mt-3 max-w-md text-[var(--text-secondary)]">Choose a tool and follow its clear processing steps.</p>
             <Link
               href="/pdf-tools"
               className="mt-7 inline-flex items-center justify-center rounded-xl border border-[rgba(var(--atelier-sage-rgb),0.5)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-8 py-3.5 text-sm font-bold text-[var(--text-on-accent)] shadow-[0_12px_28px_rgba(var(--atelier-sage-rgb),0.18)] transition hover:-translate-y-0.5 hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]"

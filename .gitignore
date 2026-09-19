@@ -66,3 +66,7 @@ graphify-out/graph.html
 e2e/.tmp/
 test-results/
 playwright-report/
+
+# HEIC Phase 0: local iPhone exports and generated diagnostic reports.
+/samples/
+/inspector-output/

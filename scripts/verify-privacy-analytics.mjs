@@ -232,22 +232,22 @@ try {
   assert(privacy.includes("Do Not Track"), "Privacy disclosure must mention Do Not Track.");
   const docs = read("docs/PRIVACY_ANALYTICS.md");
   assert(docs.includes("Analytics V1 scope"), "Privacy analytics docs must document V1 scope.");
-  assert(docs.includes("processing_started") && docs.includes("Planned"), "Privacy analytics docs must mark lifecycle metrics as planned.");
+  assert(docs.includes("processing_started") && docs.includes("all 16 live PDF tools"), "Privacy analytics docs must describe the current lifecycle coverage.");
   assert(migration.includes("coalesce(settings.value @>") && migration.includes("false"), "Analytics setting must default disabled when absent.");
 
   const packageJson = JSON.parse(read("package.json"));
   assert(packageJson.scripts["verify:analytics"] === "node scripts/verify-privacy-analytics.mjs", "verify:analytics script missing.");
   assert(packageJson.scripts.test === "node --no-warnings --test --experimental-strip-types", "generic test script missing.");
-  assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
-  assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");
-  assert(packageJson.dependencies["react-dom"] === "^19.2.7", "React DOM version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
+  assert(packageJson.dependencies["react-dom"] === "^19.2.8", "React DOM version changed unexpectedly.");
 
   console.log("PASS privacy analytics migration exists");
   console.log("PASS approved event allowlist and secure RPCs exist");
   console.log("PASS no anon analytics table grants or policies");
   console.log("PASS client uses sessionStorage, crypto.randomUUID, and RPC-only tracking");
   console.log("PASS Do Not Track and public route allowlist are present");
-  console.log("PASS PDF tools only emit proven tool-open analytics in V1");
+  console.log("PASS PDF tools emit the approved discovery and operation lifecycle events");
   console.log("PASS admin analytics and privacy disclosure exist");
   console.log("PASS protected package versions are unchanged");
 } catch (error) {

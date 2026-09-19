@@ -36,6 +36,7 @@ const AnalyticsContext = createContext<AnalyticsContextValue>({
 });
 
 const PUBLIC_ANALYTICS_ROUTES = new Set([
+  "/heic-to-jpeg",
   "/",
   "/pdf-tools",
   "/pdf/merge",

@@ -9,13 +9,13 @@ import { withSeoOverride } from "@/lib/public-site/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf-tools", {
-    title: { absolute: "PDF Tools - Private Browser PDF Workspace | Lumeo PDF" },
+    title: { absolute: "PDF Tools - Browser-First PDF Workspace | Lumeo PDF" },
     description:
-      "Browse Lumeo's available PDF tools — merging, splitting, compressing, and converting, handled privately in your browser.",
+      "Browse Lumeo's browser-first PDF tools, with server-assisted Word conversion clearly identified.",
     alternates: { canonical: "/pdf-tools" },
     openGraph: {
       title: "PDF Tools - Lumeo PDF Workspace",
-      description: "Browse Lumeo's available private, browser-first PDF tools.",
+      description: "Browse Lumeo's browser-first PDF tools and clear processing details.",
       url: "https://lumeo.in/pdf-tools",
       siteName: "Lumeo PDF",
       type: "website",
@@ -23,7 +23,7 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "PDF Tools - Lumeo PDF Workspace",
-      description: "Lumeo's available private, browser-first PDF tools.",
+      description: "Lumeo's browser-first PDF tools with clear processing details.",
     },
   });
 }
@@ -54,10 +54,10 @@ export default async function PdfToolsPage() {
         <div className="max-w-2xl">
           <p className="aura-text-label text-[var(--lumeo-gold-300)]">PDF tools</p>
           <h1 className="mt-3 font-serif font-medium text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[color:var(--text-primary)]">
-            The PDF tools that matter. <em className="not-italic text-[var(--atelier-sage-300)]">They run entirely in your browser.</em>
+            The PDF tools that matter. <em className="not-italic text-[var(--atelier-sage-300)]">Clear about where they run.</em>
           </h1>
           <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-            Each tool below groups related tasks in one place. More arrive as they&rsquo;re ready.
+            Most tools process files in your browser. Word to PDF and PDF to Word use server-assisted conversion and identify that before processing.
           </p>
         </div>
         <PdfHeroVisual />
