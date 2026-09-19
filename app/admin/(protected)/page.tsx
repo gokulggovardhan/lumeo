@@ -55,7 +55,7 @@ export default async function AdminPage() {
 
       <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <MetricLink href="/admin/tools">
-          <AdminMetricCard label="Enabled PDF Tools" value={data.enabledTools} detail="Real enabled tools in the catalog." tone="success" />
+          <AdminMetricCard label="Enabled Tools" value={data.enabledTools} detail="Real enabled tools in the catalog." tone="success" />
         </MetricLink>
         <MetricLink href="/admin/announcements">
           <AdminMetricCard label="Active Announcements" value={data.activeAnnouncements} detail="Announcements currently marked active." tone="neutral" />
