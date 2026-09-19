@@ -5,5 +5,10 @@
       "path": "/api/tools/word-to-pdf/cleanup",
       "schedule": "0 3 * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "research/**": false
+    }
+  }
 }

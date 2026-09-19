@@ -1,0 +1,104 @@
+name: HEIC Patched WASM Evaluation
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'scripts/build-heic-wasm-candidate.sh'
+      - '.github/workflows/heic-decoder-evaluation.yml'
+      - 'docs/HEIC_DECODER_EVALUATION.md'
+      - 'vercel.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heic-decoder-evaluation-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evaluate:
+    name: Compare official and patched HEIC decoders
+    if: github.event_name == 'workflow_dispatch' || github.head_ref == 'research/heic-patched-wasm-evaluation'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact app dependencies
+        run: npm ci
+
+      - name: Generate canonical full-resolution fixture
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends imagemagick libheif-examples libheif-plugin-x265 cmake ninja-build autoconf automake libtool pkg-config
+          mkdir -p /tmp/lumeo-heic-fixtures
+          convert -size 6048x8064 gradient:'#203858-#e9bf78' \
+            -fill '#e54868' -draw 'rectangle 0,0 900,1100' \
+            -fill '#34b985' -draw 'rectangle 5000,6900 6047,8063' \
+            /tmp/lumeo-heic-fixtures/fullres-source.png
+          heif-enc -q 55 -t 1536 /tmp/lumeo-heic-fixtures/fullres-source.png \
+            -o /tmp/lumeo-heic-fixtures/fullres-with-thumbnail.heic
+          heif-info /tmp/lumeo-heic-fixtures/fullres-with-thumbnail.heic | tee /tmp/lumeo-heic-fixtures/heif-info.txt
+          grep -Eq 'image: 6048x8064 .*primary' /tmp/lumeo-heic-fixtures/heif-info.txt
+          grep -Eq 'thumbnail: 1152x1536' /tmp/lumeo-heic-fixtures/heif-info.txt
+
+      - name: Install Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Record official bundle size
+        run: |
+          stat -c 'official_bundle_bytes=%s' node_modules/libheif-js/libheif-wasm/libheif-bundle.mjs | tee /tmp/official-size.txt
+
+      - name: Baseline official decoder
+        env:
+          HEIC_RESOLUTION_FIXTURE: /tmp/lumeo-heic-fixtures/fullres-with-thumbnail.heic
+        run: npm run test:e2e -- e2e/heic-to-jpeg.spec.ts --project=chromium --project=webkit
+
+      - name: Build pinned patched candidate
+        run: bash scripts/build-heic-wasm-candidate.sh
+
+      - name: Record candidate bundle size and provenance
+        run: |
+          stat -c 'candidate_bundle_bytes=%s' .heic-decoder-candidate/libheif-bundle.mjs | tee /tmp/candidate-size.txt
+          cat .heic-decoder-candidate/PROVENANCE.txt
+
+      - name: Install candidate into test workspace only
+        run: cp .heic-decoder-candidate/libheif-bundle.mjs node_modules/libheif-js/libheif-wasm/libheif-bundle.mjs
+
+      - name: Candidate HEIC unit and security tests
+        run: node --no-warnings --test --experimental-strip-types tests/heic-to-jpeg.test.ts inspector/*.test.ts
+
+      - name: Candidate browser regression
+        env:
+          HEIC_RESOLUTION_FIXTURE: /tmp/lumeo-heic-fixtures/fullres-with-thumbnail.heic
+        run: npm run test:e2e -- e2e/heic-to-jpeg.spec.ts --project=chromium --project=webkit
+
+      - name: Candidate typecheck
+        run: npx tsc --noEmit
+
+      - name: Candidate focused lint
+        run: npm exec eslint -- app/heic-to-jpeg/page.tsx components/heic/HeicToJpegTool.tsx components/pdf/workspace/ToolWorkspace.tsx lib/heic-to-jpeg e2e/heic-to-jpeg.spec.ts
+
+      - name: Candidate production build
+        run: npm run build
+
+      - name: Upload candidate evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: heic-patched-wasm-evaluation
+          path: |
+            .heic-decoder-candidate/PROVENANCE.txt
+            .heic-decoder-candidate/LICENSE.libheif
+            .heic-decoder-candidate/LICENSE.libde265
+            /tmp/official-size.txt
+            /tmp/candidate-size.txt
+          if-no-files-found: ignore
+          retention-days: 14
