@@ -15,6 +15,15 @@ JPEG quality controls compression only; the converter has no implicit resize pat
 
 The HEIC release gate generates a non-private 6048x8064 HEIC whose embedded thumbnail is exactly 1152x1536. Chromium and WebKit must export the 6048x8064 primary image, and the test parses the downloaded JPEG bytes to confirm their intrinsic dimensions. Chromium also checks quality 85, 92, and 96 against the same source and verifies batch/ZIP output stays full resolution. This specifically prevents a future refactor from exporting the embedded thumbnail.
 
+
+## Decoder security containment
+
+The browser converter currently uses `libheif-js 1.23.2`, whose Emscripten artifact embeds upstream libheif 1.23.2. The wrapper build enables libde265, disables WebCodecs and the uncompressed codec by default, disables libheif multithreading, and runs inside Lumeo's fresh per-file Web Worker.
+
+Until an official wrapper containing upstream libheif 1.23.4 or newer is available, Lumeo performs a bounded ISO-BMFF preflight before entering WASM. The preflight mirrors libheif's default `max_items=1000` ceiling for declared `iinf` items, total `iref` entries, and targets per reference entry; it also rejects malformed reference counts and cyclic `dimg`/`auxl` decode graphs. A generous total-reference budget prevents the JavaScript preflight itself from becoming an allocation-amplification path.
+
+Structurally partial/over-complex containers and declared primary dimensions outside Lumeo's existing 64 MP limit are rejected before the WASM parser. These controls reduce exposure to the parser-amplification and reference-cycle advisories fixed upstream after 1.23.2, but they are containment rather than a substitute for a patched libheif build.
+
 ## Resources
 
 One worker on smaller devices, at most two on higher-core desktops. Each job gets a fresh WASM heap which is destroyed on completion, error, cancellation or a two-minute timeout. Encoded JPEGs remain until reset/unmount; 500-file memory suitability is not certified. A 128 MiB source/64 megapixel decode guard protects the browser from very large individual allocations. ZIP uses the existing JSZip with STORE compression. Smaller batches are recommended for high-resolution photos.
