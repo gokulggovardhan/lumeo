@@ -24,7 +24,7 @@ const liveSettings = [
   ],
 ] as const satisfies ReadonlyArray<readonly [string, string, string]>;
 
-const liveSettingKeys = new Set(liveSettings.map(([key]) => key));
+const liveSettingKeys = new Set<string>(liveSettings.map(([key]) => key));
 
 function settingMessageValue(value: unknown, field: "title" | "message") {
   if (value && typeof value === "object" && field in value) {
