@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { assessLivePhotoPairing, classifyColorSafety, groupPhotos, jpegName, jpegQuality, orientationTransform, releasePhotoUrls, runPhotoQueue, selectPrimary } from "../lib/heic-to-jpeg/pipeline.ts";
+import { assessLivePhotoPairing, classifyColorSafety, dimensionsPreserved, groupPhotos, jpegName, jpegQuality, orientationTransform, releasePhotoUrls, runPhotoQueue, selectPrimary } from "../lib/heic-to-jpeg/pipeline.ts";
 import { inspectHeifStructure } from "../lib/heic-to-jpeg/inspection/bmff.ts";
 import { inspectAaeXml } from "../lib/heic-to-jpeg/inspection/aae.ts";
 
 const bytes = (...values: number[]) => Uint8Array.from(values);
+const u16 = (value: number) => bytes(value >>> 8, value);
 const u32 = (value: number) => bytes(value >>> 24, value >>> 16, value >>> 8, value);
 const text = (value: string) => Uint8Array.from([...value].map((character) => character.charCodeAt(0)));
 function box(type: string, ...parts: Uint8Array[]): Uint8Array {
@@ -67,7 +68,7 @@ test("HEIF primary property associations exclude auxiliary transforms", () => {
   assert.deepEqual(structure.orientation, [{ rotationDegrees: 90 }]);
 });
 test("quality and orientation transforms preserve intended bounds", () => {
-  assert.equal(jpegQuality(92), .92); assert.equal(jpegQuality(96), .96); assert.equal(jpegQuality(NaN), .92);
+  assert.equal(jpegQuality(85), .85); assert.equal(jpegQuality(92), .92); assert.equal(jpegQuality(96), .96); assert.equal(jpegQuality(NaN), .92);
   for (let orientation = 1; orientation <= 8; orientation++) {
     const [a,b,c,d,e,f] = orientationTransform(orientation, 40, 20);
     const corners = [[0,0],[40,0],[0,20],[40,20]].map(([x,y]) => [a*x+c*y+e,b*x+d*y+f]);
@@ -125,4 +126,65 @@ test("public integration uses the canonical private analytics slug and events", 
   for (const event of ["tool_opened", "processing_started", "processing_succeeded", "processing_failed", "download_started"]) assert.match(source, new RegExp(`eventName: ["']${event}["']`));
   assert.match(source, /toolSlug: ["']heic-to-jpeg["']/);
   assert.doesNotMatch(source, /track\([^)]*(fileName|filename|GPS|metadata)/i);
+});
+
+test("resolution invariant allows orientation swaps but rejects downscaling", () => {
+  assert.equal(dimensionsPreserved(6048, 8064, 6048, 8064), true);
+  assert.equal(dimensionsPreserved(6048, 8064, 8064, 6048), true);
+  assert.equal(dimensionsPreserved(6048, 8064, 1152, 1536), false);
+  assert.equal(dimensionsPreserved(4032, 3024, 2016, 1512), false);
+});
+
+
+test("HEIF structural preflight rejects item-count amplification before WASM", () => {
+  const ftyp = box("ftyp", text("heic"), u32(0), text("heic"));
+  const iinf = box("iinf", bytes(1, 0, 0, 0), u32(1001));
+  const meta = box("meta", bytes(0, 0, 0, 0), iinf);
+  const sample = new Uint8Array(ftyp.length + meta.length);
+  sample.set(ftyp); sample.set(meta, ftyp.length);
+  const structure = inspectHeifStructure(sample);
+  assert.equal(structure.inspectionStatus, "failed");
+  assert.match(structure.evidence.join(" "), /1001 items.*1000-item safety limit/i);
+});
+
+test("HEIF structural preflight rejects cyclic auxl decode graphs before WASM", () => {
+  const ftyp = box("ftyp", text("heic"), u32(0), text("heic"));
+  const ref = (type: string, from: number, to: number) => box(type, u16(from), u16(1), u16(to));
+  const iref = box("iref", bytes(0, 0, 0, 0), ref("auxl", 1, 2), ref("auxl", 2, 1));
+  const pitm = box("pitm", bytes(0, 0, 0, 0), u16(1));
+  const meta = box("meta", bytes(0, 0, 0, 0), pitm, iref);
+  const sample = new Uint8Array(ftyp.length + meta.length);
+  sample.set(ftyp); sample.set(meta, ftyp.length);
+  const structure = inspectHeifStructure(sample);
+  assert.equal(structure.inspectionStatus, "failed");
+  assert.match(structure.evidence.join(" "), /decode-reference graph.*cycle/i);
+});
+
+test("HEIF structural preflight rejects oversized and truncated reference declarations", () => {
+  const ftyp = box("ftyp", text("heic"), u32(0), text("heic"));
+  const hugeRef = box("dimg", u16(1), u16(1001));
+  const shortRef = box("auxl", u16(2), u16(2), u16(3));
+  const iref = box("iref", bytes(0, 0, 0, 0), hugeRef, shortRef);
+  const meta = box("meta", bytes(0, 0, 0, 0), iref);
+  const sample = new Uint8Array(ftyp.length + meta.length);
+  sample.set(ftyp); sample.set(meta, ftyp.length);
+  const structure = inspectHeifStructure(sample);
+  assert.equal(structure.inspectionStatus, "failed");
+  const evidence = structure.evidence.join(" ");
+  assert.match(evidence, /1001 targets.*1000-target safety limit/i);
+  assert.match(evidence, /shorter than its declared target count/i);
+});
+
+
+test("HEIF structural preflight caps total iref entry count", () => {
+  const ftyp = box("ftyp", text("heic"), u32(0), text("heic"));
+  const ref = (from: number, to: number) => box("dimg", u16(from), u16(1), u16(to));
+  const entries = Array.from({ length: 1001 }, (_, index) => ref(index + 1, index + 2));
+  const iref = box("iref", bytes(0, 0, 0, 0), ...entries);
+  const meta = box("meta", bytes(0, 0, 0, 0), iref);
+  const sample = new Uint8Array(ftyp.length + meta.length);
+  sample.set(ftyp); sample.set(meta, ftyp.length);
+  const structure = inspectHeifStructure(sample);
+  assert.equal(structure.inspectionStatus, "failed");
+  assert.match(structure.evidence.join(" "), /more than 1000 entries/i);
 });

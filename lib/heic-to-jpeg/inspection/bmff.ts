@@ -12,6 +12,12 @@ const CONTAINER_BOXES = new Set(["meta", "iinf", "iref", "iprp", "ipco", "moov",
 const IMAGE_ITEM_TYPES = new Set(["hvc1", "av01", "jpeg", "grid"]);
 const MAX_BOXES = 20_000;
 const MAX_DEPTH = 12;
+// Mirror libheif's default max_items ceiling before entering the vulnerable WASM build.
+// Modern iPhone still photos are orders of magnitude below these structural budgets.
+const MAX_HEIF_ITEMS = 1_000;
+const MAX_IREF_ENTRIES = 1_000;
+const MAX_IREF_TARGETS_PER_ENTRY = 1_000;
+const MAX_TOTAL_IREF_TARGETS = 100_000;
 
 function readType(bytes: Uint8Array, offset: number): string {
   return String.fromCharCode(bytes[offset] ?? 0, bytes[offset + 1] ?? 0, bytes[offset + 2] ?? 0, bytes[offset + 3] ?? 0);
@@ -94,6 +100,114 @@ function parseBoxes(bytes: Uint8Array): { boxes: Box[]; complete: boolean; warni
 
 function flatten(boxes: Box[]): Box[] {
   return boxes.flatMap((box) => [box, ...flatten(box.children)]);
+}
+
+type ReferenceEdge = { type: string; from: number; to: number };
+
+function readItemId(view: DataView, offset: number, size: 2 | 4): number {
+  return size === 2 ? view.getUint16(offset) : view.getUint32(offset);
+}
+
+function hasDecodeReferenceCycle(edges: ReferenceEdge[]): boolean {
+  const adjacency = new Map<number, Set<number>>();
+  const indegree = new Map<number, number>();
+  for (const { from, to } of edges) {
+    if (!adjacency.has(from)) adjacency.set(from, new Set());
+    if (!adjacency.has(to)) adjacency.set(to, new Set());
+    indegree.set(from, indegree.get(from) ?? 0);
+    indegree.set(to, indegree.get(to) ?? 0);
+    const targets = adjacency.get(from)!;
+    if (!targets.has(to)) {
+      targets.add(to);
+      indegree.set(to, (indegree.get(to) ?? 0) + 1);
+    }
+  }
+  const queue = [...indegree.entries()].filter(([, degree]) => degree === 0).map(([id]) => id);
+  let visited = 0;
+  for (let cursor = 0; cursor < queue.length; cursor += 1) {
+    const id = queue[cursor];
+    visited += 1;
+    for (const target of adjacency.get(id) ?? []) {
+      const next = (indegree.get(target) ?? 0) - 1;
+      indegree.set(target, next);
+      if (next === 0) queue.push(target);
+    }
+  }
+  return visited !== indegree.size;
+}
+
+function inspectStructuralSecurity(boxes: Box[], bytes: Uint8Array, view: DataView): string[] {
+  const issues: string[] = [];
+  const edges: ReferenceEdge[] = [];
+  let totalReferenceTargets = 0;
+
+  for (const box of boxes) {
+    if (box.type === "iinf") {
+      if (box.dataStart + 6 > box.end) {
+        issues.push("The iinf item table is truncated.");
+        continue;
+      }
+      const version = bytes[box.dataStart] ?? 0;
+      const countOffset = box.dataStart + 4;
+      const countSize = version === 0 ? 2 : 4;
+      if (countOffset + countSize > box.end) {
+        issues.push("The iinf item count is truncated.");
+        continue;
+      }
+      const declaredItems = countSize === 2 ? view.getUint16(countOffset) : view.getUint32(countOffset);
+      if (declaredItems > MAX_HEIF_ITEMS) issues.push(`The HEIF item table declares ${declaredItems} items, exceeding the ${MAX_HEIF_ITEMS}-item safety limit.`);
+    }
+
+    if (box.type !== "iref") continue;
+    const version = bytes[box.dataStart] ?? 0;
+    if (version > 1) {
+      issues.push(`Unsupported iref version ${version}.`);
+      continue;
+    }
+    if (box.children.length > MAX_IREF_ENTRIES) {
+      issues.push(`The HEIF reference table contains more than ${MAX_IREF_ENTRIES} entries.`);
+      continue;
+    }
+
+    const idSize: 2 | 4 = version === 0 ? 2 : 4;
+    for (const child of box.children) {
+      let cursor = child.dataStart;
+      if (cursor + idSize + 2 > child.end) {
+        issues.push(`The ${child.type || "iref"} reference entry is truncated.`);
+        continue;
+      }
+      const from = readItemId(view, cursor, idSize);
+      cursor += idSize;
+      const targetCount = view.getUint16(cursor);
+      cursor += 2;
+      if (targetCount === 0) {
+        issues.push(`The ${child.type || "iref"} reference entry contains no targets.`);
+        continue;
+      }
+      if (targetCount > MAX_IREF_TARGETS_PER_ENTRY) {
+        issues.push(`The ${child.type || "iref"} reference entry declares ${targetCount} targets, exceeding the ${MAX_IREF_TARGETS_PER_ENTRY}-target safety limit.`);
+        continue;
+      }
+      totalReferenceTargets += targetCount;
+      if (totalReferenceTargets > MAX_TOTAL_IREF_TARGETS) {
+        issues.push(`The HEIF reference graph exceeds the ${MAX_TOTAL_IREF_TARGETS}-edge safety budget.`);
+        break;
+      }
+      const required = cursor + targetCount * idSize;
+      if (required > child.end) {
+        issues.push(`The ${child.type || "iref"} reference entry is shorter than its declared target count.`);
+        continue;
+      }
+      if (child.type === "dimg" || child.type === "auxl") {
+        for (let index = 0; index < targetCount; index += 1) {
+          edges.push({ type: child.type, from, to: readItemId(view, cursor + index * idSize, idSize) });
+        }
+      }
+    }
+  }
+
+  if (hasDecodeReferenceCycle(edges)) issues.push("The HEIF decode-reference graph contains a dimg/auxl cycle.");
+  return [...new Set(issues)];
 }
 
 function nullTerminated(bytes: Uint8Array, start: number, end: number): string {
@@ -210,6 +324,10 @@ export function inspectHeifStructure(bytes: Uint8Array): HeifEvidence {
     if (!heifBrand) return { ...empty, brands, inspectionStatus: "unsupported", evidence: ["ISO-BMFF container found, but no recognized HEIF/HEIC brand was observed."] };
 
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    const securityIssues = inspectStructuralSecurity(boxes, bytes, view);
+    if (securityIssues.length > 0) {
+      return { ...empty, brands, inspectionStatus: "failed", evidence: securityIssues };
+    }
     const itemInfo = boxes.flatMap((box) => (box.type === "infe" ? [parseInfe(box, bytes, view)].filter((item): item is NonNullable<typeof item> => item !== null) : []));
     const pitm = boxes.find((box) => box.type === "pitm");
     let primaryItemId: number | null = null;

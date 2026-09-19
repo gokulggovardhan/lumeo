@@ -16,8 +16,12 @@ export function jpegName(name: string): string {
   const leaf = name.split(/[\\/]/).pop() ?? name;
   return `${leaf.slice(0, leaf.length - photoExtension(leaf).length).replace(/[\x00-\x1f<>:"|?*]/g, "_") || "photo"}.jpg`;
 }
-export function jpegQuality(value: number): number { return value === 96 ? 0.96 : 0.92; }
+export function jpegQuality(value: number): number { return value === 96 ? 0.96 : value === 85 ? 0.85 : 0.92; }
 export function isPhoto(name: string): boolean { return [".heic", ".heif", ".jpg", ".jpeg"].includes(photoExtension(name)); }
+export function dimensionsPreserved(sourceWidth: number, sourceHeight: number, outputWidth: number, outputHeight: number): boolean {
+  return (sourceWidth === outputWidth && sourceHeight === outputHeight)
+    || (sourceWidth === outputHeight && sourceHeight === outputWidth);
+}
 
 function compareCompanions<T extends { name: string; size?: number; lastModified?: number }>(left: T, right: T): number {
   return photoExtension(left.name).localeCompare(photoExtension(right.name))
