@@ -495,8 +495,36 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
   };
 }
 
-export async function getAnalyticsSummary(): Promise<DataResult<AnalyticsSummary>> {
+export async function getAnalyticsSummary(
+  range?: { startDate: string; endDate: string },
+): Promise<DataResult<AnalyticsSummary>> {
   const supabase = await createClient();
+
+  // The Analytics page can request an explicit bounded range. The existing
+  // Overview behavior remains unchanged below: real "today" summary cards
+  // plus a seven-day trend.
+  if (range) {
+    const rangeResult = await supabase.rpc("get_admin_analytics_summary", {
+      p_start_date: range.startDate,
+      p_end_date: range.endDate,
+    });
+
+    if (rangeResult.error) {
+      return safe(unavailableAnalyticsSummary(), rangeResult.error);
+    }
+
+    const parsedRange = parseAdminAnalyticsSummary(
+      rangeResult.data as AdminAnalyticsSummaryResult | unknown,
+    );
+
+    return parsedRange
+      ? safe(parsedRange, null)
+      : safe(
+          unavailableAnalyticsSummary(),
+          new Error("Malformed admin analytics aggregate."),
+        );
+  }
+
   const today = todayIsoDate();
   const sevenDaysAgo = sixDaysAgoIsoDate();
 
