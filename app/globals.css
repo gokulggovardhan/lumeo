@@ -1325,3 +1325,13 @@ a:active {
 .lumeo-canvas-scroll::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+
+/* Protected Control Center form controls use a 16px mobile font floor.
+ * iOS Safari zooms the visual viewport when focusing smaller form text; this
+ * scoped rule prevents that behavior without changing public tool canvases. */
+@media (max-width: 63.999rem) {
+  .admin-control-center :is(input, select, textarea) {
+    font-size: 16px;
+  }
+}
