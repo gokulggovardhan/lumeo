@@ -1,0 +1,154 @@
+name: Cloudflare Production Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/cloudflare-production-audit.yml"
+      - "next.config.ts"
+      - "app/layout.tsx"
+      - "app/robots.ts"
+      - "app/sitemap.ts"
+      - "wrangler.jsonc"
+      - "vite.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "worker/**"
+  workflow_dispatch:
+  schedule:
+    - cron: "15 1 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cloudflare-production-audit
+  cancel-in-progress: true
+
+jobs:
+  audit-production:
+    name: Audit lumeo.in on Cloudflare
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+
+    steps:
+      - name: Verify DNS and canonical host routing
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "A records:"
+          dig +short A lumeo.in || true
+          echo "AAAA records:"
+          dig +short AAAA lumeo.in || true
+          echo "www CNAME:"
+          dig +short CNAME www.lumeo.in || true
+
+          dns_dump="$( (dig +short A lumeo.in; dig +short AAAA lumeo.in; dig +short CNAME lumeo.in; dig +short CNAME www.lumeo.in) 2>/dev/null | tr '[:upper:]' '[:lower:]' )"
+          if printf '%s' "$dns_dump" | grep -Eqi 'vercel|vercel-dns|now\.sh'; then
+            echo "FAIL: DNS still contains a Vercel hostname."
+            exit 1
+          fi
+
+          http_headers="$(curl --silent --show-error --head --max-time 30 http://lumeo.in/)"
+          http_code="$(printf '%s' "$http_headers" | awk '/^HTTP\// { code=$2 } END { print code }')"
+          http_location="$(printf '%s' "$http_headers" | awk -F': ' 'tolower($1)=="location" {gsub("\r","",$2); print $2}' | tail -1)"
+          case "$http_code" in 301|302|307|308) ;; *) echo "FAIL: HTTP apex returned $http_code"; exit 1;; esac
+          case "$http_location" in https://lumeo.in|https://lumeo.in/*) ;; *) echo "FAIL: HTTP apex redirects to $http_location"; exit 1;; esac
+          echo "PASS: HTTP redirects to canonical HTTPS apex."
+
+          www_headers="$(curl --silent --show-error --head --max-time 30 https://www.lumeo.in/ || true)"
+          www_code="$(printf '%s' "$www_headers" | awk '/^HTTP\// { code=$2 } END { print code }')"
+          www_location="$(printf '%s' "$www_headers" | awk -F': ' 'tolower($1)=="location" {gsub("\r","",$2); print $2}' | tail -1)"
+          test -n "$www_code" || { echo "FAIL: www.lumeo.in is unreachable."; exit 1; }
+          case "$www_code" in
+            301|302|307|308)
+              case "$www_location" in https://lumeo.in|https://lumeo.in/*) ;; *) echo "FAIL: www redirects to $www_location"; exit 1;; esac
+              ;;
+            200) echo "FAIL: www serves duplicate HTTP 200 instead of redirecting to apex."; exit 1;;
+            *) echo "FAIL: www returned HTTP $www_code"; exit 1;;
+          esac
+          echo "PASS: www redirects to canonical apex."
+
+      - name: Verify Cloudflare edge and security headers
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(curl --silent --show-error --head --max-time 30 https://lumeo.in/)"
+
+          get_header() {
+            printf '%s' "$headers" | awk -F': ' -v wanted="$1" 'tolower($1)==tolower(wanted) {value=$2} END {gsub("\r","",value); print value}'
+          }
+
+          cf_ray="$(get_header cf-ray)"
+          server="$(get_header server)"
+          xfo="$(get_header x-frame-options)"
+          xcto="$(get_header x-content-type-options)"
+          referrer="$(get_header referrer-policy)"
+          hsts="$(get_header strict-transport-security)"
+
+          test -n "$cf_ray" || { echo "FAIL: cf-ray missing."; exit 1; }
+          printf '%s' "$server" | grep -qi cloudflare || { echo "FAIL: server is not Cloudflare."; exit 1; }
+          [ "$xfo" = "DENY" ] || { echo "FAIL: X-Frame-Options is $xfo"; exit 1; }
+          [ "$xcto" = "nosniff" ] || { echo "FAIL: X-Content-Type-Options is $xcto"; exit 1; }
+          [ "$referrer" = "strict-origin-when-cross-origin" ] || { echo "FAIL: Referrer-Policy is $referrer"; exit 1; }
+          test -n "$hsts" || { echo "FAIL: HSTS missing."; exit 1; }
+          echo "PASS: Cloudflare edge and baseline security headers verified."
+
+      - name: Verify representative production routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for route in / /pdf-tools /pdf/merge /pdf/compress /pdf/edit /pdf/crop /pdf/watermark /heic-to-jpeg /sitemap.xml /robots.txt /favicon.ico; do
+            status="$(curl --location --silent --show-error --output /dev/null --write-out "%{http_code}" --max-time 30 "https://lumeo.in$route")"
+            [ "$status" = "200" ] || { echo "FAIL: $route returned HTTP $status"; exit 1; }
+            echo "PASS: $route HTTP 200"
+          done
+
+      - name: Verify canonical metadata, robots and sitemap
+        shell: bash
+        run: |
+          set -euo pipefail
+          home="$(curl --silent --show-error --max-time 30 https://lumeo.in/)"
+          robots="$(curl --silent --show-error --max-time 30 https://lumeo.in/robots.txt)"
+          sitemap="$(curl --silent --show-error --max-time 30 https://lumeo.in/sitemap.xml)"
+
+          printf '%s' "$home" | grep -Fq 'https://lumeo.in' || { echo "FAIL: homepage canonical host missing."; exit 1; }
+          if printf '%s\n%s\n%s' "$home" "$robots" "$sitemap" | grep -Eqi 'vercel\.app|now\.sh'; then
+            echo "FAIL: public SEO output contains a Vercel hostname."
+            exit 1
+          fi
+          printf '%s' "$robots" | grep -Fq 'https://lumeo.in/sitemap.xml' || { echo "FAIL: robots sitemap URL wrong."; exit 1; }
+          for route in /heic-to-jpeg /pdf/edit /pdf/crop /pdf/watermark; do
+            printf '%s' "$sitemap" | grep -Fq "https://lumeo.in$route" || { echo "FAIL: sitemap missing $route"; exit 1; }
+          done
+          echo "PASS: canonical metadata, robots and sitemap use lumeo.in."
+
+      - name: Verify Admin is redirect-protected and non-cacheable
+        shell: bash
+        run: |
+          set -euo pipefail
+          headers="$(curl --silent --show-error --head --max-time 30 https://lumeo.in/admin)"
+          status="$(printf '%s' "$headers" | awk '/^HTTP\// { code=$2 } END { print code }')"
+          location="$(printf '%s' "$headers" | awk -F': ' 'tolower($1)=="location" {gsub("\r","",$2); print $2}' | tail -1)"
+          cache_control="$(printf '%s' "$headers" | awk -F': ' 'tolower($1)=="cache-control" {gsub("\r","",$2); print tolower($2)}' | tail -1)"
+          case "$status" in 301|302|303|307|308) ;; *) echo "FAIL: /admin returned $status"; exit 1;; esac
+          case "$location" in /admin/login*|https://lumeo.in/admin/login*) ;; *) echo "FAIL: /admin redirect target is $location"; exit 1;; esac
+          printf '%s' "$cache_control" | grep -q 'no-store' || { echo "FAIL: /admin missing no-store."; exit 1; }
+          echo "PASS: Admin redirect and no-store policy verified."
+
+      - name: Verify current static JavaScript chunk is fetchable
+        shell: bash
+        run: |
+          set -euo pipefail
+          home="$(curl --silent --show-error --max-time 30 https://lumeo.in/)"
+          script_path="$(printf '%s' "$home" | grep -Eo 'src="[^"]+\.js[^"]*"' | head -1 | sed -E 's/^src="([^"]+)".*$/\1/')"
+          test -n "$script_path" || { echo "FAIL: no JavaScript chunk found."; exit 1; }
+          case "$script_path" in http://*|https://*) script_url="$script_path";; /*) script_url="https://lumeo.in$script_path";; *) script_url="https://lumeo.in/$script_path";; esac
+          headers="$(curl --silent --show-error --head --max-time 30 "$script_url")"
+          status="$(printf '%s' "$headers" | awk '/^HTTP\// { code=$2 } END { print code }')"
+          content_type="$(printf '%s' "$headers" | awk -F': ' 'tolower($1)=="content-type" {gsub("\r","",$2); print tolower($2)}' | tail -1)"
+          [ "$status" = "200" ] || { echo "FAIL: JS chunk returned HTTP $status"; exit 1; }
+          printf '%s' "$content_type" | grep -Eq 'javascript|ecmascript' || { echo "FAIL: JS chunk content type is $content_type"; exit 1; }
+          echo "PASS: current JavaScript chunk is fetchable with a JavaScript MIME type."
