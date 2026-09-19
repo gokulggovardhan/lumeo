@@ -8,6 +8,13 @@ The public `/heic-to-jpeg` workspace reuses Phase 0 basename normalization, boun
 
 Gain-map HEICs use the available base still; auxiliary gain maps and depth are not reconstructed. HDR-only PQ/HLG transfer functions are rejected rather than mislabelled as correctly tone-mapped output. Wide-gamut/ICC parity with Apple Photos is unverified; an sRGB canvas does not by itself prove source color-profile conversion. AAE metadata never causes transformations, or a claim that edits are baked. Filename-only Live Photo pairing is probable, not authoritative. Duplicate stills stay separate, ambiguous companions remain review items.
 
+
+## Full-resolution invariant
+
+JPEG quality controls compression only; the converter has no implicit resize path. The worker records the libheif primary-image dimensions, decoded RGBA dimensions, and final export-canvas dimensions so unexpected geometry changes are visible in the result details and testable without trusting React state alone.
+
+The HEIC release gate generates a non-private 6048x8064 HEIC whose embedded thumbnail is exactly 1152x1536. Chromium and WebKit must export the 6048x8064 primary image, and the test parses the downloaded JPEG bytes to confirm their intrinsic dimensions. Chromium also checks quality 85, 92, and 96 against the same source and verifies batch/ZIP output stays full resolution. This specifically prevents a future refactor from exporting the embedded thumbnail.
+
 ## Resources
 
 One worker on smaller devices, at most two on higher-core desktops. Each job gets a fresh WASM heap which is destroyed on completion, error, cancellation or a two-minute timeout. Encoded JPEGs remain until reset/unmount; 500-file memory suitability is not certified. A 128 MiB source/64 megapixel decode guard protects the browser from very large individual allocations. ZIP uses the existing JSZip with STORE compression. Smaller batches are recommended for high-resolution photos.
