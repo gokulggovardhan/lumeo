@@ -121,6 +121,11 @@ tar -C "$ROOT/raw" -czf "$ROOT/libheif-candidate.tar.gz" libheif-wasm
 
 echo "== Reuse pinned libheif-js bundling layer =="
 pushd "$ROOT/libheif-js" >/dev/null
+# Upstream 1.23.2 uses npm but commits no lockfile. Bootstrap a deterministic
+# lock from a fixed registry cutoff; CI uploads it so this research branch can
+# pin the exact resolved dependency graph in the next revision.
+npm install --package-lock-only --ignore-scripts --before=2026-09-19T00:00:00Z
+cp package-lock.json "$OUT/libheif-js.package-lock.json"
 npm ci --ignore-scripts
 node scripts/install.js "$ROOT/libheif-candidate.tar.gz"
 popd >/dev/null
