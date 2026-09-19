@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { geolocation } from "@vercel/functions";
 import { GEO_COOKIE_NAME } from "@/lib/analytics/geo-cookie-name";
+import {
+  encodeAnalyticsGeoCookie,
+  readCloudflareApproximateLocation,
+} from "@/lib/cloudflare/request-location";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
 const SESSION_CACHE_HEADERS = ["cache-control", "expires", "pragma"] as const;
@@ -13,9 +16,7 @@ const SESSION_CACHE_HEADERS = ["cache-control", "expires", "pragma"] as const;
 // reader must decode the WHOLE value once before splitting on "|", not
 // split first and decode each part (see lib/analytics/geo.ts).
 function buildGeoCookieValue(request: NextRequest) {
-  const { city, countryRegion, country } = geolocation(request);
-  if (!city && !countryRegion && !country) return null;
-  return [city ?? "", countryRegion ?? "", country ?? ""].join("|");
+  return encodeAnalyticsGeoCookie(readCloudflareApproximateLocation(request));
 }
 
 function applyGeoCookie(response: NextResponse, value: string | null) {
