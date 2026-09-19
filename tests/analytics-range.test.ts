@@ -27,7 +27,7 @@ test("custom analytics range accepts at most 90 inclusive calendar days", () => 
 
   const invalid = resolveAnalyticsRange({ range: "custom", start: "2026-06-21", end: "2026-09-19" }, now);
   assert.equal(invalid.key, "7d");
-  assert.match(invalid.warning ?? "", /90 days/);
+  assert.match(invalid.warning ?? "", /90(?: calendar)? days/);
 });
 
 test("invalid custom ranges fail safely to the last seven days", () => {
