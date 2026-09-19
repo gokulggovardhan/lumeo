@@ -141,8 +141,37 @@ test.describe("Control Center authentication", () => {
       .click();
     await expect(page).toHaveURL(/\/admin\/login\?message=signed-out$/);
 
+    const signedOutSessionStatus = await page.evaluate(async () => {
+      const response = await fetch("/admin/session", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      return response.status;
+    });
+    expect(signedOutSessionStatus).toBe(401);
+
     await page.goBack();
-    await page.waitForLoadState("domcontentloaded");
+    await expect(page).toHaveURL(/\/admin\/login(?:\?.*)?$/);
+    await expect(page.getByRole("heading", { name: "Inbox" })).toHaveCount(0);
+
+    const restoredSessionStatus = await page.evaluate(async () => {
+      const response = await fetch("/admin/session", {
+        method: "GET",
+        cache: "no-store",
+        credentials: "same-origin",
+      });
+      return response.status;
+    });
+    expect(restoredSessionStatus).toBe(401);
+
+    // Go back through another protected history entry. The BFCache/history
+    // guard must again fail closed instead of revealing stale admin UI.
+    await page.goBack();
+    await expect(page).toHaveURL(/\/admin\/login(?:\?.*)?$/);
+
+    // Forward navigation must also remain in signed-out state.
+    await page.goForward();
     await expect(page).toHaveURL(/\/admin\/login(?:\?.*)?$/);
 
     await signIn(page);
