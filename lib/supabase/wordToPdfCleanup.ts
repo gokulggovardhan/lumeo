@@ -3,7 +3,13 @@ import { WORD_TO_PDF_BUCKET } from "@/lib/supabase/wordToPdfStorage";
 import {
   selectStaleWordToPdfObjectNames,
   WORD_TO_PDF_CLEANUP_LIST_LIMIT,
-} from "./wordToPdfCleanupPolicy.ts";
+} from "@/lib/supabase/wordToPdfCleanupPolicy";
+
+export {
+  selectStaleWordToPdfObjectNames,
+  WORD_TO_PDF_CLEANUP_LIST_LIMIT,
+  WORD_TO_PDF_STALE_CUTOFF_MS,
+} from "@/lib/supabase/wordToPdfCleanupPolicy";
 
 export type WordToPdfCleanupResult = {
   scanned: number;
