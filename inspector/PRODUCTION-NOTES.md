@@ -11,7 +11,7 @@ Gain-map HEICs use the available base still; auxiliary gain maps and depth are n
 
 ## Full-resolution invariant
 
-JPEG quality controls compression only; the converter has no implicit resize path. The worker records the libheif primary-image dimensions, decoded RGBA dimensions, and final export-canvas dimensions so unexpected geometry changes are visible in the result details and testable without trusting React state alone.
+JPEG quality controls compression only; the converter has no implicit resize path. The worker records the libheif primary-image dimensions, decoded RGBA dimensions, and final export-canvas dimensions so unexpected geometry changes are visible in the result details and testable without trusting React state alone. It also refuses to emit a JPEG if decoding or export changes the pixel geometry (apart from an orientation width/height swap), so a future decoder regression fails explicitly instead of silently downscaling.
 
 The HEIC release gate generates a non-private 6048x8064 HEIC whose embedded thumbnail is exactly 1152x1536. Chromium and WebKit must export the 6048x8064 primary image, and the test parses the downloaded JPEG bytes to confirm their intrinsic dimensions. Chromium also checks quality 85, 92, and 96 against the same source and verifies batch/ZIP output stays full resolution. This specifically prevents a future refactor from exporting the embedded thumbnail.
 
