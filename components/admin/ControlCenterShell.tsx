@@ -21,7 +21,15 @@ export function ControlCenterShell({
         <div className="absolute left-[8%] top-[10%] h-64 w-64 rounded-full bg-[rgba(var(--lumeo-aura-rgb),0.14)] blur-3xl" />
         <div className="absolute bottom-[12%] right-[8%] h-72 w-72 rounded-full bg-[rgba(var(--lumeo-seal-rgb),0.12)] blur-3xl" />
       </div>
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-[1680px] flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:gap-5 lg:px-6">
+      <div
+        className="relative mx-auto flex min-h-dvh w-full max-w-[1680px] flex-col gap-4 px-4 py-4 sm:px-6 lg:flex-row lg:gap-5 lg:px-6"
+        style={{
+          paddingTop: "max(1rem, env(safe-area-inset-top))",
+          paddingBottom: "max(1rem, env(safe-area-inset-bottom))",
+          paddingLeft: "max(1rem, env(safe-area-inset-left))",
+          paddingRight: "max(1rem, env(safe-area-inset-right))",
+        }}
+      >
         <ControlCenterSidebar email={email} role={role} unreadInboxCount={unreadInboxCount} />
         <section className="flex min-h-0 flex-1 flex-col">
           <ControlCenterMobileNav email={email} role={role} unreadInboxCount={unreadInboxCount} />
