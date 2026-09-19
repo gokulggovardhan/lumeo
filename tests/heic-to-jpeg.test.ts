@@ -174,3 +174,17 @@ test("HEIF structural preflight rejects oversized and truncated reference declar
   assert.match(evidence, /1001 targets.*1000-target safety limit/i);
   assert.match(evidence, /shorter than its declared target count/i);
 });
+
+
+test("HEIF structural preflight caps total iref entry count", () => {
+  const ftyp = box("ftyp", text("heic"), u32(0), text("heic"));
+  const ref = (from: number, to: number) => box("dimg", u16(from), u16(1), u16(to));
+  const entries = Array.from({ length: 1001 }, (_, index) => ref(index + 1, index + 2));
+  const iref = box("iref", bytes(0, 0, 0, 0), ...entries);
+  const meta = box("meta", bytes(0, 0, 0, 0), iref);
+  const sample = new Uint8Array(ftyp.length + meta.length);
+  sample.set(ftyp); sample.set(meta, ftyp.length);
+  const structure = inspectHeifStructure(sample);
+  assert.equal(structure.inspectionStatus, "failed");
+  assert.match(structure.evidence.join(" "), /more than 1000 entries/i);
+});
