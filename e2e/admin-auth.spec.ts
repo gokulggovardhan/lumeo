@@ -1,16 +1,53 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 const adminEmail = process.env.ADMIN_E2E_EMAIL ?? "";
 const adminPassword = process.env.ADMIN_E2E_PASSWORD ?? "";
 const hasAdminCredentials = Boolean(adminEmail && adminPassword);
 
-async function signIn(page: import("@playwright/test").Page) {
+async function signIn(page: Page) {
   await page.goto("/admin/login");
   await page.getByLabel("Email").fill(adminEmail);
   await page.getByLabel("Password").fill(adminPassword);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(/\/admin$/);
   await expect(page.getByRole("heading", { name: "Lumeo Control Center" })).toBeVisible();
+}
+
+function collectUnexpectedBrowserErrors(page: Page) {
+  const errors: string[] = [];
+
+  page.on("pageerror", (error) => {
+    errors.push(`pageerror: ${error.message}`);
+  });
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      errors.push(`console.error: ${message.text()}`);
+    }
+  });
+
+  return errors;
+}
+
+async function openMobileNavigation(page: Page) {
+  const openButton = page.getByRole("button", {
+    name: "Open Control Center navigation",
+  });
+  await expect(openButton).toBeVisible();
+  await expect(openButton).toHaveAttribute("aria-expanded", "false");
+  await openButton.click();
+
+  const closeButton = page.getByRole("button", {
+    name: "Close Control Center navigation",
+  });
+  await expect(closeButton).toBeVisible();
+  await expect(closeButton).toHaveAttribute("aria-expanded", "true");
+  await expect(
+    page.getByRole("navigation", {
+      name: "Mobile Control Center navigation",
+    }),
+  ).toBeVisible();
+
+  return closeButton;
 }
 
 test.describe("Control Center authentication", () => {
@@ -33,23 +70,33 @@ test.describe("Control Center authentication", () => {
     expect(overflow).toBe(false);
   });
 
-  test("login, persistence, navigation, logout, back protection and re-login", async ({ page }) => {
-    test.skip(!hasAdminCredentials, "Disposable local admin credentials are required for the authenticated lifecycle test.");
+  test("login, persistence, navigation, realtime, logout, back protection and re-login", async ({ page }) => {
+    expect(
+      hasAdminCredentials,
+      "Disposable local admin credentials are required for the authenticated lifecycle test.",
+    ).toBe(true);
+
+    const browserErrors = collectUnexpectedBrowserErrors(page);
 
     await signIn(page);
 
     await page.reload();
     await expect(page).toHaveURL(/\/admin$/);
 
-    const menuButton = page.getByRole("button", {
+    await openMobileNavigation(page);
+    await page.keyboard.press("Escape");
+    const reopenedButton = page.getByRole("button", {
       name: "Open Control Center navigation",
     });
-    await menuButton.click();
-    await expect(
-      page.getByRole("button", { name: "Close Control Center navigation" }),
-    ).toBeVisible();
+    await expect(reopenedButton).toBeVisible();
+    await expect(reopenedButton).toHaveAttribute("aria-expanded", "false");
+    await expect(reopenedButton).toBeFocused();
 
-    await page.getByRole("link", { name: "Analytics" }).last().click();
+    await openMobileNavigation(page);
+    const mobileNavigation = page.getByRole("navigation", {
+      name: "Mobile Control Center navigation",
+    });
+    await mobileNavigation.getByRole("link", { name: "Analytics" }).click();
     await expect(page).toHaveURL(/\/admin\/analytics/);
     await expect(
       page.getByRole("heading", { name: /analytics/i }),
@@ -72,10 +119,23 @@ test.describe("Control Center authentication", () => {
     await page.reload();
     await expect(page).toHaveURL(/\/admin\/analytics\?range=30d/);
 
+    await openMobileNavigation(page);
     await page
-      .getByRole("button", { name: "Open Control Center navigation" })
+      .getByRole("navigation", { name: "Mobile Control Center navigation" })
+      .getByRole("link", { name: "Inbox" })
       .click();
-    await page.getByRole("button", { name: "Sign out" }).last().click();
+    await expect(page).toHaveURL(/\/admin\/inbox/);
+    await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
+
+    await page.reload();
+    await expect(page).toHaveURL(/\/admin\/inbox/);
+    await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
+
+    await openMobileNavigation(page);
+    await page
+      .locator("#control-center-mobile-menu")
+      .getByRole("button", { name: "Sign out" })
+      .click();
     await expect(page).toHaveURL(/\/admin\/login\?message=signed-out$/);
 
     await page.goBack();
@@ -84,5 +144,13 @@ test.describe("Control Center authentication", () => {
 
     await signIn(page);
     await expect(page).toHaveURL(/\/admin$/);
+    await expect(
+      page.getByRole("button", { name: "Open Control Center navigation" }),
+    ).toBeVisible();
+
+    expect(
+      browserErrors,
+      `Unexpected browser errors:\n${browserErrors.join("\n")}`,
+    ).toEqual([]);
   });
 });
