@@ -1,20 +1,29 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { FeedbackQuery } from "@/lib/supabase/database.types";
 
-// Server-rendered initial count, kept live afterwards via the same
-// postgres_changes pattern InboxClient already uses for new-message inserts
-// -- so the sidebar badge and the inbox list never disagree without a
-// full-page reload.
-export function InboxCountBadge({ initialCount }: { initialCount: number }) {
+const InboxCountContext = createContext<number | null>(null);
+
+export function InboxCountProvider({
+  initialCount,
+  children,
+}: {
+  initialCount: number;
+  children: ReactNode;
+}) {
   const [count, setCount] = useState(initialCount);
   const supabaseRef = useRef(createClient());
 
-  // Render-phase reset when the server-fetched initial count changes (a
-  // fresh layout render on navigation) -- same pattern CommandPaletteDialog
-  // uses to reset state from a changed prop, not a setState-in-effect.
+  // Keep a server-refreshed count authoritative when a router refresh or
+  // full navigation provides a newer snapshot.
   const [lastInitialCount, setLastInitialCount] = useState(initialCount);
   if (initialCount !== lastInitialCount) {
     setLastInitialCount(initialCount);
@@ -23,45 +32,75 @@ export function InboxCountBadge({ initialCount }: { initialCount: number }) {
 
   useEffect(() => {
     const supabase = supabaseRef.current;
+    let active = true;
+    let refreshVersion = 0;
+
+    async function refreshUnreadCount() {
+      const version = ++refreshVersion;
+      const { count: unreadCount, error } = await supabase
+        .from("feedback_queries")
+        .select("id", { count: "exact", head: true })
+        .eq("is_read", false);
+
+      if (
+        !active ||
+        version !== refreshVersion ||
+        error ||
+        unreadCount === null
+      ) {
+        return;
+      }
+
+      setCount(unreadCount);
+    }
+
+    // createBrowserClient is a browser singleton. Use one logical unread
+    // subscription for both navigation surfaces, with a unique topic for
+    // each effect lifecycle so Strict Mode / fast remount cleanup cannot
+    // hand a still-subscribed channel back to a new setup.
     const channel = supabase
-      .channel("feedback_queries_unread_badge")
+      .channel(`feedback_queries_unread_badge:${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "feedback_queries" },
-        (payload) => {
-          const row = payload.new as FeedbackQuery;
-          if (!row.is_read) setCount((current) => current + 1);
+        () => {
+          void refreshUnreadCount();
         },
       )
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "feedback_queries" },
-        (payload) => {
-          const before = payload.old as Partial<FeedbackQuery>;
-          const after = payload.new as FeedbackQuery;
-          if (before.is_read === false && after.is_read === true) {
-            setCount((current) => Math.max(0, current - 1));
-          } else if (before.is_read === true && after.is_read === false) {
-            setCount((current) => current + 1);
-          }
+        () => {
+          void refreshUnreadCount();
         },
       )
       .on(
         "postgres_changes",
         { event: "DELETE", schema: "public", table: "feedback_queries" },
-        (payload) => {
-          const before = payload.old as Partial<FeedbackQuery>;
-          if (before.is_read === false) setCount((current) => Math.max(0, current - 1));
+        () => {
+          void refreshUnreadCount();
         },
       )
       .subscribe();
 
     return () => {
+      active = false;
+      refreshVersion += 1;
       void supabase.removeChannel(channel);
     };
   }, []);
 
-  if (count <= 0) return null;
+  return (
+    <InboxCountContext.Provider value={count}>
+      {children}
+    </InboxCountContext.Provider>
+  );
+}
+
+export function InboxCountBadge() {
+  const count = useContext(InboxCountContext);
+
+  if (count === null || count <= 0) return null;
 
   return (
     <span

@@ -1,180 +1,135 @@
 # Lumeo Control Center Admin Authentication
 
-This phase adds secure Supabase administrator authentication for Lumeo Control
-Center. It does not replace Firebase, the existing public login, the dashboard,
-PDF tools, or any document processing engine.
+Lumeo Control Center uses Supabase Auth for private administrator access while
+the public PDF tools remain separate and browser-local.
 
 ## Architecture
 
 - Supabase Auth provides email/password administrator sign-in.
-- `public.admin_members` stores active admin memberships and roles.
-- `lib/admin/auth.ts` verifies identity with Supabase claims and checks active
-  membership server-side.
-- `/admin/login` is public, outside the protected route group, and has no signup
-  path.
-- `/admin` is protected by `app/admin/(protected)/layout.tsx`, which calls
-  `requireAdmin()` before rendering protected admin screens.
-- `/admin/logout` signs out through a POST route.
-- `proxy.ts` refreshes Supabase cookies but is not the only authorization layer.
+- `public.admin_members` stores active memberships and roles.
+- `lib/admin/auth.ts` verifies identity with `supabase.auth.getClaims()` and
+  checks active membership server-side.
+- `/admin/login` is public, outside the protected route group, with no signup.
+- `app/admin/(protected)/layout.tsx` calls `requireAdmin()` before protected
+  content renders.
+- Login authorizes with the same Supabase server client that performed
+  `signInWithPassword()`, avoiding a cookie-propagation race between clients.
+- `proxy.ts` refreshes SSR auth cookies and preserves Supabase session/cache
+  headers. It is a session-refresh boundary, not the authorization layer.
+- `/admin/logout` is POST-only and signs out only the current session with
+  `scope: "local"`.
+- `/admin/session` is a private, no-store server probe used only to revalidate
+  authorization after browser history/BFCache restoration.
+- All `/admin/:path*` responses are private and non-cacheable.
 
 ## Route Structure
-
-The admin route tree intentionally keeps public and protected routes separate:
 
 ```text
 app/admin/login/page.tsx
 app/admin/login/actions.ts
 app/admin/logout/route.ts
+app/admin/session/route.ts
 app/admin/(protected)/layout.tsx
 app/admin/(protected)/page.tsx
 ```
 
-The route group preserves the public URLs:
-
-```text
-/admin/login
-/admin
-/admin/logout
-```
-
-There is no protecting root `app/admin/layout.tsx`, so the login page cannot be
-wrapped by `requireAdmin()` and cannot redirect to itself.
+The route group keeps the public URLs stable while ensuring the login page is
+not wrapped by `requireAdmin()`.
 
 ## Login Flow
 
-1. An administrator opens `/admin/login`.
-2. The server action receives email and password.
-3. The email is trimmed and normalized.
-4. Supabase `signInWithPassword()` authenticates the user.
-5. The server checks verified claims and active `admin_members` membership.
-6. Non-admin users are signed out immediately.
-7. Authorized admins are redirected to `/admin`.
+1. The administrator opens `/admin/login`.
+2. The server action trims/normalizes the email but leaves the password opaque.
+3. `signInWithPassword()` authenticates on one Supabase server client.
+4. That same client calls `getClaims()` and reads the active
+   `admin_members` row.
+5. Authenticated non-members are signed out and rejected.
+6. The protected admin layout is revalidated before redirecting to `/admin`.
 
-The UI only shows generic failures such as:
+The UI only exposes generic authentication errors and never reveals whether an
+email address exists.
 
-```text
-Unable to sign in with those credentials.
-```
+## Verified Claims and Authorization
 
-It never reveals whether an email exists.
-
-## Verified Claims Flow
-
-Admin authorization uses:
+Protected server code uses:
 
 ```ts
 supabase.auth.getClaims()
 ```
 
-`getSession()` must not be trusted for authorization. Claims provide the
-verified user id used for membership lookup.
+Do not use `getSession()` as an authorization check in server code. Protected
+pages and state-changing admin actions must continue to authorize through
+`requireAdmin()`.
 
-## admin_members Authorization
-
-The `public.admin_members` table includes:
-
-- `user_id`
-- `role`
-- `is_active`
-- `created_at`
-- `updated_at`
-
-The allowed roles are:
+The allowed admin roles are:
 
 - `owner`
 - `admin`
 - `analyst`
 
-An admin must have a matching `user_id` and `is_active = true`.
+A user must have a matching `user_id`, an allowed role, and
+`is_active = true`.
 
-## RLS Policy
+## Logout and Browser History Protection
 
-Row Level Security is enabled on `public.admin_members`.
+Logout is POST-only and ends the current administrator session rather than
+globally signing the account out from every device.
 
-Authenticated users may only read their own membership row:
+Browsers can restore a protected page from the back-forward cache without
+performing a network request. The protected shell therefore mounts
+`AdminSessionBoundary`:
 
-```sql
-auth.uid() = user_id
-```
+1. A BFCache snapshot is hidden before it is stored.
+2. On `pageshow` with `event.persisted`, the frozen UI remains hidden.
+3. `/admin/session` revalidates identity and membership on the server.
+4. A signed-out or unauthorized restore is replaced with `/admin/login`.
+5. An authorized restore is reloaded so the protected server layout and dynamic
+   data execute again.
 
-Normal authenticated users do not receive INSERT, UPDATE, or DELETE policies.
+This client boundary is defense in depth for browser history. The server layout
+remains the real authorization boundary.
 
-## Why Proxy Is Not The Only Authorization Layer
+## RLS and Database Security
 
-Proxy refreshes Supabase authentication cookies during requests. It does not
-query `admin_members` and does not make role decisions.
+Row Level Security is enabled on `public.admin_members`. Authenticated users
+may read only their own active membership row; normal authenticated users do
+not receive direct INSERT, UPDATE, or DELETE policies.
 
-Every protected admin page must remain under `app/admin/(protected)`, where the
-protected layout calls server authorization through `requireAdmin()`.
-
-## Manual Supabase Setup
-
-1. Open the Supabase Dashboard.
-2. Run `supabase/migrations/20260712001_admin_members.sql` in the SQL editor or
-   through your approved migration workflow.
-3. Confirm Row Level Security is enabled for `public.admin_members`.
-4. Add the required public environment variables in local and Vercel
-   environments:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
-
-## How To Create The First Administrator
-
-1. Supabase Dashboard
-2. Authentication
-3. Users
-4. Add user
-5. Create the administrator with a strong password
-6. Copy the generated user UUID
-7. SQL Editor
-8. Run:
-
-```sql
-insert into public.admin_members (user_id, role, is_active)
-values ('COPIED_USER_UUID', 'owner', true);
-```
-
-Never put a real email, password, UUID, key, or project secret in source code.
-
-## How To Disable An Administrator
-
-Set `is_active` to false for the administrator membership:
-
-```sql
-update public.admin_members
-set is_active = false
-where user_id = 'COPIED_USER_UUID';
-```
+The pending admin hardening migration also revokes anonymous execution from
+internal SECURITY DEFINER helpers and uses an init-plan-safe
+`(select auth.uid())` predicate for self-membership reads.
 
 ## Security Rules
 
-- No public signup.
-- No service-role key.
-- No secret key.
-- No admin email allowlist stored in client code.
-- No administrator identity controlled by `NEXT_PUBLIC` variables.
-- No raw Supabase errors shown.
+- No public admin signup.
+- No service-role or secret key in browser/application admin code.
+- No client-side email allowlist for administrator identity.
+- No raw Supabase authentication errors shown to users.
 - No auth token logging.
-- No PDF files or contents stored.
-- No filenames stored.
-- No extracted text stored.
-- No document metadata stored.
-- No analytics yet.
-- RLS enabled.
-- Server authorization required on every protected admin page.
+- Server authorization required for every protected page and state-changing
+  admin action.
+- Admin responses are private/no-store.
+- Logout is current-session only.
+- BFCache/history restoration fails closed.
+- Public PDF document processing remains outside the admin auth system.
 
 ## Production Checklist
 
-- Supabase project URL and publishable key are configured.
-- The admin membership migration has been applied.
-- The first administrator user has been created manually.
-- The first administrator membership has been inserted manually.
-- `/admin/login` accepts only valid Supabase credentials.
-- Non-member authenticated users are signed out and rejected.
-- `/admin` redirects unauthenticated users to `/admin/login`.
-- `/admin/logout` works through POST.
+Before declaring the release production-ready:
 
-## Next Phase
-
-The next phase is privacy-preserving analytics. It should define event shape,
-retention, aggregation, and privacy limits before storing any operational data.
+- Required Supabase URL/publishable-key environment variables are configured.
+- The administrator account and active membership exist.
+- `20260919001_admin_security_hardening.sql` has been applied through the
+  approved post-merge migration workflow.
+- Supabase security advisors are rerun after the migration and internal
+  anonymous SECURITY DEFINER warnings are resolved as expected.
+- Supabase Auth leaked-password protection is enabled for administrator
+  password security.
+- Unauthenticated `/admin` redirects to `/admin/login`.
+- Chromium and WebKit/iPhone pass login, persistence, mobile navigation,
+  Realtime, logout, repeated Back/Forward protection, and re-login.
+- No browser console/page errors appear during the lifecycle.
+- Public-route, PDF-tool, HEIC, lint, TypeScript, unit-test, and production
+  build gates remain green.
+- Production is verified only after merge/deploy; preview or branch success is
+  not reported as production success.

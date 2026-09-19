@@ -76,11 +76,89 @@ jobs:
           components/pdf/PdfToolRegistry.tsx
           scripts/verify-public-routes.mjs
 
+      - name: Verify admin authentication architecture
+        run: npm run verify:admin-auth
+
+      - name: Verify Control Center architecture
+        run: npm run verify:control-center
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint application
+        run: npm run lint
+
       - name: Build production application
         run: npm run build
 
       - name: Verify public routes
         run: npm run verify:public
+
+  admin-browser-e2e:
+    name: Admin auth — Chromium + WebKit
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Initialize and start isolated Supabase
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+
+      - name: Configure disposable admin environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/lumeo-supabase.env
+          set -a
+          source /tmp/lumeo-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+            echo "ADMIN_E2E_EMAIL=admin-e2e@lumeo.local"
+            echo "ADMIN_E2E_PASSWORD=Lumeo-E2E-Only-2026!"
+          } >> "$GITHUB_ENV"
+
+      - name: Create disposable local administrator
+        run: node scripts/seed-admin-e2e.mjs
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Run mobile Chromium and WebKit admin auth lifecycle
+        run: npm run test:e2e:admin
+
+      - name: Upload browser traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: admin-auth-playwright-report
+          path: |
+            playwright-admin-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
 
   migrate:
     name: Apply Supabase migrations

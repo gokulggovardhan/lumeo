@@ -20,8 +20,6 @@ const protectedRoutes = [
   "app/admin/(protected)/page.tsx",
   "app/admin/(protected)/analytics/page.tsx",
   "app/admin/(protected)/tools/page.tsx",
-  "app/admin/(protected)/homepage/page.tsx",
-  "app/admin/(protected)/feature-flags/page.tsx",
   "app/admin/(protected)/announcements/page.tsx",
   "app/admin/(protected)/seo/page.tsx",
   "app/admin/(protected)/audit/page.tsx",
@@ -29,10 +27,6 @@ const protectedRoutes = [
 ];
 const actionFiles = [
   "app/admin/(protected)/tools/actions.ts",
-  // homepage/actions.ts was deliberately removed -- the homepage editor was
-  // retired once the public homepage moved to the fixed dual-named tool
-  // catalog (see app/admin/(protected)/homepage/page.tsx for the rationale).
-  "app/admin/(protected)/feature-flags/actions.ts",
   "app/admin/(protected)/announcements/actions.ts",
   "app/admin/(protected)/seo/actions.ts",
   "app/admin/(protected)/settings/actions.ts",
@@ -86,6 +80,24 @@ try {
     assert(route.includes("app/admin/(protected)/"), `Protected page must stay inside route group: ${route}`);
   }
 
+  for (const retiredRoute of [
+    "app/admin/(protected)/homepage/page.tsx",
+    "app/admin/(protected)/feature-flags/page.tsx",
+    "app/admin/(protected)/feature-flags/actions.ts",
+  ]) {
+    assert(!exists(retiredRoute), `Retired admin surface must stay removed: ${retiredRoute}`);
+  }
+
+  const navigation = read("lib/admin/navigation.ts");
+  for (const retiredHref of [
+    "/admin/homepage",
+    "/admin/feature-flags",
+    "/admin/design-system",
+    "/admin/guide",
+  ]) {
+    assert(!navigation.includes(retiredHref), `Owner navigation must not restore clutter: ${retiredHref}`);
+  }
+
   assert(exists("lib/admin/permissions.ts"), "Permission helper is missing.");
   assert(exists("lib/admin/data.ts"), "Admin data module is missing.");
   assert(read("lib/admin/data.ts").includes('import "server-only"'), "Admin data module must be server-only.");
@@ -124,10 +136,16 @@ try {
   assert(!/secret[_-]?key/i.test(adminSource), "New admin source must not reference secret keys.");
 
   const analyticsPage = read("app/admin/(protected)/analytics/page.tsx");
-  assert(analyticsPage.includes("Analytics V1"), "Analytics page must use Analytics V1 wording.");
-  assert(analyticsPage.includes("Page Views Today"), "Analytics page must display page views.");
-  assert(analyticsPage.includes("Tool Opens Today"), "Analytics page must display tool opens.");
-  assert(analyticsPage.includes("Operation analytics"), "Analytics page must explain operation analytics.");
+  const analyticsActivityPage = read("app/admin/(protected)/analytics/activity/page.tsx");
+  assert(analyticsPage.includes('eyebrow="Analytics"'), "Analytics page must use current Analytics wording.");
+  assert(analyticsPage.includes('title="Date range"'), "Analytics page must expose the date-range controls.");
+  assert(analyticsPage.includes('name="range"'), "Analytics page must expose the range selector.");
+  assert(analyticsPage.includes('<option value="custom">Custom</option>'), "Analytics page must expose the custom range.");
+  assert(analyticsPage.includes('label="Page Views"'), "Analytics page must display page views.");
+  assert(analyticsPage.includes('label="Tool Opens"'), "Analytics page must display tool opens.");
+  assert(analyticsPage.includes('title="Operation analytics"'), "Analytics page must explain operation analytics.");
+  assert(!analyticsPage.includes("Analytics V1"), "Analytics page must not restore obsolete Analytics V1 copy.");
+  assert(!analyticsActivityPage.includes("Analytics V1"), "Analytics activity page must not restore obsolete Analytics V1 copy.");
   // Operation lifecycle metrics were originally postponed past Analytics V1,
   // but were verified live in production as of 2026-07-29 (real,
   // non-placeholder metric cards fed by processing_started/succeeded/failed
@@ -142,19 +160,38 @@ try {
   const overviewPage = read("app/admin/(protected)/page.tsx");
   assert(overviewPage.includes("Public Page Views"), "Overview must surface public page views.");
   assert(overviewPage.includes("Tool Opens Today"), "Overview must surface tool opens.");
+  assert(overviewPage.includes("Maintenance Tools"), "Overview must surface real maintenance state.");
+  assert(!overviewPage.includes("Feature Flags"), "Overview must not expose unwired feature flags.");
   assert(!overviewPage.includes("Processing Success Rate"), "Overview must not show processing success rate in V1.");
+
+  const settingsPage = read("app/admin/(protected)/settings/page.tsx");
+  const settingsValidation = read("lib/admin/validation.ts");
+  for (const liveSetting of ["maintenance_mode", "public_analytics_enabled"]) {
+    assert(settingsPage.includes(liveSetting), `Live setting missing from Settings UI: ${liveSetting}`);
+    assert(settingsValidation.includes(liveSetting), `Live setting missing from server allowlist: ${liveSetting}`);
+  }
+  for (const retiredSetting of [
+    "workspace_display_name",
+    "support_email",
+    "contact_page_enabled",
+    "homepage_privacy_message",
+    "default_seo_suffix",
+  ]) {
+    assert(!settingsPage.includes(retiredSetting), `Unwired setting must not appear in owner UI: ${retiredSetting}`);
+    assert(!settingsValidation.includes(retiredSetting), `Unwired setting must not remain writable: ${retiredSetting}`);
+  }
 
   // The standalone System page was deliberately removed as redundant (see
   // "refactor: remove redundant System page, trim unwired Settings, group
   // reference nav" #34) -- its Analytics V1 messaging now lives on the
   // analytics page checked above (`analyticsPage`), so no separate read is
   // needed here.
-  assert(analyticsPage.includes("Operation lifecycle metrics"), "Analytics page must reference operation lifecycle metrics.");
+  assert(analyticsPage.includes("Processing lifecycle metrics"), "Analytics page must describe processing lifecycle metrics.");
 
   const packageJson = JSON.parse(read("package.json"));
-  assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
-  assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");
-  assert(packageJson.dependencies["react-dom"] === "^19.2.7", "React DOM version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
+  assert(packageJson.dependencies["react-dom"] === "^19.2.8", "React DOM version changed unexpectedly.");
   assert(packageJson.dependencies["firebase-admin"] === "^14.2.0", "firebase-admin version changed unexpectedly.");
 
   const protectedStatus = gitStatus(protectedNonAdminFiles);
@@ -166,11 +203,13 @@ try {
   console.log("PASS seeded tools and homepage slots are present");
   console.log("PASS no fake analytics records are seeded");
   console.log("PASS protected routes are inside app/admin/(protected)");
+  console.log("PASS retired and unwired admin surfaces stay removed");
   console.log("PASS server actions call requireAdmin");
   console.log("PASS admin data module is server-only");
   console.log("PASS logout remains POST-only");
   console.log("PASS no getSession, service_role, or secret key usage in new admin source");
-  console.log("PASS Analytics V1 control center wording is present");
+  console.log("PASS current range-based Analytics control center UI is present");
+  console.log("PASS Settings exposes only live runtime controls");
   console.log("PASS protected package versions are unchanged");
   console.log("PASS protected non-admin files are untouched");
 } catch (error) {

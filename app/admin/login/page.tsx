@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { BrandLockup } from "@/components/BrandMark";
+import { AdminLoginSubmitButton } from "@/components/admin/AdminLoginSubmitButton";
 import { signInAdmin } from "@/app/admin/login/actions";
 
 const safeMessages = {
   invalid: "Unable to sign in with those credentials.",
   "not-authorized": "This account is not authorized for Lumeo Control Center.",
   "signed-out": "You have been signed out.",
+  "session-ended": "Your administrator session has ended. Sign in again to continue.",
 } as const;
 
 type LoginMessageKey = keyof typeof safeMessages;
@@ -23,6 +25,8 @@ export const metadata = {
   },
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminLoginPage({
   searchParams,
 }: {
@@ -32,7 +36,15 @@ export default async function AdminLoginPage({
   const safeMessage = getSafeMessage(params?.error, params?.message);
 
   return (
-    <main className="flex min-h-dvh items-center justify-center bg-[var(--surface-canvas)] px-5 py-10 text-[#F0EAD6]">
+    <main
+      className="flex min-h-dvh items-center justify-center bg-[var(--surface-canvas)] px-5 text-[#F0EAD6]"
+      style={{
+        paddingTop: "max(2.5rem, env(safe-area-inset-top))",
+        paddingBottom: "max(2.5rem, env(safe-area-inset-bottom))",
+        paddingLeft: "max(1.25rem, env(safe-area-inset-left))",
+        paddingRight: "max(1.25rem, env(safe-area-inset-right))",
+      }}
+    >
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(203,160,82,0.12),transparent_34%),radial-gradient(circle_at_82%_80%,rgba(30,107,74,0.16),transparent_32%)]" />
 
       <section className="relative w-full max-w-[460px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.32)] sm:p-8">
@@ -70,9 +82,12 @@ export default async function AdminLoginPage({
               id="email"
               name="email"
               type="email"
+              inputMode="email"
               autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
               required
-              className="mt-2 h-12 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-4 text-[#F0EAD6] outline-none transition placeholder:text-[#F0EAD6]/28 focus:border-[#CBA052]/55 focus:ring-2 focus:ring-[#CBA052]/18"
+              className="mt-2 h-12 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-4 text-base text-[#F0EAD6] outline-none transition placeholder:text-[#F0EAD6]/28 focus:border-[#CBA052]/55 focus:ring-2 focus:ring-[#CBA052]/18"
               placeholder="admin@example.com"
             />
           </div>
@@ -87,17 +102,12 @@ export default async function AdminLoginPage({
               type="password"
               autoComplete="current-password"
               required
-              className="mt-2 h-12 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-4 text-[#F0EAD6] outline-none transition placeholder:text-[#F0EAD6]/28 focus:border-[#CBA052]/55 focus:ring-2 focus:ring-[#CBA052]/18"
+              className="mt-2 h-12 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-4 text-base text-[#F0EAD6] outline-none transition placeholder:text-[#F0EAD6]/28 focus:border-[#CBA052]/55 focus:ring-2 focus:ring-[#CBA052]/18"
               placeholder="Enter your password"
             />
           </div>
 
-          <button
-            type="submit"
-            className="inline-flex h-12 w-full items-center justify-center rounded-xl bg-[#1E6B4A] px-5 text-sm font-bold text-[#F0EAD6] shadow-[0_14px_34px_rgba(30,107,74,0.24)] transition hover:bg-[#257A56] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45"
-          >
-            Sign in
-          </button>
+          <AdminLoginSubmitButton />
         </form>
 
         <div className="mt-6 flex items-center justify-between gap-4 border-t border-[#E8DFC8]/10 pt-5 text-sm">

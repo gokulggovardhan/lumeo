@@ -20,7 +20,7 @@ export default async function ToolsPage() {
     <div className="space-y-7">
       <AdminPageHeader
         eyebrow="Catalog"
-        title="PDF Tools"
+        title="Tools"
         description="Manage the database catalog for Lumeo PDF tools. An action's status and enabled state here control whether it shows as live in the nav, homepage, tools catalog, and its own page — set status to Maintenance (or disable it) and it's blocked on its own page too, showing the message below."
       />
       <AdminSectionCard title="Tool catalog" description={canEdit ? "Owner and admin roles can update catalog controls. Each row saves together as one change." : "Analyst access is read-only."}>
@@ -111,7 +111,7 @@ export default async function ToolsPage() {
               </AdminSubmitButton>,
             ];
           })}
-          empty={<AdminEmptyState title="No tools found" description="Run the Control Center foundation migration to seed the initial PDF tools." />}
+          empty={<AdminEmptyState title="No tools found" description="No catalog records are available." />}
         />
       </AdminSectionCard>
     </div>

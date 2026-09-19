@@ -26,7 +26,7 @@ export default async function AnalyticsActivityPage({
   return (
     <div className="space-y-7">
       <AdminPageHeader
-        eyebrow="Analytics V1"
+        eyebrow="Analytics"
         title="Full activity log"
         description="Every recent public event, newest first, with the approximate location behind each click. Capped at the 200 most recent events."
       />

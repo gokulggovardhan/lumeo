@@ -13,11 +13,9 @@ import type { AdminRole } from "@/lib/admin/types";
 export function ControlCenterMobileNav({
   email,
   role,
-  unreadInboxCount = 0,
 }: {
   email: string | null;
   role: AdminRole;
-  unreadInboxCount?: number;
 }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
@@ -42,7 +40,7 @@ export function ControlCenterMobileNav({
       >
         <AdminIcon name={item.icon} className="h-4 w-4" />
         {item.label}
-        {item.href === "/admin/inbox" ? <InboxCountBadge initialCount={unreadInboxCount} /> : null}
+        {item.href === "/admin/inbox" ? <InboxCountBadge /> : null}
       </Link>
     );
   }
@@ -70,17 +68,18 @@ export function ControlCenterMobileNav({
         <button
           ref={buttonRef}
           type="button"
-          aria-label="Open Control Center navigation"
+          aria-label={open ? "Close Control Center navigation" : "Open Control Center navigation"}
           aria-expanded={open}
+          aria-controls="control-center-mobile-menu"
           onClick={() => setOpen((value) => !value)}
-          className="min-h-11 rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.055)] px-4 text-sm font-bold text-[var(--lumeo-paper-50)] transition duration-200 hover:border-[var(--border-premium)]"
+          className="min-h-11 touch-manipulation rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.055)] px-4 text-sm font-bold text-[var(--lumeo-paper-50)] transition duration-200 hover:border-[var(--border-premium)]"
         >
           Menu
         </button>
       </div>
 
       {open && (
-        <div className="aura-drawer-enter mt-3 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 shadow-[var(--shadow-lg)]">
+        <div id="control-center-mobile-menu" className="aura-drawer-enter mt-3 max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-3 shadow-[var(--shadow-lg)]">
           <div className="mb-3 rounded-xl border border-[var(--border-subtle)] bg-[rgba(var(--lumeo-paper-rgb),0.045)] p-3">
             <p className="truncate text-sm font-bold text-[var(--lumeo-paper-50)]">{email || "Administrator"}</p>
             <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[var(--lumeo-gold-300)]">{role}</p>

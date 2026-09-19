@@ -23,6 +23,7 @@
     "start": "next start",
     "lint": "eslint",
     "test:e2e": "playwright test",
+    "test:e2e:admin": "playwright test --config=playwright.admin.config.ts",
     "inspect:heic-samples": "node --no-warnings --experimental-strip-types inspector/inspect-heic-samples.ts",
     "verify:heic-samples": "node --no-warnings --experimental-strip-types inspector/verify-heic-conversion.ts",
     "test:heic-inspection": "node --no-warnings --test --experimental-strip-types inspector/*.test.ts"

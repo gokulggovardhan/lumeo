@@ -4,10 +4,6 @@ export function canManageTools(role: AdminRole | null) {
   return role === "owner" || role === "admin";
 }
 
-export function canManageFeatureFlags(role: AdminRole | null) {
-  return role === "owner" || role === "admin";
-}
-
 export function canManageAnnouncements(role: AdminRole | null) {
   return role === "owner" || role === "admin";
 }
