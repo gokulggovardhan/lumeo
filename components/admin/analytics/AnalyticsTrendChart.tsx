@@ -19,7 +19,7 @@ export function AnalyticsTrendChart({
   const minChartWidth = points.length > 14 ? points.length * 34 : undefined;
 
   return (
-    <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
+    <div className="min-w-0 max-w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-bold text-[#F0EAD6]">Daily activity</h3>
@@ -28,7 +28,7 @@ export function AnalyticsTrendChart({
           </p>
         </div>
       </div>
-      <div className="mt-5 overflow-x-auto overscroll-x-contain pb-1">
+      <div className="mt-5 w-full max-w-full overflow-x-auto overscroll-x-contain pb-1">
         <div
           className="flex h-32 items-end gap-2"
           style={minChartWidth ? { minWidth: `${minChartWidth}px` } : undefined}
