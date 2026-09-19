@@ -7,6 +7,7 @@ const safeMessages = {
   invalid: "Unable to sign in with those credentials.",
   "not-authorized": "This account is not authorized for Lumeo Control Center.",
   "signed-out": "You have been signed out.",
+  "session-ended": "Your administrator session has ended. Sign in again to continue.",
 } as const;
 
 type LoginMessageKey = keyof typeof safeMessages;
