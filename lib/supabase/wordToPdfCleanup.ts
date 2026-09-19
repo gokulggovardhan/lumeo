@@ -20,22 +20,6 @@ export class WordToPdfCleanupError extends Error {
   }
 }
 
-export function selectStaleWordToPdfObjectNames(
-  objects: CleanupStorageObject[],
-  nowMs = Date.now(),
-): string[] {
-  const cutoff = nowMs - WORD_TO_PDF_STALE_CUTOFF_MS;
-
-  return objects
-    .filter((object) => {
-      const createdAt = object.created_at ? Date.parse(object.created_at) : Number.NaN;
-      // Missing/unparseable timestamps cannot represent an in-flight upload,
-      // so preserve the existing fail-safe behavior and treat them as stale.
-      return Number.isNaN(createdAt) || createdAt < cutoff;
-    })
-    .map((object) => object.name);
-}
-
 export async function cleanupWordToPdfUploads(
   nowMs = Date.now(),
 ): Promise<WordToPdfCleanupResult> {
