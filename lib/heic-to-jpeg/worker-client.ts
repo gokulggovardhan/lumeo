@@ -1,5 +1,14 @@
 import type { PhotoEvidence, PhotoStatus } from "./pipeline.ts";
-export type PhotoResult = { blob: Blob; width: number; height: number; evidence: PhotoEvidence };
+export type PhotoResult = {
+  blob: Blob;
+  width: number;
+  height: number;
+  primaryWidth: number;
+  primaryHeight: number;
+  decodedWidth: number;
+  decodedHeight: number;
+  evidence: PhotoEvidence;
+};
 
 export function convertPhoto(source: File, companions: File[], quality: number, status: (value: PhotoStatus) => void, signal: AbortSignal): Promise<PhotoResult> {
   return new Promise((resolve, reject) => {

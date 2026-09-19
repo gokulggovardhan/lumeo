@@ -3,14 +3,14 @@ import * as exifr from "exifr";
 import { inspectContainerIdentifiers, inspectHeifStructure } from "./inspection/bmff.ts";
 import { inspectAaeXml } from "./inspection/aae.ts";
 import { photoExtension } from "./inspection/names.ts";
-import { assessLivePhotoPairing, classifyColorSafety, jpegQuality, orientationTransform, selectPrimary, type LiveState, type PhotoEvidence, type PhotoStatus } from "./pipeline.ts";
+import { assessLivePhotoPairing, classifyColorSafety, dimensionsPreserved, jpegQuality, orientationTransform, selectPrimary, type LiveState, type PhotoEvidence, type PhotoStatus } from "./pipeline.ts";
 
 type Input = { source: File; companions: File[]; quality: number };
 function stage(status: PhotoStatus) { self.postMessage({ status }); }
 class PhotoFailure extends Error {}
 const fail = (message: string): never => { throw new PhotoFailure(message); };
 const MAX_PIXELS = 64_000_000; // RGBA alone consumes 256 MB here, before decoder and canvas copies.
-function dimensions(width: number, height: number) {
+function assertDimensions(width: number, height: number) {
   if (!Number.isSafeInteger(width) || !Number.isSafeInteger(height) || width < 1 || height < 1 || width * height > MAX_PIXELS) fail("This photo exceeds this browser's safe decoding budget. Try a smaller export.");
 }
 
@@ -88,11 +88,19 @@ self.onmessage = async ({ data }: MessageEvent<Input>) => {
     }
     stage("decoding");
     let canvas: OffscreenCanvas;
+    let primaryWidth = 0;
+    let primaryHeight = 0;
+    let decodedWidth = 0;
+    let decodedHeight = 0;
     if (typeof OffscreenCanvas === "undefined") fail("This browser needs an update for local photo conversion. Try current Safari, Chrome, Firefox or Edge.");
     if (jpeg) {
       const bitmap = await createImageBitmap(data.source, { imageOrientation: "from-image" });
       try {
-        dimensions(bitmap.width, bitmap.height);
+        assertDimensions(bitmap.width, bitmap.height);
+        primaryWidth = bitmap.width;
+        primaryHeight = bitmap.height;
+        decodedWidth = bitmap.width;
+        decodedHeight = bitmap.height;
         canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
         const ctx = canvas.getContext("2d", { colorSpace: "srgb" });
         if (!ctx) fail("The browser could not allocate the image canvas.");
@@ -105,13 +113,20 @@ self.onmessage = async ({ data }: MessageEvent<Input>) => {
       let decoded: Awaited<ReturnType<typeof lib.heif_js_decode_image2>> | undefined;
       try {
         const primary = selectPrimary(images);
-        dimensions(primary.get_width(), primary.get_height());
+        primaryWidth = primary.get_width();
+        primaryHeight = primary.get_height();
+        assertDimensions(primaryWidth, primaryHeight);
         decoded = await lib.heif_js_decode_image2(primary.handle, lib.heif_colorspace.heif_colorspace_RGB, lib.heif_chroma.heif_chroma_interleaved_RGBA);
         if (!decoded || decoded.code) fail("This HEIC photo could not be decoded. Try a compatible export from Photos.");
         const channel = decoded.channels.find((item) => item.id === lib.heif_channel.heif_channel_interleaved);
         if (!channel) fail("The decoder did not return a usable primary image.");
         const { width, height, stride } = channel!;
-        dimensions(width, height);
+        decodedWidth = width;
+        decodedHeight = height;
+        assertDimensions(decodedWidth, decodedHeight);
+        if (!dimensionsPreserved(primaryWidth, primaryHeight, decodedWidth, decodedHeight)) {
+          fail("The decoder returned a reduced-resolution image instead of the full-resolution primary photo.");
+        }
         let rgba = new Uint8ClampedArray(width * height * 4);
         for (let y = 0; y < height; y++) rgba.set(channel!.data.subarray(y * stride, y * stride + width * 4), y * width * 4);
         stage("processing");
@@ -152,12 +167,15 @@ self.onmessage = async ({ data }: MessageEvent<Input>) => {
     bytes = new Uint8Array(0);
     stage("encoding");
     const width = canvas!.width, height = canvas!.height;
+    if (!dimensionsPreserved(decodedWidth, decodedHeight, width, height)) {
+      fail("The export canvas changed the photo resolution unexpectedly. No JPEG was created.");
+    }
     let blob: Blob;
     try { blob = await canvas!.convertToBlob({ type: "image/jpeg", quality: jpegQuality(data.quality) }); }
     finally { canvas!.width = canvas!.height = 1; }
     const signature = new Uint8Array(await blob!.slice(0, 3).arrayBuffer());
     if (blob!.type !== "image/jpeg" || signature[0] !== 255 || signature[1] !== 216 || signature[2] !== 255) fail("JPEG encoding failed. Try fewer photos or restart the browser.");
-    self.postMessage({ status: "done", blob: blob!, width, height, evidence });
+    self.postMessage({ status: "done", blob: blob!, width, height, primaryWidth, primaryHeight, decodedWidth, decodedHeight, evidence });
   } catch (error) {
     // Only our curated errors leave the worker; decoder exceptions can contain metadata.
     const message = error instanceof PhotoFailure ? error.message : "This photo could not be converted. It may be corrupt, unsupported, or exceed available browser memory.";

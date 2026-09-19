@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { assessLivePhotoPairing, classifyColorSafety, groupPhotos, jpegName, jpegQuality, orientationTransform, releasePhotoUrls, runPhotoQueue, selectPrimary } from "../lib/heic-to-jpeg/pipeline.ts";
+import { assessLivePhotoPairing, classifyColorSafety, dimensionsPreserved, groupPhotos, jpegName, jpegQuality, orientationTransform, releasePhotoUrls, runPhotoQueue, selectPrimary } from "../lib/heic-to-jpeg/pipeline.ts";
 import { inspectHeifStructure } from "../lib/heic-to-jpeg/inspection/bmff.ts";
 import { inspectAaeXml } from "../lib/heic-to-jpeg/inspection/aae.ts";
 
@@ -125,4 +125,11 @@ test("public integration uses the canonical private analytics slug and events", 
   for (const event of ["tool_opened", "processing_started", "processing_succeeded", "processing_failed", "download_started"]) assert.match(source, new RegExp(`eventName: ["']${event}["']`));
   assert.match(source, /toolSlug: ["']heic-to-jpeg["']/);
   assert.doesNotMatch(source, /track\([^)]*(fileName|filename|GPS|metadata)/i);
+});
+
+test("resolution invariant allows orientation swaps but rejects downscaling", () => {
+  assert.equal(dimensionsPreserved(6048, 8064, 6048, 8064), true);
+  assert.equal(dimensionsPreserved(6048, 8064, 8064, 6048), true);
+  assert.equal(dimensionsPreserved(6048, 8064, 1152, 1536), false);
+  assert.equal(dimensionsPreserved(4032, 3024, 2016, 1512), false);
 });
