@@ -54,7 +54,7 @@ export function InboxClient({
   useEffect(() => {
     const supabase = supabaseRef.current;
     const channel = supabase
-      .channel("feedback_queries_inbox")
+      .channel(`feedback_queries_inbox:${crypto.randomUUID()}`)
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "feedback_queries" },
