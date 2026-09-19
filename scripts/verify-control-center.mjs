@@ -155,7 +155,7 @@ try {
   // reference nav" #34) -- its Analytics V1 messaging now lives on the
   // analytics page checked above (`analyticsPage`), so no separate read is
   // needed here.
-  assert(analyticsPage.includes("Operation lifecycle metrics"), "Analytics page must reference operation lifecycle metrics.");
+  assert(analyticsPage.includes("Processing lifecycle metrics"), "Analytics page must describe processing lifecycle metrics.");
 
   const packageJson = JSON.parse(read("package.json"));
   assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
