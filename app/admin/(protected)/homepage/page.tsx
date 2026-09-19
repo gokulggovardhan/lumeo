@@ -41,7 +41,7 @@ export default async function HomepagePage() {
         <ul className="grid gap-2 text-sm leading-6 text-[#F0EAD6]/72">
           <li>
             <span className="font-semibold text-[#F0EAD6]">Which underlying action is live</span> — set on the{" "}
-            <a href="/admin/tools" className="text-[#CBA052] underline underline-offset-2">PDF Tools</a> page (status, enabled). This
+            <a href="/admin/tools" className="text-[#CBA052] underline underline-offset-2">Tools</a> page (status, enabled). This
             still governs the whole site: nav, homepage, and the tools catalog.
           </li>
           <li>
