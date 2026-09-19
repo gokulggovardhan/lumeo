@@ -22,7 +22,7 @@
     "db:migrate": "node scripts/db-migrate.mjs",
     "start": "next start",
     "lint": "eslint",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",\n    "test:e2e:admin": "playwright test --config=playwright.admin.config.ts"
   },
   "dependencies": {
     "@pdf-lib/standard-fonts": "^1.0.0",
