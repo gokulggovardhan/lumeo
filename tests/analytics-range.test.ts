@@ -31,7 +31,11 @@ test("custom analytics range accepts at most 90 inclusive calendar days", () => 
 });
 
 test("invalid custom ranges fail safely to the last seven days", () => {
-  const range = resolveAnalyticsRange({ range: "custom", start: "2026-09-20", end: "2026-09-19" }, now);
-  assert.equal(range.key, "7d");
-  assert.ok(range.warning);
+  const reversed = resolveAnalyticsRange({ range: "custom", start: "2026-09-20", end: "2026-09-19" }, now);
+  assert.equal(reversed.key, "7d");
+  assert.ok(reversed.warning);
+
+  const future = resolveAnalyticsRange({ range: "custom", start: "2026-09-19", end: "2026-09-20" }, now);
+  assert.equal(future.key, "7d");
+  assert.match(future.warning ?? "", /future/);
 });
