@@ -1,5 +1,6 @@
 import handler from "vinext/server/fetch-handler";
 import { canonicalRedirectUrl } from "./canonical-routing";
+import { withProductionSecurityHeaders } from "./response-policy";
 import {
   cleanupWordToPdfUploads,
   WordToPdfCleanupError,
@@ -64,10 +65,15 @@ export default {
     );
 
     if (redirectUrl) {
-      return Response.redirect(redirectUrl, 308);
+      return withProductionSecurityHeaders(
+        request,
+        Response.redirect(redirectUrl, 308),
+      );
     }
 
-    return handler.fetch(...args);
+    return Promise.resolve(handler.fetch(...args)).then((response) =>
+      withProductionSecurityHeaders(request, response),
+    );
   },
 
   scheduled(
