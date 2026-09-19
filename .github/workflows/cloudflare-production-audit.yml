@@ -238,7 +238,7 @@ jobs:
             /tmp/lumeo-cloudflare-fixtures/source.png
           heif-enc -q 55 -t 1536 /tmp/lumeo-cloudflare-fixtures/source.png \
             -o /tmp/lumeo-cloudflare-fixtures/fullres.heic
-          heif-info /tmp/lumeo-cloudflare-fixtures/fullres.heic | tee /tmp/lumeo-cloudflare-fixtures/heif-info.txt
+          heif-info /tmp/lumeo-cloudflare-fixtures/fullres.heic | tee /tmp/lumeo-cloudflare-fixtures/heif-info.txt || true
           grep -Eq 'image: 6048x8064 .*primary' /tmp/lumeo-cloudflare-fixtures/heif-info.txt
           echo "HEIC_RESOLUTION_FIXTURE=/tmp/lumeo-cloudflare-fixtures/fullres.heic" >> "$GITHUB_ENV"
 
