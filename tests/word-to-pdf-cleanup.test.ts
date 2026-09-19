@@ -4,7 +4,7 @@ import test from "node:test";
 import {
   selectStaleWordToPdfObjectNames,
   WORD_TO_PDF_STALE_CUTOFF_MS,
-} from "../lib/supabase/wordToPdfCleanup";
+} from "../lib/supabase/wordToPdfCleanup.ts";
 
 const NOW = Date.UTC(2026, 8, 20, 3, 0, 0);
 
