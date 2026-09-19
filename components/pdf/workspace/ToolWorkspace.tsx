@@ -501,19 +501,11 @@ export function L2UploadStage({
   const defaultAction = canSelect ? (
     <label
       htmlFor={resolvedInputId}
-      role="button"
-      tabIndex={0}
-      aria-controls={resolvedInputId}
+       aria-controls={resolvedInputId}
       onClick={(event) => {
         // Pointer activation is native label -> input. Do not synthesize click().
         event.stopPropagation();
         onActivate?.();
-      }}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        event.stopPropagation();
-        openFileChooser();
       }}
       className="lumeo-primary-action lumeo-press lumeo-focus-ring inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-[var(--radius-md)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition-all duration-[var(--v2-motion-normal)] hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0 active:scale-[0.98] sm:w-auto"
     >
