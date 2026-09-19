@@ -67,7 +67,7 @@ test("HEIF primary property associations exclude auxiliary transforms", () => {
   assert.deepEqual(structure.orientation, [{ rotationDegrees: 90 }]);
 });
 test("quality and orientation transforms preserve intended bounds", () => {
-  assert.equal(jpegQuality(92), .92); assert.equal(jpegQuality(96), .96); assert.equal(jpegQuality(NaN), .92);
+  assert.equal(jpegQuality(85), .85); assert.equal(jpegQuality(92), .92); assert.equal(jpegQuality(96), .96); assert.equal(jpegQuality(NaN), .92);
   for (let orientation = 1; orientation <= 8; orientation++) {
     const [a,b,c,d,e,f] = orientationTransform(orientation, 40, 20);
     const corners = [[0,0],[40,0],[0,20],[40,20]].map(([x,y]) => [a*x+c*y+e,b*x+d*y+f]);

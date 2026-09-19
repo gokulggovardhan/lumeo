@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
-import { Camera, Download, ShieldCheck, Image as ImageIcon } from "lucide-react";
+import { Camera, Download, ShieldCheck, Image as ImageIcon, Trash2 } from "lucide-react";
 import { AuraButton } from "@/components/ui/Aura";
 import { L2UploadStage } from "@/components/pdf/workspace/ToolWorkspace";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
@@ -50,6 +50,14 @@ export default function HeicToJpegTool() {
     setNotice([ignored ? `${ignored} macOS housekeeping file(s) ignored.` : "", assets.length > 50 ? "Large batches take time and retain completed JPEGs in browser memory. For high-resolution photos, smaller batches work best." : ""].filter(Boolean).join(" "));
   }
   function update(id: string, patch: Partial<Row>) { setRows((current) => current.map((row) => row.id === id ? { ...row, ...patch } : row)); }
+  function removeRow(id: string) {
+    if (busy || zipping) return;
+    setRows((current) => {
+      const removed = current.find((row) => row.id === id);
+      if (removed?.url) { URL.revokeObjectURL(removed.url); urls.current.delete(removed.url); }
+      return current.filter((row) => row.id !== id);
+    });
+  }
   async function convert() {
     if (controller.current) return;
     const pending = rows.filter((row) => row.source && row.status === "queued");
@@ -118,7 +126,7 @@ export default function HeicToJpegTool() {
               <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-md bg-[var(--surface-base)]">
                 {row.url && index < 12 ? <Image unoptimized src={row.url} width={56} height={56} alt="Converted photo preview" className="h-full w-full object-contain" /> : <ImageIcon aria-hidden="true" className="text-[var(--text-accent)]" />}
               </div>
-              <div className="min-w-0 flex-1"><h3 className="break-all font-semibold">{row.name}</h3><p className="mt-1 text-sm text-[var(--text-secondary)]">{row.source ? size(row.source.size) : "Companion / unsupported file"}{row.result ? ` → ${size(row.result.blob.size)} JPEG · ${row.result.width} × ${row.result.height}` : ""}</p>
+              <div className="min-w-0 flex-1"><div className="flex min-w-0 items-start justify-between gap-2"><h3 className="min-w-0 break-all font-semibold">{row.name}</h3><button type="button" disabled={busy || zipping} onClick={() => removeRow(row.id)} aria-label={`Remove ${row.name}`} className="lumeo-focus-ring inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md text-[var(--text-secondary)] hover:bg-[var(--surface-base)] disabled:opacity-50"><Trash2 size={17} aria-hidden="true" /></button></div><p className="mt-1 text-sm text-[var(--text-secondary)]">{row.source ? size(row.source.size) : "Companion / unsupported file"}{row.result ? ` → ${size(row.result.blob.size)} JPEG · ${row.result.width} × ${row.result.height}` : ""}</p>
                 <p className="mt-2 text-sm font-medium">{labels[row.status]}{row.companions.length && row.source ? " · Companion detected" : ""}{row.result?.evidence.live === "confirmed" ? " · Live Photo confirmed" : row.result?.evidence.live === "probable" ? " · Possible Live Photo" : ""}{row.result?.evidence.hdr ? " · HDR evidence" : ""}{row.result?.evidence.depth ? " · Portrait data" : ""}</p>
               </div>
             </div>
@@ -130,12 +138,13 @@ export default function HeicToJpegTool() {
         <aside className="h-fit space-y-4 rounded-lg bg-[var(--surface-raised)] p-5 lg:sticky lg:top-24">
           <h2 className="text-lg font-semibold">JPEG output</h2>
           <label htmlFor="heic-quality" className="block text-sm font-semibold">Quality</label>
-          <select id="heic-quality" value={quality} disabled={busy || summary.done.length > 0} onChange={(e) => setQuality(Number(e.target.value))} className="min-h-11 w-full rounded-md bg-[var(--surface-input)] px-3 text-base focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]"><option value={92}>High · 92</option><option value={96}>Maximum · 96</option></select>
+          <select id="heic-quality" value={quality} disabled={busy || summary.done.length > 0} onChange={(e) => setQuality(Number(e.target.value))} className="min-h-11 w-full rounded-md bg-[var(--surface-input)] px-3 text-base focus-visible:outline-2 focus-visible:outline-[var(--border-focus)]"><option value={85}>Smaller file · 85</option><option value={92}>High · 92</option><option value={96}>Maximum · 96</option></select>
           <p className="text-sm leading-6 text-[var(--text-secondary)]">Converts the selected still. Apple sidecar edits, motion, depth and HDR reconstruction are not applied. JPEG exports omit location and camera metadata.</p>
           {busy ? <div role="status" className="space-y-2"><p>{summary.completed} of {summary.photos.length} processed</p><p className="text-xs text-[var(--text-muted)]">{summary.counts.inspecting} inspecting · {summary.counts.decoding} decoding · {summary.counts.processing} processing · {summary.counts.encoding} encoding</p><progress aria-label="Photos processed" className="h-2 w-full accent-[var(--action-primary)]" max={summary.photos.length || 1} value={summary.completed} /></div> : null}
           {queuedCount > 0 ? <AuraButton type="button" className="w-full" onClick={() => void convert()} loading={busy}>Convert to JPEG</AuraButton> : null}
           {!busy && summary.done.length > 1 ? <AuraButton type="button" className="w-full" loading={zipping} onClick={() => void downloadAll()}>Download all ({summary.done.length})</AuraButton> : null}
           {!busy && summary.done.length === 1 ? <AuraButton type="button" className="w-full" onClick={() => download(summary.done[0].url!, summary.done[0].outputName)}>Download JPEG</AuraButton> : null}
+          {!busy && summary.done.length > 0 ? <AuraButton type="button" variant="secondary" className="w-full" onClick={reset}>Convert more photos</AuraButton> : null}
           {!busy && summary.outputBytes > 256 * 1024 * 1024 ? <p className="text-sm text-[var(--text-warning)]">This download bundle is large. Individual downloads may use less memory on iPhone.</p> : null}
         </aside>
       </div>
