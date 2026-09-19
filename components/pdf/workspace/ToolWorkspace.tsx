@@ -444,7 +444,7 @@ export function L2UploadStage({
   loading?: boolean;
   error?: string;
   buttonLabel?: string;
-  onFilesSelected?: (files: FileList) => void;
+  onFilesSelected?: (files: FileList | readonly File[]) => void;
   onActivate?: () => void;
 }) {
   const generatedId = useId();
@@ -464,9 +464,9 @@ export function L2UploadStage({
   function handleInputChange(event: ChangeEvent<HTMLInputElement>) {
     // Snapshot before clearing: WebKit's FileList is live and may be emptied
     // when the input value is reset after the picker closes.
-    const selectedFiles = event.currentTarget.files;
-    if (selectedFiles?.length) onFilesSelected?.(selectedFiles);
+    const selectedFiles = event.currentTarget.files ? Array.from(event.currentTarget.files) : [];
     event.currentTarget.value = "";
+    if (selectedFiles.length) onFilesSelected?.(selectedFiles);
   }
 
   function handleDragEnter(event: DragEvent<HTMLDivElement>) {
@@ -495,7 +495,7 @@ export function L2UploadStage({
     event.preventDefault();
     dragDepthRef.current = 0;
     setInternalDragActive(false);
-    if (event.dataTransfer.files.length) onFilesSelected?.(event.dataTransfer.files);
+    if (event.dataTransfer.files.length) onFilesSelected?.(Array.from(event.dataTransfer.files));
   }
 
   const defaultAction = canSelect ? (
