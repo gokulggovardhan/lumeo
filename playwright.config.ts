@@ -21,7 +21,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"]],
   use: {
-    baseURL: "http://localhost:3000",
+    baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
     viewport: { width: 1600, height: 1000 },
     trace: "retain-on-failure",
   },
@@ -34,7 +34,7 @@ export default defineConfig({
   // StrictMode double-invocation, which only happens in development -- a
   // defect that reproduces in dev alone needs saying so, and one that
   // reproduces in both is unambiguous.
-  webServer: {
+  webServer: process.env.E2E_BASE_URL ? undefined : {
     command: process.env.E2E_PROD ? "npm run start" : "npm run dev",
     url: "http://localhost:3000/pdf/edit",
     reuseExistingServer: !process.env.E2E_PROD,
