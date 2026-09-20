@@ -609,7 +609,7 @@ export type RecentActivityRow =
   | { kind: "unknown_location_burst"; count: number; latestAt: string; earliestAt: string };
 
 // Bots, ad blockers, and requests that arrive without the geo cookie yet
-// (first hit before it's set, or non-Vercel environments) all land as
+// (first hit before it's set, or requests without Cloudflare geo metadata) all land as
 // "Unknown location" -- in bursts, they drown out the events that actually
 // have somewhere to show. Collapses each consecutive run of unknown-location
 // events (list is already newest-first) into one summary row instead of
