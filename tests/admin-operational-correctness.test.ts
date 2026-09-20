@@ -94,6 +94,22 @@ test("Overview avoids duplicate analytics and retired status queries", () => {
   assert.match(page, /data\.latestAnalyticsEventAt/);
 });
 
+test("browser error capture stays behind the same-origin application boundary", () => {
+  const client = read("lib/errors/client.ts");
+  const route = read("app/api/error-report/route.ts");
+
+  assert.match(client, /fetch\("\/api\/error-report"/);
+  assert.match(client, /credentials: "same-origin"/);
+  assert.doesNotMatch(client, /createClient\(\)/);
+  assert.doesNotMatch(client, /\.rpc\("record_error_event"/);
+
+  assert.match(route, /createClient/);
+  assert.match(route, /\.rpc\("record_error_event"/);
+  assert.match(route, /sameOriginPageUrl/);
+  assert.match(route, /LUMEO_BUILD_SHA/);
+  assert.match(route, /rate limit/i);
+});
+
 test("error-ingestion hardening keeps counters private and covers null-session abuse", () => {
   const migration = read("supabase/migrations/20260919170000_error_ingest_rate_limit.sql");
   const runtimeTest = read("scripts/verify-error-ingest-rate-limit.mjs");
