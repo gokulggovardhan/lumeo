@@ -7,8 +7,11 @@ const SUPABASE_URL_KEY = "NEXT_PUBLIC_SUPABASE_URL";
 const SUPABASE_PUBLISHABLE_KEY = "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY";
 
 export function getSupabaseEnv(): SupabaseEnv {
-  const url = process.env[SUPABASE_URL_KEY];
-  const publishableKey = process.env[SUPABASE_PUBLISHABLE_KEY];
+  // Keep these as direct property accesses. Next and Vite/vinext can only
+  // replace browser-safe public env values statically when the property name
+  // is visible at build time.
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!url) {
     throw new Error(`${SUPABASE_URL_KEY} is required.`);
