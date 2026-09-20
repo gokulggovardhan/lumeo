@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { BrandLockup } from "@/components/BrandMark";
 import { AdminLoginSubmitButton } from "@/components/admin/AdminLoginSubmitButton";
 import { signInAdmin } from "@/app/admin/login/actions";
@@ -47,9 +48,13 @@ export default async function AdminLoginPage({
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(203,160,82,0.12),transparent_34%),radial-gradient(circle_at_82%_80%,rgba(30,107,74,0.16),transparent_32%)]" />
 
       <section className="relative w-full max-w-[460px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.32)] sm:p-8">
-        <a href="/" className="inline-flex rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45">
+        <Link
+          href="/"
+          prefetch={false}
+          className="inline-flex rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45"
+        >
           <BrandLockup markSize="h-10 w-10" />
-        </a>
+        </Link>
 
         <div className="mt-8">
           <p className="text-[0.68rem] font-bold uppercase tracking-[0.24em] text-[#CBA052]/72">
@@ -111,12 +116,13 @@ export default async function AdminLoginPage({
 
         <div className="mt-6 flex items-center justify-between gap-4 border-t border-[#E8DFC8]/10 pt-5 text-sm">
           <p className="text-[#F0EAD6]/48">Verified administrator access only.</p>
-          <a
+          <Link
             href="/"
+            prefetch={false}
             className="font-semibold text-[#CBA052]/82 transition hover:text-[#F0EAD6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45"
           >
             Public workspace
-          </a>
+          </Link>
         </div>
       </section>
     </main>
