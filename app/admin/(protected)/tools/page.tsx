@@ -16,6 +16,22 @@ export default async function ToolsPage() {
   const [tools, categories] = await Promise.all([getPdfTools(), getToolCategories()]);
   const canEdit = canManageTools(admin.role);
 
+  if (tools.error || categories.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Catalog"
+          title="Tools"
+          description="Manage the database catalog for Lumeo PDF tools."
+        />
+        <AdminEmptyState
+          title="Tool catalog is unavailable"
+          description="Tool or category state could not be verified, so catalog changes are disabled until the data service recovers."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-7">
       <AdminPageHeader
