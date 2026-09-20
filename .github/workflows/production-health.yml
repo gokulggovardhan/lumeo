@@ -1,6 +1,10 @@
 name: Lumeo Production Health
 
 on:
+  push:
+    branches:
+      - main
+
   schedule:
     - cron: "30 */6 * * *"
 
@@ -67,6 +71,111 @@ jobs:
 
             echo "PASS ${route} HTTP ${status_code}"
           done
+
+      - name: Verify deployed revision and Admin boundary
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          base_url="https://lumeo.in"
+
+          matched_revision=0
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error --max-time 30               "$base_url/api/build-info"               --output /tmp/lumeo-build-info.json; then
+              deployed_sha="$(
+                python3 -c 'import json; print(json.load(open("/tmp/lumeo-build-info.json")).get("commit") or "")'
+              )"
+              deployment_environment="$(
+                python3 -c 'import json; print(json.load(open("/tmp/lumeo-build-info.json")).get("environment") or "")'
+              )"
+
+              if [ "$deployed_sha" = "$EXPECTED_SHA" ] && [ "$deployment_environment" = "production" ]; then
+                matched_revision=1
+                echo "PASS production build-info matches $EXPECTED_SHA"
+                break
+              fi
+
+              echo "Waiting for Cloudflare revision $EXPECTED_SHA (currently ${deployed_sha:-missing}, env ${deployment_environment:-missing})"
+            fi
+
+            sleep 5
+          done
+
+          if [ "$matched_revision" != "1" ]; then
+            echo "FAIL production did not report expected revision $EXPECTED_SHA"
+            cat /tmp/lumeo-build-info.json 2>/dev/null || true
+            exit 1
+          fi
+
+          admin_status="$(
+            curl               --silent               --show-error               --output /dev/null               --dump-header /tmp/lumeo-admin.headers               --write-out "%{http_code}"               --max-time 30               "$base_url/admin"
+          )"
+
+          if [ "$admin_status" != "307" ]; then
+            echo "FAIL /admin returned HTTP $admin_status instead of 307"
+            cat /tmp/lumeo-admin.headers
+            exit 1
+          fi
+
+          if ! grep -Eiq '^location: .*\/admin\/login' /tmp/lumeo-admin.headers; then
+            echo "FAIL /admin did not redirect to /admin/login"
+            cat /tmp/lumeo-admin.headers
+            exit 1
+          fi
+
+          login_status="$(
+            curl               --silent               --show-error               --output /dev/null               --write-out "%{http_code}"               --max-time 30               "$base_url/admin/login"
+          )"
+          if [ "$login_status" != "200" ]; then
+            echo "FAIL /admin/login returned HTTP $login_status"
+            exit 1
+          fi
+
+          curl             --fail             --silent             --show-error             --dump-header /tmp/lumeo-session.headers             --output /tmp/lumeo-session.json             --max-time 30             "$base_url/admin/session"
+
+          python3 - <<'PY'
+          import json
+          with open("/tmp/lumeo-session.json", encoding="utf-8") as handle:
+              payload = json.load(handle)
+          expected = {"authenticated": False, "authorized": False}
+          if payload != expected:
+              raise SystemExit(f"FAIL signed-out session payload: {payload!r}")
+          print("PASS signed-out /admin/session is unauthorized")
+          PY
+
+          if ! grep -Eiq '^cache-control: .*private.*no-store' /tmp/lumeo-session.headers; then
+            echo "FAIL /admin/session is missing private no-store cache policy"
+            cat /tmp/lumeo-session.headers
+            exit 1
+          fi
+
+          logout_get_status="$(
+            curl               --silent               --show-error               --output /dev/null               --write-out "%{http_code}"               --max-time 30               "$base_url/admin/logout"
+          )"
+          if [ "$logout_get_status" != "405" ]; then
+            echo "FAIL GET /admin/logout returned HTTP $logout_get_status instead of 405"
+            exit 1
+          fi
+
+          error_probe_status="$(
+            curl               --silent               --show-error               --output /dev/null               --write-out "%{http_code}"               --request POST               --header "Content-Type: application/json"               --data '{"message":""}'               --max-time 30               "$base_url/api/error-report"
+          )"
+          if [ "$error_probe_status" != "400" ]; then
+            echo "FAIL invalid /api/error-report probe returned HTTP $error_probe_status"
+            exit 1
+          fi
+
+          feedback_probe_status="$(
+            curl               --silent               --show-error               --output /dev/null               --write-out "%{http_code}"               --request POST               --header "Content-Type: application/json"               --data '{}'               --max-time 30               "$base_url/api/feedback"
+          )"
+          if [ "$feedback_probe_status" != "400" ]; then
+            echo "FAIL invalid /api/feedback probe returned HTTP $feedback_probe_status"
+            exit 1
+          fi
+
+          echo "PASS production Admin/API boundary checks"
 
       - name: Verify production social images
         shell: bash
