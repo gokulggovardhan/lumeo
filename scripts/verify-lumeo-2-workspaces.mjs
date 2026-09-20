@@ -115,7 +115,7 @@ try {
   assert(mergeTool.includes("Move ${item.file.name} up") && mergeTool.includes("Remove ${item.file.name}"), "Merge file controls must keep accessible labels.");
   assert(!/metadata removal|archive/i.test(mergeTool.match(/inspector=\{[\s\S]*?Merge options[\s\S]*?<\/div>\s*\}/)?.[0] ?? ""), "Merge settings panel includes invented settings.");
 
-  assert(splitTool.includes("Document tray") && splitTool.includes("Source PDF"), "Split must retain one-document profile language.");
+  assert(splitTool.includes('acceptedNote="PDF only · One file"') && splitTool.includes('<span className="aura-text-label shrink-0 text-[var(--text-accent)]">File</span>'), "Split must retain its current single-document file summary.");
   assert(splitTool.includes("inputId=\"split-pdf-upload\"") && splitTool.includes("multiple={false}") && splitTool.includes("onFilesSelected={handleFiles}"), "Split must use the shared one-file upload contract.");
   for (const splitMode of ['"extract"', '"ranges"', '"everyPage"', '"everyN"', '"remove"']) {
     assert(splitTool.includes(splitMode), `Split mode constant changed unexpectedly: ${splitMode}`);
@@ -131,10 +131,9 @@ try {
   assert(compressTool.includes("Grayscale") && compressTool.includes("Quality mode") && compressTool.includes("Target size"), "Compress controls changed unexpectedly.");
   assert(compressTool.includes("Target achieved") && compressTool.includes("Closest safe result") && compressTool.includes("Compression not beneficial") && compressTool.includes("Unable to process"), "Target status wording changed unexpectedly.");
 
-  // Operation lifecycle events were originally postponed past Run 3, but
-  // were verified live in production across all 14 PDF tools as of
-  // 2026-07-29 -- this check was updated to match reality (see
-  // scripts/verify-privacy-analytics.mjs).
+  // Operation lifecycle events are part of the current production analytics
+  // contract; keep the flagship tool markers aligned with the dedicated
+  // analytics verifier.
   const analyticsLifecycleEvents = /processing_started|processing_succeeded|processing_failed|download_started/;
   assert(analyticsLifecycleEvents.test([mergeTool, splitTool, compressTool].join("\n")), "Analytics lifecycle events must be present.");
 
@@ -145,7 +144,7 @@ try {
   const modified = changedFiles();
   for (const file of modified) {
     assert(!file.startsWith("supabase/migrations/"), `Supabase migration changed: ${file}`);
-    assert(!file.startsWith("components/analytics/") && !file.startsWith("lib/analytics/"), `Analytics V1 file changed: ${file}`);
+    assert(!file.startsWith("components/analytics/") && !file.startsWith("lib/analytics/"), `Protected analytics implementation changed: ${file}`);
   }
 
   const scannedSource = [workspace, css, tokens, mergePage, splitPage, compressPage, mergeTool, splitTool, compressTool, docs].join("\n");
