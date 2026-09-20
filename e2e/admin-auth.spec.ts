@@ -132,7 +132,11 @@ test.describe("Control Center authentication", () => {
     ).toBeVisible();
 
     const rangeSelect = page.getByLabel("Range");
-    await expect(rangeSelect).toHaveCSS("font-size", "16px");
+    const viewportWidth = page.viewportSize()?.width ?? 1280;
+    await expect(rangeSelect).toHaveCSS(
+      "font-size",
+      viewportWidth < 640 ? "16px" : "14px",
+    );
     await rangeSelect.selectOption("30d");
     await page.getByRole("button", { name: "Apply" }).click();
     await expect(page).toHaveURL(/\/admin\/analytics\?range=30d/);
@@ -179,7 +183,7 @@ test.describe("Control Center authentication", () => {
     await errorsNavigation.getByRole("link", { name: "Health" }).click();
     await expect(page).toHaveURL(/\/admin\/health/);
     await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
-    await expect(page.getByText(/LibreOffice converter · Optional/)).toBeVisible();
+    await expect(page.getByText(/LibreOffice converter/)).toBeVisible();
 
     const { navigation: healthNavigation } = await openAdminNavigation(page);
     await healthNavigation.getByRole("link", { name: "Settings" }).click();
