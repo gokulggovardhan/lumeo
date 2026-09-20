@@ -19,10 +19,14 @@ const deploymentEnvironment =
       ? "ci"
       : "local";
 
+const deploymentUrl =
+  deploymentEnvironment === "production" ? "https://lumeo.in" : "";
+
 export default defineConfig({
   define: {
     "process.env.LUMEO_BUILD_SHA": JSON.stringify(buildSha),
     "process.env.LUMEO_DEPLOYMENT_ENV": JSON.stringify(deploymentEnvironment),
+    "process.env.LUMEO_DEPLOYMENT_URL": JSON.stringify(deploymentUrl),
   },
   plugins: [
     vinext({
