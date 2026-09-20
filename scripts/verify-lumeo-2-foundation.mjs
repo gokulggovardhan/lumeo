@@ -251,8 +251,8 @@ try {
     assert(ui.includes(marker), `Missing UI foundation marker: ${marker}`);
   }
 
-  assert(workspace.includes("aura-tool-workspace-layout"), "Tool workspace layout foundation marker missing.");
-  assert(workspace.includes("aura-tool-workspace-inspector"), "Tool workspace inspector foundation marker missing.");
+  assert(workspace.includes("l2-workspace-grid"), "Current tool workspace grid foundation marker missing.");
+  assert(workspace.includes("l2-workspace-inspector"), "Current tool workspace inspector foundation marker missing.");
   assert(publicShell.includes("AuraPublicNav") && publicShell.includes("AuraPublicFooter"), "Public shell foundation is missing.");
   assert(footer.includes("aura-public-footer"), "Public footer foundation marker is missing.");
   assert(controlShell.includes("ControlCenterShell"), "Control Center shell foundation is missing.");
