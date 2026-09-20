@@ -12,7 +12,6 @@
     "verify:public-catalog": "node scripts/verify-public-tool-catalog.mjs",
     "verify:analytics": "node scripts/verify-privacy-analytics.mjs",
     "verify:aura": "node scripts/verify-lumeo-aura.mjs",
-    "verify:aura-rollout": "node scripts/verify-lumeo-aura-rollout.mjs",
     "verify:lumeo2-foundation": "node scripts/verify-lumeo-2-foundation.mjs",
     "verify:lumeo2-public-experience": "node scripts/verify-lumeo-2-public-experience.mjs",
     "verify:lumeo2-workspaces": "node scripts/verify-lumeo-2-workspaces.mjs",
