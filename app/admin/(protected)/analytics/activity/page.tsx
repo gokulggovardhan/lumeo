@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { RecentActivityTable, RECENT_ACTIVITY_PAGE_SIZE } from "@/components/admin/analytics/RecentActivityTable";
@@ -18,6 +19,24 @@ export default async function AnalyticsActivityPage({
   // over the full set so unknown-location bursts stay grouped consistently
   // across pages, then sliced per page.
   const recentEvents = await getRecentAnalyticsEvents(200);
+  if (recentEvents.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Analytics"
+          title="Full activity log"
+          description="Every recent public event, newest first, with approximate location where available."
+        />
+        <AdminEmptyState
+          title="Recent activity is unavailable"
+          description="The secure recent-events reader could not return verified data. Try again after the data service recovers."
+        />
+        <Link href="/admin/analytics" className="text-sm font-semibold text-[#F0EAD6]/70 hover:underline">
+          ← Back to analytics
+        </Link>
+      </div>
+    );
+  }
   const rows = collapseUnknownLocationRuns(recentEvents.data);
   const totalPages = Math.max(1, Math.ceil(rows.length / RECENT_ACTIVITY_PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
