@@ -3,7 +3,7 @@ import JSZip from "jszip";
 import type {
   ReconstructedPage,
   ReconstructedTextLine,
-} from "@/lib/conversion/browser/pdfToWord/types";
+} from "./types.ts";
 
 const TWIPS_PER_PT = 20;
 const EMU_PER_PT = 12_700;
