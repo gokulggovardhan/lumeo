@@ -4,8 +4,8 @@
 // Part 3 + Part 11). Orchestrates the checks that already exist rather than
 // reimplementing any of their logic: the core test/lint/typecheck/build
 // sequence, then the maintained verify scripts in turn. Current production
-// verifiers are release-fatal; explicitly deprecated historical rollout
-// checks may still be reported as non-fatal signals.
+// verifiers are release-fatal and must describe the current production
+// architecture. Stale historical assertions should be updated, not ignored.
 //
 // Usage: npm run verify:release
 
@@ -31,11 +31,6 @@ const VERIFY_SCRIPTS = [
   "verify:lumeo2-workspaces",
 ];
 
-const NON_FATAL_VERIFY_SCRIPTS = new Set([
-  // Historical rollout verifier: useful as a signal, but its hard-coded
-  // content markers no longer define current production correctness.
-  "verify:lumeo2-public-experience",
-]);
 
 function run(command) {
   try {
@@ -67,15 +62,12 @@ if (!fatalFailure) {
   for (const scriptName of VERIFY_SCRIPTS) {
     console.log(`--- ${scriptName} ---`);
     const result = run(`npm run ${scriptName}`);
-    const fatal = !NON_FATAL_VERIFY_SCRIPTS.has(scriptName);
-    results.push({ label: scriptName, ok: result.ok, fatal });
+    results.push({ label: scriptName, ok: result.ok, fatal: true });
     if (result.ok) {
       console.log(`PASS: ${scriptName}\n`);
-    } else if (fatal) {
+    } else {
       fatalFailure = true;
       console.error(`FAIL: ${scriptName}\n`);
-    } else {
-      console.warn(`WARN: ${scriptName} (deprecated, non-fatal)\n`);
     }
   }
 }

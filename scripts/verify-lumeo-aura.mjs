@@ -78,8 +78,6 @@ const requiredComponents = [
 ];
 
 const toolFoundations = [
-  "ToolWorkspaceShell",
-  "ToolStepHeader",
   "ToolUploadStage",
   "ToolSettingsStage",
   "ToolProcessingStage",
@@ -89,6 +87,9 @@ const toolFoundations = [
   "ToolDocumentSummary",
   "ToolModeCard",
   "ToolOptionRow",
+  "L2WorkspaceHeader",
+  "L2WorkspaceGrid",
+  "L2WorkspaceToolbar",
 ];
 
 
