@@ -219,9 +219,13 @@ test.describe("Control Center authentication", () => {
 
     // Server-side transition checking must also reject an enable submit that
     // lacks the explicit confirmation field (for example, implicit Enter).
+    // Use the real form submission path instead of requestSubmit()+immediate
+    // reload, which WebKit can abort mid-navigation and report as a browser
+    // network error even though the server correctly rejects the transition.
+    const implicitSubmitNavigation = page.waitForURL(/\/admin\/settings/);
     await maintenanceForm.evaluate((form: HTMLFormElement) => form.requestSubmit());
+    await implicitSubmitNavigation;
 
-    await page.reload();
     const maintenanceAfterCancel = page
       .getByRole("form", { name: "Maintenance mode setting" })
       .getByRole("checkbox", { name: "Enabled" });
