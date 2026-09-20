@@ -1,11 +1,11 @@
 import {
   textRunsFromContent,
   type DetectedTextRun,
-} from "@/lib/pdf/edit/textRuns";
+} from "../../../pdf/edit/textRuns.ts";
 import type {
   OcrTextLine,
   ReconstructedTextLine,
-} from "@/lib/conversion/browser/pdfToWord/types";
+} from "./types.ts";
 
 type PdfTextItem = {
   str: string;
