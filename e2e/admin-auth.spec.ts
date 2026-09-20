@@ -222,9 +222,16 @@ test.describe("Control Center authentication", () => {
     // Use the real form submission path instead of requestSubmit()+immediate
     // reload, which WebKit can abort mid-navigation and report as a browser
     // network error even though the server correctly rejects the transition.
-    const implicitSubmitNavigation = page.waitForURL(/\/admin\/settings/);
+    const implicitSubmitResponse = page.waitForResponse((response) => {
+      const request = response.request();
+      return (
+        request.method() === "POST" &&
+        new URL(response.url()).pathname === "/admin/settings"
+      );
+    });
     await maintenanceForm.evaluate((form: HTMLFormElement) => form.requestSubmit());
-    await implicitSubmitNavigation;
+    const rejectedEnableResponse = await implicitSubmitResponse;
+    expect(rejectedEnableResponse.ok()).toBe(true);
 
     const maintenanceAfterCancel = page
       .getByRole("form", { name: "Maintenance mode setting" })
