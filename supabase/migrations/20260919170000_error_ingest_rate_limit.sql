@@ -80,7 +80,10 @@ declare
   cleaned_route text := left(nullif(btrim(record_error_event.route), ''), 300);
   cleaned_component text := left(nullif(btrim(record_error_event.component), ''), 200);
   cleaned_stack text := private.sanitize_error_text(record_error_event.stack, 4000);
-  cleaned_page_url text := private.sanitize_error_text(nullif(btrim(record_error_event.page_url), ''), 500);
+  cleaned_page_url text := private.sanitize_error_text(
+    split_part(split_part(nullif(btrim(record_error_event.page_url), ''), '?', 1), '#', 1),
+    500
+  );
   actor_user_id uuid := auth.uid();
   actor_bucket text;
   accepted_count integer;
