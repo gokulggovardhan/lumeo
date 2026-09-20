@@ -82,6 +82,15 @@ jobs:
       - name: Verify Control Center architecture
         run: npm run verify:control-center
 
+      - name: Verify maintained release architecture
+        run: |
+          npm run verify:public-catalog
+          npm run verify:analytics
+          npm run verify:aura
+          npm run verify:lumeo2-foundation
+          npm run verify:lumeo2-public-experience
+          npm run verify:lumeo2-workspaces
+
       - name: Run unit tests
         run: npm test
 
@@ -152,7 +161,7 @@ jobs:
       - name: Verify Admin Inbox RLS roles
         run: node scripts/verify-admin-inbox-rls.mjs
 
-      - name: Verify error ingestion rate limits
+      - name: Verify error and feedback ingestion rate limits
         run: node scripts/verify-error-ingest-rate-limit.mjs
 
       - name: Install Playwright browsers
