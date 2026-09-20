@@ -142,53 +142,48 @@ Production collection is disabled unless this setting explicitly resolves to
 true through the public setting RPC. Local development can use
 `NEXT_PUBLIC_ANALYTICS_DEBUG=true` for testing.
 
-## Analytics V1 Scope
+## Current Analytics Scope
 
-Analytics V1 scope is intentionally limited and explicit.
-
-Analytics V1 is intentionally limited to discovery analytics:
+Current production analytics covers both discovery and operation lifecycle signals:
 
 - `page_view`
 - `tool_opened`
-- total public events
-- page views today
-- tool opens today
-- top tools by opens
-- coarse device class
-- coarse browser family
-- coarse operating-system family
-- temporary anonymous session counts in aggregate form only
-- latest event timestamp
-- seven-day page-view and tool-open trends
-
-Operation lifecycle analytics remains Planned for a later shared browser-tool
-framework:
-
 - `processing_started`
 - `processing_succeeded`
 - `processing_failed`
 - `download_started`
-- processing success rate
-- average processing duration
 
-The schema and RPC allowlists keep those event names reserved so historical
-rows and future migration history remain compatible. The current Merge, Split,
-and Compress components do not emit operation lifecycle events in Analytics V1.
-The Control Center labels those metrics as planned instead of displaying
-misleading zero cards.
+The Control Center presents verified aggregate metrics for public events, unique
+visitors, page views, tool opens, processing started/succeeded/failed, downloads,
+processing success rate, average successful duration, top tools, device class,
+browser family, operating-system family, generic error categories, approximate
+network-derived locations, and the latest event timestamp.
+
+These metrics come from the approved RPC/event schema. They do not expose raw
+session identifiers, IP addresses, filenames, document content, or precise
+location data.
 
 ## Admin Analytics Views
 
-The Control Center analytics page shows real data only:
+The Control Center analytics page shows verified aggregate and recent operational
+data only:
 
-- events today
-- tool opens
+- unique visitors
+- total approved events
 - page views
-- seven-day page-view and tool-open activity
-- top tools
+- tool opens
+- processing started, succeeded, and failed
+- processing success rate and average successful duration
+- downloads started
+- daily activity trends
+- top tools by opens and successful conversion
 - device/browser/OS summaries
+- generic error categories
+- approximate network-derived locations
+- recent public activity without session IDs, IP addresses, or precise
+  coordinates
 
-Anonymous session IDs and individual event rows are not displayed.
+Anonymous session IDs are not displayed.
 
 ## Secure Admin Aggregate Reads
 
@@ -243,33 +238,23 @@ summary and breakdown data so it does not need direct table access.
 
 ## PDF Tool Event Lifecycle
 
-> Updated 2026-07-29: this section originally described only Merge, Split, and
-> Compress. All 14 live PDF tools now use the same Analytics V1 workspace-open
-> lifecycle described below.
+All 16 live PDF tools use the current analytics lifecycle.
 
-Every live PDF tool currently uses the same Analytics V1 workspace-open
-lifecycle:
+For each mounted tool workspace:
 
-- `tool_opened` fires once per mounted tool workspace after analytics becomes
-  enabled. The one-time ref is marked only when `track()` returns
-  `accepted: true`.
+- `tool_opened` fires once after analytics becomes enabled and is marked as
+  sent only when `track()` returns `accepted: true`.
+- `processing_started` records the start of an actual operation.
+- `processing_succeeded` records successful completion.
+- `processing_failed` records an approved generic failure category.
+- `download_started` records output-download initiation.
 
-Operation events remain planned:
-
-- `processing_started`
-- `processing_succeeded`
-- `processing_failed`
-- `download_started`
-
-Those events will be reintroduced through one shared browser-tool lifecycle so
-future tools do not duplicate per-component analytics wiring. Until then,
-processing and download analytics are intentionally not emitted. PDF processing
-and downloads remain independent of analytics, with no persistent queue and no
-retry loop.
-
-Tool analytics payloads include only approved event names and tool slugs in V1.
-They exclude filenames, exact file sizes, page counts, output names, document
-text, thumbnails, PDF metadata, stack traces, and raw error messages.
+Analytics never blocks PDF processing or downloads. Tool payloads include only
+approved event names, tool slugs, coarse size/device/browser/OS classifications,
+approved generic error codes, success state, and bounded duration values where
+applicable. They exclude filenames, exact file sizes, page counts, output names,
+document text, thumbnails, PDF metadata, stack traces, raw error messages, raw
+IP addresses, and precise coordinates.
 
 ## Manual Migration Procedure
 
