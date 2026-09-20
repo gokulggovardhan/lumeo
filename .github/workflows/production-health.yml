@@ -1,6 +1,10 @@
 name: Lumeo Production Health
 
 on:
+  push:
+    branches:
+      - main
+
   schedule:
     - cron: "30 */6 * * *"
 
@@ -67,6 +71,107 @@ jobs:
 
             echo "PASS ${route} HTTP ${status_code}"
           done
+
+      - name: Verify deployed revision and Admin boundary
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          base_url="https://lumeo.in"
+          deployed_commit=""
+          deployed_environment=""
+
+          for attempt in {1..24}; do
+            body="$(curl --silent --show-error --fail --max-time 30 "$base_url/api/build-info" || true)"
+
+            if [ -n "$body" ]; then
+              deployed_commit="$(node -e 'try { const value = JSON.parse(process.argv[1]); process.stdout.write(value.commit ?? ""); } catch {}' "$body")"
+              deployed_environment="$(node -e 'try { const value = JSON.parse(process.argv[1]); process.stdout.write(value.environment ?? ""); } catch {}' "$body")"
+            fi
+
+            if [ "$deployed_commit" = "$EXPECTED_SHA" ]; then
+              break
+            fi
+
+            echo "Waiting for Cloudflare revision: expected $EXPECTED_SHA, observed ${deployed_commit:-none} (attempt $attempt/24)"
+            sleep 10
+          done
+
+          if [ "$deployed_commit" != "$EXPECTED_SHA" ]; then
+            echo "FAIL /api/build-info did not reach expected revision $EXPECTED_SHA"
+            exit 1
+          fi
+
+          if [ "$deployed_environment" != "production" ]; then
+            echo "FAIL /api/build-info reported environment '${deployed_environment:-none}'"
+            exit 1
+          fi
+
+          echo "PASS /api/build-info revision $deployed_commit (production)"
+
+          admin_headers="$(curl --silent --show-error --dump-header - --output /dev/null --max-time 30 "$base_url/admin")"
+          admin_status="$(printf "%s" "$admin_headers" | awk '/^HTTP\// { code=$2 } END { print code }')"
+          admin_location="$(printf "%s" "$admin_headers" | awk -F': ' 'tolower($1) == "location" { value=$2 } END { gsub("\r", "", value); print value }')"
+
+          case "$admin_status" in
+            302|303|307|308) ;;
+            *)
+              echo "FAIL unauthenticated /admin returned HTTP $admin_status"
+              exit 1
+              ;;
+          esac
+
+          case "$admin_location" in
+            *"/admin/login"*) ;;
+            *)
+              echo "FAIL unauthenticated /admin redirect location was '${admin_location:-missing}'"
+              exit 1
+              ;;
+          esac
+
+          echo "PASS unauthenticated /admin redirects to login"
+
+          login_headers="$(curl --silent --show-error --dump-header - --output /dev/null --max-time 30 "$base_url/admin/login")"
+          login_status="$(printf "%s" "$login_headers" | awk '/^HTTP\// { code=$2 } END { print code }')"
+          login_cache="$(printf "%s" "$login_headers" | awk -F': ' 'tolower($1) == "cache-control" { value=tolower($2) } END { gsub("\r", "", value); print value }')"
+
+          if [ "$login_status" != "200" ]; then
+            echo "FAIL /admin/login returned HTTP $login_status"
+            exit 1
+          fi
+
+          case "$login_cache" in
+            *private*no-store*|*no-store*private*) ;;
+            *)
+              echo "FAIL /admin/login cache-control was '${login_cache:-missing}'"
+              exit 1
+              ;;
+          esac
+
+          echo "PASS /admin/login HTTP 200 with private no-store cache policy"
+
+          session_headers="$(mktemp)"
+          session_body="$(curl --silent --show-error --fail --dump-header "$session_headers" --max-time 30 "$base_url/admin/session")"
+          session_cache="$(awk -F': ' 'tolower($1) == "cache-control" { value=tolower($2) } END { gsub("\r", "", value); print value }' "$session_headers")"
+
+          node -e '
+            const value = JSON.parse(process.argv[1]);
+            if (value.authenticated !== false || value.authorized !== false) {
+              process.exit(1);
+            }
+          ' "$session_body"
+
+          case "$session_cache" in
+            *private*no-store*|*no-store*private*) ;;
+            *)
+              echo "FAIL /admin/session cache-control was '${session_cache:-missing}'"
+              exit 1
+              ;;
+          esac
+
+          echo "PASS signed-out /admin/session is unauthorized and private/no-store"
 
       - name: Verify production social images
         shell: bash
