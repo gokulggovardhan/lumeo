@@ -8,8 +8,17 @@ test.beforeAll(async () => {
 test("vinext Edit PDF exposes matched editable text runs", async ({ page }) => {
   const pageErrors: string[] = [];
   const failedRequests: string[] = [];
+  const editEngineErrors: string[] = [];
 
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (
+      message.type() === "error" &&
+      message.text().includes("[Edit PDF]")
+    ) {
+      editEngineErrors.push(message.text());
+    }
+  });
   page.on("requestfailed", (request) => {
     failedRequests.push(
       `${request.method()} ${request.url()} — ${request.failure()?.errorText ?? "unknown"}`,
@@ -22,7 +31,18 @@ test("vinext Edit PDF exposes matched editable text runs", async ({ page }) => {
   const editable = page.locator(
     'div[role="button"][aria-label^="Editable text: "]',
   );
-  await expect(editable.first()).toBeVisible({ timeout: 90_000 });
+  await expect
+    .poll(
+      async () => ({
+        editable: await editable.count(),
+        diagnostics: editEngineErrors.join(" | "),
+      }),
+      {
+        timeout: 90_000,
+        message: "vinext should produce editable runs; browser diagnostics are included in the observed value",
+      },
+    )
+    .toMatchObject({ editable: 1 });
 
   const labels = await editable.evaluateAll((nodes) =>
     nodes.map((node) => node.getAttribute("aria-label") ?? ""),
@@ -30,6 +50,7 @@ test("vinext Edit PDF exposes matched editable text runs", async ({ page }) => {
   expect(labels.join(" ")).toContain("Employee record");
   expect(labels.join(" ")).toContain("123-45-6789");
 
+  expect(editEngineErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
 });
