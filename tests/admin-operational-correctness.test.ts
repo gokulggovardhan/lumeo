@@ -2,69 +2,131 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { summarizeHealthStatus } from "../lib/admin/health-status.ts";
+import { PUBLIC_ROUTE_PATHS } from "../lib/public-site/routes.ts";
 
 function read(path: string) {
   return readFileSync(path, "utf8");
 }
 
-test("health summary does not report Operational when a required dependency is unconfigured", () => {
-  assert.equal(
-    summarizeHealthStatus([
-      { status: "ok" },
-      { status: "not_configured" },
-      { status: "ok" },
-    ]),
-    "not_configured",
-  );
-  assert.equal(
-    summarizeHealthStatus([
-      { status: "not_configured" },
-      { status: "degraded" },
-    ]),
-    "degraded",
-  );
-  assert.equal(
-    summarizeHealthStatus([
-      { status: "degraded" },
-      { status: "down" },
-    ]),
-    "down",
-  );
+test("health summary distinguishes required and optional dependencies", () => {
+  assert.equal(summarizeHealthStatus([
+    { status: "ok", required: true },
+    { status: "not_configured", required: false },
+  ]), "ok");
+  assert.equal(summarizeHealthStatus([
+    { status: "ok", required: true },
+    { status: "not_configured", required: true },
+  ]), "not_configured");
+  assert.equal(summarizeHealthStatus([
+    { status: "ok", required: true },
+    { status: "down", required: false },
+  ]), "degraded");
+  assert.equal(summarizeHealthStatus([
+    { status: "degraded", required: true },
+    { status: "ok", required: false },
+  ]), "degraded");
+  assert.equal(summarizeHealthStatus([
+    { status: "down", required: true },
+    { status: "ok", required: false },
+  ]), "down");
 });
 
-test("Admin SEO and sitemap share one public route registry", () => {
+test("Admin SEO and sitemap share one intentional public route registry", () => {
   const sitemap = read("app/sitemap.ts");
   const seo = read("app/admin/(protected)/seo/page.tsx");
-  const routes = read("lib/public-site/routes.ts");
 
   assert.match(sitemap, /PUBLIC_ROUTE_CONFIG/);
   assert.match(seo, /PUBLIC_ROUTE_PATHS/);
-  for (const route of [
-    "/heic-to-jpeg",
-    "/pdf/organize",
-    "/pdf/extract-text",
-    "/pdf/edit",
-    "/pdf/watermark",
-    "/pdf/crop",
-    "/pdf/page-numbers",
-    "/pdf/header-footer",
-    "/pdf/html-to-pdf",
-  ]) {
-    assert.match(routes, new RegExp(route.replaceAll("/", "\\/")));
-  }
+  assert.equal(new Set(PUBLIC_ROUTE_PATHS).size, PUBLIC_ROUTE_PATHS.length);
+  assert.ok(PUBLIC_ROUTE_PATHS.includes("/heic-to-jpeg"));
+  assert.ok(PUBLIC_ROUTE_PATHS.includes("/pdf/html-to-pdf"));
+  assert.ok(PUBLIC_ROUTE_PATHS.includes("/contact"));
+  assert.ok(PUBLIC_ROUTE_PATHS.every((route) => !route.startsWith("/admin")));
+  assert.ok(PUBLIC_ROUTE_PATHS.every((route) => !route.startsWith("/api")));
+  assert.equal(PUBLIC_ROUTE_PATHS.includes("/features"), false);
 });
 
-test("Admin Errors does not render raw stack traces", () => {
+test("Admin Errors renders sanitized diagnostics as inert expandable text", () => {
   const errorsPage = read("app/admin/(protected)/errors/page.tsx");
-  assert.doesNotMatch(errorsPage, /log\.stack/);
-  assert.doesNotMatch(errorsPage, /<pre/);
+
+  assert.match(errorsPage, /sanitizeErrorDiagnostic/);
+  assert.match(errorsPage, /<pre/);
+  assert.match(errorsPage, /safeStack/);
+  assert.doesNotMatch(errorsPage, /\{log\.stack\}/);
+  assert.doesNotMatch(errorsPage, /dangerouslySetInnerHTML/);
 });
 
-test("maintenance mode requires a confirmation before enabling", () => {
+test("maintenance mode has explicit two-stage enable confirmation and server enforcement", () => {
   const settings = read("app/admin/(protected)/settings/page.tsx");
   const button = read("components/admin/MaintenanceModeSubmitButton.tsx");
+  const action = read("app/admin/(protected)/settings/actions.ts");
 
-  assert.match(settings, /MaintenanceModeSubmitButton/);
-  assert.match(button, /window\.confirm/);
-  assert.match(button, /willEnable/);
+  assert.match(settings, /MaintenanceModeSubmitButton wasEnabled=\{enabled\}/);
+  assert.match(settings, /aria-label=/);
+  assert.match(button, /role="alertdialog"/);
+  assert.match(button, /Enable maintenance mode/);
+  assert.match(button, /maintenance_confirmation/);
+  assert.match(button, />Cancel</);
+  assert.doesNotMatch(button, /window\.confirm/);
+  assert.match(action, /requireAdmin\(\)/);
+  assert.match(action, /canManageSettings\(admin\.role\)/);
+  assert.match(action, /maintenance_confirmation/);
+  assert.match(action, /confirm-enable/);
+  assert.match(action, /if \(error\) return errorState/);
+  assert.ok(
+    action.indexOf("if (error) return errorState") <
+      action.indexOf("await writeAuditLog"),
+  );
+  assert.match(action, /maintenance mode/);
+  assert.match(action, /changes: \{ key, enabled \}/);
+});
+
+test("Overview avoids duplicate analytics and retired status queries", () => {
+  const data = read("lib/admin/data.ts");
+  const page = read("app/admin/(protected)/page.tsx");
+
+  assert.doesNotMatch(data, /getSystemStatus/);
+  assert.doesNotMatch(data, /auditActions24h/);
+  assert.doesNotMatch(data, /homepage_tool_slots/);
+  assert.doesNotMatch(data, /latestDailyMetricDate/);
+  assert.doesNotMatch(page, /getSystemStatus/);
+  assert.match(page, /data\.recentAuditLogs\[0\]/);
+  assert.match(page, /data\.latestAnalyticsEventAt/);
+});
+
+test("error-ingestion hardening keeps counters private and covers null-session abuse", () => {
+  const migration = read("supabase/migrations/20260919170000_error_ingest_rate_limit.sql");
+  const runtimeTest = read("scripts/test-error-ingest-rate-limit.mjs");
+
+  assert.match(migration, /create schema if not exists private/);
+  assert.match(migration, /private\.error_ingest_rate_limits/);
+  assert.match(migration, /set search_path = ''/);
+  assert.match(migration, /auth\.uid\(\)/);
+  assert.match(migration, /'anon:null'/);
+  assert.match(migration, /'anon:global'/);
+  assert.match(migration, /anonymous_global_limit constant integer := 200/);
+  assert.match(migration, /revoke execute .* from public/i);
+  assert.match(migration, /grant execute .* to anon, authenticated, service_role/i);
+  assert.match(runtimeTest, /null-session limit/);
+  assert.match(runtimeTest, /authenticated limit/);
+  assert.match(runtimeTest, /current_admin_role/);
+});
+
+test("Admin runtime metadata is Cloudflare-native", () => {
+  const health = read("lib/admin/health.ts");
+  const overview = read("app/admin/(protected)/page.tsx");
+  const timezone = read("lib/admin/timezone.ts");
+  const errors = read("lib/errors/server.ts");
+  const vite = read("vite.config.ts");
+
+  for (const source of [health, overview, timezone, errors]) {
+    assert.doesNotMatch(source, /VERCEL_[A-Z_]+/);
+    assert.doesNotMatch(source, /Vercel runtime/);
+  }
+  assert.match(health, /LUMEO_BUILD_SHA/);
+  assert.match(health, /LUMEO_DEPLOYMENT_ENV/);
+  assert.match(overview, /LUMEO_DEPLOYMENT_ENV/);
+  assert.match(errors, /LUMEO_BUILD_SHA/);
+  assert.match(vite, /WORKERS_CI_COMMIT_SHA/);
+  assert.match(vite, /LUMEO_BUILD_SHA/);
 });

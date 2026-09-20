@@ -135,6 +135,27 @@ try {
   assert(!/service_role/i.test(adminSource), "New admin source must not reference service_role.");
   assert(!/secret[_-]?key/i.test(adminSource), "New admin source must not reference secret keys.");
 
+  const healthSource = read("lib/admin/health.ts");
+  const overviewSource = read("app/admin/(protected)/page.tsx");
+  const timezoneSource = read("lib/admin/timezone.ts");
+  const errorCaptureSource = read("lib/errors/server.ts");
+  const viteSource = read("vite.config.ts");
+  const buildInfoSource = read("app/api/build-info/route.ts");
+  const deploymentSource = [
+    healthSource,
+    overviewSource,
+    timezoneSource,
+    errorCaptureSource,
+  ].join("\n");
+  assert(!/VERCEL_[A-Z_]+/.test(deploymentSource), "Admin/runtime diagnostics must not depend on Vercel environment variables.");
+  assert(!/Vercel runtime/.test(deploymentSource), "Admin/runtime diagnostics must not describe Vercel as the active runtime.");
+  for (const name of ["LUMEO_BUILD_SHA", "LUMEO_DEPLOYMENT_ENV", "LUMEO_DEPLOYMENT_URL"]) {
+    assert(healthSource.includes(name) || overviewSource.includes(name), `Admin deployment metadata missing ${name}.`);
+    assert(viteSource.includes(name), `Cloudflare build must define ${name}.`);
+  }
+  assert(buildInfoSource.includes("LUMEO_BUILD_SHA"), "Build-info endpoint must expose Cloudflare build SHA metadata.");
+  assert(errorCaptureSource.includes("LUMEO_BUILD_SHA"), "Server error capture must tag Cloudflare build SHA metadata.");
+
   const analyticsPage = read("app/admin/(protected)/analytics/page.tsx");
   const analyticsActivityPage = read("app/admin/(protected)/analytics/activity/page.tsx");
   assert(analyticsPage.includes('eyebrow="Analytics"'), "Analytics page must use current Analytics wording.");
@@ -207,7 +228,7 @@ try {
   console.log("PASS server actions call requireAdmin");
   console.log("PASS admin data module is server-only");
   console.log("PASS logout remains POST-only");
-  console.log("PASS no getSession, service_role, or secret key usage in new admin source");
+  console.log("PASS no getSession, service_role, or secret key usage in new admin source");\n  console.log("PASS Admin deployment metadata is Cloudflare-native and Vercel-free");
   console.log("PASS current range-based Analytics control center UI is present");
   console.log("PASS Settings exposes only live runtime controls");
   console.log("PASS protected package versions are unchanged");

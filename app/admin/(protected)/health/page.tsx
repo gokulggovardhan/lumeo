@@ -37,11 +37,6 @@ export default async function HealthPage() {
   }
 
   const snapshot = await getHealthSnapshot();
-  const worst = snapshot.checks.some((check) => check.status === "down")
-    ? "down"
-    : snapshot.checks.some((check) => check.status === "degraded")
-      ? "degraded"
-      : "ok";
 
   return (
     <div className="space-y-7">
@@ -51,7 +46,7 @@ export default async function HealthPage() {
         description="Live status for the services Lumeo depends on. Checked on every page load."
         meta={
           <p className="text-sm text-[var(--lumeo-paper-400)]">
-            Overall: <span className="font-semibold text-[var(--lumeo-paper-50)]">{statusLabel[worst]}</span> · checked{" "}
+            Overall: <span className="font-semibold text-[var(--lumeo-paper-50)]">{statusLabel[snapshot.overallStatus]}</span> · checked{" "}
             {formatAdminDateTime(snapshot.generatedAt)}
           </p>
         }
@@ -61,7 +56,7 @@ export default async function HealthPage() {
         {snapshot.checks.map((check) => (
           <AdminMetricCard
             key={check.name}
-            label={check.name}
+            label={`${check.name}${check.required ? "" : " · Optional"}`}
             value={statusLabel[check.status]}
             detail={check.latencyMs !== null ? `${check.detail} (${check.latencyMs}ms)` : check.detail}
             tone={statusTone[check.status]}

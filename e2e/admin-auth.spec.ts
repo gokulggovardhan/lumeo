@@ -152,6 +152,108 @@ test.describe("Control Center authentication", () => {
     expect(inboxReload?.headers()["cache-control"]).toContain("no-store");
 
     await openMobileNavigation(page);
+    await page
+      .getByRole("navigation", { name: "Mobile Control Center navigation" })
+      .getByRole("link", { name: "Errors" })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/errors/);
+    await expect(page.getByRole("heading", { name: "Errors" })).toBeVisible();
+    const firstError = page.locator("details").first();
+    await expect(firstError).toBeVisible();
+    await firstError.locator("summary").click();
+    await expect(firstError.locator("code")).toContainText("<script>not-executed</script>");
+    await expect(firstError.locator("code")).not.toContainText("should-not-matter");
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(false);
+
+    await openMobileNavigation(page);
+    await page
+      .getByRole("navigation", { name: "Mobile Control Center navigation" })
+      .getByRole("link", { name: "Health" })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/health/);
+    await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
+    await expect(page.getByText(/LibreOffice converter · Optional/)).toBeVisible();
+
+    await openMobileNavigation(page);
+    await page
+      .getByRole("navigation", { name: "Mobile Control Center navigation" })
+      .getByRole("link", { name: "Settings" })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/settings/);
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+
+    const maintenanceForm = page.getByRole("form", {
+      name: "Maintenance mode setting",
+    });
+    const maintenanceToggle = maintenanceForm.getByRole("checkbox", {
+      name: "Enabled",
+    });
+    if (await maintenanceToggle.isChecked()) {
+      await maintenanceToggle.uncheck();
+      await maintenanceForm
+        .getByRole("button", { name: "Save changes" })
+        .click();
+      await expect(maintenanceToggle).not.toBeChecked();
+    }
+
+    await maintenanceToggle.check();
+    await maintenanceForm
+      .getByRole("button", { name: "Save changes" })
+      .click();
+    const maintenanceDialog = maintenanceForm.getByRole("alertdialog");
+    await expect(maintenanceDialog).toBeVisible();
+    await maintenanceDialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(maintenanceDialog).toHaveCount(0);
+
+    // Server-side transition checking must also reject an enable submit that
+    // lacks the explicit confirmation field (for example, implicit Enter).
+    await maintenanceForm.evaluate((form: HTMLFormElement) => form.requestSubmit());
+
+    await page.reload();
+    const maintenanceAfterCancel = page
+      .getByRole("form", { name: "Maintenance mode setting" })
+      .getByRole("checkbox", { name: "Enabled" });
+    await expect(maintenanceAfterCancel).not.toBeChecked();
+
+    await maintenanceAfterCancel.check();
+    const maintenanceFormAfterCancel = page.getByRole("form", {
+      name: "Maintenance mode setting",
+    });
+    await maintenanceFormAfterCancel
+      .getByRole("button", { name: "Save changes" })
+      .click();
+    await maintenanceFormAfterCancel
+      .getByRole("button", { name: "Enable maintenance mode" })
+      .click();
+    await expect(page.getByText("Live: site is down for visitors")).toBeVisible();
+
+    const enabledMaintenanceForm = page.getByRole("form", {
+      name: "Maintenance mode setting",
+    });
+    const enabledMaintenanceToggle = enabledMaintenanceForm.getByRole(
+      "checkbox",
+      { name: "Enabled" },
+    );
+    await enabledMaintenanceToggle.uncheck();
+    await enabledMaintenanceForm
+      .getByRole("button", { name: "Save changes" })
+      .click();
+    await expect(page.getByText("Live: site is down for visitors")).toHaveCount(0);
+
+    await openMobileNavigation(page);
+    await page
+      .getByRole("navigation", { name: "Mobile Control Center navigation" })
+      .getByRole("link", { name: "Inbox" })
+      .click();
+    await expect(page).toHaveURL(/\/admin\/inbox/);
+
+    await openMobileNavigation(page);
     const protectedOrigin = new URL(page.url()).origin;
     await page
       .locator("#control-center-mobile-menu")

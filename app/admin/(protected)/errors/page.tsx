@@ -7,6 +7,7 @@ import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { AdminSubmitButton } from "@/components/admin/AdminSubmitButton";
 import { requireAdmin } from "@/lib/admin/auth";
+import { sanitizeErrorDiagnostic } from "@/lib/admin/error-display";
 import { getErrorLogSummary, getErrorLogs } from "@/lib/admin/errors";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { ignoreErrorLog, reopenErrorLog, resolveErrorLog } from "@/app/admin/(protected)/errors/actions";
@@ -141,13 +142,15 @@ export default async function ErrorsPage({
         <AdminDataTable
           columns={["Severity", "Message", "Route", "Occurrences", "Last seen", "Status", canManage ? "Actions" : "" ].filter(Boolean)}
           rows={logs.data.map((log) => {
+            const safeMessage = sanitizeErrorDiagnostic(log.message, 2000) ?? "Unknown error";
+            const safeStack = sanitizeErrorDiagnostic(log.stack, 4000);
             const cells: React.ReactNode[] = [
               <AdminStatusBadge key="severity" tone={severityTone[log.severity]}>{log.severity}</AdminStatusBadge>,
               <details key="message" className="max-w-md">
-                <summary className="cursor-pointer font-semibold text-[#F0EAD6]">{log.message}</summary>
-                {log.stack && (
+                <summary className="cursor-pointer font-semibold text-[#F0EAD6]">{safeMessage}</summary>
+                {safeStack && (
                   <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[rgba(8,16,29,0.58)] p-3 text-xs leading-5 text-[#F0EAD6]/60">
-                    {log.stack}
+                    <code>{safeStack}</code>
                   </pre>
                 )}
                 <p className="mt-2 text-xs leading-5 text-[#F0EAD6]/50">

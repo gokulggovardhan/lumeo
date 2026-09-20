@@ -11,33 +11,10 @@ import { getSeoSettings } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageSeo } from "@/lib/admin/permissions";
 import { formatAdminDate } from "@/lib/admin/timezone";
+import { PUBLIC_ROUTE_PATHS } from "@/lib/public-site/routes";
 import { deleteSeoSetting, saveSeoSetting } from "@/app/admin/(protected)/seo/actions";
 
-// Known public routes this app actually serves (excludes /admin/** and
-// /maintenance, which are intentionally noindex). Kept as a plain list
-// rather than a filesystem scan since this is a Server Component -- update
-// it when a new public page is added.
-const publicRoutes = [
-  "/",
-  "/about",
-  "/accessibility",
-  "/contact",
-  "/features",
-  "/guides",
-  "/pdf-tools",
-  "/privacy",
-  "/security",
-  "/terms",
-  "/pdf",
-  "/pdf/compress",
-  "/pdf/jpg-to-pdf",
-  "/pdf/merge",
-  "/pdf/pdf-to-jpg",
-  "/pdf/pdf-to-word",
-  "/pdf/sign",
-  "/pdf/split",
-  "/pdf/word-to-pdf",
-];
+const publicRoutes = PUBLIC_ROUTE_PATHS;
 
 export default async function SeoPage({
   searchParams,
