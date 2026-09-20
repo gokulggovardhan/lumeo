@@ -146,7 +146,7 @@ export default async function ErrorsPage({
               Apply filters
             </button>
             {(params.status || params.severity || params.search) && (
-              <Link href="/admin/errors" className="min-h-11 rounded-xl border border-[#E8DFC8]/12 px-5 text-sm font-semibold leading-[2.75rem] text-[#F0EAD6]/70">
+              <Link prefetch={false} href="/admin/errors" className="min-h-11 rounded-xl border border-[#E8DFC8]/12 px-5 text-sm font-semibold leading-[2.75rem] text-[#F0EAD6]/70">
                 Clear
               </Link>
             )}
@@ -210,12 +210,12 @@ export default async function ErrorsPage({
         />
         <div className="mt-4 flex gap-3">
           {page > 1 && (
-            <Link className="rounded-xl border border-[#E8DFC8]/12 px-4 py-2 text-sm font-semibold" href={`/admin/errors${buildQuery({ ...carryParams, page: String(page - 1) })}`}>
+            <Link prefetch={false} className="rounded-xl border border-[#E8DFC8]/12 px-4 py-2 text-sm font-semibold" href={`/admin/errors${buildQuery({ ...carryParams, page: String(page - 1) })}`}>
               Previous
             </Link>
           )}
           {logs.data.length === PAGE_SIZE && (
-            <Link className="rounded-xl border border-[#E8DFC8]/12 px-4 py-2 text-sm font-semibold" href={`/admin/errors${buildQuery({ ...carryParams, page: String(page + 1) })}`}>
+            <Link prefetch={false} className="rounded-xl border border-[#E8DFC8]/12 px-4 py-2 text-sm font-semibold" href={`/admin/errors${buildQuery({ ...carryParams, page: String(page + 1) })}`}>
               Next
             </Link>
           )}
