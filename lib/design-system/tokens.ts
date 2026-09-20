@@ -270,6 +270,14 @@ export type AuraComponentFoundation = (typeof auraComponentFoundations)[number];
 
 export const lumeo2WorkspaceFoundations = [
   "L2ToolPageHeader",
+  "L2WorkspaceHeader",
+  "L2WorkspaceToolbar",
+  "L2PanelLabel",
+  "L2WorkspacePanel",
+  "L2WorkspaceInspector",
+  "L2ToolbarButton",
+  "L2WorkspaceGrid",
+  "ToolActionBar",
   "L2ToolWorkspace",
   "L2ToolMainColumn",
   "L2ToolSettingsPanel",
