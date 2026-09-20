@@ -112,6 +112,21 @@ test("error-ingestion hardening keeps counters private and covers null-session a
   assert.match(runtimeTest, /current_admin_role/);
 });
 
+test("Admin request proxy is Cloudflare-native and enforces production edge safety", () => {
+  const proxy = read("lib/supabase/proxy.ts");
+  const packageJson = read("package.json");
+
+  assert.doesNotMatch(proxy, /@vercel\/functions/);
+  assert.doesNotMatch(packageJson, /"@vercel\/functions"/);
+  assert.match(proxy, /readCloudflareApproximateLocation/);
+  assert.match(proxy, /productionHttpsRedirect/);
+  assert.match(proxy, /PRODUCTION_HOSTS/);
+  assert.match(proxy, /X-Frame-Options/);
+  assert.match(proxy, /X-Content-Type-Options/);
+  assert.match(proxy, /Referrer-Policy/);
+  assert.match(proxy, /applyAdminCachePolicy/);
+});
+
 test("Admin runtime metadata is Cloudflare-native", () => {
   const health = read("lib/admin/health.ts");
   const overview = read("app/admin/(protected)/page.tsx");
