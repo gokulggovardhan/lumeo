@@ -209,41 +209,15 @@ type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 // -- same singleton-lazy-import pattern already established in this
 // codebase for pdfjs-dist, just applied to pdf-lib's own equally-eager
 // static import.
-let editEngineModulePromise: Promise<{
-  exportEditedPdf: (typeof import("@/lib/pdf/edit/export"))["exportEditedPdf"];
-  collectPageTextOperators: (typeof import("@/lib/pdf/edit/formXObjects"))["collectPageTextOperators"];
-  resolveFont: (typeof import("@/lib/pdf/edit/fontEncoding"))["resolveFont"];
-  resolveFontMetrics: (typeof import("@/lib/pdf/edit/fontMetrics"))["resolveFontMetrics"];
-  readFallbackStyleHints: (typeof import("@/lib/pdf/edit/fallbackFont"))["readFallbackStyleHints"];
-  applyEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyEditPlanToDocument"];
-  applyMultiRunEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyMultiRunEditPlanToDocument"];
-  PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
-  PDFName: (typeof import("pdf-lib"))["PDFName"];
-  PDFDict: (typeof import("pdf-lib"))["PDFDict"];
-}> | null = null;
+let editEngineModulePromise: Promise<typeof import("@/lib/pdf/edit/browserEngine")> | null = null;
 
 function loadEditEngine() {
   if (!editEngineModulePromise) {
-    editEngineModulePromise = Promise.all([
-      import("@/lib/pdf/edit/export"),
-      import("@/lib/pdf/edit/formXObjects"),
-      import("@/lib/pdf/edit/fontEncoding"),
-      import("@/lib/pdf/edit/fontMetrics"),
-      import("@/lib/pdf/edit/applyEditPlan"),
-      import("pdf-lib"),
-      import("@/lib/pdf/edit/fallbackFont"),
-    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod]) => ({
-      exportEditedPdf: exportMod.exportEditedPdf,
-      collectPageTextOperators: formXObjectsMod.collectPageTextOperators,
-      resolveFont: fontEncodingMod.resolveFont,
-      resolveFontMetrics: fontMetricsMod.resolveFontMetrics,
-      readFallbackStyleHints: fallbackFontMod.readFallbackStyleHints,
-      applyEditPlanToDocument: applyEditPlanMod.applyEditPlanToDocument,
-      applyMultiRunEditPlanToDocument: applyEditPlanMod.applyMultiRunEditPlanToDocument,
-      PDFDocument: pdfLibMod.PDFDocument,
-      PDFName: pdfLibMod.PDFName,
-      PDFDict: pdfLibMod.PDFDict,
-    }));
+    // Keep every pdf-lib consumer behind ONE dynamic entrypoint. Several edit
+    // helpers exchange pdf-lib class instances and use instanceof checks; a
+    // single Vite/vinext module graph prevents those objects from crossing
+    // independently split dependency instances while preserving lazy loading.
+    editEngineModulePromise = import("@/lib/pdf/edit/browserEngine");
   }
   return editEngineModulePromise;
 }
