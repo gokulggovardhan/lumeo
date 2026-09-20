@@ -228,7 +228,7 @@ try {
   assert(privacy.includes("Do Not Track"), "Privacy disclosure must mention Do Not Track.");
   const docs = read("docs/PRIVACY_ANALYTICS.md");
   assert(docs.includes("Current Analytics Scope"), "Privacy analytics docs must document the current scope.");
-  assert(docs.includes("processing_started") && docs.includes("all 16 live PDF tools"), "Privacy analytics docs must describe the current lifecycle coverage.");
+  assert(docs.includes("processing_started") && /all 16 live PDF tools/i.test(docs), "Privacy analytics docs must describe the current lifecycle coverage.");
   assert(migration.includes("coalesce(settings.value @>") && migration.includes("false"), "Analytics setting must default disabled when absent.");
 
   const packageJson = JSON.parse(read("package.json"));
