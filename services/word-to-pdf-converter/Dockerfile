@@ -1,8 +1,7 @@
 # Deploy this directory (services/word-to-pdf-converter) to a real container
-# host -- Render, Fly.io, Railway, etc. Vercel's standard Next.js deployment
-# does not build a Dockerfile for the main app, so LibreOffice cannot live
-# there; this is a small, separately-hosted service the main app calls
-# over HTTP instead.
+# host -- Render, Fly.io, Railway, etc. The Cloudflare Worker application
+# runtime does not provide a LibreOffice binary, so this remains a small,
+# separately-hosted service the main app calls over HTTPS.
 #
 # bookworm, not bullseye: the current official LibreOffice build (see the
 # LO_VERSION install below) is linked against GLIBC_2.33/2.34 and libstdc++
