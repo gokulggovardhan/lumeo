@@ -60,7 +60,9 @@ export async function captureClientError(input: ErrorCaptureInput): Promise<void
           browser_family: getBrowserFamily(),
           operating_system: getOperatingSystem(),
           device_class: getDeviceClass(),
-          page_url: window.location.href,
+          // Keep troubleshooting context without persisting query strings or
+          // fragments, which may contain reset tokens or other private values.
+          page_url: `${window.location.origin}${window.location.pathname}`,
           anonymous_session_id: getAnonymousSessionId(),
           build_version: null,
           git_sha: null,
