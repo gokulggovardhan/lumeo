@@ -22,6 +22,22 @@ export default async function AnnouncementsPage({
   const announcements = await getAnnouncements();
   const canEdit = canManageAnnouncements(admin.role);
   const params = (await searchParams) ?? {};
+
+  if (announcements.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Messaging"
+          title="Announcements"
+          description="Public announcement records and schedules."
+        />
+        <AdminEmptyState
+          title="Announcements are unavailable"
+          description="Current announcement state could not be verified, so changes are disabled until the data service recovers."
+        />
+      </div>
+    );
+  }
   const editing = params.edit ? announcements.data.find((item) => item.id === params.edit) : null;
 
   return (
