@@ -85,8 +85,14 @@ jobs:
       # rebuild overwrites it. This is the guard's baseline.
       - name: Fingerprint committed graph
         run: |
-          python scripts/graphify_fingerprint.py graphify-out/graph.json \
-            > "${RUNNER_TEMP}/before.json"
+          if [ ! -s graphify-out/graph.json ]; then
+            echo "Committed graph is empty; treating it as a missing baseline so the rebuild can repair it."
+            printf '%s\n' '{"nodes":0,"links":0,"communities":0,"topology":"missing"}' \
+              > "${RUNNER_TEMP}/before.json"
+          else
+            python scripts/graphify_fingerprint.py graphify-out/graph.json \
+              > "${RUNNER_TEMP}/before.json"
+          fi
           cat "${RUNNER_TEMP}/before.json"
 
       # --force is required, not cosmetic: the default refuses to write a
