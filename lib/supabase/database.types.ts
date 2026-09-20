@@ -241,6 +241,19 @@ export type ControlCenterDatabase = {
       error_logs: { Row: ErrorLog };
     };
     Functions: {
+      record_feedback_query: {
+        Args: {
+          p_type: FeedbackQueryType;
+          p_name: string;
+          p_subject: string;
+          p_message: string;
+          p_email?: string | null;
+          p_phone?: string | null;
+          p_location?: string | null;
+          p_anonymous_session_id?: string | null;
+        };
+        Returns: string;
+      };
       record_error_event: {
         Args: {
           message: string;
