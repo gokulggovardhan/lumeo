@@ -25,7 +25,7 @@ returns text
 language plpgsql
 immutable
 set search_path = ''
-as $
+as $sanitize$
 declare
   cleaned text;
 begin
@@ -36,13 +36,13 @@ begin
   cleaned := input_value;
   cleaned := regexp_replace(cleaned, $re$(postgres|postgresql)://[^[:space:]/@:]+:[^[:space:]/@]+@$re$, E'\\1://[REDACTED]@', 'gi');
   cleaned := regexp_replace(cleaned, $re$Bearer[[:space:]]+[A-Za-z0-9._~+/=-]{8,}$re$, 'Bearer [REDACTED]', 'gi');
-  cleaned := regexp_replace(cleaned, $re$eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}$re$, '[REDACTED_JWT]', 'g');
+  cleaned := regexp_replace(cleaned, $re$eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}$re$, '[REDACTED_JWT]', 'g');
   cleaned := regexp_replace(cleaned, $re$sb_secret_[A-Za-z0-9_-]+$re$, '[REDACTED_SUPABASE_SECRET]', 'g');
   cleaned := regexp_replace(cleaned, $re$(password|passwd|pwd|secret|token|api[_-]?key|authorization|cookie|set-cookie)([[:space:]]*[:=][[:space:]]*)[^[:space:],;]+$re$, E'\\1\\2[REDACTED]', 'gi');
 
   return left(cleaned, greatest(0, max_chars));
 end;
-$;
+$sanitize$;
 
 revoke all on function private.sanitize_error_text(text, integer) from public;
 revoke all on function private.sanitize_error_text(text, integer) from anon, authenticated;
