@@ -143,6 +143,19 @@ test("Admin request proxy is Cloudflare-native and enforces production edge safe
   assert.match(proxy, /applyAdminCachePolicy/);
 });
 
+test("Cloudflare browser bundle statically receives only public Supabase config", () => {
+  const envSource = read("lib/supabase/env.ts");
+  const vite = read("vite.config.ts");
+
+  assert.match(envSource, /process\.env\.NEXT_PUBLIC_SUPABASE_URL/);
+  assert.match(envSource, /process\.env\.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY/);
+  assert.doesNotMatch(envSource, /process\.env\[SUPABASE_/);
+
+  assert.match(vite, /"process\.env\.NEXT_PUBLIC_SUPABASE_URL"/);
+  assert.match(vite, /"process\.env\.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"/);
+  assert.doesNotMatch(vite, /SUPABASE_SERVICE_ROLE_KEY/);
+});
+
 test("Admin runtime metadata is Cloudflare-native", () => {
   const health = read("lib/admin/health.ts");
   const overview = read("app/admin/(protected)/page.tsx");
