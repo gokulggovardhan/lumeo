@@ -163,6 +163,12 @@ test.describe("Control Center authentication", () => {
     await analyticsNavigation.getByRole("link", { name: "Inbox" }).click();
     await expect(page).toHaveURL(/\/admin\/inbox/);
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
+    // The heading is server-rendered. Wait for the client Inbox surface to
+    // hydrate before reloading so WebKit does not cancel an in-flight module
+    // import and report a false application error during the lifecycle test.
+    await expect(
+      page.getByRole("searchbox", { name: "Search loaded messages..." }),
+    ).toBeVisible();
 
     const inboxReload = await page.reload();
     await expect(page).toHaveURL(/\/admin\/inbox/);
