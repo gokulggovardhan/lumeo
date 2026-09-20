@@ -19,13 +19,17 @@ export function MaintenanceModeSubmitButton({
   function submitOrConfirm(event: React.MouseEvent<HTMLButtonElement>) {
     const form = event.currentTarget.form;
     if (!wasEnabled && willEnable(form)) {
+      event.preventDefault();
       setConfirming(true);
-      return;
     }
-    form?.requestSubmit();
   }
 
-  if (confirming) {
+  // A successful enable can refresh the Server Component while preserving
+  // this Client Component's local state. Never let stale confirming=true
+  // hide the normal Save button once the server says maintenance is enabled.
+  const showConfirmation = confirming && !wasEnabled;
+
+  if (showConfirmation) {
     return (
       <>
         <input
@@ -75,7 +79,7 @@ export function MaintenanceModeSubmitButton({
 
   return (
     <button
-      type="button"
+      type="submit"
       disabled={pending}
       onClick={submitOrConfirm}
       className="min-h-11 rounded-[var(--radius-md)] border border-[rgba(var(--lumeo-seal-rgb),0.6)] bg-[var(--lumeo-seal-600)] px-4 py-2 text-sm font-bold text-[var(--lumeo-paper-50)] shadow-[var(--shadow-success)] transition duration-200 hover:bg-[var(--lumeo-seal-500)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.18)] active:scale-[0.98] disabled:cursor-wait disabled:opacity-45"
