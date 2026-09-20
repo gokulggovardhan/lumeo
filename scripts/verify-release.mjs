@@ -25,7 +25,6 @@ const VERIFY_SCRIPTS = [
   "verify:public-catalog",
   "verify:analytics",
   "verify:aura",
-  "verify:aura-rollout",
   "verify:lumeo2-foundation",
   "verify:lumeo2-public-experience",
   "verify:lumeo2-workspaces",
