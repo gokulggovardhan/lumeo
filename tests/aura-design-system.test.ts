@@ -9,9 +9,6 @@ function read(path: string) {
 const css = read("app/globals.css");
 const ui = read("components/ui/Aura.tsx");
 const workspace = read("components/pdf/workspace/ToolWorkspace.tsx");
-const guidance = read("components/admin/guidance/AdminGuidance.tsx");
-const showcase = read("app/admin/(protected)/design-system/page.tsx");
-const guide = read("app/admin/(protected)/guide/page.tsx");
 const homepage = read("app/page.tsx");
 const pdfTools = read("app/pdf-tools/page.tsx");
 const launcher = read("components/pdf/PdfToolLauncher.tsx");
@@ -102,8 +99,6 @@ test("Lumeo Atelier retheme keeps soft semantic tokens and interaction contracts
   assert.ok(v2Tokens.includes("--v2-focus-ring-strong: rgba(var(--champagne-rgb), 0.2);"));
   assert.ok(ui.includes("rgba(var(--atelier-sage-rgb),0.09)"));
   assert.doesNotMatch(ui, /rgba\(var\(--sky-rgb\)/);
-  assert.ok(showcase.includes("Lumeo Atelier"));
-  assert.ok(showcase.includes("--atelier-sage-500"));
   assert.ok(lumeo2Doc.includes("Lumeo Atelier Theme"));
   assert.ok(lumeo2Doc.includes("Heritage Sage"));
   assert.ok(publicMenu.includes("const MENU_ID = \"lumeo-pdf-tools-menu\""));
@@ -158,7 +153,7 @@ test("reduced motion and high contrast support exist", () => {
   assert.ok(css.includes("@keyframes lumeo2-drag-highlight"));
 });
 
-test("tool workspace and admin guidance foundations are present", () => {
+test("tool workspace foundations are present", () => {
   for (const name of ["ToolUploadStage", "ToolResultStage", "ToolPrivacyNote"]) {
     assert.ok(workspace.includes(`export function ${name}`), `${name} should exist`);
   }
@@ -185,19 +180,6 @@ test("tool workspace and admin guidance foundations are present", () => {
     assert.ok(workspace.includes(`export function ${name}`), `${name} should exist`);
   }
 
-  for (const name of ["AdminWhatThisControls", "AdminImpactPreview", "AdminStoredOnlyNotice", "AdminSettingExplanation"]) {
-    assert.ok(guidance.includes(`export function ${name}`), `${name} should exist`);
-  }
-});
-
-test("protected showcase demonstrates the foundation without public exposure markers", () => {
-  assert.ok(showcase.includes('"use client"'));
-  assert.ok(showcase.includes("Lumeo Atelier"));
-  assert.ok(showcase.includes("Atelier theme system"));
-  assert.ok(showcase.includes("Tool workspace foundations"));
-  assert.ok(showcase.includes("Control Center guidance"));
-  assert.ok(showcase.includes("Responsive and reduced-motion notes"));
-  assert.doesNotMatch(showcase, /console\.(log|info|warn|error)/);
 });
 
 test("Lumeo 2 upload, file-card, and result foundations are accessible", () => {
@@ -335,7 +317,7 @@ test("Lumeo 2 footer has grouped navigation and public verifier exists", () => {
 });
 
 test("new Aura code avoids prohibited debug and secret patterns", () => {
-  const combined = [ui, workspace, guidance, showcase].join("\n");
+  const combined = [ui, workspace].join("\n");
   assert.doesNotMatch(combined, /console\.(log|info|warn|error)/);
   assert.doesNotMatch(combined, /service_role|secret[_-]?key|password\s*=/i);
 });
@@ -479,19 +461,9 @@ test("Run 3 workspace documentation and verifier exist", () => {
   assert.ok(lumeo2Doc.includes("What Remains For Run 5") || lumeo2Doc.includes("What remains for Run 5"));
 });
 
-test("Run 2 admin guide documents stored-only and runtime impact states", () => {
-  // Wording was generalized after this test was written (verified current
-  // text below), still using Compress PDF as its concrete example.
-  assert.ok(guide.includes("What happens when a live tool (e.g. Compress PDF) is disabled?"));
-  assert.ok(guide.includes("What happens when public analytics is disabled?"));
-  assert.ok(guide.includes("Stored only"));
-  assert.ok(guide.includes("Requires setup") || guide.includes("requires setup"));
-});
-
 test("Run 2 documentation records constraints and review URLs", () => {
   assert.ok(rolloutDoc.includes("Run 2"));
   assert.ok(rolloutDoc.includes("No SQL"));
   assert.ok(rolloutDoc.includes("PDF processing algorithms"));
-  assert.ok(rolloutDoc.includes("http://localhost:3000/admin/design-system"));
-  assert.ok(rolloutDoc.includes("http://localhost:3000/admin/guide"));
+  assert.doesNotMatch(rolloutDoc, /http:\/\/localhost:3000\/admin\/(design-system|guide)/);
 });
