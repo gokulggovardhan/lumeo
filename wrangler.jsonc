@@ -5,7 +5,7 @@
 	"compatibility_flags": [
 		"nodejs_compat"
 	],
-	"main": "vinext/server/fetch-handler",
+	"main": "./worker/index.ts",
 	"assets": {
 		"directory": "dist/client",
 		"not_found_handling": "none",
@@ -19,5 +19,13 @@
 			"binding": "VINEXT_KV_CACHE",
 			"id": "75b64086aab24c498267c2d61489874a"
 		}
-	]
+	],
+	"triggers": {
+		"crons": [
+			"0 3 * * *"
+		]
+	},
+	"observability": {
+		"enabled": true
+	}
 }
