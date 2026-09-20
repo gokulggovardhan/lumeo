@@ -168,12 +168,9 @@ try {
     { file: "components/pdf/SplitPdfTool.tsx", slug: "split" },
     { file: "components/pdf/CompressPdfTool.tsx", slug: "compress" },
   ];
-  // Operation lifecycle events (processing_started/succeeded/failed,
-  // download_started) were originally postponed past Analytics V1, but were
-  // verified live in production across all 14 PDF tools as of 2026-07-29
-  // (confirmed via components/pdf/*Tool.tsx track() calls and real,
-  // non-placeholder AdminMetricCard values on /admin/analytics) -- this check
-  // was updated from "must not emit" to "must emit" to match reality.
+  // Operation lifecycle events are part of the current production analytics
+  // contract. Merge, Split, and Compress are the focused source-level guard
+  // here; the catalog/docs describe the complete live PDF-tool coverage.
   const activeToolEvents = ["tool_opened", "processing_started", "processing_succeeded", "processing_failed", "download_started"];
   for (const { file: toolFile, slug } of pdfTools) {
     const tool = read(toolFile);
@@ -188,7 +185,7 @@ try {
     assert(!/await\s+track\(/.test(tool), `${toolFile} must not block processing on analytics.`);
     assert(!/await\s+trackMergeAnalytics\(/.test(tool), `${toolFile} must not block processing on analytics.`);
     const trackCalls = tool.match(/(?:track|trackMergeAnalytics)\(\{[\s\S]*?\}\);/g) ?? [];
-    assert(trackCalls.length === activeToolEvents.length, `${toolFile} must include exactly the ${activeToolEvents.length} Analytics V1 events (tool_opened + operation lifecycle).`);
+    assert(trackCalls.length === activeToolEvents.length, `${toolFile} must include exactly the ${activeToolEvents.length} approved analytics events (tool_opened + operation lifecycle).`);
     assert(!/console\.info\(/.test(tool), `${toolFile} must not contain analytics debug console logs.`);
     assert(!/Analytics Probe/.test(tool), `${toolFile} must not contain temporary analytics probes.`);
     for (const call of trackCalls) {
@@ -199,7 +196,7 @@ try {
 
   const adminPage = read("app/admin/(protected)/analytics/page.tsx");
   assert(adminPage.includes("AnalyticsPrivacyNotice"), "Admin analytics privacy notice missing.");
-  assert(adminPage.includes("Analytics V1"), "Admin analytics page must identify Analytics V1.");
+  assert(!adminPage.includes("Analytics V1"), "Admin analytics page must not restore obsolete Analytics V1 copy.");
   assert(adminPage.includes("Discovery & operation analytics"), "Admin analytics page must use discovery & operation analytics wording.");
   assert(adminPage.includes("Page Views Today"), "Admin analytics page must display page views.");
   assert(adminPage.includes("Tool Opens Today"), "Admin analytics page must display tool opens.");
@@ -208,9 +205,8 @@ try {
   assert(adminPage.includes("Browser family"), "Admin analytics page must display browser summary.");
   assert(adminPage.includes("Operating system"), "Admin analytics page must display operating-system summary.");
   assert(adminPage.includes("Operation analytics"), "Admin analytics page must explain operation lifecycle metrics.");
-  // Operation lifecycle metric cards were originally postponed past
-  // Analytics V1, but were verified live in production as of 2026-07-29 --
-  // see the matching note in scripts/verify-control-center.mjs.
+  // Operation lifecycle metric cards are current production behavior; keep
+  // the dashboard aligned with the events emitted by live tool workspaces.
   for (const requiredLabel of ["Processing Started", "Processing Succeeded", "Processing Failed", "Downloads Started"]) {
     assert(adminPage.includes(`label="${requiredLabel}"`), `Admin analytics page must show ${requiredLabel} as a metric card.`);
   }
@@ -231,7 +227,7 @@ try {
   assert(privacy.includes("temporary browser-session ID"), "Privacy disclosure must mention temporary session IDs.");
   assert(privacy.includes("Do Not Track"), "Privacy disclosure must mention Do Not Track.");
   const docs = read("docs/PRIVACY_ANALYTICS.md");
-  assert(docs.includes("Analytics V1 scope"), "Privacy analytics docs must document V1 scope.");
+  assert(docs.includes("Current Analytics Scope"), "Privacy analytics docs must document the current scope.");
   assert(docs.includes("processing_started") && docs.includes("all 16 live PDF tools"), "Privacy analytics docs must describe the current lifecycle coverage.");
   assert(migration.includes("coalesce(settings.value @>") && migration.includes("false"), "Analytics setting must default disabled when absent.");
 
