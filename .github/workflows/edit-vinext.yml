@@ -1,0 +1,92 @@
+name: Edit PDF vinext regression
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "fix/**"
+      - "feature/**"
+    paths:
+      - "components/pdf/EditPdfTool.tsx"
+      - "lib/pdf/edit/**"
+      - "e2e/edit-vinext.spec.ts"
+      - "e2e/fixtures.ts"
+      - "playwright.vinext.config.ts"
+      - "vite.config.ts"
+      - "wrangler.jsonc"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/edit-vinext.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edit-vinext-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Edit PDF — vinext Worker browsers
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install Chromium, WebKit and Firefox
+        run: npx playwright install --with-deps chromium webkit firefox
+
+      - name: Build Cloudflare Worker
+        run: npm run build:vinext
+
+      - name: Run Edit PDF against local Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev --config dist/server/wrangler.json --port 8787 > /tmp/lumeo-vinext.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/pdf/edit >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/lumeo-vinext.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat /tmp/lumeo-vinext.log
+            echo "Local vinext Worker did not become ready." >&2
+            exit 1
+          fi
+
+          npx playwright test --config=playwright.vinext.config.ts
+
+      - name: Upload trace on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: edit-vinext-playwright-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7
