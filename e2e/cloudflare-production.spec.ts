@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import { PDFDocument } from "pdf-lib";
 import { TEXT_ONLY_PDF, writeFixtures } from "./fixtures.ts";
 
 const EDITABLE_RUN = 'div[role="button"][aria-label^="Editable text"]';
@@ -223,4 +224,110 @@ test("production HEIC workspace remains usable on a narrow mobile viewport", asy
   await page.getByText("Choose photos", { exact: true }).click();
   const chooser = await chooserPromise;
   expect(chooser.isMultiple()).toBe(true);
+});
+
+
+async function expectDownloadedPdf(
+  page: import("@playwright/test").Page,
+  action: () => Promise<void>,
+  expectedPages: number,
+) {
+  const downloadPromise = page.waitForEvent("download");
+  await action();
+  const download = await downloadPromise;
+  const outputPath = await download.path();
+  expect(outputPath).not.toBeNull();
+
+  const bytes = await readFile(outputPath!);
+  expect(bytes.length).toBeGreaterThan(500);
+  expect(bytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+  const document = await PDFDocument.load(bytes);
+  expect(document.getPageCount()).toBe(expectedPages);
+}
+
+test("production Merge PDF processes and downloads a real two-page result", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !testInfo.project.name.includes("chromium"),
+    "representative PDF-tool output smoke runs once in Chromium",
+  );
+
+  const assetFailures = collectProductionAssetFailures(page);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  const fixture = await readFile(TEXT_ONLY_PDF);
+  await page.goto("/pdf/merge", { waitUntil: "domcontentloaded" });
+  await page.locator('input[type="file"]').first().setInputFiles([
+    { name: "merge-a.pdf", mimeType: "application/pdf", buffer: fixture },
+    { name: "merge-b.pdf", mimeType: "application/pdf", buffer: fixture },
+  ]);
+
+  const merge = page.getByRole("button", { name: "Merge PDFs" });
+  await expect(merge).toBeEnabled({ timeout: 60_000 });
+  await merge.click();
+
+  const download = page.getByRole("button", { name: "Download merged PDF" });
+  await expect(download).toBeVisible({ timeout: 90_000 });
+  await expectDownloadedPdf(page, () => download.click(), 2);
+
+  expect(assetFailures).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test("production Crop PDF exports a valid PDF", async ({ page }, testInfo) => {
+  test.skip(
+    !testInfo.project.name.includes("chromium"),
+    "representative PDF-tool output smoke runs once in Chromium",
+  );
+
+  const assetFailures = collectProductionAssetFailures(page);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/pdf/crop", { waitUntil: "domcontentloaded" });
+  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
+
+  const apply = page.getByRole("button", { name: "Apply Crop" });
+  await expect(apply).toBeEnabled({ timeout: 60_000 });
+  await apply.click();
+
+  const download = page.getByRole("button", { name: "Download cropped PDF" });
+  await expect(download).toBeVisible({ timeout: 90_000 });
+  await expectDownloadedPdf(page, () => download.click(), 1);
+
+  expect(assetFailures).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test("production Watermark PDF exports a valid text-watermarked PDF", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !testInfo.project.name.includes("chromium"),
+    "representative PDF-tool output smoke runs once in Chromium",
+  );
+
+  const assetFailures = collectProductionAssetFailures(page);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  await page.goto("/pdf/watermark", { waitUntil: "domcontentloaded" });
+  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
+
+  const watermarkText = page.getByLabel("Text", { exact: true });
+  await expect(watermarkText).toBeVisible({ timeout: 60_000 });
+  await watermarkText.fill("CLOUDFLARE");
+
+  const apply = page.getByRole("button", { name: "Add Watermark" });
+  await expect(apply).toBeEnabled();
+  await apply.click();
+
+  const download = page.getByRole("button", { name: "Download watermarked PDF" });
+  await expect(download).toBeVisible({ timeout: 90_000 });
+  await expectDownloadedPdf(page, () => download.click(), 1);
+
+  expect(assetFailures).toEqual([]);
+  expect(pageErrors).toEqual([]);
 });
