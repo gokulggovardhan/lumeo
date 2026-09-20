@@ -52,7 +52,7 @@ type OfficeThreadMessage =
 
 declare global {
   interface Window {
-    __lumeoZetaHelperMain?: ZetaHelperMainConstructor;
+    __lumeoBrowserOfficeZetaHelperMain?: ZetaHelperMainConstructor;
   }
 }
 
@@ -77,8 +77,8 @@ function ensureOfficeCanvas(): HTMLCanvasElement {
 function loadZetaHelperConstructor(
   helperUrl: string,
 ): Promise<ZetaHelperMainConstructor> {
-  if (window.__lumeoZetaHelperMain) {
-    return Promise.resolve(window.__lumeoZetaHelperMain);
+  if (window.__lumeoBrowserOfficeZetaHelperMain) {
+    return Promise.resolve(window.__lumeoBrowserOfficeZetaHelperMain);
   }
 
   return new Promise((resolve, reject) => {
@@ -87,7 +87,7 @@ function loadZetaHelperConstructor(
       new Blob(
         [
           `import { ZetaHelperMain } from ${JSON.stringify(helperUrl)};
-globalThis.__lumeoZetaHelperMain = ZetaHelperMain;
+globalThis.__lumeoBrowserOfficeZetaHelperMain = ZetaHelperMain;
 dispatchEvent(new CustomEvent(${JSON.stringify(eventName)}));`,
         ],
         { type: "text/javascript" },
@@ -103,7 +103,7 @@ dispatchEvent(new CustomEvent(${JSON.stringify(eventName)}));`,
       window.removeEventListener(eventName, handleReady);
     };
     const handleReady = () => {
-      const constructor = window.__lumeoZetaHelperMain;
+      const constructor = window.__lumeoBrowserOfficeZetaHelperMain;
       cleanup();
       if (constructor) resolve(constructor);
       else reject(new Error("The browser Office helper did not initialize."));
