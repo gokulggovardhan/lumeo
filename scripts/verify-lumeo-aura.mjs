@@ -18,7 +18,6 @@ function assert(condition, message) {
 const css = read("app/globals.css");
 const ui = read("components/ui/Aura.tsx");
 const workspace = read("components/pdf/workspace/ToolWorkspace.tsx");
-const guidance = read("components/admin/guidance/AdminGuidance.tsx");
 const nav = read("lib/admin/navigation.ts");
 const layout = read("app/layout.tsx");
 const packageJson = JSON.parse(read("package.json"));
@@ -92,16 +91,6 @@ const toolFoundations = [
   "ToolOptionRow",
 ];
 
-const guidanceFoundations = [
-  "AdminWhatThisControls",
-  "AdminImpactPreview",
-  "AdminDependencyList",
-  "AdminStoredOnlyNotice",
-  "AdminRiskIndicator",
-  "AdminChangeSummary",
-  "AdminGuideLink",
-  "AdminSettingExplanation",
-];
 
 try {
   for (const token of requiredTokens) {
@@ -122,17 +111,13 @@ try {
     assert(new RegExp(`export function ${component}\\b`).test(workspace), `Missing tool workspace foundation: ${component}`);
   }
 
-  for (const component of guidanceFoundations) {
-    assert(new RegExp(`export function ${component}\\b`).test(guidance), `Missing admin guidance foundation: ${component}`);
-  }
 
   assert(exists("components/layout/AuraPublicShell.tsx"), "Aura public shell foundation is missing.");
   assert(exists("lib/design-system/tokens.ts"), "Aura token registry is missing.");
   assert(exists("docs/LUMEO_AURA_DESIGN_SYSTEM.md"), "Aura design-system documentation is missing.");
-  assert(exists("app/admin/(protected)/design-system/page.tsx"), "Protected design-system showcase is missing.");
-  assert(exists("app/admin/(protected)/guide/page.tsx"), "Protected admin guide foundation is missing.");
-  assert(!exists("app/design-system/page.tsx"), "Design-system showcase must not be public.");
-  assert(nav.includes("Design System") && nav.includes("/admin/design-system"), "Control Center navigation must include Design System.");
+  assert(!exists("app/admin/(protected)/design-system/page.tsx"), "Retired admin design-system showcase must stay removed.");
+  assert(!exists("app/admin/(protected)/guide/page.tsx"), "Retired admin guide must stay removed.");
+  assert(!nav.includes("/admin/design-system") && !nav.includes("/admin/guide"), "Retired reference routes must stay out of Control Center navigation.");
   assert(layout.includes("AnalyticsProvider") && layout.includes("AnalyticsPageView"), "Analytics providers must remain in root layout.");
   assert(layout.includes("aura-skip-link"), "Root layout must expose skip-to-content link.");
 
@@ -155,17 +140,17 @@ try {
   }
 
   assert(packageJson.scripts["verify:aura"] === "node scripts/verify-lumeo-aura.mjs", "verify:aura script is missing.");
-  assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
-  assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");
-  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.110.2", "Supabase JS version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
+  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.112.2", "Supabase JS version changed unexpectedly.");
 
-  const newSource = [ui, workspace, guidance, read("components/layout/AuraPublicShell.tsx"), read("app/admin/(protected)/design-system/page.tsx")].join("\n");
+  const newSource = [ui, workspace, read("components/layout/AuraPublicShell.tsx")].join("\n");
   assert(!/console\.(log|info|warn|error)/.test(newSource), "Production debug logging must not be added.");
   assert(!/service_role|secret[_-]?key|password\s*=/.test(newSource), "No hard-coded secrets may be introduced.");
 
   console.log("PASS Lumeo Aura design tokens exist");
-  console.log("PASS component, tool workspace, and guidance foundations exist");
-  console.log("PASS protected design-system showcase exists");
+  console.log("PASS component and tool workspace foundations exist");
+  console.log("PASS retired Admin showcase and guide stay removed");
   console.log("PASS analytics providers remain mounted");
   console.log("PASS migrations and PDF algorithms are not replaced");
   console.log("PASS protected package versions are unchanged");
