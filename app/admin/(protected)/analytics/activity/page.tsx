@@ -31,7 +31,7 @@ export default async function AnalyticsActivityPage({
           title="Recent activity is unavailable"
           description="The secure recent-events reader could not return verified data. Try again after the data service recovers."
         />
-        <Link href="/admin/analytics" className="text-sm font-semibold text-[#F0EAD6]/70 hover:underline">
+        <Link prefetch={false} href="/admin/analytics" className="text-sm font-semibold text-[#F0EAD6]/70 hover:underline">
           ← Back to analytics
         </Link>
       </div>
@@ -56,12 +56,12 @@ export default async function AnalyticsActivityPage({
       >
         <RecentActivityTable rows={pageRows} />
         <div className="mt-4 flex items-center justify-between gap-3">
-          <Link href="/admin/analytics" className="text-sm font-semibold text-[#F0EAD6]/70 hover:underline">
+          <Link prefetch={false} href="/admin/analytics" className="text-sm font-semibold text-[#F0EAD6]/70 hover:underline">
             ← Back to analytics
           </Link>
           <div className="flex gap-3">
             {safePage > 1 && (
-              <Link
+              <Link prefetch={false}
                 className="rounded-xl border border-[#E8DFC8]/12 px-4 py-2 text-sm font-semibold"
                 href={`/admin/analytics/activity?page=${safePage - 1}`}
               >
@@ -69,7 +69,7 @@ export default async function AnalyticsActivityPage({
               </Link>
             )}
             {safePage < totalPages && (
-              <Link
+              <Link prefetch={false}
                 className="rounded-xl border border-[#E8DFC8]/12 px-4 py-2 text-sm font-semibold"
                 href={`/admin/analytics/activity?page=${safePage + 1}`}
               >
