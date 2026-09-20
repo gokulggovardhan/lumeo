@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { writeAuditLog } from "@/lib/admin/audit";
 import { canManageMembers } from "@/lib/admin/permissions";
 import { createClient } from "@/lib/supabase/server";
+import { captureServerError } from "@/lib/errors/server";
 import { errorState, formBoolean, formString, successState } from "@/lib/admin/validation";
 
 const allowedRoles = new Set(["owner", "admin", "analyst"]);
@@ -21,7 +22,16 @@ export async function addAdminMember(formData: FormData) {
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("add_admin_member", { p_email: email, p_role: role });
 
-  if (error) return errorState(error.message || "Could not add that administrator.");
+  if (error) {
+    void captureServerError({
+      message: error.message,
+      route: "/admin/members",
+      component: "addAdminMember",
+      source: "server_action",
+      severity: "medium",
+    });
+    return errorState("Could not add that administrator.");
+  }
 
   await writeAuditLog({
     action: "admin_member.add",
@@ -51,7 +61,16 @@ export async function updateAdminMember(formData: FormData) {
     p_is_active: isActive,
   });
 
-  if (error) return errorState(error.message || "Could not update that administrator.");
+  if (error) {
+    void captureServerError({
+      message: error.message,
+      route: "/admin/members",
+      component: "updateAdminMember",
+      source: "server_action",
+      severity: "medium",
+    });
+    return errorState("Could not update that administrator.");
+  }
 
   await writeAuditLog({
     action: "admin_member.update",
