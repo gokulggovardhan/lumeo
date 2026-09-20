@@ -57,7 +57,7 @@ export default async function AnnouncementsPage({
             <AdminFormField label="Title" name="title" defaultValue={editing?.title ?? ""} />
             <label className="block text-sm font-semibold text-[#F0EAD6]">
               Tone
-              <select name="tone" defaultValue={editing?.tone ?? "information"} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm">
+              <select name="tone" defaultValue={editing?.tone ?? "information"} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm">
                 {["information", "success", "warning", "maintenance"].map((tone) => (
                   <option key={tone} value={tone}>{tone}</option>
                 ))}
