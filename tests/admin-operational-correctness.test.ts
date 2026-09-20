@@ -178,3 +178,20 @@ test("Analytics recent-feed failure does not invalidate verified aggregate analy
   assert.match(analytics, /recentEvents\.error/);
   assert.match(analytics, /Aggregate analytics are still valid/);
 });
+
+
+test("Inbox delete authorization is enforced in both UI action and database RLS", () => {
+  const permissions = read("lib/admin/permissions.ts");
+  const action = read("app/admin/(protected)/inbox/actions.ts");
+  const migration = read("supabase/migrations/20260920110000_feedback_queries_delete_roles.sql");
+
+  assert.match(permissions, /canManageInbox/);
+  assert.match(permissions, /role === "owner" \|\| role === "admin"/);
+  assert.match(action, /canManageInbox\(admin\.role\)/);
+  assert.match(migration, /for delete/);
+  assert.match(migration, /can_manage_content\(\)/);
+  assert.doesNotMatch(
+    migration,
+    /for delete[\s\S]*?using \(public\.is_active_admin\(\)\)/,
+  );
+});
