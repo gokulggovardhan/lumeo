@@ -1,23 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { geolocation } from "@vercel/functions";
+import { buildGeoCookieValue } from "@/lib/cloudflare/geolocation";
 import { GEO_COOKIE_NAME } from "@/lib/analytics/geo-cookie-name";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
 const SESSION_CACHE_HEADERS = ["cache-control", "expires", "pragma"] as const;
 
-// Next's cookie serializer already percent-encodes the whole value on write
-// (that's a single encoding pass we don't control) -- pre-encoding each
-// segment here on top of that double-encodes it. The literal "|" join
-// character itself gets encoded to %7C by that pass, so the client-side
-// reader must decode the WHOLE value once before splitting on "|", not
-// split first and decode each part (see lib/analytics/geo.ts).
-function buildGeoCookieValue(request: NextRequest) {
-  const { city, countryRegion, country } = geolocation(request);
-  if (!city && !countryRegion && !country) return null;
-  return [city ?? "", countryRegion ?? "", country ?? ""].join("|");
-}
-
+// Next's cookie serializer already percent-encodes the whole value on write.
+// The Cloudflare helper therefore returns the existing literal "|" contract;
+// the client-side reader decodes the whole value once before splitting.
 function applyGeoCookie(response: NextResponse, value: string | null) {
   if (!value) return;
   response.cookies.set(GEO_COOKIE_NAME, value, {
