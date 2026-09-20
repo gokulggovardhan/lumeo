@@ -19,10 +19,10 @@ This runs, in order, and stops at the first fatal failure:
 4. `npm run build`
 5. Every `verify:*` script in `package.json`
 
-Two scripts (`verify:aura-rollout`, `verify:lumeo2-public-experience`) are
-documented as deprecated in their own files — they check a since-completed
-rollout milestone's hardcoded content markers, not current production
-behavior. `verify:release` reports their failure but does not fail the
+`verify:lumeo2-public-experience` is documented as deprecated in its own
+file — it checks a since-completed rollout milestone's hardcoded content
+markers, not current production behavior. `verify:release` reports its
+failure but does not fail the
 overall gate on it.
 
 If `verify:release` exits non-zero for any other reason, **do not deploy**
@@ -279,7 +279,7 @@ tooling addition with no immediate consumer).
 - **Troubleshooting a `verify:release` failure**:
   1. Read which step failed from the console output — the script stops at
      the first fatal failure in the core sequence (test/lint/typecheck/
-     build) and reports (but doesn't stop on) the two known-deprecated
+     build) and reports (but doesn't stop on) the known-deprecated
      scripts.
   2. For a `verify:*` script failure, read that script's own assertion
      message — they're written to name the specific file/behavior expected.
