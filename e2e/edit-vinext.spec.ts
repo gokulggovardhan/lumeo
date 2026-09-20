@@ -1,23 +1,23 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { PDFDocument } from "pdf-lib";
 import { TEXT_ONLY_PDF, writeFixtures } from "./fixtures.ts";
+import { waitForStageReady } from "./helpers.ts";
 
 test.beforeAll(async () => {
   await writeFixtures();
 });
 
-test("vinext Edit PDF exposes matched editable text runs", async ({ page }) => {
+test("vinext Edit PDF supports text matching, editing, and export", async ({
+  page,
+}) => {
   const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
-  const editEngineErrors: string[] = [];
 
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("console", (message) => {
-    if (
-      message.type() === "error" &&
-      message.text().includes("[Edit PDF]")
-    ) {
-      editEngineErrors.push(message.text());
-    }
+    if (message.type() === "error") consoleErrors.push(message.text());
   });
   page.on("requestfailed", (request) => {
     failedRequests.push(
@@ -31,19 +31,8 @@ test("vinext Edit PDF exposes matched editable text runs", async ({ page }) => {
   const editable = page.locator(
     'div[role="button"][aria-label^="Editable text: "]',
   );
-  await expect
-    .poll(
-      async () => {
-        if ((await editable.count()) > 0) return "editable";
-        if (editEngineErrors.length > 0) return editEngineErrors.join(" | ");
-        return "waiting for editable text matching";
-      },
-      {
-        timeout: 90_000,
-        message: "vinext should produce editable runs",
-      },
-    )
-    .toBe("editable");
+  await expect(editable.first()).toBeVisible({ timeout: 90_000 });
+  await waitForStageReady(page);
 
   const labels = await editable.evaluateAll((nodes) =>
     nodes.map((node) => node.getAttribute("aria-label") ?? ""),
@@ -51,7 +40,45 @@ test("vinext Edit PDF exposes matched editable text runs", async ({ page }) => {
   expect(labels.join(" ")).toContain("Employee record");
   expect(labels.join(" ")).toContain("123-45-6789");
 
-  expect(editEngineErrors).toEqual([]);
+  const employeeRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    )
+    .first();
+  await employeeRun.click();
+
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await editor.fill("Employee file");
+  await page.getByRole("button", { name: "Apply edit" }).click();
+
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", {
+    name: "Download edited PDF",
+  });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  const outputPath = await download.path();
+  expect(outputPath).not.toBeNull();
+
+  const bytes = await readFile(outputPath!);
+  expect(bytes.length).toBeGreaterThan(500);
+  expect(bytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+
+  const exported = await PDFDocument.load(bytes);
+  expect(exported.getPageCount()).toBe(1);
+
+  expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
 });
