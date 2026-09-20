@@ -21,6 +21,36 @@ import {
 } from "pdf-lib";
 import { tokenizeContentStream, walkTextShowOperators } from "../lib/pdf/edit/contentStream.ts";
 
+test("tokenizeContentStream does not depend on Node Buffer in browser code", () => {
+  const globalWithBuffer = globalThis as typeof globalThis & {
+    Buffer?: typeof Buffer;
+  };
+  const originalBuffer = globalWithBuffer.Buffer;
+
+  try {
+    Reflect.deleteProperty(globalWithBuffer, "Buffer");
+
+    const tokens = tokenizeContentStream(
+      new TextEncoder().encode("1 0 0 1 50.25 700 Tm"),
+    );
+    const numbers = tokens
+      .filter((token) => token.type === "number")
+      .map((token) => token.value);
+
+    assert.deepEqual(numbers, [1, 0, 0, 1, 50.25, 700]);
+    assert.equal(
+      tokens.some(
+        (token) => token.type === "operator" && token.value === "Tm",
+      ),
+      true,
+    );
+  } finally {
+    if (originalBuffer) {
+      globalWithBuffer.Buffer = originalBuffer;
+    }
+  }
+});
+
 // Loads a saved PDF back and returns its first page's real, decoded (i.e.
 // un-FlateDecode'd) content-stream bytes -- proven against pdf-lib's own
 // object graph, not assumed.
