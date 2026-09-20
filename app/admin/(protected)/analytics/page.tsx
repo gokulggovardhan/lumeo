@@ -364,19 +364,28 @@ export default async function AnalyticsPage({
             title="Recent activity"
             description="Latest public events, newest first. This live feed is independent of the selected aggregate range and is capped at 200 events. Location is approximate network-derived data only; no session id, IP address, or precise coordinates are displayed."
           >
-            <RecentActivityTable
-              rows={activityRows.slice(0, RECENT_ACTIVITY_PREVIEW_SIZE)}
-            />
-            {activityRows.length > RECENT_ACTIVITY_PREVIEW_SIZE ? (
-              <div className="mt-4 text-right">
-                <Link
-                  href="/admin/analytics/activity"
-                  className="text-sm font-bold text-[var(--text-accent)] hover:underline"
-                >
-                  View full activity log →
-                </Link>
-              </div>
-            ) : null}
+            {recentEvents.error ? (
+              <AdminEmptyState
+                title="Recent activity is unavailable"
+                description="Aggregate analytics are still valid, but the recent-events reader could not return verified rows."
+              />
+            ) : (
+              <>
+                <RecentActivityTable
+                  rows={activityRows.slice(0, RECENT_ACTIVITY_PREVIEW_SIZE)}
+                />
+                {activityRows.length > RECENT_ACTIVITY_PREVIEW_SIZE ? (
+                  <div className="mt-4 text-right">
+                    <Link
+                      href="/admin/analytics/activity"
+                      className="text-sm font-bold text-[var(--text-accent)] hover:underline"
+                    >
+                      View full activity log →
+                    </Link>
+                  </div>
+                ) : null}
+              </>
+            )}
           </AdminSectionCard>
         </>
       ) : null}
