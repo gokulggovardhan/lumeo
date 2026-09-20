@@ -46,6 +46,22 @@ export default async function AuditPage({
   const page = pageNumber(params.page);
   const canView = canViewAudit(admin.role);
 
+  if (!canView) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Record of change"
+          title="Audit Log"
+          description="Read-only administrative history."
+        />
+        <AdminEmptyState
+          title="No access"
+          description="Your role does not have permission to view the audit log."
+        />
+      </div>
+    );
+  }
+
   const filters = {
     action: params.action?.trim() || undefined,
     entityType: params.entity_type?.trim() || undefined,
@@ -53,8 +69,8 @@ export default async function AuditPage({
     endDate: validDateIso(params.end, 1),
   };
 
-  const logs = canView ? await getAuditLogs(50, (page - 1) * 50, filters) : { data: [], error: null };
-  if (canView && logs.error) {
+  const logs = await getAuditLogs(50, (page - 1) * 50, filters);
+  if (logs.error) {
     return (
       <div className="space-y-7">
         <AdminPageHeader
@@ -70,9 +86,9 @@ export default async function AuditPage({
     );
   }
 
-  const actorEmails = canView
-    ? await resolveAdminEmails(logs.data.map((log) => log.actor_user_id).filter((id): id is string => Boolean(id)))
-    : {};
+  const actorEmails = await resolveAdminEmails(
+    logs.data.map((log) => log.actor_user_id).filter((id): id is string => Boolean(id)),
+  );
 
   const carryParams = { action: params.action, entity_type: params.entity_type, start: params.start, end: params.end };
 
