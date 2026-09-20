@@ -186,14 +186,14 @@ export function InboxClient({
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name, subject, message..."
-              className="min-h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] py-2 pl-9 pr-3 text-sm text-[var(--lumeo-paper-50)] outline-none placeholder:text-[var(--lumeo-paper-600)] focus:border-[var(--border-focus)]"
+              placeholder="Search loaded messages..."
+              className="min-h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] py-2 pl-9 pr-3 text-base text-[var(--lumeo-paper-50)] sm:text-sm outline-none placeholder:text-[var(--lumeo-paper-600)] focus:border-[var(--border-focus)]"
             />
           </div>
           <select
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value as TypeFilter)}
-            className="min-h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs font-semibold text-[var(--lumeo-paper-50)]"
+            className="min-h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base font-semibold text-[var(--lumeo-paper-50)] sm:text-xs"
           >
             <option value="all">All messages</option>
             <option value="Query">Queries</option>
