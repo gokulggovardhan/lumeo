@@ -1,4 +1,8 @@
-import { BrowserConversionWorkspace } from "@/lib/conversion/browser/workspace";
+import {
+  BrowserConversionWorkspace,
+  estimateLocalConversionStorage,
+  hasLocalWorkspaceCapacity,
+} from "@/lib/conversion/browser/workspace";
 import {
   detectBrowserConversionCapabilities,
   selectConversionProcessingMode,
@@ -55,8 +59,16 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
     let workspace: BrowserConversionWorkspace | null = null;
     try {
       let conversionFile = input.file;
+      const storageEstimate = capabilities.opfs
+        ? await estimateLocalConversionStorage()
+        : null;
+      const workspaceBytes = input.file.size * 2.25 + 64 * 1024 * 1024;
+      const canUseWorkspace =
+        capabilities.opfs &&
+        (!storageEstimate ||
+          hasLocalWorkspaceCapacity(storageEstimate, workspaceBytes));
 
-      if (capabilities.opfs) {
+      if (canUseWorkspace) {
         workspace = await BrowserConversionWorkspace.create("word-to-pdf");
         await workspace.markRunning();
         await workspace.appendLog(
