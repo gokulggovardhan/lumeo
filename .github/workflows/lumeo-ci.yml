@@ -149,6 +149,9 @@ jobs:
       - name: Create disposable local administrator
         run: node scripts/seed-admin-e2e.mjs
 
+      - name: Verify Admin Inbox RLS roles
+        run: node scripts/verify-admin-inbox-rls.mjs
+
       - name: Verify error ingestion rate limits
         run: node scripts/verify-error-ingest-rate-limit.mjs
 
