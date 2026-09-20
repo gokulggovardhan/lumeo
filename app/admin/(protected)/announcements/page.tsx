@@ -75,7 +75,7 @@ export default async function AnnouncementsPage({
             <div className="flex items-center gap-3 md:col-span-2">
               <AdminSubmitButton pendingLabel="Saving announcement...">{editing ? "Save changes" : "Create announcement"}</AdminSubmitButton>
               {editing && (
-                <Link href="/admin/announcements" className="text-sm font-semibold text-[#F0EAD6]/62 hover:text-[#F0EAD6]">
+                <Link prefetch={false} href="/admin/announcements" className="text-sm font-semibold text-[#F0EAD6]/62 hover:text-[#F0EAD6]">
                   Cancel edit
                 </Link>
               )}
@@ -94,7 +94,7 @@ export default async function AnnouncementsPage({
             announcement.link_url ? `${announcement.link_label ?? "Link"}: ${announcement.link_url}` : "None",
             canEdit ? (
               <div key="actions" className="flex flex-wrap items-center gap-2">
-                <Link
+                <Link prefetch={false}
                   href={`/admin/announcements?edit=${announcement.id}`}
                   className="rounded-lg border border-[#E8DFC8]/12 px-3 py-1.5 text-xs font-semibold text-[#F0EAD6]/80 hover:border-[#E8DFC8]/24"
                 >
