@@ -15,6 +15,7 @@ assert.ok(ownerPassword, "ADMIN_E2E_PASSWORD is required.");
 
 const options = { auth: { persistSession: false, autoRefreshToken: false } };
 const service = createClient(url, serviceRoleKey, options);
+const submitter = createClient(url, anonKey, options);
 const analystEmail = "analyst-e2e@lumeo.local";
 const analystPassword = "Lumeo-Analyst-E2E-2026!";
 
@@ -45,7 +46,8 @@ assert.equal(
 );
 
 const messageId = "22222222-2222-4222-8222-222222222222";
-const { error: insertError } = await service.from("feedback_queries").insert({
+// Seed through the same table privilege the public feedback route relies on.
+const { error: insertError } = await submitter.from("feedback_queries").insert({
   id: messageId,
   type: "Query",
   name: "RLS Test",
@@ -85,7 +87,18 @@ assert.equal(
 );
 
 await analyst.from("feedback_queries").delete().eq("id", messageId);
-const { data: stillPresent, error: verifyAnalystDeleteError } = await service
+
+const owner = createClient(url, anonKey, options);
+const { error: ownerSignInError } = await owner.auth.signInWithPassword({
+  email: ownerEmail,
+  password: ownerPassword,
+});
+assert.equal(ownerSignInError, null, ownerSignInError?.message ?? "owner sign-in failed");
+
+// Verify the analyst boundary through the real authenticated Admin path,
+// not through service_role table access that production application code
+// does not use for Inbox reads.
+const { data: stillPresent, error: verifyAnalystDeleteError } = await owner
   .from("feedback_queries")
   .select("id,is_read")
   .eq("id", messageId)
@@ -98,20 +111,13 @@ assert.equal(
 assert.equal(stillPresent.id, messageId, "analyst unexpectedly deleted inbox row");
 assert.equal(stillPresent.is_read, true, "analyst read-state update did not persist");
 
-const owner = createClient(url, anonKey, options);
-const { error: ownerSignInError } = await owner.auth.signInWithPassword({
-  email: ownerEmail,
-  password: ownerPassword,
-});
-assert.equal(ownerSignInError, null, ownerSignInError?.message ?? "owner sign-in failed");
-
 const { error: ownerDeleteError } = await owner
   .from("feedback_queries")
   .delete()
   .eq("id", messageId);
 assert.equal(ownerDeleteError, null, ownerDeleteError?.message ?? "owner delete failed");
 
-const { data: removedRows, error: removedCheckError } = await service
+const { data: removedRows, error: removedCheckError } = await owner
   .from("feedback_queries")
   .select("id")
   .eq("id", messageId);
