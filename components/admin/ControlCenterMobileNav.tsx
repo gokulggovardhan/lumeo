@@ -30,6 +30,7 @@ export function ControlCenterMobileNav({
       <Link
         key={item.href}
         href={item.href}
+        prefetch={false}
         aria-current={active ? "page" : undefined}
         onClick={() => setOpen(false)}
         className={`flex min-h-11 items-center gap-3 rounded-xl border px-3 text-sm font-semibold transition duration-200 ${
@@ -62,7 +63,7 @@ export function ControlCenterMobileNav({
   return (
     <header className="lg:hidden">
       <div className="flex items-center justify-between gap-3 rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 py-3 shadow-[var(--shadow-sm)]">
-        <Link href="/admin" className="rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]">
+        <Link href="/admin" prefetch={false} className="rounded-xl focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]">
           <BrandLockup markSize="h-9 w-9" />
         </Link>
         <button
