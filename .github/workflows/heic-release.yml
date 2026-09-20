@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Verify HEIC Chromium and WebKit
+    name: Verify HEIC Chromium, WebKit and Firefox
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -54,11 +54,15 @@ jobs:
           heif-info /tmp/lumeo-heic-fixtures/fullres-with-thumbnail.heic | tee /tmp/lumeo-heic-fixtures/heif-info.txt
           grep -Eq 'image: 6048x8064 .*primary' /tmp/lumeo-heic-fixtures/heif-info.txt
           grep -Eq 'thumbnail: 1152x1536' /tmp/lumeo-heic-fixtures/heif-info.txt
-      - name: Install Chromium and WebKit
-        run: npx playwright install --with-deps chromium webkit
+      - name: Install Chromium, WebKit and Firefox
+        run: npx playwright install --with-deps chromium webkit firefox
       - name: HEIC browser E2E
         env:
           HEIC_RESOLUTION_FIXTURE: /tmp/lumeo-heic-fixtures/fullres-with-thumbnail.heic
-        run: npm run test:e2e -- e2e/heic-to-jpeg.spec.ts --project=chromium --project=webkit
+        run: npm run test:e2e -- e2e/heic-to-jpeg.spec.ts --project=chromium --project=webkit --project=firefox
       - name: Production build
         run: npm run build
+      - name: Build Cloudflare Worker
+        run: npm run build:vinext
+      - name: Validate Cloudflare Worker bundle
+        run: npx vinext-cloudflare deploy --dry-run --config dist/server/wrangler.json
