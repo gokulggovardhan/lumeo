@@ -69,7 +69,7 @@ export default async function AdminPage() {
           <AdminMetricCard label="Events Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsEventsToday} detail="Privacy-preserving analytics events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
         </MetricLink>
       </section>
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <MetricLink href="/admin/analytics">
           <AdminMetricCard label="Public Page Views" value={analyticsUnavailable ? "Unavailable" : data.analyticsPageViewsToday} detail="Public page-view events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
         </MetricLink>
