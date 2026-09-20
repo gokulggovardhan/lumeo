@@ -294,10 +294,11 @@ tooling addition with no immediate consumer).
   checklist only.
 - No automated bundle-size/performance regression tracking exists; Part 10
   is a one-time baseline snapshot, not a CI-enforced budget.
-- `verify-lumeo-aura-rollout.mjs` and `verify-lumeo-2-public-experience.mjs`
-  remain deprecated rather than rewritten — a full rewrite needs a dedicated
-  investigation into which of their many hardcoded content-marker checks
-  still have a meaningful current-architecture equivalent.
+- `verify-lumeo-2-public-experience.mjs` remains deprecated rather than
+  rewritten — a full rewrite needs a dedicated investigation into which of
+  its hardcoded content-marker checks still have a meaningful
+  current-architecture equivalent. The obsolete Aura rollout verifier was
+  removed once its development-only Admin showcase routes were retired.
 - `hasPdfMagicBytes` (and other small validation helpers behind the `@/`
   path alias) have no dedicated unit test, for the path-alias reason
   documented in Part 1.
