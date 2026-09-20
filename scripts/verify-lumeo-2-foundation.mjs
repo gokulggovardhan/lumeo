@@ -29,8 +29,6 @@ const footer = read("components/PublicFooter.tsx");
 const controlShell = read("components/admin/ControlCenterShell.tsx");
 const sidebar = read("components/admin/ControlCenterSidebar.tsx");
 const mobileNav = read("components/admin/ControlCenterMobileNav.tsx");
-const guidance = read("components/admin/guidance/AdminGuidance.tsx");
-const showcase = read("app/admin/(protected)/design-system/page.tsx");
 const tokens = read("lib/design-system/tokens.ts");
 const docs = read("docs/LUMEO_2_DESIGN_SYSTEM.md");
 const packageJson = JSON.parse(read("package.json"));
@@ -260,11 +258,8 @@ try {
   assert(controlShell.includes("ControlCenterShell"), "Control Center shell foundation is missing.");
   assert(sidebar.includes("ControlCenterSidebar"), "Control Center sidebar foundation is missing.");
   assert(mobileNav.includes("ControlCenterMobileNav"), "Control Center mobile nav foundation is missing.");
-  assert(guidance.includes("AdminWhatThisControls"), "Admin guidance foundations are missing.");
-  assert(showcase.includes("Lumeo Atelier") && showcase.includes("Atelier theme system"), "Protected showcase must display Lumeo Atelier.");
-  assert(showcase.includes("Responsive and reduced-motion notes"), "Showcase must demonstrate responsive and reduced-motion notes.");
-  assert(exists("app/admin/(protected)/design-system/page.tsx"), "Protected showcase is missing.");
-  assert(!exists("app/design-system/page.tsx"), "Design-system showcase must not be public.");
+  assert(!exists("app/admin/(protected)/design-system/page.tsx"), "Retired Admin showcase must stay removed.");
+  assert(!exists("app/admin/(protected)/guide/page.tsx"), "Retired Admin guide must stay removed.");
 
   for (const registry of [
     "lumeo2FoundationTokens",
@@ -287,9 +282,9 @@ try {
   assert(!css.includes("#7ecbe8") && !css.includes("#45add5") && !css.includes("#2a87af"), "Blue-dominant public accent values must not remain in the semantic foundation.");
   assert(!ui.includes("rgba(var(--sky-rgb)"), "Shared UI components must not use sky-rgb as a public focus or action accent.");
   assert(packageJson.scripts["verify:lumeo2-foundation"] === "node scripts/verify-lumeo-2-foundation.mjs", "verify:lumeo2-foundation script is missing.");
-  assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
-  assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");
-  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.110.2", "Supabase JS version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
+  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.112.2", "Supabase JS version changed unexpectedly.");
 
   const modified = changedFiles();
   for (const file of modified) {
@@ -306,13 +301,13 @@ try {
   // "must be present" to match reality (see scripts/verify-privacy-analytics.mjs).
   assert(/processing_started|processing_succeeded|processing_failed|download_started/.test([mergeTool, splitTool, compressTool].join("\n")), "Analytics lifecycle events must be present.");
 
-  const scannedSource = [ui, workspace, publicShell, footer, controlShell, sidebar, mobileNav, guidance, showcase, tokens, docs].join("\n");
+  const scannedSource = [ui, workspace, publicShell, footer, controlShell, sidebar, mobileNav, tokens, docs].join("\n");
   assert(!/console\.(log|info|warn|error)/.test(scannedSource), "Production debug logging must not be added.");
   assert(!/service_role|secret[_-]?key|password\s*=/.test(scannedSource), "No hard-coded secrets may be introduced.");
 
   console.log("PASS Lumeo 2 semantic tokens exist");
   console.log("PASS Lumeo 2 UI, upload, file-card, result, and workspace foundations exist");
-  console.log("PASS protected showcase and documentation exist");
+  console.log("PASS retired Admin showcase/guide stay removed and documentation exists");
   console.log("PASS protected dependency versions remain unchanged");
   console.log("PASS no migrations, analytics provider, or admin data files changed");
   console.log("PASS live PDF processing markers and Analytics V1 scope remain protected");
