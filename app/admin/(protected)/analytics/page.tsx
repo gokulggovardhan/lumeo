@@ -376,7 +376,7 @@ export default async function AnalyticsPage({
                 />
                 {activityRows.length > RECENT_ACTIVITY_PREVIEW_SIZE ? (
                   <div className="mt-4 text-right">
-                    <Link
+                    <Link prefetch={false}
                       href="/admin/analytics/activity"
                       className="text-sm font-bold text-[var(--text-accent)] hover:underline"
                     >
