@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { PDFDocument, StandardFonts } from "pdf-lib";
+import { TEXT_ONLY_PDF, writeFixtures } from "./fixtures.ts";
 
 const EDITABLE_RUN = 'div[role="button"][aria-label^="Editable text"]';
 
@@ -54,6 +54,10 @@ function collectProductionAssetFailures(page: import("@playwright/test").Page) {
   return failures;
 }
 
+test.beforeAll(async () => {
+  await writeFixtures();
+});
+
 test("production Edit PDF loads the deployed pdf.js worker and detects text", async ({
   page,
 }) => {
@@ -61,23 +65,8 @@ test("production Edit PDF loads the deployed pdf.js worker and detects text", as
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  const pdf = await PDFDocument.create();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const pdfPage = pdf.addPage([595, 842]);
-  pdfPage.drawText("Cloudflare production PDF worker smoke", {
-    x: 60,
-    y: 720,
-    size: 18,
-    font,
-  });
-  const bytes = Buffer.from(await pdf.save());
-
   await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
-  await page.locator('input[type="file"]').first().setInputFiles({
-    name: "cloudflare-production-smoke.pdf",
-    mimeType: "application/pdf",
-    buffer: bytes,
-  });
+  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
 
   const editableRuns = page.locator(EDITABLE_RUN);
   await expect(editableRuns.first()).toBeVisible();
@@ -85,9 +74,8 @@ test("production Edit PDF loads the deployed pdf.js worker and detects text", as
   const labels = await editableRuns.evaluateAll((nodes) =>
     nodes.map((node) => node.getAttribute("aria-label") ?? "").join(" "),
   );
-  expect(labels).toContain("Cloudflare");
-  expect(labels).toContain("production");
-  expect(labels).toContain("PDF");
+  expect(labels).toContain("Employee record");
+  expect(labels).toContain("123-45-6789");
 
   expect(assetFailures).toEqual([]);
   expect(pageErrors).toEqual([]);
