@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { geolocation } from "@vercel/functions";
+import { formatApproximateLocation } from "@/lib/cloudflare/geolocation";
 import { createClient } from "@/lib/supabase/server";
 import { captureServerError, withRouteHandlerCapture } from "@/lib/errors/server";
 
@@ -16,16 +16,9 @@ function trimmed(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
-// City/region only, via Vercel's own geolocation() helper (the currently
-// recommended way to read this -- more robust than parsing x-vercel-ip-*
-// headers by hand). No IP address is ever read or stored, no external
-// geolocation service is called. Returns nothing outside Vercel deployments
-// (e.g. local dev), which is expected.
-function readApproxLocation(request: NextRequest) {
-  const { city, countryRegion, country } = geolocation(request);
-  const parts = [city, countryRegion, country].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : null;
-}
+// City/region/country only from Cloudflare's inbound request metadata.
+// No IP address is read or stored, and no external geolocation service is
+// called. Local/non-Cloudflare development simply records no location.
 
 export const POST = withRouteHandlerCapture("/api/feedback", async (request: NextRequest) => {
   let body: unknown;
@@ -61,7 +54,7 @@ export const POST = withRouteHandlerCapture("/api/feedback", async (request: Nex
   if (email && !emailPattern.test(email)) return NextResponse.json({ ok: false, message: "Enter a valid email." }, { status: 400 });
   if (phone && !phonePattern.test(phone)) return NextResponse.json({ ok: false, message: "Enter a valid phone number." }, { status: 400 });
 
-  const location = readApproxLocation(request);
+  const location = formatApproximateLocation(request);
 
   const supabase = await createClient();
   const { error } = await supabase.from("feedback_queries").insert({
