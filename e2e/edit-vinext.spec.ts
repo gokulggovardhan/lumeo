@@ -33,16 +33,17 @@ test("vinext Edit PDF exposes matched editable text runs", async ({ page }) => {
   );
   await expect
     .poll(
-      async () => ({
-        editable: await editable.count(),
-        diagnostics: editEngineErrors.join(" | "),
-      }),
+      async () => {
+        if ((await editable.count()) > 0) return "editable";
+        if (editEngineErrors.length > 0) return editEngineErrors.join(" | ");
+        return "waiting for editable text matching";
+      },
       {
         timeout: 90_000,
-        message: "vinext should produce editable runs; browser diagnostics are included in the observed value",
+        message: "vinext should produce editable runs",
       },
     )
-    .toMatchObject({ editable: 1 });
+    .toBe("editable");
 
   const labels = await editable.evaluateAll((nodes) =>
     nodes.map((node) => node.getAttribute("aria-label") ?? ""),
