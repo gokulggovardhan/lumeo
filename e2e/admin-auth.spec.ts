@@ -131,16 +131,23 @@ test.describe("Control Center authentication", () => {
       }),
     ).toBeVisible();
 
-    const rangeSelect = page.getByLabel("Range");
+    // vinext may retain a hidden previous route tree during navigation.
+    // Scope assertions to the active main content instead of matching hidden
+    // framework transition state outside the user-visible page.
+    const analyticsMain = page.locator("#main-content");
+    const rangeSelect = analyticsMain.getByLabel("Range");
+    await expect(rangeSelect).toHaveCount(1);
     const viewportWidth = page.viewportSize()?.width ?? 1280;
     await expect(rangeSelect).toHaveCSS(
       "font-size",
       viewportWidth < 640 ? "16px" : "14px",
     );
     await rangeSelect.selectOption("30d");
-    await page.getByRole("button", { name: "Apply" }).click();
+    await analyticsMain.getByRole("button", { name: "Apply" }).click();
     await expect(page).toHaveURL(/\/admin\/analytics\?range=30d/);
-    await expect(page.getByText("Selected: Last 30 days")).toBeVisible();
+    await expect(
+      page.locator("#main-content").getByText("Selected: Last 30 days"),
+    ).toBeVisible();
 
     const adminOverflow = await page.evaluate(
       () =>
