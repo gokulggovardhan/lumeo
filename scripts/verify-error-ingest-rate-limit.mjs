@@ -76,6 +76,16 @@ await expectRateLimited(
   "authenticated limit",
 );
 
+const { data: storedDiagnostic, error: storedDiagnosticError } = await authenticated
+  .from("error_logs")
+  .select("message, stack, page_url")
+  .eq("message", "rate-limit-test-auth-0")
+  .single();
+assert.equal(storedDiagnosticError, null, storedDiagnosticError?.message ?? "stored diagnostic read failed");
+assert.ok(storedDiagnostic?.stack?.includes("<script>not-executed</script>"), "diagnostic structure was unexpectedly removed");
+assert.ok(!storedDiagnostic?.stack?.includes("should-not-matter"), "sensitive token value was stored");
+assert.match(storedDiagnostic?.stack ?? "", /token=\[REDACTED\]/i, "stored diagnostic was not redacted at ingestion");
+
 const { error: internalHelperError } = await anon.rpc("current_admin_role");
 assert.ok(internalHelperError, "anon unexpectedly executed current_admin_role");
 
