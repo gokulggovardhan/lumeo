@@ -75,7 +75,7 @@ export default async function AnalyticsPage({
             <select
               name="range"
               defaultValue={range.key}
-              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)]"
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] sm:text-sm"
             >
               <option value="today">Today</option>
               <option value="yesterday">Yesterday</option>
@@ -94,7 +94,7 @@ export default async function AnalyticsPage({
               name="start"
               defaultValue={params.start ?? range.startDate}
               max={maxDate}
-              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)]"
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] sm:text-sm"
             />
           </label>
 
@@ -105,7 +105,7 @@ export default async function AnalyticsPage({
               name="end"
               defaultValue={params.end ?? range.endDate}
               max={maxDate}
-              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)]"
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] sm:text-sm"
             />
           </label>
 
