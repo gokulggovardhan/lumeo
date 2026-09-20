@@ -235,7 +235,8 @@ try {
   console.log("PASS server actions call requireAdmin");
   console.log("PASS admin data module is server-only");
   console.log("PASS logout remains POST-only");
-  console.log("PASS no getSession, service_role, or secret key usage in new admin source");\n  console.log("PASS Admin deployment metadata is Cloudflare-native and Vercel-free");
+  console.log("PASS no getSession, service_role, or secret key usage in new admin source");
+  console.log("PASS Admin deployment metadata is Cloudflare-native and Vercel-free");
   console.log("PASS current range-based Analytics control center UI is present");
   console.log("PASS Settings exposes only live runtime controls");
   console.log("PASS protected package versions are unchanged");
