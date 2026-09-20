@@ -28,7 +28,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Edit PDF — vinext Worker
+    name: Edit PDF — vinext Worker browsers
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -45,8 +45,8 @@ jobs:
       - name: Install exact dependencies
         run: npm ci
 
-      - name: Install Chromium
-        run: npx playwright install --with-deps chromium
+      - name: Install Chromium, WebKit and Firefox
+        run: npx playwright install --with-deps chromium webkit firefox
 
       - name: Build Cloudflare Worker
         run: npm run build:vinext
