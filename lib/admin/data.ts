@@ -728,7 +728,7 @@ export async function getSystemStatus(admin: AdminContext): Promise<DataResult<S
       authenticatedAdmin: admin.authenticated && admin.authorized,
       activeRole: admin.role,
       appVersion: process.env.npm_package_version ?? "0.1.0",
-      deploymentEnvironment: process.env.VERCEL_ENV ?? "local",
+      deploymentEnvironment: process.env.LUMEO_DEPLOYMENT_ENV ?? "local",
       currentTimestamp: new Date().toISOString(),
       analyticsCollectionStatus: "schema-ready",
       analyticsEnabled: isPublicAnalyticsEnabled(analyticsSettingResult.data as SiteSetting | null),
