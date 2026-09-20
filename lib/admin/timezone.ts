@@ -1,7 +1,7 @@
 // Every admin console timestamp -- analytics, activity log, inbox -- displays
 // in IST (Asia/Kolkata) regardless of where the server or the admin's browser
 // is running. Without an explicit timeZone, server-rendered pages fall back
-// to the Vercel runtime's UTC and client components fall back to the
+// to the server runtime's timezone and client components fall back to the
 // visitor's browser locale, so the same event shows two different times
 // depending on which component rendered it.
 export const ADMIN_TIMEZONE = "Asia/Kolkata";

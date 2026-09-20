@@ -1,30 +1,29 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { geolocation } from "@vercel/functions";
 import { createClient } from "@/lib/supabase/server";
 import { captureServerError, withRouteHandlerCapture } from "@/lib/errors/server";
+import {
+  formatApproximateLocation,
+  readCloudflareApproximateLocation,
+} from "@/lib/cloudflare/request-location";
 
-// Edge runtime: cold starts are dramatically faster here than Node.js
-// serverless (the prior default), which is what made submissions take
-// several seconds. Nothing in this route uses a Node-only API.
-export const runtime = "edge";
+// This route uses only web-standard APIs so vinext can execute it directly in
+// the Cloudflare Worker runtime without a Vercel/Next Edge Runtime override.
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phonePattern = /^[+]?[\d\s().-]{7,20}$/;
 const allowedTypes = new Set(["Query", "Feedback"]);
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function trimmed(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
-// City/region only, via Vercel's own geolocation() helper (the currently
-// recommended way to read this -- more robust than parsing x-vercel-ip-*
-// headers by hand). No IP address is ever read or stored, no external
-// geolocation service is called. Returns nothing outside Vercel deployments
-// (e.g. local dev), which is expected.
+// Approximate city/region/country comes from Cloudflare's inbound Request.cf
+// data, with Cloudflare location headers as a fallback. No IP address is read
+// or stored and no external geolocation service is called.
 function readApproxLocation(request: NextRequest) {
-  const { city, countryRegion, country } = geolocation(request);
-  const parts = [city, countryRegion, country].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : null;
+  return formatApproximateLocation(readCloudflareApproximateLocation(request));
 }
 
 export const POST = withRouteHandlerCapture("/api/feedback", async (request: NextRequest) => {
@@ -53,6 +52,11 @@ export const POST = withRouteHandlerCapture("/api/feedback", async (request: Nex
   const phone = trimmed(data.phone, 30);
   const subject = trimmed(data.subject, 150);
   const message = trimmed(data.message, 2000);
+  const anonymousSessionId =
+    typeof data.anonymousSessionId === "string" &&
+    uuidPattern.test(data.anonymousSessionId)
+      ? data.anonymousSessionId
+      : null;
 
   if (!allowedTypes.has(type)) return NextResponse.json({ ok: false, message: "Choose Query or Feedback." }, { status: 400 });
   if (!name) return NextResponse.json({ ok: false, message: "Name is required." }, { status: 400 });
@@ -64,17 +68,25 @@ export const POST = withRouteHandlerCapture("/api/feedback", async (request: Nex
   const location = readApproxLocation(request);
 
   const supabase = await createClient();
-  const { error } = await supabase.from("feedback_queries").insert({
-    type,
-    name,
-    email: email || null,
-    phone: phone || null,
-    subject,
-    message,
-    location,
+  const { error } = await supabase.rpc("record_feedback_query", {
+    p_type: type,
+    p_name: name,
+    p_subject: subject,
+    p_message: message,
+    p_email: email || null,
+    p_phone: phone || null,
+    p_location: location,
+    p_anonymous_session_id: anonymousSessionId,
   });
 
   if (error) {
+    if (/rate limit/i.test(error.message)) {
+      return NextResponse.json(
+        { ok: false, message: "Too many messages. Please try again later." },
+        { status: 429 },
+      );
+    }
+
     console.error("feedback insert failed:", error.message);
     void captureServerError({
       message: `feedback insert failed: ${error.message}`,

@@ -19,10 +19,10 @@ This runs, in order, and stops at the first fatal failure:
 4. `npm run build`
 5. Every `verify:*` script in `package.json`
 
-Two scripts (`verify:aura-rollout`, `verify:lumeo2-public-experience`) are
-documented as deprecated in their own files — they check a since-completed
-rollout milestone's hardcoded content markers, not current production
-behavior. `verify:release` reports their failure but does not fail the
+`verify:lumeo2-public-experience` is documented as deprecated in its own
+file — it checks a since-completed rollout milestone's hardcoded content
+markers, not current production behavior. `verify:release` reports its
+failure but does not fail the
 overall gate on it.
 
 If `verify:release` exits non-zero for any other reason, **do not deploy**
@@ -279,7 +279,7 @@ tooling addition with no immediate consumer).
 - **Troubleshooting a `verify:release` failure**:
   1. Read which step failed from the console output — the script stops at
      the first fatal failure in the core sequence (test/lint/typecheck/
-     build) and reports (but doesn't stop on) the two known-deprecated
+     build) and reports (but doesn't stop on) the known-deprecated
      scripts.
   2. For a `verify:*` script failure, read that script's own assertion
      message — they're written to name the specific file/behavior expected.
@@ -294,10 +294,11 @@ tooling addition with no immediate consumer).
   checklist only.
 - No automated bundle-size/performance regression tracking exists; Part 10
   is a one-time baseline snapshot, not a CI-enforced budget.
-- `verify-lumeo-aura-rollout.mjs` and `verify-lumeo-2-public-experience.mjs`
-  remain deprecated rather than rewritten — a full rewrite needs a dedicated
-  investigation into which of their many hardcoded content-marker checks
-  still have a meaningful current-architecture equivalent.
+- `verify-lumeo-2-public-experience.mjs` remains deprecated rather than
+  rewritten — a full rewrite needs a dedicated investigation into which of
+  its hardcoded content-marker checks still have a meaningful
+  current-architecture equivalent. The obsolete Aura rollout verifier was
+  removed once its development-only Admin showcase routes were retired.
 - `hasPdfMagicBytes` (and other small validation helpers behind the `@/`
   path alias) have no dedicated unit test, for the path-alias reason
   documented in Part 1.

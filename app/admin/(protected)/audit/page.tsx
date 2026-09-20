@@ -19,6 +19,14 @@ const entityTypes = [
   "site_setting",
 ];
 
+function validDateIso(value: string | undefined, addDays = 0) {
+  if (!value) return undefined;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return undefined;
+  if (addDays) date.setUTCDate(date.getUTCDate() + addDays);
+  return date.toISOString();
+}
+
 function buildQuery(params: Record<string, string | undefined>) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -38,17 +46,49 @@ export default async function AuditPage({
   const page = pageNumber(params.page);
   const canView = canViewAudit(admin.role);
 
+  if (!canView) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Record of change"
+          title="Audit Log"
+          description="Read-only administrative history."
+        />
+        <AdminEmptyState
+          title="No access"
+          description="Your role does not have permission to view the audit log."
+        />
+      </div>
+    );
+  }
+
   const filters = {
     action: params.action?.trim() || undefined,
     entityType: params.entity_type?.trim() || undefined,
-    startDate: params.start ? new Date(params.start).toISOString() : undefined,
-    endDate: params.end ? new Date(new Date(params.end).getTime() + 24 * 60 * 60 * 1000).toISOString() : undefined,
+    startDate: validDateIso(params.start),
+    endDate: validDateIso(params.end, 1),
   };
 
-  const logs = canView ? await getAuditLogs(50, (page - 1) * 50, filters) : { data: [], error: null };
-  const actorEmails = canView
-    ? await resolveAdminEmails(logs.data.map((log) => log.actor_user_id).filter((id): id is string => Boolean(id)))
-    : {};
+  const logs = await getAuditLogs(50, (page - 1) * 50, filters);
+  if (logs.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Record of change"
+          title="Audit Log"
+          description="Read-only administrative history."
+        />
+        <AdminEmptyState
+          title="Audit records are unavailable"
+          description="Administrative history could not be verified. Try again after the data service recovers."
+        />
+      </div>
+    );
+  }
+
+  const actorEmails = await resolveAdminEmails(
+    logs.data.map((log) => log.actor_user_id).filter((id): id is string => Boolean(id)),
+  );
 
   const carryParams = { action: params.action, entity_type: params.entity_type, start: params.start, end: params.end };
 
@@ -69,7 +109,7 @@ export default async function AuditPage({
               name="action"
               defaultValue={params.action}
               placeholder="e.g. update"
-              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)] placeholder:text-[var(--lumeo-paper-600)]"
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] placeholder:text-[var(--lumeo-paper-600)] sm:text-sm"
             />
           </label>
           <label className="block text-sm font-semibold text-[#F0EAD6]">
@@ -77,7 +117,7 @@ export default async function AuditPage({
             <select
               name="entity_type"
               defaultValue={params.entity_type ?? ""}
-              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm"
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm"
             >
               <option value="">All</option>
               {entityTypes.map((type) => (
@@ -91,7 +131,7 @@ export default async function AuditPage({
               type="date"
               name="start"
               defaultValue={params.start}
-              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)]"
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] sm:text-sm"
             />
           </label>
           <label className="block text-sm font-semibold text-[#F0EAD6]">

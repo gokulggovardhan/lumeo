@@ -16,6 +16,22 @@ export default async function ToolsPage() {
   const [tools, categories] = await Promise.all([getPdfTools(), getToolCategories()]);
   const canEdit = canManageTools(admin.role);
 
+  if (tools.error || categories.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Catalog"
+          title="Tools"
+          description="Manage the database catalog for Lumeo PDF tools."
+        />
+        <AdminEmptyState
+          title="Tool catalog is unavailable"
+          description="Tool or category state could not be verified, so catalog changes are disabled until the data service recovers."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-7">
       <AdminPageHeader
@@ -58,7 +74,7 @@ export default async function ToolsPage() {
                 name="category_id"
                 defaultValue={tool.category_id ?? ""}
                 aria-label={`${tool.name} category`}
-                className="min-h-10 w-full min-w-[10.5rem] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
+                className="min-h-10 w-full min-w-[10.5rem] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base sm:text-xs"
               >
                 <option value="">None</option>
                 {categories.data.map((category) => (
@@ -72,7 +88,7 @@ export default async function ToolsPage() {
                 name="status"
                 defaultValue={tool.status}
                 aria-label={`${tool.name} status`}
-                className="min-h-10 w-full min-w-[8.5rem] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
+                className="min-h-10 w-full min-w-[8.5rem] rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base sm:text-xs"
               >
                 {["active", "beta", "coming_soon", "hidden", "maintenance"].map((status) => (
                   <option key={status} value={status}>{status}</option>
@@ -87,7 +103,7 @@ export default async function ToolsPage() {
                 placeholder="e.g. Upgrading -- back shortly"
                 aria-label={`${tool.name} maintenance message`}
                 maxLength={300}
-                className="min-h-10 w-44 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs"
+                className="min-h-10 w-44 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base sm:text-xs"
               />,
               <label key="enabled" className="flex min-h-10 items-center justify-center gap-2">
                 <input

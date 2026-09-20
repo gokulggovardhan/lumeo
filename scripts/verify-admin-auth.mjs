@@ -109,7 +109,14 @@ try {
 
   const signOutButton = read("components/admin/AdminSignOutButton.tsx");
   assert(signOutButton.includes("ADMIN_SIGNED_OUT_MARKER"), "Sign-out must mark the current tab before navigation.");
-  assert(signOutButton.includes("onSubmit={markSignedOut}"), "Sign-out marker must be set before the logout POST.");
+  const markerCallIndex = signOutButton.indexOf("markSignedOut();");
+  const logoutPostIndex = signOutButton.indexOf('fetch("/admin/logout"');
+  assert(markerCallIndex >= 0, "Sign-out must set the same-tab marker.");
+  assert(logoutPostIndex >= 0, "Sign-out must POST to the authoritative logout endpoint.");
+  assert(markerCallIndex < logoutPostIndex, "Sign-out marker must be set before the logout POST.");
+  assert(signOutButton.includes('method: "POST"'), "Client logout request must remain POST-only.");
+  assert(signOutButton.includes('credentials: "same-origin"'), "Client logout request must remain same-origin.");
+  assert(signOutButton.includes('window.location.replace("/admin/login?message=signed-out")'), "Successful logout must hard-navigate to the signed-out page.");
 
   const historyBoundary = read("components/admin/AdminSessionBoundary.tsx");
   assert(historyBoundary.includes('"pagehide"'), "Admin history boundary must observe pagehide.");

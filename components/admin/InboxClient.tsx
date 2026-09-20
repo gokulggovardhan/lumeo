@@ -5,6 +5,7 @@ import { ArrowLeft, Inbox as InboxIcon, Loader2, Mail, MailOpen, Phone, Search, 
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { deleteFeedbackQuery } from "@/app/admin/(protected)/inbox/actions";
 import { createClient } from "@/lib/supabase/client";
+import { applyInboxRealtimeEvent, selectedInboxIdAfterEvent } from "@/lib/admin/inbox-realtime";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
 import type { FeedbackQuery, FeedbackQueryType } from "@/lib/supabase/database.types";
 
@@ -44,13 +45,24 @@ export function InboxClient({
   const [search, setSearch] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(initialItems.length === pageSize);
+  const [serverOffset, setServerOffset] = useState(initialItems.length);
   const [deleting, setDeleting] = useState(false);
   const [banner, setBanner] = useState<{ tone: "error" | "success"; message: string } | null>(
     initialError ? { tone: "error", message: "We couldn't load your messages. Try refreshing the page." } : null,
   );
   const supabaseRef = useRef(createClient());
+  const serverLoadedIdsRef = useRef(new Set(initialItems.map((item) => item.id)));
 
-  // Realtime: new public submissions appear at the top without a refresh.
+  const removeItem = useCallback((id: string) => {
+    if (serverLoadedIdsRef.current.delete(id)) {
+      setServerOffset((current) => Math.max(0, current - 1));
+    }
+    const event = { type: "DELETE" as const, id };
+    setItems((current) => applyInboxRealtimeEvent(current, event));
+    setSelectedId((current) => selectedInboxIdAfterEvent(current, event));
+  }, []);
+
+  // Realtime: keep the loaded list synchronized across Admin sessions.
   useEffect(() => {
     const supabase = supabaseRef.current;
     const channel = supabase
@@ -59,8 +71,24 @@ export function InboxClient({
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "feedback_queries" },
         (payload) => {
-          const row = payload.new as FeedbackQuery;
-          setItems((current) => (current.some((item) => item.id === row.id) ? current : [row, ...current]));
+          const event = { type: "INSERT" as const, row: payload.new as FeedbackQuery };
+          setItems((current) => applyInboxRealtimeEvent(current, event));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "feedback_queries" },
+        (payload) => {
+          const event = { type: "UPDATE" as const, row: payload.new as FeedbackQuery };
+          setItems((current) => applyInboxRealtimeEvent(current, event));
+        },
+      )
+      .on(
+        "postgres_changes",
+        { event: "DELETE", schema: "public", table: "feedback_queries" },
+        (payload) => {
+          const id = (payload.old as Partial<FeedbackQuery>).id;
+          if (id) removeItem(id);
         },
       )
       .subscribe();
@@ -68,7 +96,7 @@ export function InboxClient({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, []);
+  }, [removeItem]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -108,7 +136,7 @@ export function InboxClient({
         .from("feedback_queries")
         .select("id, type, name, email, phone, subject, message, location, is_read, created_at")
         .order("created_at", { ascending: false })
-        .range(items.length, items.length + pageSize - 1);
+        .range(serverOffset, serverOffset + pageSize - 1);
 
       if (error) {
         setBanner({ tone: "error", message: "Couldn't load more messages. Try again." });
@@ -116,6 +144,8 @@ export function InboxClient({
       }
 
       const rows = (data ?? []) as FeedbackQuery[];
+      for (const row of rows) serverLoadedIdsRef.current.add(row.id);
+      setServerOffset((current) => current + rows.length);
       setItems((current) => {
         const seen = new Set(current.map((row) => row.id));
         return [...current, ...rows.filter((row) => !seen.has(row.id))];
@@ -138,8 +168,7 @@ export function InboxClient({
         setBanner({ tone: "error", message: result.message });
         return;
       }
-      setItems((current) => current.filter((row) => row.id !== item.id));
-      if (selectedId === item.id) setSelectedId(null);
+      removeItem(item.id);
       setBanner({ tone: "success", message: "Message deleted." });
     } finally {
       setDeleting(false);
@@ -157,14 +186,14 @@ export function InboxClient({
               type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name, subject, message..."
-              className="min-h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] py-2 pl-9 pr-3 text-sm text-[var(--lumeo-paper-50)] outline-none placeholder:text-[var(--lumeo-paper-600)] focus:border-[var(--border-focus)]"
+              placeholder="Search loaded messages..."
+              className="min-h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] py-2 pl-9 pr-3 text-base text-[var(--lumeo-paper-50)] sm:text-sm outline-none placeholder:text-[var(--lumeo-paper-600)] focus:border-[var(--border-focus)]"
             />
           </div>
           <select
             value={typeFilter}
             onChange={(event) => setTypeFilter(event.target.value as TypeFilter)}
-            className="min-h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs font-semibold text-[var(--lumeo-paper-50)]"
+            className="min-h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base font-semibold text-[var(--lumeo-paper-50)] sm:text-xs"
           >
             <option value="all">All messages</option>
             <option value="Query">Queries</option>

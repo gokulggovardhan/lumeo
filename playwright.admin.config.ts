@@ -8,6 +8,9 @@ export default defineConfig({
     timeout: 10_000,
   },
   fullyParallel: false,
+  // The authenticated lifecycle mutates global site_settings (maintenance mode).
+  // Serialize browser projects so they cannot race the same database row.
+  workers: 1,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? [["list"], ["html", { outputFolder: "playwright-admin-report", open: "never" }]] : "list",
   use: {
@@ -16,6 +19,10 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
+    {
+      name: "chromium-desktop",
+      use: { ...devices["Desktop Chrome"] },
+    },
     {
       name: "chromium-mobile",
       use: { ...devices["Pixel 7"] },

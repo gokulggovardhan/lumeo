@@ -4,6 +4,7 @@ import { AdminFormField } from "@/components/admin/AdminFormField";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminSubmitButton } from "@/components/admin/AdminSubmitButton";
+import { MaintenanceModeSubmitButton } from "@/components/admin/MaintenanceModeSubmitButton";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getSiteSettings } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
@@ -47,6 +48,23 @@ export default async function SettingsPage() {
   const admin = await requireAdmin();
   const settings = await getSiteSettings();
   const canEdit = canManageSettings(admin.role);
+
+  if (settings.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Owner controls"
+          title="Settings"
+          description="Only controls that change live Lumeo behavior are exposed here."
+        />
+        <AdminEmptyState
+          title="Live settings are unavailable"
+          description="Current values could not be verified, so changes are disabled to avoid overwriting unknown production state."
+        />
+      </div>
+    );
+  }
+
   const visibleSettings = settings.data.filter((setting) =>
     liveSettingKeys.has(setting.key),
   );
@@ -76,6 +94,7 @@ export default async function SettingsPage() {
               return (
                 <form
                   key={key}
+                  aria-label={`${label} setting`}
                   action={asAdminFormAction(updateSiteSetting)}
                   className={`rounded-2xl border p-4 ${
                     isMaintenanceMode && enabled
@@ -134,9 +153,13 @@ export default async function SettingsPage() {
                     </div>
                   ) : null}
 
-                  <AdminSubmitButton pendingLabel="Saving...">
-                    Save
-                  </AdminSubmitButton>
+                  {isMaintenanceMode ? (
+                    <MaintenanceModeSubmitButton wasEnabled={enabled} />
+                  ) : (
+                    <AdminSubmitButton pendingLabel="Saving...">
+                      Save
+                    </AdminSubmitButton>
+                  )}
                 </form>
               );
             })}

@@ -44,26 +44,46 @@ async function getAdminSessionState(page: Page) {
   });
 }
 
-async function openMobileNavigation(page: Page) {
+async function openAdminNavigation(page: Page) {
   const openButton = page.getByRole("button", {
     name: "Open Control Center navigation",
   });
-  await expect(openButton).toBeVisible();
-  await expect(openButton).toHaveAttribute("aria-expanded", "false");
-  await openButton.click();
 
-  const closeButton = page.getByRole("button", {
-    name: "Close Control Center navigation",
-  });
-  await expect(closeButton).toBeVisible();
-  await expect(closeButton).toHaveAttribute("aria-expanded", "true");
-  await expect(
-    page.getByRole("navigation", {
+  if (await openButton.isVisible().catch(() => false)) {
+    await expect(openButton).toHaveAttribute("aria-expanded", "false");
+    await openButton.click();
+
+    const closeButton = page.getByRole("button", {
+      name: "Close Control Center navigation",
+    });
+    await expect(closeButton).toBeVisible();
+    await expect(closeButton).toHaveAttribute("aria-expanded", "true");
+
+    const mobileNavigation = page.getByRole("navigation", {
       name: "Mobile Control Center navigation",
-    }),
-  ).toBeVisible();
+    });
+    await expect(mobileNavigation).toBeVisible();
+    return { navigation: mobileNavigation, mobile: true, closeButton };
+  }
 
-  return closeButton;
+  const desktopNavigation = page.getByRole("navigation", {
+    name: "Control Center navigation",
+  });
+  await expect(desktopNavigation).toBeVisible();
+  return { navigation: desktopNavigation, mobile: false, closeButton: null };
+}
+
+async function exerciseResponsiveNavigation(page: Page) {
+  const state = await openAdminNavigation(page);
+  if (!state.mobile || !state.closeButton) return;
+
+  await page.keyboard.press("Escape");
+  const reopenedButton = page.getByRole("button", {
+    name: "Open Control Center navigation",
+  });
+  await expect(reopenedButton).toBeVisible();
+  await expect(reopenedButton).toHaveAttribute("aria-expanded", "false");
+  await expect(reopenedButton).toBeFocused();
 }
 
 test.describe("Control Center authentication", () => {
@@ -99,20 +119,10 @@ test.describe("Control Center authentication", () => {
     await page.reload();
     await expect(page).toHaveURL(/\/admin$/);
 
-    await openMobileNavigation(page);
-    await page.keyboard.press("Escape");
-    const reopenedButton = page.getByRole("button", {
-      name: "Open Control Center navigation",
-    });
-    await expect(reopenedButton).toBeVisible();
-    await expect(reopenedButton).toHaveAttribute("aria-expanded", "false");
-    await expect(reopenedButton).toBeFocused();
+    await exerciseResponsiveNavigation(page);
 
-    await openMobileNavigation(page);
-    const mobileNavigation = page.getByRole("navigation", {
-      name: "Mobile Control Center navigation",
-    });
-    await mobileNavigation.getByRole("link", { name: "Analytics" }).click();
+    const { navigation: overviewNavigation } = await openAdminNavigation(page);
+    await overviewNavigation.getByRole("link", { name: "Analytics" }).click();
     await expect(page).toHaveURL(/\/admin\/analytics/);
     await expect(
       page.getByRole("heading", {
@@ -121,12 +131,23 @@ test.describe("Control Center authentication", () => {
       }),
     ).toBeVisible();
 
-    const rangeSelect = page.getByLabel("Range");
-    await expect(rangeSelect).toHaveCSS("font-size", "16px");
+    // vinext may retain a hidden previous route tree during navigation.
+    // Scope assertions to the active main content instead of matching hidden
+    // framework transition state outside the user-visible page.
+    const analyticsMain = page.locator("#main-content");
+    const rangeSelect = analyticsMain.getByLabel("Range");
+    await expect(rangeSelect).toHaveCount(1);
+    const viewportWidth = page.viewportSize()?.width ?? 1280;
+    await expect(rangeSelect).toHaveCSS(
+      "font-size",
+      viewportWidth < 640 ? "16px" : "14px",
+    );
     await rangeSelect.selectOption("30d");
-    await page.getByRole("button", { name: "Apply" }).click();
+    await analyticsMain.getByRole("button", { name: "Apply" }).click();
     await expect(page).toHaveURL(/\/admin\/analytics\?range=30d/);
-    await expect(page.getByText("Selected: Last 30 days")).toBeVisible();
+    await expect(
+      page.locator("#main-content").getByText("Selected: Last 30 days"),
+    ).toBeVisible();
 
     const adminOverflow = await page.evaluate(
       () =>
@@ -138,11 +159,8 @@ test.describe("Control Center authentication", () => {
     await page.reload();
     await expect(page).toHaveURL(/\/admin\/analytics\?range=30d/);
 
-    await openMobileNavigation(page);
-    await page
-      .getByRole("navigation", { name: "Mobile Control Center navigation" })
-      .getByRole("link", { name: "Inbox" })
-      .click();
+    const { navigation: analyticsNavigation } = await openAdminNavigation(page);
+    await analyticsNavigation.getByRole("link", { name: "Inbox" }).click();
     await expect(page).toHaveURL(/\/admin\/inbox/);
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
 
@@ -151,12 +169,114 @@ test.describe("Control Center authentication", () => {
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
     expect(inboxReload?.headers()["cache-control"]).toContain("no-store");
 
-    await openMobileNavigation(page);
-    const protectedOrigin = new URL(page.url()).origin;
-    await page
-      .locator("#control-center-mobile-menu")
-      .getByRole("button", { name: "Sign out" })
+    const { navigation: inboxNavigation } = await openAdminNavigation(page);
+    await inboxNavigation.getByRole("link", { name: "Errors" }).click();
+    await expect(page).toHaveURL(/\/admin\/errors/);
+    await expect(page.getByRole("heading", { name: "Errors" })).toBeVisible();
+    const firstError = page.locator("details").first();
+    await expect(firstError).toBeVisible();
+    await firstError.locator("summary").click();
+    await expect(firstError.locator("code")).toContainText("<script>not-executed</script>");
+    await expect(firstError.locator("code")).not.toContainText("should-not-matter");
+    expect(
+      await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth >
+          document.documentElement.clientWidth,
+      ),
+    ).toBe(false);
+
+    const { navigation: errorsNavigation } = await openAdminNavigation(page);
+    await errorsNavigation.getByRole("link", { name: "Health" }).click();
+    await expect(page).toHaveURL(/\/admin\/health/);
+    await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
+    await expect(
+      page.locator("#main-content").getByText("LibreOffice converter", {
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    const { navigation: healthNavigation } = await openAdminNavigation(page);
+    await healthNavigation.getByRole("link", { name: "Settings" }).click();
+    await expect(page).toHaveURL(/\/admin\/settings/);
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+
+    const maintenanceForm = page.getByRole("form", {
+      name: "Maintenance mode setting",
+    });
+    const maintenanceToggle = maintenanceForm.getByRole("checkbox", {
+      name: "Enabled",
+    });
+    if (await maintenanceToggle.isChecked()) {
+      await maintenanceToggle.uncheck();
+      await maintenanceForm
+        .getByRole("button", { name: "Save changes" })
+        .click();
+      await expect(maintenanceToggle).not.toBeChecked();
+    }
+
+    await maintenanceToggle.check();
+    await maintenanceForm
+      .getByRole("button", { name: "Save changes" })
       .click();
+    const maintenanceDialog = maintenanceForm.getByRole("alertdialog");
+    await expect(maintenanceDialog).toBeVisible();
+    await maintenanceDialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(maintenanceDialog).toHaveCount(0);
+
+    // Server-side transition checking must also reject an enable submit that
+    // lacks the explicit confirmation field (for example, implicit Enter).
+    // Use the real form submission path instead of requestSubmit()+immediate
+    // reload, which WebKit can abort mid-navigation and report as a browser
+    // network error even though the server correctly rejects the transition.
+    const implicitSubmitResponse = page.waitForResponse((response) => {
+      const request = response.request();
+      return (
+        request.method() === "POST" &&
+        new URL(response.url()).pathname === "/admin/settings"
+      );
+    });
+    await maintenanceForm.evaluate((form: HTMLFormElement) => form.requestSubmit());
+    const rejectedEnableResponse = await implicitSubmitResponse;
+    expect(rejectedEnableResponse.ok()).toBe(true);
+
+    const maintenanceAfterCancel = page
+      .getByRole("form", { name: "Maintenance mode setting" })
+      .getByRole("checkbox", { name: "Enabled" });
+    await expect(maintenanceAfterCancel).not.toBeChecked();
+
+    await maintenanceAfterCancel.check();
+    const maintenanceFormAfterCancel = page.getByRole("form", {
+      name: "Maintenance mode setting",
+    });
+    await maintenanceFormAfterCancel
+      .getByRole("button", { name: "Save changes" })
+      .click();
+    await maintenanceFormAfterCancel
+      .getByRole("button", { name: "Enable maintenance mode" })
+      .click();
+    await expect(page.getByText("Live: site is down for visitors")).toBeVisible();
+
+    const enabledMaintenanceForm = page.getByRole("form", {
+      name: "Maintenance mode setting",
+    });
+    const enabledMaintenanceToggle = enabledMaintenanceForm.getByRole(
+      "checkbox",
+      { name: "Enabled" },
+    );
+    await enabledMaintenanceToggle.uncheck();
+    await enabledMaintenanceForm
+      .getByRole("button", { name: "Save changes" })
+      .click();
+    await expect(page.getByText("Live: site is down for visitors")).toHaveCount(0);
+
+    const { navigation: settingsNavigation } = await openAdminNavigation(page);
+    await settingsNavigation.getByRole("link", { name: "Inbox" }).click();
+    await expect(page).toHaveURL(/\/admin\/inbox/);
+
+    await openAdminNavigation(page);
+    const protectedOrigin = new URL(page.url()).origin;
+    await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/admin\/login\?message=signed-out$/);
     expect(new URL(page.url()).origin).toBe(protectedOrigin);
 
@@ -185,9 +305,8 @@ test.describe("Control Center authentication", () => {
 
     await signIn(page);
     await expect(page).toHaveURL(/\/admin$/);
-    await expect(
-      page.getByRole("button", { name: "Open Control Center navigation" }),
-    ).toBeVisible();
+    const finalNavigation = await openAdminNavigation(page);
+    await expect(finalNavigation.navigation).toBeVisible();
 
     expect(
       browserErrors,

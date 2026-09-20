@@ -11,33 +11,10 @@ import { getSeoSettings } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageSeo } from "@/lib/admin/permissions";
 import { formatAdminDate } from "@/lib/admin/timezone";
+import { PUBLIC_ROUTE_PATHS } from "@/lib/public-site/routes";
 import { deleteSeoSetting, saveSeoSetting } from "@/app/admin/(protected)/seo/actions";
 
-// Known public routes this app actually serves (excludes /admin/** and
-// /maintenance, which are intentionally noindex). Kept as a plain list
-// rather than a filesystem scan since this is a Server Component -- update
-// it when a new public page is added.
-const publicRoutes = [
-  "/",
-  "/about",
-  "/accessibility",
-  "/contact",
-  "/features",
-  "/guides",
-  "/pdf-tools",
-  "/privacy",
-  "/security",
-  "/terms",
-  "/pdf",
-  "/pdf/compress",
-  "/pdf/jpg-to-pdf",
-  "/pdf/merge",
-  "/pdf/pdf-to-jpg",
-  "/pdf/pdf-to-word",
-  "/pdf/sign",
-  "/pdf/split",
-  "/pdf/word-to-pdf",
-];
+const publicRoutes = PUBLIC_ROUTE_PATHS;
 
 export default async function SeoPage({
   searchParams,
@@ -48,6 +25,22 @@ export default async function SeoPage({
   const seo = await getSeoSettings();
   const canEdit = canManageSeo(admin.role);
   const params = (await searchParams) ?? {};
+
+  if (seo.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Search foundation"
+          title="SEO"
+          description="Manage route SEO records in the database."
+        />
+        <AdminEmptyState
+          title="SEO records are unavailable"
+          description="Coverage cannot be verified, so editing is disabled until the data service recovers."
+        />
+      </div>
+    );
+  }
   const configuredRoutes = new Set(seo.data.map((record) => record.route));
   const missingRoutes = publicRoutes.filter((route) => !configuredRoutes.has(route));
   const prefillRoute = params.route && publicRoutes.includes(params.route) ? params.route : "/";
@@ -87,7 +80,7 @@ export default async function SeoPage({
           <form action={asAdminFormAction(saveSeoSetting)} className="grid gap-4 md:grid-cols-2">
             <label className="block text-sm font-semibold text-[#F0EAD6]">
               Route
-              <select name="route" defaultValue={prefillRoute} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm">
+              <select name="route" defaultValue={prefillRoute} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm">
                 {publicRoutes.map((route) => (
                   <option key={route} value={route}>
                     {route} {configuredRoutes.has(route) ? "" : "— missing"}

@@ -26,7 +26,7 @@ export function AdminFormField({
           type={type}
           defaultValue={defaultValue}
           aria-describedby={helpId}
-          className="mt-2 min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 py-2 text-sm text-[var(--lumeo-paper-50)] outline-none transition duration-200 placeholder:text-[var(--lumeo-paper-600)] focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--lumeo-aura-rgb),0.16)]"
+          className="mt-2 min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 py-2 text-base text-[var(--lumeo-paper-50)] sm:text-sm outline-none transition duration-200 placeholder:text-[var(--lumeo-paper-600)] focus:border-[var(--border-focus)] focus:ring-4 focus:ring-[rgba(var(--lumeo-aura-rgb),0.16)]"
         />
       )}
       {help && (

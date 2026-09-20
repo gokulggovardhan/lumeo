@@ -14,6 +14,16 @@ import {
 } from "@/lib/admin/validation";
 import type { Json } from "@/lib/supabase/database.types";
 
+function isEnabledValue(value: Json | null | undefined) {
+  return Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      "enabled" in value &&
+      value.enabled === true,
+  );
+}
+
 function settingValue(key: string, formData: FormData): Json {
   if (key === "maintenance_mode") {
     return {
@@ -38,7 +48,31 @@ export async function updateSiteSetting(formData: FormData) {
   }
 
   const value = settingValue(key, formData);
+  const enabled = isEnabledValue(value);
   const supabase = await createClient();
+
+  if (key === "maintenance_mode" && enabled) {
+    const { data: current, error: currentError } = await supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", key)
+      .maybeSingle();
+
+    if (currentError) {
+      return errorState("Maintenance mode state could not be verified.");
+    }
+
+    const wasEnabled = isEnabledValue(
+      (current as { value?: Json } | null)?.value,
+    );
+    if (
+      !wasEnabled &&
+      formString(formData, "maintenance_confirmation", 30) !== "confirm-enable"
+    ) {
+      return errorState("Confirm Maintenance mode before enabling it.");
+    }
+  }
+
   const { error } = await supabase.from("site_settings").upsert({
     key,
     value,
@@ -57,8 +91,11 @@ export async function updateSiteSetting(formData: FormData) {
     action: "setting.update",
     entityType: "site_setting",
     entityId: key,
-    summary: `Updated live setting ${key}.`,
-    changes: { key },
+    summary:
+      key === "maintenance_mode"
+        ? `${enabled ? "Enabled" : "Disabled"} maintenance mode.`
+        : `Updated live setting ${key}.`,
+    changes: { key, enabled },
   });
 
   revalidatePath("/admin/settings");

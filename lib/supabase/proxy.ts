@@ -1,10 +1,42 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { geolocation } from "@vercel/functions";
 import { GEO_COOKIE_NAME } from "@/lib/analytics/geo-cookie-name";
+import {
+  encodeAnalyticsGeoCookie,
+  readCloudflareApproximateLocation,
+} from "@/lib/cloudflare/request-location";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
 const SESSION_CACHE_HEADERS = ["cache-control", "expires", "pragma"] as const;
+
+const PRODUCTION_HOSTS = new Set(["lumeo.in", "www.lumeo.in"]);
+
+function applyBaselineSecurityHeaders(response: NextResponse) {
+  response.headers.set("X-Frame-Options", "DENY");
+  response.headers.set("X-Content-Type-Options", "nosniff");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+}
+
+function productionHttpsRedirect(request: NextRequest) {
+  const hostname = request.nextUrl.hostname.toLowerCase();
+  if (!PRODUCTION_HOSTS.has(hostname)) return null;
+
+  const forwardedProto = request.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  const isHttp =
+    request.nextUrl.protocol === "http:" || forwardedProto === "http";
+
+  if (!isHttp) return null;
+
+  const httpsUrl = request.nextUrl.clone();
+  httpsUrl.protocol = "https:";
+  const response = NextResponse.redirect(httpsUrl, 308);
+  applyBaselineSecurityHeaders(response);
+  return response;
+}
 
 // Next's cookie serializer already percent-encodes the whole value on write
 // (that's a single encoding pass we don't control) -- pre-encoding each
@@ -13,9 +45,7 @@ const SESSION_CACHE_HEADERS = ["cache-control", "expires", "pragma"] as const;
 // reader must decode the WHOLE value once before splitting on "|", not
 // split first and decode each part (see lib/analytics/geo.ts).
 function buildGeoCookieValue(request: NextRequest) {
-  const { city, countryRegion, country } = geolocation(request);
-  if (!city && !countryRegion && !country) return null;
-  return [city ?? "", countryRegion ?? "", country ?? ""].join("|");
+  return encodeAnalyticsGeoCookie(readCloudflareApproximateLocation(request));
 }
 
 function applyGeoCookie(response: NextResponse, value: string | null) {
@@ -77,6 +107,9 @@ function applyAdminCachePolicy(response: NextResponse, pathname: string) {
 }
 
 export async function updateSession(request: NextRequest) {
+  const httpsRedirect = productionHttpsRedirect(request);
+  if (httpsRedirect) return httpsRedirect;
+
   let env;
 
   try {
@@ -90,6 +123,7 @@ export async function updateSession(request: NextRequest) {
       request,
     });
     applyAdminCachePolicy(fallbackResponse, request.nextUrl.pathname);
+    applyBaselineSecurityHeaders(fallbackResponse);
     return fallbackResponse;
   }
 
@@ -151,11 +185,13 @@ export async function updateSession(request: NextRequest) {
       copySessionMetadata(response, maintenanceResponse);
       maintenanceResponse.headers.set("X-Robots-Tag", "noindex");
       applyGeoCookie(maintenanceResponse, geoCookieValue);
+      applyBaselineSecurityHeaders(maintenanceResponse);
       return maintenanceResponse;
     }
   }
 
   applyGeoCookie(response, geoCookieValue);
   applyAdminCachePolicy(response, request.nextUrl.pathname);
+  applyBaselineSecurityHeaders(response);
   return response;
 }

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Mail, MessageCircle, Send, Sparkles, Tag, User } from "lucide-react";
+import { getFeedbackSessionId } from "@/lib/feedback/session";
 import type { FeedbackQueryType } from "@/lib/supabase/database.types";
 
 type FormState = {
@@ -93,6 +94,7 @@ export function ContactForm() {
           subject,
           message,
           companyWebsite: form.companyWebsite,
+          anonymousSessionId: getFeedbackSessionId(),
         }),
       });
       const result = (await response.json().catch(() => null)) as { ok?: boolean } | null;

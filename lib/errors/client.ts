@@ -1,6 +1,5 @@
 "use client";
 
-import { createClient } from "@/lib/supabase/client";
 import {
   getBrowserFamily,
   getDeviceClass,
@@ -34,7 +33,8 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 }
 
 /**
- * Reports a client-side error to Supabase. Never throws, never logs to the
+ * Reports a client-side error through Lumeo's same-origin API boundary.
+ * Never throws, never logs to the
  * console (that would recurse if console.error is itself instrumented), and
  * caps how many reports a single page load can send.
  */
@@ -47,24 +47,27 @@ export async function captureClientError(input: ErrorCaptureInput): Promise<void
   captureCount += 1;
 
   try {
-    const supabase = createClient();
     await withTimeout(
-      (async () =>
-        supabase.rpc("record_error_event", {
+      fetch("/api/error-report", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
           message: input.message.slice(0, 2000),
           stack: input.stack ? input.stack.slice(0, 4000) : null,
           route: input.route ?? window.location.pathname,
           component: input.component ?? null,
           source: input.source,
           severity: input.severity ?? "medium",
-          browser_family: getBrowserFamily(),
-          operating_system: getOperatingSystem(),
-          device_class: getDeviceClass(),
-          page_url: window.location.href,
-          anonymous_session_id: getAnonymousSessionId(),
-          build_version: null,
-          git_sha: null,
-        }))(),
+          browserFamily: getBrowserFamily(),
+          operatingSystem: getOperatingSystem(),
+          deviceClass: getDeviceClass(),
+          anonymousSessionId: getAnonymousSessionId(),
+        }),
+      }),
       REQUEST_TIMEOUT_MS,
     );
   } catch {

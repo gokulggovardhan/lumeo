@@ -6,7 +6,8 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getOverviewData, getSystemStatus, getUnreadInboxCount } from "@/lib/admin/data";
+import { getOverviewData, getUnreadInboxCount } from "@/lib/admin/data";
+import { getErrorLogSummary } from "@/lib/admin/errors";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
 
 function MetricLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -23,13 +24,23 @@ function formatDate(value: string | null) {
 
 export default async function AdminPage() {
   const admin = await requireAdmin();
-  const [overview, system, unreadInbox] = await Promise.all([
+  const [overview, unreadInbox, errorSummary] = await Promise.all([
     getOverviewData(),
-    getSystemStatus(admin),
     getUnreadInboxCount(),
+    getErrorLogSummary(),
   ]);
   const data = overview.data;
   const analyticsUnavailable = data.analyticsDataStatus === "unavailable";
+  const deploymentEnvironment = process.env.LUMEO_DEPLOYMENT_ENV ?? "local";
+  const gitCommitSha = process.env.LUMEO_BUILD_SHA ?? null;
+  const deploymentPlatform =
+    deploymentEnvironment === "production" || deploymentEnvironment === "preview"
+      ? "Cloudflare Workers"
+      : deploymentEnvironment === "ci"
+        ? "Cloudflare Worker CI"
+        : "Local development";
+  const checkedAt = new Date().toISOString();
+  const latestAuditAt = data.recentAuditLogs[0]?.created_at ?? null;
 
   return (
     <div className="space-y-7">
@@ -46,7 +57,7 @@ export default async function AdminPage() {
         }
       />
 
-      {(overview.error || system.error) && (
+      {(overview.error || unreadInbox.error || errorSummary.error) && (
         <AdminEmptyState
           title="Some Control Center data is unavailable"
           description="The protected admin shell is working, but one or more database reads could not complete."
@@ -67,15 +78,20 @@ export default async function AdminPage() {
           <AdminMetricCard label="Events Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsEventsToday} detail="Privacy-preserving analytics events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
         </MetricLink>
       </section>
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
         <MetricLink href="/admin/analytics">
           <AdminMetricCard label="Public Page Views" value={analyticsUnavailable ? "Unavailable" : data.analyticsPageViewsToday} detail="Public page-view events today." tone={analyticsUnavailable ? "warning" : "neutral"} />
         </MetricLink>
         <MetricLink href="/admin/analytics">
           <AdminMetricCard label="Most Opened Tool" value={analyticsUnavailable ? "Unavailable" : data.mostUsedTool ?? "N/A"} detail="Based on tool-open events." tone={analyticsUnavailable ? "warning" : "neutral"} />
         </MetricLink>
-        <MetricLink href="/admin/settings">
-          <AdminMetricCard label="Analytics Status" value={system.data.adminAnalyticsRpcStatus === "unavailable" ? "Read unavailable" : system.data.analyticsEnabled ? "Enabled" : "Disabled"} detail="Controlled by public_analytics_enabled." tone={system.data.adminAnalyticsRpcStatus === "unavailable" ? "warning" : system.data.analyticsEnabled ? "success" : "neutral"} />
+        <MetricLink href="/admin/errors">
+          <AdminMetricCard
+            label="Open Errors"
+            value={errorSummary.error ? "Unavailable" : errorSummary.data.openCount}
+            detail={errorSummary.error ? "Error monitoring could not be verified." : errorSummary.data.criticalOpenCount > 0 ? `${errorSummary.data.criticalOpenCount} critical error${errorSummary.data.criticalOpenCount === 1 ? "" : "s"} need attention.` : "Unresolved application errors."}
+            tone={errorSummary.error ? "warning" : errorSummary.data.criticalOpenCount > 0 ? "danger" : errorSummary.data.openCount > 0 ? "warning" : "success"}
+          />
         </MetricLink>
         <MetricLink href="/admin/analytics">
           <AdminMetricCard label="Tool Opens Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsToolOpensToday} detail="PDF tool workspaces opened today." tone={analyticsUnavailable ? "warning" : "gold"} />
@@ -87,31 +103,31 @@ export default async function AdminPage() {
 
       <AdminSectionCard title="System readiness" description="Truthful checks from the current request and database foundation.">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <AdminStatusBadge tone={system.data.supabaseReachable ? "success" : "warning"}>Database</AdminStatusBadge>
-          <AdminStatusBadge tone={system.data.authenticatedAdmin ? "success" : "warning"}>Authentication</AdminStatusBadge>
+          <AdminStatusBadge tone={data.databaseReachable ? "success" : "warning"}>Database</AdminStatusBadge>
+          <AdminStatusBadge tone={(admin.authenticated && admin.authorized) ? "success" : "warning"}>Authentication</AdminStatusBadge>
           <AdminStatusBadge tone={admin.role ? "success" : "warning"}>Admin membership</AdminStatusBadge>
-          <AdminStatusBadge tone={system.data.analyticsEnabled ? "success" : "neutral"}>Analytics {system.data.analyticsEnabled ? "enabled" : "disabled"}</AdminStatusBadge>
+          <AdminStatusBadge tone={data.analyticsEnabled ? "success" : "neutral"}>Analytics {data.analyticsEnabled ? "enabled" : "disabled"}</AdminStatusBadge>
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
-            <p className="text-sm font-semibold text-[#F0EAD6]">Platform configuration progress</p>
+            <p className="text-sm font-semibold text-[#F0EAD6]">Runtime / revision</p>
             <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">
-              {data.tools.length} catalog tools are readable.
+              {deploymentPlatform} · {gitCommitSha ? gitCommitSha.slice(0, 12) : "revision unavailable"}
             </p>
           </div>
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
             <p className="text-sm font-semibold text-[#F0EAD6]">Deployment environment</p>
             <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">
-              {system.data.deploymentEnvironment} · checked {formatDate(system.data.currentTimestamp)}
+              {deploymentEnvironment} · checked {formatDate(checkedAt)}
             </p>
           </div>
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
             <p className="text-sm font-semibold text-[#F0EAD6]">Latest admin action</p>
-            <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">{formatDate(system.data.latestAuditAt)}</p>
+            <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">{formatDate(latestAuditAt)}</p>
           </div>
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
             <p className="text-sm font-semibold text-[#F0EAD6]">Latest analytics event</p>
-            <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">{formatDate(system.data.latestAnalyticsEventAt)}</p>
+            <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">{formatDate(data.latestAnalyticsEventAt)}</p>
           </div>
         </div>
       </AdminSectionCard>

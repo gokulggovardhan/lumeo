@@ -27,46 +27,11 @@ Key public surfaces:
 
 Shared Control Center components now provide Aura-styled page headers, section cards, metric cards, data tables, forms, status badges, submit buttons and empty states. This gives existing admin pages a consistent premium system without rewriting their server actions or permission model.
 
-The sidebar and mobile navigation use the same Aura surfaces, active states and focus treatment. The navigation now includes:
+The sidebar and mobile navigation use the same Aura surfaces, active states and focus treatment.
 
-- Design System
-- Guide
+## Historical Admin reference routes
 
-## Protected Guide
-
-`/admin/guide` explains how administrators should read Control Center controls:
-
-- what a setting controls;
-- what happens when it is enabled;
-- what happens when it is disabled;
-- whether it is stored only;
-- dependencies;
-- risk level;
-- whether deployment is required;
-- whether changes should be audited.
-
-Examples include Compress PDF disable behaviour, public analytics disable behaviour, homepage slot assignment and SEO record storage.
-
-## Protected Showcase
-
-`/admin/design-system` remains the protected showcase for:
-
-- colour tokens;
-- typography;
-- buttons;
-- status;
-- forms;
-- modern switches;
-- segmented controls;
-- cards;
-- metrics;
-- tables;
-- tool workspace foundations;
-- admin guidance primitives;
-- dialogs and drawers;
-- loading and empty states.
-
-The showcase is intentionally protected by the admin route group and must not be exposed as a public indexed page.
+Run 2 temporarily included protected `/admin/guide` and `/admin/design-system` reference pages while the Control Center design system was being established. Those development-only routes were later retired from production so operators do not encounter stored-only examples, fake showcase metrics, or future-wiring controls. Reusable Aura primitives continue to be verified directly in source-level tests.
 
 ## PDF Tool Policy
 
@@ -98,7 +63,7 @@ The Run 2 verifier checks:
 
 - public Aura rollout markers;
 - Control Center shared primitive usage;
-- protected Guide and Design System routes;
+- source-level Aura component and Control Center coverage;
 - rollout documentation;
 - protected package versions;
 - preserved PDF algorithm markers;
@@ -108,7 +73,7 @@ The Run 2 verifier checks:
 Use:
 
 ```powershell
-npm.cmd run verify:aura-rollout
+npm.cmd test
 ```
 
 ## Manual Review URLs
@@ -126,8 +91,6 @@ Use these local URLs after starting the app:
 - `http://localhost:3000/privacy`
 - `http://localhost:3000/terms`
 - `http://localhost:3000/admin`
-- `http://localhost:3000/admin/design-system`
-- `http://localhost:3000/admin/guide`
 
 ## What Remains
 

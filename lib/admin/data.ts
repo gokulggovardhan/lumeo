@@ -3,7 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { formatLocationLabel } from "@/lib/analytics/location-names";
 import { istIsoDate } from "@/lib/admin/timezone";
-import type { AdminContext, AdminRole } from "@/lib/admin/types";
+import type { AdminRole } from "@/lib/admin/types";
 import type {
   Announcement,
   AdminAnalyticsSummaryResult,
@@ -30,13 +30,14 @@ export type OverviewData = {
   enabledTools: number;
   maintenanceTools: number;
   activeAnnouncements: number;
-  auditActions24h: number;
   analyticsEventsToday: number;
   analyticsPageViewsToday: number;
   analyticsToolOpensToday: number;
   mostUsedTool: string | null;
   analyticsEnabled: boolean;
   analyticsDataStatus: "available" | "unavailable";
+  latestAnalyticsEventAt: string | null;
+  databaseReachable: boolean;
   recentAuditLogs: AuditLog[];
   tools: ToolWithCategory[];
 };
@@ -73,24 +74,6 @@ export type AnalyticsSummary = {
   locationSummary: Array<{ label: string; count: number }>;
 };
 
-export type SystemStatus = {
-  supabaseConfigured: boolean;
-  supabaseReachable: boolean;
-  authenticatedAdmin: boolean;
-  activeRole: string | null;
-  appVersion: string;
-  deploymentEnvironment: string;
-  currentTimestamp: string;
-  analyticsCollectionStatus: "schema-ready";
-  analyticsEnabled: boolean;
-  adminAnalyticsRpcStatus: "available" | "unavailable";
-  latestAnalyticsEventAt: string | null;
-  latestDailyMetricDate: string | null;
-  latestAuditAt: string | null;
-  toolCatalogCount: number;
-  homepageSlotCount: number;
-};
-
 function safe<T>(data: T, error: unknown): DataResult<T> {
   return {
     data,
@@ -100,10 +83,6 @@ function safe<T>(data: T, error: unknown): DataResult<T> {
 
 function todayIsoDate() {
   return istIsoDate();
-}
-
-function yesterdayIso() {
-  return new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
 }
 
 function sixDaysAgoIsoDate() {
@@ -609,7 +588,7 @@ export type RecentActivityRow =
   | { kind: "unknown_location_burst"; count: number; latestAt: string; earliestAt: string };
 
 // Bots, ad blockers, and requests that arrive without the geo cookie yet
-// (first hit before it's set, or non-Vercel environments) all land as
+// (first hit before it's set, or requests without Cloudflare geo metadata) all land as
 // "Unknown location" -- in bursts, they drown out the events that actually
 // have somewhere to show. Collapses each consecutive run of unknown-location
 // events (list is already newest-first) into one summary row instead of
@@ -649,34 +628,42 @@ export function collapseUnknownLocationRuns(events: RecentAnalyticsEvent[]): Rec
 
 export async function getOverviewData(): Promise<DataResult<OverviewData>> {
   const supabase = await createClient();
-  const [toolsResult, announcementsResult, auditResult, analyticsResult] =
-    await Promise.all([
-      getPdfTools(),
-      getAnnouncements(),
-      getAuditLogs(5),
-      getAnalyticsSummary(),
-    ]);
+  const [
+    toolsResult,
+    announcementsResult,
+    auditResult,
+    analyticsResult,
+    analyticsSettingResult,
+  ] = await Promise.all([
+    getPdfTools(),
+    getAnnouncements(),
+    getAuditLogs(5),
+    getAnalyticsSummary(),
+    supabase
+      .from("site_settings")
+      .select("value")
+      .eq("key", "public_analytics_enabled")
+      .maybeSingle(),
+  ]);
 
   const tools = toolsResult.data;
   const announcements = announcementsResult.data;
-  const since = yesterdayIso();
-  const { count: auditActions24h, error: auditCountError } = await supabase
-    .from("audit_logs")
-    .select("id", { count: "exact", head: true })
-    .gte("created_at", since);
 
   return safe(
     {
       enabledTools: tools.filter((tool) => tool.is_enabled).length,
       maintenanceTools: tools.filter((tool) => tool.status === "maintenance").length,
       activeAnnouncements: announcements.filter((announcement) => announcement.is_active).length,
-      auditActions24h: auditActions24h ?? 0,
       analyticsEventsToday: analyticsResult.data.eventsToday,
       analyticsPageViewsToday: analyticsResult.data.pageViewsToday,
       analyticsToolOpensToday: analyticsResult.data.toolOpens,
       mostUsedTool: analyticsResult.data.topToolsByOpens[0]?.toolSlug ?? null,
-      analyticsEnabled: analyticsResult.data.dataStatus === "available",
+      analyticsEnabled: isPublicAnalyticsEnabled(
+        analyticsSettingResult.data as SiteSetting | null,
+      ),
       analyticsDataStatus: analyticsResult.data.dataStatus,
+      latestAnalyticsEventAt: analyticsResult.data.latestEventAt,
+      databaseReachable: !toolsResult.error,
       recentAuditLogs: auditResult.data,
       tools,
     },
@@ -684,66 +671,6 @@ export async function getOverviewData(): Promise<DataResult<OverviewData>> {
       announcementsResult.error ??
       auditResult.error ??
       analyticsResult.error ??
-      auditCountError,
-  );
-}
-
-export async function getSystemStatus(admin: AdminContext): Promise<DataResult<SystemStatus>> {
-  const supabase = await createClient();
-  const [
-    { count: toolCount, error: toolError },
-    { count: slotCount, error: slotError },
-    auditResult,
-    analyticsSummaryResult,
-    dailyMetricResult,
-    analyticsSettingResult,
-  ] =
-    await Promise.all([
-      supabase.from("pdf_tools").select("id", { count: "exact", head: true }),
-      supabase.from("homepage_tool_slots").select("slot_number", { count: "exact", head: true }),
-      supabase
-        .from("audit_logs")
-        .select("created_at")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      getAnalyticsSummary(),
-      supabase
-        .from("daily_tool_metrics")
-        .select("metric_date")
-        .order("metric_date", { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("site_settings")
-        .select("key, value, description, is_public, updated_by, updated_at")
-        .eq("key", "public_analytics_enabled")
-        .maybeSingle(),
-    ]);
-
-  return safe(
-    {
-      supabaseConfigured: true,
-      supabaseReachable: !toolError && !slotError,
-      authenticatedAdmin: admin.authenticated && admin.authorized,
-      activeRole: admin.role,
-      appVersion: process.env.npm_package_version ?? "0.1.0",
-      deploymentEnvironment: process.env.VERCEL_ENV ?? "local",
-      currentTimestamp: new Date().toISOString(),
-      analyticsCollectionStatus: "schema-ready",
-      analyticsEnabled: isPublicAnalyticsEnabled(analyticsSettingResult.data as SiteSetting | null),
-      adminAnalyticsRpcStatus: analyticsSummaryResult.data.dataStatus,
-      latestAnalyticsEventAt: analyticsSummaryResult.data.latestEventAt,
-      latestDailyMetricDate: (dailyMetricResult.data as { metric_date?: string } | null)?.metric_date ?? null,
-      latestAuditAt: (auditResult.data as { created_at?: string } | null)?.created_at ?? null,
-      toolCatalogCount: toolCount ?? 0,
-      homepageSlotCount: slotCount ?? 0,
-    },
-    toolError ??
-      slotError ??
-      auditResult.error ??
-      analyticsSummaryResult.error ??
-      dailyMetricResult.error ??
       analyticsSettingResult.error,
   );
 }

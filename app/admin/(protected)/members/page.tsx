@@ -21,6 +21,22 @@ export default async function MembersPage() {
   const canEdit = canManageMembers(admin.role);
   const members = canEdit ? await getAdminMembers() : { data: [], error: null };
 
+  if (canEdit && members.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Owner controls"
+          title="Administrators"
+          description="Manage who can access the Control Center and what they can do."
+        />
+        <AdminEmptyState
+          title="Administrator data is unavailable"
+          description="Membership could not be verified, so administrator changes are disabled until the data service recovers."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-7">
       <AdminPageHeader
@@ -44,7 +60,7 @@ export default async function MembersPage() {
               <AdminFormField label="Email" name="email" type="email" />
               <label className="block text-sm font-semibold text-[#F0EAD6]">
                 Role
-                <select name="role" defaultValue="analyst" className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm">
+                <select name="role" defaultValue="analyst" className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm">
                   <option value="analyst">Analyst — read-only</option>
                   <option value="admin">Admin — can manage content</option>
                   <option value="owner">Owner — full control</option>
@@ -79,7 +95,7 @@ export default async function MembersPage() {
                   ) : (
                     <form key="update" action={asAdminFormAction(updateAdminMember)} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="user_id" value={member.userId} />
-                      <select name="role" defaultValue={member.role} className="min-h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs">
+                      <select name="role" defaultValue={member.role} className="min-h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base sm:text-xs">
                         <option value="analyst">Analyst</option>
                         <option value="admin">Admin</option>
                         <option value="owner">Owner</option>

@@ -40,13 +40,21 @@ test("unread inbox realtime configures every postgres handler before subscribe a
   assert.match(realtime, /count: "exact", head: true/);
 });
 
-test("full Inbox realtime uses a unique topic per effect lifecycle and removes that channel", () => {
+test("full Inbox realtime owns INSERT, UPDATE, DELETE before subscribe and cleans up its unique channel", () => {
   const inbox = read("components/admin/InboxClient.tsx");
+  const subscribeIndex = inbox.indexOf(".subscribe()");
+  const handlerIndexes = [...inbox.matchAll(/\.on\(/g)].map((match) => match.index);
 
   assert.match(
     inbox,
     /feedback_queries_inbox:\$\{crypto\.randomUUID\(\)\}/,
   );
+  assert.equal(handlerIndexes.length, 3);
+  assert.ok(handlerIndexes.every((index) => index < subscribeIndex));
+  assert.match(inbox, /event: "INSERT"/);
+  assert.match(inbox, /event: "UPDATE"/);
+  assert.match(inbox, /event: "DELETE"/);
   assert.match(inbox, /removeChannel\(channel\)/);
-  assert.ok(inbox.indexOf(".on(") < inbox.indexOf(".subscribe()"));
+  assert.match(inbox, /serverOffset/);
+  assert.doesNotMatch(inbox, /\.range\(items\.length/);
 });

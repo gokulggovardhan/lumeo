@@ -22,6 +22,22 @@ export default async function AnnouncementsPage({
   const announcements = await getAnnouncements();
   const canEdit = canManageAnnouncements(admin.role);
   const params = (await searchParams) ?? {};
+
+  if (announcements.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Messaging"
+          title="Announcements"
+          description="Public announcement records and schedules."
+        />
+        <AdminEmptyState
+          title="Announcements are unavailable"
+          description="Current announcement state could not be verified, so changes are disabled until the data service recovers."
+        />
+      </div>
+    );
+  }
   const editing = params.edit ? announcements.data.find((item) => item.id === params.edit) : null;
 
   return (
@@ -41,7 +57,7 @@ export default async function AnnouncementsPage({
             <AdminFormField label="Title" name="title" defaultValue={editing?.title ?? ""} />
             <label className="block text-sm font-semibold text-[#F0EAD6]">
               Tone
-              <select name="tone" defaultValue={editing?.tone ?? "information"} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm">
+              <select name="tone" defaultValue={editing?.tone ?? "information"} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm">
                 {["information", "success", "warning", "maintenance"].map((tone) => (
                   <option key={tone} value={tone}>{tone}</option>
                 ))}

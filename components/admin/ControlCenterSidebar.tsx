@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BrandLockup } from "@/components/BrandMark";
 import { AdminIcon } from "@/components/admin/AdminIcons";
@@ -24,7 +23,7 @@ export function ControlCenterSidebar({
   function renderLink(item: (typeof items)[number]) {
     const active = isActiveAdminRoute(pathname, item.href);
     return (
-      <Link
+      <a
         key={item.href}
         href={item.href}
         aria-current={active ? "page" : undefined}
@@ -37,18 +36,18 @@ export function ControlCenterSidebar({
         <AdminIcon name={item.icon} className="h-4 w-4 shrink-0" />
         <span>{item.label}</span>
         {item.href === "/admin/inbox" ? <InboxCountBadge /> : null}
-      </Link>
+      </a>
     );
   }
 
   return (
     <aside className="hidden w-72 shrink-0 rounded-[var(--radius-2xl)] border border-[var(--border-subtle)] bg-[var(--surface-base)] p-4 shadow-[var(--shadow-lg)] lg:flex lg:flex-col">
-      <Link
+      <a
         href="/admin"
         className="rounded-xl p-1 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]"
       >
         <BrandLockup markSize="h-10 w-10" />
-      </Link>
+      </a>
 
       <div className="mt-7">
         <p className="aura-text-label px-3 text-[var(--lumeo-gold-300)]">
