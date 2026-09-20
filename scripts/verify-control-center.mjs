@@ -177,11 +177,9 @@ try {
   assert(analyticsPage.includes('title="Operation analytics"'), "Analytics page must explain operation analytics.");
   assert(!analyticsPage.includes("Analytics V1"), "Analytics page must not restore obsolete Analytics V1 copy.");
   assert(!analyticsActivityPage.includes("Analytics V1"), "Analytics activity page must not restore obsolete Analytics V1 copy.");
-  // Operation lifecycle metrics were originally postponed past Analytics V1,
-  // but were verified live in production as of 2026-07-29 (real,
-  // non-placeholder metric cards fed by processing_started/succeeded/failed
-  // and download_started events emitted by every live PDF tool) -- these
-  // checks were updated from "must not show" to "must show" to match reality.
+  // Operation lifecycle metrics are current production behavior and must
+  // remain backed by real processing/download events rather than placeholder
+  // cards.
   assert(analyticsPage.includes('label="Processing Started"'), "Analytics page must show the Processing Started metric card.");
   assert(analyticsPage.includes('label="Processing Succeeded"'), "Analytics page must show the Processing Succeeded metric card.");
   assert(analyticsPage.includes('label="Processing Failed"'), "Analytics page must show the Processing Failed metric card.");
@@ -193,7 +191,7 @@ try {
   assert(overviewPage.includes("Tool Opens Today"), "Overview must surface tool opens.");
   assert(overviewPage.includes("Maintenance Tools"), "Overview must surface real maintenance state.");
   assert(!overviewPage.includes("Feature Flags"), "Overview must not expose unwired feature flags.");
-  assert(!overviewPage.includes("Processing Success Rate"), "Overview must not show processing success rate in V1.");
+  assert(!overviewPage.includes("Processing Success Rate"), "Overview must not duplicate the processing success-rate metric from Analytics.");
 
   const settingsPage = read("app/admin/(protected)/settings/page.tsx");
   const settingsValidation = read("lib/admin/validation.ts");
@@ -214,7 +212,7 @@ try {
 
   // The standalone System page was deliberately removed as redundant (see
   // "refactor: remove redundant System page, trim unwired Settings, group
-  // reference nav" #34) -- its Analytics V1 messaging now lives on the
+  // reference nav" #34) -- current analytics messaging lives on the
   // analytics page checked above (`analyticsPage`), so no separate read is
   // needed here.
   assert(analyticsPage.includes("Processing lifecycle metrics"), "Analytics page must describe processing lifecycle metrics.");
