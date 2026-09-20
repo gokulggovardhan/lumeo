@@ -25,7 +25,7 @@ function payload(label, sessionId) {
     browser_family: "Chrome",
     operating_system: "Linux",
     device_class: "desktop",
-    page_url: "http://127.0.0.1/test",
+    page_url: "http://127.0.0.1/test?email=private@example.com#token",
     build_version: "test",
     git_sha: "test",
   };
@@ -85,6 +85,7 @@ assert.equal(storedDiagnosticError, null, storedDiagnosticError?.message ?? "sto
 assert.ok(storedDiagnostic?.stack?.includes("<script>not-executed</script>"), "diagnostic structure was unexpectedly removed");
 assert.ok(!storedDiagnostic?.stack?.includes("should-not-matter"), "sensitive token value was stored");
 assert.match(storedDiagnostic?.stack ?? "", /token=\[REDACTED\]/i, "stored diagnostic was not redacted at ingestion");
+assert.equal(storedDiagnostic?.page_url, "http://127.0.0.1/test", "URL query or fragment data was stored");
 
 const { error: internalHelperError } = await anon.rpc("current_admin_role");
 assert.ok(internalHelperError, "anon unexpectedly executed current_admin_role");
