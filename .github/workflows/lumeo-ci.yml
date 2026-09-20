@@ -82,6 +82,15 @@ jobs:
       - name: Verify Control Center architecture
         run: npm run verify:control-center
 
+      - name: Verify maintained release architecture
+        run: |
+          npm run verify:public-catalog
+          npm run verify:analytics
+          npm run verify:aura
+          npm run verify:lumeo2-foundation
+          npm run verify:lumeo2-public-experience
+          npm run verify:lumeo2-workspaces
+
       - name: Run unit tests
         run: npm test
 
@@ -102,15 +111,6 @@ jobs:
 
       - name: Verify public routes
         run: npm run verify:public
-
-      - name: Verify maintained release architecture
-        run: |
-          npm run verify:public-catalog
-          npm run verify:analytics
-          npm run verify:aura
-          npm run verify:lumeo2-foundation
-          npm run verify:lumeo2-public-experience
-          npm run verify:lumeo2-workspaces
 
   admin-browser-e2e:
     name: Admin auth — Chromium + WebKit
