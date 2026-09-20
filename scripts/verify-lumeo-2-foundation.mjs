@@ -295,10 +295,9 @@ try {
   assert(mergeTool.includes("PDFDocument.create()") && mergeTool.includes("copyPages"), "Merge PDF algorithm markers changed unexpectedly.");
   assert(splitTool.includes("JSZip") && splitTool.includes("copyPages"), "Split PDF algorithm markers changed unexpectedly.");
   assert(compressTool.includes("Target Size Studio") && compressTool.includes("Under 100 KB") && compressTool.includes("Under 200 KB") && compressTool.includes("Under 400 KB"), "Compress Target Size Studio markers changed unexpectedly.");
-  // Operation lifecycle events were originally postponed past this run, but
-  // were verified live in production across all 14 PDF tools as of
-  // 2026-07-29 -- this check was updated from "must not be reintroduced" to
-  // "must be present" to match reality (see scripts/verify-privacy-analytics.mjs).
+  // Operation lifecycle events are part of the current production analytics
+  // contract; keep the flagship tool markers aligned with the dedicated
+  // analytics verifier.
   assert(/processing_started|processing_succeeded|processing_failed|download_started/.test([mergeTool, splitTool, compressTool].join("\n")), "Analytics lifecycle events must be present.");
 
   const scannedSource = [ui, workspace, publicShell, footer, controlShell, sidebar, mobileNav, tokens, docs].join("\n");
@@ -310,7 +309,7 @@ try {
   console.log("PASS retired Admin showcase/guide stay removed and documentation exists");
   console.log("PASS protected dependency versions remain unchanged");
   console.log("PASS no migrations, analytics provider, or admin data files changed");
-  console.log("PASS live PDF processing markers and Analytics V1 scope remain protected");
+  console.log("PASS live PDF processing markers and approved analytics lifecycle remain protected");
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Lumeo 2 foundation verification failed.");
   process.exit(1);
