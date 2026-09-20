@@ -175,6 +175,11 @@ drop policy if exists "Anyone can submit feedback or a query" on public.feedback
 revoke insert on table public.feedback_queries from anon;
 revoke insert on table public.feedback_queries from authenticated;
 
+comment on table public.feedback_queries is
+  'Private Feedback & Query inbox. Public writes are accepted only through record_feedback_query(...); reads and administrative changes require an active administrator.';
+comment on column public.feedback_queries.location is
+  'Approximate city/region/country derived server-side from Cloudflare request location. Never an IP address or precise coordinates.';
+
 revoke execute on function public.record_feedback_query(text, text, text, text, text, text, text, uuid) from public;
 grant execute on function public.record_feedback_query(text, text, text, text, text, text, text, uuid)
   to anon, authenticated, service_role;
