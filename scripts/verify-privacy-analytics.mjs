@@ -198,8 +198,8 @@ try {
   assert(adminPage.includes("AnalyticsPrivacyNotice"), "Admin analytics privacy notice missing.");
   assert(!adminPage.includes("Analytics V1"), "Admin analytics page must not restore obsolete Analytics V1 copy.");
   assert(adminPage.includes("Discovery & operation analytics"), "Admin analytics page must use discovery & operation analytics wording.");
-  assert(adminPage.includes("Page Views Today"), "Admin analytics page must display page views.");
-  assert(adminPage.includes("Tool Opens Today"), "Admin analytics page must display tool opens.");
+  assert(adminPage.includes('label="Page Views"'), "Admin analytics page must display page views.");
+  assert(adminPage.includes('label="Tool Opens"'), "Admin analytics page must display tool opens.");
   assert(adminPage.includes("Top tools by opens"), "Admin analytics page must display top tools by opens.");
   assert(adminPage.includes("Device class"), "Admin analytics page must display device summary.");
   assert(adminPage.includes("Browser family"), "Admin analytics page must display browser summary.");
