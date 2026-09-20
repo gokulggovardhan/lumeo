@@ -48,7 +48,11 @@ export default async function AdminLoginPage({
       <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_20%_12%,rgba(203,160,82,0.12),transparent_34%),radial-gradient(circle_at_82%_80%,rgba(30,107,74,0.16),transparent_32%)]" />
 
       <section className="relative w-full max-w-[460px] rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-raised)] p-6 shadow-[0_28px_90px_rgba(0,0,0,0.32)] sm:p-8">
-        <Link href="/" className="inline-flex rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45">
+        <Link
+          href="/"
+          prefetch={false}
+          className="inline-flex rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45"
+        >
           <BrandLockup markSize="h-10 w-10" />
         </Link>
 
@@ -114,6 +118,7 @@ export default async function AdminLoginPage({
           <p className="text-[#F0EAD6]/48">Verified administrator access only.</p>
           <Link
             href="/"
+            prefetch={false}
             className="font-semibold text-[#CBA052]/82 transition hover:text-[#F0EAD6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#CBA052]/45"
           >
             Public workspace
