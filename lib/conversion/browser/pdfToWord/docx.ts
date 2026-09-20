@@ -245,6 +245,7 @@ export async function buildReconstructedDocx(
     type: "blob",
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    streamFiles: true,
     compression: "DEFLATE",
     compressionOptions: { level: 6 },
   });
