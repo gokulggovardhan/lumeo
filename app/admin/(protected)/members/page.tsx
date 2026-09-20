@@ -21,6 +21,22 @@ export default async function MembersPage() {
   const canEdit = canManageMembers(admin.role);
   const members = canEdit ? await getAdminMembers() : { data: [], error: null };
 
+  if (canEdit && members.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Owner controls"
+          title="Administrators"
+          description="Manage who can access the Control Center and what they can do."
+        />
+        <AdminEmptyState
+          title="Administrator data is unavailable"
+          description="Membership could not be verified, so administrator changes are disabled until the data service recovers."
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-7">
       <AdminPageHeader
