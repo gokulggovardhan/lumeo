@@ -17,13 +17,13 @@ import { AuraStatus } from "@/components/ui/Aura";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
-import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
+import { ConversionCoordinator } from "@/lib/conversion/ConversionCoordinator";
+import { LegacyServerWordToPdfEngine } from "@/lib/conversion/legacy/LegacyServerWordToPdfEngine";
+import type { ConversionResult } from "@/lib/conversion/types";
 import {
   checkWordFileSize,
   isWordNamedFile,
-  removeWordUpload,
-  uploadWordFileForConversion,
 } from "@/lib/supabase/wordToPdfStorage";
 
 type Stage = "idle" | "uploading" | "converting" | "success" | "error";
@@ -32,10 +32,7 @@ type SelectedFile = {
   file: File;
 };
 
-type ConversionResult = {
-  blob: Blob;
-  fileName: string;
-};
+const conversionCoordinator = new ConversionCoordinator(new LegacyServerWordToPdfEngine());
 
 function downloadBlob(blob: Blob, fileName: string) {
   const url = URL.createObjectURL(blob);
@@ -50,13 +47,6 @@ function downloadBlob(blob: Blob, fileName: string) {
 
 function WordIcon() {
   return <FileText aria-hidden="true" className="h-8 w-8" />;
-}
-
-// Ping the API's warm-up handler (GET) so the sleepy converter starts
-// booting while the user reads the confirmation and reaches for "Convert".
-// Fire-and-forget: it must never block or surface an error in the UI.
-function warmConverter() {
-  void fetch("/api/tools/word-to-pdf", { method: "GET" }).catch(() => {});
 }
 
 // This tool uploads to Supabase and converts server-side (LibreOffice), so
@@ -119,52 +109,38 @@ export default function WordToPdfTool() {
     setStatusLabel("Ready to convert");
     setError("");
     setResult(null);
-    warmConverter();
   }
 
   async function handleConvert() {
     if (!selected || stage === "uploading" || stage === "converting") return;
     const currentSession = sessionRef.current;
     const { file } = selected;
+    const controller = new AbortController();
 
     setError("");
     setResult(null);
-    setStage("uploading");
-    setStatusLabel("Uploading to secure cloud...");
+    setStage("converting");
+    setStatusLabel("Preparing conversion...");
 
     const startedAt = performance.now();
     track({ eventName: "processing_started", toolSlug: "word-to-pdf" });
 
-    let uploadPath = "";
     try {
-      const upload = await uploadWordFileForConversion(file);
-      if (currentSession !== sessionRef.current) return;
-      uploadPath = upload.path;
-
-      setStage("converting");
-      setStatusLabel("Converting layout...");
-
-      const response = await fetch("/api/tools/word-to-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fileName: file.name,
-          filePathInSupabase: upload.path,
-        }),
-      });
+      const conversionResult = await conversionCoordinator.convert(
+        { file },
+        {
+          onProgress: ({ phase, message }) => {
+            if (currentSession !== sessionRef.current) return;
+            setStage(phase === "uploading" ? "uploading" : "converting");
+            setStatusLabel(message);
+          },
+        },
+        controller.signal,
+      );
 
       if (currentSession !== sessionRef.current) return;
 
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null);
-        throw new Error(payload?.message || "Conversion failed. Please try again.");
-      }
-
-      setStatusLabel("Finalizing PDF...");
-      const blob = await response.blob();
-      const outputName = `${sanitizeFileStem(file.name, "converted")}.pdf`;
-
-      setResult({ blob, fileName: outputName });
+      setResult(conversionResult);
       setStage("success");
       setStatusLabel("Download ready");
       track({
@@ -173,10 +149,13 @@ export default function WordToPdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
-      recordRecentFile({ tool: "word-to-pdf", filename: outputName, fileSize: blob.size });
+      recordRecentFile({
+        tool: "word-to-pdf",
+        filename: conversionResult.fileName,
+        fileSize: conversionResult.blob.size,
+      });
     } catch (conversionError) {
       if (currentSession !== sessionRef.current) return;
-      if (uploadPath) await removeWordUpload(uploadPath).catch(() => {});
       const message =
         conversionError instanceof Error
           ? conversionError.message
