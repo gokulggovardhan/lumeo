@@ -6,7 +6,8 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getErrorLogSummary, getOverviewData, getUnreadInboxCount } from "@/lib/admin/data";
+import { getOverviewData, getUnreadInboxCount } from "@/lib/admin/data";
+import { getErrorLogSummary } from "@/lib/admin/errors";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
 
 function MetricLink({ href, children }: { href: string; children: React.ReactNode }) {
