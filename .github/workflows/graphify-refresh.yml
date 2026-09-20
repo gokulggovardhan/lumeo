@@ -85,15 +85,21 @@ jobs:
       # rebuild overwrites it. This is the guard's baseline.
       - name: Fingerprint committed graph
         run: |
-          if [ ! -s graphify-out/graph.json ]; then
-            echo "Committed graph is empty; treating it as a missing baseline so the rebuild can repair it."
-            printf '%s\n' '{"nodes":0,"links":0,"communities":0,"topology":"missing"}' \
-              > "${RUNNER_TEMP}/before.json"
+          if python scripts/graphify_fingerprint.py graphify-out/graph.json \
+            > "${RUNNER_TEMP}/before.json"; then
+            cat "${RUNNER_TEMP}/before.json"
           else
-            python scripts/graphify_fingerprint.py graphify-out/graph.json \
-              > "${RUNNER_TEMP}/before.json"
+            echo "Committed graph is missing or invalid; forcing a full refresh."
+            cat > "${RUNNER_TEMP}/before.json" <<'JSON'
+          {
+            "topology": "invalid-or-missing-baseline",
+            "nodes": 0,
+            "links": 0,
+            "communities": 0
+          }
+          JSON
+            cat "${RUNNER_TEMP}/before.json"
           fi
-          cat "${RUNNER_TEMP}/before.json"
 
       # --force is required, not cosmetic: the default refuses to write a
       # graph with fewer nodes than the last one, which is exactly what a PR
