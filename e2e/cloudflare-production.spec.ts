@@ -125,3 +125,102 @@ test("production HEIC/HEIF worker preserves full-resolution output and download"
   expect(assetFailures).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
+
+
+test("production HEIC batch isolates corrupt input, recovers, and ZIP preserves full resolution", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !testInfo.project.name.includes("chromium"),
+    "full-resolution corruption/ZIP production smoke runs once in Chromium",
+  );
+
+  const fixturePath = process.env.HEIC_RESOLUTION_FIXTURE;
+  test.skip(!fixturePath, "HEIC production fixture was not generated.");
+
+  const assetFailures = collectProductionAssetFailures(page);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  const heic = await readFile(fixturePath!);
+  await page.goto("/heic-to-jpeg", { waitUntil: "domcontentloaded" });
+  await page.locator('input[type="file"]').setInputFiles([
+    { name: "VALID-BEFORE.HEIC", mimeType: "image/heic", buffer: heic },
+    { name: "BROKEN.HEIC", mimeType: "image/heic", buffer: Buffer.from("corrupt input") },
+    { name: "VALID-AFTER.HEIC", mimeType: "image/heic", buffer: heic },
+  ]);
+
+  await page.getByLabel("Quality").selectOption("92");
+  await page.getByRole("button", { name: "Convert to JPEG" }).click();
+  await expect(page.getByText("2 converted, 1 failed.", { exact: false })).toBeVisible({
+    timeout: 120_000,
+  });
+
+  const successful = page.locator('[data-photo-asset][data-status="done"]');
+  const failed = page.locator('[data-photo-asset][data-status="failed"]');
+  await expect(successful).toHaveCount(2);
+  await expect(failed).toHaveCount(1);
+
+  for (let index = 0; index < 2; index += 1) {
+    await expect(successful.nth(index)).toHaveAttribute(
+      "data-primary-dimensions",
+      "6048x8064",
+    );
+    await expect(successful.nth(index)).toHaveAttribute(
+      "data-decoded-dimensions",
+      "6048x8064",
+    );
+    await expect(successful.nth(index)).toHaveAttribute(
+      "data-output-dimensions",
+      "6048x8064",
+    );
+  }
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download all (2)" }).click();
+  const download = await downloadPromise;
+  const outputPath = await download.path();
+  expect(outputPath).not.toBeNull();
+
+  const { default: JSZip } = await import("jszip");
+  const zip = await JSZip.loadAsync(await readFile(outputPath!));
+  expect(Object.keys(zip.files).sort()).toEqual([
+    "VALID-AFTER.jpg",
+    "VALID-BEFORE.jpg",
+  ]);
+
+  for (const name of ["VALID-BEFORE.jpg", "VALID-AFTER.jpg"]) {
+    const bytes = await zip.file(name)!.async("nodebuffer");
+    expect(jpegDimensions(bytes)).toEqual({ width: 6048, height: 8064 });
+  }
+
+  expect(assetFailures).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test("production HEIC workspace remains usable on a narrow mobile viewport", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !testInfo.project.name.includes("chromium"),
+    "mobile production layout smoke runs once in Chromium",
+  );
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/heic-to-jpeg", { waitUntil: "domcontentloaded" });
+
+  await expect(page.getByText("Choose photos", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("Your photos are processed in your browser.", { exact: false }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+
+  const chooserPromise = page.waitForEvent("filechooser");
+  await page.getByText("Choose photos", { exact: true }).click();
+  const chooser = await chooserPromise;
+  expect(chooser.isMultiple()).toBe(true);
+});
