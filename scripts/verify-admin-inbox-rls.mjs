@@ -17,7 +17,7 @@ const options = { auth: { persistSession: false, autoRefreshToken: false } };
 const service = createClient(url, serviceRoleKey, options);
 const submitter = createClient(url, anonKey, options);
 const analystEmail = "analyst-e2e@lumeo.local";
-const analystPassword = "Lumeo-Analyst-E2E-2026!";
+const analystPassword = ownerPassword;
 
 const { data: analystCreate, error: analystCreateError } =
   await service.auth.admin.createUser({
@@ -45,17 +45,23 @@ assert.equal(
   analystMembershipError?.message ?? "failed to create analyst membership",
 );
 
-const messageId = "22222222-2222-4222-8222-222222222222";
-// Seed through the same table privilege the public feedback route relies on.
-const { error: insertError } = await submitter.from("feedback_queries").insert({
-  id: messageId,
-  type: "Query",
-  name: "RLS Test",
-  subject: "Analyst delete boundary",
-  message: "Disposable isolated-Supabase test row.",
-  is_read: false,
-});
+// Seed through the same validated public RPC the production feedback route
+// uses. Direct anonymous table INSERT is intentionally revoked.
+const { data: messageId, error: insertError } = await submitter.rpc(
+  "record_feedback_query",
+  {
+    p_type: "Query",
+    p_name: "RLS Test",
+    p_subject: "Analyst delete boundary",
+    p_message: "Disposable isolated-Supabase test row.",
+    p_email: null,
+    p_phone: null,
+    p_location: "Test City, TS, IN",
+    p_anonymous_session_id: "22222222-2222-4222-8222-222222222222",
+  },
+);
 assert.equal(insertError, null, insertError?.message ?? "failed to seed inbox row");
+assert.ok(messageId, "feedback RPC did not return an inbox row id");
 
 const analyst = createClient(url, anonKey, options);
 const { error: analystSignInError } = await analyst.auth.signInWithPassword({
