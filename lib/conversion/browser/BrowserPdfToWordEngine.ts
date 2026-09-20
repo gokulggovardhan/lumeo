@@ -1,5 +1,7 @@
 import {
   BrowserConversionWorkspace,
+  estimateLocalConversionStorage,
+  hasLocalWorkspaceCapacity,
 } from "@/lib/conversion/browser/workspace";
 import {
   detectBrowserConversionCapabilities,
@@ -18,6 +20,7 @@ import type {
 } from "@/lib/conversion/browser/pdfToWord/types";
 import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 import {
   clampRenderScaleToMaxDimension,
   clampRenderScaleToPixelBudget,
@@ -204,8 +207,16 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
 
     try {
       let sourceFile = input.file;
+      const storageEstimate = capabilities.opfs
+        ? await estimateLocalConversionStorage()
+        : null;
+      const workspaceBytes = input.file.size * 2.5 + 96 * 1024 * 1024;
+      const canUseWorkspace =
+        capabilities.opfs &&
+        (!storageEstimate ||
+          hasLocalWorkspaceCapacity(storageEstimate, workspaceBytes));
 
-      if (capabilities.opfs) {
+      if (canUseWorkspace) {
         workspace = await BrowserConversionWorkspace.create("pdf-to-word");
         await workspace.markRunning();
         await workspace.appendLog(
@@ -221,6 +232,9 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
         url: sourceUrl,
         useWorkerFetch: false,
       }).promise) as unknown as PdfDocumentLike;
+
+      const pageCountError = checkPdfPageCount(document.numPages);
+      if (pageCountError) throw new Error(pageCountError);
 
       const pages: ReconstructedPage[] = [];
 
@@ -338,13 +352,19 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
         },
       };
     } catch (error) {
+      const normalized =
+        error instanceof Error &&
+        (error.name === "PasswordException" || /password/i.test(error.message))
+          ? new Error("This PDF is password-protected. Unlock it before converting to Word.")
+          : error;
+
       if (workspace) {
         await workspace.appendLog(
-          `Conversion failed: ${error instanceof Error ? error.message : "unknown error"}`,
+          `Conversion failed: ${normalized instanceof Error ? normalized.message : "unknown error"}`,
         ).catch(() => {});
         await workspace.dispose(signal.aborted ? "cancelled" : "failed").catch(() => {});
       }
-      throw error;
+      throw normalized;
     } finally {
       if (sourceUrl) URL.revokeObjectURL(sourceUrl);
       if (document) {
