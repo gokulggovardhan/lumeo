@@ -63,7 +63,7 @@ export default async function SeoPage({
         ) : (
           <div className="flex flex-wrap gap-2">
             {missingRoutes.map((route) => (
-              <Link
+              <Link prefetch={false}
                 key={route}
                 href={canEdit ? `/admin/seo?route=${encodeURIComponent(route)}` : "/admin/seo"}
                 className="rounded-full border border-[rgba(var(--ruby-rgb),0.4)] bg-[rgba(var(--ruby-rgb),0.12)] px-3 py-1.5 text-xs font-semibold text-[#FFD9D9] transition hover:border-[rgba(var(--ruby-rgb),0.65)]"
@@ -110,7 +110,7 @@ export default async function SeoPage({
             formatAdminDate(record.updated_at),
             canEdit ? (
               <div key="actions" className="flex flex-wrap items-center gap-2">
-                <Link
+                <Link prefetch={false}
                   href={`/admin/seo?route=${encodeURIComponent(record.route)}`}
                   className="rounded-lg border border-[#E8DFC8]/12 px-3 py-1.5 text-xs font-semibold text-[#F0EAD6]/80 hover:border-[#E8DFC8]/24"
                 >
