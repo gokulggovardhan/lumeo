@@ -92,8 +92,8 @@ try {
   assert((loginPage.match(/text-base/g) ?? []).length >= 2, "iPhone login inputs must render at 16px to avoid focus zoom.");
   assert(loginPage.includes("safe-area-inset-bottom"), "Login page must respect iPhone safe-area insets.");
   assert(loginPage.includes("AdminLoginSubmitButton"), "Login must use a pending-aware submit button.");
-  assert(!loginPage.includes('from "next/link"'), "Login must not use Next Link for public-home navigation because Safari can surface cancelled RSC prefetches.");
-  assert((loginPage.match(/<a\s[\s\S]*?href="\/"[\s\S]*?<\/a>/g) ?? []).length >= 2, "Login public-home links must use native navigation.");
+  assert(loginPage.includes('from "next/link"'), "Login public-home navigation should use Next Link with prefetch disabled.");
+  assert((loginPage.match(/href="\/"[\s\S]{0,120}?prefetch=\{false\}/g) ?? []).length >= 2, "Login public-home links must disable speculative RSC prefetch for Safari.");
 
   const logoutSource = read("app/admin/logout/route.ts");
   assert(/export async function POST/.test(logoutSource), "Admin logout must expose POST.");
