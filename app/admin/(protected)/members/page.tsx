@@ -60,7 +60,7 @@ export default async function MembersPage() {
               <AdminFormField label="Email" name="email" type="email" />
               <label className="block text-sm font-semibold text-[#F0EAD6]">
                 Role
-                <select name="role" defaultValue="analyst" className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm">
+                <select name="role" defaultValue="analyst" className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm">
                   <option value="analyst">Analyst — read-only</option>
                   <option value="admin">Admin — can manage content</option>
                   <option value="owner">Owner — full control</option>
@@ -95,7 +95,7 @@ export default async function MembersPage() {
                   ) : (
                     <form key="update" action={asAdminFormAction(updateAdminMember)} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="user_id" value={member.userId} />
-                      <select name="role" defaultValue={member.role} className="min-h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-xs">
+                      <select name="role" defaultValue={member.role} className="min-h-9 rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base sm:text-xs">
                         <option value="analyst">Analyst</option>
                         <option value="admin">Admin</option>
                         <option value="owner">Owner</option>
