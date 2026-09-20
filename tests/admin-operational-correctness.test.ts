@@ -130,3 +130,36 @@ test("Admin runtime metadata is Cloudflare-native", () => {
   assert.match(vite, /WORKERS_CI_COMMIT_SHA/);
   assert.match(vite, /LUMEO_BUILD_SHA/);
 });
+
+test("Admin database-backed pages distinguish unavailable data from valid empty state", () => {
+  const expectations = [
+    ["app/admin/(protected)/analytics/activity/page.tsx", "recentEvents.error", "Recent activity is unavailable"],
+    ["app/admin/(protected)/members/page.tsx", "members.error", "Administrator data is unavailable"],
+    ["app/admin/(protected)/seo/page.tsx", "seo.error", "SEO records are unavailable"],
+    ["app/admin/(protected)/settings/page.tsx", "settings.error", "Live settings are unavailable"],
+    ["app/admin/(protected)/tools/page.tsx", "tools.error || categories.error", "Tool catalog is unavailable"],
+    ["app/admin/(protected)/announcements/page.tsx", "announcements.error", "Announcements are unavailable"],
+    ["app/admin/(protected)/errors/page.tsx", "summary.error || logs.error", "Error monitoring data is unavailable"],
+    ["app/admin/(protected)/audit/page.tsx", "logs.error", "Audit records are unavailable"],
+  ] as const;
+
+  for (const [path, errorCheck, message] of expectations) {
+    const source = read(path);
+    assert.ok(source.includes(errorCheck), `${path} must inspect its read error state`);
+    assert.ok(source.includes(message), `${path} must explain unavailable data`);
+  }
+});
+
+test("Audit filters reject malformed date input without throwing", () => {
+  const audit = read("app/admin/(protected)/audit/page.tsx");
+  assert.match(audit, /function validDateIso/);
+  assert.match(audit, /Number\.isNaN\(date\.getTime\(\)\)/);
+  assert.doesNotMatch(audit, /new Date\(params\.start\)\.toISOString/);
+  assert.match(audit, /if \(!canView\)/);
+});
+
+test("Analytics recent-feed failure does not invalidate verified aggregate analytics", () => {
+  const analytics = read("app/admin/(protected)/analytics/page.tsx");
+  assert.match(analytics, /recentEvents\.error/);
+  assert.match(analytics, /Aggregate analytics are still valid/);
+});
