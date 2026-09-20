@@ -183,7 +183,11 @@ test.describe("Control Center authentication", () => {
     await errorsNavigation.getByRole("link", { name: "Health" }).click();
     await expect(page).toHaveURL(/\/admin\/health/);
     await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
-    await expect(page.getByText(/LibreOffice converter/)).toBeVisible();
+    await expect(
+      page.locator("#main-content").getByText("LibreOffice converter", {
+        exact: true,
+      }),
+    ).toBeVisible();
 
     const { navigation: healthNavigation } = await openAdminNavigation(page);
     await healthNavigation.getByRole("link", { name: "Settings" }).click();
