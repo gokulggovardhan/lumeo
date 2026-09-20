@@ -19,6 +19,14 @@ const entityTypes = [
   "site_setting",
 ];
 
+function validDateIso(value: string | undefined, addDays = 0) {
+  if (!value) return undefined;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return undefined;
+  if (addDays) date.setUTCDate(date.getUTCDate() + addDays);
+  return date.toISOString();
+}
+
 function buildQuery(params: Record<string, string | undefined>) {
   const search = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
@@ -41,11 +49,27 @@ export default async function AuditPage({
   const filters = {
     action: params.action?.trim() || undefined,
     entityType: params.entity_type?.trim() || undefined,
-    startDate: params.start ? new Date(params.start).toISOString() : undefined,
-    endDate: params.end ? new Date(new Date(params.end).getTime() + 24 * 60 * 60 * 1000).toISOString() : undefined,
+    startDate: validDateIso(params.start),
+    endDate: validDateIso(params.end, 1),
   };
 
   const logs = canView ? await getAuditLogs(50, (page - 1) * 50, filters) : { data: [], error: null };
+  if (canView && logs.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Record of change"
+          title="Audit Log"
+          description="Read-only administrative history."
+        />
+        <AdminEmptyState
+          title="Audit records are unavailable"
+          description="Administrative history could not be verified. Try again after the data service recovers."
+        />
+      </div>
+    );
+  }
+
   const actorEmails = canView
     ? await resolveAdminEmails(logs.data.map((log) => log.actor_user_id).filter((id): id is string => Boolean(id)))
     : {};
