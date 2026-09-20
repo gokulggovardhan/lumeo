@@ -1,6 +1,6 @@
-// See lib/converters/word-to-pdf.ts for the full rationale (why this is a
-// separate service, not soffice in-process on Vercel). This is the
-// PDF -> DOCX direction: same converter service, POST /convert-pdf-to-word.
+// See lib/converters/word-to-pdf.ts for the full rationale (the Cloudflare
+// Worker runtime has no in-process LibreOffice binary). This is the PDF -> DOCX
+// direction: same converter service, POST /convert-pdf-to-word.
 
 export class PdfToWordConversionError extends Error {}
 
@@ -9,9 +9,9 @@ export type PdfToWordResult = {
   fileName: string;
 };
 
-// Kept just under the route's maxDuration (300s, the Fluid-compute ceiling)
-// so a slow conversion aborts with a readable message here instead of being
-// hard-killed by the platform mid-response. Large or image-heavy PDFs on the
+// Keep a finite application-level timeout so a stalled converter fails with a
+// readable error even though the Cloudflare Worker request itself has no fixed
+// HTTP wall-clock duration limit while the client remains connected. Large or image-heavy PDFs on the
 // free-tier converter (limited CPU) can legitimately take a couple of minutes,
 // so this has to be generous -- the old 55s cap made every big PDF fail even
 // though the converter would have finished given the time.
