@@ -95,6 +95,26 @@ try {
   assert(loginPage.includes('from "next/link"'), "Login public-home navigation should use Next Link with prefetch disabled.");
   assert((loginPage.match(/href="\/"[\s\S]{0,120}?prefetch=\{false\}/g) ?? []).length >= 2, "Login public-home links must disable speculative RSC prefetch for Safari.");
 
+  const protectedLinkFiles = [
+    "app/admin/(protected)/page.tsx",
+    "app/admin/(protected)/analytics/page.tsx",
+    "app/admin/(protected)/analytics/activity/page.tsx",
+    "app/admin/(protected)/announcements/page.tsx",
+    "app/admin/(protected)/audit/page.tsx",
+    "app/admin/(protected)/errors/page.tsx",
+    "app/admin/(protected)/seo/page.tsx",
+    "app/admin/(protected)/not-found.tsx",
+  ];
+  for (const file of protectedLinkFiles) {
+    const source = read(file);
+    const linkCount = (source.match(/<Link\\b/g) ?? []).length;
+    const noPrefetchCount = (source.match(/prefetch=\\{false\\}/g) ?? []).length;
+    assert(
+      noPrefetchCount >= linkCount,
+      `${file} must disable speculative prefetch on protected Admin links.`,
+    );
+  }
+
   const logoutSource = read("app/admin/logout/route.ts");
   assert(/export async function POST/.test(logoutSource), "Admin logout must expose POST.");
   assert(!/export async function GET/.test(logoutSource), "Admin logout must not expose GET.");
