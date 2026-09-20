@@ -6,7 +6,7 @@ import {
   WordToPdfCleanupError,
 } from "../lib/supabase/wordToPdfCleanup";
 
-export const WORD_TO_PDF_CLEANUP_CRON = "0 3 * * *";
+const WORD_TO_PDF_CLEANUP_CRON = "0 3 * * *";
 
 type FetchArgs = Parameters<typeof handler.fetch>;
 
