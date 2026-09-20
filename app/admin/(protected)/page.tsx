@@ -6,7 +6,7 @@ import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getOverviewData, getUnreadInboxCount } from "@/lib/admin/data";
+import { getErrorLogSummary, getOverviewData, getUnreadInboxCount } from "@/lib/admin/data";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
 
 function MetricLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -23,13 +23,21 @@ function formatDate(value: string | null) {
 
 export default async function AdminPage() {
   const admin = await requireAdmin();
-  const [overview, unreadInbox] = await Promise.all([
+  const [overview, unreadInbox, errorSummary] = await Promise.all([
     getOverviewData(),
     getUnreadInboxCount(),
+    getErrorLogSummary(),
   ]);
   const data = overview.data;
   const analyticsUnavailable = data.analyticsDataStatus === "unavailable";
   const deploymentEnvironment = process.env.LUMEO_DEPLOYMENT_ENV ?? "local";
+  const gitCommitSha = process.env.LUMEO_BUILD_SHA ?? null;
+  const deploymentPlatform =
+    deploymentEnvironment === "production" || deploymentEnvironment === "preview"
+      ? "Cloudflare Workers"
+      : deploymentEnvironment === "ci"
+        ? "Cloudflare Worker CI"
+        : "Local development";
   const checkedAt = new Date().toISOString();
   const latestAuditAt = data.recentAuditLogs[0]?.created_at ?? null;
 
@@ -48,7 +56,7 @@ export default async function AdminPage() {
         }
       />
 
-      {(overview.error || unreadInbox.error) && (
+      {(overview.error || unreadInbox.error || errorSummary.error) && (
         <AdminEmptyState
           title="Some Control Center data is unavailable"
           description="The protected admin shell is working, but one or more database reads could not complete."
@@ -76,8 +84,13 @@ export default async function AdminPage() {
         <MetricLink href="/admin/analytics">
           <AdminMetricCard label="Most Opened Tool" value={analyticsUnavailable ? "Unavailable" : data.mostUsedTool ?? "N/A"} detail="Based on tool-open events." tone={analyticsUnavailable ? "warning" : "neutral"} />
         </MetricLink>
-        <MetricLink href="/admin/settings">
-          <AdminMetricCard label="Analytics Status" value={analyticsUnavailable ? "Read unavailable" : data.analyticsEnabled ? "Enabled" : "Disabled"} detail="Controlled by public_analytics_enabled." tone={analyticsUnavailable ? "warning" : data.analyticsEnabled ? "success" : "neutral"} />
+        <MetricLink href="/admin/errors">
+          <AdminMetricCard
+            label="Open Errors"
+            value={errorSummary.error ? "Unavailable" : errorSummary.data.openCount}
+            detail={errorSummary.error ? "Error monitoring could not be verified." : errorSummary.data.criticalOpenCount > 0 ? `${errorSummary.data.criticalOpenCount} critical error${errorSummary.data.criticalOpenCount === 1 ? "" : "s"} need attention.` : "Unresolved application errors."}
+            tone={errorSummary.error ? "warning" : errorSummary.data.criticalOpenCount > 0 ? "danger" : errorSummary.data.openCount > 0 ? "warning" : "success"}
+          />
         </MetricLink>
         <MetricLink href="/admin/analytics">
           <AdminMetricCard label="Tool Opens Today" value={analyticsUnavailable ? "Unavailable" : data.analyticsToolOpensToday} detail="PDF tool workspaces opened today." tone={analyticsUnavailable ? "warning" : "gold"} />
@@ -96,9 +109,9 @@ export default async function AdminPage() {
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
-            <p className="text-sm font-semibold text-[#F0EAD6]">Platform configuration progress</p>
+            <p className="text-sm font-semibold text-[#F0EAD6]">Runtime / revision</p>
             <p className="mt-2 text-sm leading-6 text-[#F0EAD6]/56">
-              {data.tools.length} catalog tools are readable.
+              {deploymentPlatform} · {gitCommitSha ? gitCommitSha.slice(0, 12) : "revision unavailable"}
             </p>
           </div>
           <div className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
