@@ -70,6 +70,22 @@ export default async function ErrorsPage({
     getErrorLogs(PAGE_SIZE, (page - 1) * PAGE_SIZE, { status, severity, search }),
   ]);
 
+  if (summary.error || logs.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Operations"
+          title="Errors"
+          description="Client and server error monitoring."
+        />
+        <AdminEmptyState
+          title="Error monitoring data is unavailable"
+          description="Error counts or log rows could not be verified. No zero-state metrics are shown until the data service recovers."
+        />
+      </div>
+    );
+  }
+
   const carryParams = { status: params.status, severity: params.severity, search: params.search };
 
   return (
