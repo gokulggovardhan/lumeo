@@ -24,12 +24,19 @@ const protectedRoutes = [
   "app/admin/(protected)/seo/page.tsx",
   "app/admin/(protected)/audit/page.tsx",
   "app/admin/(protected)/settings/page.tsx",
+  "app/admin/(protected)/errors/page.tsx",
+  "app/admin/(protected)/health/page.tsx",
+  "app/admin/(protected)/inbox/page.tsx",
+  "app/admin/(protected)/members/page.tsx",
 ];
 const actionFiles = [
   "app/admin/(protected)/tools/actions.ts",
   "app/admin/(protected)/announcements/actions.ts",
   "app/admin/(protected)/seo/actions.ts",
   "app/admin/(protected)/settings/actions.ts",
+  "app/admin/(protected)/errors/actions.ts",
+  "app/admin/(protected)/inbox/actions.ts",
+  "app/admin/(protected)/members/actions.ts",
 ];
 const protectedNonAdminFiles = [
   "app/login/page.tsx",
