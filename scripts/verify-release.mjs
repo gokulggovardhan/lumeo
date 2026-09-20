@@ -3,8 +3,9 @@
 // The permanent pre-release quality gate (docs/RELEASE_CERTIFICATION.md,
 // Part 3 + Part 11). Orchestrates the checks that already exist rather than
 // reimplementing any of their logic: the core test/lint/typecheck/build
-// sequence, then every scripts/verify-*.mjs script in turn. Every listed
-// verifier reflects current production behavior and is release-fatal.
+// sequence, then the maintained verify scripts in turn. Current production
+// verifiers are release-fatal; explicitly deprecated historical rollout
+// checks may still be reported as non-fatal signals.
 //
 // Usage: npm run verify:release
 
