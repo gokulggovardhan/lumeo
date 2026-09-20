@@ -91,6 +91,9 @@ try {
     "app/admin/(protected)/homepage/page.tsx",
     "app/admin/(protected)/feature-flags/page.tsx",
     "app/admin/(protected)/feature-flags/actions.ts",
+    "app/admin/(protected)/design-system/page.tsx",
+    "app/admin/(protected)/guide/page.tsx",
+    "components/admin/guidance/AdminGuidance.tsx",
   ]) {
     assert(!exists(retiredRoute), `Retired admin surface must stay removed: ${retiredRoute}`);
   }
