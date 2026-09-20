@@ -66,7 +66,7 @@ test("maintenance mode has explicit two-stage enable confirmation and server enf
   assert.match(button, /role="alertdialog"/);
   assert.match(button, /Enable maintenance mode/);
   assert.match(button, /maintenance_confirmation/);
-  assert.match(button, />Cancel</);
+  assert.match(button, /\bCancel\b/);
   assert.doesNotMatch(button, /window\.confirm/);
   assert.match(action, /requireAdmin\(\)/);
   assert.match(action, /canManageSettings\(admin\.role\)/);
@@ -96,7 +96,7 @@ test("Overview avoids duplicate analytics and retired status queries", () => {
 
 test("error-ingestion hardening keeps counters private and covers null-session abuse", () => {
   const migration = read("supabase/migrations/20260919170000_error_ingest_rate_limit.sql");
-  const runtimeTest = read("scripts/test-error-ingest-rate-limit.mjs");
+  const runtimeTest = read("scripts/verify-error-ingest-rate-limit.mjs");
 
   assert.match(migration, /create schema if not exists private/);
   assert.match(migration, /private\.error_ingest_rate_limits/);
