@@ -155,7 +155,7 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit
 
-      - name: Run mobile Chromium and WebKit admin auth lifecycle
+      - name: Run Chromium desktop/mobile and WebKit admin lifecycle
         run: npm run test:e2e:admin
 
       - name: Upload browser traces on failure
