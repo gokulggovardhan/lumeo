@@ -1,8 +1,7 @@
 // Standalone Word-to-PDF converter. Runs on a real container host (Render,
-// Fly.io, etc.) instead of Vercel, because Vercel's standard Next.js
-// deployment does not build a Dockerfile for the app itself -- there is no
-// LibreOffice binary available in that runtime. The Next.js API route
-// (app/api/tools/word-to-pdf/route.ts) calls this service over HTTP with a
+// Fly.io, etc.) because the Cloudflare Worker application runtime has no
+// LibreOffice binary. The application route
+// (app/api/tools/word-to-pdf/route.ts) calls this service over HTTPS with a
 // Supabase signed URL it derived itself.
 //
 // No framework dependency on purpose: this container only needs to accept
@@ -22,11 +21,11 @@ const execFileAsync = promisify(execFile);
 const PORT = process.env.PORT || 8080;
 const CONVERT_SECRET = process.env.CONVERT_SECRET || "";
 const LIBREOFFICE_BINARY = process.env.LIBREOFFICE_BINARY || "soffice";
-// Bounded below the caller's fetch abort (285s in lib/converters/*.ts) and
-// Vercel's 300s function ceiling, but far above the old 90s: a large or
-// image-heavy PDF on this box's limited CPU can legitimately need a couple of
-// minutes, and 90s was killing soffice mid-conversion on files it could
-// otherwise finish. Still capped so a truly stuck soffice can't run forever.
+// Bounded below the caller's fetch abort (285s in lib/converters/*.ts), but
+// far above the old 90s: a large or image-heavy PDF on this box's limited CPU
+// can legitimately need a couple of minutes, and 90s was killing soffice
+// mid-conversion on files it could otherwise finish. Still capped so a truly
+// stuck soffice can't run forever.
 const CONVERSION_TIMEOUT_MS = 260_000;
 const MAX_BODY_BYTES = 10 * 1024;
 
