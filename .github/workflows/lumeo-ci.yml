@@ -167,6 +167,9 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit
 
+      - name: Run Sign drag history regression
+        run: npx playwright test e2e/sign-drag.spec.ts --project=chromium
+
       - name: Run Chromium desktop/mobile and WebKit admin lifecycle
         run: npm run test:e2e:admin
 
