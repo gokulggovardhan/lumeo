@@ -58,3 +58,48 @@ The comparison workflow runs the current official decoder first, swaps the candi
 ## Licensing boundary
 
 Both libheif and libde265 are LGPL-licensed libraries. This evaluation preserves their license files and does not ship the custom artifact to users. Before production distribution, confirm the obligations applicable to a statically linked/embedded WASM bundle, including notices, corresponding source/build scripts, and any required user relinking/replacement mechanism. That legal/distribution review is a release blocker, not an assumption.
+
+
+## 2026-09-20 Cloudflare-era rerun
+
+The pinned candidate build completed successfully on the Cloudflare-synchronized research branch.
+
+- libheif: 1.23.4 at `4e14f5942c1732ace9611b9522cc991501445463`
+- libde265: 1.1.1 at `4dd701fffac01632ffd5cabc5ef10deb56accba1`
+- libheif-js bundling layer: 1.23.2 at `6ca00b818c0ff51cb2a5c75b9ce97d708083335a`
+- Emscripten: 3.1.61
+- Generated upstream npm lock: lockfile v3, 386 package entries
+- Generated lock SHA-256: `e6fb3e2dab13f96e88f820628c6c908aa7731f00b3c733c2e00cde34628ba04d`
+
+The research harness regenerates that lock from the fixed npm registry cutoff
+`2026-09-19T00:00:00Z`, verifies the SHA-256 above, and only then runs
+`npm ci --ignore-scripts`. A registry/dependency drift therefore fails before
+the candidate is bundled.
+
+### Evidence from the successful evaluation
+
+| Metric | Current decoder | Candidate decoder | Result |
+|---|---:|---:|---|
+| Bundle JS bytes | 1,989,119 | 2,035,540 | Candidate +46,421 bytes (+2.33%) |
+| Chromium q85 end-to-end | 1,777 ms | 1,393 ms | Candidate faster in this run |
+| Chromium q92 end-to-end | 1,532 ms | 1,372 ms | Candidate faster in this run |
+| Chromium q96 end-to-end | 1,430 ms | 1,468 ms | Essentially comparable; candidate slightly slower |
+| WebKit q92 end-to-end | 2,376 ms | 2,246 ms | Candidate faster in this run |
+| Full-resolution primary | 6048×8064 | 6048×8064 | PASS |
+| Embedded thumbnail rejected as export source | 1152×1536 thumbnail present | 1152×1536 thumbnail present | PASS |
+| Browser suite | 27 passed | 27 passed | PASS |
+| HEIC unit/security suite | baseline PASS | candidate PASS | PASS |
+| TypeScript / focused lint | baseline CI PASS | candidate PASS | PASS |
+| Next production build | baseline CI PASS | candidate PASS | PASS |
+| Cloudflare/vinext build | current architecture | candidate PASS | PASS |
+| Cloudflare deployment dry-run | current architecture | candidate PASS | PASS |
+
+The timing samples are single CI observations, not a statistically rigorous
+performance benchmark. They are useful as regression evidence, not as a
+performance guarantee.
+
+Memory consumption was not promoted to a numeric comparison because the
+browser/WASM heap is isolated inside Playwright browser processes and the
+workflow does not yet expose a reliable apples-to-apples peak-heap metric.
+Existing source-size, decoded-pixel, timeout, per-file isolation and worker
+termination guards remain the primary resource-containment controls.
