@@ -12,7 +12,7 @@ import { formatAdminDateTime } from "@/lib/admin/timezone";
 
 function MetricLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="block rounded-[var(--radius-xl)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]">
+    <Link prefetch={false} href={href} className="block rounded-[var(--radius-xl)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)]">
       {children}
     </Link>
   );
@@ -135,7 +135,7 @@ export default async function AdminPage() {
       <AdminSectionCard
         title="Most recent administrative actions"
         description="Latest audit records for meaningful Control Center changes."
-        action={<Link href="/admin/audit" className="text-sm font-semibold text-[var(--text-accent)] hover:underline">View all</Link>}
+        action={<Link prefetch={false} href="/admin/audit" className="text-sm font-semibold text-[var(--text-accent)] hover:underline">View all</Link>}
       >
         <AdminDataTable
           columns={["Time", "Action", "Summary"]}
