@@ -191,7 +191,13 @@ export function tokenizeContentStream(bytes: Uint8Array): ContentStreamToken[] {
       const start = pos;
       pos += 1;
       while (pos < length && ((bytes[pos] >= 0x30 && bytes[pos] <= 0x39) || bytes[pos] === 0x2e)) pos += 1;
-      const text = Buffer.from(bytes.subarray(start, pos)).toString("latin1");
+      // PDF numeric tokens are ASCII by definition. Avoid Node's Buffer
+      // global here: this parser runs in the browser for Edit PDF, and the
+      // vinext/Cloudflare client bundle intentionally does not provide Buffer.
+      let text = "";
+      for (let index = start; index < pos; index += 1) {
+        text += String.fromCharCode(bytes[index]);
+      }
       const value = Number.parseFloat(text);
       if (!Number.isNaN(value)) {
         tokens.push({ type: "number", value, start, end: pos });
@@ -219,7 +225,11 @@ export function tokenizeContentStream(bytes: Uint8Array): ContentStreamToken[] {
         pos += 1;
         continue;
       }
-      tokens.push({ type: "operator", value: Buffer.from(bytes.subarray(start, pos)).toString("latin1"), start, end: pos });
+      let operator = "";
+      for (let index = start; index < pos; index += 1) {
+        operator += String.fromCharCode(bytes[index]);
+      }
+      tokens.push({ type: "operator", value: operator, start, end: pos });
     }
   }
 
