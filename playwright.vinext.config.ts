@@ -14,5 +14,7 @@ export default defineConfig({
   },
   projects: [
     { name: "chromium-vinext", use: { ...devices["Desktop Chrome"] } },
+    { name: "webkit-vinext", use: { ...devices["Desktop Safari"] } },
+    { name: "firefox-vinext", use: { ...devices["Desktop Firefox"] } },
   ],
 });
