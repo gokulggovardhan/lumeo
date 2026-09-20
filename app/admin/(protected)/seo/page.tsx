@@ -80,7 +80,7 @@ export default async function SeoPage({
           <form action={asAdminFormAction(saveSeoSetting)} className="grid gap-4 md:grid-cols-2">
             <label className="block text-sm font-semibold text-[#F0EAD6]">
               Route
-              <select name="route" defaultValue={prefillRoute} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm">
+              <select name="route" defaultValue={prefillRoute} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm">
                 {publicRoutes.map((route) => (
                   <option key={route} value={route}>
                     {route} {configuredRoutes.has(route) ? "" : "— missing"}
