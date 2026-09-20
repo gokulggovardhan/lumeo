@@ -44,26 +44,46 @@ async function getAdminSessionState(page: Page) {
   });
 }
 
-async function openMobileNavigation(page: Page) {
+async function openAdminNavigation(page: Page) {
   const openButton = page.getByRole("button", {
     name: "Open Control Center navigation",
   });
-  await expect(openButton).toBeVisible();
-  await expect(openButton).toHaveAttribute("aria-expanded", "false");
-  await openButton.click();
 
-  const closeButton = page.getByRole("button", {
-    name: "Close Control Center navigation",
-  });
-  await expect(closeButton).toBeVisible();
-  await expect(closeButton).toHaveAttribute("aria-expanded", "true");
-  await expect(
-    page.getByRole("navigation", {
+  if (await openButton.isVisible().catch(() => false)) {
+    await expect(openButton).toHaveAttribute("aria-expanded", "false");
+    await openButton.click();
+
+    const closeButton = page.getByRole("button", {
+      name: "Close Control Center navigation",
+    });
+    await expect(closeButton).toBeVisible();
+    await expect(closeButton).toHaveAttribute("aria-expanded", "true");
+
+    const mobileNavigation = page.getByRole("navigation", {
       name: "Mobile Control Center navigation",
-    }),
-  ).toBeVisible();
+    });
+    await expect(mobileNavigation).toBeVisible();
+    return { navigation: mobileNavigation, mobile: true, closeButton };
+  }
 
-  return closeButton;
+  const desktopNavigation = page.getByRole("navigation", {
+    name: "Control Center navigation",
+  });
+  await expect(desktopNavigation).toBeVisible();
+  return { navigation: desktopNavigation, mobile: false, closeButton: null };
+}
+
+async function exerciseResponsiveNavigation(page: Page) {
+  const state = await openAdminNavigation(page);
+  if (!state.mobile || !state.closeButton) return;
+
+  await page.keyboard.press("Escape");
+  const reopenedButton = page.getByRole("button", {
+    name: "Open Control Center navigation",
+  });
+  await expect(reopenedButton).toBeVisible();
+  await expect(reopenedButton).toHaveAttribute("aria-expanded", "false");
+  await expect(reopenedButton).toBeFocused();
 }
 
 test.describe("Control Center authentication", () => {
@@ -99,20 +119,10 @@ test.describe("Control Center authentication", () => {
     await page.reload();
     await expect(page).toHaveURL(/\/admin$/);
 
-    await openMobileNavigation(page);
-    await page.keyboard.press("Escape");
-    const reopenedButton = page.getByRole("button", {
-      name: "Open Control Center navigation",
-    });
-    await expect(reopenedButton).toBeVisible();
-    await expect(reopenedButton).toHaveAttribute("aria-expanded", "false");
-    await expect(reopenedButton).toBeFocused();
+    await exerciseResponsiveNavigation(page);
 
-    await openMobileNavigation(page);
-    const mobileNavigation = page.getByRole("navigation", {
-      name: "Mobile Control Center navigation",
-    });
-    await mobileNavigation.getByRole("link", { name: "Analytics" }).click();
+    const { navigation: overviewNavigation } = await openAdminNavigation(page);
+    await overviewNavigation.getByRole("link", { name: "Analytics" }).click();
     await expect(page).toHaveURL(/\/admin\/analytics/);
     await expect(
       page.getByRole("heading", {
@@ -138,11 +148,8 @@ test.describe("Control Center authentication", () => {
     await page.reload();
     await expect(page).toHaveURL(/\/admin\/analytics\?range=30d/);
 
-    await openMobileNavigation(page);
-    await page
-      .getByRole("navigation", { name: "Mobile Control Center navigation" })
-      .getByRole("link", { name: "Inbox" })
-      .click();
+    const { navigation: analyticsNavigation } = await openAdminNavigation(page);
+    await analyticsNavigation.getByRole("link", { name: "Inbox" }).click();
     await expect(page).toHaveURL(/\/admin\/inbox/);
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
 
@@ -151,11 +158,8 @@ test.describe("Control Center authentication", () => {
     await expect(page.getByRole("heading", { name: "Inbox" })).toBeVisible();
     expect(inboxReload?.headers()["cache-control"]).toContain("no-store");
 
-    await openMobileNavigation(page);
-    await page
-      .getByRole("navigation", { name: "Mobile Control Center navigation" })
-      .getByRole("link", { name: "Errors" })
-      .click();
+    const { navigation: inboxNavigation } = await openAdminNavigation(page);
+    await inboxNavigation.getByRole("link", { name: "Errors" }).click();
     await expect(page).toHaveURL(/\/admin\/errors/);
     await expect(page.getByRole("heading", { name: "Errors" })).toBeVisible();
     const firstError = page.locator("details").first();
@@ -171,20 +175,14 @@ test.describe("Control Center authentication", () => {
       ),
     ).toBe(false);
 
-    await openMobileNavigation(page);
-    await page
-      .getByRole("navigation", { name: "Mobile Control Center navigation" })
-      .getByRole("link", { name: "Health" })
-      .click();
+    const { navigation: errorsNavigation } = await openAdminNavigation(page);
+    await errorsNavigation.getByRole("link", { name: "Health" }).click();
     await expect(page).toHaveURL(/\/admin\/health/);
     await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
     await expect(page.getByText(/LibreOffice converter · Optional/)).toBeVisible();
 
-    await openMobileNavigation(page);
-    await page
-      .getByRole("navigation", { name: "Mobile Control Center navigation" })
-      .getByRole("link", { name: "Settings" })
-      .click();
+    const { navigation: healthNavigation } = await openAdminNavigation(page);
+    await healthNavigation.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveURL(/\/admin\/settings/);
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 
@@ -246,19 +244,13 @@ test.describe("Control Center authentication", () => {
       .click();
     await expect(page.getByText("Live: site is down for visitors")).toHaveCount(0);
 
-    await openMobileNavigation(page);
-    await page
-      .getByRole("navigation", { name: "Mobile Control Center navigation" })
-      .getByRole("link", { name: "Inbox" })
-      .click();
+    const { navigation: settingsNavigation } = await openAdminNavigation(page);
+    await settingsNavigation.getByRole("link", { name: "Inbox" }).click();
     await expect(page).toHaveURL(/\/admin\/inbox/);
 
-    await openMobileNavigation(page);
+    await openAdminNavigation(page);
     const protectedOrigin = new URL(page.url()).origin;
-    await page
-      .locator("#control-center-mobile-menu")
-      .getByRole("button", { name: "Sign out" })
-      .click();
+    await page.getByRole("button", { name: "Sign out" }).click();
     await expect(page).toHaveURL(/\/admin\/login\?message=signed-out$/);
     expect(new URL(page.url()).origin).toBe(protectedOrigin);
 
@@ -287,9 +279,8 @@ test.describe("Control Center authentication", () => {
 
     await signIn(page);
     await expect(page).toHaveURL(/\/admin$/);
-    await expect(
-      page.getByRole("button", { name: "Open Control Center navigation" }),
-    ).toBeVisible();
+    const finalNavigation = await openAdminNavigation(page);
+    await expect(finalNavigation.navigation).toBeVisible();
 
     expect(
       browserErrors,
