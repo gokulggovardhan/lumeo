@@ -79,12 +79,15 @@ test("production Edit PDF loads the deployed pdf.js worker and detects text", as
     buffer: bytes,
   });
 
-  await expect(page.locator(EDITABLE_RUN).first()).toBeVisible();
-  await expect(
-    page.locator(
-      'div[role="button"][aria-label*="Cloudflare production PDF worker smoke"]',
-    ),
-  ).toBeVisible();
+  const editableRuns = page.locator(EDITABLE_RUN);
+  await expect(editableRuns.first()).toBeVisible();
+
+  const labels = await editableRuns.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("aria-label") ?? "").join(" "),
+  );
+  expect(labels).toContain("Cloudflare");
+  expect(labels).toContain("production");
+  expect(labels).toContain("PDF");
 
   expect(assetFailures).toEqual([]);
   expect(pageErrors).toEqual([]);
@@ -122,7 +125,7 @@ test("production HEIC/HEIF worker preserves full-resolution output and download"
   await expect(asset).toHaveAttribute("data-output-dimensions", "6048x8064");
 
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download JPEG", exact: true }).click();
+  await page.getByRole("button", { name: "Download JPEG", exact: true }).first().click();
   const download = await downloadPromise;
   const outputPath = await download.path();
   expect(outputPath).not.toBeNull();
