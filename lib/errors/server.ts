@@ -37,7 +37,7 @@ export async function captureServerError(input: ServerErrorCaptureInput): Promis
       page_url: null,
       anonymous_session_id: null,
       build_version: process.env.npm_package_version ?? null,
-      git_sha: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
+      git_sha: process.env.LUMEO_BUILD_SHA ?? null,
     });
   } catch {
     // Reporting failures are swallowed by design.
