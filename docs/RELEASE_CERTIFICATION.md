@@ -259,13 +259,13 @@ tooling addition with no immediate consumer).
       change
 - [ ] Manual SEO regression (Part 8) done for any routing/metadata change
 - [ ] Manual security regression (Part 9) done for any auth/infra change
-- [ ] Deployment verification: confirm the Vercel preview deploy succeeded
-      and matches the branch under test
+- [ ] Deployment verification: confirm deterministic CI and Cloudflare/vinext
+      build validation succeeded for the branch under test
 - [ ] Production smoke test: after merge, load the live site and exercise
       at least one browser-only tool and one server-assisted tool
       end-to-end with a real file
-- [ ] Rollback verification: confirm the previous production deployment can
-      be re-promoted in Vercel if the new release needs to be reverted
+- [ ] Rollback verification: confirm the previous Cloudflare Worker version
+      remains available for production rollback
 
 ## Part 12 — Documentation, troubleshooting, future contributors
 

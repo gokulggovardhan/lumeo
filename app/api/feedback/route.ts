@@ -7,7 +7,7 @@ import {
 } from "@/lib/cloudflare/request-location";
 
 // This route uses only web-standard APIs so vinext can execute it directly in
-// the Cloudflare Worker runtime without a Vercel/Next Edge Runtime override.
+// the Cloudflare Worker runtime without any platform-specific Edge override.
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const phonePattern = /^[+]?[\d\s().-]{7,20}$/;

@@ -1,9 +1,9 @@
 import { createStorageBrowserClient } from "@/lib/supabase/storageBrowserClient";
 
-// Vercel's Docker functions reject request bodies over 4.5MB, so the
-// Next.js API route never receives the .docx directly -- the browser
-// uploads straight to this bucket and the route only ever sees a
-// short-lived signed URL + storage path.
+// Keep document bytes out of the application Worker: the browser uploads
+// directly to the short-lived scratch bucket and the route receives only a
+// signed URL + storage path. This reduces Worker memory/transfer pressure and
+// keeps the server-assisted conversion boundary explicit.
 export const WORD_TO_PDF_BUCKET = "lumeo-temp";
 
 // Temporary cap, well below the 45MB the pipeline can technically accept.

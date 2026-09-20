@@ -185,7 +185,7 @@ The current workflow is:
 
 ## Deployment
 
-The public domain is https://lumeo.in, deployed on Vercel. The Word/PDF-to-Word/HTML-to-PDF conversion service (`services/word-to-pdf-converter/`) is deployed separately (currently Render's free tier — see the file-size comments in `lib/supabase/pdfToWordStorage.ts` for the memory constraint that drives its upload cap). Deployment configuration should not expose secrets, credentials, private keys, or service tokens.
+The public domain is https://lumeo.in and the application is deployed on Cloudflare Workers through vinext. Cloudflare Workers Builds is the sole production deployment path. The Word/PDF-to-Word/HTML-to-PDF conversion service (`services/word-to-pdf-converter/`) is deployed separately (currently Render's free tier — see the file-size comments in `lib/supabase/pdfToWordStorage.ts` for the memory constraint that drives its upload cap). Deployment configuration must not expose secrets, credentials, private keys, or service tokens.
 
 ## Contributing expectations
 

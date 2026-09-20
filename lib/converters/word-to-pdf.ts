@@ -1,9 +1,7 @@
 // Delegates to a standalone LibreOffice-backed converter service (see
 // services/word-to-pdf-converter/) instead of running soffice in-process.
-// Vercel's standard Next.js deployment does not build a Dockerfile for this
-// app, so there is no LibreOffice binary available in this runtime -- the
-// conversion has to happen on a real container host that this function
-// calls over HTTP.
+// The Cloudflare Worker runtime has no LibreOffice binary, so conversion runs
+// on the dedicated container host that this function calls over HTTPS.
 
 export class WordToPdfConversionError extends Error {}
 
@@ -12,9 +10,9 @@ export type WordToPdfResult = {
   fileName: string;
 };
 
-// Kept just under the route's maxDuration (300s, the Fluid-compute ceiling)
-// so a slow conversion aborts with a readable message here instead of being
-// hard-killed by the platform mid-response. Large or complex documents on the
+// Keep a finite application-level timeout so a stalled converter fails with a
+// readable error even though the Cloudflare Worker request itself has no fixed
+// HTTP wall-clock duration limit while the client remains connected. Large or complex documents on the
 // free-tier converter (limited CPU) can legitimately take a couple of minutes,
 // so this has to be generous -- the old 55s cap made every big file fail even
 // though the converter would have finished given the time.

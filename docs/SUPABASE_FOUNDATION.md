@@ -66,9 +66,9 @@ npm.cmd run verify:supabase
 The verifier checks only that both values exist and that the URL is HTTPS. It
 does not print credential values.
 
-## Vercel Environment Setup
+## Cloudflare Environment Setup
 
-Add the same variables in Vercel project settings for the relevant environments:
+Add the same variables to the Cloudflare Workers build/runtime environment for the relevant deployment environment:
 
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`

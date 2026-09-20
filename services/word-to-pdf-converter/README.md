@@ -1,9 +1,9 @@
 # Word to PDF converter service
 
 Standalone LibreOffice-backed converter for Lumeo's Word to PDF tool. Lives
-outside the main app because Vercel's standard Next.js deployment does not
-build a Dockerfile for the app itself, so there's nowhere on Vercel to run
-`soffice`.
+outside the main app because the Cloudflare Worker runtime does not provide a
+LibreOffice/`soffice` binary. The conversion therefore runs in a dedicated
+container service and the Worker calls it over HTTPS.
 
 ## Deploy (Render, free tier)
 
@@ -22,7 +22,7 @@ build a Dockerfile for the app itself, so there's nowhere on Vercel to run
 
 ## Wire it into the main app
 
-In the Lumeo Vercel project, set:
+In the Lumeo Cloudflare Worker/build environment, set:
 
 - `WORD_TO_PDF_CONVERTER_URL` -- the Render service URL (e.g.
   `https://lumeo-word-to-pdf-converter.onrender.com`)
