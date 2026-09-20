@@ -225,7 +225,11 @@ export function tokenizeContentStream(bytes: Uint8Array): ContentStreamToken[] {
         pos += 1;
         continue;
       }
-      tokens.push({ type: "operator", value: Buffer.from(bytes.subarray(start, pos)).toString("latin1"), start, end: pos });
+      let operator = "";
+      for (let index = start; index < pos; index += 1) {
+        operator += String.fromCharCode(bytes[index]);
+      }
+      tokens.push({ type: "operator", value: operator, start, end: pos });
     }
   }
 
