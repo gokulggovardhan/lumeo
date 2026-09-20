@@ -277,9 +277,9 @@ Merge PDF, Split PDF and Compress PDF remain algorithmically unchanged. Run 2 pr
 
 Shared admin primitives now use Aura surfaces, table styling, form focus states, tactile buttons and calmer empty states. This updates overview, analytics, tools, homepage, feature flags, announcements, SEO, audit, system and settings pages through their common components.
 
-### Guide and showcase
+### Historical guide and showcase
 
-The protected Design System showcase remains at `/admin/design-system`. The protected admin guide at `/admin/guide` explains runtime impact, stored-only states, dependencies, risk and deployment expectations for the current Control Center.
+Run 2 originally included protected `/admin/design-system` and `/admin/guide` reference pages. They were retired from the production Control Center once the operational Admin surfaces stabilized, so production Admin contains only real operator functionality. The reusable Aura primitives and their source-level accessibility/design tests remain the maintained reference.
 
 ### Run 2 constraints
 
