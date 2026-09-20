@@ -166,8 +166,9 @@ test.describe("Control Center authentication", () => {
     // The heading is server-rendered. Wait for the client Inbox surface to
     // hydrate before reloading so WebKit does not cancel an in-flight module
     // import and report a false application error during the lifecycle test.
+    const inboxMain = page.locator("#main-content");
     await expect(
-      page.getByPlaceholder("Search loaded messages..."),
+      inboxMain.getByPlaceholder("Search loaded messages..."),
     ).toBeVisible();
 
     const inboxReload = await page.reload();
