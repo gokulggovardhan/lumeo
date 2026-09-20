@@ -98,9 +98,9 @@ async function checkLibreOfficeConverter(): Promise<HealthCheck> {
 function getBuildInfo(): BuildInfo {
   return {
     appVersion: process.env.npm_package_version ?? "0.1.0",
-    gitCommitSha: process.env.VERCEL_GIT_COMMIT_SHA ?? null,
-    deploymentEnvironment: process.env.VERCEL_ENV ?? "local",
-    deploymentUrl: process.env.VERCEL_URL ?? null,
+    gitCommitSha: process.env.LUMEO_BUILD_SHA ?? null,
+    deploymentEnvironment: process.env.LUMEO_DEPLOYMENT_ENV ?? "local",
+    deploymentUrl: process.env.LUMEO_DEPLOYMENT_URL ?? null,
   };
 }
 
