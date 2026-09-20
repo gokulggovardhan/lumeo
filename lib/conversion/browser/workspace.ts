@@ -46,6 +46,14 @@ export type LocalStorageEstimate = {
   availableBytes: number | null;
 };
 
+export function hasLocalWorkspaceCapacity(
+  estimate: LocalStorageEstimate,
+  requiredBytes: number,
+): boolean {
+  if (!estimate.supported || estimate.availableBytes === null) return true;
+  return estimate.availableBytes >= requiredBytes;
+}
+
 type StorageManagerWithOpfs = StorageManager & {
   getDirectory?: () => Promise<FileSystemDirectoryHandle>;
 };
