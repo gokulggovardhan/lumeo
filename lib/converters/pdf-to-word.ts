@@ -1,6 +1,6 @@
-// See lib/converters/word-to-pdf.ts for the full rationale (why this is a
-// separate service, not soffice in-process on Vercel). This is the
-// PDF -> DOCX direction: same converter service, POST /convert-pdf-to-word.
+// See lib/converters/word-to-pdf.ts for the full rationale (the Cloudflare
+// Worker runtime has no in-process LibreOffice binary). This is the PDF -> DOCX
+// direction: same converter service, POST /convert-pdf-to-word.
 
 export class PdfToWordConversionError extends Error {}
 
