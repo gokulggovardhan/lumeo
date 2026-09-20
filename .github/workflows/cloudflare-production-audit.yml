@@ -207,6 +207,87 @@ jobs:
           echo "All Cloudflare production audit sections passed."
 
 
+  compare-edit-pdf-runtimes:
+    name: Compare Edit PDF — Next vs vinext
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Next production application
+        run: npm run build
+
+      - name: Test Edit PDF on local Next production
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run start -- --hostname 127.0.0.1 > /tmp/lumeo-next.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000/pdf/edit >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/lumeo-next.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          CLOUDFLARE_AUDIT_BASE_URL=http://127.0.0.1:3000 \
+            npx playwright test \
+              --config=playwright.cloudflare-production.config.ts \
+              --project=chromium-production \
+              --grep "production Edit PDF"
+
+          kill "$server_pid"
+          wait "$server_pid" || true
+          trap - EXIT
+
+      - name: Build vinext Cloudflare Worker
+        run: npm run build:vinext
+
+      - name: Start local Worker and test Edit PDF
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev --config dist/server/wrangler.json --port 8787 > /tmp/lumeo-vinext.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/pdf/edit >/dev/null; then
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/lumeo-vinext.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          CLOUDFLARE_AUDIT_BASE_URL=http://127.0.0.1:8787 \
+            npx playwright test \
+              --config=playwright.cloudflare-production.config.ts \
+              --project=chromium-production \
+              --grep "production Edit PDF"
+
   browser-production:
     name: Browser smoke — PDF.js + HEIC
     runs-on: ubuntu-latest
