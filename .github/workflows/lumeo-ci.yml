@@ -173,6 +173,7 @@ jobs:
             --port 8787 \
             --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
             --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            --var "SUPABASE_SERVICE_ROLE_KEY:$SUPABASE_SERVICE_ROLE_KEY" \
             > /tmp/lumeo-admin-worker.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
