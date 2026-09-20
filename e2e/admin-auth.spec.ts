@@ -167,7 +167,7 @@ test.describe("Control Center authentication", () => {
     // hydrate before reloading so WebKit does not cancel an in-flight module
     // import and report a false application error during the lifecycle test.
     await expect(
-      page.getByRole("searchbox", { name: "Search loaded messages..." }),
+      page.getByPlaceholder("Search loaded messages..."),
     ).toBeVisible();
 
     const inboxReload = await page.reload();
