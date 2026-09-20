@@ -25,6 +25,22 @@ export default async function SeoPage({
   const seo = await getSeoSettings();
   const canEdit = canManageSeo(admin.role);
   const params = (await searchParams) ?? {};
+
+  if (seo.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Search foundation"
+          title="SEO"
+          description="Manage route SEO records in the database."
+        />
+        <AdminEmptyState
+          title="SEO records are unavailable"
+          description="Coverage cannot be verified, so editing is disabled until the data service recovers."
+        />
+      </div>
+    );
+  }
   const configuredRoutes = new Set(seo.data.map((record) => record.route));
   const missingRoutes = publicRoutes.filter((route) => !configuredRoutes.has(route));
   const prefillRoute = params.route && publicRoutes.includes(params.route) ? params.route : "/";
