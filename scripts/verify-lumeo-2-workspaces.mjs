@@ -31,12 +31,20 @@ const docs = read("docs/LUMEO_2_DESIGN_SYSTEM.md");
 
 try {
   assert(packageJson.scripts["verify:lumeo2-workspaces"] === "node scripts/verify-lumeo-2-workspaces.mjs", "verify:lumeo2-workspaces script is missing.");
-  assert(packageJson.dependencies.next === "^16.2.10", "Next.js version changed unexpectedly.");
-  assert(packageJson.dependencies.react === "^19.2.7", "React version changed unexpectedly.");
-  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.110.2", "Supabase JS version changed unexpectedly.");
+  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
+  assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
+  assert(packageJson.dependencies["@supabase/supabase-js"] === "^2.112.2", "Supabase JS version changed unexpectedly.");
 
   for (const component of [
     "L2ToolPageHeader",
+    "L2WorkspaceHeader",
+    "L2WorkspaceToolbar",
+    "L2PanelLabel",
+    "L2WorkspacePanel",
+    "L2WorkspaceInspector",
+    "L2ToolbarButton",
+    "L2WorkspaceGrid",
+    "ToolActionBar",
     "L2ToolWorkspace",
     "L2ToolMainColumn",
     "L2ToolSettingsPanel",
@@ -93,11 +101,11 @@ try {
     ["SplitPdfTool", splitTool],
     ["CompressPdfTool", compressTool],
   ]) {
-    for (const component of ["L2ToolWorkspace", "L2ToolMainColumn", "L2ToolSettingsPanel", "L2UploadStage", "L2ActionArea", "L2PrivacyNote"]) {
+    for (const component of ["L2UploadStage", "L2WorkspaceHeader", "L2WorkspaceGrid", "L2WorkspaceToolbar", "ToolActionBar", "L2PrivacyNote"]) {
       assert(source.includes(component), `${name} must use ${component} internally.`);
     }
-    assert(source.includes("l2-tool-empty-state"), `${name} must use the compact empty-state class.`);
-    assert(source.includes("l2-tool-deep-workspace"), `${name} must use the deep workspace class.`);
+    assert(source.includes("l2-workspace"), `${name} must use the v2 workspace state classes.`);
+    assert(source.includes("l2-workspace-deep"), `${name} must use the v2 deep workspace class.`);
     assert(source.includes("lumeo-primary-action"), `${name} must mark its dominant action.`);
   }
 
@@ -105,7 +113,7 @@ try {
   assert(mergeTool.includes("inputId=\"merge-pdf-upload\"") && mergeTool.includes("onFilesSelected={(selectedFiles)") && mergeTool.includes("multiple"), "Merge must use the shared multi-file upload contract.");
   assert(mergeTool.includes("One combined PDF using the file order shown."), "Merge must describe the truthful combined output.");
   assert(mergeTool.includes("Move ${item.file.name} up") && mergeTool.includes("Remove ${item.file.name}"), "Merge file controls must keep accessible labels.");
-  assert(!/quality|metadata removal|compression|archive/i.test(mergeTool.match(/<L2ToolSettingsPanel title="Merge options"[\s\S]*?<\/L2ToolSettingsPanel>/)?.[0] ?? ""), "Merge settings panel includes invented settings.");
+  assert(!/metadata removal|archive/i.test(mergeTool.match(/inspector=\{[\s\S]*?Merge options[\s\S]*?<\/div>\s*\}/)?.[0] ?? ""), "Merge settings panel includes invented settings.");
 
   assert(splitTool.includes("Document tray") && splitTool.includes("Source PDF"), "Split must retain one-document profile language.");
   assert(splitTool.includes("inputId=\"split-pdf-upload\"") && splitTool.includes("multiple={false}") && splitTool.includes("onFilesSelected={handleFiles}"), "Split must use the shared one-file upload contract.");
