@@ -9,7 +9,7 @@ export default defineConfig({
   workers: 1,
   reporter: [["list"]],
   use: {
-    baseURL: "https://lumeo.in",
+    baseURL: process.env.CLOUDFLARE_AUDIT_BASE_URL ?? "https://lumeo.in",
     trace: "retain-on-failure",
   },
   projects: [
