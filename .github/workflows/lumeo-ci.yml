@@ -150,7 +150,7 @@ jobs:
         run: node scripts/seed-admin-e2e.mjs
 
       - name: Verify error ingestion rate limits
-        run: node scripts/test-error-ingest-rate-limit.mjs
+        run: node scripts/verify-error-ingest-rate-limit.mjs
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit
