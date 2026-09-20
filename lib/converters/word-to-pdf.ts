@@ -1,9 +1,7 @@
 // Delegates to a standalone LibreOffice-backed converter service (see
 // services/word-to-pdf-converter/) instead of running soffice in-process.
-// Vercel's standard Next.js deployment does not build a Dockerfile for this
-// app, so there is no LibreOffice binary available in this runtime -- the
-// conversion has to happen on a real container host that this function
-// calls over HTTP.
+// The Cloudflare Worker runtime has no LibreOffice binary, so conversion runs
+// on the dedicated container host that this function calls over HTTPS.
 
 export class WordToPdfConversionError extends Error {}
 
