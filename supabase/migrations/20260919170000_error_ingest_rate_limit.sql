@@ -18,6 +18,35 @@ create index if not exists error_ingest_rate_limits_window_idx
 revoke all on table private.error_ingest_rate_limits from public;
 revoke all on table private.error_ingest_rate_limits from anon, authenticated;
 
+-- Sanitize diagnostics before storage, not only when rendering Admin UI. This
+-- protects the database even when a caller invokes the public RPC directly.
+create or replace function private.sanitize_error_text(input_value text, max_chars integer)
+returns text
+language plpgsql
+immutable
+set search_path = ''
+as $
+declare
+  cleaned text;
+begin
+  if input_value is null then
+    return null;
+  end if;
+
+  cleaned := input_value;
+  cleaned := regexp_replace(cleaned, $re$(postgres|postgresql)://[^[:space:]/@:]+:[^[:space:]/@]+@$re$, E'\\1://[REDACTED]@', 'gi');
+  cleaned := regexp_replace(cleaned, $re$Bearer[[:space:]]+[A-Za-z0-9._~+/=-]{8,}$re$, 'Bearer [REDACTED]', 'gi');
+  cleaned := regexp_replace(cleaned, $re$eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}$re$, '[REDACTED_JWT]', 'g');
+  cleaned := regexp_replace(cleaned, $re$sb_secret_[A-Za-z0-9_-]+$re$, '[REDACTED_SUPABASE_SECRET]', 'g');
+  cleaned := regexp_replace(cleaned, $re$(password|passwd|pwd|secret|token|api[_-]?key|authorization|cookie|set-cookie)([[:space:]]*[:=][[:space:]]*)[^[:space:],;]+$re$, E'\\1\\2[REDACTED]', 'gi');
+
+  return left(cleaned, greatest(0, max_chars));
+end;
+$;
+
+revoke all on function private.sanitize_error_text(text, integer) from public;
+revoke all on function private.sanitize_error_text(text, integer) from anon, authenticated;
+
 -- Keep public error reporting available, but make rate limiting independent of
 -- caller-supplied metadata. Authenticated requests are bucketed by auth.uid().
 -- Anonymous requests use the supplied anonymous session when present, a
@@ -45,11 +74,13 @@ security definer
 set search_path = ''
 as $$
 declare
-  cleaned_message text := left(coalesce(nullif(btrim(record_error_event.message), ''), 'Unknown error'), 2000);
+  cleaned_message text := private.sanitize_error_text(coalesce(nullif(btrim(record_error_event.message), ''), 'Unknown error'), 2000);
   cleaned_source text := case when record_error_event.source in ('client', 'server_action', 'route_handler', 'error_boundary', 'unhandled_rejection') then record_error_event.source else 'client' end;
   cleaned_severity text := case when record_error_event.severity in ('low', 'medium', 'high', 'critical') then record_error_event.severity else 'medium' end;
   cleaned_route text := left(nullif(btrim(record_error_event.route), ''), 300);
   cleaned_component text := left(nullif(btrim(record_error_event.component), ''), 200);
+  cleaned_stack text := private.sanitize_error_text(record_error_event.stack, 4000);
+  cleaned_page_url text := private.sanitize_error_text(nullif(btrim(record_error_event.page_url), ''), 500);
   actor_user_id uuid := auth.uid();
   actor_bucket text;
   accepted_count integer;
@@ -138,11 +169,11 @@ begin
   )
   values (
     computed_fingerprint, cleaned_severity, cleaned_source, cleaned_message,
-    left(record_error_event.stack, 4000), cleaned_route, cleaned_component,
+    cleaned_stack, cleaned_route, cleaned_component,
     left(nullif(btrim(record_error_event.browser_family), ''), 40),
     left(nullif(btrim(record_error_event.operating_system), ''), 40),
     left(nullif(btrim(record_error_event.device_class), ''), 40),
-    left(nullif(btrim(record_error_event.page_url), ''), 500),
+    cleaned_page_url,
     record_error_event.anonymous_session_id,
     left(nullif(btrim(record_error_event.build_version), ''), 40),
     left(nullif(btrim(record_error_event.git_sha), ''), 40)
