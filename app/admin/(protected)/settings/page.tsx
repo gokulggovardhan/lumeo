@@ -48,6 +48,23 @@ export default async function SettingsPage() {
   const admin = await requireAdmin();
   const settings = await getSiteSettings();
   const canEdit = canManageSettings(admin.role);
+
+  if (settings.error) {
+    return (
+      <div className="space-y-7">
+        <AdminPageHeader
+          eyebrow="Owner controls"
+          title="Settings"
+          description="Only controls that change live Lumeo behavior are exposed here."
+        />
+        <AdminEmptyState
+          title="Live settings are unavailable"
+          description="Current values could not be verified, so changes are disabled to avoid overwriting unknown production state."
+        />
+      </div>
+    );
+  }
+
   const visibleSettings = settings.data.filter((setting) =>
     liveSettingKeys.has(setting.key),
   );
