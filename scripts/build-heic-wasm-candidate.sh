@@ -125,6 +125,12 @@ pushd "$ROOT/libheif-js" >/dev/null
 # lock from a fixed registry cutoff; CI uploads it so this research branch can
 # pin the exact resolved dependency graph in the next revision.
 npm install --package-lock-only --ignore-scripts --before=2026-09-19T00:00:00Z
+EXPECTED_LIBHEIF_JS_LOCK_SHA256="e6fb3e2dab13f96e88f820628c6c908aa7731f00b3c733c2e00cde34628ba04d"
+ACTUAL_LIBHEIF_JS_LOCK_SHA256="$(sha256sum package-lock.json | awk '{print $1}')"
+if [ "$ACTUAL_LIBHEIF_JS_LOCK_SHA256" != "$EXPECTED_LIBHEIF_JS_LOCK_SHA256" ]; then
+  echo "libheif-js dependency lock drifted: expected $EXPECTED_LIBHEIF_JS_LOCK_SHA256, got $ACTUAL_LIBHEIF_JS_LOCK_SHA256" >&2
+  exit 1
+fi
 cp package-lock.json "$OUT/libheif-js.package-lock.json"
 npm ci --ignore-scripts
 node scripts/install.js "$ROOT/libheif-candidate.tar.gz"
