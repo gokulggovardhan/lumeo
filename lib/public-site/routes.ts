@@ -39,4 +39,4 @@ export const PUBLIC_ROUTE_CONFIG = [
   { path: "/contact", changeFrequency: "monthly", priority: 0.55 },
 ] as const satisfies readonly PublicRouteConfig[];
 
-export const PUBLIC_ROUTE_PATHS = PUBLIC_ROUTE_CONFIG.map((route) => route.path);
+export const PUBLIC_ROUTE_PATHS: readonly string[] = PUBLIC_ROUTE_CONFIG.map((route) => route.path);
