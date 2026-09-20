@@ -109,7 +109,7 @@ export default async function AuditPage({
               name="action"
               defaultValue={params.action}
               placeholder="e.g. update"
-              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)] placeholder:text-[var(--lumeo-paper-600)]"
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] placeholder:text-[var(--lumeo-paper-600)] sm:text-sm"
             />
           </label>
           <label className="block text-sm font-semibold text-[#F0EAD6]">
@@ -117,7 +117,7 @@ export default async function AuditPage({
             <select
               name="entity_type"
               defaultValue={params.entity_type ?? ""}
-              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm"
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm"
             >
               <option value="">All</option>
               {entityTypes.map((type) => (
@@ -131,7 +131,7 @@ export default async function AuditPage({
               type="date"
               name="start"
               defaultValue={params.start}
-              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)]"
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] sm:text-sm"
             />
           </label>
           <label className="block text-sm font-semibold text-[#F0EAD6]">
