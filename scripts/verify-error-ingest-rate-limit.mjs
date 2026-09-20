@@ -90,3 +90,7 @@ const { error: internalHelperError } = await anon.rpc("current_admin_role");
 assert.ok(internalHelperError, "anon unexpectedly executed current_admin_role");
 
 console.log("PASS error ingestion rate limits: session, null-session, authenticated, privileges");
+
+// The Admin CI job already executes this verifier. Keep the feedback ingestion
+// boundary in the same isolated-Supabase gate without widening workflow permissions.
+await import("./verify-feedback-ingest-rate-limit.mjs");
