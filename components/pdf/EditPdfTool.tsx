@@ -754,9 +754,16 @@ export default function EditPdfTool() {
         if (cancelled) return;
         pdfLibDocRef.current = doc;
         setPdfLibDoc(doc);
-      } catch {
-        // In-place text editing simply won't be available for this file;
-        // the existing overlay-annotation workflow is unaffected.
+      } catch (engineError) {
+        // Keep preview/overlay editing available, but do not make a browser-
+        // runtime compatibility failure invisible. This contains no document
+        // bytes or secrets; it records only the exception type/message.
+        console.error(
+          "[Edit PDF] in-place edit engine failed to load",
+          engineError instanceof Error
+            ? { name: engineError.name, message: engineError.message }
+            : { message: String(engineError) },
+        );
       }
     })();
     return () => {
@@ -1113,8 +1120,14 @@ export default function EditPdfTool() {
             return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
           }),
         );
-      } catch {
+      } catch (matchError) {
         if (!cancelled) {
+          console.error(
+            "[Edit PDF] content-stream matching failed",
+            matchError instanceof Error
+              ? { name: matchError.name, message: matchError.message }
+              : { message: String(matchError) },
+          );
           setRunMatches([]);
           setPageOperators([]);
         }
