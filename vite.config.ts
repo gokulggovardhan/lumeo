@@ -22,11 +22,19 @@ const deploymentEnvironment =
 const deploymentUrl =
   deploymentEnvironment === "production" ? "https://lumeo.in" : "";
 
+const publicSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const publicSupabasePublishableKey =
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
+
 export default defineConfig({
   define: {
     "process.env.LUMEO_BUILD_SHA": JSON.stringify(buildSha),
     "process.env.LUMEO_DEPLOYMENT_ENV": JSON.stringify(deploymentEnvironment),
     "process.env.LUMEO_DEPLOYMENT_URL": JSON.stringify(deploymentUrl),
+    "process.env.NEXT_PUBLIC_SUPABASE_URL": JSON.stringify(publicSupabaseUrl),
+    "process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY": JSON.stringify(
+      publicSupabasePublishableKey,
+    ),
   },
   plugins: [
     vinext({
