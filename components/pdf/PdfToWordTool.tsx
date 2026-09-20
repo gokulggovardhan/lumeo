@@ -19,6 +19,7 @@ import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { recordRecentFile } from "@/lib/recent-files";
 import { ConversionCoordinator } from "@/lib/conversion/ConversionCoordinator";
+import { cleanupOrphanedConversionJobs } from "@/lib/conversion/browser/workspace";
 import { BrowserPdfToWordEngine } from "@/lib/conversion/browser/BrowserPdfToWordEngine";
 import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
 import type { ConversionResult } from "@/lib/conversion/types";
@@ -62,6 +63,7 @@ export default function PdfToWordTool() {
   const { availability, track } = useAnalytics();
   const openedTrackedRef = useRef(false);
   const sessionRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const [selected, setSelected] = useState<SelectedFile | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
@@ -75,7 +77,17 @@ export default function PdfToWordTool() {
     if (outcome.accepted) openedTrackedRef.current = true;
   }, [availability, track]);
 
+  useEffect(() => {
+    void cleanupOrphanedConversionJobs().catch(() => {});
+    return () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, []);
+
   function resetTool() {
+    abortRef.current?.abort();
+    abortRef.current = null;
     sessionRef.current += 1;
     setSelected(null);
     setStage("idle");
@@ -111,6 +123,8 @@ export default function PdfToWordTool() {
     const currentSession = sessionRef.current;
     const { file } = selected;
     const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
 
     setError("");
     setResult(null);
@@ -151,6 +165,12 @@ export default function PdfToWordTool() {
       });
     } catch (conversionError) {
       if (currentSession !== sessionRef.current) return;
+      if (controller.signal.aborted) {
+        setStage("idle");
+        setStatusLabel("Ready to convert");
+        setError("");
+        return;
+      }
       const message =
         conversionError instanceof Error
           ? conversionError.message
@@ -165,7 +185,18 @@ export default function PdfToWordTool() {
         success: false,
         errorCode: "processing_error",
       });
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  }
+
+  function handleCancel() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    sessionRef.current += 1;
+    setStage("idle");
+    setStatusLabel("Ready to convert");
+    setError("");
   }
 
   function handleDownload() {
@@ -289,19 +320,21 @@ export default function PdfToWordTool() {
               Download Word document
             </button>
           </>
+        ) : isBusy ? (
+          <button
+            type="button"
+            onClick={handleCancel}
+            className="inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/14 px-5 text-sm font-bold text-[var(--text-primary)] transition hover:border-[var(--text-danger)]/45 hover:text-[var(--text-danger)] sm:w-auto"
+          >
+            Cancel
+          </button>
         ) : (
           <button
             type="button"
-            disabled={isBusy}
             onClick={handleConvert}
             className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
           >
-            {isBusy ? (
-              <>
-                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-                {statusLabel}
-              </>
-            ) : error ? (
+            {error ? (
               "Retry conversion"
             ) : (
               "Convert to Word"
