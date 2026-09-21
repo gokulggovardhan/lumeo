@@ -14,6 +14,7 @@ import {
   normalizeConversionError,
 } from "@/lib/conversion/errors";
 import { validateWordConversionFile } from "@/lib/conversion/fileValidation";
+import { validateGeneratedPdf } from "@/lib/conversion/outputValidation";
 import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import type {
@@ -148,6 +149,18 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
         throw normalizeConversionError(error, "conversion");
       }
 
+      options.onProgress?.({
+        phase: "validating",
+        message: "Validating PDF",
+      });
+
+      try {
+        await validateGeneratedPdf(blob);
+      } catch (error) {
+        throw normalizeConversionError(error, "output");
+      }
+
+      throwIfAborted(signal);
       options.onProgress?.({
         phase: "finalizing",
         message: "Finalizing file",
