@@ -205,7 +205,31 @@ test.describe("Control Center authentication", () => {
     ).toHaveCount(0);
 
     const { navigation: healthNavigation } = await openAdminNavigation(page);
-    await healthNavigation.getByRole("link", { name: "Settings" }).click();
+    await healthNavigation.getByRole("link", { name: "Audit Log" }).click();
+    await expect(page).toHaveURL(/\/admin\/audit/);
+    const auditMain = page.locator("#main-content");
+    await expect(auditMain.getByRole("heading", { name: "Audit Log" })).toBeVisible();
+    await expect(auditMain.getByLabel("Entity type")).toContainText("error_log");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      ),
+    ).toBe(false);
+
+    const { navigation: auditNavigation } = await openAdminNavigation(page);
+    await auditNavigation.getByRole("link", { name: "Administrators" }).click();
+    await expect(page).toHaveURL(/\/admin\/members/);
+    const membersMain = page.locator("#main-content");
+    await expect(
+      membersMain.getByRole("heading", { name: "Administrators", exact: true }),
+    ).toBeVisible();
+    const memberFilters = membersMain.locator('form[method="get"]');
+    await expect(memberFilters.getByLabel("Search")).toBeVisible();
+    await expect(memberFilters.getByLabel("Role")).toBeVisible();
+    await expect(memberFilters.getByLabel("Access")).toBeVisible();
+
+    const { navigation: membersNavigation } = await openAdminNavigation(page);
+    await membersNavigation.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveURL(/\/admin\/settings/);
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 

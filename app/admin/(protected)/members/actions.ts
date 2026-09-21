@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/lib/admin/audit";
 import { canManageMembers } from "@/lib/admin/permissions";
 import { createClient } from "@/lib/supabase/server";
 import { captureServerError } from "@/lib/errors/server";
+import { getAdminMembers } from "@/lib/admin/data";
 import { errorState, formBoolean, formString, successState } from "@/lib/admin/validation";
 
 const allowedRoles = new Set(["owner", "admin", "analyst"]);
@@ -14,10 +15,18 @@ export async function addAdminMember(formData: FormData) {
   const admin = await requireAdmin();
   if (!canManageMembers(admin.role)) return errorState("Only owners can manage administrators.");
 
-  const email = formString(formData, "email", 254);
+  const email = formString(formData, "email", 254).toLocaleLowerCase();
   const role = formString(formData, "role", 20);
   if (!email || !email.includes("@")) return errorState("Enter a valid email address.");
   if (!allowedRoles.has(role)) return errorState("Choose a valid role.");
+
+  const members = await getAdminMembers();
+  if (members.error) {
+    return errorState("Administrator membership could not be verified. Try again later.");
+  }
+  if (members.data.some((member) => member.email?.toLocaleLowerCase() === email)) {
+    return errorState("That account is already an administrator. Update its existing membership below.");
+  }
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("add_admin_member", { p_email: email, p_role: role });
