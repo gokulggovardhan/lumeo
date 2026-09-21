@@ -12,7 +12,7 @@ Lumeo should feel like a premium document workspace: calm, capable, precise, and
 - Tactile without being playful for its own sake
 - Spacious without hiding the actual tool
 - Trustworthy without becoming governmental or clinical
-- Stylish without copying Apple, Linear, Stripe, Notion, Vercel, iLovePDF, Smallpdf, Adobe, or PDF24
+- Stylish without copying Apple, Linear, Stripe, Notion, legacy hosting platform, iLovePDF, Smallpdf, Adobe, or PDF24
 
 ## 3. Colour System
 

@@ -10,7 +10,7 @@ Phase 2 (architectural analysis) below is grounded in files actually read
 this session — cited by path/line. Phase 3 (design research) is
 necessarily different in kind: no live browsing of iOS 26, VisionOS,
 macOS Tahoe, OxygenOS, Nothing OS, Arc, Linear, Raycast, Stripe, Notion,
-Figma, or Vercel's current products was done or is possible from this
+Figma, or legacy hosting platform's current products was done or is possible from this
 environment. That section draws on general, pre-trained knowledge of
 these products' publicly documented design principles as of this
 model's training — it is a synthesis, not a fresh audit, and is labeled
@@ -134,7 +134,7 @@ Common threads across the referenced products, as documented publicly:
   by keyboard, extremely fast perceived transitions (100-150ms range),
   and command-palette-style navigation as a first-class pattern, not an
   afterthought.
-- **Stripe Dashboard / Vercel / Notion / Figma**: dense information
+- **Stripe Dashboard / legacy hosting platform / Notion / Figma**: dense information
   surfaces that still read as calm, achieved through a strict typographic
   scale, consistent 4/8px spacing rhythm, and muted default states with
   color reserved for meaning (status, selection, danger) rather than
