@@ -2,17 +2,18 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const TOOL_FILES = [
-  "components/pdf/WordToPdfTool.tsx",
-  "components/pdf/PdfToWordTool.tsx",
+const TOOL_ENGINES = [
+  ["components/pdf/WordToPdfTool.tsx", "BrowserWordToPdfEngine"],
+  ["components/pdf/PdfToWordTool.tsx", "BrowserPdfToWordEngine"],
 ] as const;
 
-test("Word/PDF converter UIs depend on ConversionCoordinator, not transport details", async () => {
-  for (const path of TOOL_FILES) {
+test("Word/PDF converter UIs use browser engines and contain no retired transport", async () => {
+  for (const [path, engine] of TOOL_ENGINES) {
     const source = await readFile(path, "utf8");
 
     assert.match(source, /ConversionCoordinator/);
     assert.match(source, /conversionCoordinator\.convert\(/);
+    assert.ok(source.includes(engine));
 
     assert.doesNotMatch(source, /uploadWordFileForConversion/);
     assert.doesNotMatch(source, /uploadPdfFileForConversion/);
