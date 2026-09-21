@@ -187,11 +187,49 @@ try {
   assert(analyticsPage.includes("Success Rate"), "Analytics page must show processing success rate.");
 
   const overviewPage = read("app/admin/(protected)/page.tsx");
-  assert(overviewPage.includes("Public Page Views"), "Overview must surface public page views.");
-  assert(overviewPage.includes("Tool Opens Today"), "Overview must surface tool opens.");
-  assert(overviewPage.includes("Maintenance Tools"), "Overview must surface real maintenance state.");
-  assert(!overviewPage.includes("Feature Flags"), "Overview must not expose unwired feature flags.");
-  assert(!overviewPage.includes("Processing Success Rate"), "Overview must not duplicate the processing success-rate metric from Analytics.");
+  const navigationSource = read("lib/admin/navigation.ts");
+  const adminShell = read("components/admin/ControlCenterShell.tsx");
+  const protectedLayout = read("app/admin/(protected)/layout.tsx");
+
+  for (const reader of [
+    "getPdfTools",
+    "getAnalyticsSummary",
+    "getUnreadInboxCount",
+    "getFeedbackQueries",
+    "getErrorLogSummary",
+    "getErrorLogs",
+    "getAuditLogs",
+    "getSiteSettings",
+  ]) {
+    assert(overviewPage.includes(reader), `Admin V2 Dashboard must use real reader: ${reader}`);
+  }
+  for (const section of [
+    "Platform status",
+    "Requires attention",
+    "Important metrics",
+    "Processing health",
+    "Tool activity",
+    "Inbox summary",
+    "Recent errors",
+    "Recent Admin activity",
+    "Quick actions",
+  ]) {
+    assert(overviewPage.includes(section), `Admin V2 Dashboard section missing: ${section}`);
+  }
+  assert(overviewPage.includes('label="Page Views"'), "Dashboard must surface real public page views.");
+  assert(overviewPage.includes('label="Tool Opens"'), "Dashboard must surface real tool opens.");
+  assert(overviewPage.includes("maintenanceTools"), "Dashboard must surface real maintenance state.");
+  assert(!overviewPage.includes("Feature Flags"), "Dashboard must not expose unwired feature flags.");
+  assert(!overviewPage.includes("AI insight"), "Dashboard must not add fake AI recommendations.");
+
+  for (const group of ["main", "operations", "content", "governance", "owner"]) {
+    assert(navigationSource.includes(`group: "${group}"`), `Admin V2 navigation group missing: ${group}`);
+  }
+  assert(navigationSource.includes('label: "Dashboard"'), "Admin V2 must name /admin Dashboard.");
+  assert(navigationSource.includes('roles: ["owner"]'), "Owner navigation must remain role-gated.");
+  assert(adminShell.includes("AdminSessionBoundary"), "Admin V2 shell must preserve the session boundary.");
+  assert(protectedLayout.includes("requireAdmin()"), "Admin V2 protected layout must keep server authorization.");
+  assert(protectedLayout.includes("LUMEO_DEPLOYMENT_ENV") && protectedLayout.includes("LUMEO_BUILD_SHA"), "Admin V2 shell must expose Cloudflare-native runtime metadata.");
 
   const settingsPage = read("app/admin/(protected)/settings/page.tsx");
   const settingsValidation = read("lib/admin/validation.ts");
