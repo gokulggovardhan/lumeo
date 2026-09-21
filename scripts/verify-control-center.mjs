@@ -187,7 +187,7 @@ try {
   assert(analyticsPage.includes("Success Rate"), "Analytics page must show processing success rate.");
 
   const overviewPage = read("app/admin/(protected)/page.tsx");
-  const navigation = read("lib/admin/navigation.ts");
+  const navigationSource = read("lib/admin/navigation.ts");
   const adminShell = read("components/admin/ControlCenterShell.tsx");
   const protectedLayout = read("app/admin/(protected)/layout.tsx");
 
@@ -223,10 +223,10 @@ try {
   assert(!overviewPage.includes("AI insight"), "Dashboard must not add fake AI recommendations.");
 
   for (const group of ["main", "operations", "content", "governance", "owner"]) {
-    assert(navigation.includes(`group: "${group}"`), `Admin V2 navigation group missing: ${group}`);
+    assert(navigationSource.includes(`group: "${group}"`), `Admin V2 navigation group missing: ${group}`);
   }
-  assert(navigation.includes('label: "Dashboard"'), "Admin V2 must name /admin Dashboard.");
-  assert(navigation.includes('roles: ["owner"]'), "Owner navigation must remain role-gated.");
+  assert(navigationSource.includes('label: "Dashboard"'), "Admin V2 must name /admin Dashboard.");
+  assert(navigationSource.includes('roles: ["owner"]'), "Owner navigation must remain role-gated.");
   assert(adminShell.includes("AdminSessionBoundary"), "Admin V2 shell must preserve the session boundary.");
   assert(protectedLayout.includes("requireAdmin()"), "Admin V2 protected layout must keep server authorization.");
   assert(protectedLayout.includes("LUMEO_DEPLOYMENT_ENV") && protectedLayout.includes("LUMEO_BUILD_SHA"), "Admin V2 shell must expose Cloudflare-native runtime metadata.");
