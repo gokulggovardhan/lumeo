@@ -4,12 +4,12 @@
 - cluster-only mode — file stats not available
 
 ## Summary
-- 3586 nodes · 7459 edges · 262 communities (227 shown, 35 thin omitted)
+- 3587 nodes · 7459 edges · 261 communities (226 shown, 35 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 98 edges (avg confidence: 0.68)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d0f9cd08`
+- Built from commit: `a9f541ed`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -120,7 +120,7 @@
 - Design: Page Organizer, HTML to PDF, Text Extractor
 - Edit PDF tool — design
 - prepare-office-runtime-release.mjs
-- edit-fallback-font-apply.test.ts
+- export.ts
 - Lumeo Aura Rollout
 - Product Excellence & Commercial Readiness Audit (Phases 23-30)
 - PDF Organizer, HTML to PDF, Text Extractor Implementation Plan
@@ -197,7 +197,7 @@
 - eslint-config-next
 - README.md
 - next.config.ts
-- supabase
+- @types/node
 - tailwindcss
 - @tailwindcss/postcss
 - @testing-library/react
@@ -212,22 +212,20 @@
 - 20260719015_fix_feedback_queries_realtime.sql
 - 20260719016_feedback_queries_location.sql
 - pdfjs-page-timeout.test.ts
-- edit-multi-run-plan.test.ts
-- export.ts
+- contentStream.ts
+- page.tsx
 - page.tsx
 - page.tsx
 - page.tsx
 - page.tsx
 - page.tsx
 - edit-rotated-text.test.ts
-- edit-shared-forms.test.ts
 - edit-shared-form-cross-page-hardening.test.ts
 - conversion-engine-boundary.test.ts
 - html2canvas
 - lucide-react
 - react-server-dom-webpack
 - LIBREOFFICE_PROTOTYPE_MAX_FILE_BYTES
-- page.tsx
 
 ## God Nodes (most connected - your core abstractions)
 1. `createClient()` - 56 edges
@@ -256,7 +254,7 @@
 ## Import Cycles
 - None detected.
 
-## Communities (262 total, 35 thin omitted)
+## Communities (261 total, 35 thin omitted)
 
 ### Community 0 - "getToolBlockedState"
 Cohesion: 0.06
@@ -271,8 +269,8 @@ Cohesion: 0.06
 Nodes (42): CompressAnalysis, CompressPdfTool(), CompressResult, CompressStage, DocumentRisk, ExpertMode, Opportunity, PageInfo (+34 more)
 
 ### Community 3 - "page.tsx"
-Cohesion: 0.11
-Nodes (34): AnnouncementsPage(), formatDate(), MembersPage(), SeoPage(), isEnabled(), liveSettingKeys, settingMessageValue(), SettingsPage() (+26 more)
+Cohesion: 0.13
+Nodes (29): AnnouncementsPage(), formatDate(), MembersPage(), SeoPage(), isEnabled(), liveSettingKeys, settingMessageValue(), SettingsPage() (+21 more)
 
 ### Community 4 - "createClient"
 Cohesion: 0.13
@@ -283,8 +281,8 @@ Cohesion: 0.05
 Nodes (38): AuraBadge(), AuraCard(), AuraCheckbox(), AuraFormField(), AuraIconButton(), AuraInput(), AuraLabeledControl(), AuraNotice() (+30 more)
 
 ### Community 6 - "editPlan.ts"
-Cohesion: 0.09
-Nodes (38): registerFallbackFont(), TextShowOperator, buildEditPlan(), bytesToCodes(), decodeCodes(), FallbackFontUse, rejectionReasonFor(), SUPPORTED_OPERATOR_KINDS (+30 more)
+Cohesion: 0.10
+Nodes (34): registerFallbackFont(), buildEditPlan(), bytesToCodes(), decodeCodes(), FallbackFontUse, rejectionReasonFor(), SUPPORTED_OPERATOR_KINDS, asNumber() (+26 more)
 
 ### Community 7 - "ToolWorkspace.tsx"
 Cohesion: 0.09
@@ -387,8 +385,8 @@ Cohesion: 0.43
 Nodes (5): buildPlanForOperatorIndex(), buildQuoteFixture(), decodedContentStreamBytes(), firstFontDict(), hexOf()
 
 ### Community 32 - "formXObjects.ts"
-Cohesion: 0.13
-Nodes (29): asNumber(), defaultTextState(), IDENTITY_MATRIX, isDelimiter(), isWhitespace(), Matrix2x3, multiplyMatrix(), TextShowOperatorKind (+21 more)
+Cohesion: 0.16
+Nodes (21): AmbiguousSharedFormError, asNumber(), countDocumentFormXObjectInvocations(), CyclicFormReferenceError, findFormInvocations(), FormInvocation, getPageContentStreamRefs(), getResourcesDict() (+13 more)
 
 ### Community 33 - "scripts"
 Cohesion: 0.07
@@ -515,8 +513,8 @@ Cohesion: 0.27
 Nodes (10): getFormString(), signInAdmin(), GET(), noStoreHeaders, AdminSupabaseClient, getAdminContext(), getAdminContextWithClient(), getClaimString() (+2 more)
 
 ### Community 64 - "permissions.ts"
-Cohesion: 0.15
-Nodes (19): AuditPage(), buildQuery(), entityTypes, validDateIso(), deleteFeedbackQuery(), InboxPage(), absoluteTime(), InboxClient() (+11 more)
+Cohesion: 0.11
+Nodes (27): AnalyticsActivityPage(), AuditPage(), buildQuery(), entityTypes, validDateIso(), deleteFeedbackQuery(), InboxPage(), AdminEmptyState() (+19 more)
 
 ### Community 65 - "tiles.ts"
 Cohesion: 0.10
@@ -682,9 +680,9 @@ Nodes (11): Architecture, Context, Data model & undo/redo, Edit PDF tool — des
 Cohesion: 0.15
 Nodes (7): FILES, manifest, manifestPath, outputDir, outputRoot, release, source
 
-### Community 106 - "edit-fallback-font-apply.test.ts"
-Cohesion: 0.18
-Nodes (8): decodedContentStreamBytes(), decodedPageContent(), makeType0SubsetPdf(), planFor(), PreparedEdit, toUnicodeCMapFor(), decodedContentStreamBytes(), decodedContentStreamBytes()
+### Community 106 - "export.ts"
+Cohesion: 0.46
+Nodes (7): exportEditedPdf(), hexToRgb01(), normalizePageRotation(), PageRotation, toNativeBox(), toNativePoint(), visualPageSize()
 
 ### Community 107 - "Lumeo Aura Rollout"
 Cohesion: 0.18
@@ -703,8 +701,8 @@ Cohesion: 0.18
 Nodes (10): Edit PDF Tool Implementation Plan, Global Constraints, Self-review notes, Task 1: Element data model & pure array operations, Task 2: PDF export/flatten logic, Task 3: Ink capture component, Task 4: Placed-element view (select/move/resize/line-endpoints), Task 5: Main Edit PDF tool component (+2 more)
 
 ### Community 111 - "page.tsx"
-Cohesion: 0.11
-Nodes (24): AnalyticsActivityPage(), AnalyticsPage(), formatDate(), formatDuration(), AnalyticsBarList(), BarItem, AnalyticsDistribution(), AnalyticsPrivacyNotice() (+16 more)
+Cohesion: 0.12
+Nodes (21): AnalyticsPage(), formatDate(), formatDuration(), AnalyticsBarList(), BarItem, AnalyticsDistribution(), AnalyticsPrivacyNotice(), AnalyticsTrendChart() (+13 more)
 
 ### Community 112 - "tool-filters.ts"
 Cohesion: 0.27
@@ -930,13 +928,13 @@ Nodes (14): breadcrumbSchema, generateMetadata(), JpgToPdfPage(), JpgToPdfTool, 
 Cohesion: 0.43
 Nodes (4): EmbeddedJpegXObject, findEmbeddedJpegs(), isDctDecodeFilter(), isPlainDctDecodeJpeg()
 
-### Community 239 - "edit-multi-run-plan.test.ts"
-Cohesion: 0.43
-Nodes (5): buildMultiOperatorFixture(), buildMultiRunPlanForIndices(), decodedContentStreamBytes(), firstFontDict(), hexOf()
+### Community 239 - "contentStream.ts"
+Cohesion: 0.09
+Nodes (28): asNumber(), defaultTextState(), IDENTITY_MATRIX, isDelimiter(), isWhitespace(), Matrix2x3, multiplyMatrix(), TextShowOperator (+20 more)
 
-### Community 240 - "export.ts"
-Cohesion: 0.46
-Nodes (7): exportEditedPdf(), hexToRgb01(), normalizePageRotation(), PageRotation, toNativeBox(), toNativePoint(), visualPageSize()
+### Community 240 - "page.tsx"
+Cohesion: 0.33
+Nodes (5): breadcrumbSchema, ExtractTextPage(), ExtractTextTool, generateMetadata(), softwareSchema
 
 ### Community 241 - "page.tsx"
 Cohesion: 0.33
@@ -962,17 +960,9 @@ Nodes (5): breadcrumbSchema, generateMetadata(), SignPdfPage(), SignPdfTool, sof
 Cohesion: 0.47
 Nodes (3): buildDoc(), buildRotatedTextPage(), fmt()
 
-### Community 247 - "edit-shared-forms.test.ts"
-Cohesion: 0.50
-Nodes (3): AmbiguousSharedFormError, buildFormXObject(), hexOf()
-
 ### Community 248 - "edit-shared-form-cross-page-hardening.test.ts"
 Cohesion: 0.60
 Nodes (3): buildFormXObject(), buildTwoPageDocWithSharedHeader(), hexOf()
-
-### Community 261 - "page.tsx"
-Cohesion: 0.33
-Nodes (5): breadcrumbSchema, CropPdfPage(), CropPdfTool, generateMetadata(), softwareSchema
 
 ## Knowledge Gaps
 - **1310 isolated node(s):** `aboutSchema`, `accessibilitySchema`, `tones`, `entityTypes`, `statuses` (+1305 more)
@@ -983,11 +973,11 @@ Nodes (5): breadcrumbSchema, CropPdfPage(), CropPdfTool, generateMetadata(), sof
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `dependencies` connect `dependencies` to `package.json`, `sign-history.test.ts`, `html2canvas`, `lucide-react`, `react-server-dom-webpack`, `jszip`?**
-  _High betweenness centrality (0.049) - this node is a cross-community bridge._
-- **Why does `createClient()` connect `createClient` to `permissions.ts`, `data.ts`, `page.tsx`, `page.tsx`, `route.ts`, `withSeoOverride`, `page.tsx`, `page.tsx`, `ControlCenterMobileNav.tsx`, `proxy.ts`, `page.tsx`, `auth.ts`?**
   _High betweenness centrality (0.048) - this node is a cross-community bridge._
-- **Why does `pageNumber()` connect `permissions.ts` to `page.tsx`, `page.tsx`, `PdfToJpgTool.tsx`, `page.tsx`, `SplitPdfTool.tsx`, `MergePdfTool.tsx`?**
-  _High betweenness centrality (0.044) - this node is a cross-community bridge._
+- **Why does `createClient()` connect `createClient` to `permissions.ts`, `data.ts`, `page.tsx`, `page.tsx`, `route.ts`, `withSeoOverride`, `page.tsx`, `ControlCenterMobileNav.tsx`, `proxy.ts`, `page.tsx`, `auth.ts`?**
+  _High betweenness centrality (0.047) - this node is a cross-community bridge._
+- **Why does `pageNumber()` connect `permissions.ts` to `PdfToJpgTool.tsx`, `page.tsx`, `SplitPdfTool.tsx`, `MergePdfTool.tsx`?**
+  _High betweenness centrality (0.040) - this node is a cross-community bridge._
 - **What connects `aboutSchema`, `accessibilitySchema`, `tones` to the rest of the system?**
   _1310 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `getToolBlockedState` be split into smaller, more focused modules?**
