@@ -8,6 +8,8 @@ on:
       - ".github/workflows/office-runtime-production.yml"
       - "config/office-runtime-release.json"
       - "app/office-runtime/**"
+      - "worker/index.ts"
+      - "worker/office-runtime.ts"
       - "lib/conversion/browser/libreoffice/assetConfig.ts"
       - "scripts/prepare-office-runtime-release.mjs"
   workflow_dispatch:
@@ -223,8 +225,16 @@ jobs:
               [ "$status" = "206" ] || { echo "FAIL: $file range returned HTTP $status"; exit 1; }
             fi
 
-            printf '%s' "$headers" | grep -Eqi '^cache-control: .*max-age=31536000.*immutable' ||
-              { echo "FAIL: $file immutable cache header missing"; exit 1; }
+            printf '%s' "$headers" | grep -Eqi '^cache-control: .*max-age=31536000.*immutable.*no-transform' ||
+              { echo "FAIL: $file immutable/no-transform cache header missing"; exit 1; }
+            if printf '%s' "$headers" | grep -Eqi '^content-encoding: (gzip|br|zstd)'; then
+              echo "FAIL: $file was unexpectedly compressed at the application edge"
+              exit 1
+            fi
+            if printf '%s' "$headers" | grep -Eqi '^vary: .*x-vinext'; then
+              echo "FAIL: $file still passed through vinext"
+              exit 1
+            fi
             printf '%s' "$headers" | grep -Eqi '^cross-origin-resource-policy: same-origin' ||
               { echo "FAIL: $file CORP header missing"; exit 1; }
             printf '%s' "$headers" | grep -Eqi '^cf-ray:' ||
@@ -238,6 +248,63 @@ jobs:
             esac || { echo "FAIL: $file content type is incorrect"; exit 1; }
 
             echo "PASS: $file production delivery verified."
+          done
+
+      - name: Verify full production runtime integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://lumeo.in/office-runtime/${{ steps.release.outputs.release_id }}"
+          manifest_file="/tmp/lumeo-production-runtime-manifest.json"
+
+          curl --fail --silent --show-error --max-time 60 \
+            "$base/lumeo-office-runtime.json" \
+            --output "$manifest_file"
+
+          for file in soffice.wasm soffice.data; do
+            output="/tmp/$file"
+            headers="/tmp/$file.headers"
+            expected_size="$(node -p "require('$manifest_file').files['$file'].bytes")"
+            expected_sha="$(node -p "require('$manifest_file').files['$file'].sha256")"
+
+            curl --fail --silent --show-error --location --max-time 600 \
+              -H 'Accept-Encoding: identity' \
+              --dump-header "$headers" \
+              --output "$output" \
+              "$base/$file"
+
+            status="$(awk '/^HTTP\// {code=$2} END {print code}' "$headers")"
+            [ "$status" = "200" ] || {
+              echo "FAIL: full $file request returned HTTP $status"
+              exit 1
+            }
+
+            if grep -Eqi '^content-encoding: (gzip|br|zstd)' "$headers"; then
+              echo "FAIL: full $file response was transformed/compressed"
+              exit 1
+            fi
+            grep -Eqi '^cache-control: .*max-age=31536000.*immutable.*no-transform' "$headers" || {
+              echo "FAIL: full $file response is missing immutable/no-transform caching"
+              exit 1
+            }
+            if grep -Eqi '^vary: .*x-vinext' "$headers"; then
+              echo "FAIL: full $file response still passed through vinext"
+              exit 1
+            fi
+
+            actual_size="$(wc -c < "$output" | tr -d '[:space:]')"
+            actual_sha="$(sha256sum "$output" | awk '{print $1}')"
+
+            [ "$actual_size" = "$expected_size" ] || {
+              echo "FAIL: $file size mismatch: $actual_size != $expected_size"
+              exit 1
+            }
+            [ "$actual_sha" = "$expected_sha" ] || {
+              echo "FAIL: $file SHA-256 mismatch"
+              exit 1
+            }
+
+            echo "PASS: full $file size and SHA-256 match the immutable manifest."
           done
 
       - name: Report runtime route
