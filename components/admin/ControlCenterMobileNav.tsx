@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { BrandLockup } from "@/components/BrandMark";
@@ -25,10 +26,6 @@ export function ControlCenterMobileNav({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const wrapperRef = useRef<HTMLElement>(null);
   const groups = groupedAdminNavigation(role);
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
 
   useEffect(() => {
     if (!open) return;
@@ -98,9 +95,9 @@ export function ControlCenterMobileNav({
               <p className="truncate text-sm font-semibold text-[var(--text-primary)]">{email || "Administrator"}</p>
               <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-accent)]">{role}</p>
             </div>
-            <a href="/" className="text-xs font-semibold text-[var(--text-secondary)]">
+            <Link href="/" className="text-xs font-semibold text-[var(--text-secondary)]">
               Site ↗
-            </a>
+            </Link>
           </div>
 
           <nav className="space-y-5" aria-label="Mobile Admin navigation">
@@ -117,6 +114,7 @@ export function ControlCenterMobileNav({
                         key={item.href}
                         href={item.href}
                         aria-current={active ? "page" : undefined}
+                        onClick={() => setOpen(false)}
                         className={`flex min-h-11 items-center gap-3 rounded-xl px-3 text-sm font-semibold transition ${
                           active
                             ? "bg-[rgba(var(--lumeo-seal-rgb),0.14)] text-[var(--text-primary)]"
