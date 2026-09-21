@@ -41,6 +41,32 @@ function jpegDimensions(bytes: Buffer): { width: number; height: number } {
   throw new Error("JPEG dimensions not found");
 }
 
+async function jpegOrientationMarkers(
+  page: import("@playwright/test").Page,
+  bytes: Buffer,
+) {
+  const dataUrl = `data:image/jpeg;base64,${bytes.toString("base64")}`;
+  return page.evaluate(async (url) => {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+
+    const width = 604;
+    const height = 806;
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas unavailable");
+    context.drawImage(image, 0, 0, width, height);
+
+    return {
+      topLeft: Array.from(context.getImageData(45, 55, 1, 1).data.slice(0, 3)),
+      bottomRight: Array.from(context.getImageData(552, 748, 1, 1).data.slice(0, 3)),
+    };
+  }, dataUrl);
+}
+
 function collectProductionAssetFailures(page: import("@playwright/test").Page) {
   const failures: string[] = [];
   page.on("requestfailed", (request) => {
@@ -127,6 +153,63 @@ test("production HEIC/HEIF worker preserves full-resolution output and download"
   expect(pageErrors).toEqual([]);
 });
 
+
+test("production HEIC mobile flow converts a valid file, preserves visual orientation, and downloads", async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !testInfo.project.name.includes("chromium"),
+    "mobile valid-HEIC production certification runs once in Chromium",
+  );
+
+  const fixturePath = process.env.HEIC_RESOLUTION_FIXTURE;
+  test.skip(!fixturePath, "HEIC production fixture was not generated.");
+
+  const assetFailures = collectProductionAssetFailures(page);
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
+  const source = await readFile(fixturePath!);
+  await page.setViewportSize({ width: 375, height: 812 });
+  await page.goto("/heic-to-jpeg", { waitUntil: "domcontentloaded" });
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "MOBILE-PROD.HEIC",
+    mimeType: "image/heic",
+    buffer: source,
+  });
+
+  await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
+  await page.getByLabel("Quality").selectOption("92");
+  await page.getByRole("button", { name: "Convert to JPEG" }).click();
+
+  const asset = page.locator('[data-photo-asset][data-status="done"]').first();
+  await expect(asset).toHaveAttribute("data-primary-dimensions", "6048x8064");
+  await expect(asset).toHaveAttribute("data-decoded-dimensions", "6048x8064");
+  await expect(asset).toHaveAttribute("data-output-dimensions", "6048x8064");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download JPEG", exact: true }).first().click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("MOBILE-PROD.jpg");
+  const outputPath = await download.path();
+  expect(outputPath).not.toBeNull();
+
+  const output = await readFile(outputPath!);
+  expect([...output.subarray(0, 3)]).toEqual([255, 216, 255]);
+  expect(jpegDimensions(output)).toEqual({ width: 6048, height: 8064 });
+
+  const markers = await jpegOrientationMarkers(page, output);
+  const [tr, tg, tb] = markers.topLeft;
+  const [br, bg, bb] = markers.bottomRight;
+  expect(tr).toBeGreaterThan(tg + 40);
+  expect(tr).toBeGreaterThan(tb + 40);
+  expect(bg).toBeGreaterThan(br + 25);
+  expect(bg).toBeGreaterThan(bb + 25);
+
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  expect(assetFailures).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
 
 test("production HEIC batch isolates corrupt input, recovers, and ZIP preserves full resolution", async ({
   page,
