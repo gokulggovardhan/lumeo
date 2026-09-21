@@ -44,7 +44,7 @@ test("discovery search exposes signature, image, and text vocabulary", () => {
 test("directory uses direct links, combined filters, live counts, and truthful availability", () => {
   const source = readFileSync("components/tools/ToolsExplorer.tsx", "utf8");
   for (const label of ["All tools", "Organize", "Edit & sign", "Optimize", "Convert"]) {
-    assert.match(source, new RegExp(label.replace("&", "&")));
+    assert.match(source, new RegExp(label));
   }
   assert.match(source, /aria-pressed=\{category === filter\.id\}/);
   assert.match(source, /aria-live="polite"/);
