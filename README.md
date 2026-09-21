@@ -24,10 +24,11 @@ Live production tools (browser-only processing, `pdf-lib` + `pdfjs-dist`):
 - Crop PDF — `/pdf/crop`
 - Sign PDF — `/pdf/sign`
 
-Live production tools (server-assisted, self-hosted, no third-party processors):
+Live production conversion tools (browser-only):
 
-- Word to PDF, PDF to Word — `/pdf/word-to-pdf`, `/pdf/pdf-to-word` (self-hosted LibreOffice conversion service, see `services/word-to-pdf-converter/`; temporary files only, deleted immediately after conversion)
-- HTML to PDF — `/pdf/html-to-pdf`
+- Word to PDF — `/pdf/word-to-pdf` (browser-side LibreOffice/ZetaOffice runtime)
+- PDF to Word — `/pdf/pdf-to-word` (browser-side PDF reconstruction)
+- HTML to PDF — `/pdf/html-to-pdf` (browser-side HTML rendering)
 
 Planned / not yet live (see `lib/tools/catalog.ts` for the authoritative, current list — every action's `live` flag there is the source of truth, not this README):
 
@@ -37,9 +38,8 @@ A tool is only "live" once its `live: true` flag is set in `lib/tools/catalog.ts
 
 ## Core principles
 
-- Browser-first by default; a tool only uses server processing when the task genuinely requires it (e.g. Office document conversion via LibreOffice), and that is always disclosed here.
-- Document contents stay on the user's device for all browser-processed tools — no upload, no server-side PDF manipulation.
-- For the two server-assisted conversion tools, uploaded files are stored only in a short-lived Supabase scratch bucket and deleted immediately after conversion — never retained, never analyzed.
+- Browser-first by default; the current Word ↔ PDF and HTML → PDF tools also process documents locally in the browser.
+- Document contents stay on the user's device for current document-conversion tools — no document upload or server-side Word/PDF conversion.
 - Calm, professional Midnight Notary visual design.
 - Dual-named tool catalog: a small set of deep "Lumeo" tools (Compose, Distill, Capture, Render, Inscribe, Seal, Secure, Convert, Recognize), each bundling multiple concrete actions — see `lib/tools/catalog.ts`.
 
@@ -47,7 +47,7 @@ A tool is only "live" once its `live: true` flag is set in `lib/tools/catalog.ts
 
 Most PDF processing happens entirely in the browser via `pdf-lib` (manipulation) and `pdfjs-dist` (preview/decode). No file upload, no server-side PDF manipulation, no Firebase, no Cloudinary, no Google Drive.
 
-The Office-conversion tools (Word to PDF, PDF to Word, HTML to PDF) are the deliberate exception: they call a self-hosted LibreOffice conversion service (`services/word-to-pdf-converter/`, deployed separately) through a Supabase storage bucket for the temporary file hop. This is disclosed here precisely because it's the one place document bytes leave the browser.
+Word to PDF uses Lumeo's browser-side LibreOffice/ZetaOffice runtime, PDF to Word uses browser-side reconstruction, and HTML to PDF uses browser-side HTML rendering. The immutable Office runtime assets are delivered separately from the application bundle; user document bytes are not sent with those runtime requests.
 
 Document contents must not be stored in `localStorage`. UI preferences (e.g. thumbnail density) may be stored locally when they contain no document data.
 
@@ -135,8 +135,8 @@ Before committing changes: run `git diff --check`, the commands above, and any r
 - `lib/tools/catalog.ts` — the single source of truth for which tools/actions are live, their routes, and their processing model.
 - `lib/admin/*` — admin auth, permissions, validation, and data-access helpers.
 - `lib/analytics/*` — client-side analytics state/dedup helpers.
-- `lib/supabase/*` — browser/server Supabase clients and the temp-storage helper for Office conversion.
-- `services/word-to-pdf-converter/` — the separately-deployed LibreOffice conversion microservice (Docker).
+- `lib/supabase/*` — shared Supabase clients and application data-access helpers.
+- `lib/conversion/browser/*` — browser-side Word ↔ PDF conversion engines and workspace/runtime helpers.
 - `supabase/migrations/` — SQL migrations, applied manually through the Supabase SQL editor (see `docs/SUPABASE_FOUNDATION.md`).
 - `scripts/*.mjs` — manual developer-verification scripts, invoked via the `verify:*` npm scripts.
 - `docs/specs/` — frozen, shipped feature specifications (e.g. `watermark-pdf-v1-freeze.md`) — historical record, not aspirational.
@@ -161,8 +161,8 @@ See `docs/ADMIN_AUTH.md` for the auth model. In short: Supabase email/password s
 
 ## Privacy model
 
-- Browser-processed tools: files never leave the device, nothing is uploaded, nothing is stored in `localStorage`.
-- The two Office-conversion tools (Word↔PDF, HTML to PDF): files pass through a short-lived Supabase scratch bucket and a self-hosted LibreOffice service, then are deleted immediately after conversion.
+- Current document tools, including Word ↔ PDF and HTML → PDF, process document content in the browser; conversion files are not uploaded to a Lumeo conversion backend.
+- Document contents are not stored in `localStorage`.
 - Temporary object URLs and active workspace state should be cleared by cleanup or reset flows.
 - Browser downloads remain under the user's control.
 
@@ -185,7 +185,7 @@ The current workflow is:
 
 ## Deployment
 
-The public domain is https://lumeo.in and the application is deployed on Cloudflare Workers through vinext. Cloudflare Workers Builds is the sole production deployment path. The Word/PDF-to-Word/HTML-to-PDF conversion service (`services/word-to-pdf-converter/`) is deployed separately (currently Render's free tier — see the file-size comments in `lib/supabase/pdfToWordStorage.ts` for the memory constraint that drives its upload cap). Deployment configuration must not expose secrets, credentials, private keys, or service tokens.
+The public domain is https://lumeo.in and the application is deployed on Cloudflare Workers through vinext. Cloudflare Workers Builds is the sole production application path. Word → PDF loads its immutable browser Office runtime through the protected `/office-runtime/...` delivery path; PDF → Word and HTML → PDF are also browser-side. Deployment configuration must not expose secrets, credentials, private keys, or service tokens.
 
 ## Contributing expectations
 
