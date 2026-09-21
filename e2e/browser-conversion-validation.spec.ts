@@ -9,7 +9,7 @@ import {
 import { readFile } from "node:fs/promises";
 
 const ONE_PIXEL_PNG = Buffer.from(
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z3xkAAAAASUVORK5CYII=",
+  "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYGJAQoAHxcCAk+Uzr4AAAAASUVORK5CYII=",
   "base64",
 );
 
@@ -484,6 +484,47 @@ test.describe("browser conversion validation lab", () => {
     );
   });
 
+  test("oversized Word input is rejected before conversion starts", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName !== "chromium", "Oversized upload enforcement is validated once in Chromium.");
+
+    await page.goto("/internal/conversion-ui-lab");
+    await page.evaluate(() => {
+      const chunk = new Uint8Array(1024 * 1024);
+      chunk[0] = 0x50;
+      chunk[1] = 0x4b;
+      chunk[2] = 0x03;
+      chunk[3] = 0x04;
+      const file = new File(
+        Array.from({ length: 251 }, () => chunk),
+        "oversized.docx",
+        {
+          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+      );
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      const input = document.getElementById("word-to-pdf-upload");
+      const dropTarget = input?.closest(".l2-upload-stage");
+      if (!dropTarget) throw new Error("Word drop target not found.");
+      dropTarget.dispatchEvent(
+        new DragEvent("drop", {
+          bubbles: true,
+          cancelable: true,
+          dataTransfer: transfer,
+        }),
+      );
+    });
+
+    const wordUi = page.getByTestId("word-public-ui");
+    await expect(wordUi.getByRole("alert")).toContainText(/250 MB/i);
+    await expect(
+      wordUi.getByRole("button", { name: "Select Word document" }),
+    ).toBeVisible();
+  });
+
   test("Word customer UI accepts drag-and-drop as well as the file picker", async ({
     page,
     browserName,
@@ -595,6 +636,48 @@ test.describe("browser conversion validation lab", () => {
         () => document.documentElement.scrollWidth - window.innerWidth,
       );
       expect(overflow).toBeLessThanOrEqual(1);
+    }
+  });
+
+  test("Word path is capability-aware outside Chromium", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName === "chromium", "Chromium Word conversion is covered by the full fidelity tests.");
+
+    await expect(page.getByTestId("capabilities")).not.toContainText(
+      "Checking browser capabilities",
+      { timeout: 30_000 },
+    );
+    const capabilities = (await page.getByTestId("capabilities").textContent()) ?? "";
+
+    const docx = await makeDocx();
+    await page.getByTestId("word-input").setInputFiles({
+      name: `capability-${browserName}.docx`,
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: docx,
+    });
+    await page.getByTestId("word-convert").click();
+
+    if (capabilities.includes("Threads ready: yes")) {
+      await expect(page.getByTestId("word-lab")).toHaveAttribute(
+        "data-state",
+        "success",
+        { timeout: 420_000 },
+      );
+      const downloadPromise = page.waitForEvent("download");
+      await page.getByTestId("word-download").click();
+      await validatePdfDownload(await downloadBytes(await downloadPromise));
+    } else {
+      await expect(page.getByTestId("word-lab")).toHaveAttribute(
+        "data-state",
+        "error",
+        { timeout: 30_000 },
+      );
+      await expect(page.getByTestId("word-status")).toContainText(
+        /browser cannot run the local conversion engine/i,
+      );
     }
   });
 
