@@ -313,7 +313,7 @@ jobs:
           {
             echo "### Production Office runtime"
             echo
-            printf '%s\\n' 'Release: `${{ steps.release.outputs.release_tag }}`'
+            printf '%s\n' 'Release: `${{ steps.release.outputs.release_tag }}`'
             echo
-            printf '%s\\n' 'Verified Lumeo route: `https://lumeo.in/office-runtime/${{ steps.release.outputs.release_id }}/`'
+            printf '%s\n' 'Verified Lumeo route: `https://lumeo.in/office-runtime/${{ steps.release.outputs.release_id }}/`'
           } >> "$GITHUB_STEP_SUMMARY"
