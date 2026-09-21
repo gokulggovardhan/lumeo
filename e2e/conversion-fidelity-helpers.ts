@@ -243,7 +243,11 @@ export async function assertPdfLineAnchorFidelity(
   referencePdf: string,
   candidatePdf: string,
   outputDirectory: string,
-  anchors: Array<{ page: number; contains: string }>,
+  anchors: Array<{
+    page: number;
+    contains: string;
+    horizontal?: "left" | "center" | "right";
+  }>,
   tolerance = 0.025,
 ): Promise<void> {
   const [reference, candidate] = await Promise.all([
@@ -290,8 +294,19 @@ export async function assertPdfLineAnchorFidelity(
       );
     }
 
+    const horizontal = anchor.horizontal ?? "left";
+    const horizontalPosition = (box: PdfLineBox): number => {
+      if (horizontal === "center") {
+        return ((box.xMin + box.xMax) / 2) / box.pageWidth;
+      }
+      if (horizontal === "right") {
+        return box.xMax / box.pageWidth;
+      }
+      return box.xMin / box.pageWidth;
+    };
+
     const xDelta = Math.abs(
-      expected.xMin / expected.pageWidth - actual.xMin / actual.pageWidth,
+      horizontalPosition(expected) - horizontalPosition(actual),
     );
     const yDelta = Math.abs(
       expected.yMin / expected.pageHeight - actual.yMin / actual.pageHeight,
