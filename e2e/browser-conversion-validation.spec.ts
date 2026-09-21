@@ -252,18 +252,18 @@ async function makeFixedLayoutInvoicePdf(): Promise<Buffer> {
       color: rgb(0, 0, 0),
     });
 
-  text(page1, "Invoice No: LUMEO-30321", 36, 806, 11, true);
+  text(page1, "Invoice No: SYN-84721", 36, 806, 11, true);
   text(page1, "Service Labour Invoice", 225, 806, 11, true);
-  text(page1, "Invoice Date: 08/12/2025 13:31", 394, 806, 9);
+  text(page1, "Invoice Date: 15/01/2030 10:30", 394, 806, 9);
   rule(page1, 795);
 
   text(page1, "LUMEO MOTORS PRIVATE LIMITED", 36, 770, 10, true);
   text(page1, "SYNTHETIC AUTOMOBILES", 330, 770, 10, true);
-  text(page1, "GST IN No.: TEST27LUMEO", 36, 740, 9);
-  text(page1, "JC No.: 41537", 36, 720, 9);
+  text(page1, "GST IN No.: SYNTH27DEMO", 36, 740, 9);
+  text(page1, "JC No.: 87542", 36, 720, 9);
   text(page1, "JobType: PAID SERVICE", 210, 720, 9);
-  text(page1, "RegnNo.: TEST-1604", 36, 700, 9);
-  text(page1, "Model: APACHE-LIKE FIXTURE", 210, 700, 9);
+  text(page1, "RegnNo.: DEMO-4821", 36, 700, 9);
+  text(page1, "Model: SAMPLE ROADSTER", 210, 700, 9);
   rule(page1, 684);
 
   const columns = [
@@ -281,11 +281,11 @@ async function makeFixedLayoutInvoicePdf(): Promise<Buffer> {
   rule(page1, 654);
 
   const rows = [
-    ["NF330502", "Engine flush VST 50 ml", "1.00", "83.90", "12.58", "71.32", "34039900", "18.00", "99.00"],
-    ["NR110920", "KIT PAD ASSY REAR", "1.00", "435.59", "108.90", "326.69", "87149400", "18.00", "514.00"],
-    ["TR600200", "TRU4 SYNTHETIC ENGINE OIL 1200 ML", "1.00", "761.86", "152.37", "609.49", "27101980", "18.00", "899.00"],
-    ["WKC", "consumable", "1.00", "200.00", "60.00", "140.00", "9985", "18.00", "236.00"],
-    ["MC17", "DRIVE CHAIN CLEAN LUBRICATION", "1.00", "100.00", "30.00", "70.00", "9987", "18.00", "118.00"],
+    ["ITEM-A101", "Cleaning fluid 50 ml", "1.00", "83.90", "12.58", "71.32", "34030000", "18.00", "99.00"],
+    ["ITEM-B202", "BRAKE LINING KIT", "1.00", "435.59", "108.90", "326.69", "87149000", "18.00", "514.00"],
+    ["ITEM-C303", "SYNTHETIC LUBRICANT 1200 ML", "1.00", "761.86", "152.37", "609.49", "27100000", "18.00", "899.00"],
+    ["SHOP", "shop consumable", "1.00", "200.00", "60.00", "140.00", "9985", "18.00", "236.00"],
+    ["SERVICE-X", "DRIVE SYSTEM CLEANING", "1.00", "100.00", "30.00", "70.00", "9987", "18.00", "118.00"],
     ["PA", "PAID SERVICE", "1.00", "560.00", "559.94", "0.06", "9954", "18.00", "660.80"],
   ] as const;
   const xs = [38, 112, 250, 292, 335, 375, 428, 485, 530];
@@ -307,13 +307,13 @@ async function makeFixedLayoutInvoicePdf(): Promise<Buffer> {
   text(page1, "1301.56", 375, 266, 9);
   rule(page1, 250);
   text(page1, "Grand Total", 345, 218, 10, true);
-  text(page1, "1535.84", 445, 218, 10, true);
+  text(page1, "1842.75", 445, 218, 10, true);
   text(page1, "Round Off", 345, 198, 9);
   text(page1, "0.16", 445, 198, 9);
   rule(page1, 182);
 
   text(page2, "Net Total", 300, 795, 11, true);
-  text(page2, "1536.00", 455, 795, 11, true);
+  text(page2, "1843.00", 455, 795, 11, true);
   text(page2, "( Rupees One Thousand Five Hundred and Thirty Six Only )", 130, 770, 9);
   text(page2, "Synthetic AMC fixture preserves fixed-layout service columns.", 36, 738, 9);
   rule(page2, 700);
@@ -334,8 +334,8 @@ async function makeFixedLayoutInvoicePdf(): Promise<Buffer> {
   );
   rule(page2, 638);
 
-  text(page2, "20997", 36, 610, 9);
-  text(page2, "09-Dec-2025", 95, 610, 9);
+  text(page2, "AMC9007", 36, 610, 9);
+  text(page2, "15-Jan-2030", 95, 610, 9);
   ["3", "2", "2", "0", "0", "0", "0", "0", "2", "0"].forEach((value, index) =>
     text(page2, value, totalAvail[index] + 8, 610, 9),
   );
@@ -481,14 +481,14 @@ test.describe("browser conversion validation lab", () => {
     const downloadPromise = page.waitForEvent("download");
     await page.getByTestId("pdf-download").click();
     const bytes = await downloadBytes(await downloadPromise);
-    const docx = await validateDocxDownload(bytes, "NF330502");
+    const docx = await validateDocxDownload(bytes, "ITEM-A101");
     const documentXml = await docx.file("word/document.xml")!.async("string");
 
     for (const expected of [
-      "Engine flush VST 50 ml",
-      "NR110920",
-      "TR600200",
-      "TRU4 SYNTHETIC ENGINE OIL 1200 ML",
+      "Cleaning fluid 50 ml",
+      "ITEM-B202",
+      "ITEM-C303",
+      "SYNTHETIC LUBRICANT 1200 ML",
       "Parts Total",
       "Labour Total",
       "Grand Total",
@@ -506,13 +506,13 @@ test.describe("browser conversion validation lab", () => {
       "Service Water wash Co check chain Pick up &amp; drop",
     );
     expect(documentXml).not.toContain(
-      "NF330502 Engine flush VST 50 ml 1.00 83.90",
+      "ITEM-A101 Cleaning fluid 50 ml 1.00 83.90",
     );
 
-    expect(frameXForText(documentXml, "NF330502")).toBeLessThan(
-      frameXForText(documentXml, "Engine flush VST 50 ml"),
+    expect(frameXForText(documentXml, "ITEM-A101")).toBeLessThan(
+      frameXForText(documentXml, "Cleaning fluid 50 ml"),
     );
-    expect(frameXForText(documentXml, "Engine flush VST 50 ml")).toBeLessThan(
+    expect(frameXForText(documentXml, "Cleaning fluid 50 ml")).toBeLessThan(
       frameXForText(documentXml, "1.00"),
     );
     expect(frameXForText(documentXml, "Amc No.")).toBeLessThan(
@@ -553,12 +553,12 @@ test.describe("browser conversion validation lab", () => {
         reconstructedPdf,
         outputDirectory,
         [
-          { page: 1, text: "NF330502" },
-          { page: 1, text: "NR110920" },
-          { page: 1, text: "TR600200" },
-          { page: 1, text: "1535.84" },
-          { page: 2, text: "20997" },
-          { page: 2, text: "1536.00" },
+          { page: 1, text: "ITEM-A101" },
+          { page: 1, text: "ITEM-B202" },
+          { page: 1, text: "ITEM-C303" },
+          { page: 1, text: "1842.75" },
+          { page: 2, text: "AMC9007" },
+          { page: 2, text: "1843.00" },
           { page: 2, text: "Authorised" },
           { page: 2, text: "Signatory" },
         ],
