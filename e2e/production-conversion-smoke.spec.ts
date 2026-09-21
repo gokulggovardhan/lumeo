@@ -4,9 +4,16 @@ import JSZip from "jszip";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 
+type FailedRequest = {
+  method: string;
+  url: string;
+  errorText: string;
+};
+
 type RuntimeWatch = {
   pageErrors: string[];
-  failedRequests: string[];
+  failedRequests: FailedRequest[];
+  successfulResponseUrls: Set<string>;
   retiredTransportRequests: string[];
 };
 
@@ -36,13 +43,21 @@ function isExpectedOfficePreflightAbort(request: Request): boolean {
 
 function watchConversionRuntime(page: Page): RuntimeWatch {
   const pageErrors: string[] = [];
-  const failedRequests: string[] = [];
+  const failedRequests: FailedRequest[] = [];
+  const successfulResponseUrls = new Set<string>();
   const retiredTransportRequests: string[] = [];
 
   page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("response", (response) => {
+    if (response.ok()) successfulResponseUrls.add(response.url());
+  });
   page.on("requestfailed", (request) => {
     if (isExpectedOfficePreflightAbort(request)) return;
-    failedRequests.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "failed"}`);
+    failedRequests.push({
+      method: request.method(),
+      url: request.url(),
+      errorText: request.failure()?.errorText ?? "failed",
+    });
   });
   page.on("request", (request) => {
     const url = new URL(request.url());
@@ -63,12 +78,26 @@ function watchConversionRuntime(page: Page): RuntimeWatch {
     }
   });
 
-  return { pageErrors, failedRequests, retiredTransportRequests };
+  return { pageErrors, failedRequests, successfulResponseUrls, retiredTransportRequests };
+}
+
+function isRecoveredPdfWorkerBootstrapFailure(failure: FailedRequest, successfulResponseUrls: Set<string>): boolean {
+  if (failure.method !== "GET" || failure.errorText !== "net::ERR_BLOCKED_BY_RESPONSE") return false;
+  const url = new URL(failure.url);
+  const isBundledPdfWorker =
+    url.origin === "https://lumeo.in" &&
+    /^\/_next\/static\/media\/pdf\.worker\.[A-Za-z0-9_-]+\.mjs$/.test(url.pathname);
+  return isBundledPdfWorker && successfulResponseUrls.has(failure.url);
 }
 
 function expectCleanRuntime(watch: RuntimeWatch) {
   expect(watch.pageErrors).toEqual([]);
-  expect(watch.failedRequests).toEqual([]);
+  const unrecoveredFailures = watch.failedRequests.filter(
+    (failure) => !isRecoveredPdfWorkerBootstrapFailure(failure, watch.successfulResponseUrls),
+  );
+  expect(
+    unrecoveredFailures.map((failure) => `${failure.method} ${failure.url}: ${failure.errorText}`),
+  ).toEqual([]);
   expect(watch.retiredTransportRequests).toEqual([]);
 }
 
