@@ -32,7 +32,7 @@ reported as such, not fixed speculatively).
 | Check | Finding |
 |---|---|
 | `TODO`/`FIXME`/`HACK`/`XXX` | **Zero** in tracked `app/`, `components/`, `lib/`, `services/`, `scripts/`. |
-| `console.log`/`console.warn`/`console.error` | 9 files, all `console.error` in server-side API routes and admin data-layer `catch` blocks (e.g. `app/api/tools/pdf-to-word/route.ts:108`, `lib/admin/data.ts:790`), each with a descriptive message. This is legitimate server-side error logging (visible in legacy hosting platform function logs), not debug leftovers. **No fix.** |
+| `console.log`/`console.warn`/`console.error` | Historical July 2026 finding: 9 files contained legitimate server-side error logging. The cited server PDF→Word API route was retired in September 2026 after browser-only Word↔PDF production certification; this row is retained only as historical audit evidence. |
 | `eslint-disable` | 27 occurrences. 22 are `@next/next/no-img-element` on PDF thumbnail/preview `<img>` tags (deliberate — these render from `blob:`/canvas-derived sources where Next's `<Image>` optimization pipeline doesn't apply). 5 are `react-hooks/exhaustive-deps`, spot-checked at `MergePdfTool.tsx:454`, `PdfToJpgTool.tsx:460`, `SplitPdfTool.tsx:1092` — each wraps a scoped cleanup pattern (`cancelled` flag guard, explicit narrow dep arrays, or a documented mount-only reset), not a bare blanket suppression hiding an obvious bug. **No fix** — flagging the exhaustive-deps disables as the one area worth a deeper look in a dedicated React-hooks review session, since suppressing this rule is exactly where stale-closure bugs like to hide, but nothing here showed concrete evidence of an actual bug. |
 | `@ts-ignore`/`@ts-expect-error` | **Zero** in tracked source. |
 | `dangerouslySetInnerHTML` | 27 occurrences, **all** feeding `JSON.stringify(...)` of statically-built schema objects (`buildSoftwareApplicationSchema`/`buildBreadcrumbSchema`, confirmed reading their signatures earlier this session — inputs are hardcoded strings, not user data) into `<script type="application/ld+json">` tags. This is the standard, safe Next.js JSON-LD pattern; `JSON.stringify` escapes the content and none of it is user-controlled. **PASS, no XSS risk identified.** |
@@ -84,13 +84,11 @@ download flow happen with **zero network requests** for the file content
 itself — file parsing and merging both ran via in-browser `pdf-lib` calls
 triggered by a local `DataTransfer`, no `fetch` to any endpoint carrying
 the PDF bytes. This matches the homepage's stated claim ("processed for
-the task at hand, then cleared"). The Word↔PDF conversion path is a
-documented, intentional exception (uses a Supabase signed URL to a
-dedicated LibreOffice container, per `services/word-to-pdf-converter/`'s
-own comments) — not a violation of the privacy model, a different,
-explicitly necessary architecture for a format LibreOffice alone can
-convert. No server-side PDF processing was found for any of the
-client-side tools. **PASS**, for what was directly observed; the other
+the task at hand, then cleared"). Historical note: at the time of this July 2026 audit, Word↔PDF still used
+a server-assisted Supabase/container path. That exception was retired in
+September 2026 after browser-only Word↔PDF production certification. No
+server-side PDF processing was found for the other client-side tools in
+this historical pass. **PASS**, for what was directly observed; the other
 12 tools' network behavior was not individually re-traced this session.
 
 ## 8, 9, 10, 11, 12. Accessibility, SEO, Analytics, Admin, Security
