@@ -1,0 +1,250 @@
+name: Office Runtime Release
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/office-runtime-release.yml"
+      - "config/office-runtime-r2-cors.json"
+      - "docs/browser-conversion-assets.md"
+      - "lib/conversion/browser/libreoffice/assetConfig.ts"
+      - "scripts/prepare-office-runtime-release.mjs"
+      - "tests/conversion-office-assets.test.ts"
+  workflow_dispatch:
+    inputs:
+      release_id:
+        description: Immutable release ID (for example zeta-2026-09-21-a)
+        required: true
+        type: string
+      source_base_url:
+        description: HTTPS source containing the soffice.* runtime files
+        required: true
+        default: https://cdn.zetaoffice.net/zetaoffice_latest/
+        type: string
+      asset_origin:
+        description: Public R2 custom-domain origin
+        required: true
+        default: https://assets.lumeo.in
+        type: string
+      publish:
+        description: Publish to production R2 after preparing the snapshot
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+env:
+  OFFICE_RELEASE_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.release_id || format('pr-{0}-{1}', github.event.pull_request.number, github.event.pull_request.head.sha) }}
+  OFFICE_SOURCE_BASE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.source_base_url || 'https://cdn.zetaoffice.net/zetaoffice_latest/' }}
+  OFFICE_ASSET_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.asset_origin || 'https://assets.lumeo.in' }}
+
+concurrency:
+  group: office-runtime-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Prepare and verify Office runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Prepare immutable runtime snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/prepare-office-runtime-release.mjs \
+            --release "${{ env.OFFICE_RELEASE_ID }}" \
+            --source "${{ env.OFFICE_SOURCE_BASE_URL }}" \
+            --out /tmp/lumeo-office-runtime
+
+      - name: Report production publish readiness
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LUMEO_OFFICE_R2_BUCKET: ${{ vars.LUMEO_OFFICE_R2_BUCKET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=()
+          [ -n "${CLOUDFLARE_API_TOKEN:-}" ] || missing+=("CLOUDFLARE_API_TOKEN")
+          [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ] || missing+=("CLOUDFLARE_ACCOUNT_ID")
+          [ -n "${LUMEO_OFFICE_R2_BUCKET:-}" ] || missing+=("LUMEO_OFFICE_R2_BUCKET")
+
+          if [ "${#missing[@]}" -eq 0 ]; then
+            echo "Production R2 publish credentials/config: READY"
+            echo "Production R2 publish credentials/config: **READY**" >> "$GITHUB_STEP_SUMMARY"
+          else
+            joined="$(IFS=', '; echo "${missing[*]}")"
+            echo "Production R2 publish credentials/config: MISSING (${joined})"
+            echo "Production R2 publish credentials/config: **MISSING** (${joined})" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Validate prepared manifest and payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="/tmp/lumeo-office-runtime/${{ env.OFFICE_RELEASE_ID }}"
+          node -e '
+            const fs = require("fs");
+            const path = process.argv[1];
+            const manifest = JSON.parse(fs.readFileSync(path, "utf8"));
+            const required = ["soffice.js", "soffice.wasm", "soffice.data", "soffice.data.js.metadata"];
+            if (manifest.schemaVersion !== 1) throw new Error("Unexpected manifest schema");
+            if (manifest.releaseId !== process.argv[2]) throw new Error("Release ID mismatch");
+            if (manifest.zetaJsVersion !== "1.2.0") throw new Error("ZetaJS version mismatch");
+            for (const name of required) {
+              const entry = manifest.files?.[name];
+              if (!entry || !Number.isFinite(entry.bytes) || entry.bytes <= 0) {
+                throw new Error("Missing or invalid " + name);
+              }
+              if (!/^[a-f0-9]{64}$/i.test(entry.sha256)) {
+                throw new Error("Invalid SHA-256 for " + name);
+              }
+            }
+          ' "$dir/lumeo-office-runtime.json" "${{ env.OFFICE_RELEASE_ID }}"
+          test -s "$dir/soffice.js"
+          test -s "$dir/soffice.wasm"
+          test -s "$dir/soffice.data"
+          test -s "$dir/soffice.data.js.metadata"
+
+      - name: Publish immutable runtime to R2
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          LUMEO_OFFICE_R2_BUCKET: ${{ vars.LUMEO_OFFICE_R2_BUCKET }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${CLOUDFLARE_API_TOKEN:?Missing CLOUDFLARE_API_TOKEN repository secret}"
+          : "${CLOUDFLARE_ACCOUNT_ID:?Missing CLOUDFLARE_ACCOUNT_ID repository secret}"
+          : "${LUMEO_OFFICE_R2_BUCKET:?Missing LUMEO_OFFICE_R2_BUCKET repository variable}"
+
+          release="${{ env.OFFICE_RELEASE_ID }}"
+          prefix="office/zeta-24-2/$release"
+          dir="/tmp/lumeo-office-runtime/$release"
+          existing="/tmp/lumeo-existing-runtime-manifest.json"
+
+          if npx wrangler r2 object get \
+            "$LUMEO_OFFICE_R2_BUCKET/$prefix/lumeo-office-runtime.json" \
+            --file "$existing" --remote >/dev/null 2>&1; then
+            echo "Release already exists at $prefix. Immutable releases are never overwritten."
+            exit 1
+          fi
+
+          npx wrangler r2 bucket cors set "$LUMEO_OFFICE_R2_BUCKET" \
+            --file config/office-runtime-r2-cors.json --force
+
+          npx wrangler r2 object put "$LUMEO_OFFICE_R2_BUCKET/$prefix/soffice.js" \
+            --file "$dir/soffice.js" --content-type "application/javascript" \
+            --cache-control "public, max-age=31536000, immutable" --remote --force
+          npx wrangler r2 object put "$LUMEO_OFFICE_R2_BUCKET/$prefix/soffice.wasm" \
+            --file "$dir/soffice.wasm" --content-type "application/wasm" \
+            --cache-control "public, max-age=31536000, immutable" --remote --force
+          npx wrangler r2 object put "$LUMEO_OFFICE_R2_BUCKET/$prefix/soffice.data" \
+            --file "$dir/soffice.data" --content-type "application/octet-stream" \
+            --cache-control "public, max-age=31536000, immutable" --remote --force
+          npx wrangler r2 object put "$LUMEO_OFFICE_R2_BUCKET/$prefix/soffice.data.js.metadata" \
+            --file "$dir/soffice.data.js.metadata" --content-type "application/json" \
+            --cache-control "public, max-age=31536000, immutable" --remote --force
+
+          # Manifest is the publish marker and is intentionally uploaded last.
+          npx wrangler r2 object put "$LUMEO_OFFICE_R2_BUCKET/$prefix/lumeo-office-runtime.json" \
+            --file "$dir/lumeo-office-runtime.json" --content-type "application/json" \
+            --cache-control "public, max-age=31536000, immutable" --remote --force
+
+          remote_manifest="/tmp/lumeo-remote-runtime-manifest.json"
+          npx wrangler r2 object get \
+            "$LUMEO_OFFICE_R2_BUCKET/$prefix/lumeo-office-runtime.json" \
+            --file "$remote_manifest" --remote
+          cmp "$dir/lumeo-office-runtime.json" "$remote_manifest"
+
+          verify_dir="/tmp/lumeo-remote-runtime"
+          mkdir -p "$verify_dir"
+          for file in soffice.js soffice.wasm soffice.data soffice.data.js.metadata; do
+            npx wrangler r2 object get \
+              "$LUMEO_OFFICE_R2_BUCKET/$prefix/$file" \
+              --file "$verify_dir/$file" --remote
+          done
+
+          node - "$dir/lumeo-office-runtime.json" "$verify_dir" <<'NODE' > /tmp/lumeo-runtime-sha256.txt
+          const fs = require("fs");
+          const path = require("path");
+          const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const verifyDir = process.argv[3];
+          for (const [name, entry] of Object.entries(manifest.files)) {
+            process.stdout.write(`${entry.sha256}  ${path.join(verifyDir, name)}\n`);
+          }
+          NODE
+          sha256sum --check /tmp/lumeo-runtime-sha256.txt
+
+      - name: Verify public runtime origin
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          origin="${{ env.OFFICE_ASSET_ORIGIN }}"
+          origin="${origin%/}"
+          release="${{ env.OFFICE_RELEASE_ID }}"
+          base="$origin/office/zeta-24-2/$release"
+
+          manifest="$(curl --fail --silent --show-error \
+            -H 'Origin: https://lumeo.in' \
+            "$base/lumeo-office-runtime.json")"
+          printf '%s' "$manifest" | grep -Fq "\"releaseId\": \"$release\""
+
+          for file in soffice.js soffice.wasm soffice.data soffice.data.js.metadata; do
+            headers="$(curl --fail --silent --show-error --dump-header - --output /dev/null \
+              -H 'Origin: https://lumeo.in' \
+              -H 'Range: bytes=0-0' \
+              "$base/$file")"
+            status="$(printf '%s' "$headers" | awk '/^HTTP\// {code=$2} END {print code}')"
+            [ "$status" = "206" ] || { echo "FAIL: $file did not honor the byte-range probe (HTTP $status)."; exit 1; }
+            printf '%s' "$headers" | grep -Eqi '^access-control-allow-origin: (https://lumeo\.in|\*)'
+            printf '%s' "$headers" | grep -Eqi '^cross-origin-resource-policy: cross-origin'
+            printf '%s' "$headers" | grep -Eqi '^cache-control: .*max-age=31536000.*immutable'
+            case "$file" in
+              soffice.js) printf '%s' "$headers" | grep -Eqi '^content-type: (application|text)/javascript' ;;
+              soffice.wasm) printf '%s' "$headers" | grep -Eqi '^content-type: application/wasm' ;;
+              soffice.data) printf '%s' "$headers" | grep -Eqi '^content-type: (application|binary)/octet-stream' ;;
+              soffice.data.js.metadata) printf '%s' "$headers" | grep -Eqi '^content-type: application/json' ;;
+            esac
+            echo "PASS: $file is ranged, CORS/CORP-enabled, correctly typed and immutable."
+          done
+
+          {
+            echo "### Office runtime release"
+            echo
+            echo "Published and verified: `$base/`"
+            echo
+            echo "Set the production build variable:"
+            echo
+            echo "`NEXT_PUBLIC_LUMEO_OFFICE_ASSET_BASE_URL=$base/`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report prepared release without publishing
+        if: ${{ github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && !inputs.publish) }}
+        shell: bash
+        run: |
+          {
+            echo "### Office runtime dry run"
+            echo
+            echo "Prepared release `${{ env.OFFICE_RELEASE_ID }}` successfully."
+            echo "No R2 objects were changed because publish=false."
+          } >> "$GITHUB_STEP_SUMMARY"
