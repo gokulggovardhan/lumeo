@@ -16,6 +16,7 @@ on:
       - "app/office-runtime/**"
       - "e2e/production-conversion-smoke.spec.ts"
       - "playwright.production-conversion.config.ts"
+      - "supabase/migrations/*word*pdf*.sql"
   workflow_dispatch:
 
 permissions:
