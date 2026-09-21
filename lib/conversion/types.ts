@@ -8,6 +8,7 @@ export type ConversionPhase =
   | "uploading"
   | "converting"
   | "generating"
+  | "validating"
   | "finalizing";
 
 export type ConversionProgress = {
