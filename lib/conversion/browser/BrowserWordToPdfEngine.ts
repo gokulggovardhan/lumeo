@@ -4,6 +4,7 @@ import {
   hasLocalWorkspaceCapacity,
 } from "@/lib/conversion/browser/workspace";
 import {
+  canRunThreadedBrowserOffice,
   detectBrowserConversionCapabilities,
   selectConversionProcessingMode,
 } from "@/lib/conversion/browser/capabilities";
@@ -59,17 +60,11 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
     }
 
     const capabilities = await detectBrowserConversionCapabilities();
-    if (
-      !capabilities.webAssembly ||
-      !capabilities.webWorkers ||
-      !capabilities.sharedArrayBuffer ||
-      !capabilities.crossOriginIsolated ||
-      !capabilities.wasmThreadsReady
-    ) {
+    if (!canRunThreadedBrowserOffice(capabilities)) {
       throw conversionUserError("browser-unsupported", {
         recoverable: false,
         technicalMessage:
-          "Threaded browser Office conversion requires WebAssembly, workers, SharedArrayBuffer, cross-origin isolation, and shared WASM memory.",
+          "Threaded browser Office conversion requires WebAssembly, workers, SharedArrayBuffer, cross-origin isolation, shared WASM memory, and worker OffscreenCanvas WebGL.",
       });
     }
 
