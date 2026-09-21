@@ -243,18 +243,23 @@ async function probeRuntimeAsset(
   manifestEntry: OfficeRuntimeFileManifest | null,
   signal?: AbortSignal,
 ): Promise<void> {
+  // Never cache the preflight response. A cached partial (Range) response
+  // can poison the later <script src="soffice.js"> load in Chromium and make
+  // Emscripten execute an incomplete script. Probe the executable JS with HEAD
+  // and use uncached byte-range GETs only for the non-script payloads.
+  const isScript = name === "soffice.js";
   const response = await fetchWithRetry(
     new URL(name, config.officeBaseUrl),
     {
-      method: "GET",
-      cache: "force-cache",
+      method: isScript ? "HEAD" : "GET",
+      cache: "no-store",
       credentials: "omit",
-      headers: { Range: "bytes=0-0" },
+      headers: isScript ? undefined : { Range: "bytes=0-0" },
     },
     signal,
   );
 
-  if (response.status !== 200 && response.status !== 206) {
+  if (response.status !== 200 && (!isScript && response.status !== 206)) {
     await response.body?.cancel().catch(() => {});
     throw new Error(`Office runtime file ${name} is unavailable (HTTP ${response.status}).`);
   }
