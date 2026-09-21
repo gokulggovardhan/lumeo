@@ -48,13 +48,13 @@ test("PDF same-baseline cells remain independently positioned editable runs", ()
 test("invoice-like columns are never collapsed into one flowing paragraph", () => {
   const items = [
     {
-      str: "NF330502",
+      str: "ITEM-A101",
       transform: [11, 0, 0, 11, 52, 470],
       width: 50,
       fontName: "g_d0_f1",
     },
     {
-      str: "Engine flush",
+      str: "Cleaning fluid",
       transform: [11, 0, 0, 11, 112, 470],
       width: 65,
       fontName: "g_d0_f1",
@@ -72,7 +72,7 @@ test("invoice-like columns are never collapsed into one flowing paragraph", () =
       fontName: "g_d0_f1",
     },
     {
-      str: "34039900",
+      str: "34030000",
       transform: [11, 0, 0, 11, 390, 470],
       width: 48,
       fontName: "g_d0_f1",
