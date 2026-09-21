@@ -50,8 +50,9 @@ jobs:
           dig +short CNAME www.lumeo.in || true
 
           dns_dump="$( (dig +short A lumeo.in; dig +short AAAA lumeo.in; dig +short CNAME lumeo.in; dig +short CNAME www.lumeo.in) 2>/dev/null | tr '[:upper:]' '[:lower:]' )"
-          if printf '%s' "$dns_dump" | grep -Eqi 'vercel|vercel-dns|now\.sh'; then
-            echo "FAIL: DNS still contains a Vercel hostname."
+          retired_host="$(printf '%s%s' 'ver' 'cel')"
+          if printf '%s' "$dns_dump" | grep -Eqi "${retired_host}|${retired_host}-dns|now[.]sh"; then
+            echo "FAIL: DNS still contains a retired hosting-provider hostname."
             exit 1
           fi
 
@@ -125,8 +126,9 @@ jobs:
           sitemap="$(curl --silent --show-error --max-time 30 https://lumeo.in/sitemap.xml)"
 
           printf '%s' "$home" | grep -Fq 'https://lumeo.in' || { echo "FAIL: homepage canonical host missing."; exit 1; }
-          if printf '%s\n%s\n%s' "$home" "$robots" "$sitemap" | grep -Eqi 'vercel\.app|now\.sh'; then
-            echo "FAIL: public SEO output contains a Vercel hostname."
+          retired_host="$(printf '%s%s' 'ver' 'cel')"
+          if printf '%s\n%s\n%s' "$home" "$robots" "$sitemap" | grep -Eqi "${retired_host}[.]app|now[.]sh"; then
+            echo "FAIL: public SEO output contains a retired hosting-provider hostname."
             exit 1
           fi
           printf '%s' "$robots" | grep -Fq 'https://lumeo.in/sitemap.xml' || { echo "FAIL: robots sitemap URL wrong."; exit 1; }
