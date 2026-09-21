@@ -17,13 +17,6 @@ type RouteContext = {
   }>;
 };
 
-type CloudflareFetchInit = RequestInit & {
-  cf?: {
-    cacheEverything?: boolean;
-    cacheTtl?: number;
-  };
-};
-
 function runtimeSourceUrl(asset: RuntimeAssetName): string {
   return `https://github.com/gokulggovardhan/lumeo/releases/download/${runtimeRelease.releaseTag}/${asset}`;
 }
@@ -71,14 +64,17 @@ async function proxyRuntimeAsset(
   const range = request.headers.get("range");
   if (range) upstreamHeaders.set("Range", range);
 
-  const init: CloudflareFetchInit = {
+  // The public /office-runtime/... response is immutable, but the outgoing
+  // GitHub subrequest must bypass Cloudflare's fetch cache. Range probes and
+  // full runtime reads share the same source URL; force-caching those
+  // subrequests can let a cached partial body poison a later full WASM/data
+  // fetch. Browser/edge consumers still receive the immutable Cache-Control
+  // policy below.
+  const init: RequestInit = {
     method: request.method === "HEAD" ? "HEAD" : "GET",
     headers: upstreamHeaders,
     redirect: "follow",
-    cf: {
-      cacheEverything: true,
-      cacheTtl: 31_536_000,
-    },
+    cache: "no-store",
   };
 
   let upstream: Response;
