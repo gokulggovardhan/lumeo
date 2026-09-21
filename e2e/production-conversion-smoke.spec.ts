@@ -17,7 +17,15 @@ function watchConversionRuntime(page: Page): RuntimeWatch {
 
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("requestfailed", (request) => {
-    failedRequests.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "failed"}`);
+    const url = new URL(request.url());
+    const expectedOfficeProbeAbort =
+      url.origin === "https://lumeo.in" &&
+      url.pathname.startsWith("/office-runtime/") &&
+      request.failure()?.errorText === "net::ERR_ABORTED";
+
+    if (!expectedOfficeProbeAbort) {
+      failedRequests.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "failed"}`);
+    }
   });
   page.on("request", (request) => {
     const url = new URL(request.url());
