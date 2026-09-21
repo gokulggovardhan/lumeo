@@ -198,11 +198,11 @@ export const wordToPdfFaqs: FaqItem[] = [
   {
     question: "Is Word to PDF conversion private?",
     answer:
-      "Office format conversion needs a server-side engine (free, self-hosted LibreOffice), so the file is uploaded temporarily and cleared immediately after conversion -- it is not stored.",
+      "Processed locally in your browser. Your Word document is not uploaded for conversion.",
   },
   {
     question: "Does it preserve formatting?",
-    answer: "Layout, fonts, tables, and images are preserved for standard DOCX/DOC documents. Highly complex layouts may shift slightly.",
+    answer: "Lumeo preserves layout, fonts, tables, images, and pagination as closely as the local Office engine allows. Highly complex documents can still have small layout differences.",
   },
 ];
 
@@ -210,11 +210,11 @@ export const pdfToWordFaqs: FaqItem[] = [
   {
     question: "Is PDF to Word conversion private?",
     answer:
-      "Conversion needs a server-side engine (free, self-hosted LibreOffice), so the file is uploaded temporarily and cleared immediately after conversion -- it is not stored.",
+      "Processed locally in your browser. Your PDF is not uploaded for conversion.",
   },
   {
     question: "Will my PDF's layout and tables convert cleanly?",
-    answer: "Standard text layouts, tables, and images convert well. Complex multi-column layouts or scanned pages may need manual cleanup.",
+    answer: "Lumeo reconstructs editable text and page layout as closely as possible. Complex layouts and scanned pages can use a layout-preserving image fallback where reliable editable structure is unavailable.",
   },
 ];
 

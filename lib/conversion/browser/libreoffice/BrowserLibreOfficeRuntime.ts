@@ -30,8 +30,15 @@ type EmscriptenFs = {
   unlink(path: string): void;
 };
 
+type EmscriptenModule = {
+  PThread?: {
+    terminateAllThreads?: () => void;
+  };
+};
+
 type ZetaHelperMainInstance = {
   FS: EmscriptenFs;
+  Module?: EmscriptenModule;
   thrPort: MessagePort;
   start(callback: () => void): void;
 };
@@ -50,10 +57,24 @@ type OfficeThreadMessage =
   | { cmd: "converted"; requestId: string; to: string }
   | { cmd: "convert-error"; requestId: string; message: string };
 
+type RuntimeWindow = Window & {
+  __lumeoBrowserOfficeZetaHelperMain?: ZetaHelperMainConstructor;
+  Module?: unknown;
+  FS?: unknown;
+};
+
 declare global {
   interface Window {
     __lumeoBrowserOfficeZetaHelperMain?: ZetaHelperMainConstructor;
   }
+}
+
+function abortError(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException("Conversion cancelled", "AbortError");
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw abortError(signal);
 }
 
 function safeExtension(fileName: string): string {
@@ -131,20 +152,23 @@ const pdfExport = new css.beans.PropertyValue({
   Name: "FilterName",
   Value: "writer_pdf_Export",
 });
-let model;
+
+function closeModel(model) {
+  if (!model) return;
+  try {
+    const closeable = model.queryInterface(
+      zetajs.type.interface(css.util.XCloseable),
+    );
+    if (closeable) closeable.close(false);
+  } catch {}
+}
 
 helper.thrPort.onmessage = (event) => {
   const message = event.data;
   if (message.cmd !== "convert") return;
 
+  let model;
   try {
-    if (
-      model !== undefined &&
-      model.queryInterface(zetajs.type.interface(css.util.XCloseable))
-    ) {
-      model.close(false);
-    }
-
     model = helper.desktop.loadComponentFromURL(
       "file://" + message.from,
       "_blank",
@@ -168,6 +192,8 @@ helper.thrPort.onmessage = (event) => {
       requestId: message.requestId,
       message: detail,
     });
+  } finally {
+    closeModel(model);
   }
 };
 
@@ -176,23 +202,44 @@ helper.thrPort.postMessage({ cmd: "ready" });
   return URL.createObjectURL(new Blob([source], { type: "text/javascript" }));
 }
 
-function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  message: string,
-): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = window.setTimeout(() => reject(new Error(message)), timeoutMs);
-    promise.then(
-      (value) => {
-        window.clearTimeout(timer);
-        resolve(value);
-      },
-      (error) => {
-        window.clearTimeout(timer);
-        reject(error);
-      },
-    );
+async function waitForReady(
+  helper: ZetaHelperMainInstance,
+  signal: AbortSignal,
+): Promise<void> {
+  throwIfAborted(signal);
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const timer = window.setTimeout(() => {
+      finish(
+        reject,
+        new Error("The local Office engine did not finish loading."),
+      );
+    }, READY_TIMEOUT_MS);
+
+    const onAbort = () => finish(reject, abortError(signal));
+
+    const finish = (
+      callback: (value?: never) => void,
+      value?: unknown,
+    ) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      signal.removeEventListener("abort", onAbort);
+      if (helper.thrPort) helper.thrPort.onmessage = null;
+      if (value === undefined) resolve();
+      else callback(value as never);
+    };
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    helper.start(() => {
+      helper.thrPort.onmessage = (
+        event: MessageEvent<OfficeThreadMessage>,
+      ) => {
+        if (event.data.cmd === "ready") finish(() => undefined);
+      };
+    });
   });
 }
 
@@ -205,30 +252,32 @@ async function writeBlobToFs(
 ): Promise<void> {
   const stream = fs.open(path, "w+");
   let position = 0;
+  const reader = source.stream().getReader();
 
   try {
-    const reader = source.stream().getReader();
-    try {
-      while (true) {
-        if (signal.aborted) {
-          throw signal.reason ?? new DOMException("Conversion cancelled", "AbortError");
-        }
+    while (true) {
+      throwIfAborted(signal);
 
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!value?.byteLength) continue;
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!value?.byteLength) continue;
 
-        for (let offset = 0; offset < value.byteLength; offset += IO_CHUNK_BYTES) {
-          const part = value.subarray(offset, Math.min(value.byteLength, offset + IO_CHUNK_BYTES));
-          fs.write(stream, part, 0, part.byteLength, position);
-          position += part.byteLength;
-          onProgress?.(position, source.size);
-        }
+      for (let offset = 0; offset < value.byteLength; offset += IO_CHUNK_BYTES) {
+        throwIfAborted(signal);
+        const part = value.subarray(
+          offset,
+          Math.min(value.byteLength, offset + IO_CHUNK_BYTES),
+        );
+        fs.write(stream, part, 0, part.byteLength, position);
+        position += part.byteLength;
+        onProgress?.(position, source.size);
       }
-    } finally {
-      reader.releaseLock();
     }
+  } catch (error) {
+    await reader.cancel().catch(() => {});
+    throw error;
   } finally {
+    reader.releaseLock();
     fs.close(stream);
   }
 }
@@ -262,6 +311,7 @@ function readFsFileAsBlob(
 export type BrowserOfficeConvertOptions = {
   signal: AbortSignal;
   onInputProgress?: (loaded: number, total: number) => void;
+  onInputReady?: () => void;
 };
 
 export class BrowserLibreOfficeRuntime {
@@ -271,7 +321,8 @@ export class BrowserLibreOfficeRuntime {
 
   constructor(private readonly assets: OfficeAssetConfig) {}
 
-  async start(): Promise<void> {
+  async start(signal: AbortSignal): Promise<void> {
+    throwIfAborted(signal);
     if (this.helper) return;
 
     if (
@@ -286,48 +337,111 @@ export class BrowserLibreOfficeRuntime {
     }
 
     ensureOfficeCanvas();
-    await preflightOfficeAssetOrigin(this.assets);
+    await preflightOfficeAssetOrigin(this.assets, signal);
+    throwIfAborted(signal);
 
     const ZetaHelperMain = await loadZetaHelperConstructor(this.assets.helperUrl);
-    this.officeThreadUrl = createOfficeThreadModule(this.assets.helperUrl);
+    throwIfAborted(signal);
 
+    this.officeThreadUrl = createOfficeThreadModule(this.assets.helperUrl);
     const helper = new ZetaHelperMain(this.officeThreadUrl, {
       threadJsType: "module",
       wasmPkg: `url:${this.assets.officeBaseUrl}`,
       blockPageScroll: false,
     });
-
-    await withTimeout(
-      new Promise<void>((resolve) => {
-        helper.start(() => {
-          helper.thrPort.onmessage = (event: MessageEvent<OfficeThreadMessage>) => {
-            if (event.data.cmd === "ready") resolve();
-          };
-        });
-      }),
-      READY_TIMEOUT_MS,
-      "The local Office engine did not finish loading.",
-    );
-
     this.helper = helper;
+
+    try {
+      await waitForReady(helper, signal);
+    } catch (error) {
+      this.destroy();
+      throw error;
+    }
   }
 
   convertDocumentToPdf(
     file: File,
     options: BrowserOfficeConvertOptions,
   ): Promise<Blob> {
-    const operation = this.queue.then(() =>
-      this.convertDocumentToPdfExclusive(file, options),
-    );
+    const operation = this.queue.then(async () => {
+      throwIfAborted(options.signal);
+      return this.convertDocumentToPdfExclusive(file, options);
+    });
     this.queue = operation.catch(() => undefined);
     return operation;
+  }
+
+  private async waitForConversion(
+    helper: ZetaHelperMainInstance,
+    requestId: string,
+    from: string,
+    to: string,
+    signal: AbortSignal,
+  ): Promise<void> {
+    throwIfAborted(signal);
+
+    await new Promise<void>((resolve, reject) => {
+      let settled = false;
+      const timer = window.setTimeout(() => {
+        finish(
+          reject,
+          new Error("Local Word to PDF conversion exceeded the safety watchdog."),
+          true,
+        );
+      }, CONVERSION_TIMEOUT_MS);
+
+      const cleanup = () => {
+        window.clearTimeout(timer);
+        signal.removeEventListener("abort", onAbort);
+        helper.thrPort.removeEventListener("message", onMessage);
+      };
+
+      const finish = (
+        callback: (value?: never) => void,
+        value?: unknown,
+        resetRuntime = false,
+      ) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        if (resetRuntime) this.destroy();
+        if (value === undefined) resolve();
+        else callback(value as never);
+      };
+
+      const onAbort = () => finish(reject, abortError(signal), true);
+      const onMessage = (event: MessageEvent<OfficeThreadMessage>) => {
+        const message = event.data;
+        if (
+          (message.cmd !== "converted" && message.cmd !== "convert-error") ||
+          message.requestId !== requestId
+        ) {
+          return;
+        }
+
+        if (message.cmd === "convert-error") {
+          finish(reject, new Error(message.message));
+        } else {
+          finish(() => undefined);
+        }
+      };
+
+      signal.addEventListener("abort", onAbort, { once: true });
+      helper.thrPort.addEventListener("message", onMessage);
+      helper.thrPort.postMessage({
+        cmd: "convert",
+        requestId,
+        from,
+        to,
+      });
+    });
   }
 
   private async convertDocumentToPdfExclusive(
     file: File,
     options: BrowserOfficeConvertOptions,
   ): Promise<Blob> {
-    await this.start();
+    await this.start(options.signal);
     const helper = this.helper;
     if (!helper) throw new Error("The local Office engine is unavailable.");
 
@@ -339,47 +453,26 @@ export class BrowserLibreOfficeRuntime {
     const from = `/tmp/lumeo/input-${requestId}${safeExtension(file.name)}`;
     const to = `/tmp/lumeo/output-${requestId}.pdf`;
 
-    await writeBlobToFs(
-      helper.FS,
-      from,
-      file,
-      options.signal,
-      options.onInputProgress,
-    );
-
     try {
-      await withTimeout(
-        new Promise<void>((resolve, reject) => {
-          const handle = (event: MessageEvent<OfficeThreadMessage>) => {
-            const message = event.data;
-            if (
-              (message.cmd !== "converted" &&
-                message.cmd !== "convert-error") ||
-              message.requestId !== requestId
-            ) {
-              return;
-            }
+      await writeBlobToFs(
+        helper.FS,
+        from,
+        file,
+        options.signal,
+        options.onInputProgress,
+      );
+      throwIfAborted(options.signal);
+      options.onInputReady?.();
 
-            helper.thrPort.removeEventListener("message", handle);
-            if (message.cmd === "convert-error") {
-              reject(new Error(message.message));
-            } else {
-              resolve();
-            }
-          };
-
-          helper.thrPort.addEventListener("message", handle);
-          helper.thrPort.postMessage({
-            cmd: "convert",
-            requestId,
-            from,
-            to,
-          });
-        }),
-        CONVERSION_TIMEOUT_MS,
-        "Local Word to PDF conversion exceeded the safety watchdog.",
+      await this.waitForConversion(
+        helper,
+        requestId,
+        from,
+        to,
+        options.signal,
       );
 
+      throwIfAborted(options.signal);
       return readFsFileAsBlob(helper.FS, to, "application/pdf");
     } finally {
       try {
@@ -389,6 +482,43 @@ export class BrowserLibreOfficeRuntime {
         helper.FS.unlink(to);
       } catch {}
     }
+  }
+
+  /**
+   * ZetaJS 1.2.0 does not expose a public destroy API. We close the message
+   * port, terminate Emscripten pthreads when available, revoke our generated
+   * worker module, remove the runtime script, and clear large global runtime
+   * references. The cached lightweight ZetaJS constructor is intentionally
+   * retained so a recoverable retry can initialize a fresh Office runtime.
+   */
+  destroy(): void {
+    const helper = this.helper;
+    this.helper = null;
+
+    try {
+      helper?.thrPort?.close();
+    } catch {}
+    try {
+      helper?.Module?.PThread?.terminateAllThreads?.();
+    } catch {}
+
+    if (this.officeThreadUrl) {
+      URL.revokeObjectURL(this.officeThreadUrl);
+      this.officeThreadUrl = null;
+    }
+
+    const sofficeUrl = new URL("soffice.js", this.assets.officeBaseUrl).toString();
+    for (const script of Array.from(document.scripts)) {
+      if (script.src === sofficeUrl) script.remove();
+    }
+
+    const runtimeWindow = window as RuntimeWindow;
+    try {
+      delete runtimeWindow.Module;
+    } catch {}
+    try {
+      delete runtimeWindow.FS;
+    } catch {}
   }
 }
 

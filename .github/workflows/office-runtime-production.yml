@@ -1,0 +1,252 @@
+name: Office Runtime Production Release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/office-runtime-production.yml"
+      - "config/office-runtime-release.json"
+      - "app/office-runtime/**"
+      - "lib/conversion/browser/libreoffice/assetConfig.ts"
+      - "scripts/prepare-office-runtime-release.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: office-runtime-production
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish immutable Office runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+
+      - name: Read immutable release configuration
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          release_id="$(node -p 'require("./config/office-runtime-release.json").releaseId')"
+          release_tag="$(node -p 'require("./config/office-runtime-release.json").releaseTag')"
+          source_base="$(node -p 'require("./config/office-runtime-release.json").sourceBaseUrl')"
+          echo "release_id=$release_id" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "source_base=$source_base" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare immutable runtime snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/prepare-office-runtime-release.mjs \
+            --release "${{ steps.release.outputs.release_id }}" \
+            --source "${{ steps.release.outputs.source_base }}" \
+            --out /tmp/lumeo-office-runtime
+
+      - name: Validate prepared payload and manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="/tmp/lumeo-office-runtime/${{ steps.release.outputs.release_id }}"
+          manifest="$dir/lumeo-office-runtime.json"
+
+          node - "$manifest" "${{ steps.release.outputs.release_id }}" <<'NODE'
+          const fs = require("fs");
+          const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const releaseId = process.argv[3];
+          const required = [
+            "soffice.js",
+            "soffice.wasm",
+            "soffice.data",
+            "soffice.data.js.metadata",
+          ];
+          if (manifest.schemaVersion !== 1) throw new Error("Unexpected manifest schema");
+          if (manifest.releaseId !== releaseId) throw new Error("Release ID mismatch");
+          if (manifest.zetaJsVersion !== "1.2.0") throw new Error("ZetaJS version mismatch");
+          for (const name of required) {
+            const entry = manifest.files?.[name];
+            if (!entry || !Number.isFinite(entry.bytes) || entry.bytes <= 0) {
+              throw new Error("Missing or invalid " + name);
+            }
+            if (!/^[a-f0-9]{64}$/i.test(entry.sha256)) {
+              throw new Error("Invalid SHA-256 for " + name);
+            }
+          }
+          NODE
+
+      - name: Replace incomplete draft if necessary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.release_tag }}"
+
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            is_draft="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')"
+            if [ "$is_draft" = "true" ]; then
+              gh release delete "$tag" --repo "$GITHUB_REPOSITORY" --cleanup-tag --yes
+            else
+              echo "Immutable runtime release already exists: $tag"
+              echo "LUMEO_RUNTIME_RELEASE_EXISTS=true" >> "$GITHUB_ENV"
+            fi
+          fi
+
+      - name: Create draft runtime release
+        if: env.LUMEO_RUNTIME_RELEASE_EXISTS != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.release_tag }}"
+          gh release create "$tag" \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --draft \
+            --title "Lumeo Office Runtime — ${{ steps.release.outputs.release_id }}" \
+            --notes "Immutable browser-only LibreOffice/ZetaOffice runtime used by Lumeo Word → PDF. User documents are not uploaded to this release."
+
+      - name: Upload immutable runtime assets
+        if: env.LUMEO_RUNTIME_RELEASE_EXISTS != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.release_tag }}"
+          dir="/tmp/lumeo-office-runtime/${{ steps.release.outputs.release_id }}"
+
+          gh release upload "$tag" \
+            "$dir/soffice.js" \
+            "$dir/soffice.wasm" \
+            "$dir/soffice.data" \
+            "$dir/soffice.data.js.metadata" \
+            --repo "$GITHUB_REPOSITORY"
+
+          # Manifest is the publish marker and is uploaded last.
+          gh release upload "$tag" \
+            "$dir/lumeo-office-runtime.json" \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Verify release asset inventory and sizes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag="${{ steps.release.outputs.release_tag }}"
+          dir="/tmp/lumeo-office-runtime/${{ steps.release.outputs.release_id }}"
+          release_json="/tmp/lumeo-release.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$release_json"
+
+          node - "$dir/lumeo-office-runtime.json" "$release_json" <<'NODE'
+          const fs = require("fs");
+          const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const release = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+          const assets = new Map(release.assets.map((asset) => [asset.name, asset]));
+          for (const [name, entry] of Object.entries(manifest.files)) {
+            const asset = assets.get(name);
+            if (!asset) throw new Error("Release is missing " + name);
+            if (asset.size !== entry.bytes) {
+              throw new Error(`${name} size mismatch: ${asset.size} != ${entry.bytes}`);
+            }
+          }
+          const manifestAsset = assets.get("lumeo-office-runtime.json");
+          if (!manifestAsset || manifestAsset.size <= 0) {
+            throw new Error("Release is missing runtime manifest");
+          }
+          NODE
+
+      - name: Publish verified runtime release
+        if: env.LUMEO_RUNTIME_RELEASE_EXISTS != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit "${{ steps.release.outputs.release_tag }}" \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft=false \
+            --latest=false
+
+      - name: Verify immutable release is public
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://github.com/$GITHUB_REPOSITORY/releases/download/${{ steps.release.outputs.release_tag }}"
+          for file in soffice.js soffice.wasm soffice.data soffice.data.js.metadata lumeo-office-runtime.json; do
+            curl --fail --silent --show-error --location --head --max-time 60 "$base/$file" >/dev/null
+            echo "PASS: $file is publicly reachable."
+          done
+
+      - name: Verify deployed Cloudflare runtime route
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://lumeo.in/office-runtime/${{ steps.release.outputs.release_id }}"
+          manifest=""
+
+          for attempt in {1..40}; do
+            if manifest="$(curl --fail --silent --show-error --max-time 60 "$base/lumeo-office-runtime.json" 2>/dev/null)" &&
+               printf '%s' "$manifest" | grep -Fq "\"releaseId\": \"${{ steps.release.outputs.release_id }}\""; then
+              echo "Production runtime manifest is live."
+              break
+            fi
+            if [ "$attempt" -eq 40 ]; then
+              echo "Production runtime route did not become ready."
+              exit 1
+            fi
+            sleep 15
+          done
+
+          for file in soffice.js soffice.wasm soffice.data soffice.data.js.metadata; do
+            if [ "$file" = "soffice.js" ]; then
+              headers="$(curl --fail --silent --show-error --head --max-time 60 "$base/$file")"
+              status="$(printf '%s' "$headers" | awk '/^HTTP\// {code=$2} END {print code}')"
+              [ "$status" = "200" ] || { echo "FAIL: $file HEAD returned HTTP $status"; exit 1; }
+            else
+              headers="$(curl --fail --silent --show-error --dump-header - --output /dev/null --max-time 60 -H 'Range: bytes=0-0' "$base/$file")"
+              status="$(printf '%s' "$headers" | awk '/^HTTP\// {code=$2} END {print code}')"
+              [ "$status" = "206" ] || { echo "FAIL: $file range returned HTTP $status"; exit 1; }
+            fi
+
+            printf '%s' "$headers" | grep -Eqi '^cache-control: .*max-age=31536000.*immutable' ||
+              { echo "FAIL: $file immutable cache header missing"; exit 1; }
+            printf '%s' "$headers" | grep -Eqi '^cross-origin-resource-policy: same-origin' ||
+              { echo "FAIL: $file CORP header missing"; exit 1; }
+            printf '%s' "$headers" | grep -Eqi '^cf-ray:' ||
+              { echo "FAIL: $file is not verified at the Cloudflare edge"; exit 1; }
+
+            case "$file" in
+              soffice.js) printf '%s' "$headers" | grep -Eqi '^content-type: (application|text)/javascript' ;;
+              soffice.wasm) printf '%s' "$headers" | grep -Eqi '^content-type: application/wasm' ;;
+              soffice.data) printf '%s' "$headers" | grep -Eqi '^content-type: application/octet-stream' ;;
+              soffice.data.js.metadata) printf '%s' "$headers" | grep -Eqi '^content-type: application/json' ;;
+            esac || { echo "FAIL: $file content type is incorrect"; exit 1; }
+
+            echo "PASS: $file production delivery verified."
+          done
+
+      - name: Report runtime route
+        shell: bash
+        run: |
+          {
+            echo "### Production Office runtime"
+            echo
+            echo "Release: `${{ steps.release.outputs.release_tag }}`"
+            echo
+            echo "Verified Lumeo route: `https://lumeo.in/office-runtime/${{ steps.release.outputs.release_id }}/`"
+          } >> "$GITHUB_STEP_SUMMARY"

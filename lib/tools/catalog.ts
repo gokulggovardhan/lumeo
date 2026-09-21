@@ -189,8 +189,8 @@ export const lumeoTools: LumeoTool[] = [
     key: "convert",
     name: "Convert",
     plain: "Office ↔ PDF",
-    tag: "Word, Excel, PowerPoint and more — via free, self-hosted LibreOffice.",
-    processing: "server",
+    tag: "Convert Office documents and PDFs locally in your browser.",
+    processing: "browser",
     availability: "available",
     primaryRoute: "/pdf/word-to-pdf",
     actions: [

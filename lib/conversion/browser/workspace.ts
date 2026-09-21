@@ -5,6 +5,8 @@ export const CONVERSION_JOB_PREFIX = "job-";
 export const CONVERSION_JOB_METADATA = "job.json";
 export const CONVERSION_JOB_LOG = "job.log";
 export const CONVERSION_ORPHAN_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+export const CONVERSION_WORKSPACE_SETUP_TIMEOUT_MS = 5_000;
+export const CONVERSION_STORAGE_PROBE_TIMEOUT_MS = 2_000;
 export const CONVERSION_WORKSPACE_DIRECTORIES = [
   "input",
   "working",
@@ -46,6 +48,14 @@ export type LocalStorageEstimate = {
   availableBytes: number | null;
 };
 
+export function hasLocalWorkspaceCapacity(
+  estimate: LocalStorageEstimate,
+  requiredBytes: number,
+): boolean {
+  if (!estimate.supported || estimate.availableBytes === null) return true;
+  return estimate.availableBytes >= requiredBytes;
+}
+
 type StorageManagerWithOpfs = StorageManager & {
   getDirectory?: () => Promise<FileSystemDirectoryHandle>;
 };
@@ -71,6 +81,49 @@ type FilePickerScope = typeof globalThis & {
 function storageManager(): StorageManagerWithOpfs | null {
   if (typeof navigator === "undefined" || !navigator.storage) return null;
   return navigator.storage as StorageManagerWithOpfs;
+}
+
+function workspaceAbortReason(signal?: AbortSignal): unknown {
+  return signal?.reason ?? new DOMException("Conversion cancelled", "AbortError");
+}
+
+function throwIfWorkspaceAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) throw workspaceAbortReason(signal);
+}
+
+async function withWorkspaceDeadline<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+  signal?: AbortSignal,
+): Promise<T> {
+  throwIfWorkspaceAborted(signal);
+
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = (callback: (value: T) => void, value: T) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      callback(value);
+    };
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", onAbort);
+      reject(error);
+    };
+    const onAbort = () => fail(workspaceAbortReason(signal));
+    const timer = setTimeout(() => fail(new Error(message)), timeoutMs);
+
+    signal?.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      (value) => finish(resolve, value),
+      (error) => fail(error),
+    );
+  });
 }
 
 function parseTimestamp(value: string): number | null {
@@ -157,17 +210,41 @@ async function writeTextFile(
 async function streamBlobToHandle(
   blob: Blob,
   handle: FileSystemFileHandle,
+  signal?: AbortSignal,
 ): Promise<void> {
+  throwIfWorkspaceAborted(signal);
   const writable = await handle.createWritable();
+
   try {
     if (typeof blob.stream === "function") {
-      await blob.stream().pipeTo(writable);
-      return;
+      const reader = blob.stream().getReader();
+      try {
+        while (true) {
+          throwIfWorkspaceAborted(signal);
+          const { done, value } = await reader.read();
+          if (done) break;
+          if (value?.byteLength) {
+            await writable.write(value);
+          }
+        }
+      } catch (error) {
+        await reader.cancel().catch(() => {});
+        throw error;
+      } finally {
+        reader.releaseLock();
+      }
+    } else {
+      const chunkBytes = 4 * 1024 * 1024;
+      for (let offset = 0; offset < blob.size; offset += chunkBytes) {
+        throwIfWorkspaceAborted(signal);
+        const chunk = new Uint8Array(
+          await blob.slice(offset, Math.min(blob.size, offset + chunkBytes)).arrayBuffer(),
+        );
+        await writable.write(chunk);
+      }
     }
 
-    // Compatibility fallback for old engines. This still lets the browser
-    // implementation avoid ArrayBuffer duplication in every modern browser.
-    await writable.write(blob);
+    throwIfWorkspaceAborted(signal);
     await writable.close();
   } catch (error) {
     await writable.abort().catch(() => {});
@@ -175,17 +252,31 @@ async function streamBlobToHandle(
   }
 }
 
-async function getAppRoot(): Promise<FileSystemDirectoryHandle> {
+async function getAppRoot(
+  signal?: AbortSignal,
+): Promise<FileSystemDirectoryHandle> {
   const storage = storageManager();
   if (!storage || typeof storage.getDirectory !== "function") {
     throw new Error("Local browser workspace is not available in this browser.");
   }
 
-  const opfsRoot = await storage.getDirectory();
-  return opfsRoot.getDirectoryHandle(CONVERSION_WORKSPACE_ROOT, { create: true });
+  const opfsRoot = await withWorkspaceDeadline(
+    storage.getDirectory(),
+    CONVERSION_WORKSPACE_SETUP_TIMEOUT_MS,
+    "Local browser workspace did not become ready.",
+    signal,
+  );
+  return withWorkspaceDeadline(
+    opfsRoot.getDirectoryHandle(CONVERSION_WORKSPACE_ROOT, { create: true }),
+    CONVERSION_WORKSPACE_SETUP_TIMEOUT_MS,
+    "Local browser workspace could not be opened.",
+    signal,
+  );
 }
 
-export async function estimateLocalConversionStorage(): Promise<LocalStorageEstimate> {
+export async function estimateLocalConversionStorage(
+  signal?: AbortSignal,
+): Promise<LocalStorageEstimate> {
   const storage = storageManager();
   if (!storage || typeof storage.estimate !== "function") {
     return {
@@ -197,7 +288,12 @@ export async function estimateLocalConversionStorage(): Promise<LocalStorageEsti
   }
 
   try {
-    const estimate = await storage.estimate();
+    const estimate = await withWorkspaceDeadline(
+      storage.estimate(),
+      CONVERSION_STORAGE_PROBE_TIMEOUT_MS,
+      "Browser storage estimate timed out.",
+      signal,
+    );
     const quotaBytes = typeof estimate.quota === "number" ? estimate.quota : null;
     const usageBytes = typeof estimate.usage === "number" ? estimate.usage : null;
     return {
@@ -224,7 +320,11 @@ export async function requestPersistentConversionStorage(): Promise<boolean> {
   if (!storage || typeof storage.persist !== "function") return false;
 
   try {
-    return await storage.persist();
+    return await withWorkspaceDeadline(
+      storage.persist(),
+      CONVERSION_STORAGE_PROBE_TIMEOUT_MS,
+      "Persistent storage request timed out.",
+    );
   } catch {
     return false;
   }
@@ -232,11 +332,13 @@ export async function requestPersistentConversionStorage(): Promise<boolean> {
 
 export async function cleanupOrphanedConversionJobs(
   now = Date.now(),
+  signal?: AbortSignal,
 ): Promise<WorkspaceCleanupResult> {
-  const root = await getAppRoot();
+  const root = await getAppRoot(signal);
   const result: WorkspaceCleanupResult = { removed: 0, preserved: 0, errors: 0 };
 
   for await (const [name, handle] of (root as DirectoryHandleWithEntries).entries()) {
+    throwIfWorkspaceAborted(signal);
     if (handle.kind !== "directory" || !name.startsWith(CONVERSION_JOB_PREFIX)) continue;
 
     const directory = handle as FileSystemDirectoryHandle;
@@ -285,13 +387,19 @@ export class BrowserConversionWorkspace {
     this.status = metadata.status;
   }
 
-  static async create(kind: ConversionKind): Promise<BrowserConversionWorkspace> {
-    await requestPersistentConversionStorage();
+  static async create(
+    kind: ConversionKind,
+    signal?: AbortSignal,
+  ): Promise<BrowserConversionWorkspace> {
+    // Persistence improves quota durability but must never block a conversion.
+    void requestPersistentConversionStorage().catch(() => {});
 
-    const root = await getAppRoot();
-    // Best-effort sweep on every new visit/job. A failed cleanup must never
-    // prevent a fresh conversion from starting.
-    await cleanupOrphanedConversionJobs().catch(() => {});
+    const root = await getAppRoot(signal);
+    // Orphan cleanup is housekeeping, not a conversion prerequisite. In
+    // particular, Firefox may take a long time to enumerate OPFS entries.
+    // Never let that block a fresh conversion.
+    void cleanupOrphanedConversionJobs(Date.now()).catch(() => {});
+    throwIfWorkspaceAborted(signal);
 
     const jobId = crypto.randomUUID();
     const directory = await root.getDirectoryHandle(
@@ -364,23 +472,30 @@ export class BrowserConversionWorkspace {
     }
   }
 
-  async stageInput(file: File): Promise<FileSystemFileHandle> {
+  async stageInput(
+    file: File,
+    signal?: AbortSignal,
+  ): Promise<FileSystemFileHandle> {
     this.assertOpen();
     const handle = await this.directories.input.getFileHandle(
       `input${safeExtension(file.name)}`,
       { create: true },
     );
-    await streamBlobToHandle(file, handle);
+    await streamBlobToHandle(file, handle, signal);
     return handle;
   }
 
-  async writeOutput(name: string, blob: Blob): Promise<FileSystemFileHandle> {
+  async writeOutput(
+    name: string,
+    blob: Blob,
+    signal?: AbortSignal,
+  ): Promise<FileSystemFileHandle> {
     this.assertOpen();
     const handle = await this.directories.output.getFileHandle(
       safeOutputName(name),
       { create: true },
     );
-    await streamBlobToHandle(blob, handle);
+    await streamBlobToHandle(blob, handle, signal);
     return handle;
   }
 

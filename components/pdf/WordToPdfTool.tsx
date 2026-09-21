@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, CheckCircle2, FileDown, FileText, Loader2 } from "lucide-react";
+import { AlertCircle, CheckCircle2, FileDown, FileText } from "lucide-react";
+
+import {
+  ConversionStageIndicator,
+  LocalConversionPrivacyNote,
+} from "@/components/pdf/conversion/LocalConversionExperience";
 import {
   L2FileCard,
   L2ToolbarButton,
@@ -16,15 +21,34 @@ import {
 import { AuraStatus } from "@/components/ui/Aura";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
-import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
-import { recordRecentFile } from "@/lib/recent-files";
 import { ConversionCoordinator } from "@/lib/conversion/ConversionCoordinator";
 import { BrowserWordToPdfEngine } from "@/lib/conversion/browser/BrowserWordToPdfEngine";
-import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
+import { cleanupOrphanedConversionJobs } from "@/lib/conversion/browser/workspace";
+import {
+  conversionUserError,
+  normalizeConversionError,
+  toAnalyticsConversionErrorCode,
+  type ConversionUserError,
+} from "@/lib/conversion/errors";
 import { isWordNamedFile } from "@/lib/conversion/fileValidation";
-import type { ConversionResult } from "@/lib/conversion/types";
+import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
+import type {
+  ConversionPhase,
+  ConversionResult,
+} from "@/lib/conversion/types";
+import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
+import { recordRecentFile } from "@/lib/recent-files";
 
-type Stage = "idle" | "uploading" | "converting" | "success" | "error";
+type Stage =
+  | "idle"
+  | "selected"
+  | "preparing"
+  | "converting"
+  | "finalizing"
+  | "success"
+  | "cancelled"
+  | "recoverable-error"
+  | "unsupported";
 
 type SelectedFile = {
   file: File;
@@ -40,47 +64,70 @@ function downloadBlob(blob: Blob, fileName: string) {
   document.body.appendChild(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 function WordIcon() {
   return <FileText aria-hidden="true" className="h-8 w-8" />;
 }
 
-function LocalPrivacyNote() {
-  return (
-    <div className="mx-auto flex w-fit max-w-[560px] items-center justify-center gap-2 rounded-[var(--radius-pill)] bg-[var(--surface-raised)] px-4 py-2 text-center text-xs font-extrabold text-[var(--text-muted)]">
-      <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 shrink-0 text-[var(--text-premium)]" fill="none">
-        <path d="M8 2.5 12 4v3.1c0 2.6-1.5 4.9-4 6.1-2.5-1.2-4-3.5-4-6.1V4l4-1.5Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.4" />
-      </svg>
-      <span>Browser-only · Files stay on your device · Local workspace is cleaned automatically</span>
-    </div>
-  );
+function stageForPhase(phase: ConversionPhase): Stage {
+  if (phase === "preparing" || phase === "uploading") return "preparing";
+  if (phase === "finalizing") return "finalizing";
+  return "converting";
+}
+
+function selectedFileType(file: File): string {
+  const match = /\.([a-z0-9]+)$/i.exec(file.name);
+  return match ? match[1].toUpperCase() : "Word document";
 }
 
 export default function WordToPdfTool() {
   const { availability, track } = useAnalytics();
   const openedTrackedRef = useRef(false);
   const sessionRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   const [selected, setSelected] = useState<SelectedFile | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
+  const [phase, setPhase] = useState<ConversionPhase | null>(null);
   const [statusLabel, setStatusLabel] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ConversionUserError | null>(null);
   const [result, setResult] = useState<ConversionResult | null>(null);
 
   useEffect(() => {
-    if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
-    const outcome = track({ eventName: "tool_opened", toolSlug: "word-to-pdf" });
+    if (
+      !shouldAttemptOnce({
+        availability,
+        alreadyAccepted: openedTrackedRef.current,
+      })
+    ) {
+      return;
+    }
+    const outcome = track({
+      eventName: "tool_opened",
+      toolSlug: "word-to-pdf",
+    });
     if (outcome.accepted) openedTrackedRef.current = true;
   }, [availability, track]);
 
+  useEffect(() => {
+    void cleanupOrphanedConversionJobs().catch(() => {});
+    return () => {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, []);
+
   function resetTool() {
+    abortRef.current?.abort();
+    abortRef.current = null;
     sessionRef.current += 1;
     setSelected(null);
     setStage("idle");
+    setPhase(null);
     setStatusLabel("");
-    setError("");
+    setError(null);
     setResult(null);
   }
 
@@ -89,33 +136,47 @@ export default function WordToPdfTool() {
     if (!file) return;
 
     if (!isWordNamedFile(file)) {
-      setError("Please add one Word document (.docx or .doc).");
+      setError(
+        conversionUserError("unsupported-file", {
+          message: "Choose a DOCX or DOC Word document.",
+        }),
+      );
       return;
     }
+
     const sizeError = checkBrowserConversionFileSize(file);
     if (sizeError) {
-      setError(sizeError);
+      setError(
+        conversionUserError("file-too-large", {
+          technicalMessage: sizeError,
+        }),
+      );
       return;
     }
 
     sessionRef.current += 1;
     setSelected({ file });
-    setStage("idle");
-    setStatusLabel("Ready to convert");
-    setError("");
+    setStage("selected");
+    setPhase(null);
+    setStatusLabel("File selected");
+    setError(null);
     setResult(null);
   }
 
   async function handleConvert() {
-    if (!selected || stage === "uploading" || stage === "converting") return;
+    if (!selected || isBusy) return;
+
     const currentSession = sessionRef.current;
     const { file } = selected;
     const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
 
-    setError("");
+    setError(null);
     setResult(null);
-    setStage("converting");
-    setStatusLabel("Preparing conversion...");
+    setPhase("preparing");
+    setStage("preparing");
+    setStatusLabel("Preparing document");
 
     const startedAt = performance.now();
     track({ eventName: "processing_started", toolSlug: "word-to-pdf" });
@@ -124,10 +185,11 @@ export default function WordToPdfTool() {
       const conversionResult = await conversionCoordinator.convert(
         { file },
         {
-          onProgress: ({ phase, message }) => {
+          onProgress: (progress) => {
             if (currentSession !== sessionRef.current) return;
-            setStage(phase === "uploading" ? "uploading" : "converting");
-            setStatusLabel(message);
+            setPhase(progress.phase);
+            setStage(stageForPhase(progress.phase));
+            setStatusLabel(progress.message);
           },
         },
         controller.signal,
@@ -136,8 +198,9 @@ export default function WordToPdfTool() {
       if (currentSession !== sessionRef.current) return;
 
       setResult(conversionResult);
+      setPhase(null);
       setStage("success");
-      setStatusLabel("Download ready");
+      setStatusLabel("Ready to download");
       track({
         eventName: "processing_succeeded",
         toolSlug: "word-to-pdf",
@@ -151,21 +214,53 @@ export default function WordToPdfTool() {
       });
     } catch (conversionError) {
       if (currentSession !== sessionRef.current) return;
-      const message =
-        conversionError instanceof Error
-          ? conversionError.message
-          : "Conversion failed. Please try again.";
-      setError(message);
-      setStage("error");
-      setStatusLabel("");
+
+      const normalized = normalizeConversionError(conversionError);
+      if (process.env.NODE_ENV === "development") {
+        console.error("Word to PDF conversion failed", conversionError);
+      }
+
+      if (normalized.code === "cancelled" || controller.signal.aborted) {
+        setPhase(null);
+        setStage("cancelled");
+        setStatusLabel("Conversion cancelled");
+        setError(null);
+        return;
+      }
+
+      setPhase(null);
+      setError(normalized);
+      setStage(
+        normalized.code === "browser-unsupported"
+          ? "unsupported"
+          : "recoverable-error",
+      );
+      setStatusLabel(
+        normalized.code === "browser-unsupported"
+          ? "Browser not supported"
+          : "Conversion needs attention",
+      );
       track({
         eventName: "processing_failed",
         toolSlug: "word-to-pdf",
         durationMs: performance.now() - startedAt,
         success: false,
-        errorCode: "processing_error",
+        errorCode: toAnalyticsConversionErrorCode(normalized.code),
       });
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
     }
+  }
+
+  function handleCancel() {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    sessionRef.current += 1;
+    setPhase(null);
+    setStage("cancelled");
+    setStatusLabel("Conversion cancelled");
+    setError(null);
+    setResult(null);
   }
 
   function handleDownload() {
@@ -174,7 +269,10 @@ export default function WordToPdfTool() {
     downloadBlob(result.blob, result.fileName);
   }
 
-  const isBusy = stage === "uploading" || stage === "converting";
+  const isBusy =
+    stage === "preparing" ||
+    stage === "converting" ||
+    stage === "finalizing";
 
   const uploadArea = (
     <div className="mx-auto w-full max-w-[1040px]">
@@ -200,12 +298,15 @@ export default function WordToPdfTool() {
           {uploadArea}
         </div>
 
-        <LocalPrivacyNote />
+        <LocalConversionPrivacyNote />
 
         {error ? (
-          <div role="alert" className="mx-auto flex w-full max-w-[720px] items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]">
+          <div
+            role="alert"
+            className="mx-auto flex w-full max-w-[720px] items-center gap-2 rounded-[var(--radius-lg)] border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 p-4 text-sm font-medium text-[var(--text-danger)]"
+          >
             <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
-            {error}
+            {error.message}
           </div>
         ) : null}
       </section>
@@ -213,14 +314,26 @@ export default function WordToPdfTool() {
   }
 
   return (
-    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
-      <L2WorkspaceHeader title="Word to PDF" description={formatFileSize(selected.file.size)} />
+    <section className="l2-workspace-deep grid min-w-0 gap-4 pb-28 lg:pb-6">
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {statusLabel}
+      </p>
+
+      <L2WorkspaceHeader
+        title="Word to PDF"
+        description={`${selectedFileType(selected.file)} · ${formatFileSize(selected.file.size)}`}
+      />
 
       <L2WorkspaceToolbar>
         <L2ToolbarButton onClick={resetTool} disabled={isBusy}>
-          Start new
+          Replace file
         </L2ToolbarButton>
-        <span className="ml-auto text-xs font-bold text-[var(--text-subtle)]">{selected.file.name}</span>
+        <span
+          className="ml-auto min-w-0 max-w-[55vw] truncate text-xs font-bold text-[var(--text-subtle)] sm:max-w-[420px]"
+          title={selected.file.name}
+        >
+          {selected.file.name}
+        </span>
       </L2WorkspaceToolbar>
 
       <L2WorkspaceGrid
@@ -228,32 +341,82 @@ export default function WordToPdfTool() {
           <L2WorkspacePanel variant="flat">
             <L2FileCard
               name={selected.file.name}
-              meta={formatFileSize(selected.file.size)}
-              icon={<FileText aria-hidden="true" className="h-6 w-6 text-[var(--text-accent)]" />}
-              action={<AuraStatus tone={stage === "error" ? "danger" : "neutral"} label={statusLabel || "Ready"} />}
+              meta={`${selectedFileType(selected.file)} · ${formatFileSize(selected.file.size)}`}
+              icon={
+                <FileText
+                  aria-hidden="true"
+                  className="h-6 w-6 text-[var(--text-accent)]"
+                />
+              }
+              action={
+                <AuraStatus
+                  tone={
+                    stage === "recoverable-error" || stage === "unsupported"
+                      ? "danger"
+                      : "neutral"
+                  }
+                  label={statusLabel || "File selected"}
+                />
+              }
+              onRemove={isBusy ? undefined : resetTool}
+              removeLabel={`Remove ${selected.file.name}`}
             />
 
-            {isBusy ? (
-              <div className="mt-3 flex items-center gap-3 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/62 p-4">
-                <Loader2 aria-hidden="true" className="h-5 w-5 shrink-0 animate-spin text-[var(--text-accent)]" />
-                <p className="text-sm font-semibold text-[var(--text-primary)]">{statusLabel}</p>
+            {isBusy && phase ? (
+              <ConversionStageIndicator
+                kind="word-to-pdf"
+                phase={phase}
+                detail={statusLabel}
+              />
+            ) : null}
+
+            {stage === "cancelled" ? (
+              <div
+                role="status"
+                className="mt-3 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/62 p-4"
+              >
+                <p className="text-sm font-bold text-[var(--text-primary)]">
+                  Conversion cancelled
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-subtle)]">
+                  Your selected document is still ready if you want to try again.
+                </p>
               </div>
             ) : null}
 
             {stage === "success" && result ? (
-              <div className="aura-success-reveal mt-3 flex items-center gap-3 rounded-xl border border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)] p-4">
-                <CheckCircle2 aria-hidden="true" className="h-5 w-5 shrink-0 text-[var(--text-success)]" />
-                <div>
-                  <p className="text-sm font-bold text-[var(--text-success)]">PDF ready</p>
-                  <p className="mt-0.5 text-xs text-[var(--text-primary)]/56">{result.fileName} · {formatFileSize(result.blob.size)}</p>
+              <div className="aura-success-reveal mt-3 flex min-w-0 items-start gap-3 rounded-xl border border-[rgb(var(--emerald-rgb)/0.36)] bg-[var(--surface-success)] p-4">
+                <CheckCircle2
+                  aria-hidden="true"
+                  className="mt-0.5 h-5 w-5 shrink-0 text-[var(--text-success)]"
+                />
+                <div className="min-w-0">
+                  <p className="text-sm font-bold text-[var(--text-success)]">
+                    PDF ready
+                  </p>
+                  <p
+                    className="mt-1 truncate text-xs font-semibold text-[var(--text-primary)]/70"
+                    title={result.fileName}
+                  >
+                    {result.fileName}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--text-primary)]/56">
+                    PDF · {formatFileSize(result.blob.size)}
+                  </p>
                 </div>
               </div>
             ) : null}
 
             {error ? (
-              <div role="alert" className="mt-3 flex items-center gap-2 rounded-xl border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 px-3 py-2 text-sm text-[var(--text-danger)]">
-                <AlertCircle aria-hidden="true" className="h-4 w-4 shrink-0" />
-                {error}
+              <div
+                role="alert"
+                className="mt-3 flex items-start gap-2 rounded-xl border border-[var(--text-danger)]/20 bg-[var(--text-danger)]/10 px-3 py-3 text-sm text-[var(--text-danger)]"
+              >
+                <AlertCircle
+                  aria-hidden="true"
+                  className="mt-0.5 h-4 w-4 shrink-0"
+                />
+                <span>{error.message}</span>
               </div>
             ) : null}
           </L2WorkspacePanel>
@@ -261,10 +424,12 @@ export default function WordToPdfTool() {
         inspector={
           <L2WorkspaceInspector
             title="Convert to PDF"
-            description="Your document is converted locally in this browser. Lumeo does not upload the file for conversion."
+            description="Processed locally in your browser. Your document is not uploaded for conversion."
           >
             <p className="mt-3 text-xs leading-5 text-[var(--text-subtle)]">
-              Layout, tables, and formatting are preserved as closely as LibreOffice allows.
+              Lumeo uses a local Office engine to preserve document layout,
+              tables, images, pagination, and formatting as closely as the
+              document allows.
             </p>
           </L2WorkspaceInspector>
         }
@@ -276,41 +441,51 @@ export default function WordToPdfTool() {
             <button
               type="button"
               onClick={resetTool}
-              className="inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]"
+              className="lumeo-focus-ring inline-flex h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 px-5 text-sm font-bold text-[var(--text-primary)]/62 transition hover:border-[var(--lumeo-gold)]/30 hover:text-[var(--text-primary)]"
             >
               Convert another
             </button>
             <button
               type="button"
               onClick={handleDownload}
-              className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
+              className="lumeo-primary-action lumeo-focus-ring inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto"
             >
               <FileDown aria-hidden="true" className="h-4 w-4" />
               Download PDF
             </button>
           </>
+        ) : isBusy ? (
+          <button
+            type="button"
+            onClick={handleCancel}
+            aria-label="Cancel Word to PDF conversion"
+            className="lumeo-focus-ring inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/14 px-5 text-sm font-bold text-[var(--text-primary)] transition hover:border-[var(--text-danger)]/45 hover:text-[var(--text-danger)] sm:w-auto"
+          >
+            Cancel conversion
+          </button>
+        ) : stage === "unsupported" ? (
+          <button
+            type="button"
+            onClick={resetTool}
+            className="lumeo-focus-ring inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/14 px-5 text-sm font-bold text-[var(--text-primary)] sm:w-auto"
+          >
+            Choose another file
+          </button>
         ) : (
           <button
             type="button"
-            disabled={isBusy}
             onClick={handleConvert}
-            className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
+            disabled={!selected}
+            className="lumeo-primary-action lumeo-focus-ring inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
           >
-            {isBusy ? (
-              <>
-                <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-                {statusLabel}
-              </>
-            ) : error ? (
-              "Retry conversion"
-            ) : (
-              "Convert to PDF"
-            )}
+            {stage === "recoverable-error" || stage === "cancelled"
+              ? "Retry conversion"
+              : "Convert to PDF"}
           </button>
         )}
       </ToolActionBar>
 
-      <LocalPrivacyNote />
+      <LocalConversionPrivacyNote />
     </section>
   );
 }
