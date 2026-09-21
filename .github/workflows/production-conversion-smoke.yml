@@ -15,6 +15,7 @@ on:
       - "config/office-runtime-release.json"
       - "app/office-runtime/**"
       - "e2e/production-conversion-smoke.spec.ts"
+      - "tests/conversion-engine-boundary.test.ts"
       - "playwright.production-conversion.config.ts"
   workflow_dispatch:
 
