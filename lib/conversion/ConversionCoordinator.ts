@@ -8,8 +8,8 @@ import type {
 /**
  * Stable boundary between converter UI and a concrete conversion engine.
  *
- * Browser engines can later replace the legacy server adapters without the
- * React pages learning about WASM, OPFS, PDF.js, LibreOffice, or OCR details.
+ * Browser engines stay isolated from React pages so the UI does not need to
+ * know about WASM, OPFS, PDF.js, LibreOffice, or OCR implementation details.
  */
 export class ConversionCoordinator {
   constructor(private readonly engine: ConversionEngine) {}
