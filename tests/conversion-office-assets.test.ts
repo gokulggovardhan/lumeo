@@ -5,6 +5,7 @@ import {
   isImmutableOfficeAssetUrl,
   OFFICE_RUNTIME_MANIFEST_FILE,
   OFFICE_RUNTIME_REQUIRED_FILES,
+  preflightOfficeAssetOrigin,
   resolveOfficeAssetConfig,
   validateOfficeRuntimeManifest,
   ZETAJS_HELPER_URL,
@@ -134,4 +135,44 @@ test("runtime manifest requires every expected Office payload file", () => {
       ),
     /missing soffice\.wasm/,
   );
+});
+
+
+test("runtime preflight never caches a partial soffice.js response", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{ method: string; cache: RequestCache | undefined; range: string | null }> = [];
+
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    const headers = new Headers(init?.headers);
+    calls.push({
+      method: init?.method ?? "GET",
+      cache: init?.cache,
+      range: headers.get("Range"),
+    });
+    return new Response(null, {
+      status: 200,
+      headers: {
+        "content-type": "application/javascript",
+      },
+    });
+  }) as typeof fetch;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  await preflightOfficeAssetOrigin(
+    resolveOfficeAssetConfig(
+      "development",
+      "https://assets.example.test/runtime-dev/",
+    ),
+  );
+
+  assert.deepEqual(calls, [
+    {
+      method: "HEAD",
+      cache: "no-store",
+      range: null,
+    },
+  ]);
 });
