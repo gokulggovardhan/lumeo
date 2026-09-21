@@ -1,7 +1,10 @@
-const DEV_ZETA_HELPER_URL =
-  "https://cdn.jsdelivr.net/npm/zetajs@1.2.0/source/zetaHelper.js";
-const DEV_ZETAOFFICE_BASE_URL =
-  "https://cdn.zetaoffice.net/zetaoffice_latest/";
+import {
+  resolveOfficeAssetConfig,
+} from "@/lib/conversion/browser/libreoffice/assetConfig";
+
+const prototypeAssets = resolveOfficeAssetConfig("development");
+const DEV_ZETA_HELPER_URL = prototypeAssets.helperUrl;
+const DEV_ZETAOFFICE_BASE_URL = prototypeAssets.officeBaseUrl;
 const PROTOTYPE_MAX_FILE_BYTES = 10 * 1024 * 1024;
 const READY_TIMEOUT_MS = 120_000;
 const CONVERSION_TIMEOUT_MS = 120_000;

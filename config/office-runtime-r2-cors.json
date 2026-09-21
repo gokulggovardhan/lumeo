@@ -1,0 +1,28 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://lumeo.in"
+        ],
+        "methods": [
+          "GET",
+          "HEAD"
+        ],
+        "headers": [
+          "Range"
+        ]
+      },
+      "exposeHeaders": [
+        "Accept-Ranges",
+        "Cache-Control",
+        "Content-Length",
+        "Content-Range",
+        "Content-Type",
+        "Cross-Origin-Resource-Policy",
+        "ETag"
+      ],
+      "maxAgeSeconds": 86400
+    }
+  ]
+}
