@@ -1,4 +1,12 @@
 export type ReconstructedTextLine = {
+  /**
+   * A single independently positioned PDF text run.
+   *
+   * Despite the historical type name, this must not represent a whole visual
+   * row. Fixed-layout PDFs often place several unrelated cells on the same
+   * baseline, and concatenating them into one flowing Word paragraph destroys
+   * column geometry.
+   */
   text: string;
   xPt: number;
   yPt: number;
@@ -17,6 +25,13 @@ export type ReconstructedPage = {
   lines: ReconstructedTextLine[];
   backgroundImage?: Blob | File | null;
   backgroundExtension?: "jpg" | "png";
+  /**
+   * True when editable text pixels were removed from the raster fidelity
+   * background before embedding it. The DOCX builder can then keep text
+   * frames transparent instead of hiding duplicate raster text with opaque
+   * white paragraph shading.
+   */
+  backgroundTextMasked?: boolean;
 };
 
 export type OcrTextLine = {
