@@ -220,7 +220,9 @@ test.describe("Control Center authentication", () => {
     await auditNavigation.getByRole("link", { name: "Administrators" }).click();
     await expect(page).toHaveURL(/\/admin\/members/);
     const membersMain = page.locator("#main-content");
-    await expect(membersMain.getByRole("heading", { name: "Administrators" })).toBeVisible();
+    await expect(
+      membersMain.getByRole("heading", { name: "Administrators", exact: true }),
+    ).toBeVisible();
     await expect(membersMain.getByLabel("Search")).toBeVisible();
     await expect(membersMain.getByLabel("Role")).toBeVisible();
     await expect(membersMain.getByLabel("Access")).toBeVisible();
