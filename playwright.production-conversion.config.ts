@@ -27,12 +27,14 @@ export default defineConfig({
       name: "chromium-production-conversion",
       use: {
         ...devices["Desktop Chrome"],
+        headless: false,
         launchOptions: {
           args: [
             "--use-gl=angle",
-            "--use-angle=swiftshader",
+            "--use-angle=swiftshader-webgl",
             "--enable-unsafe-swiftshader",
             "--ignore-gpu-blocklist",
+            "--enable-gpu",
           ],
         },
       },
