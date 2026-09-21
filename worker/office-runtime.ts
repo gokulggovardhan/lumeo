@@ -1,4 +1,4 @@
-import runtimeRelease from "../config/office-runtime-release.json";
+import runtimeRelease from "../config/office-runtime-release.json" with { type: "json" };
 
 const OFFICE_RUNTIME_ROOT = "/office-runtime/";
 
