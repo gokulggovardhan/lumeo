@@ -3,12 +3,9 @@
 // Deliberately does NOT redefine the tool list. It takes the same Tile[]
 // that already powers the "PDF Tools" nav dropdown (lib/tools/tiles.ts's
 // buildTiles(), computed once server-side in PublicNav) and layers two
-// things on top: a small set of extra search aliases (so "combine" finds
-// Merge, "shrink" finds Compress, etc -- words that don't appear in the
-// tile's own label/description) and a short static list of non-tool pages
-// (Guides, Privacy, About, Contact). This is the one place both result
-// types are merged -- nothing else in the app should build its own
-// parallel copy of this list.
+// it with a short static list of non-tool pages (Guides, Privacy, About,
+// Contact). Tool aliases and bundled capabilities come from the canonical
+// catalog-derived Tile[] so the command palette and /pdf-tools never drift.
 import type { Tile } from "@/lib/tools/tiles";
 
 export type CommandPaletteItem = {
@@ -19,26 +16,6 @@ export type CommandPaletteItem = {
   route: string;
   glyph?: Tile["glyph"];
   keywords: string[];
-};
-
-// Extra synonyms per tool slug -- only words that a real user might type
-// that don't already appear in the tile's own label/description text.
-// Not exhaustive; extend here as real search gaps are found, not guessed.
-const TOOL_ALIASES: Record<string, string[]> = {
-  merge: ["combine", "join", "concatenate"],
-  compress: ["reduce", "shrink", "smaller", "optimize"],
-  "jpg-to-pdf": ["jpeg", "image", "photo", "picture"],
-  "pdf-to-jpg": ["jpeg", "image", "export", "screenshot"],
-  split: ["separate", "divide", "extract pages"],
-  reorder: ["organize", "rotate", "duplicate", "remove pages"],
-  sign: ["signature", "initials"],
-  watermark: ["stamp", "brand", "overlay"],
-  crop: ["trim", "resize", "margins"],
-  edit: ["annotate", "draw", "text", "whiteout"],
-  "extract-text": ["ocr", "copy text", "read"],
-  "word-to-pdf": ["doc", "docx", "convert"],
-  "pdf-to-word": ["doc", "docx", "editable"],
-  "html-to-pdf": ["webpage", "convert", "css"],
 };
 
 // Non-tool destinations worth surfacing. Admin is deliberately excluded --
@@ -66,7 +43,7 @@ export function buildCommandPaletteIndex(tiles: Tile[]): CommandPaletteItem[] {
     category: "Tool",
     route: tile.route,
     glyph: tile.glyph,
-    keywords: TOOL_ALIASES[tile.slug] ?? [],
+    keywords: [tile.categoryLabel, tile.brandedCategory, ...tile.aliases, ...tile.capabilities],
   }));
 
   return [...toolItems, ...STATIC_PAGES];

@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
 import PublicFooter from "@/components/PublicFooter";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
-import { PdfHeroVisual } from "@/components/pdf/PdfHeroVisual";
 import { ToolsExplorer } from "@/components/tools/ToolsExplorer";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
 import { resolveLumeoTools } from "@/lib/tools/resolve";
+import { buildDiscoveryTiles } from "@/lib/tools/tiles";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf-tools", {
-    title: { absolute: "PDF Tools - Browser-First PDF Workspace | Lumeo PDF" },
+    title: { absolute: "PDF Tools - Choose Your PDF Action | Lumeo PDF" },
     description:
-      "Browse Lumeo's browser-first PDF tools, with server-assisted Word conversion clearly identified.",
+      "Choose a PDF action directly. Compare on-device and server-assisted processing before opening a Lumeo tool.",
     alternates: { canonical: "/pdf-tools" },
     openGraph: {
       title: "PDF Tools - Lumeo PDF Workspace",
@@ -39,6 +39,7 @@ const structuredData = {
 export default async function PdfToolsPage() {
   const catalog = await getPublicPdfCatalog();
   const tools = resolveLumeoTools(catalog.tools);
+  const discoveryTools = buildDiscoveryTiles(tools);
 
   return (
     <PublicCatalogPageShell
@@ -50,20 +51,17 @@ export default async function PdfToolsPage() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <section className="lumeo-fade-up mb-7 flex items-center justify-between gap-8">
-        <div className="max-w-2xl">
-          <p className="aura-text-label text-[var(--lumeo-gold-300)]">PDF tools</p>
-          <h1 className="mt-3 font-serif font-medium text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[color:var(--text-primary)]">
-            The PDF tools that matter. <em className="not-italic text-[var(--atelier-sage-300)]">Clear about where they run.</em>
-          </h1>
-          <p className="mt-4 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-            Most tools process files in your browser. Word to PDF and PDF to Word use server-assisted conversion and identify that before processing.
-          </p>
-        </div>
-        <PdfHeroVisual />
+      <section className="lumeo-fade-up mb-6 max-w-3xl sm:mb-8">
+        <p className="aura-text-label text-[var(--text-premium)]">PDF tools</p>
+        <h1 className="mt-3 font-serif font-medium text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[color:var(--text-primary)]">
+          What do you need to do?
+        </h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+          Choose an action directly. Every tool shows whether it runs on your device or uses clearly identified server assistance.
+        </p>
       </section>
 
-      <ToolsExplorer tools={tools} />
+      <ToolsExplorer tools={discoveryTools} />
 
       <div className="mt-10">
         <PublicFooter />

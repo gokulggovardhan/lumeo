@@ -11,6 +11,9 @@ const eslintConfig = defineConfig([
     ".next/**",
     "out/**",
     "build/**",
+    // Cloudflare/vinext deployment output. Lint the authored source that
+    // produces it, not minified bundles generated during release checks.
+    "dist/**",
     "next-env.d.ts",
     // Standalone CommonJS container service, built and deployed
     // independently of the Next.js app (see services/word-to-pdf-converter/README.md).
