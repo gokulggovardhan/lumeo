@@ -56,7 +56,7 @@ export default async function WordToPdfPage() {
     >
       <L2ToolPageHeader
         title="Word to PDF"
-        description="Convert Word documents to PDF. Uploaded securely, converted on our server, deleted immediately after."
+        description="Convert Word documents to PDF locally in your browser. Your document stays on your device."
       />
 
       {toolState.blocked ? (
