@@ -1,9 +1,19 @@
-import { BrowserConversionWorkspace } from "@/lib/conversion/browser/workspace";
 import {
+  BrowserConversionWorkspace,
+  estimateLocalConversionStorage,
+  hasLocalWorkspaceCapacity,
+} from "@/lib/conversion/browser/workspace";
+import {
+  canRunThreadedBrowserOffice,
   detectBrowserConversionCapabilities,
   selectConversionProcessingMode,
 } from "@/lib/conversion/browser/capabilities";
 import { getBrowserLibreOfficeRuntime } from "@/lib/conversion/browser/libreoffice/BrowserLibreOfficeRuntime";
+import {
+  conversionUserError,
+  normalizeConversionError,
+} from "@/lib/conversion/errors";
+import { validateWordConversionFile } from "@/lib/conversion/fileValidation";
 import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import type {
@@ -20,83 +30,143 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
   readonly kind = "word-to-pdf" as const;
   readonly processingLocation = "browser" as const;
 
+  constructor(
+    private readonly injectedRuntime: ReturnType<
+      typeof getBrowserLibreOfficeRuntime
+    > | null = null,
+  ) {}
+
+  private getRuntime() {
+    return this.injectedRuntime ?? getBrowserLibreOfficeRuntime();
+  }
+
   async convert(
     input: ConversionInput,
     options: ConversionOptions,
     signal: AbortSignal,
   ): Promise<ConversionResult> {
     const sizeError = checkBrowserConversionFileSize(input.file);
-    if (sizeError) throw new Error(sizeError);
+    if (sizeError) {
+      throw conversionUserError("file-too-large", {
+        technicalMessage: sizeError,
+      });
+    }
+
+    const validation = await validateWordConversionFile(input.file);
+    if (!validation.ok) {
+      throw conversionUserError(validation.code, {
+        message: validation.message,
+      });
+    }
 
     const capabilities = await detectBrowserConversionCapabilities();
-    if (
-      !capabilities.webAssembly ||
-      !capabilities.webWorkers ||
-      !capabilities.sharedArrayBuffer ||
-      !capabilities.crossOriginIsolated ||
-      !capabilities.wasmThreadsReady
-    ) {
-      throw new Error(
-        "This browser cannot run local Word to PDF conversion. Update the browser and try again on a device that supports isolated WebAssembly workers.",
-      );
+    if (!canRunThreadedBrowserOffice(capabilities)) {
+      throw conversionUserError("browser-unsupported", {
+        recoverable: false,
+        technicalMessage:
+          "Threaded browser Office conversion requires WebAssembly, workers, SharedArrayBuffer, cross-origin isolation, shared WASM memory, and worker OffscreenCanvas WebGL.",
+      });
     }
 
     const mode = selectConversionProcessingMode({
       fileSizeBytes: input.file.size,
     });
+
     options.onProgress?.({
       phase: "preparing",
       message:
         mode === "normal"
-          ? "Preparing local conversion..."
-          : "Preparing large document workspace...",
+          ? "Preparing document"
+          : "Preparing large document workspace",
     });
 
     let workspace: BrowserConversionWorkspace | null = null;
+    let runtime: ReturnType<typeof getBrowserLibreOfficeRuntime> | null = null;
+    let completed = false;
+
     try {
       let conversionFile = input.file;
+      const storageEstimate = capabilities.opfs
+        ? await estimateLocalConversionStorage(signal)
+        : null;
+      const workspaceBytes = input.file.size * 2.25 + 64 * 1024 * 1024;
+      const canUseWorkspace =
+        mode !== "normal" &&
+        capabilities.opfs &&
+        (!storageEstimate ||
+          hasLocalWorkspaceCapacity(storageEstimate, workspaceBytes));
 
-      if (capabilities.opfs) {
-        workspace = await BrowserConversionWorkspace.create("word-to-pdf");
-        await workspace.markRunning();
-        await workspace.appendLog(
-          `Starting Word to PDF conversion in ${mode} mode (${input.file.size} bytes).`,
-        );
-        const inputHandle = await workspace.stageInput(input.file);
-        conversionFile = await inputHandle.getFile();
+      if (canUseWorkspace) {
+        try {
+          workspace = await BrowserConversionWorkspace.create(
+            "word-to-pdf",
+            signal,
+          );
+          await workspace.markRunning();
+          await workspace.appendLog(
+            `Starting Word to PDF conversion in ${mode} mode (${input.file.size} bytes).`,
+          );
+          const inputHandle = await workspace.stageInput(input.file, signal);
+          conversionFile = await inputHandle.getFile();
+        } catch (workspaceError) {
+          if (signal.aborted) throw workspaceError;
+          await workspace?.dispose("failed").catch(() => {});
+          workspace = null;
+          conversionFile = input.file;
+        }
+      }
+
+      options.onProgress?.({
+        phase: "loading-engine",
+        message: "Loading conversion engine",
+      });
+
+      runtime = this.getRuntime();
+      try {
+        await runtime.start(signal);
+      } catch (error) {
+        throw normalizeConversionError(error, "runtime");
       }
 
       options.onProgress?.({
         phase: "converting",
-        message: "Converting locally in your browser...",
+        message: "Processing document",
       });
 
-      const runtime = getBrowserLibreOfficeRuntime();
-      const blob = await runtime.convertDocumentToPdf(conversionFile, {
-        signal,
-        onInputProgress: (loaded, total) => {
-          const pct = total > 0 ? Math.min(99, Math.floor((loaded / total) * 100)) : 0;
-          options.onProgress?.({
-            phase: "converting",
-            message: `Preparing document for LibreOffice... ${pct}%`,
-          });
-        },
-      });
+      let blob: Blob;
+      try {
+        blob = await runtime.convertDocumentToPdf(conversionFile, {
+          signal,
+          onInputReady: () => {
+            options.onProgress?.({
+              phase: "generating",
+              message: "Generating PDF",
+            });
+          },
+        });
+      } catch (error) {
+        throw normalizeConversionError(error, "conversion");
+      }
 
       options.onProgress?.({
         phase: "finalizing",
-        message: "Finalizing PDF...",
+        message: "Finalizing file",
       });
 
       const fileName = `${sanitizeFileStem(input.file.name, "converted")}.pdf`;
-      if (workspace) {
-        await workspace.writeOutput(fileName, blob);
-        await workspace.appendLog(`Conversion completed (${blob.size} bytes).`);
-        await workspace.dispose("completed");
-        workspace = null;
+
+      try {
+        if (workspace) {
+          await workspace.writeOutput(fileName, blob, signal);
+          await workspace.appendLog(`Conversion completed (${blob.size} bytes).`);
+          await workspace.dispose("completed");
+          workspace = null;
+        }
+      } catch (error) {
+        throw normalizeConversionError(error, "output");
       }
 
-      return {
+      const result: ConversionResult = {
         blob,
         fileName,
         mimeType: PDF_MIME,
@@ -105,14 +175,29 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
           engineId: this.id,
         },
       };
+      completed = true;
+      return result;
     } catch (error) {
+      const normalized = normalizeConversionError(error);
       if (workspace) {
-        await workspace.appendLog(
-          `Conversion failed: ${error instanceof Error ? error.message : "unknown error"}`,
-        ).catch(() => {});
-        await workspace.dispose(signal.aborted ? "cancelled" : "failed").catch(() => {});
+        await workspace
+          .appendLog(
+            `Conversion failed [${normalized.code}]: ${normalized.technicalMessage ?? normalized.message}`,
+          )
+          .catch(() => {});
+        await workspace
+          .dispose(signal.aborted ? "cancelled" : "failed")
+          .catch(() => {});
       }
-      throw error;
+      throw normalized;
+    } finally {
+      // Normal conversions can reuse the already-loaded runtime for a fast
+      // second conversion. Large/extreme jobs release WASM threads and memory
+      // immediately, and any failed/cancelled job resets the runtime so retry
+      // starts from a clean process.
+      if (runtime && (mode !== "normal" || !completed)) {
+        runtime.destroy();
+      }
     }
   }
 }

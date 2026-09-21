@@ -42,3 +42,29 @@ test("Word to PDF route is cross-origin isolated for SharedArrayBuffer", async (
   assert.match(source, /Cross-Origin-Opener-Policy/);
   assert.match(source, /Cross-Origin-Embedder-Policy/);
 });
+
+
+test("Word to PDF resolves the production Office runtime only when conversion starts", async () => {
+  const source = await readFile(
+    "lib/conversion/browser/BrowserWordToPdfEngine.ts",
+    "utf8",
+  );
+  assert.match(source, /private getRuntime\(\)/);
+  assert.match(source, /this\.injectedRuntime \?\? getBrowserLibreOfficeRuntime\(\)/);
+  assert.doesNotMatch(
+    source,
+    /private readonly runtime\s*=\s*getBrowserLibreOfficeRuntime\(\)/,
+  );
+});
+
+
+test("Word runtime is reset after heavy or failed conversions to bound memory growth", async () => {
+  const source = await readFile(
+    "lib/conversion/browser/BrowserWordToPdfEngine.ts",
+    "utf8",
+  );
+
+  assert.match(source, /let completed = false/);
+  assert.match(source, /mode !== "normal" \|\| !completed/);
+  assert.match(source, /runtime\.destroy\(\)/);
+});
