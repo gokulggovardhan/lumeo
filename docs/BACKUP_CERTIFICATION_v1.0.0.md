@@ -54,7 +54,7 @@ All are tool-scaffolding from this session's environment setup (`.claude-flow/`,
 
 - `.env.local` — present, **untracked**, correctly excluded by `.gitignore`
 - `.env.example` — present, **tracked**, contains only empty placeholders (`NEXT_PUBLIC_SUPABASE_URL=`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=`), no real values
-- No `.env.production` file exists (not required for this deployment model — Vercel manages production env vars directly, not via a committed file)
+- No `.env.production` file exists (not required for this deployment model — legacy hosting platform manages production env vars directly, not via a committed file)
 - No secrets, API keys, service-role keys, or private-key patterns found in any tracked file (scanned for `sk_live_`, `AKIA...`, `service_role`, PEM private-key headers)
 
 ## Step 5 — Database / Supabase
@@ -69,8 +69,8 @@ All 7 explicitly requested files present and tracked: `README.md`, `docs/RELEASE
 
 ## Step 7 — Production configuration
 
-- `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `vercel.json`, `postcss.config.mjs` — all tracked, unmodified this pass
-- No root `Dockerfile` — correct, this app deploys to Vercel directly; the only Dockerfile in the repo is `services/word-to-pdf-converter/Dockerfile` for the standalone LibreOffice conversion container, present and tracked
+- `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `retired deployment config`, `postcss.config.mjs` — all tracked, unmodified this pass
+- No root `Dockerfile` — correct, this app deploys to legacy hosting platform directly; the only Dockerfile in the repo is `services/word-to-pdf-converter/Dockerfile` for the standalone LibreOffice conversion container, present and tracked
 - No `tailwind.config.ts` — correct, this project uses Tailwind v4's CSS-first config (`@import "tailwindcss"` in `app/globals.css` + `postcss.config.mjs`), confirmed in an earlier pass this session, not a missing file
 - CI workflows tracked: `.github/workflows/lumeo-ci.yml`, `production-health.yml`, `converter-keep-warm.yml`
 
@@ -146,7 +146,7 @@ All 14 routes live, all returning 200. No conversions were executed (route exist
 
 - `unzip -t`: **no errors detected**, all entries pass CRC integrity check
 - File count: 376 files (vs. 377 via `git ls-files` — a 1-file discrepancy traced to an `awk` field-splitting artifact in the counting command on a filename containing spaces, not a missing file; the integrity test independently confirms every archived entry is uncorrupted)
-- Spot-checked present: `package.json`, `package-lock.json`, `next.config.ts`, `README.md`, `vercel.json`, `.github/workflows/lumeo-ci.yml`, `services/word-to-pdf-converter/Dockerfile`, `supabase/migrations/*`
+- Spot-checked present: `package.json`, `package-lock.json`, `next.config.ts`, `README.md`, `retired deployment config`, `.github/workflows/lumeo-ci.yml`, `services/word-to-pdf-converter/Dockerfile`, `supabase/migrations/*`
 - Confirmed absent: `node_modules/`, `.next/` (0 matches)
 
 ## Restore readiness
