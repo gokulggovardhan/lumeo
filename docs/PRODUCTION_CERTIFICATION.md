@@ -98,10 +98,10 @@ login/contact/API routes. See [SECURITY_CERTIFICATION.md](./SECURITY_CERTIFICATI
 
 ## Deployment
 
-**Verified**: PR #115 merged → Vercel auto-deployed → manually triggered
+**Verified**: PR #115 merged → legacy hosting platform auto-deployed → manually triggered
 `production-health.yml` workflow → green (`https://lumeo.in` routes
 responding). PR #116 (Phase 16) merged the same way, CI green
-(CodeQL/Analyze × 3 languages, "Validate Lumeo PDF Workspace", Vercel
+(CodeQL/Analyze × 3 languages, "Validate Lumeo PDF Workspace", legacy hosting platform
 deploy) before merge.
 
 **This branch (`phase-17-22-certification`) is not yet merged** — see
