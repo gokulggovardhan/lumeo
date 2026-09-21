@@ -74,5 +74,6 @@ test("active conversion and health code do not depend on retired converter confi
   assert.doesNotMatch(active, /WORD_TO_PDF_CONVERTER_URL/);
   assert.doesNotMatch(active, /WORD_TO_PDF_CONVERTER_SECRET/);
   assert.doesNotMatch(active, /lumeo-word-to-pdf-converter/);
+  assert.doesNotMatch(active, /lumeo-temp/);
   assert.doesNotMatch(active, /\/api\/tools\/(word-to-pdf|pdf-to-word)/);
 });
