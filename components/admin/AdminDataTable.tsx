@@ -14,22 +14,32 @@ export function AdminDataTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-[var(--radius-lg)] border border-[var(--border-subtle)] shadow-[var(--shadow-xs)]">
-      <table className="min-w-full divide-y divide-[var(--border-subtle)] text-left text-sm">
-        <thead className="bg-[rgba(8,16,29,0.58)] text-xs uppercase tracking-[0.14em] text-[var(--lumeo-paper-400)]">
-          <tr>
+    <div className="overflow-x-auto rounded-xl border border-[var(--border-hairline)]">
+      <table className="min-w-full border-separate border-spacing-0 text-left text-sm">
+        <thead>
+          <tr className="bg-[rgba(var(--lumeo-paper-rgb),0.028)]">
             {columns.map((column) => (
-              <th key={column} scope="col" className="px-4 py-3 font-bold">
+              <th
+                key={column}
+                scope="col"
+                className="border-b border-[var(--border-hairline)] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-subtle)]"
+              >
                 {column}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[var(--border-subtle)]">
+        <tbody>
           {rows.map((row, index) => (
-            <tr key={index} className="bg-[var(--surface-raised)] transition duration-200 hover:bg-[var(--surface-elevated)]">
+            <tr
+              key={index}
+              className="transition hover:bg-[rgba(var(--lumeo-paper-rgb),0.022)]"
+            >
               {row.map((cell, cellIndex) => (
-                <td key={cellIndex} className="px-4 py-3 align-top text-[var(--lumeo-paper-200)]">
+                <td
+                  key={cellIndex}
+                  className="border-b border-[var(--border-hairline)] px-4 py-3.5 align-top text-[var(--text-secondary)] last:border-b-0"
+                >
                   {cell}
                 </td>
               ))}
