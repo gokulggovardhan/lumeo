@@ -210,6 +210,143 @@ async function makePdf({
   return Buffer.from(await pdf.save());
 }
 
+
+async function makeFixedLayoutInvoicePdf(): Promise<Buffer> {
+  const pdf = await PDFDocument.create();
+  const regular = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+  const page1 = pdf.addPage([595.276, 841.89]);
+  const page2 = pdf.addPage([595.276, 841.89]);
+
+  const rule = (page: ReturnType<typeof pdf.addPage>, y: number) =>
+    page.drawLine({
+      start: { x: 36, y },
+      end: { x: 559, y },
+      thickness: 0.8,
+      color: rgb(0.25, 0.25, 0.25),
+    });
+  const text = (
+    page: ReturnType<typeof pdf.addPage>,
+    value: string,
+    x: number,
+    y: number,
+    size = 9,
+    useBold = false,
+  ) =>
+    page.drawText(value, {
+      x,
+      y,
+      size,
+      font: useBold ? bold : regular,
+      color: rgb(0, 0, 0),
+    });
+
+  text(page1, "Invoice No: LUMEO-30321", 36, 806, 11, true);
+  text(page1, "Service Labour Invoice", 225, 806, 11, true);
+  text(page1, "Invoice Date: 08/12/2025 13:31", 394, 806, 9);
+  rule(page1, 795);
+
+  text(page1, "LUMEO MOTORS PRIVATE LIMITED", 36, 770, 10, true);
+  text(page1, "SYNTHETIC AUTOMOBILES", 330, 770, 10, true);
+  text(page1, "GST IN No.: TEST27LUMEO", 36, 740, 9);
+  text(page1, "JC No.: 41537", 36, 720, 9);
+  text(page1, "JobType: PAID SERVICE", 210, 720, 9);
+  text(page1, "RegnNo.: TEST-1604", 36, 700, 9);
+  text(page1, "Model: APACHE-LIKE FIXTURE", 210, 700, 9);
+  rule(page1, 684);
+
+  const columns = [
+    ["Item No", 38],
+    ["Particulars", 112],
+    ["Qty", 250],
+    ["Rate", 292],
+    ["Disc", 335],
+    ["Taxable", 375],
+    ["HSN", 428],
+    ["IGST", 485],
+    ["MRP", 530],
+  ] as const;
+  for (const [label, x] of columns) text(page1, label, x, 665, 8, true);
+  rule(page1, 654);
+
+  const rows = [
+    ["NF330502", "Engine flush VST 50 ml", "1.00", "83.90", "12.58", "71.32", "34039900", "18.00", "99.00"],
+    ["NR110920", "KIT PAD ASSY REAR", "1.00", "435.59", "108.90", "326.69", "87149400", "18.00", "514.00"],
+    ["TR600200", "TRU4 SYNTHETIC ENGINE OIL 1200 ML", "1.00", "761.86", "152.37", "609.49", "27101980", "18.00", "899.00"],
+    ["WKC", "consumable", "1.00", "200.00", "60.00", "140.00", "9985", "18.00", "236.00"],
+    ["MC17", "DRIVE CHAIN CLEAN LUBRICATION", "1.00", "100.00", "30.00", "70.00", "9987", "18.00", "118.00"],
+    ["PA", "PAID SERVICE", "1.00", "560.00", "559.94", "0.06", "9954", "18.00", "660.80"],
+  ] as const;
+  const xs = [38, 112, 250, 292, 335, 375, 428, 485, 530];
+  rows.forEach((row, rowIndex) => {
+    const y = 625 - rowIndex * 42;
+    row.forEach((value, columnIndex) =>
+      text(page1, value, xs[columnIndex], y, columnIndex === 1 ? 7.5 : 8),
+    );
+  });
+  rule(page1, 355);
+  text(page1, "Parts Total", 112, 330, 9, true);
+  text(page1, "3.00", 250, 330, 9);
+  text(page1, "1007.50", 375, 330, 9);
+  text(page1, "Labour Total", 112, 306, 9, true);
+  text(page1, "4.00", 250, 306, 9);
+  text(page1, "294.06", 375, 306, 9);
+  rule(page1, 292);
+  text(page1, "Sub Total", 112, 266, 9, true);
+  text(page1, "1301.56", 375, 266, 9);
+  rule(page1, 250);
+  text(page1, "Grand Total", 345, 218, 10, true);
+  text(page1, "1535.84", 445, 218, 10, true);
+  text(page1, "Round Off", 345, 198, 9);
+  text(page1, "0.16", 445, 198, 9);
+  rule(page1, 182);
+
+  text(page2, "Net Total", 300, 795, 11, true);
+  text(page2, "1536.00", 455, 795, 11, true);
+  text(page2, "( Rupees One Thousand Five Hundred and Thirty Six Only )", 130, 770, 9);
+  text(page2, "Synthetic AMC fixture preserves fixed-layout service columns.", 36, 738, 9);
+  rule(page2, 700);
+
+  const amcHeadings = [
+    ["Amc No.", 36],
+    ["Valid Till", 95],
+    ["Service", 166],
+    ["Water wash", 255],
+    ["Co check", 342],
+    ["chain", 414],
+    ["Pick up & drop", 480],
+  ] as const;
+  for (const [label, x] of amcHeadings) text(page2, label, x, 670, 8, true);
+  const totalAvail = [166, 210, 255, 299, 342, 382, 414, 448, 500, 540];
+  totalAvail.forEach((x, index) =>
+    text(page2, index % 2 === 0 ? "Total" : "Avail", x, 650, 7.5, true),
+  );
+  rule(page2, 638);
+
+  text(page2, "20997", 36, 610, 9);
+  text(page2, "09-Dec-2025", 95, 610, 9);
+  ["3", "2", "2", "0", "0", "0", "0", "0", "2", "0"].forEach((value, index) =>
+    text(page2, value, totalAvail[index] + 8, 610, 9),
+  );
+  rule(page2, 590);
+  text(page2, "For LUMEO MOTORS PRIVATE LIMITED", 315, 555, 9, true);
+  text(page2, "Authorised Signatory", 430, 520, 9);
+
+  return Buffer.from(await pdf.save());
+}
+
+function frameXForText(documentXml: string, value: string): number {
+  const marker = `>${value}</w:t>`;
+  const index = documentXml.indexOf(marker);
+  if (index < 0) throw new Error(`Missing reconstructed text: ${value}`);
+  const prefix = documentXml.slice(Math.max(0, index - 1600), index);
+  const matches = Array.from(prefix.matchAll(/w:x="(\d+)"/g));
+  const x = matches.at(-1)?.[1];
+  if (!x) throw new Error(`Missing positioned frame for: ${value}`);
+  return Number(x) / 20;
+}
+
 async function downloadBytes(download: Download) {
   const path = await download.path();
   if (!path) throw new Error("Playwright download has no local path.");
@@ -309,6 +446,122 @@ test.describe("browser conversion validation lab", () => {
     await page.getByTestId("pdf-download").click();
     bytes = await downloadBytes(await downloadPromise);
     await validateDocxDownload(bytes, "Lumeo page 2");
+  });
+
+
+  test("PDF to Word preserves invoice and AMC column geometry as independent editable runs", async ({
+    page,
+  }) => {
+    const pdf = await makeFixedLayoutInvoicePdf();
+
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "synthetic-fixed-layout-invoice.pdf",
+      mimeType: "application/pdf",
+      buffer: pdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const docx = await validateDocxDownload(bytes, "NF330502");
+    const documentXml = await docx.file("word/document.xml")!.async("string");
+
+    for (const expected of [
+      "Engine flush VST 50 ml",
+      "NR110920",
+      "TR600200",
+      "TRU4 SYNTHETIC ENGINE OIL 1200 ML",
+      "Parts Total",
+      "Labour Total",
+      "Grand Total",
+      "Amc No.",
+      "Valid Till",
+      "Water wash",
+      "Co check",
+      "Pick up &amp; drop",
+      "Authorised Signatory",
+    ]) {
+      expect(documentXml).toContain(expected);
+    }
+
+    expect(documentXml).not.toContain(
+      "Service Water wash Co check chain Pick up &amp; drop",
+    );
+    expect(documentXml).not.toContain(
+      "NF330502 Engine flush VST 50 ml 1.00 83.90",
+    );
+
+    expect(frameXForText(documentXml, "NF330502")).toBeLessThan(
+      frameXForText(documentXml, "Engine flush VST 50 ml"),
+    );
+    expect(frameXForText(documentXml, "Engine flush VST 50 ml")).toBeLessThan(
+      frameXForText(documentXml, "1.00"),
+    );
+    expect(frameXForText(documentXml, "Amc No.")).toBeLessThan(
+      frameXForText(documentXml, "Valid Till"),
+    );
+    expect(frameXForText(documentXml, "Valid Till")).toBeLessThan(
+      frameXForText(documentXml, "Service"),
+    );
+    expect(frameXForText(documentXml, "Service")).toBeLessThan(
+      frameXForText(documentXml, "Water wash"),
+    );
+    expect(frameXForText(documentXml, "Water wash")).toBeLessThan(
+      frameXForText(documentXml, "Co check"),
+    );
+
+    expect(docx.file("word/media/page-1.jpg")).toBeTruthy();
+    expect(docx.file("word/media/page-2.jpg")).toBeTruthy();
+    expect(documentXml).not.toContain("<w:shd ");
+  });
+
+  test("PDF to Word remains stable across ten sequential conversions and Unicode filenames", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "Sequential stress is exercised once in Chromium; WebKit and Firefox run the functional corpus.",
+    );
+
+    for (let index = 0; index < 10; index += 1) {
+      const pdf = await makePdf({ pages: index % 3 === 0 ? 2 : 1 });
+      const name =
+        index === 4
+          ? "invoice résumé 日本語 04.pdf"
+          : index === 7
+            ? "duplicate name.pdf"
+            : index === 8
+              ? "duplicate name.pdf"
+              : `sequential conversion ${index + 1}.pdf`;
+
+      await page.getByTestId("pdf-input").setInputFiles({
+        name,
+        mimeType: "application/pdf",
+        buffer: pdf,
+      });
+      await page.getByTestId("pdf-convert").click();
+      await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+        "data-state",
+        "success",
+        { timeout: 120_000 },
+      );
+
+      const downloadPromise = page.waitForEvent("download");
+      await page.getByTestId("pdf-download").click();
+      const bytes = await downloadBytes(await downloadPromise);
+      await validateDocxDownload(
+        bytes,
+        "Lumeo editable PDF reconstruction fixture",
+      );
+    }
   });
 
   test("PDF to Word cancellation cleans up and permits retry", async ({ page }) => {
@@ -413,6 +666,127 @@ test.describe("browser conversion validation lab", () => {
     bytes = await downloadBytes(await downloadPromise);
     const pdf = await PDFDocument.load(bytes);
     expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
+  });
+
+
+  test("Word to PDF stays stable across five sequential conversions", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "Threaded Office sequential stress runs once in Chromium.",
+    );
+
+    await expect(page.getByTestId("capabilities")).toContainText(
+      "Threads ready: yes",
+      { timeout: 30_000 },
+    );
+
+    for (let index = 0; index < 5; index += 1) {
+      const source = await makeDocx({ rich: index % 2 === 1 });
+      await page.getByTestId("word-input").setInputFiles({
+        name:
+          index === 2
+            ? "professional résumé 日本語.docx"
+            : `sequential word ${index + 1}.docx`,
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        buffer: source,
+      });
+      await page.getByTestId("word-convert").click();
+      await expect(page.getByTestId("word-lab")).toHaveAttribute(
+        "data-state",
+        "success",
+        { timeout: 420_000 },
+      );
+      const downloadPromise = page.waitForEvent("download");
+      await page.getByTestId("word-download").click();
+      await validatePdfDownload(await downloadBytes(await downloadPromise));
+    }
+  });
+
+  test("browser converters survive Word to PDF to Word to PDF round trip without retired transport", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "Office round-trip validation runs once in Chromium.",
+    );
+
+    const retiredTransport: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      const retiredApi =
+        url.pathname === "/api/tools/word-to-pdf" ||
+        url.pathname === "/api/tools/pdf-to-word" ||
+        url.pathname === "/api/tools/word-to-pdf/cleanup";
+      const storageWrite =
+        /\.supabase\.(?:co|in)$/.test(url.hostname) &&
+        url.pathname.startsWith("/storage/v1/") &&
+        request.method() !== "GET";
+      const retiredRender =
+        url.hostname === "lumeo-word-to-pdf-converter.onrender.com";
+      if (retiredApi || storageWrite || retiredRender) {
+        retiredTransport.push(`${request.method()} ${request.url()}`);
+      }
+    });
+
+    const sourceWord = await makeDocx({ rich: true });
+    await page.getByTestId("word-input").setInputFiles({
+      name: "round trip source.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: sourceWord,
+    });
+    await page.getByTestId("word-convert").click();
+    await expect(page.getByTestId("word-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 420_000 },
+    );
+    let downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("word-download").click();
+    const firstPdf = await downloadBytes(await downloadPromise);
+    await validatePdfDownload(firstPdf);
+
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "round trip intermediate.pdf",
+      mimeType: "application/pdf",
+      buffer: firstPdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+    downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const reconstructedWord = await downloadBytes(await downloadPromise);
+    await validateDocxDownload(
+      reconstructedWord,
+      "Lumeo browser-only Word conversion fixture",
+    );
+
+    await page.getByTestId("word-input").setInputFiles({
+      name: "round trip reconstructed.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: reconstructedWord,
+    });
+    await page.getByTestId("word-convert").click();
+    await expect(page.getByTestId("word-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 420_000 },
+    );
+    downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("word-download").click();
+    await validatePdfDownload(await downloadBytes(await downloadPromise));
+
+    expect(retiredTransport).toEqual([]);
   });
 
   test("Word to PDF cancellation resets runtime and a retry can start cleanly", async ({
