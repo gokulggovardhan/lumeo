@@ -31,3 +31,23 @@ test("leaves local development responses untouched", () => {
   assert.equal(response, source);
   assert.equal(response.headers.get("x-frame-options"), null);
 });
+
+
+test("adds cross-origin isolation headers to production Word to PDF", () => {
+  const request = new Request("https://lumeo.in/pdf/word-to-pdf");
+  const response = withProductionSecurityHeaders(request, new Response("ok"));
+
+  assert.equal(response.headers.get("cross-origin-opener-policy"), "same-origin");
+  assert.equal(
+    response.headers.get("cross-origin-embedder-policy"),
+    "require-corp",
+  );
+});
+
+test("does not force cross-origin isolation onto unrelated production tools", () => {
+  const request = new Request("https://lumeo.in/pdf/pdf-to-word");
+  const response = withProductionSecurityHeaders(request, new Response("ok"));
+
+  assert.equal(response.headers.get("cross-origin-opener-policy"), null);
+  assert.equal(response.headers.get("cross-origin-embedder-policy"), null);
+});
