@@ -1,8 +1,51 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import type { Download } from "@playwright/test";
 import JSZip from "jszip";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { readFile } from "node:fs/promises";
+
+type RuntimeWatch = {
+  pageErrors: string[];
+  failedRequests: string[];
+  retiredTransportRequests: string[];
+};
+
+function watchConversionRuntime(page: Page): RuntimeWatch {
+  const pageErrors: string[] = [];
+  const failedRequests: string[] = [];
+  const retiredTransportRequests: string[] = [];
+
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("requestfailed", (request) => {
+    failedRequests.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "failed"}`);
+  });
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    const pathname = url.pathname;
+    const retiredApi =
+      pathname === "/api/tools/word-to-pdf" ||
+      pathname === "/api/tools/pdf-to-word" ||
+      pathname === "/api/tools/word-to-pdf/cleanup";
+    const retiredStorageUpload =
+      /\.supabase\.(?:co|in)$/.test(url.hostname) &&
+      pathname.startsWith("/storage/v1/") &&
+      request.method() !== "GET";
+    const retiredContainer =
+      url.hostname === "lumeo-word-to-pdf-converter.onrender.com";
+
+    if (retiredApi || retiredStorageUpload || retiredContainer) {
+      retiredTransportRequests.push(`${request.method()} ${request.url()}`);
+    }
+  });
+
+  return { pageErrors, failedRequests, retiredTransportRequests };
+}
+
+function expectCleanRuntime(watch: RuntimeWatch) {
+  expect(watch.pageErrors).toEqual([]);
+  expect(watch.failedRequests).toEqual([]);
+  expect(watch.retiredTransportRequests).toEqual([]);
+}
 
 async function makeDocx(): Promise<Buffer> {
   const zip = new JSZip();
@@ -67,23 +110,22 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
 }) => {
   test.skip(browserName !== "chromium", "Threaded Office runtime production smoke runs in Chromium.");
 
+  const runtime = watchConversionRuntime(page);
   await page.goto("/pdf/word-to-pdf");
-
-  const tool = page;
-  await expect(tool.getByText(/Processed locally in your browser/i)).toBeVisible();
+  await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
 
   const docx = await makeDocx();
-  await tool.locator('input[type="file"]').setInputFiles({
+  await page.locator('input[type="file"]').setInputFiles({
     name: "production-smoke.docx",
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: docx,
   });
 
-  await tool.getByRole("button", { name: "Convert to PDF" }).click();
+  await page.getByRole("button", { name: "Convert to PDF" }).click();
 
-  const ready = tool.getByText("PDF ready");
-  const failure = tool.getByRole("alert");
+  const ready = page.getByText("PDF ready");
+  const failure = page.getByRole("alert");
   await Promise.race([
     ready.waitFor({ state: "visible", timeout: 420_000 }),
     failure.waitFor({ state: "visible", timeout: 420_000 }).then(async () => {
@@ -92,36 +134,58 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
   ]);
 
   const downloadPromise = page.waitForEvent("download");
-  await tool.getByRole("button", { name: "Download PDF" }).click();
+  await page.getByRole("button", { name: "Download PDF" }).click();
   const bytes = await downloadBytes(await downloadPromise);
   const output = await PDFDocument.load(bytes);
   expect(output.getPageCount()).toBeGreaterThan(0);
+  expectCleanRuntime(runtime);
 });
 
 test("production PDF to Word reconstructs locally and downloaded DOCX opens", async ({
   page,
 }) => {
+  const runtime = watchConversionRuntime(page);
   await page.goto("/pdf/pdf-to-word");
-
-  const tool = page;
-  await expect(tool.getByText(/Processed locally in your browser/i).first()).toBeVisible();
+  await expect(page.getByText(/Processed locally in your browser/i).first()).toBeVisible();
 
   const pdf = await makePdf();
-  await tool.locator('input[type="file"]').setInputFiles({
+  await page.locator('input[type="file"]').setInputFiles({
     name: "production-smoke.pdf",
     mimeType: "application/pdf",
     buffer: pdf,
   });
 
-  await tool.getByRole("button", { name: "Convert to Word" }).click();
-  await expect(tool.getByText("Word document ready")).toBeVisible({
+  await page.getByRole("button", { name: "Convert to Word" }).click();
+  await expect(page.getByText("Word document ready")).toBeVisible({
     timeout: 180_000,
   });
 
   const downloadPromise = page.waitForEvent("download");
-  await tool.getByRole("button", { name: "Download Word document" }).click();
+  await page.getByRole("button", { name: "Download Word document" }).click();
   const bytes = await downloadBytes(await downloadPromise);
   const docx = await JSZip.loadAsync(bytes);
   const xml = await docx.file("word/document.xml")?.async("string");
   expect(xml).toContain("Lumeo production PDF to Word smoke");
+  expectCleanRuntime(runtime);
+});
+
+test("production HTML to PDF generates and downloads a valid PDF locally", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName !== "chromium", "HTML production smoke runs once in Chromium.");
+
+  const runtime = watchConversionRuntime(page);
+  await page.goto("/pdf/html-to-pdf");
+  await page.getByLabel("HTML and CSS source").fill(
+    `<!doctype html><html><body><h1>Lumeo HTML production smoke</h1><p>Browser-only HTML to PDF validation.</p></body></html>`,
+  );
+  await page.getByLabel("File name").fill("production-html-smoke");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Generate PDF" }).click();
+  const bytes = await downloadBytes(await downloadPromise);
+  const output = await PDFDocument.load(bytes);
+  expect(output.getPageCount()).toBeGreaterThan(0);
+  expectCleanRuntime(runtime);
 });
