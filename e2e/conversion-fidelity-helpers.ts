@@ -257,6 +257,20 @@ export async function assertPdfLineAnchorFidelity(
     );
   }
 
+  for (let index = 0; index < reference.pages.length; index += 1) {
+    const expected = reference.pages[index];
+    const actual = candidate.pages[index];
+    const widthDelta = Math.abs(expected.width - actual.width) / expected.width;
+    const heightDelta =
+      Math.abs(expected.height - actual.height) / expected.height;
+    if (widthDelta > 0.005 || heightDelta > 0.005) {
+      throw new Error(
+        `Page ${index + 1} size changed materially: ` +
+          `${expected.width}x${expected.height} -> ${actual.width}x${actual.height}`,
+      );
+    }
+  }
+
   for (const anchor of anchors) {
     const expected = reference.lines.find(
       (line) =>
