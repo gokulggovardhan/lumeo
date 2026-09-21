@@ -73,7 +73,7 @@ export default async function AnalyticsPage({
           <div className="flex items-end"><button type="submit" className="min-h-11 w-full rounded-xl bg-[var(--action-primary)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:bg-[var(--action-primary-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)] lg:w-auto">Apply</button></div>
         </form>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-          <AdminStatusBadge tone="gold">{range.label}</AdminStatusBadge>
+          <AdminStatusBadge tone="gold">Selected: {range.label}</AdminStatusBadge>
           <span>{range.startDate} to {range.endDate} · IST</span>
         </div>
         {range.warning ? <p className="mt-3 rounded-xl border border-[rgba(var(--lumeo-gold-rgb),0.24)] bg-[rgba(var(--lumeo-gold-rgb),0.08)] px-4 py-3 text-sm text-[var(--text-secondary)]">{range.warning} Showing the last 7 days instead.</p> : null}
