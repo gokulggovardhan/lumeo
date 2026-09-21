@@ -5,7 +5,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ConversionCoordinator } from "@/lib/conversion/ConversionCoordinator";
 import { BrowserPdfToWordEngine } from "@/lib/conversion/browser/BrowserPdfToWordEngine";
 import { BrowserWordToPdfEngine } from "@/lib/conversion/browser/BrowserWordToPdfEngine";
-import { detectBrowserConversionCapabilities } from "@/lib/conversion/browser/capabilities";
+import {
+  canRunThreadedBrowserOffice,
+  detectBrowserConversionCapabilities,
+} from "@/lib/conversion/browser/capabilities";
 import {
   BrowserLibreOfficeRuntime,
 } from "@/lib/conversion/browser/libreoffice/BrowserLibreOfficeRuntime";
@@ -101,6 +104,8 @@ export default function BrowserConversionLab() {
           `crossOriginIsolated: ${capabilities.crossOriginIsolated ? "yes" : "no"}`,
           `OPFS: ${capabilities.opfs ? "yes" : "no"}`,
           `Threads ready: ${capabilities.wasmThreadsReady ? "yes" : "no"}`,
+          `Worker WebGL: ${capabilities.workerOffscreenWebGl ? "yes" : "no"}`,
+          `Office runtime ready: ${canRunThreadedBrowserOffice(capabilities) ? "yes" : "no"}`,
         ].join(" · "),
       );
     });
