@@ -222,8 +222,9 @@ Manually re-verify after any auth/infra change:
 - [ ] No `service_role` key or other secret appears in any client-bundled
       file
 - [ ] `.env`/`.env.local` remain gitignored; no committed secrets
-- [ ] The LibreOffice conversion service still requires `CONVERT_SECRET`
-      and fails closed if it's unset
+- [ ] Word → PDF still uses the browser LibreOffice/ZetaOffice engine and
+      immutable `/office-runtime/...` delivery; no remote converter URL,
+      secret, or server fallback has been reintroduced
 - [ ] `npm audit` shows no new HIGH/CRITICAL vulnerabilities beyond the
       already-documented, already-triaged set
 
@@ -261,9 +262,9 @@ tooling addition with no immediate consumer).
 - [ ] Manual security regression (Part 9) done for any auth/infra change
 - [ ] Deployment verification: confirm deterministic CI and Cloudflare/vinext
       build validation succeeded for the branch under test
-- [ ] Production smoke test: after merge, load the live site and exercise
-      at least one browser-only tool and one server-assisted tool
-      end-to-end with a real file
+- [ ] Production smoke test: after merge, exercise Word → PDF and PDF → Word
+      end-to-end with real files, validate the downloaded outputs, and confirm
+      HTML → PDF still works in the browser
 - [ ] Rollback verification: confirm the previous Cloudflare Worker version
       remains available for production rollback
 
