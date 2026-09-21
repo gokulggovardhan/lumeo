@@ -112,6 +112,7 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
 
   const runtime = watchConversionRuntime(page);
   await page.goto("/pdf/word-to-pdf");
+  expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
   await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
 
   const docx = await makeDocx();
