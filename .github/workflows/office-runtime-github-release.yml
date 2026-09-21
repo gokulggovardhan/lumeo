@@ -1,0 +1,118 @@
+name: Office Runtime GitHub Release
+
+on:
+  push:
+    branches:
+      - 'feature/browser-conversion-hardening'
+    paths:
+      - ".github/workflows/office-runtime-github-release.yml"
+      - "scripts/prepare-office-runtime-release.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: office-runtime-github-release
+  cancel-in-progress: false
+
+env:
+  OFFICE_RELEASE_ID: zeta-24-2-2026-09-21-a
+  OFFICE_RELEASE_TAG: office-runtime-zeta-24-2-2026-09-21-a
+  OFFICE_SOURCE_BASE_URL: https://cdn.zetaoffice.net/zetaoffice_latest/
+
+jobs:
+  publish:
+    name: Publish immutable Office runtime release
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+
+      - name: Refuse to overwrite an immutable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$OFFICE_RELEASE_TAG" >/dev/null 2>&1; then
+            echo "Release $OFFICE_RELEASE_TAG already exists. Immutable runtime releases are never overwritten."
+            exit 1
+          fi
+
+      - name: Prepare immutable runtime snapshot
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/prepare-office-runtime-release.mjs \
+            --release "$OFFICE_RELEASE_ID" \
+            --source "$OFFICE_SOURCE_BASE_URL" \
+            --out /tmp/lumeo-office-runtime
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$OFFICE_RELEASE_TAG" \
+            --target "$GITHUB_SHA" \
+            --title "Lumeo Office Runtime $OFFICE_RELEASE_ID" \
+            --notes "Immutable browser-only LibreOffice/ZetaOffice runtime snapshot for Lumeo Word to PDF." \
+            --draft
+
+      - name: Upload runtime payload and manifest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir="/tmp/lumeo-office-runtime/$OFFICE_RELEASE_ID"
+          gh release upload "$OFFICE_RELEASE_TAG" \
+            "$dir/soffice.js" \
+            "$dir/soffice.wasm" \
+            "$dir/soffice.data" \
+            "$dir/soffice.data.js.metadata"
+          gh release upload "$OFFICE_RELEASE_TAG" "$dir/lumeo-office-runtime.json"
+
+      - name: Verify uploaded release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          names="$(gh release view "$OFFICE_RELEASE_TAG" --json assets --jq '.assets[].name' | sort)"
+          expected="$(printf '%s\n' \
+            lumeo-office-runtime.json \
+            soffice.data \
+            soffice.data.js.metadata \
+            soffice.js \
+            soffice.wasm | sort)"
+          diff -u <(printf '%s\n' "$expected") <(printf '%s\n' "$names")
+
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release edit "$OFFICE_RELEASE_TAG" --draft=false --latest=false
+
+      - name: Report release
+        shell: bash
+        run: |
+          {
+            echo "### Immutable Office runtime"
+            echo
+            echo "Published release: $OFFICE_RELEASE_TAG"
+            echo "Release ID: $OFFICE_RELEASE_ID"
+            echo
+            echo "The application serves these assets through its same-origin Cloudflare Worker runtime route."
+          } >> "$GITHUB_STEP_SUMMARY"
