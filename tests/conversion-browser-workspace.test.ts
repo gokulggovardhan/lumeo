@@ -55,11 +55,16 @@ test("workspace layout reserves reusable directories for later engines", () => {
   ]);
 });
 
-test("workspace stages modern files by stream instead of ArrayBuffer duplication", async () => {
+test("workspace stages files with bounded abortable streaming", async () => {
   const source = await readFile("lib/conversion/browser/workspace.ts", "utf8");
 
-  assert.match(source, /blob\.stream\(\)\.pipeTo\(writable\)/);
-  assert.doesNotMatch(source, /\.arrayBuffer\(/);
+  assert.match(source, /blob\.stream\(\)\.getReader\(\)/);
+  assert.match(source, /await writable\.write\(value\)/);
+  assert.match(source, /chunkBytes = 4 \* 1024 \* 1024/);
+  assert.doesNotMatch(source, /pipeTo\(writable/);
+  assert.doesNotMatch(source, /blob\.arrayBuffer\(\)/);
+  assert.match(source, /throwIfWorkspaceAborted\(signal\)/);
+  assert.match(source, /void cleanupOrphanedConversionJobs\(Date\.now\(\)\)\.catch/);
   assert.match(source, /navigator\.storage/);
   assert.match(source, /storage\.estimate/);
   assert.match(source, /getDirectory/);
