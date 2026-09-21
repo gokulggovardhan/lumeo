@@ -16,7 +16,7 @@ from a generic checklist without evidence.
 
 **Missing baseline security response headers.** Verified live against
 `https://lumeo.in` via `fetch()`: the site returned `strict-transport-security`
-(good, Vercel default) but no `Content-Security-Policy`,
+(good, legacy hosting platform default) but no `Content-Security-Policy`,
 `X-Frame-Options`, `X-Content-Type-Options`, or `Referrer-Policy`, and
 leaked `X-Powered-By: Next.js`. Confirmed the app has no cross-origin
 iframe embedding of itself (`HtmlToPdfTool.tsx`'s `<iframe>` is same-page,
