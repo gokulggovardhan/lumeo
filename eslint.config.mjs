@@ -15,9 +15,6 @@ const eslintConfig = defineConfig([
     // produces it, not minified bundles generated during release checks.
     "dist/**",
     "next-env.d.ts",
-    // Standalone CommonJS container service, built and deployed
-    // independently of the Next.js app (see services/word-to-pdf-converter/README.md).
-    "services/word-to-pdf-converter/**",
     // Agent tooling, skills, and any git worktrees checked out beneath it.
     // A worktree here holds a FULL second copy of the repo, so linting it
     // reported ~46,500 problems and made `npm run lint` unusable as a
