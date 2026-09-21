@@ -737,7 +737,11 @@ test.describe("browser conversion validation lab", () => {
           { page: 1, contains: "Lumeo formatted heading" },
           { page: 1, contains: "Table A1" },
           { page: 1, contains: "Table B2" },
-          { page: 2, contains: "Lumeo second page centered text" },
+          {
+            page: 2,
+            contains: "Lumeo second page centered text",
+            horizontal: "center",
+          },
         ],
         0.025,
       );
@@ -808,17 +812,37 @@ test.describe("browser conversion validation lab", () => {
         browserPdf,
         outputDirectory,
         [
-          { page: 1, contains: "Lumeo Professional Header" },
+          {
+            page: 1,
+            contains: "Lumeo Professional Header",
+            horizontal: "right",
+          },
           { page: 1, contains: "Professional fidelity fixture" },
           { page: 1, contains: "Times italic underlined sample" },
           { page: 1, contains: "Unicode:" },
           { page: 1, contains: "Merged table heading" },
           { page: 1, contains: "Table A1" },
-          { page: 1, contains: "Professional Footer" },
-          { page: 2, contains: "Lumeo Professional Header" },
-          { page: 2, contains: "Landscape section content" },
+          {
+            page: 1,
+            contains: "Professional Footer",
+            horizontal: "center",
+          },
+          {
+            page: 2,
+            contains: "Lumeo Professional Header",
+            horizontal: "right",
+          },
+          {
+            page: 2,
+            contains: "Landscape section content",
+            horizontal: "center",
+          },
           { page: 2, contains: "Landscape Table A" },
-          { page: 2, contains: "Professional Footer" },
+          {
+            page: 2,
+            contains: "Professional Footer",
+            horizontal: "center",
+          },
         ],
         0.025,
       );
