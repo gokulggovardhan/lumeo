@@ -22,6 +22,7 @@ import {
   normalizeConversionError,
 } from "@/lib/conversion/errors";
 import { validatePdfConversionFile } from "@/lib/conversion/fileValidation";
+import { validateGeneratedDocx } from "@/lib/conversion/outputValidation";
 import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { checkPdfPageCount } from "@/lib/pdf/uploadValidation";
@@ -598,6 +599,27 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
       let blob: Blob;
       try {
         blob = await buildReconstructedDocx(pages);
+      } catch (error) {
+        throw normalizeConversionError(error, "output");
+      }
+
+      throwIfAborted(signal);
+      options.onProgress?.({
+        phase: "validating",
+        message: "Validating Word document",
+      });
+
+      try {
+        await validateGeneratedDocx(blob, {
+          expectedPageCount: pages.length,
+          minimumEditableTextRuns: pages.reduce(
+            (count, page) => count + page.lines.length,
+            0,
+          ),
+          expectedBackgroundImages: pages.filter(
+            (page) => Boolean(page.backgroundImage),
+          ).length,
+        });
       } catch (error) {
         throw normalizeConversionError(error, "output");
       }
