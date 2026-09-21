@@ -2,14 +2,21 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("LibreOffice prototype is development-only and uses pinned ZetaJS helper", async () => {
-  const source = await readFile(
-    "lib/conversion/browser/libreoffice/prototypeRuntime.ts",
-    "utf8",
-  );
+test("LibreOffice prototype is development-only and uses the shared pinned asset policy", async () => {
+  const [source, assetConfig] = await Promise.all([
+    readFile(
+      "lib/conversion/browser/libreoffice/prototypeRuntime.ts",
+      "utf8",
+    ),
+    readFile(
+      "lib/conversion/browser/libreoffice/assetConfig.ts",
+      "utf8",
+    ),
+  ]);
 
   assert.match(source, /process\.env\.NODE_ENV !== "development"/);
-  assert.match(source, /zetajs@1\.2\.0/);
+  assert.match(source, /resolveOfficeAssetConfig\("development"\)/);
+  assert.match(assetConfig, /ZETAJS_HELPER_VERSION = "1\.2\.0"/);
   assert.match(source, /writer_pdf_Export/);
   assert.match(source, /crossOriginIsolated/);
   assert.match(source, /SharedArrayBuffer/);
