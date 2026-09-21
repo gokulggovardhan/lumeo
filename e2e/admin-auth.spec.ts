@@ -46,7 +46,7 @@ async function getAdminSessionState(page: Page) {
 
 async function openAdminNavigation(page: Page) {
   const openButton = page.getByRole("button", {
-    name: "Open Control Center navigation",
+    name: "Open Admin navigation",
   });
 
   if (await openButton.isVisible().catch(() => false)) {
@@ -54,20 +54,20 @@ async function openAdminNavigation(page: Page) {
     await openButton.click();
 
     const closeButton = page.getByRole("button", {
-      name: "Close Control Center navigation",
+      name: "Close Admin navigation",
     });
     await expect(closeButton).toBeVisible();
     await expect(closeButton).toHaveAttribute("aria-expanded", "true");
 
     const mobileNavigation = page.getByRole("navigation", {
-      name: "Mobile Control Center navigation",
+      name: "Mobile Admin navigation",
     });
     await expect(mobileNavigation).toBeVisible();
     return { navigation: mobileNavigation, mobile: true, closeButton };
   }
 
   const desktopNavigation = page.getByRole("navigation", {
-    name: "Control Center navigation",
+    name: "Admin navigation",
   });
   await expect(desktopNavigation).toBeVisible();
   return { navigation: desktopNavigation, mobile: false, closeButton: null };
@@ -79,7 +79,7 @@ async function exerciseResponsiveNavigation(page: Page) {
 
   await page.keyboard.press("Escape");
   const reopenedButton = page.getByRole("button", {
-    name: "Open Control Center navigation",
+    name: "Open Admin navigation",
   });
   await expect(reopenedButton).toBeVisible();
   await expect(reopenedButton).toHaveAttribute("aria-expanded", "false");
