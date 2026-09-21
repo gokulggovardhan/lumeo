@@ -16,6 +16,7 @@ import {
   renderDocxWithLibreOffice,
   writePdfFixture,
 } from "./conversion-fidelity-helpers";
+import { makeProfessionalDocx } from "./professional-docx-fixture";
 
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYGJAQoAHxcCAk+Uzr4AAAAASUVORK5CYII=",
@@ -753,6 +754,88 @@ test.describe("browser conversion validation lab", () => {
     }
   });
 
+
+
+  test("Word to PDF preserves professional formatting against native LibreOffice reference", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    test.skip(
+      browserName !== "chromium",
+      "Professional Office fidelity comparison runs once in Chromium.",
+    );
+
+    await expect(page.getByTestId("capabilities")).toContainText(
+      "Threads ready: yes",
+      { timeout: 30_000 },
+    );
+
+    const source = await makeProfessionalDocx();
+    await page.getByTestId("word-input").setInputFiles({
+      name: "professional-fidelity-fixture.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: source,
+    });
+    await page.getByTestId("word-convert").click();
+    await expect(page.getByTestId("word-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 420_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("word-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const generated = await PDFDocument.load(bytes);
+    expect(generated.getPageCount()).toBe(2);
+
+    if (process.env.LUMEO_FIDELITY_CLI === "1") {
+      const outputDirectory = testInfo.outputPath("professional-word-fidelity");
+      const referencePdf = await renderDocxWithLibreOffice(
+        source,
+        outputDirectory,
+        "professional-reference",
+      );
+      const browserPdf = await writePdfFixture(
+        bytes,
+        outputDirectory,
+        "professional-browser",
+      );
+
+      await assertPdfLineAnchorFidelity(
+        referencePdf,
+        browserPdf,
+        outputDirectory,
+        [
+          { page: 1, contains: "Lumeo Professional Header" },
+          { page: 1, contains: "Professional fidelity fixture" },
+          { page: 1, contains: "Times italic underlined sample" },
+          { page: 1, contains: "Unicode:" },
+          { page: 1, contains: "Merged table heading" },
+          { page: 1, contains: "Table A1" },
+          { page: 1, contains: "Professional Footer" },
+          { page: 2, contains: "Lumeo Professional Header" },
+          { page: 2, contains: "Landscape section content" },
+          { page: 2, contains: "Landscape Table A" },
+          { page: 2, contains: "Professional Footer" },
+        ],
+        0.025,
+      );
+
+      const [referenceImages, browserImages] = await Promise.all([
+        countPdfImages(referencePdf),
+        countPdfImages(browserPdf),
+      ]);
+      expect(referenceImages).toBeGreaterThan(0);
+      expect(browserImages).toBeGreaterThanOrEqual(referenceImages);
+
+      await assertRenderedPdfSimilarity(referencePdf, browserPdf, {
+        maxMae: 20,
+        maxChanged: 0.22,
+      });
+    }
+  });
 
   test("Word to PDF stays stable across five sequential conversions", async ({
     page,
