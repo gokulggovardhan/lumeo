@@ -70,9 +70,9 @@ All 7 explicitly requested files present and tracked: `README.md`, `docs/RELEASE
 ## Step 7 — Production configuration
 
 - `next.config.ts`, `tsconfig.json`, `eslint.config.mjs`, `retired deployment config`, `postcss.config.mjs` — all tracked, unmodified this pass
-- No root `Dockerfile` — correct, this app deploys to legacy hosting platform directly; the only Dockerfile in the repo is `services/word-to-pdf-converter/Dockerfile` for the standalone LibreOffice conversion container, present and tracked
+- Historical snapshot note: at this July 2026 restore point, the repository still contained a standalone Word→PDF converter Dockerfile. That converter service was retired from current `main` in September 2026 after browser-only conversion production certification.
 - No `tailwind.config.ts` — correct, this project uses Tailwind v4's CSS-first config (`@import "tailwindcss"` in `app/globals.css` + `postcss.config.mjs`), confirmed in an earlier pass this session, not a missing file
-- CI workflows tracked: `.github/workflows/lumeo-ci.yml`, `production-health.yml`, `converter-keep-warm.yml`
+- Historical snapshot note: `converter-keep-warm.yml` was tracked at this July 2026 restore point; it was retired with the server Word→PDF converter in September 2026.
 
 ## Step 8 — Public assets
 
@@ -146,7 +146,7 @@ All 14 routes live, all returning 200. No conversions were executed (route exist
 
 - `unzip -t`: **no errors detected**, all entries pass CRC integrity check
 - File count: 376 files (vs. 377 via `git ls-files` — a 1-file discrepancy traced to an `awk` field-splitting artifact in the counting command on a filename containing spaces, not a missing file; the integrity test independently confirms every archived entry is uncorrupted)
-- Spot-checked present: `package.json`, `package-lock.json`, `next.config.ts`, `README.md`, `retired deployment config`, `.github/workflows/lumeo-ci.yml`, `services/word-to-pdf-converter/Dockerfile`, `supabase/migrations/*`
+- Spot-checked present in the July 2026 backup archive: `package.json`, `package-lock.json`, `next.config.ts`, `README.md`, `retired deployment config`, `.github/workflows/lumeo-ci.yml`, the then-current standalone Word→PDF converter Dockerfile, and `supabase/migrations/*`. The converter Dockerfile is intentionally absent from current `main` after the September 2026 browser-only migration.
 - Confirmed absent: `node_modules/`, `.next/` (0 matches)
 
 ## Restore readiness
