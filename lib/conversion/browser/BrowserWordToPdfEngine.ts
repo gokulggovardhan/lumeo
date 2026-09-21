@@ -26,6 +26,12 @@ import type {
 
 const PDF_MIME = "application/pdf";
 
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) {
+    throw signal.reason ?? new DOMException("Conversion cancelled", "AbortError");
+  }
+}
+
 export class BrowserWordToPdfEngine implements ConversionEngine {
   readonly id = "browser-libreoffice-word-to-pdf";
   readonly kind = "word-to-pdf" as const;
