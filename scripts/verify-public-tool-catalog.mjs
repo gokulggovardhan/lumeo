@@ -13,6 +13,11 @@ const newFiles = [
   // separate loading.tsx exists under app/pdf-tools/ (removed since the
   // initial rollout -- page.tsx and error.tsx cover the route today).
   "components/public/PublicPdfToolsMenuClient.tsx",
+  "components/tools/ToolsExplorer.tsx",
+  "lib/tools/catalog.ts",
+  "lib/tools/tiles.ts",
+  "lib/tools/discovery-search.ts",
+  "lib/command-palette/index.ts",
   "app/pdf-tools/page.tsx",
   "app/pdf-tools/error.tsx",
   "docs/PUBLIC_TOOL_CATALOG.md",
@@ -90,6 +95,27 @@ try {
   assert(menu.includes("aria-controls"), "Menu must expose aria-controls.");
   assert(menu.includes("aria-haspopup"), "Menu must expose aria-haspopup.");
   assert(menu.includes("Escape"), "Menu must close on Escape.");
+
+  const directory = read("app/pdf-tools/page.tsx");
+  const explorer = read("components/tools/ToolsExplorer.tsx");
+  const toolCatalog = read("lib/tools/catalog.ts");
+  const tiles = read("lib/tools/tiles.ts");
+  const commandIndex = read("lib/command-palette/index.ts");
+  assert(directory.includes("buildDiscoveryTiles") && directory.includes("ToolsExplorer"), "Directory must render resolved direct-action tools.");
+  assert(directory.includes("What do you need to do?"), "Directory must use an action-focused introduction.");
+  assert(explorer.includes('type="search"') && explorer.includes('aria-live="polite"'), "Directory search and live result count are missing.");
+  for (const filter of ["All tools", "Organize", "Edit & sign", "Optimize", "Convert"]) {
+    assert(explorer.includes(filter), `Directory filter missing: ${filter}`);
+  }
+  assert(explorer.includes("aria-pressed={category === filter.id}"), "Directory filters must expose pressed state.");
+  assert(explorer.includes("href={tool.route}"), "Available directory cards must link directly to tool routes.");
+  assert(explorer.includes("Temporarily unavailable") && !explorer.includes("Notify me"), "Unavailable tools must be explicit and non-misleading.");
+  assert(explorer.includes("On device") && explorer.includes("Server-assisted"), "Directory processing labels are incomplete.");
+  assert(toolCatalog.includes("searchAliases") && toolCatalog.includes('processing: "browser"'), "Canonical tool actions must own aliases and action-level processing overrides.");
+  assert(tiles.includes("action.dbStatus") && tiles.includes("buildDiscoveryTiles"), "Discovery availability must derive from resolved catalog status.");
+  assert(commandIndex.includes("...tile.aliases") && commandIndex.includes("...tile.capabilities"), "Command palette must reuse canonical discovery aliases.");
+  assert(!commandIndex.includes("const TOOL_ALIASES"), "Command palette must not maintain a second tool alias index.");
+  assert(!/pdfjs-dist|pdf-lib|heic-decode|JSZip/.test([directory, explorer, tiles].join("\n")), "Directory must not import heavy processing engines.");
 
   const combined = newFiles.map(read).join("\n");
   assert(!/getSession\(/.test(combined), "New public catalog files must not use getSession().");
