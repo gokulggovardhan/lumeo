@@ -53,5 +53,10 @@ drop policy if exists "Allow Public Deletes 1bqrt77_0" on storage.objects;
 drop policy if exists "Allow Public Deletes 1bqrt77_1" on storage.objects;
 drop policy if exists "Allow Public Uploads 1bqrt77_0" on storage.objects;
 
+-- Supabase protects storage metadata from ordinary direct deletion. The
+-- Storage service itself opts into deletion with this transaction-local
+-- setting. We do the same only after the empty-bucket and policy guards above.
+select set_config('storage.allow_delete_query', 'true', true);
+
 delete from storage.buckets
 where id = 'lumeo-temp';
