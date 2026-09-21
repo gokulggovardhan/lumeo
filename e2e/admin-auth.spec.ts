@@ -223,9 +223,10 @@ test.describe("Control Center authentication", () => {
     await expect(
       membersMain.getByRole("heading", { name: "Administrators", exact: true }),
     ).toBeVisible();
-    await expect(membersMain.getByLabel("Search")).toBeVisible();
-    await expect(membersMain.getByLabel("Role")).toBeVisible();
-    await expect(membersMain.getByLabel("Access")).toBeVisible();
+    const memberFilters = membersMain.locator('form[method="get"]');
+    await expect(memberFilters.getByLabel("Search")).toBeVisible();
+    await expect(memberFilters.getByLabel("Role")).toBeVisible();
+    await expect(memberFilters.getByLabel("Access")).toBeVisible();
 
     const { navigation: membersNavigation } = await openAdminNavigation(page);
     await membersNavigation.getByRole("link", { name: "Settings" }).click();
