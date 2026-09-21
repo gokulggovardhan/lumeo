@@ -1,13 +1,13 @@
 import {
   BrowserConversionWorkspace,
+  estimateLocalConversionStorage,
+  hasLocalWorkspaceCapacity,
 } from "@/lib/conversion/browser/workspace";
 import {
   detectBrowserConversionCapabilities,
   selectConversionProcessingMode,
 } from "@/lib/conversion/browser/capabilities";
-import {
-  buildReconstructedDocx,
-} from "@/lib/conversion/browser/pdfToWord/docx";
+import { buildReconstructedDocx } from "@/lib/conversion/browser/pdfToWord/docx";
 import {
   ocrLinesToReconstructed,
   reconstructTextLines,
@@ -16,8 +16,14 @@ import type {
   PdfToWordOcrAdapter,
   ReconstructedPage,
 } from "@/lib/conversion/browser/pdfToWord/types";
+import {
+  conversionUserError,
+  normalizeConversionError,
+} from "@/lib/conversion/errors";
+import { validatePdfConversionFile } from "@/lib/conversion/fileValidation";
 import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 import {
   clampRenderScaleToMaxDimension,
   clampRenderScaleToPixelBudget,
@@ -64,15 +70,64 @@ type PdfDocumentLike = {
   destroy?(): Promise<void> | void;
 };
 
+function abortReason(signal: AbortSignal): unknown {
+  return signal.reason ?? new DOMException("Conversion cancelled", "AbortError");
+}
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw abortReason(signal);
+}
+
+async function withAbort<T>(
+  promise: Promise<T>,
+  signal: AbortSignal,
+  onAbort?: () => void,
+): Promise<T> {
+  throwIfAborted(signal);
+
+  return new Promise<T>((resolve, reject) => {
+    let settled = false;
+    const finish = (
+      callback: (value: T | PromiseLike<T>) => void,
+      value: T,
+    ) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", handleAbort);
+      callback(value);
+    };
+    const fail = (error: unknown) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", handleAbort);
+      reject(error);
+    };
+    const handleAbort = () => {
+      try {
+        onAbort?.();
+      } catch {}
+      fail(abortReason(signal));
+    };
+
+    signal.addEventListener("abort", handleAbort, { once: true });
+    promise.then(
+      (value) => finish(resolve, value),
+      (error) => fail(error),
+    );
+  });
+}
+
 async function writeBlob(
   directory: FileSystemDirectoryHandle,
   name: string,
   blob: Blob,
+  signal: AbortSignal,
 ): Promise<File> {
+  throwIfAborted(signal);
   const handle = await directory.getFileHandle(name, { create: true });
   const writable = await handle.createWritable();
   try {
-    await blob.stream().pipeTo(writable);
+    await blob.stream().pipeTo(writable, { signal });
   } catch (error) {
     await writable.abort().catch(() => {});
     throw error;
@@ -107,7 +162,10 @@ async function writeCheckpoint(
   }
 }
 
-function countImageOperators(pdfjs: typeof import("pdfjs-dist"), fnArray: number[]): number {
+function countImageOperators(
+  pdfjs: typeof import("pdfjs-dist"),
+  fnArray: number[],
+): number {
   const imageOps = new Set<number>(
     [
       pdfjs.OPS.paintImageXObject,
@@ -123,10 +181,35 @@ function countImageOperators(pdfjs: typeof import("pdfjs-dist"), fnArray: number
   );
 }
 
+function countVectorLayoutOperators(
+  pdfjs: typeof import("pdfjs-dist"),
+  fnArray: number[],
+): number {
+  const layoutOps = new Set<number>(
+    [
+      pdfjs.OPS.constructPath,
+      pdfjs.OPS.stroke,
+      pdfjs.OPS.closeStroke,
+      pdfjs.OPS.fill,
+      pdfjs.OPS.eoFill,
+      pdfjs.OPS.fillStroke,
+      pdfjs.OPS.eoFillStroke,
+    ].filter((value): value is number => typeof value === "number"),
+  );
+
+  return fnArray.reduce(
+    (count, operation) => count + (layoutOps.has(operation) ? 1 : 0),
+    0,
+  );
+}
+
 async function renderPageBackground(
   page: PdfPageLike,
   pageNumber: number,
+  signal: AbortSignal,
 ): Promise<Blob> {
+  throwIfAborted(signal);
+
   const pointViewport = page.getViewport({ scale: 1 });
   let scale = clampRenderScaleToMaxDimension(
     BACKGROUND_RENDER_SCALE,
@@ -157,10 +240,18 @@ async function renderPageBackground(
       canvasContext: context,
       viewport,
     });
-    await renderPageWithTimeout(task, pageNumber);
+    await withAbort(
+      renderPageWithTimeout(task, pageNumber),
+      signal,
+      () => task.cancel(),
+    );
+    throwIfAborted(signal);
 
-    const blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY),
+    const blob = await withAbort(
+      new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY),
+      ),
+      signal,
     );
     if (!blob) throw new Error(`Page ${pageNumber} could not be rasterized.`);
     return blob;
@@ -183,9 +274,27 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
     signal: AbortSignal,
   ): Promise<ConversionResult> {
     const sizeError = checkBrowserConversionFileSize(input.file);
-    if (sizeError) throw new Error(sizeError);
+    if (sizeError) {
+      throw conversionUserError("file-too-large", {
+        technicalMessage: sizeError,
+      });
+    }
+
+    const validation = await validatePdfConversionFile(input.file);
+    if (!validation.ok) {
+      throw conversionUserError(validation.code, {
+        message: validation.message,
+      });
+    }
 
     const capabilities = await detectBrowserConversionCapabilities();
+    if (!capabilities.webWorkers) {
+      throw conversionUserError("browser-unsupported", {
+        recoverable: false,
+        technicalMessage: "PDF reconstruction requires Web Worker support.",
+      });
+    }
+
     const mode = selectConversionProcessingMode({
       fileSizeBytes: input.file.size,
     });
@@ -194,8 +303,8 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
       phase: "preparing",
       message:
         mode === "normal"
-          ? "Analyzing PDF locally..."
-          : "Preparing large PDF workspace...",
+          ? "Preparing document"
+          : "Preparing large document workspace",
     });
 
     let workspace: BrowserConversionWorkspace | null = null;
@@ -204,51 +313,96 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
 
     try {
       let sourceFile = input.file;
+      const storageEstimate = capabilities.opfs
+        ? await estimateLocalConversionStorage(signal)
+        : null;
+      const workspaceBytes = input.file.size * 2.5 + 96 * 1024 * 1024;
+      const canUseWorkspace =
+        mode !== "normal" &&
+        capabilities.opfs &&
+        (!storageEstimate ||
+          hasLocalWorkspaceCapacity(storageEstimate, workspaceBytes));
 
-      if (capabilities.opfs) {
-        workspace = await BrowserConversionWorkspace.create("pdf-to-word");
-        await workspace.markRunning();
-        await workspace.appendLog(
-          `Starting PDF to Word reconstruction in ${mode} mode (${input.file.size} bytes).`,
-        );
-        const handle = await workspace.stageInput(input.file);
-        sourceFile = await handle.getFile();
+      if (canUseWorkspace) {
+        try {
+          workspace = await BrowserConversionWorkspace.create(
+            "pdf-to-word",
+            signal,
+          );
+          await workspace.markRunning();
+          await workspace.appendLog(
+            `Starting PDF to Word reconstruction in ${mode} mode (${input.file.size} bytes).`,
+          );
+          const handle = await workspace.stageInput(input.file, signal);
+          sourceFile = await handle.getFile();
+        } catch (workspaceError) {
+          if (signal.aborted) throw workspaceError;
+          await workspace?.dispose("failed").catch(() => {});
+          workspace = null;
+          sourceFile = input.file;
+        }
       }
 
+      throwIfAborted(signal);
+      options.onProgress?.({
+        phase: "loading-engine",
+        message: "Loading PDF engine",
+      });
+
       sourceUrl = URL.createObjectURL(sourceFile);
-      const pdfjs = await loadPdfJsModule();
-      document = (await pdfjs.getDocument({
-        url: sourceUrl,
-        useWorkerFetch: false,
-      }).promise) as unknown as PdfDocumentLike;
+      const pdfjs = await withAbort(loadPdfJsModule(), signal);
+
+      try {
+        document = (await withAbort(
+          pdfjs.getDocument({
+            url: sourceUrl,
+            useWorkerFetch: false,
+          }).promise,
+          signal,
+        )) as unknown as PdfDocumentLike;
+      } catch (error) {
+        throw normalizeConversionError(error, "input");
+      }
+
+      const pageCountError = checkPdfPageCount(document.numPages);
+      if (pageCountError) {
+        throw conversionUserError("conversion-failed", {
+          message: pageCountError,
+          technicalMessage: pageCountError,
+        });
+      }
 
       const pages: ReconstructedPage[] = [];
 
       for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-        if (signal.aborted) {
-          throw signal.reason ?? new DOMException("Conversion cancelled", "AbortError");
-        }
+        throwIfAborted(signal);
 
         options.onProgress?.({
           phase: "converting",
-          message: `Reconstructing page ${pageNumber} of ${document.numPages}...`,
+          message: `Processing page ${pageNumber} of ${document.numPages}`,
         });
 
-        const page = await document.getPage(pageNumber);
+        const page = await withAbort(document.getPage(pageNumber), signal);
         const viewport = page.getViewport({ scale: 1, rotation: page.rotate });
 
         const [textContent, operatorList] = await Promise.all([
-          withPageTimeout(
-            page.getTextContent(),
-            pageNumber,
-            PAGE_OPERATION_TIMEOUT_MS,
-            "extract text",
+          withAbort(
+            withPageTimeout(
+              page.getTextContent(),
+              pageNumber,
+              PAGE_OPERATION_TIMEOUT_MS,
+              "extract text",
+            ),
+            signal,
           ),
-          withPageTimeout(
-            page.getOperatorList(),
-            pageNumber,
-            PAGE_OPERATION_TIMEOUT_MS,
-            "inspect page graphics",
+          withAbort(
+            withPageTimeout(
+              page.getOperatorList(),
+              pageNumber,
+              PAGE_OPERATION_TIMEOUT_MS,
+              "inspect page graphics",
+            ),
+            signal,
           ),
         ]);
 
@@ -260,14 +414,19 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
         );
 
         const imageCount = countImageOperators(pdfjs, operatorList.fnArray);
+        const vectorLayoutCount = countVectorLayoutOperators(
+          pdfjs,
+          operatorList.fnArray,
+        );
         const shouldRasterize =
           lines.length === 0 ||
           imageCount >= 2 ||
-          (imageCount >= 1 && lines.length < 6);
+          (imageCount >= 1 && lines.length < 6) ||
+          vectorLayoutCount >= 6;
 
         let backgroundImage: Blob | File | null = null;
         if (shouldRasterize) {
-          const rendered = await renderPageBackground(page, pageNumber);
+          const rendered = await renderPageBackground(page, pageNumber, signal);
 
           if (lines.length === 0 && this.ocrAdapter) {
             const ocrLines = await this.ocrAdapter.recognize(
@@ -275,6 +434,7 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
               pageNumber,
               signal,
             );
+            throwIfAborted(signal);
             lines = ocrLinesToReconstructed(
               ocrLines,
               viewport.width,
@@ -287,6 +447,7 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
               workspace.getDirectory("images"),
               `page-${String(pageNumber).padStart(4, "0")}.jpg`,
               rendered,
+              signal,
             );
           } else {
             backgroundImage = rendered;
@@ -306,26 +467,43 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
         if (workspace) {
           await writeCheckpoint(workspace, reconstructed);
           await workspace.appendLog(
-            `Page ${pageNumber}: ${lines.length} editable lines, ${imageCount} image operators, raster=${Boolean(backgroundImage)}.`,
+            `Page ${pageNumber}: ${lines.length} editable lines, ${imageCount} image operators, ${vectorLayoutCount} vector layout operators, raster=${Boolean(backgroundImage)}.`,
           );
         }
       }
 
+      throwIfAborted(signal);
       options.onProgress?.({
-        phase: "finalizing",
-        message: "Building editable Word document...",
+        phase: "generating",
+        message: "Generating Word document",
       });
 
-      const blob = await buildReconstructedDocx(pages);
+      let blob: Blob;
+      try {
+        blob = await buildReconstructedDocx(pages);
+      } catch (error) {
+        throw normalizeConversionError(error, "output");
+      }
+
+      throwIfAborted(signal);
+      options.onProgress?.({
+        phase: "finalizing",
+        message: "Finalizing file",
+      });
+
       const fileName = `${sanitizeFileStem(input.file.name, "converted")}.docx`;
 
-      if (workspace) {
-        await workspace.writeOutput(fileName, blob);
-        await workspace.appendLog(
-          `DOCX completed (${blob.size} bytes, ${pages.length} pages).`,
-        );
-        await workspace.dispose("completed");
-        workspace = null;
+      try {
+        if (workspace) {
+          await workspace.writeOutput(fileName, blob, signal);
+          await workspace.appendLog(
+            `DOCX completed (${blob.size} bytes, ${pages.length} pages).`,
+          );
+          await workspace.dispose("completed");
+          workspace = null;
+        }
+      } catch (error) {
+        throw normalizeConversionError(error, "output");
       }
 
       return {
@@ -338,13 +516,19 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
         },
       };
     } catch (error) {
+      const normalized = normalizeConversionError(error, "conversion");
+
       if (workspace) {
-        await workspace.appendLog(
-          `Conversion failed: ${error instanceof Error ? error.message : "unknown error"}`,
-        ).catch(() => {});
-        await workspace.dispose(signal.aborted ? "cancelled" : "failed").catch(() => {});
+        await workspace
+          .appendLog(
+            `Conversion failed [${normalized.code}]: ${normalized.technicalMessage ?? normalized.message}`,
+          )
+          .catch(() => {});
+        await workspace
+          .dispose(signal.aborted ? "cancelled" : "failed")
+          .catch(() => {});
       }
-      throw error;
+      throw normalized;
     } finally {
       if (sourceUrl) URL.revokeObjectURL(sourceUrl);
       if (document) {

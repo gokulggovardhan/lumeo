@@ -1,31 +1,37 @@
 # Browser Office runtime asset delivery
 
-Lumeo's browser Office engine must **not** ship the LibreOffice/ZetaOffice
-runtime inside the ordinary Next/Cloudflare application bundle. The runtime is
-large, changes independently from the UI, and should be cached independently.
+Lumeo's browser Office engine does **not** bundle the LibreOffice/ZetaOffice
+runtime into the ordinary Next/Cloudflare Worker bundle. The runtime is large,
+versioned separately, and cached independently.
 
-## Production layout
+## Production architecture
 
-Production uses one immutable release directory on a dedicated static origin,
-preferably Cloudflare R2 behind `assets.lumeo.in`:
-
-```
-https://assets.lumeo.in/office/zeta-24-2/<release-id>/
-```
-
-Set the application build variable to that exact release:
+The production browser loads one immutable Lumeo runtime path:
 
 ```
-NEXT_PUBLIC_LUMEO_OFFICE_ASSET_BASE_URL=https://assets.lumeo.in/office/zeta-24-2/<release-id>/
+https://lumeo.in/office-runtime/<release-id>/
 ```
 
-The production resolver rejects mutable `latest` paths. It derives the release
-ID from the final path segment and requires a matching
-`lumeo-office-runtime.json` manifest before LibreOffice is started.
+The path is implemented by the Cloudflare-deployed Lumeo application as a
+streaming proxy to an immutable GitHub Release. User documents never pass
+through this route; it serves only LibreOffice/ZetaOffice runtime binaries.
+
+The authoritative release is defined in:
+
+```
+config/office-runtime-release.json
+```
+
+The default production runtime URL is resolved from the current Lumeo origin.
+`NEXT_PUBLIC_LUMEO_OFFICE_ASSET_BASE_URL` remains available only as an
+explicit override for a future dedicated static origin such as R2.
+
+The production resolver rejects mutable `latest` paths and requires a matching
+`lumeo-office-runtime.json` manifest before LibreOffice starts.
 
 ## Runtime release contents
 
-Every release contains:
+Every immutable release contains:
 
 - `soffice.js`
 - `soffice.wasm`
@@ -33,109 +39,91 @@ Every release contains:
 - `soffice.data.js.metadata`
 - `lumeo-office-runtime.json`
 
-The manifest records:
+The manifest records the immutable release ID, pinned ZetaJS version,
+ZetaOffice source branch, creation timestamp, byte size, SHA-256, and content
+type of each runtime file.
 
-- manifest schema version
-- immutable release ID
-- pinned ZetaJS helper version
-- ZetaOffice source branch
-- creation timestamp
-- byte size, SHA-256 and content type for each required runtime file
-
-The browser preflight rejects a release when the release ID, pinned helper
-version, required file inventory, reported content type or readable object size
-does not match. Transient network failures are retried briefly; there is no
-server-conversion fallback.
-
-The manifest's SHA-256 values are release/publishing integrity metadata. The
-browser does not re-download the full ~250 MB payload just to hash it before
-LibreOffice starts; runtime initialization remains the final executable-integrity
-check.
+The browser preflight rejects missing, mismatched, incorrectly typed, or
+non-immutable runtime responses. There is no Render, Supabase, or server
+conversion fallback.
 
 ## Reproducible snapshot
 
-Prepare an immutable release from the upstream ZetaOffice CDN without publishing:
+The runtime snapshot is prepared by:
 
 ```bash
 node scripts/prepare-office-runtime-release.mjs \
-  --release zeta-2026-09-21-a \
+  --release <release-id> \
   --source https://cdn.zetaoffice.net/zetaoffice_latest/ \
   --out .runtime/office
 ```
 
-The preparation script refuses to overwrite an existing release directory,
-streams each large object to disk, records its SHA-256, and writes the manifest.
+The preparation script streams each large object to disk, calculates SHA-256,
+writes the manifest, and refuses to overwrite an existing release directory.
 
-GitHub Actions also provides the manually triggered
-`Office Runtime Release` workflow. With `publish=false`, it performs a dry
-run only. With `publish=true`, it publishes the immutable release to R2 and
-uploads the manifest last so an incomplete release can never look published.
+## Automatic production publication
 
-Publishing requires:
+`.github/workflows/office-runtime-production.yml` runs when the runtime
+configuration/delivery implementation lands on `main`.
 
-- repository secret `CLOUDFLARE_API_TOKEN`
-- repository secret `CLOUDFLARE_ACCOUNT_ID`
-- repository variable `LUMEO_OFFICE_R2_BUCKET`
-- a public R2 custom domain matching the workflow's `asset_origin` input
+It:
 
-The workflow deliberately fails instead of falling back to Render, Supabase, or
-another conversion service when this infrastructure is missing.
+1. reads `config/office-runtime-release.json`
+2. prepares the immutable runtime snapshot
+3. validates all required files and manifest metadata
+4. creates a **draft** GitHub Release
+5. uploads the four runtime files
+6. uploads the manifest last as the publish marker
+7. verifies the release asset inventory and sizes
+8. publishes the verified release
+9. waits for the Cloudflare deployment
+10. verifies the production Lumeo runtime route, MIME types, byte-range
+   behavior, immutable caching, CORP header, and Cloudflare edge delivery
 
-## R2 CORS and response behavior
+GitHub release assets may be up to 2 GiB, so the current LibreOffice payload
+fits without putting large binaries into Git history or the Worker bundle.
 
-`config/office-runtime-r2-cors.json` is the canonical CORS policy for the
-runtime bucket. The release workflow applies it before publishing.
+## Cloudflare streaming route
 
-The public asset origin must provide:
+`app/office-runtime/[release]/[asset]/route.ts` only permits the configured
+release and five known asset names.
 
-- HTTPS
-- CORS access from `https://lumeo.in`
-- GET/HEAD and single-range requests
-- exposed range/cache headers used by runtime verification
-- `Cross-Origin-Resource-Policy: cross-origin` when required by the serving layer
-- byte-range support for the large runtime payload
-- correct JavaScript/WebAssembly/data MIME types
-- correct `Content-Encoding` if objects are compressed in transit
-- long-lived immutable caching
-
-Versioned objects use:
+It forwards GET/HEAD and Range requests to the immutable release, streams the
+upstream body instead of buffering it, and returns:
 
 ```
 Cache-Control: public, max-age=31536000, immutable
+Cross-Origin-Resource-Policy: same-origin
+X-Content-Type-Options: nosniff
 ```
 
-Do not overwrite an existing release path. Publish a new release directory and
-change the Lumeo production build variable only after the new runtime passes the
-conversion corpus.
+with explicit JavaScript, WebAssembly, binary-data, and JSON MIME types.
 
-Cloudflare R2 custom domains emit CORS headers only for matching cross-origin
-requests, so production verification sends
-`Origin: https://lumeo.in`. CORS and CORP are separate policies: the bucket
-CORS configuration does not by itself create
-`Cross-Origin-Resource-Policy: cross-origin`. The `assets.lumeo.in` serving
-layer must add that response header (for example with a Cloudflare response
-header transform or a dedicated asset Worker). The browser preflight and the
-publish workflow both reject a cross-origin production release when that header
-is missing. After changing an already-cached CORS or response-header policy,
-purge the runtime hostname cache before relying on old cached objects.
+Cloudflare Workers have no enforced response-body size limit and the standard
+CDN cache object limit is above the current runtime object sizes, so the large
+WASM/data files can remain streamed and cacheable without entering Worker
+memory.
+
+## Optional R2 delivery
+
+The existing `Office Runtime Release` workflow and
+`config/office-runtime-r2-cors.json` remain available as an optional future
+optimization. If R2 credentials and a custom asset domain are configured,
+`NEXT_PUBLIC_LUMEO_OFFICE_ASSET_BASE_URL` can point to that immutable release.
+
+R2 is **not required** for the browser-only converters to launch.
 
 ## Development
 
-The internal development lab may use the upstream
+The internal development lab may use the upstream mutable
 `https://cdn.zetaoffice.net/zetaoffice_latest/` endpoint for compatibility
-research. Development performs a lightweight `soffice.js` reachability probe
-and does not require a Lumeo manifest.
+testing. Production never uses that mutable URL directly.
 
-Public production conversion must never depend on the mutable upstream
-`latest` alias.
+## Conversion privacy boundary
 
-## Deployment rule
+The Office runtime delivery path contains no document upload or conversion API.
+Word → PDF runs inside the user's browser after the runtime loads. PDF → Word
+also reconstructs locally in the browser.
 
-The large Office payload is deployed separately from the application. Normal
-Next builds, Cloudflare Worker bundles, public routes, and admin routes must
-remain functional even if the Office asset origin is unavailable.
-
-The conversion engine performs the runtime preflight lazily when a user starts
-Word → PDF. If the release is unavailable, incomplete, mismatched, or cannot
-initialize, the UI must show a clear local-runtime error. It must not silently
-route the document to any server-side conversion path.
+If the runtime cannot initialize, the user receives a local-runtime error.
+Lumeo never silently routes the document to the legacy server converter.

@@ -69,9 +69,25 @@ function imageParagraph(
   <w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr>
   <w:r>
     <w:drawing>
-      <wp:inline distT="0" distB="0" distL="0" distR="0">
+      <wp:anchor
+        distT="0"
+        distB="0"
+        distL="0"
+        distR="0"
+        simplePos="0"
+        relativeHeight="0"
+        behindDoc="1"
+        locked="0"
+        layoutInCell="1"
+        allowOverlap="1">
+        <wp:simplePos x="0" y="0"/>
+        <wp:positionH relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionH>
+        <wp:positionV relativeFrom="page"><wp:posOffset>0</wp:posOffset></wp:positionV>
         <wp:extent cx="${emu(page.widthPt)}" cy="${emu(page.heightPt)}"/>
+        <wp:effectExtent l="0" t="0" r="0" b="0"/>
+        <wp:wrapNone/>
         <wp:docPr id="${imageId}" name="Page ${page.pageNumber} background"/>
+        <wp:cNvGraphicFramePr/>
         <a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">
           <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
             <pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
@@ -93,7 +109,7 @@ function imageParagraph(
             </pic:pic>
           </a:graphicData>
         </a:graphic>
-      </wp:inline>
+      </wp:anchor>
     </w:drawing>
   </w:r>
 </w:p>`;
@@ -245,6 +261,7 @@ export async function buildReconstructedDocx(
   );
 
   return zip.generateAsync({
+    streamFiles: true,
     type: "blob",
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

@@ -16,10 +16,21 @@ test("capability detection is feature-based and reports storage details", async 
   class FakeFile {
     stream() {}
   }
+  class FakeWorker {
+    onmessage: ((event: MessageEvent<boolean>) => void) | null = null;
+    onerror: ((event: ErrorEvent) => void) | null = null;
+    constructor(_url: string | URL) {}
+    postMessage() {
+      queueMicrotask(() => {
+        this.onmessage?.({ data: true } as MessageEvent<boolean>);
+      });
+    }
+    terminate() {}
+  }
 
   const result = await detectBrowserConversionCapabilities({
     WebAssembly: { Memory: FakeMemory } as unknown as typeof WebAssembly,
-    Worker: class {},
+    Worker: FakeWorker,
     SharedArrayBuffer: FakeSharedArrayBuffer,
     OffscreenCanvas: class {},
     File: FakeFile as unknown as typeof File,
@@ -57,6 +68,7 @@ test("capability detection is feature-based and reports storage details", async 
   assert.equal(result.storageEstimate.quotaBytes, 1_000_000);
   assert.equal(result.storageEstimate.usageBytes, 125_000);
   assert.equal(result.offscreenCanvas, true);
+  assert.equal(result.workerOffscreenWebGl, true);
   assert.equal(result.transferableArrayBuffer, true);
   assert.equal(result.hardwareConcurrency, 8);
   assert.equal(result.fileStream, true);

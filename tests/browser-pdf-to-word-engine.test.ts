@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import JSZip from "jszip";
 
@@ -90,4 +91,19 @@ test("DOCX builder embeds page background images when reconstruction needs raste
   assert.ok(zip.file("word/media/page-1.jpg"));
   const rels = await zip.file("word/_rels/document.xml.rels")?.async("string");
   assert.match(rels ?? "", /relationships\/image/);
+
+  const documentXml = await zip.file("word/document.xml")?.async("string");
+  assert.match(documentXml ?? "", /wp:anchor/);
+  assert.match(documentXml ?? "", /behindDoc="1"/);
+  assert.doesNotMatch(documentXml ?? "", /wp:inline/);
+});
+
+test("PDF reconstruction preserves vector-heavy page fidelity without pretending it is a semantic table", async () => {
+  const source = await readFile(
+    "lib/conversion/browser/BrowserPdfToWordEngine.ts",
+    "utf8",
+  );
+  assert.match(source, /countVectorLayoutOperators/);
+  assert.match(source, /vectorLayoutCount >= 6/);
+  assert.match(source, /backgroundImage/);
 });

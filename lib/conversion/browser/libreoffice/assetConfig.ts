@@ -1,3 +1,5 @@
+import runtimeRelease from "../../../../config/office-runtime-release.json" with { type: "json" };
+
 export const ZETAJS_HELPER_VERSION = "1.2.0";
 export const ZETAJS_HELPER_URL =
   `https://cdn.jsdelivr.net/npm/zetajs@${ZETAJS_HELPER_VERSION}/source/zetaHelper.js`;
@@ -20,6 +22,14 @@ export const OFFICE_RUNTIME_REQUIRED_FILES = {
 
 const OFFICE_ASSET_BASE_ENV = process.env.NEXT_PUBLIC_LUMEO_OFFICE_ASSET_BASE_URL;
 const PREFLIGHT_RETRY_DELAYS_MS = [250, 750] as const;
+
+export const LUMEO_OFFICE_RUNTIME_RELEASE_ID = runtimeRelease.releaseId;
+export const LUMEO_OFFICE_RUNTIME_ROUTE =
+  `/office-runtime/${LUMEO_OFFICE_RUNTIME_RELEASE_ID}/`;
+
+export function resolveLumeoOfficeAssetBaseUrl(origin: string): string {
+  return new URL(LUMEO_OFFICE_RUNTIME_ROUTE, ensureTrailingSlash(origin)).toString();
+}
 
 export type OfficeAssetMode = "development" | "production";
 
@@ -202,10 +212,13 @@ export function resolveOfficeAssetConfig(
   mode: OfficeAssetMode,
   explicitBaseUrl?: string | null,
 ): OfficeAssetConfig {
-  const configured = explicitBaseUrl?.trim() || OFFICE_ASSET_BASE_ENV?.trim();
+  const explicit = explicitBaseUrl?.trim();
+  const configuredEnv = OFFICE_ASSET_BASE_ENV?.trim();
 
   if (mode === "development") {
-    const officeBaseUrl = ensureTrailingSlash(configured || DEV_ZETAOFFICE_BASE_URL);
+    const officeBaseUrl = ensureTrailingSlash(
+      explicit || configuredEnv || DEV_ZETAOFFICE_BASE_URL,
+    );
     parseAbsoluteHttpUrl(officeBaseUrl);
     return {
       helperUrl: ZETAJS_HELPER_URL,
@@ -217,9 +230,15 @@ export function resolveOfficeAssetConfig(
     };
   }
 
+  const browserDefault =
+    typeof window !== "undefined"
+      ? resolveLumeoOfficeAssetBaseUrl(window.location.origin)
+      : null;
+  const configured = explicit || configuredEnv || browserDefault;
+
   if (!configured) {
     throw new Error(
-      "NEXT_PUBLIC_LUMEO_OFFICE_ASSET_BASE_URL is required for browser Office conversion in production.",
+      "A production Office runtime asset base URL is required outside the browser.",
     );
   }
 

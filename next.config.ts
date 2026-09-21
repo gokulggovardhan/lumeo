@@ -57,6 +57,19 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: "/internal/conversion-production-smoke/:path*",
+        headers: [
+          {
+            key: "Cross-Origin-Opener-Policy",
+            value: "same-origin",
+          },
+          {
+            key: "Cross-Origin-Embedder-Policy",
+            value: "require-corp",
+          },
+        ],
+      },
+      {
         source: "/pdf/word-to-pdf/:path*",
         headers: [
           {
