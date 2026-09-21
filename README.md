@@ -24,10 +24,11 @@ Live production tools (browser-only processing, `pdf-lib` + `pdfjs-dist`):
 - Crop PDF — `/pdf/crop`
 - Sign PDF — `/pdf/sign`
 
-Live production tools (server-assisted, self-hosted, no third-party processors):
+Live production conversion tools (browser-only processing):
 
-- Word to PDF, PDF to Word — `/pdf/word-to-pdf`, `/pdf/pdf-to-word` (self-hosted LibreOffice conversion service, see `services/word-to-pdf-converter/`; temporary files only, deleted immediately after conversion)
-- HTML to PDF — `/pdf/html-to-pdf`
+- Word to PDF — `/pdf/word-to-pdf` (LibreOffice/ZetaOffice WebAssembly runs locally; immutable runtime assets are delivered through `/office-runtime/<release-id>/...`)
+- PDF to Word — `/pdf/pdf-to-word` (browser-side PDF.js analysis and DOCX reconstruction)
+- HTML to PDF — `/pdf/html-to-pdf` (browser-side HTML/CSS rendering)
 
 Planned / not yet live (see `lib/tools/catalog.ts` for the authoritative, current list — every action's `live` flag there is the source of truth, not this README):
 
@@ -47,7 +48,7 @@ A tool is only "live" once its `live: true` flag is set in `lib/tools/catalog.ts
 
 Most PDF processing happens entirely in the browser via `pdf-lib` (manipulation) and `pdfjs-dist` (preview/decode). No file upload, no server-side PDF manipulation, no Firebase, no Cloudinary, no Google Drive.
 
-The Office-conversion tools (Word to PDF, PDF to Word, HTML to PDF) are the deliberate exception: they call a self-hosted LibreOffice conversion service (`services/word-to-pdf-converter/`, deployed separately) through a Supabase storage bucket for the temporary file hop. This is disclosed here precisely because it's the one place document bytes leave the browser.
+Word → PDF runs LibreOffice/ZetaOffice WebAssembly in the browser. The large immutable Office runtime is published as a versioned GitHub Release and streamed through the same-origin `/office-runtime/<release-id>/...` Cloudflare Worker fast path before vinext. PDF → Word reconstructs DOCX locally in the browser, and HTML → PDF remains browser-side. There is no active Render or remote LibreOffice conversion dependency.
 
 Document contents must not be stored in `localStorage`. UI preferences (e.g. thumbnail density) may be stored locally when they contain no document data.
 
@@ -162,7 +163,7 @@ See `docs/ADMIN_AUTH.md` for the auth model. In short: Supabase email/password s
 ## Privacy model
 
 - Browser-processed tools: files never leave the device, nothing is uploaded, nothing is stored in `localStorage`.
-- The two Office-conversion tools (Word↔PDF, HTML to PDF): files pass through a short-lived Supabase scratch bucket and a self-hosted LibreOffice service, then are deleted immediately after conversion.
+- Word → PDF, PDF → Word, and HTML → PDF process document contents locally in the browser; their conversion paths do not upload user files to a conversion backend.
 - Temporary object URLs and active workspace state should be cleared by cleanup or reset flows.
 - Browser downloads remain under the user's control.
 
@@ -185,7 +186,7 @@ The current workflow is:
 
 ## Deployment
 
-The public domain is https://lumeo.in and the application is deployed on Cloudflare Workers through vinext. Cloudflare Workers Builds is the sole production deployment path. The Word/PDF-to-Word/HTML-to-PDF conversion service (`services/word-to-pdf-converter/`) is deployed separately (currently Render's free tier — see the file-size comments in `lib/supabase/pdfToWordStorage.ts` for the memory constraint that drives its upload cap). Deployment configuration must not expose secrets, credentials, private keys, or service tokens.
+The public domain is https://lumeo.in and the application is deployed on Cloudflare Workers through vinext. Cloudflare Workers Builds is the sole production application deployment path. Word → PDF, PDF → Word, and HTML → PDF are browser-side; Office runtime binaries are delivered through the immutable same-origin Cloudflare Worker fast path. Deployment configuration must not expose secrets, credentials, private keys, or service tokens.
 
 ## Contributing expectations
 
