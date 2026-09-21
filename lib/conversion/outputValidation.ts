@@ -124,7 +124,7 @@ export async function validateGeneratedPdf(blob: Blob): Promise<number> {
     // This validation runs after LibreOffice has already produced the output.
     // Use the worker-free OOXML/PDF utility already shipped in the browser
     // bundle instead of starting PDF.js solely to count pages. That keeps the
-    // validation local while avoiding a redundant pdf.worker network request.
+    // validation local while avoiding a redundant worker network request.
     document = await PDFDocument.load(await blob.arrayBuffer());
   } catch (error) {
     throw new Error(
