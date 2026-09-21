@@ -7,11 +7,26 @@ import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { AdminSubmitButton } from "@/components/admin/AdminSubmitButton";
 import { requireAdmin } from "@/lib/admin/auth";
+import { resolveAnnouncementStatus, type AnnouncementDisplayStatus } from "@/lib/admin/announcement-status";
 import { getAnnouncements } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageAnnouncements } from "@/lib/admin/permissions";
 import { formatAdminDateTime, utcIsoToIstInputValue } from "@/lib/admin/timezone";
 import { deleteAnnouncement, saveAnnouncement, toggleAnnouncement } from "@/app/admin/(protected)/announcements/actions";
+
+const statusLabel: Record<AnnouncementDisplayStatus, string> = {
+  inactive: "Inactive",
+  scheduled: "Scheduled",
+  live: "Live",
+  expired: "Expired",
+};
+
+const statusTone: Record<AnnouncementDisplayStatus, "success" | "warning" | "neutral"> = {
+  inactive: "neutral",
+  scheduled: "warning",
+  live: "success",
+  expired: "neutral",
+};
 
 export default async function AnnouncementsPage({
   searchParams,
@@ -86,13 +101,20 @@ export default async function AnnouncementsPage({
       <AdminSectionCard title="Announcement records" description={canEdit ? "Owner and admin roles can edit or activate messages." : "Analyst access is read-only."}>
         <AdminDataTable
           columns={["Title", "Tone", "State", "Schedule", "Link", "Action"]}
-          rows={announcements.data.map((announcement) => [
-            <div key="title"><p className="font-semibold text-[#F0EAD6]">{announcement.title}</p><p className="text-xs text-[#F0EAD6]/46">{announcement.message}</p></div>,
-            announcement.tone,
-            <AdminStatusBadge key="state" tone={announcement.is_active ? "success" : "neutral"}>{announcement.is_active ? "Active" : "Inactive"}</AdminStatusBadge>,
-            `${announcement.starts_at ? formatAdminDateTime(announcement.starts_at) : "Anytime"} - ${announcement.ends_at ? formatAdminDateTime(announcement.ends_at) : "No end"}`,
-            announcement.link_url ? `${announcement.link_label ?? "Link"}: ${announcement.link_url}` : "None",
-            canEdit ? (
+          rows={announcements.data.map((announcement) => {
+            const status = resolveAnnouncementStatus({
+              isActive: announcement.is_active,
+              startsAt: announcement.starts_at,
+              endsAt: announcement.ends_at,
+            });
+
+            return [
+              <div key="title"><p className="font-semibold text-[#F0EAD6]">{announcement.title}</p><p className="text-xs text-[#F0EAD6]/46">{announcement.message}</p></div>,
+              announcement.tone,
+              <AdminStatusBadge key="state" tone={statusTone[status]}>{statusLabel[status]}</AdminStatusBadge>,
+              `${announcement.starts_at ? formatAdminDateTime(announcement.starts_at) : "Anytime"} - ${announcement.ends_at ? formatAdminDateTime(announcement.ends_at) : "No end"}`,
+              announcement.link_url ? `${announcement.link_label}: ${announcement.link_url}` : "None",
+              canEdit ? (
               <div key="actions" className="flex flex-wrap items-center gap-2">
                 <Link
                   href={`/admin/announcements?edit=${announcement.id}`}
@@ -112,8 +134,9 @@ export default async function AnnouncementsPage({
                   </AdminSubmitButton>
                 </form>
               </div>
-            ) : "Read-only",
-          ])}
+              ) : "Read-only",
+            ];
+          })}
           empty={<AdminEmptyState title="No announcements" description="Announcements will appear here when they are created." />}
         />
       </AdminSectionCard>

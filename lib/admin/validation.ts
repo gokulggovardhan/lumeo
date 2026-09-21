@@ -44,8 +44,28 @@ export function validateToolStatus(value: string): value is ToolStatus {
 
 
 export function validateAnnouncementSchedule(startsAt: string, endsAt: string) {
-  if (!startsAt || !endsAt) return true;
-  return new Date(endsAt).getTime() >= new Date(startsAt).getTime();
+  const parseLocalDateTime = (value: string) => {
+    if (!value) return null;
+    const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+    if (!match) return Number.NaN;
+
+    const [, year, month, day, hour, minute] = match.map(Number);
+    const parsed = Date.UTC(year, month - 1, day, hour, minute);
+    const date = new Date(parsed);
+    return date.getUTCFullYear() === year &&
+      date.getUTCMonth() === month - 1 &&
+      date.getUTCDate() === day &&
+      date.getUTCHours() === hour &&
+      date.getUTCMinutes() === minute
+      ? parsed
+      : Number.NaN;
+  };
+
+  const startsAtMs = parseLocalDateTime(startsAt);
+  const endsAtMs = parseLocalDateTime(endsAt);
+  if (Number.isNaN(startsAtMs) || Number.isNaN(endsAtMs)) return false;
+  if (startsAtMs === null || endsAtMs === null) return true;
+  return endsAtMs > startsAtMs;
 }
 
 export function validateLinkUrl(value: string) {
