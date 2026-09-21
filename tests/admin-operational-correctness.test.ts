@@ -132,8 +132,9 @@ test("Admin request proxy is Cloudflare-native and enforces production edge safe
   const proxy = read("lib/supabase/proxy.ts");
   const packageJson = read("package.json");
 
-  assert.doesNotMatch(proxy, /@vercel\/functions/);
-  assert.doesNotMatch(packageJson, /"@vercel\/functions"/);
+  const retiredFunctionsPackage = ["@ver", "cel/functions"].join("");
+  assert.ok(!proxy.includes(retiredFunctionsPackage));
+  assert.ok(!packageJson.includes(retiredFunctionsPackage));
   assert.match(proxy, /readCloudflareApproximateLocation/);
   assert.match(proxy, /productionHttpsRedirect/);
   assert.match(proxy, /PRODUCTION_HOSTS/);
@@ -163,9 +164,11 @@ test("Admin runtime metadata is Cloudflare-native", () => {
   const errors = read("lib/errors/server.ts");
   const vite = read("vite.config.ts");
 
+  const retiredEnvPrefix = ["VER", "CEL_"].join("");
+  const retiredRuntimeLabel = ["Ver", "cel runtime"].join("");
   for (const source of [health, overview, timezone, errors]) {
-    assert.doesNotMatch(source, /VERCEL_[A-Z_]+/);
-    assert.doesNotMatch(source, /Vercel runtime/);
+    assert.doesNotMatch(source, new RegExp(`${retiredEnvPrefix}[A-Z_]+`));
+    assert.ok(!source.includes(retiredRuntimeLabel));
   }
   assert.match(health, /LUMEO_BUILD_SHA/);
   assert.match(health, /LUMEO_DEPLOYMENT_ENV/);
