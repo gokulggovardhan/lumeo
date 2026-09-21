@@ -199,14 +199,16 @@ test("admin analytics dashboard exposes current range controls and lifecycle met
   const page = readFileSync("app/admin/(protected)/analytics/page.tsx", "utf8");
 
   assert.match(page, /eyebrow="Analytics"/);
-  assert.match(page, /title="Discovery & operation analytics"/);
+  assert.match(page, /title="Analytics"/);
+  assert.match(page, /Discovery & operation analytics/);
   assert.match(page, /title="Date range"/);
   assert.match(page, /name="range"/);
   assert.match(page, /<option value="30d">Last 30 days<\/option>/);
   assert.match(page, /<option value="custom">Custom<\/option>/);
   assert.match(page, /label="Page Views"/);
   assert.match(page, /label="Tool Opens"/);
-  assert.match(page, /label="Most Opened Tool"/);
+  assert.match(page, /Most opened tool/);
+  assert.match(page, /title="Tool performance"/);
   assert.match(page, /title="Operation analytics"/);
   assert.match(page, /label="Processing Started"/);
   assert.match(page, /label="Processing Succeeded"/);
