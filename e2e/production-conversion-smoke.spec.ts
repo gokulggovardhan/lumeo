@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Download } from "@playwright/test";
+import type { Download, Page } from "@playwright/test";
 import JSZip from "jszip";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { readFile } from "node:fs/promises";
@@ -62,7 +62,7 @@ async function downloadBytes(download: Download): Promise<Buffer> {
 }
 
 async function assertPublicToolStillBlocked(
-  page: Parameters<typeof test>[0] extends never ? never : any,
+  page: Page,
   route: string,
   actionName: string,
 ) {
