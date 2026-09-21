@@ -10,6 +10,7 @@ import { readFile } from "node:fs/promises";
 
 import {
   assertPdfAnchorFidelity,
+  assertPdfLineAnchorFidelity,
   assertRenderedPdfSimilarity,
   countPdfImages,
   renderDocxWithLibreOffice,
@@ -727,18 +728,15 @@ test.describe("browser conversion validation lab", () => {
         "rich-word-browser",
       );
 
-      await assertPdfAnchorFidelity(
+      await assertPdfLineAnchorFidelity(
         referencePdf,
         browserPdf,
         outputDirectory,
         [
-          { page: 1, text: "formatted" },
-          { page: 1, text: "heading" },
-          { page: 1, text: "italic" },
-          { page: 1, text: "A1" },
-          { page: 1, text: "B2" },
-          { page: 2, text: "second" },
-          { page: 2, text: "centered" },
+          { page: 1, contains: "Lumeo formatted heading" },
+          { page: 1, contains: "Table A1" },
+          { page: 1, contains: "Table B2" },
+          { page: 2, contains: "Lumeo second page centered text" },
         ],
         0.025,
       );
@@ -810,7 +808,6 @@ test.describe("browser conversion validation lab", () => {
         url.pathname === "/api/tools/pdf-to-word" ||
         url.pathname === "/api/tools/word-to-pdf/cleanup";
       const storageWrite =
-        /\.supabase\.(?:co|in)$/.test(url.hostname) &&
         url.pathname.startsWith("/storage/v1/") &&
         request.method() !== "GET";
       const retiredRender =
