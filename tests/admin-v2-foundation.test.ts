@@ -63,6 +63,16 @@ test("Admin Console V2 Dashboard derives attention and metrics from real protect
   assert.doesNotMatch(dashboard, /fake|placeholder|AI insight/i);
 });
 
+test("Admin Console V2 mobile navigation remains keyboard and pointer dismissible", () => {
+  const mobile = read("components/admin/ControlCenterMobileNav.tsx");
+
+  assert.match(mobile, /event\.key === "Escape"/);
+  assert.match(mobile, /document\.addEventListener\("pointerdown", handlePointerDown, true\)/);
+  assert.match(mobile, /onClick=\{\(\) => setOpen\(false\)\}/);
+  assert.match(mobile, /aria-expanded=\{open\}/);
+  assert.match(mobile, /aria-controls="admin-mobile-menu"/);
+});
+
 test("Admin Console V2 runtime identity stays Cloudflare-native", () => {
   const layout = read("app/admin/(protected)/layout.tsx");
   const topbar = read("components/admin/AdminTopbar.tsx");
