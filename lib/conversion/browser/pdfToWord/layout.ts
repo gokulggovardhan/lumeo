@@ -16,30 +16,75 @@ type PdfTextItem = {
 
 type PdfMarkedContent = { type: string };
 
-function fontFamilyFromName(fontName: string): string {
-  const normalized = fontName.replace(/^[A-Z]{6}\+/, "").replace(/[-_](Bold|Italic|Oblique).*$/i, "");
-  return normalized || "Arial";
+export type PdfTextStyle = {
+  fontFamily?: string;
+  fontName?: string;
+  bold?: boolean;
+  italic?: boolean;
+};
+
+function firstFamilyName(value: string): string {
+  return value
+    .split(",")[0]
+    ?.trim()
+    .replace(/^['"]|['"]$/g, "") ?? "";
 }
 
-function styleFromFontName(fontName: string) {
+function normalizeWordFontFamily(value: string): string {
+  const subsetless = value.replace(/^[A-Z]{6}\+/, "");
+  const raw = firstFamilyName(subsetless)
+    .replace(/^\./, "")
+    .replace(/[-_](Bold|Italic|Oblique|Regular|Medium|Semibold|Demi).*$/i, "")
+    .replace(/(PSMT|MT)$/i, "")
+    .trim();
+
+  const lower = raw.toLowerCase();
+  if (
+    !raw ||
+    /^g_d\d+_f\d+$/i.test(raw) ||
+    /sans-serif|system-ui|sfui|helvetica|arial/.test(lower)
+  ) {
+    return "Arial";
+  }
+  if (/serif|times/.test(lower)) return "Times New Roman";
+  if (/monospace|courier/.test(lower)) return "Courier New";
+  return raw;
+}
+
+function fontFamilyFromName(
+  fontName: string,
+  style: PdfTextStyle | undefined,
+): string {
+  const preferred = style?.fontFamily || style?.fontName || fontName;
+  return normalizeWordFontFamily(preferred);
+}
+
+function styleFromFontName(
+  fontName: string,
+  style: PdfTextStyle | undefined,
+) {
+  const descriptor = `${fontName} ${style?.fontFamily ?? ""} ${style?.fontName ?? ""}`;
   return {
-    bold: /bold|black|semibold|demi/i.test(fontName),
-    italic: /italic|oblique/i.test(fontName),
+    bold: style?.bold ?? /bold|black|semibold|demi/i.test(descriptor),
+    italic: style?.italic ?? /italic|oblique/i.test(descriptor),
   };
 }
 
-function normalizeTextGap(left: DetectedTextRun, right: DetectedTextRun): string {
-  const leftEnd = left.xPct + left.widthPct;
-  const gap = right.xPct - leftEnd;
-  if (left.str.endsWith(" ") || right.str.startsWith(" ")) return "";
-  return gap > Math.max(0.35, left.heightPct * 0.18) ? " " : "";
-}
-
+/**
+ * Reconstruct independently positioned editable PDF text runs.
+ *
+ * A PDF baseline is not a Word paragraph. Invoices, statements, forms and
+ * tables routinely put unrelated cells on the same Y coordinate. Joining
+ * those cells into one string causes Word to reflow them according to the
+ * replacement font's metrics, which is exactly the failure mode that used to
+ * collapse invoice columns and AMC tables.
+ */
 export function reconstructTextLines(
   items: Array<PdfTextItem | PdfMarkedContent>,
   viewportTransform: number[],
   pageWidthPt: number,
   pageHeightPt: number,
+  styles: Record<string, PdfTextStyle> = {},
 ): ReconstructedTextLine[] {
   const runs = textRunsFromContent(
     items,
@@ -48,71 +93,30 @@ export function reconstructTextLines(
     pageHeightPt,
   );
 
-  const editableRuns = runs.filter((run) => !run.rotated);
-  if (!editableRuns.length) return [];
+  return runs
+    .filter((run) => !run.rotated)
+    .map((run: DetectedTextRun) => {
+      const style = styles[run.fontName];
+      const textStyle = styleFromFontName(run.fontName, style);
+      const widthPt = (run.widthPct / 100) * pageWidthPt;
+      const heightPt = (run.heightPct / 100) * pageHeightPt;
 
-  const sorted = [...editableRuns].sort((a, b) => {
-    const yDiff = a.yPct - b.yPct;
-    return Math.abs(yDiff) > 0.35 ? yDiff : a.xPct - b.xPct;
-  });
-
-  const groups: DetectedTextRun[][] = [];
-
-  for (const run of sorted) {
-    const last = groups.at(-1);
-    if (!last) {
-      groups.push([run]);
-      continue;
-    }
-
-    const baseline = last.reduce((sum, item) => sum + item.yPct, 0) / last.length;
-    const tolerancePct = Math.max(
-      0.35,
-      (Math.max(run.fontSizePt, ...last.map((item) => item.fontSizePt)) /
-        pageHeightPt) *
-        45,
-    );
-
-    if (Math.abs(run.yPct - baseline) <= tolerancePct) {
-      last.push(run);
-      last.sort((a, b) => a.xPct - b.xPct);
-    } else {
-      groups.push([run]);
-    }
-  }
-
-  return groups.map((group) => {
-    const first = group[0];
-    const last = group[group.length - 1];
-    let text = "";
-    for (let index = 0; index < group.length; index += 1) {
-      if (index > 0) text += normalizeTextGap(group[index - 1], group[index]);
-      text += group[index].str;
-    }
-
-    const dominant = group.reduce((best, item) =>
-      item.str.length > best.str.length ? item : best,
-    );
-    const style = styleFromFontName(dominant.fontName);
-    const maxHeightPct = Math.max(...group.map((item) => item.heightPct));
-    const fontSizePt = Math.max(...group.map((item) => item.fontSizePt));
-
-    return {
-      text,
-      xPt: (first.xPct / 100) * pageWidthPt,
-      yPt: (Math.min(...group.map((item) => item.yPct)) / 100) * pageHeightPt,
-      widthPt:
-        ((last.xPct + last.widthPct - first.xPct) / 100) * pageWidthPt,
-      heightPt: Math.max(
-        (maxHeightPct / 100) * pageHeightPt,
-        fontSizePt * 1.15,
-      ),
-      fontSizePt,
-      fontFamily: fontFamilyFromName(dominant.fontName),
-      bold: style.bold,
-      italic: style.italic,
-    };
-  });
+      return {
+        text: run.str,
+        xPt: (run.xPct / 100) * pageWidthPt,
+        yPt: (run.yPct / 100) * pageHeightPt,
+        widthPt: Math.max(widthPt, 1),
+        heightPt: Math.max(heightPt, run.fontSizePt * 1.15),
+        fontSizePt: run.fontSizePt,
+        fontFamily: fontFamilyFromName(run.fontName, style),
+        bold: textStyle.bold,
+        italic: textStyle.italic,
+      };
+    })
+    .sort((a, b) => {
+      const yDiff = a.yPt - b.yPt;
+      return Math.abs(yDiff) > 0.25 ? yDiff : a.xPt - b.xPt;
+    });
 }
 
 export function ocrLinesToReconstructed(
@@ -128,7 +132,9 @@ export function ocrLinesToReconstructed(
       yPt: (line.yPct / 100) * pageHeightPt,
       widthPt: (line.widthPct / 100) * pageWidthPt,
       heightPt: (line.heightPct / 100) * pageHeightPt,
-      fontSizePt: line.fontSizePt ?? Math.max(8, (line.heightPct / 100) * pageHeightPt * 0.8),
+      fontSizePt:
+        line.fontSizePt ??
+        Math.max(8, (line.heightPct / 100) * pageHeightPt * 0.8),
       fontFamily: "Arial",
       bold: false,
       italic: false,
