@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Request } from "@playwright/test";
 import type { Download } from "@playwright/test";
 import JSZip from "jszip";
 import { PDFDocument, StandardFonts } from "pdf-lib";
@@ -10,6 +10,30 @@ type RuntimeWatch = {
   retiredTransportRequests: string[];
 };
 
+function isExpectedOfficePreflightAbort(request: Request): boolean {
+  const failure = request.failure()?.errorText ?? "";
+  if (!/ERR_ABORTED/i.test(failure)) return false;
+
+  const url = new URL(request.url());
+  if (url.origin !== "https://lumeo.in" || !url.pathname.startsWith("/office-runtime/")) {
+    return false;
+  }
+
+  const asset = url.pathname.split("/").at(-1) ?? "";
+  if (asset === "soffice.js" && request.method() === "HEAD") {
+    return true;
+  }
+
+  if (
+    request.method() === "GET" &&
+    ["soffice.wasm", "soffice.data", "soffice.data.js.metadata"].includes(asset)
+  ) {
+    return request.headers()["range"] === "bytes=0-0";
+  }
+
+  return false;
+}
+
 function watchConversionRuntime(page: Page): RuntimeWatch {
   const pageErrors: string[] = [];
   const failedRequests: string[] = [];
@@ -17,6 +41,7 @@ function watchConversionRuntime(page: Page): RuntimeWatch {
 
   page.on("pageerror", (error) => pageErrors.push(error.message));
   page.on("requestfailed", (request) => {
+    if (isExpectedOfficePreflightAbort(request)) return;
     failedRequests.push(`${request.method()} ${request.url()}: ${request.failure()?.errorText ?? "failed"}`);
   });
   page.on("request", (request) => {
