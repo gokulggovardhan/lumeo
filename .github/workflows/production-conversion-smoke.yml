@@ -15,6 +15,10 @@ on:
       - "config/office-runtime-release.json"
       - "app/office-runtime/**"
       - "e2e/production-conversion-smoke.spec.ts"
+      - "e2e/conversion-fidelity-helpers.ts"
+      - "e2e/fixed-layout-pdf-fixture.ts"
+      - "e2e/professional-docx-fixture.ts"
+      - "scripts/compare-pdf-fidelity.py"
       - "playwright.production-conversion.config.ts"
       - "supabase/migrations/*word*pdf*.sql"
   workflow_dispatch:
@@ -70,6 +74,11 @@ jobs:
 
           echo "FAIL production did not reach expected revision $EXPECTED_SHA"
           exit 1
+
+      - name: Install deterministic document fidelity tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils python3-pil
 
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
