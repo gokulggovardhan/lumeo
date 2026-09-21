@@ -28,6 +28,7 @@ export default defineConfig({
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
   ],
   // E2E_PROD=1 runs the suite against a production build instead of the dev
   // server. That distinction matters for anything involving React's

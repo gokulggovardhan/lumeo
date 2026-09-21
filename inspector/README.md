@@ -12,4 +12,4 @@ Results are written to `inspector-output/report.json` and `inspector-output/deci
 
 Phase 0 never proves an AAE is already represented in rendered pixels. It never labels transfer mode from an extension alone. Live Photo pairing is definitive only when embedded identifiers agree, and HDR is reported as present only from direct gain-map or transfer-function evidence. All other cases remain probable, unknown, or unsupported.
 
-Human verification against Apple Photos remains mandatory before any evidence becomes a production handling rule.
+Human verification against Apple Photos remains mandatory before promoting sample-derived Apple-specific visual or metadata interpretations into new production handling rules. It is not a blocker for the current generic still-image conversion path, whose supported behavior is covered by the automated release and production gates.
