@@ -291,6 +291,17 @@ try {
   assert(auditPage.includes("hasNextPage"), "Audit pagination must not infer next-page state from a full page alone.");
   assert(auditPage.includes('role="alert"'), "Invalid audit date ranges must be announced accessibly.");
 
+  const announcementsPage = read("app/admin/(protected)/announcements/page.tsx");
+  const announcementsAction = read("app/admin/(protected)/announcements/actions.ts");
+  const announcementStatus = read("lib/admin/announcement-status.ts");
+  const heicPage = read("app/heic-to-jpeg/page.tsx");
+  assert(announcementsPage.includes("resolveAnnouncementStatus"), "Announcements must show schedule-aware states.");
+  for (const state of ["inactive", "scheduled", "live", "expired"]) {
+    assert(announcementStatus.includes(`\"${state}\"`), `Announcement status is missing ${state}.`);
+  }
+  assert(announcementsAction.includes("Boolean(linkLabel) !== Boolean(linkUrl)"), "Announcements must reject incomplete public links.");
+  assert(heicPage.includes('withSeoOverride("/heic-to-jpeg"'), "HEIC metadata must consume live Admin SEO overrides.");
+
   const packageJson = JSON.parse(read("package.json"));
   assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
