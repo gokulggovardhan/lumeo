@@ -143,6 +143,32 @@ export function CommandPaletteDialog({
     }
   }
 
+  function handleDialogKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== "Tab") return;
+
+    const focusable = Array.from(
+      panelRef.current?.querySelectorAll<HTMLElement>(
+        "input:not([disabled]), button:not([disabled]), a[href]",
+      ) ?? [],
+    ).filter((element) => element.tabIndex !== -1);
+    if (focusable.length === 0) return;
+
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   const activeOptionId = displayResults[activeIndex]
     ? `${listboxId}-option-${displayResults[activeIndex].id}`
     : undefined;
@@ -162,6 +188,7 @@ export function CommandPaletteDialog({
         role="dialog"
         aria-modal="true"
         aria-label="Command palette"
+        onKeyDown={handleDialogKeyDown}
         className="aura-glass-thick aura-scale-in w-full max-w-xl overflow-hidden rounded-[var(--radius-2xl)]"
       >
         <div className="flex items-center gap-3 border-b border-[var(--border-hairline)] px-4 py-3">

@@ -1,270 +1,262 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ToolGlyph } from "@/components/pdf/ToolGlyph";
-import type { ToolAction, ToolProcessing } from "@/lib/tools/catalog";
-import type { ResolvedTool } from "@/lib/tools/resolve";
+import {
+  DISCOVERY_CATEGORY_LABEL,
+  type ToolDiscoveryCategory,
+} from "@/lib/tools/catalog";
+import { toolMatchesQuery } from "@/lib/tools/discovery-search";
+import type { Tile } from "@/lib/tools/tiles";
 
-const PROCESSING_TAG: Record<ToolProcessing, string> = {
-  browser: "Private",
-  server: "Server",
-  hybrid: "Adaptive",
+type CategoryFilter = "all" | ToolDiscoveryCategory;
+
+const FILTERS: { id: CategoryFilter; label: string }[] = [
+  { id: "all", label: "All tools" },
+  { id: "organize", label: "Organize" },
+  { id: "edit-sign", label: "Edit & sign" },
+  { id: "optimize", label: "Optimize" },
+  { id: "convert", label: "Convert" },
+];
+
+const PROCESSING_LABEL: Record<Tile["processing"], string> = {
+  browser: "On device",
+  server: "Server-assisted",
+  hybrid: "Adaptive processing",
 };
 
-function actionMatches(action: ToolAction, q: string) {
-  return action.label.toLowerCase().includes(q);
+function availabilityLabel(tool: Tile) {
+  if (tool.availability === "maintenance") return "Temporarily unavailable";
+  if (tool.availability === "coming_soon") return "Coming soon";
+  if (tool.availability === "beta") return "Beta";
+  return "Available";
 }
 
-function toolMatches(tool: ResolvedTool, q: string) {
-  if (!q) return true;
+function ProcessingBadge({ tool }: { tool: Tile }) {
+  const browser = tool.processing === "browser";
   return (
-    tool.name.toLowerCase().includes(q) ||
-    tool.plain.toLowerCase().includes(q) ||
-    tool.tag.toLowerCase().includes(q) ||
-    tool.actions.some((action) => actionMatches(action, q))
-  );
-}
-
-function ProcessingLine({ tool }: { tool: ResolvedTool }) {
-  const dotColor =
-    tool.processing === "browser"
-      ? "var(--atelier-sage-300)"
-      : tool.processing === "server"
-        ? "var(--atelier-brass-300)"
-        : "var(--atelier-info)";
-  return (
-    <span className="inline-flex items-center gap-2 text-[11.5px] text-[var(--text-muted)]">
-      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ background: dotColor }} />
-      {PROCESSING_TAG[tool.processing]}
+    <span
+      className={`inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+        browser
+          ? "border-[rgba(var(--atelier-sage-rgb),0.32)] bg-[rgba(var(--atelier-sage-rgb),0.1)] text-[var(--atelier-sage-300)]"
+          : "border-[rgba(var(--champagne-rgb),0.3)] bg-[rgba(var(--champagne-rgb),0.09)] text-[var(--text-premium)]"
+      }`}
+    >
+      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
+      {PROCESSING_LABEL[tool.processing]}
     </span>
   );
 }
 
-function ToolCard({
-  tool,
-  query,
-  animate,
-  index,
-}: {
-  tool: ResolvedTool;
-  query: string;
-  animate: boolean;
-  index: number;
-}) {
-  const soon = tool.availability === "soon";
-
-  // A tool bundles several actions -- some genuinely separate destinations
-  // (Compose is both Merge and Split), some sub-modes of one workspace
-  // (Rotate/Remove/Extract are all inside Split). Neither "pick one action as
-  // the card's default click" nor "list every action as its own button on a
-  // compact grid card" scales as more actions ship. Every card instead links
-  // to that tool's own category page (/pdf-tools/{key}), which is where the
-  // real per-destination navigation and route grouping lives -- see
-  // ToolCategoryDetail. The action list here is just a preview.
-  const inner = (
+function ToolCard({ tool }: { tool: Tile }) {
+  const available = tool.availability === "active" || tool.availability === "beta";
+  const contents = (
     <>
-      <div className="flex items-center gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)]">
-          <ToolGlyph name={tool.key} className="h-[19px] w-[19px]" />
+      <div className="flex items-start justify-between gap-4">
+        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)] shadow-[inset_0_1px_0_rgba(var(--paper-rgb),0.05)]">
+          <ToolGlyph name={tool.glyph} className="h-5 w-5" />
         </span>
-        <span className="min-w-0">
-          <span className="block font-serif text-[1.05rem] font-medium leading-none tracking-[-0.01em] text-[var(--text-primary)]">
-            {tool.name}
+        <span className="text-right">
+          <span className="block text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--text-muted)]">
+            {tool.categoryLabel}
           </span>
-          <span className="mt-1 block font-mono text-[10px] tracking-[0.01em] text-[var(--text-muted)]">
-            {tool.plain}
-          </span>
+          <span className="mt-1 block text-[10px] text-[var(--text-subtle)]">{tool.brandedCategory}</span>
         </span>
       </div>
 
-      <p className="text-[12.5px] leading-relaxed text-[var(--text-secondary)]">{tool.tag}</p>
+      <div>
+        <h3 className="font-serif text-[1.16rem] font-medium leading-tight text-[var(--text-primary)]">
+          {tool.label}
+        </h3>
+        <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">{tool.description}</p>
+      </div>
 
-      <div className="mt-auto flex flex-wrap gap-x-2.5 gap-y-1 text-[11.5px] leading-6 text-[var(--text-muted)]">
-        {tool.actions.map((action) => {
-          const hit = query.length > 0 && actionMatches(action, query);
-          const style = hit ? { color: "var(--atelier-sage-300)" } : undefined;
-          return (
-            <span
-              key={action.slug}
-              className={`inline-flex items-center ${action.live ? "text-[var(--text-secondary)]" : ""}`}
-              style={style}
-            >
-              {action.live ? (
-                <span aria-hidden="true" className="mr-1.5 h-1 w-1 rounded-full bg-[var(--atelier-sage-400)]" />
-              ) : null}
-              {action.label}
+      <div className="mt-auto flex items-end justify-between gap-3 pt-3">
+        <div className="flex min-w-0 flex-col items-start gap-2">
+          <ProcessingBadge tool={tool} />
+          {!available ? (
+            <span className="text-xs font-bold text-[var(--atelier-warning)]">
+              {availabilityLabel(tool)}
             </span>
-          );
-        })}
-      </div>
-
-      <div className="flex items-center justify-between pt-0.5">
-        {soon ? <span /> : <ProcessingLine tool={tool} />}
-        <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-muted)] transition-colors duration-200 group-hover:text-[var(--text-premium)]">
-          {soon ? "Notify me" : "Open"}
-          <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none">
-            →
+          ) : tool.availability === "beta" ? (
+            <span className="text-xs font-bold text-[var(--text-premium)]">Beta</span>
+          ) : null}
+        </div>
+        {available ? (
+          <span className="inline-flex min-h-11 shrink-0 items-center gap-1.5 self-end text-sm font-bold text-[var(--atelier-sage-300)]">
+            Open tool
+            <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none">→</span>
           </span>
-        </span>
+        ) : null}
       </div>
     </>
   );
 
   const shell =
-    "lumeo-tool-card group relative flex flex-col gap-2.5 rounded-[14px] border p-4 " +
-    (soon
-      ? "border-dashed border-[var(--border-subtle)] bg-transparent"
-      : "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-300 [transition-timing-function:var(--lumeo-spring)] hover:-translate-y-1 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-base)]") +
-    (animate ? " lumeo-fade-up" : "");
+    "lumeo-tool-card group flex min-h-[15rem] flex-col gap-4 rounded-[16px] border p-5 shadow-[var(--shadow-sm)] " +
+    (available
+      ? "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
+      : "border-[var(--border-subtle)] bg-[var(--surface-raised)] opacity-80");
 
-  const style = animate ? { animationDelay: `${Math.min(index, 7) * 45}ms` } : undefined;
+  if (!available) {
+    return (
+      <article className={shell} aria-label={`${tool.label}, ${availabilityLabel(tool)}`}>
+        {contents}
+      </article>
+    );
+  }
 
   return (
-    <Link id={`tool-${tool.key}`} href={`/pdf-tools/${tool.key}`} aria-label={`View ${tool.name} tools`} className={shell} style={style}>
-      {inner}
+    <Link
+      href={tool.route}
+      className={shell}
+      aria-label={`Open ${tool.label}. ${PROCESSING_LABEL[tool.processing]}.`}
+    >
+      {contents}
     </Link>
   );
 }
 
-function SectionHead({ label, soon = false }: { label: string; soon?: boolean }) {
+function ToolGrid({ tools }: { tools: Tile[] }) {
   return (
-    <div className="mb-4 mt-8 flex items-center gap-3 first:mt-0">
-      <h2 className="font-serif text-[0.95rem] font-medium tracking-[0.01em] text-[var(--text-muted)]">{label}</h2>
-      <span aria-hidden="true" className="h-px flex-1 bg-[var(--border-hairline)]" />
-      {soon ? (
-        <span className="rounded-full border border-[rgba(var(--champagne-rgb),0.3)] px-2.5 py-[3px] font-mono text-[10px] uppercase tracking-[0.12em] text-[var(--text-premium)]">
-          In development
-        </span>
-      ) : null}
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {tools.map((tool) => <ToolCard key={tool.route} tool={tool} />)}
     </div>
   );
 }
 
-export function ToolsExplorer({ tools }: { tools: ResolvedTool[] }) {
+export function ToolsExplorer({ tools }: { tools: Tile[] }) {
   const [query, setQuery] = useState("");
-  const [touched, setTouched] = useState(false);
+  const [category, setCategory] = useState<CategoryFilter>("all");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const q = query.trim().toLowerCase();
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      const typing = target?.matches("input, textarea, select, [contenteditable='true']");
 
-  const jumps = useMemo(() => {
-    if (!q) return [];
-    const out: { action: ToolAction; tool: ResolvedTool }[] = [];
-    for (const tool of tools) {
-      for (const action of tool.actions) {
-        if (actionMatches(action, q)) out.push({ action, tool });
+      if (event.key === "/" && !typing && !event.metaKey && !event.ctrlKey && !event.altKey) {
+        event.preventDefault();
+        inputRef.current?.focus();
+        return;
+      }
+
+      if (event.key === "Escape" && document.activeElement === inputRef.current) {
+        event.preventDefault();
+        if (query) setQuery("");
+        else inputRef.current?.blur();
       }
     }
-    return out.slice(0, 8);
-  }, [q, tools]);
 
-  // A tool only counts as "available" once it both carries the design's
-  // available flag AND actually has somewhere live to send someone --
-  // otherwise an admin disabling every action underneath it would leave a
-  // dead-looking card sitting in the wrong section.
-  const shownAvailable = tools
-    .filter((tool) => tool.availability === "available" && tool.effectivePrimaryRoute)
-    .filter((tool) => toolMatches(tool, q));
-  const shownSoon = tools
-    .filter((tool) => tool.availability === "soon" || !tool.effectivePrimaryRoute)
-    .filter((tool) => toolMatches(tool, q));
-  const nothing = shownAvailable.length === 0 && shownSoon.length === 0;
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [query]);
 
-  function scrollToTool(key: string) {
-    const el = document.getElementById(`tool-${key}`);
-    if (!el) return;
-    el.scrollIntoView({ behavior: "smooth", block: "center" });
-    el.classList.remove("lumeo-tool-flash");
-    void el.offsetWidth;
-    el.classList.add("lumeo-tool-flash");
-    window.setTimeout(() => el.classList.remove("lumeo-tool-flash"), 1400);
+  const shown = useMemo(
+    () => tools.filter((tool) => (category === "all" || tool.category === category) && toolMatchesQuery(tool, query)),
+    [category, query, tools],
+  );
+  const available = shown.filter((tool) => tool.availability === "active" || tool.availability === "beta");
+  const unavailable = shown.filter((tool) => tool.availability === "maintenance" || tool.availability === "coming_soon");
+  const popular = tools.filter((tool) => tool.popular && (tool.availability === "active" || tool.availability === "beta"));
+
+  function resetFilters() {
+    setQuery("");
+    setCategory("all");
+    inputRef.current?.focus();
   }
 
   return (
     <div>
-      <div className="max-w-[560px]">
-        <div className="flex items-center gap-3 rounded-[13px] border border-[var(--border-subtle)] bg-[var(--surface-base)] px-4 py-3.5 transition focus-within:border-[var(--atelier-sage-500)] focus-within:shadow-[0_0_0_4px_rgba(var(--atelier-sage-rgb),0.12)]">
-          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-[var(--text-muted)]">
+      <section aria-label="Find a PDF tool" className="rounded-[18px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-4 shadow-[var(--shadow-sm)] sm:p-5">
+        <label htmlFor="pdf-tool-search" className="mb-2 block text-sm font-bold text-[var(--text-primary)]">
+          Search tools and actions
+        </label>
+        <div className="flex min-h-12 items-center gap-3 rounded-[12px] border border-[var(--border-default)] bg-[var(--surface-input)] px-4 transition focus-within:border-[var(--border-focus)] focus-within:shadow-[var(--shadow-focus)]">
+          <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-[var(--text-muted)]">
             <circle cx="11" cy="11" r="7" />
             <path d="m21 21-4.3-4.3" />
           </svg>
           <input
             ref={inputRef}
-            type="text"
+            id="pdf-tool-search"
+            type="search"
             value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              if (!touched) setTouched(true);
-            }}
-            placeholder="Search an action — “rotate”, “watermark”, “sign”…"
-            aria-label="Search tools"
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            placeholder="Search: merge, rotate, watermark, sign…"
             autoComplete="off"
-            className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-subtle)]"
+            className="min-w-0 flex-1 bg-transparent py-3 text-[15px] text-[var(--text-primary)] outline-none placeholder:text-[var(--text-subtle)]"
           />
+          <kbd className="hidden rounded-md border border-[var(--border-hairline)] px-2 py-1 text-[10px] font-bold text-[var(--text-subtle)] sm:inline">/</kbd>
         </div>
 
-        {jumps.length > 0 ? (
-          <div className="mt-3">
-            <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.1em] text-[var(--text-subtle)]">Jump to</p>
-            <div className="flex flex-wrap gap-2">
-              {jumps.map(({ action, tool }) =>
-                action.route && action.live ? (
-                  <Link
-                    key={`${tool.key}-${action.slug}`}
-                    href={action.route}
-                    className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] px-3 py-1.5 text-[12.5px] text-[var(--text-secondary)] transition hover:border-[var(--atelier-sage-500)] hover:text-[var(--text-primary)]"
-                  >
-                    {action.label}
-                    <span aria-hidden="true" className="text-[var(--text-subtle)]">→</span>
-                    <span className="font-serif text-[var(--atelier-sage-300)]">{tool.name}</span>
-                  </Link>
-                ) : (
-                  <button
-                    key={`${tool.key}-${action.slug}`}
-                    type="button"
-                    onClick={() => scrollToTool(tool.key)}
-                    className="inline-flex items-center gap-2 rounded-full border border-[var(--border-subtle)] px-3 py-1.5 text-[12.5px] text-[var(--text-secondary)] transition hover:border-[var(--atelier-sage-500)] hover:text-[var(--text-primary)]"
-                  >
-                    {action.label}
-                    <span aria-hidden="true" className="text-[var(--text-subtle)]">→</span>
-                    <span className="font-serif text-[var(--atelier-sage-300)]">{tool.name}</span>
-                  </button>
-                ),
-              )}
-            </div>
-          </div>
-        ) : null}
+        <div className="aura-scrollbar -mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1" aria-label="Filter PDF tools by category">
+          {FILTERS.map((filter) => (
+            <button
+              key={filter.id}
+              type="button"
+              aria-pressed={category === filter.id}
+              onClick={() => setCategory(filter.id)}
+              className={`lumeo-focus-ring min-h-11 shrink-0 rounded-full border px-4 text-sm font-bold transition duration-200 ${
+                category === filter.id
+                  ? "border-[var(--border-selected)] bg-[var(--surface-selected)] text-[var(--text-primary)]"
+                  : "border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--border-default)] hover:text-[var(--text-primary)]"
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {popular.length > 0 ? (
+        <nav aria-label="Popular PDF tools" className="mt-5 flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Popular</span>
+          {popular.map((tool) => (
+            <Link key={tool.route} href={tool.route} className="lumeo-focus-ring inline-flex min-h-11 items-center rounded-full border border-[var(--border-hairline)] bg-[var(--surface-base)] px-4 text-sm font-bold text-[var(--text-secondary)] transition hover:border-[var(--border-selected)] hover:text-[var(--text-primary)]">
+              {tool.label}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+
+      <div className="mb-4 mt-7 flex items-center justify-between gap-4">
+        <h2 className="font-serif text-xl font-medium text-[var(--text-primary)]">
+          {category === "all" ? "All tools" : DISCOVERY_CATEGORY_LABEL[category]}
+        </h2>
+        <p aria-live="polite" aria-atomic="true" className="text-sm text-[var(--text-muted)]">
+          {shown.length} {shown.length === 1 ? "tool" : "tools"}
+        </p>
       </div>
 
-      {nothing ? (
-        <div className="py-14 text-center">
-          <p className="font-serif text-lg text-[var(--text-secondary)]">Nothing matches that yet</p>
-          <p className="mt-1.5 text-sm text-[var(--text-muted)]">Try a broader term, or tell us what you need built.</p>
+      {shown.length === 0 ? (
+        <div className="rounded-[16px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-6 py-12 text-center">
+          <p className="font-serif text-lg text-[var(--text-primary)]">No tools match that search</p>
+          <p className="mt-2 text-sm text-[var(--text-muted)]">Try another action or clear the current filters.</p>
+          <button type="button" onClick={resetFilters} className="lumeo-focus-ring mt-5 inline-flex min-h-11 items-center rounded-[var(--radius-md)] bg-[var(--action-primary)] px-5 text-sm font-bold text-[var(--text-on-accent)] hover:bg-[var(--action-primary-hover)]">
+            Clear search and filters
+          </button>
         </div>
-      ) : null}
-
-      {shownAvailable.length > 0 ? (
+      ) : (
         <>
-          <SectionHead label="Available now" />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {shownAvailable.map((tool, index) => (
-              <ToolCard key={tool.key} tool={tool} query={q} animate={!touched} index={index} />
-            ))}
-          </div>
+          {available.length > 0 ? <ToolGrid tools={available} /> : null}
+          {unavailable.length > 0 ? (
+            <section className="mt-10" aria-labelledby="unavailable-tools-heading">
+              <div className="mb-4 flex items-center gap-3">
+                <h2 id="unavailable-tools-heading" className="font-serif text-lg font-medium text-[var(--text-secondary)]">Not currently available</h2>
+                <span aria-hidden="true" className="h-px flex-1 bg-[var(--border-hairline)]" />
+              </div>
+              <ToolGrid tools={unavailable} />
+            </section>
+          ) : null}
         </>
-      ) : null}
+      )}
 
-      {shownSoon.length > 0 ? (
-        <>
-          <SectionHead label="Coming soon" soon />
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {shownSoon.map((tool, index) => (
-              <ToolCard key={tool.key} tool={tool} query={q} animate={!touched} index={shownAvailable.length + index} />
-            ))}
-          </div>
-        </>
-      ) : null}
+      <aside className="mt-9 grid gap-3 rounded-[16px] border border-[var(--border-hairline)] bg-[var(--surface-base)] p-4 text-sm text-[var(--text-secondary)] sm:grid-cols-2 sm:p-5" aria-label="Processing information">
+        <p><strong className="text-[var(--atelier-sage-300)]">On device</strong> means the file is processed in your browser.</p>
+        <p><strong className="text-[var(--text-premium)]">Server-assisted</strong> tools are explicitly identified before upload.</p>
+      </aside>
     </div>
   );
 }

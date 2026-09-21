@@ -14,6 +14,7 @@
 
 export type ToolProcessing = "browser" | "server" | "hybrid";
 export type ToolAvailability = "available" | "soon";
+export type ToolDiscoveryCategory = "organize" | "edit-sign" | "optimize" | "convert";
 export type ToolGlyphName =
   | "compose"
   | "distill"
@@ -30,6 +31,8 @@ export type ToolAction = {
   slug: string;
   route?: string;
   live: boolean;
+  processing?: ToolProcessing;
+  searchAliases?: string[];
   // Populated by resolveLumeoTools() when the admin-controlled DB row says
   // this action isn't live right now -- undefined in the static catalog.
   dbStatus?: string;
@@ -53,6 +56,13 @@ export const PROCESSING_LABEL: Record<ToolProcessing, string> = {
   hybrid: "Local when it can, server when it must",
 };
 
+export const DISCOVERY_CATEGORY_LABEL: Record<ToolDiscoveryCategory, string> = {
+  organize: "Organize",
+  "edit-sign": "Edit & sign",
+  optimize: "Optimize",
+  convert: "Convert",
+};
+
 export const lumeoTools: LumeoTool[] = [
   {
     key: "compose",
@@ -63,8 +73,8 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/merge",
     actions: [
-      { label: "Merge", slug: "merge", route: "/pdf/merge", live: true },
-      { label: "Split", slug: "split", route: "/pdf/split", live: true },
+      { label: "Merge", slug: "merge", route: "/pdf/merge", live: true, searchAliases: ["combine", "join", "concatenate"] },
+      { label: "Split", slug: "split", route: "/pdf/split", live: true, searchAliases: ["separate", "divide", "extract range"] },
       { label: "Split by range", slug: "split-range", route: "/pdf/split", live: true },
       { label: "Page Re-Order", slug: "reorder", route: "/pdf/organize", live: true },
       { label: "Rotate pages", slug: "rotate", route: "/pdf/organize", live: true },
@@ -82,7 +92,7 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/compress",
     actions: [
-      { label: "Compress", slug: "compress", route: "/pdf/compress", live: true },
+      { label: "Compress", slug: "compress", route: "/pdf/compress", live: true, searchAliases: ["reduce", "shrink", "smaller", "optimize"] },
       { label: "Deep compress", slug: "deep-compress", route: "/pdf/compress", live: true },
       { label: "Grayscale", slug: "grayscale", route: "/pdf/compress", live: true },
       { label: "Flatten", slug: "flatten", route: "/pdf/compress", live: true },
@@ -102,11 +112,11 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/jpg-to-pdf",
     actions: [
-      { label: "JPG to PDF", slug: "jpg-to-pdf", route: "/pdf/jpg-to-pdf", live: true },
+      { label: "JPG to PDF", slug: "jpg-to-pdf", route: "/pdf/jpg-to-pdf", live: true, searchAliases: ["jpeg", "image", "photo", "picture"] },
       { label: "PNG to PDF", slug: "png-to-pdf", route: "/pdf/jpg-to-pdf", live: true },
       { label: "WEBP to PDF", slug: "webp-to-pdf", route: "/pdf/jpg-to-pdf", live: true },
       { label: "HEIC to PDF", slug: "heic-to-pdf", live: false },
-      { label: "HEIC to JPEG", slug: "heic-to-jpeg", route: "/heic-to-jpeg", live: true },
+      { label: "HEIC to JPEG", slug: "heic-to-jpeg", route: "/heic-to-jpeg", live: true, searchAliases: ["iphone photo", "heif", "image"] },
     ],
   },
   {
@@ -121,10 +131,10 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/pdf-to-jpg",
     actions: [
-      { label: "PDF to JPG", slug: "pdf-to-jpg", route: "/pdf/pdf-to-jpg", live: true },
+      { label: "PDF to JPG", slug: "pdf-to-jpg", route: "/pdf/pdf-to-jpg", live: true, searchAliases: ["jpeg", "image", "export", "picture"] },
       { label: "PDF to PNG", slug: "pdf-to-png", route: "/pdf/pdf-to-jpg", live: true },
       { label: "PDF to WEBP", slug: "pdf-to-webp", route: "/pdf/pdf-to-jpg", live: true },
-      { label: "Text Extract", slug: "extract-text", route: "/pdf/extract-text", live: true },
+      { label: "Text Extract", slug: "extract-text", route: "/pdf/extract-text", live: true, searchAliases: ["copy text", "read", "selectable text"] },
       { label: "PDF to HTML", slug: "pdf-to-html", live: false },
     ],
   },
@@ -137,12 +147,12 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/edit",
     actions: [
-      { label: "Edit PDF", slug: "edit", route: "/pdf/edit", live: true },
+      { label: "Edit PDF", slug: "edit", route: "/pdf/edit", live: true, searchAliases: ["annotate", "draw", "text", "whiteout"] },
       { label: "Images", slug: "add-images", live: false },
-      { label: "Watermark", slug: "watermark", route: "/pdf/watermark", live: true },
+      { label: "Watermark", slug: "watermark", route: "/pdf/watermark", live: true, searchAliases: ["stamp", "brand", "overlay"] },
       { label: "Page numbers", slug: "page-numbers", route: "/pdf/page-numbers", live: true },
       { label: "Header & footer", slug: "header-footer", route: "/pdf/header-footer", live: true },
-      { label: "Crop", slug: "crop", route: "/pdf/crop", live: true },
+      { label: "Crop", slug: "crop", route: "/pdf/crop", live: true, searchAliases: ["trim", "resize", "margins"] },
       { label: "Bookmarks", slug: "bookmarks", live: false },
     ],
   },
@@ -155,7 +165,7 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/sign",
     actions: [
-      { label: "Sign PDF", slug: "sign", route: "/pdf/sign", live: true },
+      { label: "Sign PDF", slug: "sign", route: "/pdf/sign", live: true, searchAliases: ["signature", "initials"] },
       { label: "Fill forms", slug: "fill-forms", live: false },
       { label: "Initials & date", slug: "initials-date", route: "/pdf/sign", live: true },
     ],
@@ -184,11 +194,11 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/word-to-pdf",
     actions: [
-      { label: "Word to PDF", slug: "word-to-pdf", route: "/pdf/word-to-pdf", live: true },
+      { label: "Word to PDF", slug: "word-to-pdf", route: "/pdf/word-to-pdf", live: true, searchAliases: ["doc", "docx", "office"] },
       { label: "Excel to PDF", slug: "excel-to-pdf", live: false },
       { label: "PowerPoint to PDF", slug: "powerpoint-to-pdf", live: false },
-      { label: "PDF to Word", slug: "pdf-to-word", route: "/pdf/pdf-to-word", live: true },
-      { label: "HTML to PDF", slug: "html-to-pdf", route: "/pdf/html-to-pdf", live: true },
+      { label: "PDF to Word", slug: "pdf-to-word", route: "/pdf/pdf-to-word", live: true, searchAliases: ["doc", "docx", "editable"] },
+      { label: "HTML to PDF", slug: "html-to-pdf", route: "/pdf/html-to-pdf", live: true, processing: "browser", searchAliases: ["webpage", "website", "css"] },
     ],
   },
   {
