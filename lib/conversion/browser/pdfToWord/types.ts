@@ -8,6 +8,8 @@ export type ReconstructedTextLine = {
   fontFamily: string;
   bold: boolean;
   italic: boolean;
+  textColorHex?: string;
+  backgroundColorHex?: string;
 };
 
 export type ReconstructedPage = {
