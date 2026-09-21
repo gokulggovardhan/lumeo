@@ -9,9 +9,9 @@ import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/pub
 
 const softwareSchema = buildSoftwareApplicationSchema({
   name: "Lumeo PDF to Word",
-  description: "Convert PDF pages into an editable Word (DOCX) file using free, self-hosted LibreOffice.",
+  description: "Reconstruct PDF pages into an editable Word (DOCX) file locally in the browser.",
   path: "/pdf/pdf-to-word",
-  featureList: ["Preserves layout and fonts", "Handles tables and images", "Cleared immediately after conversion"],
+  featureList: ["Editable text reconstruction", "Preserves page geometry and graphics", "Browser-only local processing"],
 });
 const breadcrumbSchema = buildBreadcrumbSchema([
   { name: "Home", path: "/" },
@@ -26,11 +26,11 @@ const PdfToWordTool = dynamic(() => import("@/components/pdf/PdfToWordTool"), {
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf/pdf-to-word", {
     title: { absolute: "PDF to Word Converter Online - Free & Private" },
-    description: "Convert PDF documents to editable Word (.docx) files with Lumeo. Powered by free, self-hosted LibreOffice -- uploads are deleted immediately after conversion.",
+    description: "Convert PDF documents to editable Word (.docx) files locally in your browser with Lumeo. Files stay on your device during conversion.",
     alternates: { canonical: "/pdf/pdf-to-word" },
     openGraph: {
       title: "PDF to Word Converter Online - Lumeo PDF",
-      description: "Convert PDF documents to editable Word documents with accurate layout, fonts, and tables.",
+      description: "Convert PDF documents to editable Word documents with local text and layout reconstruction.",
       url: "https://lumeo.in/pdf/pdf-to-word",
       siteName: "Lumeo PDF",
       type: "website",
@@ -39,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "PDF to Word Converter Online - Lumeo PDF",
-      description: "Convert PDF documents to editable Word files online with Lumeo, powered by free, self-hosted LibreOffice.",
+      description: "Convert PDF documents to editable Word files locally in your browser with Lumeo.",
       images: ["https://lumeo.in/twitter-image"],
     },
   });
@@ -56,7 +56,7 @@ export default async function PdfToWordPage() {
     >
       <L2ToolPageHeader
         title="PDF to Word"
-        description="Convert PDF documents to editable Word files. Uploaded securely, converted on our server, deleted immediately after."
+        description="Convert PDF documents to editable Word files locally in your browser. Your PDF stays on your device."
       />
 
       {toolState.blocked ? (
