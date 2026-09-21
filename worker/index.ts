@@ -1,6 +1,6 @@
 import handler from "vinext/server/fetch-handler";
 import { canonicalRedirectUrl } from "./canonical-routing";
-import { withProductionSecurityHeaders } from "./response-policy";
+import { withProductionSecurityHeaders } from "./response-policy";\nimport { maybeHandleOfficeRuntimeRequest } from "./office-runtime";
 import {
   cleanupWordToPdfUploads,
   WordToPdfCleanupError,
@@ -57,7 +57,7 @@ async function runScheduledCleanup(controller: ScheduledControllerLike): Promise
 }
 
 export default {
-  fetch(...args: FetchArgs) {
+  async fetch(...args: FetchArgs) {
     const request = args[0];
     const redirectUrl = canonicalRedirectUrl(
       request.url,
@@ -71,9 +71,11 @@ export default {
       );
     }
 
-    return Promise.resolve(handler.fetch(...args)).then((response) =>
-      withProductionSecurityHeaders(request, response),
-    );
+    const officeRuntimeResponse = await maybeHandleOfficeRuntimeRequest(request);
+    if (officeRuntimeResponse) return officeRuntimeResponse;
+
+    const response = await handler.fetch(...args);
+    return withProductionSecurityHeaders(request, response);
   },
 
   scheduled(
