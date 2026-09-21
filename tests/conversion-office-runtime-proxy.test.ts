@@ -18,7 +18,7 @@ test("production Office runtime release is immutable and matches the client rout
   );
 });
 
-test("Office runtime route is a fixed streaming proxy, not a conversion backend", async () => {
+test("Office runtime route streams immutable responses without caching partial upstream bodies", async () => {
   const source = await readFile(
     "app/office-runtime/[release]/[asset]/route.ts",
     "utf8",
@@ -26,8 +26,9 @@ test("Office runtime route is a fixed streaming proxy, not a conversion backend"
 
   assert.match(source, /github\.com\/gokulggovardhan\/lumeo\/releases\/download/);
   assert.match(source, /upstream\.body/);
-  assert.match(source, /cacheEverything: true/);
-  assert.match(source, /cacheTtl: 31_536_000/);
+  assert.match(source, /cache:\s*"no-store"/);
+  assert.doesNotMatch(source, /cacheEverything:\s*true/);
+  assert.doesNotMatch(source, /cacheTtl:\s*31_536_000/);
   assert.match(source, /Cache-Control", "public, max-age=31536000, immutable"/);
   assert.match(source, /Cross-Origin-Resource-Policy", "same-origin"/);
   assert.match(source, /Content-Type/);
