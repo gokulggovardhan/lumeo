@@ -11,7 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf-tools", {
     title: { absolute: "PDF Tools - Choose Your PDF Action | Lumeo PDF" },
     description:
-      "Choose a PDF action directly. Compare on-device and server-assisted processing before opening a Lumeo tool.",
+      "Choose a PDF action directly and see where each Lumeo tool processes your file before opening it.",
     alternates: { canonical: "/pdf-tools" },
     openGraph: {
       title: "PDF Tools - Lumeo PDF Workspace",
