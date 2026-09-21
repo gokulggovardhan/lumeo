@@ -197,10 +197,12 @@ test.describe("Control Center authentication", () => {
     await expect(page).toHaveURL(/\/admin\/health/);
     await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
     await expect(
-      page.locator("#main-content").getByText("LibreOffice converter", {
+      page.locator("#main-content").getByText("Supabase database", {
         exact: true,
       }),
     ).toBeVisible();
+    await expect(page.getByText("LibreOffice converter", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Supabase storage", { exact: true })).toHaveCount(0);
 
     const { navigation: healthNavigation } = await openAdminNavigation(page);
     await healthNavigation.getByRole("link", { name: "Settings" }).click();
