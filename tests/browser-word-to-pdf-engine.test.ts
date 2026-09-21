@@ -56,3 +56,15 @@ test("Word to PDF resolves the production Office runtime only when conversion st
     /private readonly runtime\s*=\s*getBrowserLibreOfficeRuntime\(\)/,
   );
 });
+
+
+test("Word runtime is reset after heavy or failed conversions to bound memory growth", async () => {
+  const source = await readFile(
+    "lib/conversion/browser/BrowserWordToPdfEngine.ts",
+    "utf8",
+  );
+
+  assert.match(source, /let completed = false/);
+  assert.match(source, /mode !== "normal" \|\| !completed/);
+  assert.match(source, /runtime\.destroy\(\)/);
+});
