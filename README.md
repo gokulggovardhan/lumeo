@@ -38,9 +38,9 @@ A tool is only "live" once its `live: true` flag is set in `lib/tools/catalog.ts
 
 ## Core principles
 
-- Browser-first by default; a tool only uses server processing when the task genuinely requires it (e.g. Office document conversion via LibreOffice), and that is always disclosed here.
-- Document contents stay on the user's device for all browser-processed tools — no upload, no server-side PDF manipulation.
-- For the two server-assisted conversion tools, uploaded files are stored only in a short-lived Supabase scratch bucket and deleted immediately after conversion — never retained, never analyzed.
+- Browser-first by default; all currently live PDF and Office conversion tools process document contents locally in the browser.
+- Document contents stay on the user's device for browser-processed tools — no conversion upload and no server-side Word/PDF manipulation.
+- Word → PDF loads LibreOffice/ZetaOffice runtime assets from Lumeo's immutable same-origin Office-runtime path; those runtime assets contain no user documents.
 - Calm, professional Midnight Notary visual design.
 - Dual-named tool catalog: a small set of deep "Lumeo" tools (Compose, Distill, Capture, Render, Inscribe, Seal, Secure, Convert, Recognize), each bundling multiple concrete actions — see `lib/tools/catalog.ts`.
 
@@ -52,7 +52,7 @@ Word → PDF runs LibreOffice/ZetaOffice WebAssembly in the browser. The large i
 
 Document contents must not be stored in `localStorage`. UI preferences (e.g. thumbnail density) may be stored locally when they contain no document data.
 
-Any future feature that adds new backend processing, accounts, cloud history, or sync must be explicitly approved and disclosed before release, following the same pattern as the Office-conversion tools above.
+Any future feature that adds backend document processing, accounts, cloud history, or sync must be explicitly approved and disclosed before release.
 
 ## Design system
 
@@ -136,8 +136,9 @@ Before committing changes: run `git diff --check`, the commands above, and any r
 - `lib/tools/catalog.ts` — the single source of truth for which tools/actions are live, their routes, and their processing model.
 - `lib/admin/*` — admin auth, permissions, validation, and data-access helpers.
 - `lib/analytics/*` — client-side analytics state/dedup helpers.
-- `lib/supabase/*` — browser/server Supabase clients and the temp-storage helper for Office conversion.
-- `services/word-to-pdf-converter/` — the separately-deployed LibreOffice conversion microservice (Docker).
+- `lib/supabase/*` — shared browser/server Supabase clients for catalog, Admin, analytics, and other application data.
+- `lib/conversion/browser/*` — browser Word → PDF and PDF → Word engines, workspace helpers, and Office runtime integration.
+- `worker/office-runtime.ts` — same-origin immutable Office-runtime streaming fast path that runs before vinext.
 - `supabase/migrations/` — SQL migrations, applied manually through the Supabase SQL editor (see `docs/SUPABASE_FOUNDATION.md`).
 - `scripts/*.mjs` — manual developer-verification scripts, invoked via the `verify:*` npm scripts.
 - `docs/specs/` — frozen, shipped feature specifications (e.g. `watermark-pdf-v1-freeze.md`) — historical record, not aspirational.
