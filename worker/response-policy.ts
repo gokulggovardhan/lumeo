@@ -1,5 +1,13 @@
 const PRODUCTION_HOSTS = new Set(["lumeo.in", "www.lumeo.in"]);
 
+function requiresCrossOriginIsolation(request: Request): boolean {
+  const pathname = new URL(request.url).pathname;
+  return (
+    pathname === "/pdf/word-to-pdf" ||
+    pathname.startsWith("/pdf/word-to-pdf/")
+  );
+}
+
 export function isProductionRequest(request: Request): boolean {
   return PRODUCTION_HOSTS.has(new URL(request.url).hostname.toLowerCase());
 }
@@ -15,6 +23,11 @@ export function withProductionSecurityHeaders(
   headers.set("X-Content-Type-Options", "nosniff");
   headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   headers.set("Strict-Transport-Security", "max-age=31536000");
+
+  if (requiresCrossOriginIsolation(request)) {
+    headers.set("Cross-Origin-Opener-Policy", "same-origin");
+    headers.set("Cross-Origin-Embedder-Policy", "require-corp");
+  }
 
   return new Response(response.body, {
     status: response.status,

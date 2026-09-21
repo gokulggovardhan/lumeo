@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import type { Download, Page } from "@playwright/test";
+import type { Download } from "@playwright/test";
 import JSZip from "jszip";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { readFile } from "node:fs/promises";
@@ -61,25 +61,15 @@ async function downloadBytes(download: Download): Promise<Buffer> {
   return readFile(path);
 }
 
-async function assertPublicToolStillBlocked(
-  page: Page,
-  route: string,
-  actionName: string,
-) {
-  await page.goto(route);
-  await expect(page.getByRole("button", { name: actionName })).toHaveCount(0);
-}
-
 test("production Word to PDF converts locally and downloaded PDF opens", async ({
   page,
   browserName,
 }) => {
   test.skip(browserName !== "chromium", "Threaded Office runtime production smoke runs in Chromium.");
 
-  await assertPublicToolStillBlocked(page, "/pdf/word-to-pdf", "Convert to PDF");
-  await page.goto("/internal/conversion-production-smoke");
+  await page.goto("/pdf/word-to-pdf");
 
-  const tool = page.getByTestId("word-production-smoke");
+  const tool = page;
   await expect(tool.getByText(/Processed locally in your browser/i)).toBeVisible();
 
   const docx = await makeDocx();
@@ -91,7 +81,15 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
   });
 
   await tool.getByRole("button", { name: "Convert to PDF" }).click();
-  await expect(tool.getByText("PDF ready")).toBeVisible({ timeout: 420_000 });
+
+  const ready = tool.getByText("PDF ready");
+  const failure = tool.getByRole("alert");
+  await Promise.race([
+    ready.waitFor({ state: "visible", timeout: 420_000 }),
+    failure.waitFor({ state: "visible", timeout: 420_000 }).then(async () => {
+      throw new Error(`Word to PDF production smoke failed: ${await failure.innerText()}`);
+    }),
+  ]);
 
   const downloadPromise = page.waitForEvent("download");
   await tool.getByRole("button", { name: "Download PDF" }).click();
@@ -103,10 +101,9 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
 test("production PDF to Word reconstructs locally and downloaded DOCX opens", async ({
   page,
 }) => {
-  await assertPublicToolStillBlocked(page, "/pdf/pdf-to-word", "Convert to Word");
-  await page.goto("/internal/conversion-production-smoke");
+  await page.goto("/pdf/pdf-to-word");
 
-  const tool = page.getByTestId("pdf-production-smoke");
+  const tool = page;
   await expect(tool.getByText(/Processed locally in your browser/i).first()).toBeVisible();
 
   const pdf = await makePdf();

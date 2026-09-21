@@ -36,7 +36,7 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
 
       - name: Verify production converters and downloaded files
-        run: npx playwright test --config=playwright.production-conversion.config.ts
+        run: xvfb-run -a npx playwright test --config=playwright.production-conversion.config.ts
 
       - name: Upload production traces on failure
         if: failure()
