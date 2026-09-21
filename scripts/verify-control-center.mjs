@@ -276,6 +276,21 @@ try {
   assert(analyticsPage.includes('title="Audience and environment"'), "Analytics V2 environment section is missing.");
   assert(analyticsPage.includes("Metrics are withheld instead of presenting unverified zero values"), "Analytics V2 must explain unavailable metrics honestly.");
 
+  const membersPage = read("app/admin/(protected)/members/page.tsx");
+  const membersAction = read("app/admin/(protected)/members/actions.ts");
+  const auditPage = read("app/admin/(protected)/audit/page.tsx");
+  const governanceFilters = read("lib/admin/governance-filters.ts");
+  for (const filterName of ["q", "role", "status"]) {
+    assert(membersPage.includes(`name="${filterName}"`), `Governance member filter missing: ${filterName}.`);
+  }
+  assert(membersPage.includes("canManageMembers(admin.role)"), "Member management must remain owner-only.");
+  assert(membersAction.includes("getAdminMembers()"), "Add-member action must verify current membership first.");
+  assert(membersAction.includes("already an administrator"), "Add-member action must reject existing memberships.");
+  assert(governanceFilters.includes('"error_log"'), "Audit filters must include real error-log actions.");
+  assert(auditPage.includes("PAGE_SIZE + 1"), "Audit pagination must probe for a real next page.");
+  assert(auditPage.includes("hasNextPage"), "Audit pagination must not infer next-page state from a full page alone.");
+  assert(auditPage.includes('role="alert"'), "Invalid audit date ranges must be announced accessibly.");
+
   const packageJson = JSON.parse(read("package.json"));
   assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
   assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");

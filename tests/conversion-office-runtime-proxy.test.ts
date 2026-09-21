@@ -125,7 +125,7 @@ test("production runtime release workflow verifies full production payload integ
     "utf8",
   );
 
-  assert.match(source, /permissions:\n  contents: write/);
+  assert.match(source, /permissions:\r?\n  contents: write/);
   assert.match(source, /--draft/);
   assert.match(source, /Verify release asset inventory and sizes/);
   assert.match(source, /Manifest is the publish marker and is uploaded last/);
