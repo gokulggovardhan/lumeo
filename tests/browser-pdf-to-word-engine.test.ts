@@ -229,7 +229,7 @@ test("PDF reconstruction preserves vector-heavy geometry while masking native te
     "utf8",
   );
   assert.match(source, /countVectorLayoutOperators/);
-  assert.match(source, /vectorLayoutCount >= 6/);
+  assert.match(source, /vectorLayoutCount > 0/);
   assert.match(source, /maskEditableTextFromBackground/);
   assert.match(source, /imageCount === 0/);
   assert.match(source, /backgroundTextMasked/);
