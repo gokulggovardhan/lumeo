@@ -22,13 +22,17 @@ export type PdfPageGeometry = {
   height: number;
 };
 
+export type PdfLineBox = PdfWordBox;
+
 function decodeXmlText(value: string): string {
+  // Decode exactly one XML escaping layer. Ampersand must be last so
+  // "&amp;lt;" becomes "&lt;" rather than being double-decoded to "<".
   return value
-    .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'");
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, "&");
 }
 
 function attributeMap(value: string): Map<string, string> {
@@ -87,6 +91,7 @@ export async function extractPdfWordBoxes(
 ): Promise<{
   pages: PdfPageGeometry[];
   words: PdfWordBox[];
+  lines: PdfLineBox[];
 }> {
   await mkdir(outputDirectory, { recursive: true });
   const htmlPath = join(outputDirectory, `${stem}.bbox.html`);
@@ -97,6 +102,7 @@ export async function extractPdfWordBoxes(
 
   const pages: PdfPageGeometry[] = [];
   const words: PdfWordBox[] = [];
+  const lines: PdfLineBox[] = [];
   let pageNumber = 0;
 
   for (const pageMatch of html.matchAll(
@@ -110,6 +116,35 @@ export async function extractPdfWordBoxes(
       throw new Error(`Unable to read page geometry from ${pdfPath}`);
     }
     pages.push({ page: pageNumber, width: pageWidth, height: pageHeight });
+
+    for (const lineMatch of pageMatch[2].matchAll(
+      /<line\b([^>]*)>([\s\S]*?)<\/line>/g,
+    )) {
+      const attributes = attributeMap(lineMatch[1]);
+      const xMin = Number(attributes.get("xMin"));
+      const yMin = Number(attributes.get("yMin"));
+      const xMax = Number(attributes.get("xMax"));
+      const yMax = Number(attributes.get("yMax"));
+      if (![xMin, yMin, xMax, yMax].every(Number.isFinite)) continue;
+
+      const text = Array.from(
+        lineMatch[2].matchAll(/<word\b[^>]*>([\s\S]*?)<\/word>/g),
+        (match) => decodeXmlText(match[1]).trim(),
+      )
+        .filter(Boolean)
+        .join(" ");
+
+      lines.push({
+        page: pageNumber,
+        pageWidth,
+        pageHeight,
+        text,
+        xMin,
+        yMin,
+        xMax,
+        yMax,
+      });
+    }
 
     for (const wordMatch of pageMatch[2].matchAll(
       /<word\b([^>]*)>([\s\S]*?)<\/word>/g,
@@ -137,7 +172,7 @@ export async function extractPdfWordBoxes(
   if (!pages.length) {
     throw new Error(`No PDF pages were extracted from ${pdfPath}`);
   }
-  return { pages, words };
+  return { pages, words, lines };
 }
 
 export async function assertPdfAnchorFidelity(
@@ -197,6 +232,60 @@ export async function assertPdfAnchorFidelity(
     if (xDelta > tolerance || yDelta > tolerance) {
       throw new Error(
         `Fidelity anchor "${anchor.text}" moved too far on page ${anchor.page}: ` +
+          `Δx=${xDelta.toFixed(4)}, Δy=${yDelta.toFixed(4)}, tolerance=${tolerance.toFixed(4)}.`,
+      );
+    }
+  }
+}
+
+
+export async function assertPdfLineAnchorFidelity(
+  referencePdf: string,
+  candidatePdf: string,
+  outputDirectory: string,
+  anchors: Array<{ page: number; contains: string }>,
+  tolerance = 0.025,
+): Promise<void> {
+  const [reference, candidate] = await Promise.all([
+    extractPdfWordBoxes(referencePdf, outputDirectory, "reference-lines"),
+    extractPdfWordBoxes(candidatePdf, outputDirectory, "candidate-lines"),
+  ]);
+
+  if (reference.pages.length !== candidate.pages.length) {
+    throw new Error(
+      `Page count changed: reference=${reference.pages.length}, candidate=${candidate.pages.length}`,
+    );
+  }
+
+  for (const anchor of anchors) {
+    const expected = reference.lines.find(
+      (line) =>
+        line.page === anchor.page &&
+        line.text.toLowerCase().includes(anchor.contains.toLowerCase()),
+    );
+    const actual = candidate.lines.find(
+      (line) =>
+        line.page === anchor.page &&
+        line.text.toLowerCase().includes(anchor.contains.toLowerCase()),
+    );
+
+    if (!expected || !actual) {
+      throw new Error(
+        `Missing line fidelity anchor "${anchor.contains}" on page ${anchor.page} ` +
+          `(reference=${Boolean(expected)}, candidate=${Boolean(actual)}).`,
+      );
+    }
+
+    const xDelta = Math.abs(
+      expected.xMin / expected.pageWidth - actual.xMin / actual.pageWidth,
+    );
+    const yDelta = Math.abs(
+      expected.yMin / expected.pageHeight - actual.yMin / actual.pageHeight,
+    );
+
+    if (xDelta > tolerance || yDelta > tolerance) {
+      throw new Error(
+        `Line fidelity anchor "${anchor.contains}" moved too far on page ${anchor.page}: ` +
           `Δx=${xDelta.toFixed(4)}, Δy=${yDelta.toFixed(4)}, tolerance=${tolerance.toFixed(4)}.`,
       );
     }
