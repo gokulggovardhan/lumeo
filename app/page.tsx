@@ -19,12 +19,12 @@ export async function generateMetadata(): Promise<Metadata> {
         "Lumeo PDF - Merge, Split, Compress & Convert PDFs",
     },
     description:
-      "Merge, split, compress, and convert PDFs and images with browser-first tools and clearly disclosed server-assisted Word conversion. No account required.",
+      "Merge, split, compress, and convert PDFs, images, and Office files directly in your browser. No account required.",
     alternates: { canonical: "/" },
     openGraph: {
       title: "Lumeo PDF - Browser-First PDF Tools",
       description:
-        "A browser-first PDF workspace with clearly disclosed server-assisted Word conversion.",
+        "A browser-first PDF workspace with local Word and PDF conversion.",
       url: "https://lumeo.in",
       siteName: "Lumeo PDF",
       type: "website",
@@ -53,7 +53,7 @@ const structuredData = [
     applicationCategory: "BusinessApplication",
     operatingSystem: "Any modern browser",
     description:
-      "A browser-first PDF workspace for merging, splitting, compression, signing, and conversion, with server-assisted Word conversion clearly identified.",
+      "A browser-first PDF workspace for merging, splitting, compression, signing, and local document conversion.",
     featureList: [
       "Merge PDF",
       "Split PDF",
@@ -113,7 +113,7 @@ const whyItems = [
   {
     icon: TrustShieldIcon,
     title: "Clear file handling",
-    description: "Most tools process files on your device. Word conversion clearly identifies when server assistance is required.",
+    description: "Document tools, including Word and PDF conversion, process files locally in your browser.",
   },
   {
     icon: () => (
