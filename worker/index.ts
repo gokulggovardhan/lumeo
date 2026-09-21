@@ -1,6 +1,7 @@
 import handler from "vinext/server/fetch-handler";
 import { canonicalRedirectUrl } from "./canonical-routing";
-import { withProductionSecurityHeaders } from "./response-policy";\nimport { maybeHandleOfficeRuntimeRequest } from "./office-runtime";
+import { withProductionSecurityHeaders } from "./response-policy";
+import { maybeHandleOfficeRuntimeRequest } from "./office-runtime";
 import {
   cleanupWordToPdfUploads,
   WordToPdfCleanupError,
