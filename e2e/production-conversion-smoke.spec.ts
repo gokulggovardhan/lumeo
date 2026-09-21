@@ -61,28 +61,40 @@ async function downloadBytes(download: Download): Promise<Buffer> {
   return readFile(path);
 }
 
+async function assertPublicToolStillBlocked(
+  page: Parameters<typeof test>[0] extends never ? never : any,
+  route: string,
+  actionName: string,
+) {
+  await page.goto(route);
+  await expect(page.getByRole("button", { name: actionName })).toHaveCount(0);
+}
+
 test("production Word to PDF converts locally and downloaded PDF opens", async ({
   page,
   browserName,
 }) => {
   test.skip(browserName !== "chromium", "Threaded Office runtime production smoke runs in Chromium.");
 
-  await page.goto("/pdf/word-to-pdf");
-  await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
+  await assertPublicToolStillBlocked(page, "/pdf/word-to-pdf", "Convert to PDF");
+  await page.goto("/internal/conversion-production-smoke");
+
+  const tool = page.getByTestId("word-production-smoke");
+  await expect(tool.getByText(/Processed locally in your browser/i)).toBeVisible();
 
   const docx = await makeDocx();
-  await page.locator('input[type="file"]').setInputFiles({
+  await tool.locator('input[type="file"]').setInputFiles({
     name: "production-smoke.docx",
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: docx,
   });
 
-  await page.getByRole("button", { name: "Convert to PDF" }).click();
-  await expect(page.getByText("PDF ready")).toBeVisible({ timeout: 420_000 });
+  await tool.getByRole("button", { name: "Convert to PDF" }).click();
+  await expect(tool.getByText("PDF ready")).toBeVisible({ timeout: 420_000 });
 
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download PDF" }).click();
+  await tool.getByRole("button", { name: "Download PDF" }).click();
   const bytes = await downloadBytes(await downloadPromise);
   const output = await PDFDocument.load(bytes);
   expect(output.getPageCount()).toBeGreaterThan(0);
@@ -91,23 +103,26 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
 test("production PDF to Word reconstructs locally and downloaded DOCX opens", async ({
   page,
 }) => {
-  await page.goto("/pdf/pdf-to-word");
-  await expect(page.getByText(/Processed locally in your browser/i).first()).toBeVisible();
+  await assertPublicToolStillBlocked(page, "/pdf/pdf-to-word", "Convert to Word");
+  await page.goto("/internal/conversion-production-smoke");
+
+  const tool = page.getByTestId("pdf-production-smoke");
+  await expect(tool.getByText(/Processed locally in your browser/i).first()).toBeVisible();
 
   const pdf = await makePdf();
-  await page.locator('input[type="file"]').setInputFiles({
+  await tool.locator('input[type="file"]').setInputFiles({
     name: "production-smoke.pdf",
     mimeType: "application/pdf",
     buffer: pdf,
   });
 
-  await page.getByRole("button", { name: "Convert to Word" }).click();
-  await expect(page.getByText("Word document ready")).toBeVisible({
+  await tool.getByRole("button", { name: "Convert to Word" }).click();
+  await expect(tool.getByText("Word document ready")).toBeVisible({
     timeout: 180_000,
   });
 
   const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download Word document" }).click();
+  await tool.getByRole("button", { name: "Download Word document" }).click();
   const bytes = await downloadBytes(await downloadPromise);
   const docx = await JSZip.loadAsync(bytes);
   const xml = await docx.file("word/document.xml")?.async("string");
