@@ -92,7 +92,7 @@ It forwards GET/HEAD and Range requests to the immutable release, streams the
 upstream body instead of buffering it, and returns:
 
 ```
-Cache-Control: public, max-age=31536000, immutable
+Cache-Control: public, max-age=31536000, immutable, no-transform
 Cross-Origin-Resource-Policy: same-origin
 X-Content-Type-Options: nosniff
 ```
