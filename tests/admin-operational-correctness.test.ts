@@ -81,7 +81,7 @@ test("maintenance mode has explicit two-stage enable confirmation and server enf
   assert.match(action, /changes: \{ key, enabled \}/);
 });
 
-test("Overview avoids duplicate analytics and retired status queries", () => {
+test("Dashboard avoids retired status queries and reads current operational sources directly", () => {
   const data = read("lib/admin/data.ts");
   const page = read("app/admin/(protected)/page.tsx");
 
@@ -90,8 +90,11 @@ test("Overview avoids duplicate analytics and retired status queries", () => {
   assert.doesNotMatch(data, /homepage_tool_slots/);
   assert.doesNotMatch(data, /latestDailyMetricDate/);
   assert.doesNotMatch(page, /getSystemStatus/);
-  assert.match(page, /data\.recentAuditLogs\[0\]/);
-  assert.match(page, /data\.latestAnalyticsEventAt/);
+  assert.match(page, /getAnalyticsSummary\(\)/);
+  assert.match(page, /getAuditLogs\(5\)/);
+  assert.match(page, /getErrorLogSummary\(\)/);
+  assert.match(page, /getUnreadInboxCount\(\)/);
+  assert.match(page, /Requires attention/);
 });
 
 test("browser error capture stays behind the same-origin application boundary", () => {

@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getUnreadInboxCount } from "@/lib/admin/data";
 
 export const metadata = {
-  title: "Lumeo Control Center",
+  title: "Lumeo Admin",
   robots: {
     index: false,
     follow: false,
@@ -20,9 +20,17 @@ export default async function ProtectedAdminLayout({
 }) {
   const admin = await requireAdmin();
   const unreadInbox = await getUnreadInboxCount();
+  const environment = process.env.LUMEO_DEPLOYMENT_ENV ?? "local";
+  const revision = process.env.LUMEO_BUILD_SHA ?? null;
 
   return (
-    <ControlCenterShell email={admin.email} role={admin.role} unreadInboxCount={unreadInbox.data}>
+    <ControlCenterShell
+      email={admin.email}
+      role={admin.role}
+      unreadInboxCount={unreadInbox.data}
+      environment={environment}
+      revision={revision}
+    >
       {children}
     </ControlCenterShell>
   );
