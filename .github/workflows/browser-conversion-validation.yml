@@ -1,0 +1,70 @@
+name: Browser Conversion Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - 'fix/**'
+      - 'feature/**'
+    paths:
+      - ".github/workflows/browser-conversion-validation.yml"
+      - "app/internal/conversion-lab/**"
+      - "app/internal/conversion-ui-lab/**"
+      - "components/internal/BrowserConversionLab.tsx"
+      - "components/pdf/WordToPdfTool.tsx"
+      - "components/pdf/PdfToWordTool.tsx"
+      - "components/pdf/conversion/**"
+      - "lib/conversion/**"
+      - "lib/pdf/pdfjs.ts"
+      - "lib/pdf/uploadValidation.ts"
+      - "next.config.ts"
+      - "e2e/browser-conversion-validation.spec.ts"
+      - "playwright.browser-conversion.config.ts"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-conversion-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-conversion:
+    name: Conversion corpus — Chromium + WebKit + Firefox
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install conversion browsers
+        run: npx playwright install --with-deps chromium webkit firefox
+
+      - name: Run real browser conversion corpus
+        env:
+          CI: "1"
+        run: npx playwright test --config=playwright.browser-conversion.config.ts
+
+      - name: Upload conversion traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-conversion-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 7

@@ -48,9 +48,10 @@ export function reconstructTextLines(
     pageHeightPt,
   );
 
-  if (!runs.length) return [];
+  const editableRuns = runs.filter((run) => !run.rotated);
+  if (!editableRuns.length) return [];
 
-  const sorted = [...runs].sort((a, b) => {
+  const sorted = [...editableRuns].sort((a, b) => {
     const yDiff = a.yPct - b.yPct;
     return Math.abs(yDiff) > 0.35 ? yDiff : a.xPct - b.xPct;
   });

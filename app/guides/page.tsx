@@ -257,16 +257,16 @@ export default function GuidesPage() {
         <ToolGuide
           title="Convert — Word to PDF"
           href="/pdf/word-to-pdf"
-          use="Convert Word documents to PDF using free, self-hosted LibreOffice."
-          workflow="Upload a DOCX or DOC file, convert, download the PDF."
-          limitation="Server-side conversion, so the file is uploaded temporarily and cleared right after."
+          use="Convert Word documents to PDF locally in your browser."
+          workflow="Choose a DOCX or DOC file, convert locally, download the PDF."
+          limitation="Very complex Word layouts can still have small rendering differences after conversion."
         />
         <ToolGuide
           title="Convert — PDF to Word"
           href="/pdf/pdf-to-word"
           use="Convert PDF pages into an editable Word file."
-          workflow="Upload one PDF, convert, download the DOCX."
-          limitation="Complex layouts, tables, or scanned pages may not convert cleanly."
+          workflow="Choose one PDF, reconstruct it locally, download the DOCX."
+          limitation="PDFs do not contain Word document structure, so complex layouts and scanned pages are reconstructed as closely as possible."
         />
         <ToolGuide
           title="Convert — HTML to PDF"

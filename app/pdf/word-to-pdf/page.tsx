@@ -9,9 +9,9 @@ import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/pub
 
 const softwareSchema = buildSoftwareApplicationSchema({
   name: "Lumeo Word to PDF",
-  description: "Convert Word documents (DOCX, DOC) to PDF using free, self-hosted LibreOffice.",
+  description: "Convert Word documents (DOCX, DOC) to PDF locally in the browser with Lumeo.",
   path: "/pdf/word-to-pdf",
-  featureList: ["Preserves layout and fonts", "Handles tables and images", "Cleared immediately after conversion"],
+  featureList: ["Browser-only local conversion", "Preserves layout and fonts", "Handles tables and images"],
 });
 const breadcrumbSchema = buildBreadcrumbSchema([
   { name: "Home", path: "/" },
@@ -26,7 +26,7 @@ const WordToPdfTool = dynamic(() => import("@/components/pdf/WordToPdfTool"), {
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf/word-to-pdf", {
     title: { absolute: "Word to PDF Converter Online - Free & Private" },
-    description: "Convert Word documents (.docx, .doc) to PDF online with Lumeo. Powered by free, self-hosted LibreOffice -- uploads are deleted immediately after conversion.",
+    description: "Convert Word documents (.docx, .doc) to PDF locally in your browser with Lumeo. Your document is not uploaded for conversion.",
     alternates: { canonical: "/pdf/word-to-pdf" },
     openGraph: {
       title: "Word to PDF Converter Online - Lumeo PDF",
@@ -39,7 +39,7 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "Word to PDF Converter Online - Lumeo PDF",
-      description: "Convert Word documents to PDF online with Lumeo, powered by free, self-hosted LibreOffice.",
+      description: "Convert Word documents to PDF locally in your browser with Lumeo.",
       images: ["https://lumeo.in/twitter-image"],
     },
   });

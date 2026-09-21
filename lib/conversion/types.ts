@@ -4,8 +4,10 @@ export type ConversionProcessingLocation = "browser" | "server";
 
 export type ConversionPhase =
   | "preparing"
+  | "loading-engine"
   | "uploading"
   | "converting"
+  | "generating"
   | "finalizing";
 
 export type ConversionProgress = {
