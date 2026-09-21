@@ -526,7 +526,7 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           lines.length === 0 ||
           imageCount >= 2 ||
           (imageCount >= 1 && lines.length < 6) ||
-          vectorLayoutCount >= 6;
+          vectorLayoutCount > 0;
 
         let backgroundImage: Blob | File | null = null;
         // When a native-text page only needs raster fallback for vector
