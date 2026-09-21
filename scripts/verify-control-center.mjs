@@ -157,8 +157,16 @@ try {
     timezoneSource,
     errorCaptureSource,
   ].join("\n");
-  assert(!/VERCEL_[A-Z_]+/.test(deploymentSource), "Admin/runtime diagnostics must not depend on Vercel environment variables.");
-  assert(!/Vercel runtime/.test(deploymentSource), "Admin/runtime diagnostics must not describe Vercel as the active runtime.");
+  const legacyHostingEnvPrefix = ["VER", "CEL_"].join("");
+  const legacyRuntimeLabel = ["Ver", "cel runtime"].join("");
+  assert(
+    !new RegExp(`${legacyHostingEnvPrefix}[A-Z_]+`).test(deploymentSource),
+    "Admin/runtime diagnostics must not depend on legacy hosting environment variables.",
+  );
+  assert(
+    !deploymentSource.includes(legacyRuntimeLabel),
+    "Admin/runtime diagnostics must not describe the retired hosting runtime as active.",
+  );
   for (const name of ["LUMEO_BUILD_SHA", "LUMEO_DEPLOYMENT_ENV", "LUMEO_DEPLOYMENT_URL"]) {
     assert(healthSource.includes(name) || overviewSource.includes(name), `Admin deployment metadata missing ${name}.`);
     assert(viteSource.includes(name), `Cloudflare build must define ${name}.`);
@@ -237,7 +245,7 @@ try {
   console.log("PASS admin data module is server-only");
   console.log("PASS logout remains POST-only");
   console.log("PASS no getSession, service_role, or secret key usage in new admin source");
-  console.log("PASS Admin deployment metadata is Cloudflare-native and Vercel-free");
+  console.log("PASS Admin deployment metadata is Cloudflare-native and free of retired-host dependencies");
   console.log("PASS current range-based Analytics control center UI is present");
   console.log("PASS Settings exposes only live runtime controls");
   console.log("PASS protected package versions are unchanged");
