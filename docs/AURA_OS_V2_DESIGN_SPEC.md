@@ -231,7 +231,7 @@ without an opacity value being invented ad hoc per component.
 ## Spacing scale
 
 4px base unit, 9 steps — matches the "strict 4/8px rhythm" pattern
-identified in the design research as common to Stripe/Vercel/Notion/
+identified in the design research as common to Stripe/legacy hosting platform/Notion/
 Figma:
 
 ```
