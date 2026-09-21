@@ -660,7 +660,7 @@ test.describe("browser conversion validation lab", () => {
     });
     await page.getByTestId("word-convert").click();
 
-    if (capabilities.includes("Threads ready: yes")) {
+    if (capabilities.includes("Office runtime ready: yes")) {
       await expect(page.getByTestId("word-lab")).toHaveAttribute(
         "data-state",
         "success",
