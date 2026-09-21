@@ -125,3 +125,24 @@ test("production PDF to Word reconstructs locally and downloaded DOCX opens", as
   const xml = await docx.file("word/document.xml")?.async("string");
   expect(xml).toContain("Lumeo production PDF to Word smoke");
 });
+
+test("production HTML to PDF generates locally and downloaded PDF opens", async ({
+  page,
+}) => {
+  await page.goto("/pdf/html-to-pdf");
+
+  await expect(page.getByText(/Browser-only|browser/i).first()).toBeVisible();
+
+  await page.getByLabel("HTML and CSS source").fill(
+    "<style>body{font-family:sans-serif;padding:24px}</style><h1>Lumeo HTML production smoke</h1><p>Browser-only HTML to PDF validation.</p>",
+  );
+  await page.getByLabel("File name").fill("production-html-smoke");
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Generate PDF" }).click();
+  const bytes = await downloadBytes(await downloadPromise);
+  const output = await PDFDocument.load(bytes);
+
+  expect(output.getPageCount()).toBeGreaterThan(0);
+});
+

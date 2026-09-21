@@ -104,8 +104,8 @@ qualitative (no automated profiler is wired up yet — see "Remaining gaps").
 | Sign PDF | 1 PDF + signature | PDF with signature/initials placed | No signature created yet | Signature library reuse, placement rotation |
 | JPG/PNG/WEBP to PDF | 1+ images | One PDF, one page per image | Corrupted image bytes | Very large images, mixed formats in one batch |
 | PDF to JPG/PNG/WEBP | 1 PDF | One image per page | Password-protected PDF (see limitations) | Very large page counts, rotated pages |
-| PDF to Word | 1 PDF (≤150MB) | .docx via server conversion | File over the size cap | LibreOffice service unavailable |
-| Word to PDF | 1 .docx (≤1.5MB, Render free-tier cap) | PDF via server conversion | File over the size cap | Default-font (Calibri/Cambria) documents |
+| PDF to Word | 1 PDF (≤250MB) | .docx via browser reconstruction | File over the size cap | Text/image-heavy layout reconstruction |
+| Word to PDF | 1 DOCX/DOC (≤250MB) | PDF via browser LibreOffice/ZetaOffice | File over the size cap | Browser Office capability/runtime availability |
 | HTML to PDF | HTML/text content | PDF snapshot | Extremely long content | Custom margins/orientation |
 
 ## Part 3 — Automated release verification
@@ -222,8 +222,9 @@ Manually re-verify after any auth/infra change:
 - [ ] No `service_role` key or other secret appears in any client-bundled
       file
 - [ ] `.env`/`.env.local` remain gitignored; no committed secrets
-- [ ] The LibreOffice conversion service still requires `CONVERT_SECRET`
-      and fails closed if it's unset
+- [ ] Word → PDF still uses the browser LibreOffice/ZetaOffice engine and
+      immutable `/office-runtime/...` delivery; no remote converter URL,
+      secret, or server fallback has been reintroduced
 - [ ] `npm audit` shows no new HIGH/CRITICAL vulnerabilities beyond the
       already-documented, already-triaged set
 
@@ -261,9 +262,9 @@ tooling addition with no immediate consumer).
 - [ ] Manual security regression (Part 9) done for any auth/infra change
 - [ ] Deployment verification: confirm deterministic CI and Cloudflare/vinext
       build validation succeeded for the branch under test
-- [ ] Production smoke test: after merge, load the live site and exercise
-      at least one browser-only tool and one server-assisted tool
-      end-to-end with a real file
+- [ ] Production smoke test: after merge, exercise Word → PDF and PDF → Word
+      end-to-end with real files, validate the downloaded outputs, and confirm
+      HTML → PDF still works in the browser
 - [ ] Rollback verification: confirm the previous Cloudflare Worker version
       remains available for production rollback
 

@@ -78,21 +78,26 @@ It:
 8. publishes the verified release
 9. waits for the Cloudflare deployment
 10. verifies the production Lumeo runtime route, MIME types, byte-range
-   behavior, immutable caching, CORP header, and Cloudflare edge delivery
+    behavior, immutable/no-transform caching, CORP header, and Cloudflare edge delivery
+11. downloads the full `soffice.wasm` and `soffice.data` through production
+    and verifies their byte sizes and SHA-256 hashes against the manifest
 
 GitHub release assets may be up to 2 GiB, so the current LibreOffice payload
 fits without putting large binaries into Git history or the Worker bundle.
 
 ## Cloudflare streaming route
 
-`app/office-runtime/[release]/[asset]/route.ts` only permits the configured
-release and five known asset names.
+`worker/office-runtime.ts` handles production Office-runtime requests before
+`vinext/server/fetch-handler`. The application route remains a fallback
+implementation, but production requests take the Worker fast path.
 
-It forwards GET/HEAD and Range requests to the immutable release, streams the
-upstream body instead of buffering it, and returns:
+The fast path only permits the configured release and known asset names,
+forwards GET/HEAD and Range requests, requests identity encoding upstream, and
+returns the upstream `ReadableStream` directly without buffering or cloning it.
+It returns:
 
 ```
-Cache-Control: public, max-age=31536000, immutable
+Cache-Control: public, max-age=31536000, immutable, no-transform
 Cross-Origin-Resource-Policy: same-origin
 X-Content-Type-Options: nosniff
 ```

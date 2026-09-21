@@ -47,7 +47,7 @@ const TILE_DESCRIPTION: Record<string, string> = {
   "jpg-to-pdf": "Turn JPG, PNG, or WebP images into one PDF.",
   "pdf-to-jpg": "Export PDF pages as sharp image files.",
   sign: "Add a signature or initials to any PDF page.",
-  "word-to-pdf": "Convert Word documents to PDF with server assistance.",
+  "word-to-pdf": "Convert Word documents to PDF locally in your browser.",
   "pdf-to-word": "Convert PDF pages into an editable Word file.",
   reorder: "Reorder, rotate, duplicate, or remove PDF pages.",
   "extract-text": "Read, search, and export selectable PDF text.",
