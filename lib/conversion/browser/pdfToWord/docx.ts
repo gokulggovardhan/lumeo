@@ -24,18 +24,34 @@ function emu(valuePt: number): number {
   return Math.max(1, Math.round(valuePt * EMU_PER_PT));
 }
 
-function lineParagraph(line: ReconstructedTextLine, useOpaqueBackground: boolean): string {
+function lineParagraph(
+  line: ReconstructedTextLine,
+  useOpaqueBackground: boolean,
+  pageWidthPt: number,
+): string {
   const fontSizeHalfPt = Math.max(12, Math.round(line.fontSizePt * 2));
   const family = xmlEscape(line.fontFamily || "Arial");
-  const shade = useOpaqueBackground ? '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>' : "";
+  const shade = useOpaqueBackground
+    ? '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>'
+    : "";
   const bold = line.bold ? "<w:b/>" : "";
   const italic = line.italic ? "<w:i/>" : "";
+  // A PDF run's measured advance is often a few points narrower than the
+  // width Word needs after font substitution. A narrow frame therefore turns
+  // one fixed-layout run into two flowing lines. Give the frame the remaining
+  // page width; the run itself still starts at its exact PDF X coordinate and
+  // Word is free to use only as much horizontal space as its glyphs require.
+  const frameWidthPt = Math.max(
+    pageWidthPt - line.xPt - 6,
+    line.widthPt + Math.max(12, line.fontSizePt * 1.5),
+    8,
+  );
 
   return `
 <w:p>
   <w:pPr>
     <w:framePr
-      w:w="${twips(Math.max(line.widthPt + 4, 8))}"
+      w:w="${twips(frameWidthPt)}"
       w:h="${twips(Math.max(line.heightPt, line.fontSizePt * 1.2))}"
       w:hRule="atLeast"
       w:x="${twips(line.xPt)}"
@@ -51,6 +67,7 @@ function lineParagraph(line: ReconstructedTextLine, useOpaqueBackground: boolean
       <w:rFonts w:ascii="${family}" w:hAnsi="${family}" w:cs="${family}"/>
       <w:sz w:val="${fontSizeHalfPt}"/>
       <w:szCs w:val="${fontSizeHalfPt}"/>
+      <w:fitText w:val="${twips(Math.max(line.widthPt, 1))}"/>
       ${bold}
       ${italic}
     </w:rPr>
@@ -132,7 +149,13 @@ function documentXml(pages: ReconstructedPage[], imageRels: Map<number, string>)
     if (rel) body.push(imageParagraph(rel, page, page.pageNumber));
 
     for (const line of page.lines) {
-      body.push(lineParagraph(line, Boolean(rel)));
+      body.push(
+        lineParagraph(
+          line,
+          Boolean(rel) && !page.backgroundTextMasked,
+          page.widthPt,
+        ),
+      );
     }
 
     if (index < pages.length - 1) {

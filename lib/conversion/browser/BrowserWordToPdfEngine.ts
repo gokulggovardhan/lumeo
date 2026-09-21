@@ -14,6 +14,7 @@ import {
   normalizeConversionError,
 } from "@/lib/conversion/errors";
 import { validateWordConversionFile } from "@/lib/conversion/fileValidation";
+import { validateGeneratedPdf } from "@/lib/conversion/outputValidation";
 import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import type {
@@ -24,6 +25,12 @@ import type {
 } from "@/lib/conversion/types";
 
 const PDF_MIME = "application/pdf";
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) {
+    throw signal.reason ?? new DOMException("Conversion cancelled", "AbortError");
+  }
+}
 
 export class BrowserWordToPdfEngine implements ConversionEngine {
   readonly id = "browser-libreoffice-word-to-pdf";
@@ -148,6 +155,18 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
         throw normalizeConversionError(error, "conversion");
       }
 
+      options.onProgress?.({
+        phase: "validating",
+        message: "Validating PDF",
+      });
+
+      try {
+        await validateGeneratedPdf(blob);
+      } catch (error) {
+        throw normalizeConversionError(error, "output");
+      }
+
+      throwIfAborted(signal);
       options.onProgress?.({
         phase: "finalizing",
         message: "Finalizing file",

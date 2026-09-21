@@ -69,12 +69,18 @@ jobs:
       - name: Install exact dependencies
         run: npm ci
 
+      - name: Install deterministic document fidelity tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils python3-pil
+
       - name: Install conversion browsers
         run: npx playwright install --with-deps chromium webkit firefox
 
       - name: Run real browser conversion corpus
         env:
           CI: "1"
+          LUMEO_FIDELITY_CLI: "1"
         run: npx playwright test --config=playwright.browser-conversion.config.ts
 
       - name: Upload conversion traces on failure

@@ -11,6 +11,7 @@ import { buildReconstructedDocx } from "@/lib/conversion/browser/pdfToWord/docx"
 import {
   ocrLinesToReconstructed,
   reconstructTextLines,
+  type PdfTextStyle,
 } from "@/lib/conversion/browser/pdfToWord/layout";
 import type {
   PdfToWordOcrAdapter,
@@ -21,6 +22,7 @@ import {
   normalizeConversionError,
 } from "@/lib/conversion/errors";
 import { validatePdfConversionFile } from "@/lib/conversion/fileValidation";
+import { validateGeneratedDocx } from "@/lib/conversion/outputValidation";
 import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { checkPdfPageCount } from "@/lib/pdf/uploadValidation";
@@ -48,6 +50,14 @@ const JPEG_QUALITY = 0.84;
 
 type PdfPageLike = {
   rotate: number;
+  commonObjs?: {
+    get(id: string): {
+      name?: string;
+      fallbackName?: string;
+      bold?: boolean;
+      italic?: boolean;
+    } | undefined;
+  };
   getViewport(options: { scale: number; rotation?: number }): {
     width: number;
     height: number;
@@ -55,6 +65,7 @@ type PdfPageLike = {
   };
   getTextContent(): Promise<{
     items: unknown[];
+    styles?: Record<string, PdfTextStyle>;
   }>;
   getOperatorList(): Promise<{ fnArray: number[] }>;
   render(options: {
@@ -203,10 +214,88 @@ function countVectorLayoutOperators(
   );
 }
 
+function enrichTextStyles(
+  page: PdfPageLike,
+  items: unknown[],
+  styles: Record<string, PdfTextStyle> | undefined,
+): Record<string, PdfTextStyle> {
+  const enriched: Record<string, PdfTextStyle> = { ...(styles ?? {}) };
+
+  for (const item of items) {
+    if (
+      !item ||
+      typeof item !== "object" ||
+      !("fontName" in item) ||
+      typeof (item as { fontName?: unknown }).fontName !== "string"
+    ) {
+      continue;
+    }
+
+    const fontName = (item as { fontName: string }).fontName;
+    let font:
+      | {
+          name?: string;
+          fallbackName?: string;
+          bold?: boolean;
+          italic?: boolean;
+        }
+      | undefined;
+    try {
+      font = page.commonObjs?.get(fontName);
+    } catch {
+      font = undefined;
+    }
+
+    enriched[fontName] = {
+      ...enriched[fontName],
+      fontName: font?.name ?? font?.fallbackName ?? enriched[fontName]?.fontName,
+      bold: font?.bold ?? enriched[fontName]?.bold,
+      italic: font?.italic ?? enriched[fontName]?.italic,
+    };
+  }
+
+  return enriched;
+}
+
+function maskEditableTextFromBackground(
+  context: CanvasRenderingContext2D,
+  lines: ReconstructedPage["lines"],
+  scaleX: number,
+  scaleY: number,
+): void {
+  if (!lines.length) return;
+
+  context.save();
+  context.fillStyle = "#FFFFFF";
+
+  for (const line of lines) {
+    // PDF text boxes hug the glyphs closely. Slightly over-mask them so
+    // anti-aliased source pixels cannot ghost underneath the editable Word
+    // text. Fixed-layout documents normally place these runs on flat page
+    // backgrounds; image-heavy pages retain the conservative opaque-frame
+    // path instead.
+    const paddingPt = Math.max(1.5, line.fontSizePt * 0.12);
+    const x = Math.max(0, (line.xPt - paddingPt) * scaleX);
+    const y = Math.max(0, (line.yPt - paddingPt) * scaleY);
+    const width = Math.max(
+      1,
+      (line.widthPt + paddingPt * 2) * scaleX,
+    );
+    const height = Math.max(
+      1,
+      (line.heightPt + paddingPt * 2) * scaleY,
+    );
+    context.fillRect(x, y, width, height);
+  }
+
+  context.restore();
+}
+
 async function renderPageBackground(
   page: PdfPageLike,
   pageNumber: number,
   signal: AbortSignal,
+  editableLines: ReconstructedPage["lines"] = [],
 ): Promise<Blob> {
   throwIfAborted(signal);
 
@@ -246,6 +335,15 @@ async function renderPageBackground(
       () => task.cancel(),
     );
     throwIfAborted(signal);
+
+    if (editableLines.length > 0) {
+      maskEditableTextFromBackground(
+        context,
+        editableLines,
+        viewport.width / pointViewport.width,
+        viewport.height / pointViewport.height,
+      );
+    }
 
     const blob = await withAbort(
       new Promise<Blob | null>((resolve) =>
@@ -406,11 +504,17 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           ),
         ]);
 
+        const textStyles = enrichTextStyles(
+          page,
+          textContent.items,
+          textContent.styles,
+        );
         let lines = reconstructTextLines(
           textContent.items as never,
           viewport.transform,
           viewport.width,
           viewport.height,
+          textStyles,
         );
 
         const imageCount = countImageOperators(pdfjs, operatorList.fnArray);
@@ -422,11 +526,24 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           lines.length === 0 ||
           imageCount >= 2 ||
           (imageCount >= 1 && lines.length < 6) ||
-          vectorLayoutCount >= 6;
+          vectorLayoutCount > 0;
 
         let backgroundImage: Blob | File | null = null;
+        // When a native-text page only needs raster fallback for vector
+        // geometry (rules, boxes, diagrams), remove the source glyph pixels
+        // from that background and overlay independently positioned editable
+        // text. Mixed/image-heavy pages retain the conservative opaque-frame
+        // behavior because blindly painting white over an image can be worse
+        // than preserving the original raster.
+        const backgroundTextMasked =
+          shouldRasterize && lines.length > 0 && imageCount === 0;
         if (shouldRasterize) {
-          const rendered = await renderPageBackground(page, pageNumber, signal);
+          const rendered = await renderPageBackground(
+            page,
+            pageNumber,
+            signal,
+            backgroundTextMasked ? lines : [],
+          );
 
           if (lines.length === 0 && this.ocrAdapter) {
             const ocrLines = await this.ocrAdapter.recognize(
@@ -461,6 +578,7 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           lines,
           backgroundImage,
           backgroundExtension: backgroundImage ? "jpg" : undefined,
+          backgroundTextMasked,
         };
         pages.push(reconstructed);
 
@@ -481,6 +599,27 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
       let blob: Blob;
       try {
         blob = await buildReconstructedDocx(pages);
+      } catch (error) {
+        throw normalizeConversionError(error, "output");
+      }
+
+      throwIfAborted(signal);
+      options.onProgress?.({
+        phase: "validating",
+        message: "Validating Word document",
+      });
+
+      try {
+        await validateGeneratedDocx(blob, {
+          expectedPageCount: pages.length,
+          minimumEditableTextRuns: pages.reduce(
+            (count, page) => count + page.lines.length,
+            0,
+          ),
+          expectedBackgroundImages: pages.filter(
+            (page) => Boolean(page.backgroundImage),
+          ).length,
+        });
       } catch (error) {
         throw normalizeConversionError(error, "output");
       }

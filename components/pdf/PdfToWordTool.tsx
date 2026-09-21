@@ -73,7 +73,7 @@ function PdfIcon() {
 
 function stageForPhase(phase: ConversionPhase): Stage {
   if (phase === "preparing" || phase === "uploading") return "preparing";
-  if (phase === "finalizing") return "finalizing";
+  if (phase === "validating" || phase === "finalizing") return "finalizing";
   return "converting";
 }
 
