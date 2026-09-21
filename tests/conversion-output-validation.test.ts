@@ -10,9 +10,11 @@ test("generated PDF validation parses and counts pages without PDF.js", async ()
   document.addPage([612, 792]);
   document.addPage([792, 612]);
   const bytes = await document.save();
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
 
   const pageCount = await validateGeneratedPdf(
-    new Blob([bytes], { type: "application/pdf" }),
+    new Blob([buffer], { type: "application/pdf" }),
   );
 
   assert.equal(pageCount, 2);
