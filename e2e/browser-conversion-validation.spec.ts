@@ -8,6 +8,14 @@ import {
 } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 
+import {
+  assertPdfAnchorFidelity,
+  assertRenderedPdfSimilarity,
+  countPdfImages,
+  renderDocxWithLibreOffice,
+  writePdfFixture,
+} from "./conversion-fidelity-helpers";
+
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYGJAQoAHxcCAk+Uzr4AAAAASUVORK5CYII=",
   "base64",
@@ -451,7 +459,8 @@ test.describe("browser conversion validation lab", () => {
 
   test("PDF to Word preserves invoice and AMC column geometry as independent editable runs", async ({
     page,
-  }) => {
+    browserName,
+  }, testInfo) => {
     const pdf = await makeFixedLayoutInvoicePdf();
 
     await page.getByTestId("pdf-input").setInputFiles({
@@ -520,6 +529,44 @@ test.describe("browser conversion validation lab", () => {
     expect(docx.file("word/media/page-1.jpg")).toBeTruthy();
     expect(docx.file("word/media/page-2.jpg")).toBeTruthy();
     expect(documentXml).not.toContain("<w:shd ");
+
+    if (
+      browserName === "chromium" &&
+      process.env.LUMEO_FIDELITY_CLI === "1"
+    ) {
+      const outputDirectory = testInfo.outputPath("pdf-to-word-fidelity");
+      const sourcePdf = await writePdfFixture(
+        pdf,
+        outputDirectory,
+        "synthetic-invoice-source",
+      );
+      const reconstructedPdf = await renderDocxWithLibreOffice(
+        bytes,
+        outputDirectory,
+        "synthetic-invoice-current",
+      );
+
+      await assertPdfAnchorFidelity(
+        sourcePdf,
+        reconstructedPdf,
+        outputDirectory,
+        [
+          { page: 1, text: "NF330502" },
+          { page: 1, text: "NR110920" },
+          { page: 1, text: "TR600200" },
+          { page: 1, text: "1535.84" },
+          { page: 2, text: "20997" },
+          { page: 2, text: "1536.00" },
+          { page: 2, text: "Authorised" },
+          { page: 2, text: "Signatory" },
+        ],
+        0.03,
+      );
+      await assertRenderedPdfSimilarity(sourcePdf, reconstructedPdf, {
+        maxMae: 20,
+        maxChanged: 0.22,
+      });
+    }
   });
 
   test("PDF to Word remains stable across ten sequential conversions and Unicode filenames", async ({
@@ -618,7 +665,7 @@ test.describe("browser conversion validation lab", () => {
   test("Word to PDF converts small and rich DOCX and generated PDFs really open", async ({
     page,
     browserName,
-  }) => {
+  }, testInfo) => {
     test.skip(browserName !== "chromium", "LibreOffice WASM validation runs once in Chromium.");
 
     await expect(page.getByTestId("capabilities")).toContainText(
@@ -666,6 +713,46 @@ test.describe("browser conversion validation lab", () => {
     bytes = await downloadBytes(await downloadPromise);
     const pdf = await PDFDocument.load(bytes);
     expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
+
+    if (process.env.LUMEO_FIDELITY_CLI === "1") {
+      const outputDirectory = testInfo.outputPath("word-to-pdf-fidelity");
+      const referencePdf = await renderDocxWithLibreOffice(
+        rich,
+        outputDirectory,
+        "rich-word-reference",
+      );
+      const browserPdf = await writePdfFixture(
+        bytes,
+        outputDirectory,
+        "rich-word-browser",
+      );
+
+      await assertPdfAnchorFidelity(
+        referencePdf,
+        browserPdf,
+        outputDirectory,
+        [
+          { page: 1, text: "formatted" },
+          { page: 1, text: "heading" },
+          { page: 1, text: "italic" },
+          { page: 1, text: "A1" },
+          { page: 1, text: "B2" },
+          { page: 2, text: "second" },
+          { page: 2, text: "centered" },
+        ],
+        0.025,
+      );
+      const [referenceImages, browserImages] = await Promise.all([
+        countPdfImages(referencePdf),
+        countPdfImages(browserPdf),
+      ]);
+      expect(referenceImages).toBeGreaterThan(0);
+      expect(browserImages).toBeGreaterThanOrEqual(referenceImages);
+      await assertRenderedPdfSimilarity(referencePdf, browserPdf, {
+        maxMae: 18,
+        maxChanged: 0.20,
+      });
+    }
   });
 
 
