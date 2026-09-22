@@ -676,9 +676,14 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           pageWidthPt: viewport.width,
         });
         for (const region of classification.regions) {
-          if (region.kind !== "fixed-layout-table") continue;
+          if (
+            region.kind !== "fixed-layout-table" &&
+            region.kind !== "semantic-table"
+          ) {
+            continue;
+          }
           for (const index of region.lineIndices) {
-            if (lines[index]) lines[index].regionKind = "fixed-layout-table";
+            if (lines[index]) lines[index].regionKind = region.kind;
           }
         }
         lines.forEach((line) => {
