@@ -2170,10 +2170,46 @@ export default function EditPdfTool() {
       }
     }
 
-    setHistoryState((current) => ({
-      elements: [...current.elements, ...added],
-      pdfBytes: blankedBytes ?? current.pdfBytes,
-    }));
+    setHistoryState((current) => {
+      const nextElements = [...current.elements, ...added];
+      let journal = recordElementMutation(
+        current.journal,
+        current.elements,
+        nextElements,
+      );
+
+      if (blankedBytes && resolvedEditContext.kind === "single") {
+        const locator = resolvedEditContext.locatedOperator.locator;
+        const sourceIndex = selectedRunIndices[0];
+        const nativeTarget: NativeTextSourceRef = {
+          kind: "native",
+          pageIndex,
+          spanIds: [
+            pageTextModel?.spans[sourceIndex]?.id ??
+              `p${pageIndex}-span-${sourceIndex}`,
+          ],
+          operators: [{
+            streamKind: locator.kind,
+            contentStreamIndex:
+              locator.kind === "page" ? locator.contentStreamIndex : 0,
+            formPath: locator.kind === "xobject" ? [...locator.formPath] : null,
+            operatorIndex: resolvedEditContext.locatedOperator.operatorIndex,
+          }],
+        };
+        journal = appendPdfEditOperation(journal, {
+          kind: "deleteText",
+          pageIndex,
+          target: nativeTarget,
+          beforeText: run.str,
+        });
+      }
+
+      return {
+        elements: nextElements,
+        pdfBytes: blankedBytes ?? current.pdfBytes,
+        journal,
+      };
+    });
     setRestyleKeptOriginalText(blankedBytes === null);
     // The download URL is cleared by setHistoryState itself -- see its
     // wrapper near the top of this component.
@@ -2203,6 +2239,10 @@ export default function EditPdfTool() {
   async function runPageOperation(
     operation: () => Promise<{ bytes: ArrayBuffer; pageMap: PageMap; pageCount: number }>,
     describe: (droppedElements: number) => string,
+    journalOperation: {
+      action: "reorder" | "delete" | "merge" | "rotate" | "redact";
+      detail: Record<string, string | number | boolean | number[]>;
+    },
   ) {
     if (pageOpBusy) return;
     setPageOpBusy(true);
@@ -2215,6 +2255,12 @@ export default function EditPdfTool() {
       setHistoryState((current) => ({
         elements: remapElements(current.elements, pageMap),
         pdfBytes: bytes,
+        journal: appendPdfEditOperation(current.journal, {
+          kind: "pageOperation",
+          pageIndex,
+          action: journalOperation.action,
+          detail: journalOperation.detail,
+        }),
       }));
       setPageIndex((current) => remapPageIndex(current, pageMap, pageCount));
       setSelectedPages(new Set());
@@ -2374,7 +2420,27 @@ export default function EditPdfTool() {
         return { ...mask, widthPct: box.widthPct, heightPct: box.heightPct };
       });
 
-      setHistoryState((current) => ({ elements: [...current.elements, ...masks], pdfBytes: outcome.bytes }));
+      setHistoryState((current) => {
+        const nextElements = [...current.elements, ...masks];
+        const elementJournal = recordElementMutation(
+          current.journal,
+          current.elements,
+          nextElements,
+        );
+        return {
+          elements: nextElements,
+          pdfBytes: outcome.bytes,
+          journal: appendPdfEditOperation(elementJournal, {
+            kind: "pageOperation",
+            pageIndex,
+            action: "redact",
+            detail: {
+              targetCount: redactionTargets.length,
+              maskCount: masks.length,
+            },
+          }),
+        };
+      });
       setRedactionOutcome(outcome);
       setRedactionBoxes([]);
       setSelectedId(null);
