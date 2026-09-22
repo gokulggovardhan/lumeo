@@ -565,6 +565,7 @@ export default function EditPdfTool() {
   // whether a browser happens to accept the embedded font bytes.
   const [browserFontPreview, setBrowserFontPreview] = useState<{ spanId: string; family: string } | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
+  const [nativeFormatOpen, setNativeFormatOpen] = useState(false);
   // True when the last Restyle could not blank the original glyphs from the
   // content stream, so the covered text is still in the exported file. Drives
   // the disclosure notice -- see restyleSelectedRun for when that happens.
@@ -1644,6 +1645,7 @@ export default function EditPdfTool() {
       setEditDraftText("");
       setEditApplyError("");
       setUseSubstituteFont(false);
+      setNativeFormatOpen(false);
       return;
     }
     const range =
@@ -1658,6 +1660,7 @@ export default function EditPdfTool() {
     setEditDraftText(range.map((i) => detectedTextRuns[i]?.str ?? "").join(""));
     setEditApplyError("");
     setUseSubstituteFont(false);
+    if (!extend) setNativeFormatOpen(false);
   }
 
   // Bug fix (reported from iPhone 15 Plus / Safari): tapping editable text
@@ -2498,19 +2501,22 @@ export default function EditPdfTool() {
   // shared by both the inline on-page toolbar and the sidebar panel -- was
   // previously computed inline in one place only; extracted so the two
   // Apply buttons can never disagree about when they're enabled.
+  const nativeStyleChanged =
+    editPreview.kind === "single" && Boolean(editPreview.plan.replacementTextState);
+  const textDraftChanged =
+    editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
   const canApplyEdit =
     !isApplyingEdit &&
     editPreview.kind !== "empty" &&
     editPreview.editable &&
     (replacementLayoutDecision?.safeToApplyWithCurrentWriter ?? true) &&
-    editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
+    (textDraftChanged || nativeStyleChanged);
   // Phase 11: looked up once and reused throughout the inline on-page editor
   // JSX below, instead of repeatedly indexing detectedTextRuns/runMatches by
   // selectedRunIndices[0] at each use site.
   const singleSelectedRun = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
   const singleSelectedRunMatch = selectedRunIndices.length === 1 ? runMatches[selectedRunIndices[0]] : null;
-  const singleSelectedSpan =
-    selectedRunIndices.length === 1 ? pageTextModel?.spans[selectedRunIndices[0]] ?? null : null;
+  const singleSelectedSpan = selectedNativeSpan;
   const inlineEditorFontFamily =
     singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
       ? browserFontPreview.family
@@ -2567,7 +2573,14 @@ export default function EditPdfTool() {
     ? pickHorizontalAlign(singleSelectedRun.xPct, singleSelectedRun.xPct + singleSelectedRun.widthPct)
     : "start";
   const inlineEditorToolbarPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-1" : "bottom-full mb-1";
-  const inlineEditorTooltipPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-11" : "bottom-full mb-11";
+  const nativeFormatPanelPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-12" : "bottom-full mb-12";
+  const inlineEditorTooltipPositionClass = nativeFormatOpen
+    ? inlineEditorVerticalPlacement === "below"
+      ? "top-full mt-[12rem]"
+      : "bottom-full mb-[12rem]"
+    : inlineEditorVerticalPlacement === "below"
+      ? "top-full mt-11"
+      : "bottom-full mb-11";
   const inlineEditorHorizontalClass = inlineEditorHorizontalAlign === "end" ? "right-0" : "left-0";
 
   const generateEditedPdf = useCallback(async () => {
