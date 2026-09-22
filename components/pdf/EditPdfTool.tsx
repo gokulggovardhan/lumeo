@@ -597,6 +597,15 @@ export default function EditPdfTool() {
   // TextRunOverlay) and the autofocus effect just below this.
   const inlineEditInputRef = useRef<HTMLInputElement | null>(null);
   const textSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadClientReadyRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    // SSR can render the file input before React has attached its change
+    // handler. Mark the upload surface only after hydration so automated
+    // browsers—and assistive automation using the raw file input—never race
+    // a visually-present but not-yet-interactive control.
+    uploadClientReadyRef.current?.setAttribute("data-edit-client-ready", "true");
+  }, []);
 
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   // Phase 11: live drag-to-create preview for the Whiteout tool -- see
@@ -2900,7 +2909,7 @@ export default function EditPdfTool() {
 
   if (!pdf) {
     return (
-      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+      <section ref={uploadClientReadyRef} className="l2-workspace grid gap-5 pb-4 lg:pb-0">
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="edit-pdf-upload"
