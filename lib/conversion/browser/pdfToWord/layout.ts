@@ -111,6 +111,7 @@ export function reconstructTextLines(
         fontFamily: fontFamilyFromName(run.fontName, style),
         bold: textStyle.bold,
         italic: textStyle.italic,
+        sourceKind: "pdfjs",
       };
     })
     .sort((a, b) => {
@@ -138,5 +139,6 @@ export function ocrLinesToReconstructed(
       fontFamily: "Arial",
       bold: false,
       italic: false,
+      sourceKind: "ocr",
     }));
 }
