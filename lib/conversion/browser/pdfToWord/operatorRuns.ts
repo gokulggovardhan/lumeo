@@ -390,9 +390,9 @@ function mergeContiguousOperatorFragments(
           : []),
         ...(candidate.glyphs ?? []),
       ];
-      current.readingOrderIndex = Math.min(
-        current.readingOrderIndex ?? Number.MAX_SAFE_INTEGER,
-        candidate.readingOrderIndex ?? Number.MAX_SAFE_INTEGER,
+      current.sourceOrderIndex = Math.min(
+        current.sourceOrderIndex ?? Number.MAX_SAFE_INTEGER,
+        candidate.sourceOrderIndex ?? Number.MAX_SAFE_INTEGER,
       );
       consumed.add(candidate);
     }
@@ -427,7 +427,7 @@ export function reconstructOperatorTextRuns({
   let decodedOperatorCount = 0;
   let decodedCharacterCount = 0;
 
-  located.forEach((locatedOperator: LocatedTextOperator, readingOrderIndex) => {
+  located.forEach((locatedOperator: LocatedTextOperator, sourceOrderIndex) => {
     const operator = locatedOperator.operator;
     const resourceName = operator.fontResourceName;
     if (!resourceName) return;
@@ -515,7 +515,7 @@ export function reconstructOperatorTextRuns({
       underline: false,
       underlineColorHex: null,
       hyperlinkUrl: null,
-      readingOrderIndex,
+      sourceOrderIndex,
       sourceKind: "operator",
       visualOnly:
         Math.abs(origin.rotationDeg) > ROTATION_EPSILON_DEG ||
@@ -537,10 +537,13 @@ export function reconstructOperatorTextRuns({
     )
     .forEach((line, visualOrderIndex) => {
       line.visualOrderIndex = visualOrderIndex;
+      // For ordinary left-to-right fixed-layout pages, geometric row order is
+      // a safer logical/editable order than raw PDF operator order. Visual
+      // placement still comes only from each run's absolute x/y frame, so
+      // changing XML order cannot move a cell on the page.
+      line.readingOrderIndex = visualOrderIndex;
     });
 
-  // Return in source/content-stream order for accessible/logical Word XML;
-  // the absolute X/Y on each frame independently controls visual placement.
   merged.sort(
     (a, b) =>
       (a.readingOrderIndex ?? 0) - (b.readingOrderIndex ?? 0),
