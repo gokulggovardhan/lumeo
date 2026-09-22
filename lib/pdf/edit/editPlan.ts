@@ -109,6 +109,7 @@ export type EditPlan = {
    */
   wordSpacing: number;
   charSpacing: number;
+  horizontalScalingPct: number;
   /**
    * Null for the established text-only rewrite path. When set, the replacement
    * is rendered under this exact PDF text state and the writer restores the
@@ -240,6 +241,7 @@ export function buildEditPlan({
     fontSizePt: operator.fontSizePt,
     wordSpacing: operator.wordSpacing,
     charSpacing: operator.charSpacing,
+    horizontalScalingPct: operator.horizontalScalingPct,
     replacementTextState: effectiveReplacementState,
     originalText,
     replacementText,
@@ -282,7 +284,11 @@ export function buildEditPlan({
     };
   }
 
-  if (effectiveReplacementState?.fontSizePt !== undefined && !operator.fontResourceName) {
+  if (
+    effectiveReplacementState &&
+    effectiveReplacementState.fontSizePt !== state.fontSizePt &&
+    !operator.fontResourceName
+  ) {
     return {
       ...base,
       originalWidthPt: 0,
