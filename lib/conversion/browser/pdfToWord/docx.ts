@@ -375,27 +375,9 @@ function lineParagraph(
   pageWidthPt: number,
   hyperlinkRelationshipId: string | null = null,
 ): string {
-  const fontSizeHalfPt = Math.max(12, Math.round(line.fontSizePt * 2));
-  const family = xmlEscape(line.fontFamily || "Arial");
   const shade = useOpaqueBackground
     ? '<w:shd w:val="clear" w:color="auto" w:fill="FFFFFF"/>'
     : "";
-  const bold = line.bold ? "<w:b/>" : "";
-  const italic = line.italic ? "<w:i/>" : "";
-  const color = /^#[0-9A-Fa-f]{6}$/.test(line.colorHex ?? "")
-    ? `<w:color w:val="${xmlEscape((line.colorHex ?? "#000000").slice(1).toUpperCase())}"/>`
-    : "";
-  const underlineColor =
-    line.underline && /^#[0-9A-Fa-f]{6}$/.test(line.underlineColorHex ?? line.colorHex ?? "")
-      ? (line.underlineColorHex ?? line.colorHex ?? "#000000").slice(1).toUpperCase()
-      : null;
-  const underline = line.underline
-    ? `<w:u w:val="single"${underlineColor ? ` w:color="${xmlEscape(underlineColor)}"` : ""}/>`
-    : "";
-  const wordScale =
-    typeof line.wordScalePct === "number" && Number.isFinite(line.wordScalePct)
-      ? `<w:w w:val="${Math.max(70, Math.min(130, Math.round(line.wordScalePct)))}"/>`
-      : "";
   // A PDF run's measured advance is often a few points narrower than the
   // width Word needs after font substitution. A narrow frame therefore turns
   // one fixed-layout run into two flowing lines. Give the frame the remaining
@@ -425,15 +407,7 @@ function lineParagraph(
   ${hyperlinkRelationshipId ? `<w:hyperlink r:id="${hyperlinkRelationshipId}" w:history="1">` : ""}
   <w:r>
     <w:rPr>
-      <w:rFonts w:ascii="${family}" w:hAnsi="${family}" w:cs="${family}"/>
-      <w:sz w:val="${fontSizeHalfPt}"/>
-      <w:szCs w:val="${fontSizeHalfPt}"/>
-      <w:fitText w:val="${twips(Math.max(line.widthPt, 1))}"/>
-      ${wordScale}
-      ${color}
-      ${underline}
-      ${bold}
-      ${italic}
+      ${wordRunProperties(line, { fixedWidth: true })}
     </w:rPr>
     <w:t xml:space="preserve">${xmlEscape(line.text)}</w:t>
   </w:r>
