@@ -76,11 +76,44 @@ function dominantInkColor(
     }
   }
 
-  let best: { count: number; sum: Rgb } | null = null;
+  let best:
+    | { count: number; sum: Rgb; paintStrength: number }
+    | null = null;
+
   for (const entry of histogram.values()) {
-    if (!best || entry.count > best.count) best = entry;
+    if (entry.count < 2) continue;
+    const average = {
+      r: entry.sum.r / entry.count,
+      g: entry.sum.g / entry.count,
+      b: entry.sum.b / entry.count,
+    };
+
+    // Anti-aliasing blends source ink with the white page background. The
+    // most frequent cluster is therefore often a lighter fringe (for
+    // example #4040F1 around source #0000ED). Recover the source paint by
+    // selecting the supported cluster furthest from white; use frequency only
+    // as a tie-breaker. This also preserves black/gray text faithfully.
+    const paintStrength = Math.hypot(
+      255 - average.r,
+      255 - average.g,
+      255 - average.b,
+    );
+
+    if (
+      !best ||
+      paintStrength > best.paintStrength + 1 ||
+      (Math.abs(paintStrength - best.paintStrength) <= 1 &&
+        entry.count > best.count)
+    ) {
+      best = {
+        count: entry.count,
+        sum: entry.sum,
+        paintStrength,
+      };
+    }
   }
-  if (!best || best.count < 2) return null;
+
+  if (!best) return null;
   return {
     r: best.sum.r / best.count,
     g: best.sum.g / best.count,
