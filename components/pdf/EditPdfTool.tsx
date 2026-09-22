@@ -2517,6 +2517,8 @@ export default function EditPdfTool() {
   const singleSelectedRun = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
   const singleSelectedRunMatch = selectedRunIndices.length === 1 ? runMatches[selectedRunIndices[0]] : null;
   const singleSelectedSpan = selectedNativeSpan;
+  const activeNativeStyleDraft =
+    nativeStyleDraft?.spanId === singleSelectedSpan?.id ? nativeStyleDraft : null;
   const inlineEditorFontFamily =
     singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
       ? browserFontPreview.family
@@ -3038,9 +3040,7 @@ export default function EditPdfTool() {
                         className="lumeo-page-overlay-input h-full w-full rounded-[3px] border border-[var(--lumeo-gold)] bg-white px-0.5 font-semibold text-[#12141a] shadow-[0_0_0_3px_rgba(var(--lumeo-gold-rgb),0.16)] outline-none"
                         style={{
                           fontSize: `${overlayFontSizePx(
-                            nativeStyleDraft?.spanId === singleSelectedSpan?.id
-                              ? nativeStyleDraft.fontSizePt
-                              : singleSelectedRun.fontSizePt,
+                            activeNativeStyleDraft?.fontSizePt ?? singleSelectedRun.fontSizePt,
                             pagePointSize?.width ?? 0,
                             stageWidthPx,
                           )}px`,
@@ -3048,12 +3048,12 @@ export default function EditPdfTool() {
                           fontWeight: singleSelectedSpan?.style.weight ?? 600,
                           fontStyle: singleSelectedSpan?.style.italic ? "italic" : "normal",
                           letterSpacing:
-                            nativeStyleDraft?.spanId === singleSelectedSpan?.id && nativeStyleDraft.charSpacing !== 0
-                              ? `${(nativeStyleDraft.charSpacing / Math.max(1, nativeStyleDraft.fontSizePt)).toFixed(4)}em`
+                            activeNativeStyleDraft && activeNativeStyleDraft.charSpacing !== 0
+                              ? `${(activeNativeStyleDraft.charSpacing / Math.max(1, activeNativeStyleDraft.fontSizePt)).toFixed(4)}em`
                               : undefined,
                           wordSpacing:
-                            nativeStyleDraft?.spanId === singleSelectedSpan?.id && nativeStyleDraft.wordSpacing !== 0
-                              ? `${(nativeStyleDraft.wordSpacing / Math.max(1, nativeStyleDraft.fontSizePt)).toFixed(4)}em`
+                            activeNativeStyleDraft && activeNativeStyleDraft.wordSpacing !== 0
+                              ? `${(activeNativeStyleDraft.wordSpacing / Math.max(1, activeNativeStyleDraft.fontSizePt)).toFixed(4)}em`
                               : undefined,
                         }}
                       />
