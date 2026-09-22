@@ -1,3 +1,9 @@
+export type ReconstructedGlyph = {
+  text: string;
+  code: number | null;
+  advancePt: number;
+};
+
 export type ReconstructedTextLine = {
   /**
    * A single independently positioned PDF text run.
@@ -16,6 +22,38 @@ export type ReconstructedTextLine = {
   fontFamily: string;
   bold: boolean;
   italic: boolean;
+  /** Source baseline in visual page points, top-left origin. */
+  baselinePt?: number;
+  /** Source text rotation. Zero remains the normal fixed-frame path. */
+  rotationDeg?: number;
+  sourceFontName?: string;
+  fontWeight?: number;
+  charSpacingPt?: number;
+  wordSpacingPt?: number;
+  horizontalScalingPct?: number;
+  textRisePt?: number;
+  colorHex?: string | null;
+  underline?: boolean;
+  underlineColorHex?: string | null;
+  hyperlinkUrl?: string | null;
+  /** Original content-stream order, independent from absolute positioning. */
+  readingOrderIndex?: number;
+  /** Deterministic top-to-bottom/left-to-right visual order. */
+  visualOrderIndex?: number;
+  sourceKind?: "operator" | "pdfjs" | "ocr";
+  glyphs?: ReconstructedGlyph[];
+  regionKind?: "semantic-text" | "fixed-layout-table" | "fixed-layout" | "footer" | "header";
+};
+
+export type ReconstructedRegion = {
+  id: string;
+  kind: "semantic-text" | "fixed-layout-table" | "fixed-layout" | "image" | "mixed";
+  lineIndices: number[];
+  xPt: number;
+  yPt: number;
+  widthPt: number;
+  heightPt: number;
+  columnAnchorsPt?: number[];
 };
 
 export type ReconstructedPage = {
@@ -23,6 +61,9 @@ export type ReconstructedPage = {
   widthPt: number;
   heightPt: number;
   lines: ReconstructedTextLine[];
+  regions?: ReconstructedRegion[];
+  reconstructionMode?: "semantic-text" | "fixed-layout" | "complex-vector" | "image" | "mixed";
+  operatorCoverageRatio?: number;
   backgroundImage?: Blob | File | null;
   backgroundExtension?: "jpg" | "png";
   /**
