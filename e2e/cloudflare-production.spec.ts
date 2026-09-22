@@ -120,7 +120,6 @@ test("production Edit PDF detects, edits, exports and reopens native text", asyn
     .join(" ");
   expect(extracted).toContain("Employee file");
   expect(extracted).not.toContain("Employee record");
-  await textDoc.destroy();
 
   expect(assetFailures).toEqual([]);
   expect(pageErrors).toEqual([]);
