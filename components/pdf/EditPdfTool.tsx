@@ -1700,7 +1700,18 @@ export default function EditPdfTool() {
     // simple-tap-with-no-drag fallback -- handling it here too would create
     // a SECOND element, since a plain tap fires both a pointerup and a click.
     if (activeTool === "whiteout") return;
-    if ((event.target as HTMLElement).closest('[role="button"]')) return;
+    // Inline editor controls live inside the stage. Native <button>/<input>
+    // elements do not necessarily carry an explicit role attribute, and
+    // desktop WebKit can deliver the stage click after scrolling a floating
+    // control into view. Treat every native interactive descendant as UI,
+    // never as a click on the PDF canvas that should clear selection.
+    if (
+      (event.target as HTMLElement).closest(
+        'button, input, textarea, select, [contenteditable="true"], [role="button"]',
+      )
+    ) {
+      return;
+    }
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return;
 
