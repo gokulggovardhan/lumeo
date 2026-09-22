@@ -979,10 +979,119 @@ test.describe("browser conversion validation lab", () => {
     }
   });
 
+  test("browser converters preserve semantic structure through PDF to Word to PDF round trip", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    test.skip(
+      browserName !== "chromium",
+      "Office round-trip validation runs once in Chromium.",
+    );
+
+    const retiredTransport: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      const retiredApi =
+        url.pathname === "/api/tools/word-to-pdf" ||
+        url.pathname === "/api/tools/pdf-to-word" ||
+        url.pathname === "/api/tools/word-to-pdf/cleanup";
+      const storageWrite =
+        url.pathname.startsWith("/storage/v1/") &&
+        request.method() !== "GET";
+      const retiredRender =
+        url.hostname === "lumeo-word-to-pdf-converter.onrender.com";
+      if (retiredApi || storageWrite || retiredRender) {
+        retiredTransport.push(`${request.method()} ${request.url()}`);
+      }
+    });
+
+    const sourcePdf = await makeSemanticLetterPdf();
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "semantic round trip source.pdf",
+      mimeType: "application/pdf",
+      buffer: sourcePdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+
+    let downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const reconstructedWord = await downloadBytes(await downloadPromise);
+    const reconstructedZip = await validateDocxDownload(
+      reconstructedWord,
+      "This document exercises normal paragraph reconstruction",
+    );
+    const reconstructedXml = await reconstructedZip
+      .file("word/document.xml")!
+      .async("string");
+    const semanticMarker =
+      "This document exercises normal paragraph reconstruction";
+    const markerIndex = reconstructedXml.indexOf(semanticMarker);
+    const paragraphStart = reconstructedXml.lastIndexOf("<w:p>", markerIndex);
+    const paragraphEnd = reconstructedXml.indexOf("</w:p>", markerIndex);
+    expect(
+      reconstructedXml.slice(paragraphStart, paragraphEnd + 6),
+    ).not.toContain("w:framePr");
+
+    await page.getByTestId("word-input").setInputFiles({
+      name: "semantic round trip reconstructed.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: reconstructedWord,
+    });
+    await page.getByTestId("word-convert").click();
+    await expect(page.getByTestId("word-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 420_000 },
+    );
+    downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("word-download").click();
+    const roundTripPdf = await downloadBytes(await downloadPromise);
+    await validatePdfDownload(roundTripPdf);
+
+    if (process.env.LUMEO_FIDELITY_CLI === "1") {
+      const outputDirectory = testInfo.outputPath("pdf-word-pdf-roundtrip");
+      const sourcePath = await writePdfFixture(
+        sourcePdf,
+        outputDirectory,
+        "source",
+      );
+      const roundTripPath = await writePdfFixture(
+        roundTripPdf,
+        outputDirectory,
+        "roundtrip",
+      );
+      await assertPdfLineAnchorFidelity(
+        sourcePath,
+        roundTripPath,
+        outputDirectory,
+        [
+          { page: 1, contains: "Lumeo Professional Letter" },
+          { page: 1, contains: "This document exercises" },
+          { page: 1, contains: "The second visual line" },
+          { page: 1, contains: "A separate paragraph follows" },
+          { page: 1, contains: "Kind regards" },
+        ],
+        0.035,
+      );
+      await assertRenderedPdfSimilarity(sourcePath, roundTripPath, {
+        maxMae: 22,
+        maxChanged: 0.25,
+      });
+    }
+
+    expect(retiredTransport).toEqual([]);
+  });
+
   test("browser converters survive Word to PDF to Word to PDF round trip without retired transport", async ({
     page,
     browserName,
-  }) => {
+  }, testInfo) => {
     test.skip(
       browserName !== "chromium",
       "Office round-trip validation runs once in Chromium.",
@@ -1056,7 +1165,40 @@ test.describe("browser conversion validation lab", () => {
     );
     downloadPromise = page.waitForEvent("download");
     await page.getByTestId("word-download").click();
-    await validatePdfDownload(await downloadBytes(await downloadPromise));
+    const finalPdf = await downloadBytes(await downloadPromise);
+    await validatePdfDownload(finalPdf);
+
+    if (process.env.LUMEO_FIDELITY_CLI === "1") {
+      const outputDirectory = testInfo.outputPath("word-pdf-word-pdf-roundtrip");
+      const firstPdfPath = await writePdfFixture(
+        firstPdf,
+        outputDirectory,
+        "first-pdf",
+      );
+      const reconstructedWordPdf = await renderDocxWithLibreOffice(
+        reconstructedWord,
+        outputDirectory,
+        "reconstructed-word",
+      );
+      const finalPdfPath = await writePdfFixture(
+        finalPdf,
+        outputDirectory,
+        "final-pdf",
+      );
+
+      await assertRenderedPdfSimilarity(
+        firstPdfPath,
+        reconstructedWordPdf,
+        {
+          maxMae: 22,
+          maxChanged: 0.25,
+        },
+      );
+      await assertRenderedPdfSimilarity(firstPdfPath, finalPdfPath, {
+        maxMae: 22,
+        maxChanged: 0.25,
+      });
+    }
 
     expect(retiredTransport).toEqual([]);
   });
