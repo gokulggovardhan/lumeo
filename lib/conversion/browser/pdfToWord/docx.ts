@@ -1,5 +1,6 @@
 import JSZip from "jszip";
 
+import { clusterVisualTextRows, type VisualTextRow } from "./structure.ts";
 import type {
   ReconstructedPage,
   ReconstructedTextLine,
@@ -27,6 +28,345 @@ function twips(valuePt: number): number {
 
 function emu(valuePt: number): number {
   return Math.max(1, Math.round(valuePt * EMU_PER_PT));
+}
+
+
+function wordRunProperties(
+  line: ReconstructedTextLine,
+  options: { fixedWidth?: boolean } = {},
+): string {
+  const fontSizeHalfPt = Math.max(12, Math.round(line.fontSizePt * 2));
+  const family = xmlEscape(line.fontFamily || "Arial");
+  const bold = line.bold ? "<w:b/>" : "";
+  const italic = line.italic ? "<w:i/>" : "";
+  const color = /^#[0-9A-Fa-f]{6}$/.test(line.colorHex ?? "")
+    ? `<w:color w:val="${xmlEscape((line.colorHex ?? "#000000").slice(1).toUpperCase())}"/>`
+    : "";
+  const underlineColor =
+    line.underline &&
+    /^#[0-9A-Fa-f]{6}$/.test(
+      line.underlineColorHex ?? line.colorHex ?? "",
+    )
+      ? (line.underlineColorHex ?? line.colorHex ?? "#000000")
+          .slice(1)
+          .toUpperCase()
+      : null;
+  const underline = line.underline
+    ? `<w:u w:val="single"${underlineColor ? ` w:color="${xmlEscape(underlineColor)}"` : ""}/>`
+    : "";
+  const wordScale =
+    typeof line.wordScalePct === "number" && Number.isFinite(line.wordScalePct)
+      ? `<w:w w:val="${Math.max(70, Math.min(130, Math.round(line.wordScalePct)))}"/>`
+      : "";
+  const characterSpacing =
+    typeof line.charSpacingPt === "number" &&
+    Number.isFinite(line.charSpacingPt) &&
+    Math.abs(line.charSpacingPt) >= 0.05
+      ? `<w:spacing w:val="${Math.round(line.charSpacingPt * TWIPS_PER_PT)}"/>`
+      : "";
+  const textRise =
+    typeof line.textRisePt === "number" &&
+    Number.isFinite(line.textRisePt) &&
+    Math.abs(line.textRisePt) >= 0.25
+      ? `<w:position w:val="${Math.round(line.textRisePt * 2)}"/>`
+      : "";
+  const fitText = options.fixedWidth
+    ? `<w:fitText w:val="${twips(Math.max(line.widthPt, 1))}"/>`
+    : "";
+
+  return `
+      <w:rFonts w:ascii="${family}" w:hAnsi="${family}" w:cs="${family}"/>
+      <w:sz w:val="${fontSizeHalfPt}"/>
+      <w:szCs w:val="${fontSizeHalfPt}"/>
+      ${fitText}
+      ${wordScale}
+      ${characterSpacing}
+      ${textRise}
+      ${color}
+      ${underline}
+      ${bold}
+      ${italic}`;
+}
+
+function semanticRun(
+  line: ReconstructedTextLine,
+  hyperlinkRelationshipId: string | null,
+  prefix = "",
+): string {
+  const content = `<w:r>
+    <w:rPr>
+      ${wordRunProperties(line)}
+    </w:rPr>
+    <w:t xml:space="preserve">${xmlEscape(prefix + line.text)}</w:t>
+  </w:r>`;
+
+  return hyperlinkRelationshipId
+    ? `<w:hyperlink r:id="${hyperlinkRelationshipId}" w:history="1">${content}</w:hyperlink>`
+    : content;
+}
+
+type SemanticParagraphPlan = {
+  rows: VisualTextRow[];
+  topPt: number;
+  bottomPt: number;
+  leftPt: number;
+  rightPt: number;
+};
+
+function rowStyleSignature(
+  row: VisualTextRow,
+  lines: ReconstructedTextLine[],
+): string {
+  const line = lines[row.indices[0]];
+  return [
+    line?.fontFamily ?? "",
+    Math.round((line?.fontSizePt ?? 0) * 4) / 4,
+    line?.bold ? "b" : "",
+    line?.italic ? "i" : "",
+  ].join("|");
+}
+
+function canJoinSemanticRows(
+  previous: VisualTextRow,
+  next: VisualTextRow,
+  lines: ReconstructedTextLine[],
+  pageWidthPt: number,
+): boolean {
+  const fontSize = Math.max(
+    1,
+    Math.min(previous.dominantFontSizePt, next.dominantFontSizePt),
+  );
+  const baselineGap = next.baselinePt - previous.baselinePt;
+  if (
+    baselineGap < fontSize * 0.82 ||
+    baselineGap > Math.max(fontSize * 1.65, fontSize + 5)
+  ) {
+    return false;
+  }
+  if (Math.abs(previous.leftPt - next.leftPt) > Math.max(3, fontSize * 0.35)) {
+    return false;
+  }
+  if (rowStyleSignature(previous, lines) !== rowStyleSignature(next, lines)) {
+    return false;
+  }
+
+  const availableWidth = Math.max(1, pageWidthPt - previous.leftPt - 24);
+  const previousFill = (previous.rightPt - previous.leftPt) / availableWidth;
+  return previousFill >= 0.52;
+}
+
+function inferSemanticParagraphs(
+  page: ReconstructedPage,
+): SemanticParagraphPlan[] {
+  const indices = page.lines
+    .map((line, index) => ({ line, index }))
+    .filter(
+      ({ line }) =>
+        !line.visualOnly && line.regionKind === "semantic-text",
+    )
+    .map(({ index }) => index);
+  const rows = clusterVisualTextRows(page.lines, indices);
+  const paragraphs: SemanticParagraphPlan[] = [];
+
+  for (const row of rows) {
+    const previous = paragraphs.at(-1);
+    const previousRow = previous?.rows.at(-1);
+    if (
+      previous &&
+      previousRow &&
+      canJoinSemanticRows(previousRow, row, page.lines, page.widthPt)
+    ) {
+      previous.rows.push(row);
+      previous.topPt = Math.min(previous.topPt, row.topPt);
+      previous.bottomPt = Math.max(previous.bottomPt, row.bottomPt);
+      previous.leftPt = Math.min(previous.leftPt, row.leftPt);
+      previous.rightPt = Math.max(previous.rightPt, row.rightPt);
+      continue;
+    }
+    paragraphs.push({
+      rows: [row],
+      topPt: row.topPt,
+      bottomPt: row.bottomPt,
+      leftPt: row.leftPt,
+      rightPt: row.rightPt,
+    });
+  }
+  return paragraphs;
+}
+
+function semanticParagraph(
+  plan: SemanticParagraphPlan,
+  page: ReconstructedPage,
+  beforePt: number,
+  hyperlinkRels: Map<string, string>,
+): string {
+  const baselineGaps = plan.rows
+    .slice(1)
+    .map((row, index) => row.baselinePt - plan.rows[index].baselinePt)
+    .filter((gap) => gap > 0);
+  const firstLine = page.lines[plan.rows[0].indices[0]];
+  const lineHeightPt =
+    baselineGaps.length > 0
+      ? baselineGaps.reduce((sum, gap) => sum + gap, 0) / baselineGaps.length
+      : Math.max(firstLine.fontSizePt * 1.18, firstLine.heightPt);
+
+  const rightIndentPt = Math.max(0, page.widthPt - plan.rightPt - 12);
+  const runs: string[] = [];
+
+  plan.rows.forEach((row, rowIndex) => {
+    if (rowIndex > 0) runs.push("<w:r><w:br/></w:r>");
+    let previousRight = row.leftPt;
+
+    for (const lineIndex of row.indices) {
+      const line = page.lines[lineIndex];
+      const gapPt = Math.max(0, line.xPt - previousRight);
+      const approximateSpacePt = Math.max(2.5, line.fontSizePt * 0.32);
+      const spaces =
+        gapPt > line.fontSizePt * 0.18
+          ? " ".repeat(Math.min(8, Math.max(1, Math.round(gapPt / approximateSpacePt))))
+          : "";
+      runs.push(
+        semanticRun(
+          line,
+          line.hyperlinkUrl
+            ? hyperlinkRels.get(line.hyperlinkUrl) ?? null
+            : null,
+          spaces,
+        ),
+      );
+      previousRight = Math.max(previousRight, line.xPt + line.widthPt);
+    }
+  });
+
+  return `
+<w:p>
+  <w:pPr>
+    <w:ind w:left="${twips(plan.leftPt)}" w:right="${twips(rightIndentPt)}"/>
+    <w:spacing w:before="${twips(Math.max(0, beforePt))}" w:after="0" w:line="${twips(lineHeightPt)}" w:lineRule="exact"/>
+    <w:keepLines/>
+  </w:pPr>
+  ${runs.join("\n")}
+</w:p>`;
+}
+
+function looksNumericForWord(value: string): boolean {
+  return /^\s*[₹$€£(+-]?\s*\d[\d\s.,:/%-]*\)?\s*$/u.test(value);
+}
+
+function semanticTable(
+  page: ReconstructedPage,
+  region: NonNullable<ReconstructedPage["regions"]>[number],
+  hyperlinkRels: Map<string, string>,
+): string {
+  const anchors = region.columnAnchorsPt ?? [];
+  const rows = region.rowGroups ?? [];
+  if (anchors.length < 2 || rows.length < 2) return "";
+
+  const tolerancePt = Math.max(3, page.widthPt * 0.006);
+  const regionRight = region.xPt + region.widthPt;
+  const boundaries = anchors.map((anchor, index) => {
+    if (index === 0) return region.xPt;
+    return (anchors[index - 1] + anchor) / 2;
+  });
+  boundaries.push(regionRight);
+
+  const widthsPt = anchors.map((_anchor, index) =>
+    Math.max(18, boundaries[index + 1] - boundaries[index]),
+  );
+  const tableWidthPt = widthsPt.reduce((sum, width) => sum + width, 0);
+
+  const rowXml = rows.map((rowIndices, rowIndex) => {
+    const cells: Array<ReconstructedTextLine[]> = anchors.map(() => []);
+    for (const lineIndex of rowIndices) {
+      const line = page.lines[lineIndex];
+      let best = -1;
+      let distance = Number.POSITIVE_INFINITY;
+      anchors.forEach((anchor, index) => {
+        const candidate = Math.abs(line.xPt - anchor);
+        if (candidate <= tolerancePt && candidate < distance) {
+          best = index;
+          distance = candidate;
+        }
+      });
+      if (best >= 0) cells[best].push(line);
+    }
+
+    const nextRow = rows[rowIndex + 1];
+    const currentBaseline = Math.min(
+      ...rowIndices.map(
+        (index) =>
+          page.lines[index].baselinePt ??
+          page.lines[index].yPt + page.lines[index].heightPt * 0.85,
+      ),
+    );
+    const nextBaseline = nextRow
+      ? Math.min(
+          ...nextRow.map(
+            (index) =>
+              page.lines[index].baselinePt ??
+              page.lines[index].yPt + page.lines[index].heightPt * 0.85,
+          ),
+        )
+      : currentBaseline +
+        Math.max(...rowIndices.map((index) => page.lines[index].fontSizePt)) *
+          1.35;
+    const rowHeightPt = Math.max(10, nextBaseline - currentBaseline);
+
+    const cellXml = cells.map((cellLines, columnIndex) => {
+      const ordered = [...cellLines].sort((a, b) => a.xPt - b.xPt);
+      const rightAligned =
+        ordered.length > 0 &&
+        ordered.every((line) => looksNumericForWord(line.text));
+      const content =
+        ordered.length > 0
+          ? ordered
+              .map((line, index) =>
+                semanticRun(
+                  line,
+                  line.hyperlinkUrl
+                    ? hyperlinkRels.get(line.hyperlinkUrl) ?? null
+                    : null,
+                  index > 0 ? " " : "",
+                ),
+              )
+              .join("\n")
+          : "<w:r><w:t></w:t></w:r>";
+      return `
+      <w:tc>
+        <w:tcPr>
+          <w:tcW w:w="${twips(widthsPt[columnIndex])}" w:type="dxa"/>
+          <w:tcMar><w:top w:w="0" w:type="dxa"/><w:left w:w="24" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="24" w:type="dxa"/></w:tcMar>
+        </w:tcPr>
+        <w:p>
+          <w:pPr>
+            <w:spacing w:before="0" w:after="0"/>
+            ${rightAligned ? '<w:jc w:val="right"/>' : ""}
+          </w:pPr>
+          ${content}
+        </w:p>
+      </w:tc>`;
+    });
+
+    return `
+    <w:tr>
+      <w:trPr><w:trHeight w:val="${twips(rowHeightPt)}" w:hRule="atLeast"/></w:trPr>
+      ${cellXml.join("\n")}
+    </w:tr>`;
+  });
+
+  return `
+<w:tbl>
+  <w:tblPr>
+    <w:tblW w:w="${twips(tableWidthPt)}" w:type="dxa"/>
+    <w:tblLayout w:type="fixed"/>
+    <w:tblpPr w:leftFromText="0" w:rightFromText="0" w:topFromText="0" w:bottomFromText="0" w:vertAnchor="page" w:horzAnchor="page" w:tblpX="${twips(region.xPt)}" w:tblpY="${twips(region.yPt)}"/>
+    <w:tblLook w:val="0000" w:firstRow="0" w:lastRow="0" w:firstColumn="0" w:lastColumn="0" w:noHBand="1" w:noVBand="1"/>
+  </w:tblPr>
+  <w:tblGrid>
+    ${widthsPt.map((width) => `<w:gridCol w:w="${twips(width)}"/>`).join("\n")}
+  </w:tblGrid>
+  ${rowXml.join("\n")}
+</w:tbl>`;
 }
 
 function lineParagraph(
