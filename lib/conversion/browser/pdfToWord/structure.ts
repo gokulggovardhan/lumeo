@@ -10,9 +10,13 @@ export type VisualTextRow = {
   dominantFontSizePt: number;
 };
 
+export type TableColumnAlignment = "left" | "right";
+
 export type RegularTableEvidence = {
   rows: VisualTextRow[];
   columnAnchorsPt: number[];
+  columnAlignments: TableColumnAlignment[];
+  columnBoundsPt: Array<{ leftPt: number; rightPt: number }>;
   tableLineIndices: number[];
   confidence: number;
   numericColumnCount: number;
@@ -95,154 +99,158 @@ function looksNumeric(value: string): boolean {
   return /^[-+]?\d+(?:[.,:/-]\d+)*$/u.test(normalized);
 }
 
-type Anchor = {
-  xPt: number;
-  rowIndexes: Set<number>;
-};
+function median(values: number[]): number {
+  if (!values.length) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2
+    ? sorted[middle]
+    : (sorted[middle - 1] + sorted[middle]) / 2;
+}
 
-function nearestAnchor(
-  xPt: number,
-  anchors: number[],
-  tolerancePt: number,
-): number {
-  let best = -1;
-  let bestDistance = Number.POSITIVE_INFINITY;
-  anchors.forEach((anchor, index) => {
-    const distance = Math.abs(anchor - xPt);
-    if (distance <= tolerancePt && distance < bestDistance) {
-      best = index;
-      bestDistance = distance;
+function spread(values: number[]): number {
+  if (!values.length) return Number.POSITIVE_INFINITY;
+  return Math.max(...values) - Math.min(...values);
+}
+
+function modalColumnCount(rows: VisualTextRow[]): {
+  columnCount: number;
+  occurrences: number;
+} {
+  const counts = new Map<number, number>();
+  for (const row of rows) {
+    counts.set(row.indices.length, (counts.get(row.indices.length) ?? 0) + 1);
+  }
+  let columnCount = 0;
+  let occurrences = 0;
+  for (const [count, frequency] of counts) {
+    if (
+      frequency > occurrences ||
+      (frequency === occurrences && count > columnCount)
+    ) {
+      columnCount = count;
+      occurrences = frequency;
     }
-  });
-  return best;
+  }
+  return { columnCount, occurrences };
 }
 
 /**
  * Detect a deliberately conservative, regular row/column structure.
  *
- * This is not a generic "anything aligned is a table" heuristic. A page must
- * expose repeated X anchors across several visual rows and the majority of
- * cell runs must map uniquely to those anchors. Two-column layouts additionally
- * need a numeric/date-like column so newspaper/report columns are not turned
- * into false Word tables.
+ * Rows must repeat the same cell count, preserving source left-to-right
+ * ordinals. This supports both left-aligned textual columns and right-aligned
+ * numeric/date columns: for each ordinal column the more stable source edge
+ * becomes the anchor. Two-column layouts still require a numeric column so
+ * newspaper/report columns are not turned into false Word tables.
  */
 export function inferRegularTableEvidence(
   lines: ReconstructedTextLine[],
   pageWidthPt: number,
 ): RegularTableEvidence | null {
-  const rows = clusterVisualTextRows(lines).filter(
+  const allRows = clusterVisualTextRows(lines).filter(
     (row) => row.indices.length >= 2,
   );
-  if (rows.length < 3) return null;
+  if (allRows.length < 3) return null;
+
+  const { columnCount, occurrences } = modalColumnCount(allRows);
+  if (columnCount < 2 || columnCount > 10) return null;
+
+  const rows = allRows.filter((row) => row.indices.length === columnCount);
+  const rowCoverage = rows.length / allRows.length;
+  if (rows.length < 3 || rowCoverage < 0.72) return null;
 
   const tolerancePt = Math.max(3, pageWidthPt * 0.006);
-  const anchorClusters: Anchor[] = [];
+  const columnAnchorsPt: number[] = [];
+  const columnAlignments: TableColumnAlignment[] = [];
+  const observedBounds: Array<{ minLeft: number; maxRight: number }> = [];
+  let numericColumnCount = 0;
+  let stabilityScore = 0;
 
-  rows.forEach((row, rowIndex) => {
-    for (const lineIndex of row.indices) {
-      const xPt = lines[lineIndex].xPt;
-      let anchor = anchorClusters.find(
-        (candidate) => Math.abs(candidate.xPt - xPt) <= tolerancePt,
-      );
-      if (!anchor) {
-        anchor = { xPt, rowIndexes: new Set<number>() };
-        anchorClusters.push(anchor);
-      }
-      const count = anchor.rowIndexes.size;
-      anchor.xPt = (anchor.xPt * count + xPt) / (count + 1);
-      anchor.rowIndexes.add(rowIndex);
-    }
-  });
+  for (let column = 0; column < columnCount; column += 1) {
+    const columnLines = rows.map((row) => lines[row.indices[column]]);
+    const leftEdges = columnLines.map((line) => line.xPt);
+    const rightEdges = columnLines.map(
+      (line) => line.xPt + line.widthPt,
+    );
+    const numericRatio =
+      columnLines.filter((line) => looksNumeric(line.text)).length /
+      columnLines.length;
+    if (numericRatio >= 0.5) numericColumnCount += 1;
 
-  const minimumOccurrences = Math.max(2, Math.ceil(rows.length * 0.6));
-  const anchors = anchorClusters
-    .filter((anchor) => anchor.rowIndexes.size >= minimumOccurrences)
-    .sort((a, b) => a.xPt - b.xPt)
-    .map((anchor) => anchor.xPt);
+    const leftSpread = spread(leftEdges);
+    const rightSpread = spread(rightEdges);
+    const rightAligned =
+      numericRatio >= 0.5 &&
+      rightSpread <= tolerancePt &&
+      (rightSpread <= leftSpread * 0.75 || leftSpread <= tolerancePt * 0.35);
 
-  if (anchors.length < 2 || anchors.length > 10) return null;
+    const alignment: TableColumnAlignment = rightAligned ? "right" : "left";
+    const chosenEdges = rightAligned ? rightEdges : leftEdges;
+    const chosenSpread = spread(chosenEdges);
+    if (chosenSpread > tolerancePt) return null;
 
-  const qualifyingRows: VisualTextRow[] = [];
-  let mappedRuns = 0;
-  let totalRuns = 0;
-  const numericHits = new Array<number>(anchors.length).fill(0);
-  const columnHits = new Array<number>(anchors.length).fill(0);
-
-  for (const row of rows) {
-    const used = new Set<number>();
-    let rowMapped = 0;
-    let rowCollision = false;
-
-    for (const lineIndex of row.indices) {
-      totalRuns += 1;
-      const line = lines[lineIndex];
-      const column = nearestAnchor(line.xPt, anchors, tolerancePt);
-      if (column < 0 || used.has(column)) {
-        if (column >= 0 && used.has(column)) rowCollision = true;
-        continue;
-      }
-      used.add(column);
-      rowMapped += 1;
-      mappedRuns += 1;
-      columnHits[column] += 1;
-      if (looksNumeric(line.text)) numericHits[column] += 1;
-    }
-
-    if (!rowCollision && rowMapped >= 2) qualifyingRows.push(row);
+    columnAlignments.push(alignment);
+    columnAnchorsPt.push(median(chosenEdges));
+    observedBounds.push({
+      minLeft: Math.min(...leftEdges),
+      maxRight: Math.max(...rightEdges),
+    });
+    stabilityScore += Math.max(0, 1 - chosenSpread / tolerancePt);
   }
 
-  if (qualifyingRows.length < 3) return null;
-  const mappingCoverage = mappedRuns / Math.max(1, totalRuns);
-  if (mappingCoverage < 0.86) return null;
+  if (columnCount === 2 && numericColumnCount < 1) return null;
 
-  const numericColumnCount = numericHits.reduce(
-    (count, hits, index) =>
-      count +
-      (columnHits[index] >= 2 && hits / Math.max(1, columnHits[index]) >= 0.5
-        ? 1
-        : 0),
-    0,
-  );
+  for (let index = 1; index < observedBounds.length; index += 1) {
+    if (
+      observedBounds[index].minLeft <=
+      observedBounds[index - 1].maxRight + 2
+    ) {
+      return null;
+    }
+  }
 
-  const structurallySafe =
-    (anchors.length >= 3 && qualifyingRows.length >= 3) ||
-    (anchors.length === 2 &&
-      qualifyingRows.length >= 3 &&
-      numericColumnCount >= 1);
-  if (!structurallySafe) return null;
+  const boundaries: number[] = [observedBounds[0].minLeft];
+  for (let index = 0; index < observedBounds.length - 1; index += 1) {
+    boundaries.push(
+      (observedBounds[index].maxRight +
+        observedBounds[index + 1].minLeft) /
+        2,
+    );
+  }
+  boundaries.push(observedBounds.at(-1)!.maxRight);
 
-  const rowCoverage = qualifyingRows.length / rows.length;
-  const repeatedAnchorCoverage =
-    anchors.reduce(
-      (sum, anchorX) =>
-        sum +
-        rows.filter((row) =>
-          row.indices.some(
-            (index) => Math.abs(lines[index].xPt - anchorX) <= tolerancePt,
-          ),
-        ).length /
-          rows.length,
-      0,
-    ) / anchors.length;
+  const columnBoundsPt = observedBounds.map((_bounds, index) => ({
+    leftPt: boundaries[index],
+    rightPt: boundaries[index + 1],
+  }));
+
+  const widthPt =
+    columnBoundsPt.at(-1)!.rightPt - columnBoundsPt[0].leftPt;
+  if (widthPt < pageWidthPt * 0.2 || widthPt > pageWidthPt * 0.98) {
+    return null;
+  }
 
   const confidence = Math.max(
     0,
     Math.min(
       1,
-      mappingCoverage * 0.45 +
-        rowCoverage * 0.3 +
-        repeatedAnchorCoverage * 0.25,
+      rowCoverage * 0.4 +
+        (stabilityScore / columnCount) * 0.45 +
+        Math.min(1, rows.length / 5) * 0.15,
     ),
   );
   if (confidence < 0.82) return null;
 
   const tableLineIndices = Array.from(
-    new Set(qualifyingRows.flatMap((row) => row.indices)),
+    new Set(rows.flatMap((row) => row.indices)),
   ).sort((a, b) => a - b);
 
   return {
-    rows: qualifyingRows,
-    columnAnchorsPt: anchors,
+    rows,
+    columnAnchorsPt,
+    columnAlignments,
+    columnBoundsPt,
     tableLineIndices,
     confidence,
     numericColumnCount,
