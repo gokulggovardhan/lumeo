@@ -60,11 +60,19 @@ export type PdfTextSpan = {
   capabilityReason: string | null;
 };
 
+export type PdfTextLineSegment = {
+  spanId: string;
+  sourceRunIndex: number;
+  start: number;
+  end: number;
+};
+
 export type PdfTextLine = {
   id: string;
   pageIndex: number;
   spans: PdfTextSpan[];
   text: string;
+  segments: PdfTextLineSegment[];
   boundsPct: PercentBox;
   boundsPt: VisualBox;
   baselinePt: number;
@@ -215,23 +223,40 @@ function capabilityFor(
   };
 }
 
-function joinSpanText(spans: readonly PdfTextSpan[]): string {
-  if (spans.length === 0) return "";
-  let text = spans[0].text;
-  for (let index = 1; index < spans.length; index += 1) {
-    const previous = spans[index - 1];
+function composeLineText(
+  spans: readonly PdfTextSpan[],
+): { text: string; segments: PdfTextLineSegment[] } {
+  if (spans.length === 0) return { text: "", segments: [] };
+
+  let text = "";
+  const segments: PdfTextLineSegment[] = [];
+
+  for (let index = 0; index < spans.length; index += 1) {
     const current = spans[index];
-    const gapPt = current.boundsPt.xPt - (previous.boundsPt.xPt + previous.boundsPt.widthPt);
-    const fontSize = Math.max(1, Math.min(previous.style.fontSizePt, current.style.fontSizePt));
-    const needsSpace =
-      gapPt > fontSize * 0.18 &&
-      !/s$/u.test(text) &&
-      !/^s/u.test(current.text) &&
-      !/^[,.;:!?)]/u.test(current.text) &&
-      !/[(]$/u.test(text);
-    text += needsSpace ? ` ${current.text}` : current.text;
+    if (index > 0) {
+      const previous = spans[index - 1];
+      const gapPt = current.boundsPt.xPt - (previous.boundsPt.xPt + previous.boundsPt.widthPt);
+      const fontSize = Math.max(1, Math.min(previous.style.fontSizePt, current.style.fontSizePt));
+      const needsSpace =
+        gapPt > fontSize * 0.18 &&
+        !/\s$/u.test(text) &&
+        !/^\s/u.test(current.text) &&
+        !/^[,.;:!?)]/u.test(current.text) &&
+        !/[(]$/u.test(text);
+      if (needsSpace) text += " ";
+    }
+
+    const start = text.length;
+    text += current.text;
+    segments.push({
+      spanId: current.id,
+      sourceRunIndex: current.sourceRunIndex,
+      start,
+      end: text.length,
+    });
   }
-  return text;
+
+  return { text, segments };
 }
 
 function buildLines(
@@ -290,11 +315,13 @@ function buildLines(
     .map((line, index) => {
       const lineSpans = [...line.spans].sort((a, b) => a.boundsPt.xPt - b.boundsPt.xPt);
       const boundsPct = unionPercentBoxes(lineSpans.map((span) => span.boundsPct));
+      const composed = composeLineText(lineSpans);
       return {
         id: `p${pageIndex}-line-${index}`,
         pageIndex,
         spans: lineSpans,
-        text: joinSpanText(lineSpans),
+        text: composed.text,
+        segments: composed.segments,
         boundsPct,
         boundsPt: mapper.percentBoxToVisualBox(boundsPct),
         baselinePt: line.baselinePt,
