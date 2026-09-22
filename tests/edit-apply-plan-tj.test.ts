@@ -312,6 +312,12 @@ test("direct formatting localizes text state and preserves the following run pos
     setFontAndSize(fontKey, 12),
     moveText(50, 700),
     PDFOperator.of(PDFOperatorNames.ShowText, [PDFHexString.of(hexOf("First"))]),
+    // Keep the second show in the same text object/current text position, but
+    // switch size so pdf.js exposes it as a distinct text item instead of
+    // coalescing two adjacent Tj shows into one. Tf does not move the text
+    // matrix, so the second item's x still proves the first run's advance
+    // (including our TJ compensation) was preserved.
+    setFontAndSize(fontKey, 10),
     PDFOperator.of(PDFOperatorNames.ShowText, [PDFHexString.of(hexOf("Second"))]),
     endText(),
   );
