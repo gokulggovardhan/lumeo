@@ -21,6 +21,8 @@ export type DocxOutputExpectations = {
   expectedPageCount: number;
   minimumEditableTextRuns?: number;
   expectedBackgroundImages?: number;
+  expectedHyperlinks?: number;
+  expectedEditableTables?: number;
 };
 
 export async function validateGeneratedDocx(
@@ -96,6 +98,55 @@ export async function validateGeneratedDocx(
     );
   }
 
+  if (/<w:(?:vanish|webHidden)(?:\s|\/|>)/.test(documentXml)) {
+    throw new Error(
+      "Generated DOCX contains hidden editable text that could duplicate visible content.",
+    );
+  }
+
+  const declaredRelationships = new Set(
+    Array.from(
+      relationships.matchAll(/<Relationship\b[^>]*\bId="([^"]+)"[^>]*>/g),
+      (match) => match[1],
+    ),
+  );
+  const referencedRelationships = new Set(
+    Array.from(
+      documentXml.matchAll(/\br:(?:id|embed)="([^"]+)"/g),
+      (match) => match[1],
+    ),
+  );
+  for (const relationshipId of referencedRelationships) {
+    if (!declaredRelationships.has(relationshipId)) {
+      throw new Error(
+        `Generated DOCX references missing relationship ${relationshipId}.`,
+      );
+    }
+  }
+
+  const expectedHyperlinks = expectations.expectedHyperlinks ?? 0;
+  if (expectedHyperlinks > 0) {
+    const hyperlinkRelationships = countMatches(
+      relationships,
+      /Type="[^"]*\/relationships\/hyperlink"/g,
+    );
+    if (hyperlinkRelationships < expectedHyperlinks) {
+      throw new Error(
+        `Generated DOCX lost hyperlinks: expected at least ${expectedHyperlinks}, found ${hyperlinkRelationships}.`,
+      );
+    }
+  }
+
+  const expectedEditableTables = expectations.expectedEditableTables ?? 0;
+  if (expectedEditableTables > 0) {
+    const tableCount = countMatches(documentXml, /<w:tbl(?:\s|>)/g);
+    if (tableCount < expectedEditableTables) {
+      throw new Error(
+        `Generated DOCX lost editable table structure: expected at least ${expectedEditableTables}, found ${tableCount}.`,
+      );
+    }
+  }
+
   const expectedBackgroundImages = expectations.expectedBackgroundImages ?? 0;
   if (expectedBackgroundImages > 0) {
     const imageCount = Object.keys(zip.files).filter((name) =>
@@ -105,6 +156,21 @@ export async function validateGeneratedDocx(
       throw new Error(
         `Generated DOCX lost page fidelity imagery: expected at least ${expectedBackgroundImages}, found ${imageCount}.`,
       );
+    }
+
+    const imageTargets = Array.from(
+      relationships.matchAll(
+        /<Relationship\b[^>]*Type="[^"]*\/relationships\/image"[^>]*Target="([^"]+)"[^>]*>/g,
+      ),
+      (match) => match[1],
+    );
+    for (const target of imageTargets) {
+      const normalized = target.replace(/^\.\//, "");
+      if (!zip.file(`word/${normalized}`)) {
+        throw new Error(
+          `Generated DOCX image relationship points to missing part word/${normalized}.`,
+        );
+      }
     }
   }
 }
