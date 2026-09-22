@@ -18,6 +18,12 @@ import {
 import {
   assessOperatorRunCoverage,
 } from "../lib/conversion/browser/pdfToWord/coverage.ts";
+import {
+  reconstructTextLines,
+} from "../lib/conversion/browser/pdfToWord/layout.ts";
+import {
+  makeFixedLayoutInvoicePdf,
+} from "../e2e/fixed-layout-pdf-fixture.ts";
 
 test("operator reconstruction keeps independently positioned source operators split", async () => {
   const source = await PDFDocument.create();
@@ -284,4 +290,41 @@ test("operator coverage is geometry-aware and rejects matching text from the wro
 
   const coverage = assessOperatorRunCoverage(visible, wrongRow);
   assert.equal(coverage.safeToUseOperatorRuns, false);
+});
+
+
+test("privacy-safe invoice fixture reaches lossless source-operator coverage on every page", async () => {
+  const bytes = await makeFixedLayoutInvoicePdf();
+  const structural = await PDFDocument.load(bytes.slice());
+  const registry = new PdfFontRegistry(structural);
+  const pdfjs = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+
+  try {
+    for (let pageNumber = 1; pageNumber <= pdfjs.numPages; pageNumber += 1) {
+      const page = await pdfjs.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 1, rotation: page.rotate });
+      const content = await page.getTextContent();
+      const visible = reconstructTextLines(
+        content.items as never,
+        viewport.transform,
+        viewport.width,
+        viewport.height,
+      );
+      const source = reconstructOperatorTextRuns({
+        document: structural,
+        registry,
+        pageIndex: pageNumber - 1,
+        viewportTransform: viewport.transform,
+      });
+      const coverage = assessOperatorRunCoverage(visible, source.lines);
+
+      assert.equal(
+        coverage.safeToUseOperatorRuns,
+        true,
+        `page ${pageNumber} operator coverage ${coverage.characterCoverageRatio.toFixed(4)}; unexplained=${JSON.stringify(coverage.unexplainedVisibleText)}`,
+      );
+    }
+  } finally {
+    await (pdfjs as { destroy?: () => Promise<void> | void }).destroy?.();
+  }
 });
