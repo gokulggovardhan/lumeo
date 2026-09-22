@@ -59,8 +59,24 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
   });
   expect(inheritedStyle.fontFamily).toMatch(/Arial|Helvetica/i);
   expect(Number(inheritedStyle.fontWeight)).toBeGreaterThanOrEqual(400);
+
+  const workspace = page.locator("[data-edit-operation-count]");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+
+  await editor.fill("Employee record with a deliberately much longer replacement that would overlap nearby PDF content");
+  const layoutWarning = page.locator("[data-edit-layout-strategy]");
+  await expect(layoutWarning).toBeVisible();
+  await expect(page.getByRole("button", { name: "Apply edit" })).toBeDisabled();
+
   await editor.fill("Employee file");
+  await expect(layoutWarning).toHaveCount(0);
   await page.getByRole("button", { name: "Apply edit" }).click();
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+  await page.getByRole("button", { name: "Redo" }).click();
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
 
   await waitForStageReady(page);
   await expect(
