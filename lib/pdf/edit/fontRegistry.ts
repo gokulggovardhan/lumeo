@@ -2,6 +2,7 @@ import {
   PDFArray,
   PDFDict,
   PDFName,
+  PDFNumber,
   PDFRawStream,
   PDFRef,
   decodePDFRawStream,
@@ -50,6 +51,16 @@ export type PdfFontProfile = {
   monospace: boolean;
   descriptorFlags: number | null;
   italicAngle: number | null;
+  /** FontDescriptor vertical metrics normalized to one em when available. */
+  ascentRatio: number | null;
+  descentRatio: number | null;
+  capHeightRatio: number | null;
+  /**
+   * PDF FontDescriptor /FSType when the producer supplied it. Null means
+   * embedding permission cannot be proven and consumers must not assume the
+   * embedded PDF font program may be redistributed inside another document.
+   */
+  fsType: number | null;
   fallbackPdfFont: FallbackFontFamily;
   cssFallbackFamily: string;
   browserFamilyName: string;
@@ -61,6 +72,24 @@ export type PdfFontProfile = {
 
 function nameString(value: unknown): string | null {
   return value instanceof PDFName ? value.asString().replace(/^\//, "") : null;
+}
+
+function numberValue(value: unknown): number | null {
+  return value instanceof PDFNumber ? value.asNumber() : null;
+}
+
+function normalizedDescriptorMetric(
+  descriptor: PDFDict | null,
+  name: string,
+): number | null {
+  if (!descriptor) return null;
+  const value = numberValue(descriptor.get(PDFName.of(name)));
+  if (value === null || !Number.isFinite(value)) return null;
+  // FontDescriptor metrics use the standard 1000-unit glyph space for the
+  // font types handled here. Keep only sane values so malformed PDFs cannot
+  // produce absurd Word frame geometry.
+  const ratio = value / 1000;
+  return Math.abs(ratio) <= 2 ? ratio : null;
 }
 
 function resolveObject(value: unknown, context: PDFContext): unknown {
@@ -205,6 +234,7 @@ export class PdfFontRegistry {
     const resolvedFont = resolveFont(fontDict, this.context);
     const metrics = resolveFontMetrics(fontDict, this.context, resolvedFont);
     const styleHints = readFallbackStyleHints(fontDict, this.context);
+    const descriptor = descriptorForFont(fontDict, this.context);
     const fallbackPdfFont = pickFallbackFont(styleHints);
     const familyName = familyNameFromBaseFont(resolvedFont.baseFont);
     const weight =
@@ -237,6 +267,10 @@ export class PdfFontRegistry {
       monospace,
       descriptorFlags: styleHints.flags,
       italicAngle: styleHints.italicAngle,
+      ascentRatio: normalizedDescriptorMetric(descriptor, "Ascent"),
+      descentRatio: normalizedDescriptorMetric(descriptor, "Descent"),
+      capHeightRatio: normalizedDescriptorMetric(descriptor, "CapHeight"),
+      fsType: descriptor ? numberValue(descriptor.get(PDFName.of("FSType"))) : null,
       fallbackPdfFont,
       cssFallbackFamily: fallbackCssStack(fallbackPdfFont),
       browserFamilyName: `LumeoPdf_${safeFamilyToken(resourceName)}_${safeFamilyToken(resolvedFont.baseFont)}`,

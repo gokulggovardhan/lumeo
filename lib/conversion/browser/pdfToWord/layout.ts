@@ -101,16 +101,24 @@ export function reconstructTextLines(
       const widthPt = (run.widthPct / 100) * pageWidthPt;
       const heightPt = (run.heightPct / 100) * pageHeightPt;
 
+      const yPt = (run.yPct / 100) * pageHeightPt;
       return {
         text: run.str,
         xPt: (run.xPct / 100) * pageWidthPt,
-        yPt: (run.yPct / 100) * pageHeightPt,
+        yPt,
         widthPt: Math.max(widthPt, 1),
         heightPt: Math.max(heightPt, run.fontSizePt * 1.15),
         fontSizePt: run.fontSizePt,
+        // textRunsFromContent places the run top using the same 0.85-em
+        // ascent approximation as PDF.js's text layer. Preserve that source
+        // baseline before heightPt is deliberately enlarged for Word frame
+        // containment; deriving baseline from the enlarged Word box shifts
+        // underline/rise detection downward.
+        baselinePt: yPt + run.fontSizePt * 0.85,
         fontFamily: fontFamilyFromName(run.fontName, style),
         bold: textStyle.bold,
         italic: textStyle.italic,
+        sourceKind: "pdfjs" as const,
       };
     })
     .sort((a, b) => {
@@ -138,5 +146,6 @@ export function ocrLinesToReconstructed(
       fontFamily: "Arial",
       bold: false,
       italic: false,
+      sourceKind: "ocr" as const,
     }));
 }

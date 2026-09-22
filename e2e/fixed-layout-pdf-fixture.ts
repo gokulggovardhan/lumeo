@@ -1,9 +1,17 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import {
+  degrees,
+  PDFDocument,
+  PDFName,
+  PDFString,
+  StandardFonts,
+  rgb,
+} from "pdf-lib";
 
 export async function makeFixedLayoutInvoicePdf(): Promise<Buffer> {
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const serif = await pdf.embedFont(StandardFonts.TimesRoman);
 
   const page1 = pdf.addPage([595.276, 841.89]);
   const page2 = pdf.addPage([595.276, 841.89]);
@@ -39,11 +47,44 @@ export async function makeFixedLayoutInvoicePdf(): Promise<Buffer> {
   text(page1, "LUMEO MOTORS PRIVATE LIMITED", 36, 770, 10, true);
   text(page1, "SYNTHETIC AUTOMOBILES", 330, 770, 10, true);
   text(page1, "GST IN No.: SYNTH27DEMO", 36, 740, 9);
-  text(page1, "JC No.: 87542", 36, 720, 9);
-  text(page1, "JobType: PAID SERVICE", 210, 720, 9);
-  text(page1, "RegnNo.: DEMO-4821", 36, 700, 9);
-  text(page1, "Model: SAMPLE ROADSTER", 210, 700, 9);
-  rule(page1, 684);
+
+  const blue = rgb(0, 0, 0.93);
+  const linkText = "support.example/fidelity";
+  page1.drawText(linkText, {
+    x: 36,
+    y: 726,
+    size: 9,
+    font: regular,
+    color: blue,
+  });
+  const linkWidth = regular.widthOfTextAtSize(linkText, 9);
+  page1.drawRectangle({
+    x: 36,
+    y: 724.7,
+    width: linkWidth,
+    height: 0.7,
+    color: blue,
+  });
+  const linkAnnotation = pdf.context.register(
+    pdf.context.obj({
+      Type: PDFName.of("Annot"),
+      Subtype: PDFName.of("Link"),
+      Rect: [36, 724, 36 + linkWidth, 738],
+      Border: [0, 0, 0],
+      A: {
+        Type: PDFName.of("Action"),
+        S: PDFName.of("URI"),
+        URI: PDFString.of("https://example.com/fidelity"),
+      },
+    }),
+  );
+  page1.node.set(PDFName.of("Annots"), pdf.context.obj([linkAnnotation]));
+
+  text(page1, "JC No.: 87542", 36, 708, 9);
+  text(page1, "JobType: PAID SERVICE", 210, 708, 9);
+  text(page1, "RegnNo.: DEMO-4821", 36, 688, 9);
+  text(page1, "Model: SAMPLE ROADSTER", 210, 688, 9);
+  rule(page1, 674);
 
   const columns = [
     ["Item No", 38],
@@ -56,8 +97,8 @@ export async function makeFixedLayoutInvoicePdf(): Promise<Buffer> {
     ["IGST", 485],
     ["MRP", 530],
   ] as const;
-  for (const [label, x] of columns) text(page1, label, x, 665, 8, true);
-  rule(page1, 654);
+  for (const [label, x] of columns) text(page1, label, x, 655, 8, true);
+  rule(page1, 644);
 
   const rows = [
     ["ITEM-A101", "Cleaning fluid 50 ml", "1.00", "83.90", "12.58", "71.32", "34030000", "18.00", "99.00"],
@@ -69,32 +110,66 @@ export async function makeFixedLayoutInvoicePdf(): Promise<Buffer> {
   ] as const;
   const xs = [38, 112, 250, 292, 335, 375, 428, 485, 530];
   rows.forEach((row, rowIndex) => {
-    const y = 625 - rowIndex * 42;
+    const y = 615 - rowIndex * 42;
     row.forEach((value, columnIndex) =>
       text(page1, value, xs[columnIndex], y, columnIndex === 1 ? 7.5 : 8),
     );
   });
-  rule(page1, 355);
-  text(page1, "Parts Total", 112, 330, 9, true);
-  text(page1, "3.00", 250, 330, 9);
-  text(page1, "1007.50", 375, 330, 9);
-  text(page1, "Labour Total", 112, 306, 9, true);
-  text(page1, "4.00", 250, 306, 9);
-  text(page1, "294.06", 375, 306, 9);
-  rule(page1, 292);
-  text(page1, "Sub Total", 112, 266, 9, true);
-  text(page1, "1301.56", 375, 266, 9);
-  rule(page1, 250);
-  text(page1, "Grand Total", 345, 218, 10, true);
-  text(page1, "1842.75", 445, 218, 10, true);
-  text(page1, "Round Off", 345, 198, 9);
-  text(page1, "0.16", 445, 198, 9);
-  rule(page1, 182);
+  text(page1, "LONG-DESC", 38, 354, 8);
+  text(page1, "Long service description", 112, 366, 7.5);
+  text(page1, "continues on a second line", 112, 354, 7.5);
+  text(page1, "without moving numeric cells", 112, 342, 7.5);
+  text(page1, "1.00", 250, 354, 8);
+  text(page1, "88.00", 292, 354, 8);
+  text(page1, "0.00", 335, 354, 8);
+  text(page1, "88.00", 375, 354, 8);
+  text(page1, "9988", 428, 354, 8);
+  text(page1, "18.00", 485, 354, 8);
+  text(page1, "103.84", 530, 354, 8);
+  rule(page1, 326);
+  text(page1, "Parts Total", 112, 306, 9, true);
+  text(page1, "3.00", 250, 306, 9);
+  text(page1, "1007.50", 375, 306, 9);
+  text(page1, "Labour Total", 112, 282, 9, true);
+  text(page1, "4.00", 250, 282, 9);
+  text(page1, "294.06", 375, 282, 9);
+  rule(page1, 268);
+  text(page1, "Sub Total", 112, 244, 9, true);
+  text(page1, "1301.56", 375, 244, 9);
+  rule(page1, 228);
+  text(page1, "Grand Total", 345, 198, 10, true);
+  text(page1, "1842.75", 445, 198, 10, true);
+  text(page1, "Round Off", 345, 178, 9);
+  text(page1, "0.16", 445, 178, 9);
+  rule(page1, 162);
+
+  page1.drawText("Unicode café résumé €", {
+    x: 36,
+    y: 140,
+    size: 8,
+    font: regular,
+    color: rgb(0.35, 0.35, 0.35),
+  });
 
   text(page2, "Net Total", 300, 795, 11, true);
   text(page2, "1843.00", 455, 795, 11, true);
   text(page2, "( Rupees One Thousand Five Hundred and Thirty Six Only )", 130, 770, 9);
   text(page2, "Synthetic AMC fixture preserves fixed-layout service columns.", 36, 738, 9);
+  page2.drawText("Serif text validates mixed-family metrics.", {
+    x: 36,
+    y: 720,
+    size: 11,
+    font: serif,
+    color: rgb(0.08, 0.08, 0.08),
+  });
+  page2.drawText("ROTATED NOTE", {
+    x: 570,
+    y: 500,
+    size: 8,
+    font: regular,
+    rotate: degrees(90),
+    color: rgb(0.4, 0.4, 0.4),
+  });
   rule(page2, 700);
 
   const amcHeadings = [
