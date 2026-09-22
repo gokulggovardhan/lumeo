@@ -60,8 +60,16 @@ import {
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { overlayFontSizePx, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
-import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
+import { buildPdfPageTextModel, type PdfPageTextModel } from "@/lib/pdf/edit/documentModel";
 import { PercentSpatialIndex } from "@/lib/pdf/edit/spatialIndex";
+import {
+  nextSearchMatchIndex,
+  replacementTextForSearchMatch,
+  searchPdfDocumentText,
+  searchPdfPageText,
+  type PdfTextSearchMatch,
+  type PdfTextSearchScope,
+} from "@/lib/pdf/edit/textSearch";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
@@ -71,6 +79,7 @@ import type { ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
+import { reconstructFragmentedRun, type FragmentedRunReconstruction } from "@/lib/pdf/edit/fragmentedRun";
 import {
   appendPdfEditOperations,
   createPdfEditSession,
@@ -566,6 +575,17 @@ export default function EditPdfTool() {
   const [browserFontPreview, setBrowserFontPreview] = useState<{ spanId: string; family: string } | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
   const [nativeFormatOpen, setNativeFormatOpen] = useState(false);
+  const [textSearchOpen, setTextSearchOpen] = useState(false);
+  const [textSearchQuery, setTextSearchQuery] = useState("");
+  const [textSearchReplacement, setTextSearchReplacement] = useState("");
+  const [textSearchScope, setTextSearchScope] = useState<PdfTextSearchScope>("document");
+  const [textSearchCaseSensitive, setTextSearchCaseSensitive] = useState(false);
+  const [textSearchWholeWord, setTextSearchWholeWord] = useState(false);
+  const [textSearchActiveIndex, setTextSearchActiveIndex] = useState(-1);
+  const [textSearchPageModels, setTextSearchPageModels] = useState<ReadonlyMap<number, PdfPageTextModel>>(
+    () => new Map(),
+  );
+  const [textSearchIndexBusy, setTextSearchIndexBusy] = useState(false);
   // True when the last Restyle could not blank the original glyphs from the
   // content stream, so the covered text is still in the exported file. Drives
   // the disclosure notice -- see restyleSelectedRun for when that happens.
@@ -576,6 +596,16 @@ export default function EditPdfTool() {
   // editable text run -- see the JSX below (rendered next to the run's
   // TextRunOverlay) and the autofocus effect just below this.
   const inlineEditInputRef = useRef<HTMLInputElement | null>(null);
+  const textSearchInputRef = useRef<HTMLInputElement | null>(null);
+  const uploadClientReadyRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    // SSR can render the file input before React has attached its change
+    // handler. Mark the upload surface only after hydration so automated
+    // browsers—and assistive automation using the raw file input—never race
+    // a visually-present but not-yet-interactive control.
+    uploadClientReadyRef.current?.setAttribute("data-edit-client-ready", "true");
+  }, []);
 
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   // Phase 11: live drag-to-create preview for the Whiteout tool -- see
@@ -622,6 +652,8 @@ export default function EditPdfTool() {
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
+  const textSearchPageModelsRef = useRef<Map<number, PdfPageTextModel>>(new Map());
+  const textSearchBuildGenerationRef = useRef(0);
   // Phase 22: the render effect below already fetches this exact page and
   // computes its scaled viewport once per pageIndex -- the operator-matching
   // effect used to independently re-fetch and re-derive both from scratch
@@ -725,6 +757,25 @@ export default function EditPdfTool() {
     [detectedTextRuns, runMatches, fontRegistry],
   );
 
+  const fragmentedRunReconstructions = useMemo(() => {
+    const reconstructed = new Map<number, FragmentedRunReconstruction>();
+    for (let index = 0; index < detectedTextRuns.length; index += 1) {
+      const run = detectedTextRuns[index];
+      const match = runMatches[index];
+      const profile = pageFontProfiles[index];
+      if (!match || !profile) continue;
+      const fragment = reconstructFragmentedRun({
+        fullDetectedText: run.str,
+        matched: match.locatedOperator,
+        pageOperators,
+        resolvedFont: profile.resolvedFont,
+      });
+      if (fragment) reconstructed.set(index, fragment);
+    }
+    return reconstructed;
+  }, [detectedTextRuns, runMatches, pageFontProfiles, pageOperators]);
+
+
   // Document → Page → Block → Line → Span model. This is a read-only view
   // over the current page's already-proven low-level detection/matching
   // pipeline; it does not mutate the source PDF or replace the existing
@@ -739,9 +790,10 @@ export default function EditPdfTool() {
             runs: detectedTextRuns,
             matches: runMatches,
             fontProfiles: pageFontProfiles,
+            fragmentedRunIndices: new Set(fragmentedRunReconstructions.keys()),
           })
         : null,
-    [pageIndex, pagePointSize, detectedTextRuns, runMatches, pageFontProfiles],
+    [pageIndex, pagePointSize, detectedTextRuns, runMatches, pageFontProfiles, fragmentedRunReconstructions],
   );
 
   const textRunSpatialIndex = useMemo(() => {
@@ -759,6 +811,152 @@ export default function EditPdfTool() {
       textRunSpatialIndex?.topmostAt(xPct, yPct)?.sourceRunIndex ?? -1,
     [textRunSpatialIndex],
   );
+
+  const searchablePageModels = useMemo(() => {
+    const models = new Map(textSearchPageModels);
+    if (pageTextModel) models.set(pageIndex, pageTextModel);
+    return [...models.values()].sort((a, b) => a.pageIndex - b.pageIndex);
+  }, [textSearchPageModels, pageTextModel, pageIndex]);
+
+  const textSearchMatches = useMemo(() => {
+    const options = {
+      caseSensitive: textSearchCaseSensitive,
+      wholeWord: textSearchWholeWord,
+    };
+    if (!textSearchQuery.trim()) return [];
+    if (textSearchScope === "page") {
+      return pageTextModel
+        ? searchPdfPageText(pageTextModel, textSearchQuery, options)
+        : [];
+    }
+    return searchPdfDocumentText(searchablePageModels, textSearchQuery, options);
+  }, [
+    textSearchQuery,
+    textSearchScope,
+    textSearchCaseSensitive,
+    textSearchWholeWord,
+    pageTextModel,
+    searchablePageModels,
+  ]);
+
+  const normalizedTextSearchIndex =
+    textSearchMatches.length === 0
+      ? -1
+      : Math.min(
+          textSearchActiveIndex < 0 ? 0 : textSearchActiveIndex,
+          textSearchMatches.length - 1,
+        );
+  const activeTextSearchMatch: PdfTextSearchMatch | null =
+    normalizedTextSearchIndex >= 0
+      ? textSearchMatches[normalizedTextSearchIndex] ?? null
+      : null;
+  const activeTextSearchReplacementPlan = useMemo(
+    () =>
+      pageTextModel && activeTextSearchMatch?.pageIndex === pageIndex
+        ? replacementTextForSearchMatch(
+            pageTextModel,
+            activeTextSearchMatch,
+            textSearchReplacement,
+          )
+        : null,
+    [pageTextModel, activeTextSearchMatch, pageIndex, textSearchReplacement],
+  );
+  const currentPageTextSearchMatches = useMemo(
+    () => textSearchMatches.filter((match) => match.pageIndex === pageIndex),
+    [textSearchMatches, pageIndex],
+  );
+
+  useEffect(() => {
+    if (
+      !pdf ||
+      !textSearchOpen ||
+      textSearchScope !== "document" ||
+      !textSearchQuery.trim() ||
+      !pdfJsDocRef.current
+    ) {
+      return;
+    }
+
+    const doc = pdfJsDocRef.current;
+    const generation = textSearchBuildGenerationRef.current;
+    const missingPages = Array.from({ length: pdf.pageCount }, (_, index) => index).filter(
+      (index) => index !== pageIndex && !textSearchPageModelsRef.current.has(index),
+    );
+    if (missingPages.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled || generation !== textSearchBuildGenerationRef.current) return;
+      setTextSearchIndexBusy(true);
+
+      let cursor = 0;
+      let completedSincePublish = 0;
+      const worker = async () => {
+        while (!cancelled && generation === textSearchBuildGenerationRef.current) {
+          const current = cursor;
+          cursor += 1;
+          if (current >= missingPages.length) return;
+          const targetPageIndex = missingPages[current];
+
+          try {
+            const page = await doc.getPage(targetPageIndex + 1);
+            const viewport = page.getViewport({ scale: 1 });
+            const content = await withPageTimeout(
+              page.getTextContent(),
+              targetPageIndex + 1,
+              PAGE_RENDER_TIMEOUT_MS,
+              "extract text from",
+            );
+            if (cancelled || generation !== textSearchBuildGenerationRef.current) return;
+            const runs = textRunsFromContent(
+              content.items as never,
+              viewport.transform,
+              viewport.width,
+              viewport.height,
+            );
+            const model = buildPdfPageTextModel({
+              pageIndex: targetPageIndex,
+              widthPt: viewport.width,
+              heightPt: viewport.height,
+              runs,
+              matches: runs.map(() => null),
+            });
+            textSearchPageModelsRef.current.set(targetPageIndex, model);
+            completedSincePublish += 1;
+            if (completedSincePublish >= 4) {
+              completedSincePublish = 0;
+              setTextSearchPageModels(new Map(textSearchPageModelsRef.current));
+            }
+          } catch {
+            // Search is best-effort per page. One pathological page should
+            // not block searching every other page or the core editor.
+          }
+        }
+      };
+
+      await Promise.all(
+        Array.from(
+          { length: Math.min(2, missingPages.length) },
+          () => worker(),
+        ),
+      );
+      if (cancelled || generation !== textSearchBuildGenerationRef.current) return;
+      setTextSearchPageModels(new Map(textSearchPageModelsRef.current));
+      setTextSearchIndexBusy(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    pdf,
+    pageIndex,
+    docReady,
+    textSearchOpen,
+    textSearchScope,
+    textSearchQuery,
+  ]);
 
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
@@ -814,6 +1012,17 @@ export default function EditPdfTool() {
     setEditApplyError("");
     setUseSubstituteFont(false);
     setRestyleKeptOriginalText(false);
+    setTextSearchOpen(false);
+    setTextSearchQuery("");
+    setTextSearchReplacement("");
+    setTextSearchScope("document");
+    setTextSearchCaseSensitive(false);
+    setTextSearchWholeWord(false);
+    setTextSearchActiveIndex(-1);
+    setTextSearchIndexBusy(false);
+    textSearchPageModelsRef.current.clear();
+    setTextSearchPageModels(new Map());
+    textSearchBuildGenerationRef.current += 1;
     runOverlayNodesRef.current.clear();
     setActiveTool("select");
     setZoom(1);
@@ -825,6 +1034,14 @@ export default function EditPdfTool() {
   // per-page preview effect below to reuse (no re-parsing on page turns).
   useEffect(() => {
     let cancelled = false;
+    const searchGeneration = ++textSearchBuildGenerationRef.current;
+    textSearchPageModelsRef.current.clear();
+    void Promise.resolve().then(() => {
+      if (cancelled || searchGeneration !== textSearchBuildGenerationRef.current) return;
+      setTextSearchPageModels(new Map());
+      setTextSearchIndexBusy(false);
+      setTextSearchActiveIndex(-1);
+    });
     void (async () => {
       const previousDoc = pdfJsDocRef.current;
       pdfJsDocRef.current = null;
@@ -1290,8 +1507,14 @@ export default function EditPdfTool() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (isTypingTarget(event.target)) return;
       const command = event.ctrlKey || event.metaKey;
+      if (command && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setTextSearchOpen(true);
+        requestAnimationFrame(() => textSearchInputRef.current?.focus());
+        return;
+      }
+      if (isTypingTarget(event.target)) return;
       if (command && event.key.toLowerCase() === "z" && event.shiftKey) {
         event.preventDefault();
         redo();
@@ -1703,6 +1926,61 @@ export default function EditPdfTool() {
     input.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
   }
 
+  function activateTextSearchMatch(index: number) {
+    if (textSearchMatches.length === 0) return;
+    const bounded = Math.max(0, Math.min(index, textSearchMatches.length - 1));
+    const match = textSearchMatches[bounded];
+    setTextSearchActiveIndex(bounded);
+    if (!match) return;
+    if (match.pageIndex !== pageIndex) {
+      setPageIndex(match.pageIndex);
+      return;
+    }
+    const firstRun = match.sourceRunIndices[0];
+    if (firstRun !== undefined) {
+      setFocusedRunIndex(firstRun);
+      requestAnimationFrame(() => {
+        runOverlayNodesRef.current.get(firstRun)?.scrollIntoView({
+          block: "center",
+          inline: "nearest",
+          behavior: "smooth",
+        });
+      });
+    }
+  }
+
+  function stepTextSearch(direction: 1 | -1) {
+    const next = nextSearchMatchIndex(
+      textSearchMatches,
+      normalizedTextSearchIndex,
+      direction,
+    );
+    if (next >= 0) activateTextSearchMatch(next);
+  }
+
+  function prepareActiveTextSearchReplacement() {
+    const plan = activeTextSearchReplacementPlan;
+    if (!plan || !activeTextSearchMatch || activeTextSearchMatch.pageIndex !== pageIndex) return;
+    const indices = [...new Set(plan.sourceRunIndices)].sort((a, b) => a - b);
+    if (indices.length === 0) return;
+
+    setActiveTool("select");
+    setSelectedId(null);
+    setSelectionAnchorIndex(indices[0]);
+    setSelectedRunIndices(indices);
+    setEditDraftText(plan.replacementText);
+    setEditApplyError("");
+    setUseSubstituteFont(false);
+    setNativeFormatOpen(false);
+
+    if (indices.length === 1) {
+      requestAnimationFrame(() => {
+        inlineEditInputRef.current?.focus();
+        inlineEditInputRef.current?.select();
+      });
+    }
+  }
+
   // Hover highlighting for the select tool -- a discrete "did the hit-test
   // result change" comparison before setState, not a per-pixel update, so a
   // mousemove sweeping across one run's box (or the empty page background)
@@ -1869,6 +2147,18 @@ export default function EditPdfTool() {
         const resolvedFont = resolveFont(fontDict, pdfLibDoc.context);
         const fontMetrics = resolveFontMetrics(fontDict, pdfLibDoc.context, resolvedFont);
         const fallbackStyleHints = readFallbackStyleHints(fontDict, pdfLibDoc.context);
+        const fragmented = fragmentedRunReconstructions.get(selectedRunIndices[0]);
+        if (fragmented) {
+          const validation: Extract<MultiRunValidation, { kind: "valid" }> = {
+            kind: "valid",
+            contentStreamIndex: fragmented.contentStreamIndex,
+            operatorIndices: fragmented.operatorIndices,
+            allOperators: fragmented.allOperators,
+            resources: fragmented.resources,
+            fontResourceName: fragmented.fontResourceName,
+          };
+          return { kind: "multi", resolvedFont, fontMetrics, validation };
+        }
         return { kind: "single", resolvedFont, fontMetrics, locatedOperator, operator, fallbackStyleHints };
       }
 
@@ -1884,7 +2174,7 @@ export default function EditPdfTool() {
       return { kind: "error", reason, multi: selectedRunIndices.length > 1 };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
-  }, [pdfLibDoc, editEngine, selectedRunIndices, runMatches, pageOperators, pageIndex]);
+  }, [pdfLibDoc, editEngine, selectedRunIndices, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions]);
 
   // Phase 9.2: the live dry-run preview driving both the Apply button's
   // disabled state and the specific reason shown next to it -- see
@@ -2619,7 +2909,7 @@ export default function EditPdfTool() {
 
   if (!pdf) {
     return (
-      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+      <section ref={uploadClientReadyRef} className="l2-workspace grid gap-5 pb-4 lg:pb-0">
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           <L2UploadStage
             inputId="edit-pdf-upload"
@@ -2672,6 +2962,19 @@ export default function EditPdfTool() {
 
         <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
 
+        <L2ToolbarButton
+          onClick={() => {
+            setTextSearchOpen((open) => {
+              const next = !open;
+              if (!next) setTextSearchIndexBusy(false);
+              return next;
+            });
+            requestAnimationFrame(() => textSearchInputRef.current?.focus());
+          }}
+        >
+          Find
+        </L2ToolbarButton>
+
         <label className="ml-auto flex items-center gap-1.5">
           <span className="sr-only">File name</span>
           <input
@@ -2704,6 +3007,151 @@ export default function EditPdfTool() {
           Start new
         </L2ToolbarButton>
       </div>
+
+      {textSearchOpen ? (
+        <div
+          data-edit-search-panel
+          className="aura-glass-thin grid gap-3 rounded-[var(--radius-xl)] border border-[var(--text-primary)]/10 p-3 shadow-[var(--v2-elevation-1)]"
+        >
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="min-w-[min(100%,18rem)] flex-1">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                Find
+              </span>
+              <input
+                ref={textSearchInputRef}
+                role="searchbox"
+                aria-label="Find text in PDF"
+                value={textSearchQuery}
+                onChange={(event) => {
+                  setTextSearchQuery(event.target.value);
+                  if (!event.target.value.trim()) setTextSearchIndexBusy(false);
+                  setTextSearchActiveIndex(-1);
+                }}
+                placeholder="Search PDF text"
+                className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)] focus:ring-2 focus:ring-[var(--lumeo-gold)]/20"
+              />
+            </label>
+
+            <label className="min-w-32">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                Scope
+              </span>
+              <select
+                aria-label="Search scope"
+                value={textSearchScope}
+                onChange={(event) => {
+                  const nextScope = event.target.value as PdfTextSearchScope;
+                  setTextSearchScope(nextScope);
+                  if (nextScope === "page") setTextSearchIndexBusy(false);
+                  setTextSearchActiveIndex(-1);
+                }}
+                className="h-10 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 text-xs font-semibold text-[var(--text-primary)]"
+              >
+                <option value="document">Document</option>
+                <option value="page">This page</option>
+              </select>
+            </label>
+
+            <label className="flex h-10 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-2 text-xs font-semibold text-[var(--text-secondary)]">
+              <input
+                type="checkbox"
+                checked={textSearchCaseSensitive}
+                onChange={(event) => {
+                  setTextSearchCaseSensitive(event.target.checked);
+                  setTextSearchActiveIndex(-1);
+                }}
+              />
+              Aa
+            </label>
+            <label className="flex h-10 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-2 text-xs font-semibold text-[var(--text-secondary)]">
+              <input
+                type="checkbox"
+                checked={textSearchWholeWord}
+                onChange={(event) => {
+                  setTextSearchWholeWord(event.target.checked);
+                  setTextSearchActiveIndex(-1);
+                }}
+              />
+              Whole word
+            </label>
+
+            <div className="ml-auto flex h-10 items-center gap-1">
+              <span
+                data-edit-search-match-count={textSearchMatches.length}
+                className="min-w-20 px-2 text-center text-xs font-semibold text-[var(--text-secondary)]"
+              >
+                {textSearchIndexBusy && textSearchScope === "document"
+                  ? `Indexing… ${textSearchMatches.length} found`
+                  : textSearchMatches.length > 0
+                    ? `${normalizedTextSearchIndex + 1} / ${textSearchMatches.length}`
+                    : textSearchQuery.trim()
+                      ? "No matches"
+                      : "Type to find"}
+              </span>
+              <button
+                type="button"
+                aria-label="Previous search match"
+                disabled={textSearchMatches.length === 0}
+                onClick={() => stepTextSearch(-1)}
+                className="h-9 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 text-xs font-bold text-[var(--text-primary)] disabled:opacity-35"
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                aria-label="Next search match"
+                disabled={textSearchMatches.length === 0}
+                onClick={() => stepTextSearch(1)}
+                className="h-9 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 text-xs font-bold text-[var(--text-primary)] disabled:opacity-35"
+              >
+                Next
+              </button>
+              <button
+                type="button"
+                aria-label="Close find"
+                onClick={() => {
+                  setTextSearchOpen(false);
+                  setTextSearchIndexBusy(false);
+                }}
+                className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-sm font-bold text-[var(--text-secondary)] hover:bg-[var(--text-primary)]/[0.06]"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-2 border-t border-[var(--text-primary)]/8 pt-2">
+            <label className="min-w-[min(100%,18rem)] flex-1">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                Replace with
+              </span>
+              <input
+                aria-label="Replace search match with"
+                value={textSearchReplacement}
+                onChange={(event) => setTextSearchReplacement(event.target.value)}
+                placeholder="Leave empty to delete the match"
+                className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)] focus:ring-2 focus:ring-[var(--lumeo-gold)]/20"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={prepareActiveTextSearchReplacement}
+              disabled={!activeTextSearchReplacementPlan}
+              className="h-10 rounded-[var(--radius-md)] bg-[var(--lumeo-gold)] px-4 text-xs font-bold text-[var(--atelier-surface-0)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Replace this match
+            </button>
+            <span className="pb-2 text-[10px] leading-4 text-[var(--text-secondary)]">
+              {activeTextSearchMatch?.pageIndex !== pageIndex
+                ? "Navigate to the match first."
+                : activeTextSearchMatch?.capability === "editable"
+                  ? "Prepared replacements still pass the normal layout/fidelity check before Apply."
+                  : activeTextSearchMatch?.capabilityReason ?? "Only safely editable native text can be replaced."}
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="relative min-w-0">
         {/* Phase 27: the canvas panel is now the unambiguous hero -- no file
@@ -2881,6 +3329,31 @@ export default function EditPdfTool() {
                     />
                   ) : null}
 
+                  {textSearchOpen && currentPageTextSearchMatches.length > 0 ? (
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[12]">
+                      {currentPageTextSearchMatches.map((match) => {
+                        const active = activeTextSearchMatch?.id === match.id;
+                        return (
+                          <div
+                            key={match.id}
+                            data-edit-search-highlight={active ? "active" : "match"}
+                            className={
+                              active
+                                ? "absolute rounded-[2px] border-2 border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/28 shadow-[0_0_0_1px_rgba(255,255,255,0.6)]"
+                                : "absolute rounded-[2px] border border-[var(--lumeo-gold)]/60 bg-[var(--lumeo-gold)]/14"
+                            }
+                            style={{
+                              left: `${match.boundsPct.xPct}%`,
+                              top: `${match.boundsPct.yPct}%`,
+                              width: `${match.boundsPct.widthPct}%`,
+                              height: `${match.boundsPct.heightPct}%`,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  ) : null}
+
                   {detectedTextRuns.length > 0 ? (
                     // Phase 10.2: kept mounted regardless of activeTool (a CSS
                     // display toggle, not a conditional unmount) -- measured
@@ -2978,6 +3451,7 @@ export default function EditPdfTool() {
                     // comment for why they're derived up there and not
                     // inline here.
                     <div
+                      data-edit-multi-run-panel
                       className="absolute z-30"
                       style={{
                         left: `${singleSelectedRun.xPct}%`,
@@ -3051,6 +3525,7 @@ export default function EditPdfTool() {
                       <div className={`absolute z-30 flex gap-1.5 whitespace-nowrap ${inlineEditorToolbarPositionClass} ${inlineEditorHorizontalClass}`}>
                         <button
                           type="button"
+                          data-edit-inline-apply
                           onClick={(event) => {
                             event.stopPropagation();
                             void applyTextRunEdit();
@@ -3327,7 +3802,7 @@ export default function EditPdfTool() {
                     </div>
                   ) : null}
 
-                  {activeTool === "select" && editPreview.kind === "multi" ? (
+                  {activeTool === "select" && selectedRunIndices.length > 1 && editPreview.kind === "multi" ? (
                     // Multi-run selection has no per-run inline editor (that's
                     // scoped to a single run) -- this compact floating panel,
                     // anchored to the first selected run, is the only UI path
@@ -3344,6 +3819,8 @@ export default function EditPdfTool() {
                       <div className="w-64 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 p-3 shadow-lg">
                         <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with ({selectedRunIndices.length} runs selected)</span>
                         <input
+                          data-edit-multi-run-input
+                          aria-label="Edit selected text runs"
                           value={editDraftText}
                           onChange={(event) => {
                             setEditDraftText(event.target.value);
@@ -3354,6 +3831,7 @@ export default function EditPdfTool() {
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"
+                            data-edit-multi-run-apply
                             disabled={!canApplyEdit}
                             onClick={() => void applyTextRunEdit()}
                             className="min-h-11 flex-1 rounded-lg border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-2.5 text-xs font-bold text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
