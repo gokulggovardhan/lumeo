@@ -147,6 +147,8 @@ export function decideTextReplacementLayout(
         targetCharSpacingPt: null,
         targetHorizontalScalingPct: targetScale,
         tailTjAdjustment: 0,
+        originalCharSpacingPt: input.originalCharSpacingPt,
+        originalHorizontalScalingPct: input.originalHorizontalScalingPct,
       };
     }
   }
