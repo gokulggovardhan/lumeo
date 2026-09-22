@@ -15,6 +15,9 @@ import {
 import {
   classifyPageReconstruction,
 } from "../lib/conversion/browser/pdfToWord/classifier.ts";
+import {
+  assessOperatorRunCoverage,
+} from "../lib/conversion/browser/pdfToWord/coverage.ts";
 
 test("operator reconstruction keeps independently positioned source operators split", async () => {
   const source = await PDFDocument.create();
@@ -156,4 +159,129 @@ test("page classifier recognizes repeated invoice columns without forcing a Word
   const table = result.regions.find((region) => region.kind === "fixed-layout-table");
   assert.ok(table);
   assert.ok((table.columnAnchorsPt?.length ?? 0) >= 5);
+});
+
+
+test("operator coverage accepts merged visible cells only when every visible character is accounted for", () => {
+  const visible = [
+    {
+      text: "20997 09-Dec-2030 3 2",
+      xPt: 36,
+      yPt: 200,
+      widthPt: 190,
+      heightPt: 11,
+      fontSizePt: 9,
+      fontFamily: "Arial",
+      bold: false,
+      italic: false,
+      sourceKind: "pdfjs" as const,
+    },
+  ];
+
+  const source = [
+    {
+      text: "09-Dec-2030",
+      xPt: 95,
+      yPt: 200,
+      widthPt: 55,
+      heightPt: 11,
+      fontSizePt: 9,
+      fontFamily: "Arial",
+      bold: false,
+      italic: false,
+      sourceKind: "operator" as const,
+    },
+    {
+      text: "20997",
+      xPt: 36,
+      yPt: 200,
+      widthPt: 35,
+      heightPt: 11,
+      fontSizePt: 9,
+      fontFamily: "Arial",
+      bold: false,
+      italic: false,
+      sourceKind: "operator" as const,
+    },
+    {
+      text: "3",
+      xPt: 170,
+      yPt: 200,
+      widthPt: 7,
+      heightPt: 11,
+      fontSizePt: 9,
+      fontFamily: "Arial",
+      bold: false,
+      italic: false,
+      sourceKind: "operator" as const,
+    },
+    {
+      text: "2",
+      xPt: 205,
+      yPt: 200,
+      widthPt: 7,
+      heightPt: 11,
+      fontSizePt: 9,
+      fontFamily: "Arial",
+      bold: false,
+      italic: false,
+      sourceKind: "operator" as const,
+    },
+  ];
+
+  const complete = assessOperatorRunCoverage(visible, source);
+  assert.equal(complete.safeToUseOperatorRuns, true);
+  assert.equal(complete.visibleRunCoverageRatio, 1);
+  assert.equal(complete.characterCoverageRatio, 1);
+
+  const missing = assessOperatorRunCoverage(visible, source.slice(0, -1));
+  assert.equal(missing.safeToUseOperatorRuns, false);
+  assert.equal(missing.visibleRunCoverageRatio, 0);
+  assert.equal(missing.characterCoverageRatio, 0);
+});
+
+test("operator coverage is geometry-aware and rejects matching text from the wrong row", () => {
+  const visible = [
+    {
+      text: "TOTAL 1536.00",
+      xPt: 300,
+      yPt: 100,
+      widthPt: 150,
+      heightPt: 12,
+      fontSizePt: 10,
+      fontFamily: "Arial",
+      bold: true,
+      italic: false,
+      sourceKind: "pdfjs" as const,
+    },
+  ];
+  const wrongRow = [
+    {
+      text: "TOTAL",
+      xPt: 300,
+      yPt: 400,
+      widthPt: 40,
+      heightPt: 12,
+      fontSizePt: 10,
+      fontFamily: "Arial",
+      bold: true,
+      italic: false,
+      sourceKind: "operator" as const,
+    },
+    {
+      text: "1536.00",
+      xPt: 390,
+      yPt: 400,
+      widthPt: 55,
+      heightPt: 12,
+      fontSizePt: 10,
+      fontFamily: "Arial",
+      bold: true,
+      italic: false,
+      sourceKind: "operator" as const,
+    },
+  ];
+
+  const coverage = assessOperatorRunCoverage(visible, wrongRow);
+  assert.equal(coverage.safeToUseOperatorRuns, false);
 });
