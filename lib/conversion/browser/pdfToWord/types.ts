@@ -31,6 +31,12 @@ export type ReconstructedTextLine = {
   charSpacingPt?: number;
   wordSpacingPt?: number;
   horizontalScalingPct?: number;
+  /**
+   * Horizontal scale for the Word fallback font after comparing its known
+   * metrics with the source PDF advance. This compensates substitution
+   * without relying only on renderer-specific fitText behaviour.
+   */
+  wordScalePct?: number;
   textRisePt?: number;
   colorHex?: string | null;
   underline?: boolean;
