@@ -174,7 +174,7 @@ test("page classifier recognizes repeated invoice columns without forcing a Word
 test("operator coverage accepts merged visible cells only when every visible character is accounted for", () => {
   const visible = [
     {
-      text: "20997 09-Dec-2030 3 2",
+      text: "48231 09-Dec-2030 3 2",
       xPt: 36,
       yPt: 200,
       widthPt: 190,
@@ -201,7 +201,7 @@ test("operator coverage accepts merged visible cells only when every visible cha
       sourceKind: "operator" as const,
     },
     {
-      text: "20997",
+      text: "48231",
       xPt: 36,
       yPt: 200,
       widthPt: 35,
