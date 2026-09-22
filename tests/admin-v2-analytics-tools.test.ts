@@ -96,5 +96,7 @@ test("Tools V2 is server-authorized, URL-filtered, audited through the existing 
   assert.match(action, /requireAdmin\(\)/);
   assert.match(action, /canManageTools\(admin\.role\)/);
   assert.match(action, /writeAuditLog/);
+  assert.match(action, /\.select\("id"\)[\s\S]*\.maybeSingle\(\)/);
+  assert.match(action, /maintenance_message: maintenanceMessage \|\| null/);
   assert.match(action, /updateTag\("public-pdf-catalog"\)/);
 });

@@ -206,18 +206,20 @@ test("Lumeo 2 documentation and verifier cover the flagship foundation", () => {
   assert.ok(lumeo2Verifier.includes("components/analytics/AnalyticsProvider.tsx"));
 });
 
-test("Lumeo 2 public homepage shows the full live catalog as a flat tile grid", () => {
+test("Lumeo 2 public homepage shows the enabled catalog as a truthful flat tile grid", () => {
   // The 5-slot admin-configured homepage (getPublicHomepageTools,
   // configuredTools.slice(0, 5), a hardcoded 6th "All PDF Tools" card) was
-  // deliberately retired in favor of a fixed grid showing every live tool
-  // directly -- see the header comment in components/pdf/PdfToolLauncher.tsx
+  // deliberately retired in favor of a fixed grid showing every enabled tool
+  // with unavailable states rendered non-actionably -- see the header comment in components/pdf/PdfToolLauncher.tsx
   // for the rationale, and the matching fix already applied to
   // scripts/verify-public-tool-catalog.mjs. The "All PDF Tools" link now
   // lives in the public footer instead of a homepage card.
   assert.ok(homepage.includes("Pick a tool."));
   assert.ok(launcher.includes("getPublicPdfCatalog"));
   assert.ok(launcher.includes("resolveLumeoTools"));
-  assert.ok(launcher.includes("buildTiles(resolved)"));
+  assert.ok(launcher.includes("buildDiscoveryTiles(resolved)"));
+  assert.ok(launcher.includes("available ? ("));
+  assert.ok(launcher.includes("<article"));
   assert.ok(publicFooter.includes("All PDF Tools"));
   assert.doesNotMatch(homepage, /Start with Merge PDF/);
   // "processed" was dropped from this forbidden-word check: it's

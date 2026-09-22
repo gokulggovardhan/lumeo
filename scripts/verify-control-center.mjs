@@ -287,6 +287,7 @@ try {
   assert(analyticsPage.includes("Processing lifecycle metrics"), "Analytics page must describe processing lifecycle metrics.");
 
   const toolsPage = read("app/admin/(protected)/tools/page.tsx");
+  const toolsAction = read("app/admin/(protected)/tools/actions.ts");
   const toolFilters = read("lib/admin/tool-filters.ts");
   for (const filterName of ["q", "category", "status", "enabled", "maintenance"]) {
     assert(toolsPage.includes(`name="${filterName}"`), `Tools V2 filter missing: ${filterName}.`);
@@ -295,6 +296,9 @@ try {
   assert(toolsPage.includes("canManageTools(admin.role)"), "Tools V2 must retain role-gated editing.");
   assert(toolsPage.includes("usageAvailable ?"), "Tools V2 must distinguish unavailable usage from zero opens.");
   assert(toolFilters.includes("filterAdminTools"), "Tools V2 URL filter helper is missing.");
+  assert(toolsAction.includes('.select("id")') && toolsAction.includes(".maybeSingle()"), "Tool saves must verify that one catalog row was updated.");
+  assert(toolsAction.includes("maintenance_message: maintenanceMessage || null"), "Tool audit changes must include maintenance messaging.");
+  assert(toolsAction.includes('updateTag("public-pdf-catalog")'), "Tool saves must invalidate the shared public catalog immediately.");
   assert(analyticsPage.includes('title="Tool performance"'), "Analytics V2 tool-performance section is missing.");
   assert(analyticsPage.includes('title="Audience and environment"'), "Analytics V2 environment section is missing.");
   assert(analyticsPage.includes("Metrics are withheld instead of presenting unverified zero values"), "Analytics V2 must explain unavailable metrics honestly.");

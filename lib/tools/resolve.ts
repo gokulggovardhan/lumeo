@@ -2,6 +2,7 @@ import "server-only";
 
 import { lumeoTools, type LumeoTool, type ToolAction } from "@/lib/tools/catalog";
 import type { PublicPdfTool } from "@/lib/public-catalog/types";
+import { resolveEffectivePublicToolState } from "@/lib/tools/public-state";
 
 // Bridges the static Lumeo tool model (names, glyphs, grouping -- a design
 // decision, reviewed via PR) with the existing admin-controlled catalog in
@@ -22,19 +23,20 @@ export type ResolvedTool = LumeoTool & {
 
 export function resolveLumeoTools(dbTools: PublicPdfTool[]): ResolvedTool[] {
   const dbBySlug = new Map(dbTools.map((tool) => [tool.toolSlug, tool]));
+  const dbByRoute = new Map(dbTools.map((tool) => [tool.route, tool]));
 
   return lumeoTools.map((tool) => {
     const actions: ToolAction[] = tool.actions.map((action) => {
-      const dbTool = dbBySlug.get(action.slug);
-      if (!dbTool) return action;
+      const dbTool = dbBySlug.get(action.slug) ?? (action.route ? dbByRoute.get(action.route) : undefined);
+      if (!action.route) return action;
 
-      const live = dbTool.isEnabled && (dbTool.status === "active" || dbTool.status === "beta");
+      const state = resolveEffectivePublicToolState(dbTool);
       return {
         ...action,
-        live,
-        route: live ? action.route ?? dbTool.route : action.route,
-        dbStatus: dbTool.isEnabled ? dbTool.status : "hidden",
-        maintenanceMessage: dbTool.maintenanceMessage,
+        live: state.usable,
+        route: action.route ?? dbTool?.route,
+        dbStatus: state.status,
+        maintenanceMessage: state.message,
       };
     });
 
