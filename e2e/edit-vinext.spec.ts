@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { SPLIT_RUN_PDF, TEXT_ONLY_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
@@ -7,6 +7,12 @@ import { waitForStageReady } from "./helpers.ts";
 test.beforeAll(async () => {
   await writeFixtures();
 });
+
+async function uploadEditFixture(page: Page, fixturePath: string) {
+  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });
+  await page.locator('input[type="file"]').first().setInputFiles(fixturePath);
+}
 
 test("vinext Edit PDF supports text matching, editing, and export", async ({
   page,
@@ -25,8 +31,7 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
     );
   });
 
-  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
-  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
 
   const editable = page.locator(
     'div[role="button"][aria-label^="Editable text: "]',
@@ -118,8 +123,7 @@ test("vinext Edit PDF applies native formatting without converting text to an ov
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
-  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
 
   const employeeRun = page
     .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]')
@@ -168,8 +172,7 @@ test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecuti
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
-  await page.locator('input[type="file"]').first().setInputFiles(SPLIT_RUN_PDF);
+  await uploadEditFixture(page, SPLIT_RUN_PDF);
 
   const editableRuns = page.locator('div[role="button"][aria-label^="Editable text: "]');
   await expect(editableRuns.first()).toBeVisible({ timeout: 90_000 });
@@ -263,8 +266,7 @@ test("vinext Edit PDF searches across pages, highlights matches, and prepares a 
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
-  await page.locator('input[type="file"]').first().setInputFiles(TWO_PAGE_PDF);
+  await uploadEditFixture(page, TWO_PAGE_PDF);
   await waitForStageReady(page);
 
   await page.getByRole("button", { name: "Find" }).click();
