@@ -122,7 +122,11 @@ export default async function SettingsPage() {
                       {label}
                     </p>
                     <AdminStatusBadge tone={enabled ? (isMaintenanceMode ? "danger" : "success") : "neutral"}>
-                      {enabled ? "Enabled" : "Disabled"}
+                      {enabled
+                        ? isMaintenanceMode
+                          ? "Live: site is down for visitors"
+                          : "Enabled"
+                        : "Disabled"}
                     </AdminStatusBadge>
                   </div>
 
