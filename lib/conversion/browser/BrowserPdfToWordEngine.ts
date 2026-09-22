@@ -1,5 +1,6 @@
 import { PDFDocument as PdfLibDocument } from "pdf-lib";
 import { PdfFontRegistry } from "@/lib/pdf/edit/fontRegistry";
+import { transformPoint2x3 } from "@/lib/pdf/edit/textRuns";
 import {
   BrowserConversionWorkspace,
   estimateLocalConversionStorage,
@@ -53,6 +54,13 @@ const MAX_BACKGROUND_DIMENSION_PX = 3000;
 const MAX_BACKGROUND_PIXELS = 8_000_000;
 const JPEG_QUALITY = 0.84;
 
+type PdfLinkAnnotation = {
+  subtype?: string;
+  url?: string;
+  unsafeUrl?: string;
+  rect?: number[];
+};
+
 type PdfPageLike = {
   rotate: number;
   commonObjs?: {
@@ -73,6 +81,7 @@ type PdfPageLike = {
     styles?: Record<string, PdfTextStyle>;
   }>;
   getOperatorList(): Promise<{ fnArray: number[] }>;
+  getAnnotations?(options?: { intent?: string }): Promise<PdfLinkAnnotation[]>;
   render(options: {
     canvas: HTMLCanvasElement;
     canvasContext: CanvasRenderingContext2D;
@@ -175,6 +184,47 @@ async function writeCheckpoint(
   } catch (error) {
     await writable.abort().catch(() => {});
     throw error;
+  }
+}
+
+function applyLinkAnnotations(
+  lines: ReconstructedPage["lines"],
+  annotations: PdfLinkAnnotation[],
+  viewportTransform: number[],
+): void {
+  for (const annotation of annotations) {
+    if (
+      annotation.subtype !== "Link" ||
+      !annotation.rect ||
+      annotation.rect.length < 4
+    ) {
+      continue;
+    }
+    const url = annotation.url ?? annotation.unsafeUrl;
+    if (!url) continue;
+
+    const [x1, y1, x2, y2] = annotation.rect;
+    const p1 = transformPoint2x3(viewportTransform, [1, 0, 0, 1, x1, y1]);
+    const p2 = transformPoint2x3(viewportTransform, [1, 0, 0, 1, x2, y2]);
+    const left = Math.min(p1[4], p2[4]);
+    const top = Math.min(p1[5], p2[5]);
+    const right = Math.max(p1[4], p2[4]);
+    const bottom = Math.max(p1[5], p2[5]);
+
+    for (const line of lines) {
+      if (line.visualOnly) continue;
+      const overlapLeft = Math.max(left, line.xPt);
+      const overlapTop = Math.max(top, line.yPt);
+      const overlapRight = Math.min(right, line.xPt + line.widthPt);
+      const overlapBottom = Math.min(bottom, line.yPt + line.heightPt);
+      const overlap =
+        Math.max(0, overlapRight - overlapLeft) *
+        Math.max(0, overlapBottom - overlapTop);
+      const area = Math.max(1, line.widthPt * line.heightPt);
+      if (overlap / area >= 0.3) {
+        line.hyperlinkUrl = url;
+      }
+    }
   }
 }
 
@@ -520,7 +570,7 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
         const page = await withAbort(document.getPage(pageNumber), signal);
         const viewport = page.getViewport({ scale: 1, rotation: page.rotate });
 
-        const [textContent, operatorList] = await Promise.all([
+        const [textContent, operatorList, annotations] = await Promise.all([
           withAbort(
             withPageTimeout(
               page.getTextContent(),
@@ -539,6 +589,17 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
             ),
             signal,
           ),
+          page.getAnnotations
+            ? withAbort(
+                withPageTimeout(
+                  page.getAnnotations({ intent: "display" }),
+                  pageNumber,
+                  PAGE_OPERATION_TIMEOUT_MS,
+                  "inspect page links",
+                ),
+                signal,
+              )
+            : Promise.resolve([] as PdfLinkAnnotation[]),
         ]);
 
         const textStyles = enrichTextStyles(
@@ -601,6 +662,12 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           imageCount >= 2 ||
           (imageCount >= 1 && lines.length < 6) ||
           vectorLayoutCount > 0;
+
+        applyLinkAnnotations(
+          lines,
+          annotations,
+          viewport.transform,
+        );
 
         const classification = classifyPageReconstruction({
           lines,
