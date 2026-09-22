@@ -85,6 +85,7 @@ type PdfPageLike = {
   }>;
   getOperatorList(): Promise<{ fnArray: number[] }>;
   getAnnotations?(options?: { intent?: string }): Promise<PdfLinkAnnotation[]>;
+  cleanup?(): void;
   render(options: {
     canvas: HTMLCanvasElement;
     canvasContext: CanvasRenderingContext2D;
@@ -574,7 +575,8 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
         });
 
         const page = await withAbort(document.getPage(pageNumber), signal);
-        const viewport = page.getViewport({ scale: 1, rotation: page.rotate });
+        try {
+          const viewport = page.getViewport({ scale: 1, rotation: page.rotate });
 
         const [textContent, operatorList, annotations] = await Promise.all([
           withAbort(
@@ -760,6 +762,18 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           await workspace.appendLog(
             `Page ${pageNumber}: ${lines.filter((line) => !line.visualOnly).length} editable lines, ${lines.filter((line) => line.visualOnly).length} visual-only lines, operatorCoverage=${operatorCoverageRatio.toFixed(3)}, mode=${classification.mode}, ${imageCount} image operators, ${vectorLayoutCount} vector layout operators, raster=${Boolean(backgroundImage)}.`,
           );
+        }
+        } finally {
+          // PDF.js keeps decoded images/operator/font caches on each page
+          // proxy. Release those page-local resources as soon as the
+          // reconstructed page has been checkpointed so long documents do
+          // not retain every processed page until document.destroy().
+          try {
+            page.cleanup?.();
+          } catch {
+            // Cleanup is best-effort; the document-level destroy in the
+            // outer finally remains the final resource boundary.
+          }
         }
       }
 
