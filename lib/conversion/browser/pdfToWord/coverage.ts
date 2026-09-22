@@ -72,6 +72,7 @@ export type OperatorCoverageAssessment = {
   visibleRunCoverageRatio: number;
   characterCoverageRatio: number;
   safeToUseOperatorRuns: boolean;
+  unexplainedVisibleText: string[];
 };
 
 /**
@@ -96,12 +97,14 @@ export function assessOperatorRunCoverage(
       visibleRunCoverageRatio: sourceLines.length > 0 ? 1 : 0,
       characterCoverageRatio: sourceLines.length > 0 ? 1 : 0,
       safeToUseOperatorRuns: sourceLines.length > 0,
+      unexplainedVisibleText: [],
     };
   }
 
   let explainedVisibleRuns = 0;
   let explainedCharacters = 0;
   let totalCharacters = 0;
+  const unexplainedVisibleText: string[] = [];
 
   for (const line of visible) {
     const normalizedLength = normalizedCharacters(line.text).length;
@@ -110,6 +113,8 @@ export function assessOperatorRunCoverage(
     if (sameCharacterMultiset(line.text, sourceText)) {
       explainedVisibleRuns += 1;
       explainedCharacters += normalizedLength;
+    } else {
+      unexplainedVisibleText.push(line.text);
     }
   }
 
@@ -126,5 +131,6 @@ export function assessOperatorRunCoverage(
       sourceLines.length > 0 &&
       explainedVisibleRuns === visible.length &&
       characterCoverageRatio === 1,
+    unexplainedVisibleText,
   };
 }
