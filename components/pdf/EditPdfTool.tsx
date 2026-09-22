@@ -1875,7 +1875,14 @@ export default function EditPdfTool() {
 
     if (resolvedEditContext.kind === "error") {
       return resolvedEditContext.multi
-        ? { kind: "multi", editable: false, reason: resolvedEditContext.reason, plan: null as never, resolvedFont: null as never }
+        ? {
+            kind: "multi",
+            editable: false,
+            reason: resolvedEditContext.reason,
+            plan: null as never,
+            resolvedFont: null as never,
+            layoutDecision: null,
+          }
         : { kind: "empty" };
     }
 
@@ -1919,16 +1926,23 @@ export default function EditPdfTool() {
           resolvedFont,
           locatedOperator,
           substituteFont: null,
+          layoutDecision: null,
         };
       }
+      const layoutDecision = plan.editable
+        ? decideEditPlanLayout(plan, {
+            originalHorizontalScalingPct: operator.horizontalScalingPct,
+          })
+        : null;
       return {
         kind: "single",
-        editable: plan.editable,
-        reason: plan.reason,
+        editable: plan.editable && Boolean(layoutDecision?.supported),
+        reason: plan.reason ?? layoutDecision?.reason ?? null,
         plan,
         resolvedFont,
         locatedOperator,
         substituteFont: substituteAvailable?.fallbackFont?.family ?? null,
+        layoutDecision,
       };
     }
 
@@ -1943,10 +1957,31 @@ export default function EditPdfTool() {
         resolvedFont,
         fontMetrics,
       });
-      return { kind: "multi", editable: plan.editable, reason: plan.reason, plan, resolvedFont };
+      const firstOperator = validation.allOperators[validation.operatorIndices[0]];
+      const layoutDecision =
+        plan.editable && plan.subPlans[0] && firstOperator
+          ? decideEditPlanLayout(plan.subPlans[0], {
+              originalHorizontalScalingPct: firstOperator.horizontalScalingPct,
+            })
+          : null;
+      return {
+        kind: "multi",
+        editable: plan.editable && Boolean(layoutDecision?.supported),
+        reason: plan.reason ?? layoutDecision?.reason ?? null,
+        plan,
+        resolvedFont,
+        layoutDecision,
+      };
     } catch (previewError) {
       const reason = previewError instanceof Error ? previewError.message : "Could not validate this edit.";
-      return { kind: "multi", editable: false, reason, plan: null as never, resolvedFont: null as never };
+      return {
+        kind: "multi",
+        editable: false,
+        reason,
+        plan: null as never,
+        resolvedFont: null as never,
+        layoutDecision: null,
+      };
     }
   }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont]);
 
