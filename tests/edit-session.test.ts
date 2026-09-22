@@ -47,7 +47,10 @@ test("native deletion is represented explicitly instead of disguised as replacem
   assert.equal(operation.kind, "deleteText");
   if (operation.kind === "deleteText") {
     assert.equal(operation.originalText, "Delete me");
-    assert.deepEqual(operation.target.operatorIndices, [8, 9]);
+    assert.equal(operation.target.kind, "native-text");
+    if (operation.target.kind === "native-text") {
+      assert.deepEqual(operation.target.operatorIndices, [8, 9]);
+    }
   }
 });
 
