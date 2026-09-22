@@ -21,6 +21,11 @@ import {
   makeFixedLayoutInvoicePdf,
 } from "./fixed-layout-pdf-fixture";
 import { makeProfessionalDocx } from "./professional-docx-fixture";
+import {
+  makeSemanticLetterPdf,
+  makeTwoColumnReportPdf,
+  makeWhitespaceStatementPdf,
+} from "./semantic-pdf-fixtures";
 
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYGJAQoAHxcCAk+Uzr4AAAAASUVORK5CYII=",
@@ -457,6 +462,194 @@ test.describe("browser conversion validation lab", () => {
         maxChanged: 0.22,
       });
     }
+  });
+
+  test("PDF to Word emits normal editable paragraphs for semantic letter content", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    const pdf = await makeSemanticLetterPdf();
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "semantic-professional-letter.pdf",
+      mimeType: "application/pdf",
+      buffer: pdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const docx = await validateDocxDownload(
+      bytes,
+      "This document exercises normal paragraph reconstruction",
+    );
+    const documentXml = await docx.file("word/document.xml")!.async("string");
+    const relationships = await docx
+      .file("word/_rels/document.xml.rels")
+      ?.async("string");
+
+    const marker =
+      "This document exercises normal paragraph reconstruction";
+    const textIndex = documentXml.indexOf(marker);
+    expect(textIndex).toBeGreaterThan(0);
+    const paragraphStart = documentXml.lastIndexOf("<w:p>", textIndex);
+    const paragraphEnd = documentXml.indexOf("</w:p>", textIndex);
+    const bodyParagraph = documentXml.slice(paragraphStart, paragraphEnd + 6);
+
+    expect(bodyParagraph).toContain("<w:br/>");
+    expect(bodyParagraph).not.toContain("w:framePr");
+    expect(bodyParagraph).not.toContain("w:fitText");
+    expect(documentXml).toContain(
+      "The wrapped continuation remains in the same editable paragraph.",
+    );
+    expect(relationships).toContain(
+      "https://example.com/semantic-letter",
+    );
+    expect(relationships).toContain("relationships/hyperlink");
+
+    if (
+      browserName === "chromium" &&
+      process.env.LUMEO_FIDELITY_CLI === "1"
+    ) {
+      const outputDirectory = testInfo.outputPath("semantic-letter-fidelity");
+      const sourcePdf = await writePdfFixture(
+        pdf,
+        outputDirectory,
+        "semantic-letter-source",
+      );
+      const reconstructedPdf = await renderDocxWithLibreOffice(
+        bytes,
+        outputDirectory,
+        "semantic-letter-current",
+      );
+      await assertPdfLineAnchorFidelity(
+        sourcePdf,
+        reconstructedPdf,
+        outputDirectory,
+        [
+          { page: 1, contains: "Lumeo Professional Letter" },
+          { page: 1, contains: "This document exercises" },
+          { page: 1, contains: "The second visual line" },
+          { page: 1, contains: "A separate paragraph follows" },
+          { page: 1, contains: "Kind regards" },
+        ],
+        0.03,
+      );
+      await assertRenderedPdfSimilarity(sourcePdf, reconstructedPdf, {
+        maxMae: 20,
+        maxChanged: 0.22,
+      });
+    }
+  });
+
+  test("PDF to Word emits a real Word table only for high-confidence whitespace statements", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    const pdf = await makeWhitespaceStatementPdf();
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "synthetic-whitespace-statement.pdf",
+      mimeType: "application/pdf",
+      buffer: pdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const docx = await validateDocxDownload(bytes, "Monthly service");
+    const documentXml = await docx.file("word/document.xml")!.async("string");
+
+    expect(documentXml).toContain("<w:tbl>");
+    expect(documentXml).toContain('<w:tblLayout w:type="fixed"/>');
+    expect(documentXml).toContain('w:vertAnchor="page"');
+    expect(documentXml).toContain("Priority support");
+    expect(documentXml).toContain("205.00");
+    expect(documentXml).toContain('<w:jc w:val="right"/>');
+
+    const tableStart = documentXml.indexOf("<w:tbl>");
+    const tableEnd = documentXml.indexOf("</w:tbl>", tableStart);
+    const tableXml = documentXml.slice(tableStart, tableEnd + 8);
+    expect(tableXml).not.toContain("w:framePr");
+
+    if (
+      browserName === "chromium" &&
+      process.env.LUMEO_FIDELITY_CLI === "1"
+    ) {
+      const outputDirectory = testInfo.outputPath("semantic-table-fidelity");
+      const sourcePdf = await writePdfFixture(
+        pdf,
+        outputDirectory,
+        "statement-source",
+      );
+      const reconstructedPdf = await renderDocxWithLibreOffice(
+        bytes,
+        outputDirectory,
+        "statement-current",
+      );
+      await assertPdfLineAnchorFidelity(
+        sourcePdf,
+        reconstructedPdf,
+        outputDirectory,
+        [
+          { page: 1, contains: "Account activity statement" },
+          { page: 1, contains: "Description" },
+          { page: 1, contains: "Monthly service" },
+          { page: 1, contains: "Priority support" },
+          { page: 1, contains: "205.00", horizontal: "right" },
+        ],
+        0.03,
+      );
+      await assertRenderedPdfSimilarity(sourcePdf, reconstructedPdf, {
+        maxMae: 20,
+        maxChanged: 0.22,
+      });
+    }
+  });
+
+  test("PDF to Word keeps two-column prose independent instead of inventing a table", async ({
+    page,
+  }) => {
+    const pdf = await makeTwoColumnReportPdf();
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "two-column-report.pdf",
+      mimeType: "application/pdf",
+      buffer: pdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const docx = await validateDocxDownload(
+      bytes,
+      "Left column introduces the first topic.",
+    );
+    const documentXml = await docx.file("word/document.xml")!.async("string");
+
+    expect(documentXml).not.toContain("<w:tbl>");
+    expect(documentXml).toContain("w:framePr");
+    expect(documentXml).toContain("Left column introduces the first topic.");
+    expect(documentXml).toContain("Right column begins an independent topic.");
+    expect(frameXForText(documentXml, "Left column introduces the first topic."))
+      .toBeLessThan(
+        frameXForText(documentXml, "Right column begins an independent topic."),
+      );
   });
 
   test("PDF to Word remains stable across ten sequential conversions and Unicode filenames", async ({
