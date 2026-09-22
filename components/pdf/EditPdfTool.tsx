@@ -3792,7 +3792,7 @@ export default function EditPdfTool() {
                     </div>
                   ) : null}
 
-                  {activeTool === "select" && editPreview.kind === "multi" ? (
+                  {activeTool === "select" && selectedRunIndices.length > 1 && editPreview.kind === "multi" ? (
                     // Multi-run selection has no per-run inline editor (that's
                     // scoped to a single run) -- this compact floating panel,
                     // anchored to the first selected run, is the only UI path
