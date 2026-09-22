@@ -47,7 +47,9 @@ test("operator reconstruction keeps independently positioned source operators sp
   const bytes = await source.save();
   const structural = await PDFDocument.load(bytes.slice());
   const registry = new PdfFontRegistry(structural);
-  const pdfjs = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const pdfjs = await pdfjsLib.getDocument({
+    data: new Uint8Array(bytes),
+  }).promise;
   const pdfjsPage = await pdfjs.getPage(1);
   const viewport = pdfjsPage.getViewport({ scale: 1 });
 
