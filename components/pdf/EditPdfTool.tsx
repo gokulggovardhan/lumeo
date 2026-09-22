@@ -58,7 +58,10 @@ import {
 // level. Statically importing any of THEM here would pull pdf-lib back
 // in transitively regardless of the type-only import above. Their TYPE
 // exports are unaffected (same erased-at-compile-time reasoning).
-import { findTextRunAtPoint, overlayFontSizePx, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
+import { overlayFontSizePx, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
+import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
+import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
+import { PercentSpatialIndex } from "@/lib/pdf/edit/spatialIndex";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
@@ -220,6 +223,7 @@ let editEngineModulePromise: Promise<{
   PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
   PDFName: (typeof import("pdf-lib"))["PDFName"];
   PDFDict: (typeof import("pdf-lib"))["PDFDict"];
+  PdfFontRegistry: (typeof import("@/lib/pdf/edit/fontRegistry"))["PdfFontRegistry"];
 }> | null = null;
 
 function loadEditEngine() {
@@ -232,7 +236,8 @@ function loadEditEngine() {
       import("@/lib/pdf/edit/applyEditPlan"),
       import("pdf-lib"),
       import("@/lib/pdf/edit/fallbackFont"),
-    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod]) => ({
+      import("@/lib/pdf/edit/fontRegistry"),
+    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod]) => ({
       exportEditedPdf: exportMod.exportEditedPdf,
       collectPageTextOperators: formXObjectsMod.collectPageTextOperators,
       resolveFont: fontEncodingMod.resolveFont,
@@ -243,6 +248,7 @@ function loadEditEngine() {
       PDFDocument: pdfLibMod.PDFDocument,
       PDFName: pdfLibMod.PDFName,
       PDFDict: pdfLibMod.PDFDict,
+      PdfFontRegistry: fontRegistryMod.PdfFontRegistry,
     }));
   }
   return editEngineModulePromise;
@@ -515,6 +521,11 @@ export default function EditPdfTool() {
   // the control flicker while someone is still deciding what to type.
   const [useSubstituteFont, setUseSubstituteFont] = useState(false);
   const [editApplyError, setEditApplyError] = useState("");
+  // Browser FontFace previews are keyed to a model span id so an async font
+  // load can never leak the previous selection's face into a newly-selected
+  // run. Export safety remains governed by fontEncoding/editPlan, not by
+  // whether a browser happens to accept the embedded font bytes.
+  const [browserFontPreview, setBrowserFontPreview] = useState<{ spanId: string; family: string } | null>(null);
   // True when the last Restyle could not blank the original glyphs from the
   // content stream, so the covered text is still in the exported file. Drives
   // the disclosure notice -- see restyleSelectedRun for when that happens.
@@ -642,6 +653,72 @@ export default function EditPdfTool() {
   // directly, exactly as before -- that's the correct, unflagged pattern
   // for imperative, non-render-path access.
   const [pdfLibDoc, setPdfLibDoc] = useState<PDFDocument | null>(null);
+
+  // Premium engine foundation: one registry per live pdf-lib document.
+  // Expensive font dictionaries/metrics are resolved once and reused by
+  // selection, capability reporting and the inline editor.
+  const fontRegistry = useMemo(
+    () => (pdfLibDoc && editEngine ? new editEngine.PdfFontRegistry(pdfLibDoc) : null),
+    [pdfLibDoc, editEngine],
+  );
+
+  const pageCoordinateMapper = useMemo(
+    () =>
+      pagePointSize && pagePointSize.width > 0 && pagePointSize.height > 0
+        ? new PdfCoordinateMapper(pagePointSize.width, pagePointSize.height)
+        : null,
+    [pagePointSize],
+  );
+
+  const pageFontProfiles = useMemo(
+    () =>
+      detectedTextRuns.map((_run, index) => {
+        const match = runMatches[index];
+        const resourceName = match?.operator.fontResourceName;
+        if (!fontRegistry || !match || !resourceName) return null;
+        try {
+          return fontRegistry.resolve(match.locatedOperator.resources, resourceName);
+        } catch {
+          return null;
+        }
+      }),
+    [detectedTextRuns, runMatches, fontRegistry],
+  );
+
+  // Document → Page → Block → Line → Span model. This is a read-only view
+  // over the current page's already-proven low-level detection/matching
+  // pipeline; it does not mutate the source PDF or replace the existing
+  // content-stream editor.
+  const pageTextModel = useMemo(
+    () =>
+      pagePointSize
+        ? buildPdfPageTextModel({
+            pageIndex,
+            widthPt: pagePointSize.width,
+            heightPt: pagePointSize.height,
+            runs: detectedTextRuns,
+            matches: runMatches,
+            fontProfiles: pageFontProfiles,
+          })
+        : null,
+    [pageIndex, pagePointSize, detectedTextRuns, runMatches, pageFontProfiles],
+  );
+
+  const textRunSpatialIndex = useMemo(() => {
+    if (!pageTextModel) return null;
+    return new PercentSpatialIndex(
+      pageTextModel.spans.map((span) => ({
+        box: span.boundsPct,
+        sourceRunIndex: span.sourceRunIndex,
+      })),
+    );
+  }, [pageTextModel]);
+
+  const findDetectedRunIndexAtPoint = useCallback(
+    (xPct: number, yPct: number) =>
+      textRunSpatialIndex?.topmostAt(xPct, yPct)?.sourceRunIndex ?? -1,
+    [textRunSpatialIndex],
+  );
 
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
@@ -1341,16 +1418,20 @@ export default function EditPdfTool() {
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return;
 
+    const point =
+      pageCoordinateMapper?.screenPointToPercentPoint(event.clientX, event.clientY, rect) ?? {
+        xPct: ((event.clientX - rect.left) / rect.width) * 100,
+        yPct: ((event.clientY - rect.top) / rect.height) * 100,
+      };
+
     if (activeTool === "select") {
-      const xPct = ((event.clientX - rect.left) / rect.width) * 100;
-      const yPct = ((event.clientY - rect.top) / rect.height) * 100;
-      const run = findTextRunAtPoint(detectedTextRuns, xPct, yPct);
-      selectTextRunAndFocus(run ? detectedTextRuns.indexOf(run) : null, event.shiftKey);
+      const runIndex = findDetectedRunIndexAtPoint(point.xPct, point.yPct);
+      selectTextRunAndFocus(runIndex >= 0 ? runIndex : null, event.shiftKey);
       return;
     }
 
-    const xPct = ((event.clientX - rect.left) / rect.width) * 100;
-    const yPct = ((event.clientY - rect.top) / rect.height) * 100;
+    const xPct = point.xPct;
+    const yPct = point.yPct;
     const id = nextElementId();
 
     let element: EditElement;
@@ -1378,8 +1459,13 @@ export default function EditPdfTool() {
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return;
     (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-    const startXPct = clampPct(((event.clientX - rect.left) / rect.width) * 100);
-    const startYPct = clampPct(((event.clientY - rect.top) / rect.height) * 100);
+    const point =
+      pageCoordinateMapper?.screenPointToPercentPoint(event.clientX, event.clientY, rect) ?? {
+        xPct: ((event.clientX - rect.left) / rect.width) * 100,
+        yPct: ((event.clientY - rect.top) / rect.height) * 100,
+      };
+    const startXPct = clampPct(point.xPct);
+    const startYPct = clampPct(point.yPct);
     whiteoutGestureRef.current = { startXPct, startYPct, rect };
     setWhiteoutDraft({ xPct: startXPct, yPct: startYPct, widthPct: 0, heightPct: 0, snapped: false });
   }
@@ -1387,16 +1473,19 @@ export default function EditPdfTool() {
   function handleWhiteoutPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     const gesture = whiteoutGestureRef.current;
     if (!gesture) return;
-    const xPct = clampPct(((event.clientX - gesture.rect.left) / gesture.rect.width) * 100);
-    const yPct = clampPct(((event.clientY - gesture.rect.top) / gesture.rect.height) * 100);
+    const point =
+      pageCoordinateMapper?.screenPointToPercentPoint(event.clientX, event.clientY, gesture.rect) ?? {
+        xPct: ((event.clientX - gesture.rect.left) / gesture.rect.width) * 100,
+        yPct: ((event.clientY - gesture.rect.top) / gesture.rect.height) * 100,
+      };
+    const xPct = clampPct(point.xPct);
+    const yPct = clampPct(point.yPct);
 
-    // Snap-to-text-run: if the pointer is currently over a detected text
-    // run, the preview locks to that run's exact bounds instead of the raw
-    // drag rect -- the "cover this line in one drag" affordance the
-    // redesign asked for. Falls back to the manual rect the instant the
-    // pointer leaves every run's bounds, so the user can still draw an
-    // arbitrary box over non-text content.
-    const hoveredRun = findTextRunAtPoint(detectedTextRuns, xPct, yPct);
+    // Snap-to-text-span through the page spatial index. The resulting source
+    // run index still feeds the established whiteout geometry, so this is a
+    // performance/architecture improvement rather than a behavior rewrite.
+    const hoveredRunIndex = findDetectedRunIndexAtPoint(xPct, yPct);
+    const hoveredRun = hoveredRunIndex >= 0 ? detectedTextRuns[hoveredRunIndex] : null;
     if (hoveredRun) {
       setWhiteoutDraft({ xPct: hoveredRun.xPct, yPct: hoveredRun.yPct, widthPct: hoveredRun.widthPct, heightPct: hoveredRun.heightPct, snapped: true });
       return;
@@ -1582,10 +1671,12 @@ export default function EditPdfTool() {
     if (activeTool !== "select") return;
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const xPct = ((event.clientX - rect.left) / rect.width) * 100;
-    const yPct = ((event.clientY - rect.top) / rect.height) * 100;
-    const run = findTextRunAtPoint(detectedTextRuns, xPct, yPct);
-    const index = run ? detectedTextRuns.indexOf(run) : -1;
+    const point =
+      pageCoordinateMapper?.screenPointToPercentPoint(event.clientX, event.clientY, rect) ?? {
+        xPct: ((event.clientX - rect.left) / rect.width) * 100,
+        yPct: ((event.clientY - rect.top) / rect.height) * 100,
+      };
+    const index = findDetectedRunIndexAtPoint(point.xPct, point.yPct);
     setHoveredRunIndex((current) => (current === index ? current : index));
   }
 
@@ -2200,6 +2291,47 @@ export default function EditPdfTool() {
   // selectedRunIndices[0] at each use site.
   const singleSelectedRun = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
   const singleSelectedRunMatch = selectedRunIndices.length === 1 ? runMatches[selectedRunIndices[0]] : null;
+  const singleSelectedSpan =
+    selectedRunIndices.length === 1 ? pageTextModel?.spans[selectedRunIndices[0]] ?? null : null;
+  const inlineEditorFontFamily =
+    singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
+      ? browserFontPreview.family
+      : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
+  const pageCapabilityLabel = pageTextModel
+    ? pageTextModel.capability === "native-editable"
+      ? `${pageTextModel.editableSpanCount} text span${pageTextModel.editableSpanCount === 1 ? "" : "s"} editable`
+      : pageTextModel.capability === "mixed"
+        ? `${pageTextModel.editableSpanCount} editable · ${pageTextModel.viewOnlySpanCount + pageTextModel.unsupportedSpanCount} limited`
+        : pageTextModel.capability === "no-detected-text"
+          ? "No native text detected"
+          : "Text detected · direct editing limited"
+    : "";
+
+  // Best-effort embedded-font preview. A failed FontFace registration is
+  // expected for many PDF subsets (especially ones without browser cmap
+  // metadata), so the deterministic metric-compatible CSS fallback remains
+  // visible and the edit itself is never blocked.
+  useEffect(() => {
+    if (!fontRegistry || !singleSelectedSpan || !singleSelectedRunMatch) return;
+    const resourceName = singleSelectedRunMatch.operator.fontResourceName;
+    if (!resourceName || !singleSelectedSpan.fontProfile?.browserPreviewPossible) return;
+
+    let cancelled = false;
+    void fontRegistry
+      .ensureBrowserFont(singleSelectedRunMatch.locatedOperator.resources, resourceName)
+      .then((family) => {
+        if (cancelled || !family) return;
+        const fallback = singleSelectedSpan.fontProfile?.cssFallbackFamily ?? "sans-serif";
+        setBrowserFontPreview({
+          spanId: singleSelectedSpan.id,
+          family: `"${family}", ${fallback}`,
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [fontRegistry, singleSelectedSpan, singleSelectedRunMatch]);
+
   // Phase 29: the inline editor's Apply/Cancel toolbar (and its error
   // tooltip further below) render below the run by default -- for a run
   // near the bottom edge of the page, that can land outside the stage's
@@ -2455,6 +2587,16 @@ export default function EditPdfTool() {
                   className={`relative mx-auto w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""} ${activeTool === "whiteout" ? "touch-none" : ""}`}
                   style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
                 >
+                  {textDetectionReady && pageTextModel ? (
+                    <div
+                      data-edit-page-capability={pageTextModel.capability}
+                      role="status"
+                      className="pointer-events-none absolute right-2 top-2 z-20 rounded-full border border-black/10 bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-[#343842] shadow-sm backdrop-blur-sm"
+                    >
+                      {pageCapabilityLabel}
+                    </div>
+                  ) : null}
+
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={pageImageUrl} alt={`Page ${pageIndex + 1} preview`} className="pointer-events-none block h-full w-full select-none" />
 
@@ -2659,7 +2801,16 @@ export default function EditPdfTool() {
                         // placed text element, so a run being edited in place
                         // and a text box dropped next to it read identically.
                         className="lumeo-page-overlay-input h-full w-full rounded-[3px] border border-[var(--lumeo-gold)] bg-white px-0.5 font-semibold text-[#12141a] shadow-[0_0_0_3px_rgba(var(--lumeo-gold-rgb),0.16)] outline-none"
-                        style={{ fontSize: `${overlayFontSizePx(singleSelectedRun.fontSizePt, pagePointSize?.width ?? 0, stageWidthPx)}px` }}
+                        style={{
+                          fontSize: `${overlayFontSizePx(singleSelectedRun.fontSizePt, pagePointSize?.width ?? 0, stageWidthPx)}px`,
+                          fontFamily: inlineEditorFontFamily,
+                          fontWeight: singleSelectedSpan?.style.weight ?? 600,
+                          fontStyle: singleSelectedSpan?.style.italic ? "italic" : "normal",
+                          letterSpacing:
+                            singleSelectedSpan && singleSelectedSpan.style.charSpacingPt !== 0
+                              ? `${(singleSelectedSpan.style.charSpacingPt / Math.max(1, singleSelectedSpan.style.fontSizePt)).toFixed(4)}em`
+                              : undefined,
+                        }}
                       />
                       {/* Phase 12: icon-only pair (checkmark/X), matching the
                           compact inline-toolbar convention professional PDF/doc

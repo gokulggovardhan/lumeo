@@ -34,6 +34,10 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
   await expect(editable.first()).toBeVisible({ timeout: 90_000 });
   await waitForStageReady(page);
 
+  const capability = page.locator("[data-edit-page-capability]");
+  await expect(capability).toBeVisible();
+  await expect(capability).toHaveAttribute("data-edit-page-capability", /native-editable|mixed/);
+
   const labels = await editable.evaluateAll((nodes) =>
     nodes.map((node) => node.getAttribute("aria-label") ?? ""),
   );
@@ -49,6 +53,12 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
 
   const editor = page.getByRole("textbox", { name: "Edit text" });
   await expect(editor).toBeVisible();
+  const inheritedStyle = await editor.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { fontFamily: style.fontFamily, fontStyle: style.fontStyle, fontWeight: style.fontWeight };
+  });
+  expect(inheritedStyle.fontFamily).toMatch(/Arial|Helvetica/i);
+  expect(Number(inheritedStyle.fontWeight)).toBeGreaterThanOrEqual(400);
   await editor.fill("Employee file");
   await page.getByRole("button", { name: "Apply edit" }).click();
 
