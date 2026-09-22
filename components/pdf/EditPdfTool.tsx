@@ -72,6 +72,18 @@ import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import {
+  PdfEditSession,
+  appendPdfEditOperation,
+  createPdfEditJournal,
+  recordElementMutation,
+  type PdfEditJournal,
+  type NativeTextSourceRef,
+} from "@/lib/pdf/edit/editSession";
+import {
+  decideEditPlanLayout,
+  type PdfTextLayoutDecision,
+} from "@/lib/pdf/edit/layoutEngine";
+import {
   countElementsOnRemovedPages,
   deletePages,
   mergePdf,
@@ -119,7 +131,14 @@ type RunMatch = { locatedOperator: LocatedTextOperator; operator: LocatedTextOpe
 // one -- an elements-only action's snapshot reuses the SAME ArrayBuffer
 // reference, so the undo stack never duplicates multi-MB PDF bytes for
 // actions that didn't touch them.
-type EditHistorySnapshot = { elements: EditElement[]; pdfBytes: ArrayBuffer };
+type EditHistorySnapshot = {
+  elements: EditElement[];
+  // Working materialization for responsive preview/export. The semantic
+  // record of user intent is journal; uploaded source bytes stay immutable
+  // inside PdfEditSession.
+  pdfBytes: ArrayBuffer;
+  journal: PdfEditJournal;
+};
 
 // Phase 9.2: a live, dry-run preview of what "Apply edit" would do for the
 // CURRENT selection + draft text -- computed synchronously (buildEditPlan/
@@ -152,8 +171,16 @@ type EditPreview =
       resolvedFont: ResolvedFont;
       locatedOperator: LocatedTextOperator;
       substituteFont: string | null;
+      layoutDecision: PdfTextLayoutDecision | null;
     }
-  | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont };
+  | {
+      kind: "multi";
+      editable: boolean;
+      reason: string | null;
+      plan: MultiRunEditPlan;
+      resolvedFont: ResolvedFont;
+      layoutDecision: PdfTextLayoutDecision | null;
+    };
 
 // Phase 11 UX audit -- Shape tool's place in Edit PDF, decided: KEEP.
 // Rect/ellipse/line are genuine freeform annotation shapes with no other
