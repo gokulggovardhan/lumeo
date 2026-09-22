@@ -1,3 +1,5 @@
+import { PDFDocument as PdfLibDocument } from "pdf-lib";
+import { PdfFontRegistry } from "@/lib/pdf/edit/fontRegistry";
 import {
   BrowserConversionWorkspace,
   estimateLocalConversionStorage,
@@ -8,6 +10,9 @@ import {
   selectConversionProcessingMode,
 } from "@/lib/conversion/browser/capabilities";
 import { buildReconstructedDocx } from "@/lib/conversion/browser/pdfToWord/docx";
+import { enrichTextAppearanceFromCanvas } from "@/lib/conversion/browser/pdfToWord/appearance";
+import { classifyPageReconstruction } from "@/lib/conversion/browser/pdfToWord/classifier";
+import { reconstructOperatorTextRuns } from "@/lib/conversion/browser/pdfToWord/operatorRuns";
 import {
   ocrLinesToReconstructed,
   reconstructTextLines,
@@ -269,21 +274,24 @@ function maskEditableTextFromBackground(
   context.fillStyle = "#FFFFFF";
 
   for (const line of lines) {
-    // PDF text boxes hug the glyphs closely. Slightly over-mask them so
-    // anti-aliased source pixels cannot ghost underneath the editable Word
-    // text. Fixed-layout documents normally place these runs on flat page
-    // backgrounds; image-heavy pages retain the conservative opaque-frame
-    // path instead.
-    const paddingPt = Math.max(1.5, line.fontSizePt * 0.12);
-    const x = Math.max(0, (line.xPt - paddingPt) * scaleX);
-    const y = Math.max(0, (line.yPt - paddingPt) * scaleY);
+    if (line.visualOnly) continue;
+
+    // Keep the horizontal/top over-mask needed to remove anti-aliased source
+    // glyph pixels, but use a much tighter bottom pad. PDF underline/rule
+    // geometry frequently lives immediately below the glyph box; the old
+    // symmetric white rectangle erased it along with the source text.
+    const horizontalPaddingPt = Math.max(1.1, line.fontSizePt * 0.09);
+    const topPaddingPt = Math.max(1.0, line.fontSizePt * 0.08);
+    const bottomPaddingPt = Math.max(0.35, line.fontSizePt * 0.035);
+    const x = Math.max(0, (line.xPt - horizontalPaddingPt) * scaleX);
+    const y = Math.max(0, (line.yPt - topPaddingPt) * scaleY);
     const width = Math.max(
       1,
-      (line.widthPt + paddingPt * 2) * scaleX,
+      (line.widthPt + horizontalPaddingPt * 2) * scaleX,
     );
     const height = Math.max(
       1,
-      (line.heightPt + paddingPt * 2) * scaleY,
+      (line.heightPt + topPaddingPt + bottomPaddingPt) * scaleY,
     );
     context.fillRect(x, y, width, height);
   }
@@ -337,11 +345,19 @@ async function renderPageBackground(
     throwIfAborted(signal);
 
     if (editableLines.length > 0) {
+      const scaleX = viewport.width / pointViewport.width;
+      const scaleY = viewport.height / pointViewport.height;
+      enrichTextAppearanceFromCanvas(
+        context,
+        editableLines,
+        scaleX,
+        scaleY,
+      );
       maskEditableTextFromBackground(
         context,
         editableLines,
-        viewport.width / pointViewport.width,
-        viewport.height / pointViewport.height,
+        scaleX,
+        scaleY,
       );
     }
 
@@ -407,6 +423,8 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
 
     let workspace: BrowserConversionWorkspace | null = null;
     let document: PdfDocumentLike | null = null;
+    let sourceStructureDocument: PdfLibDocument | null = null;
+    let sourceFontRegistry: PdfFontRegistry | null = null;
     let sourceUrl = "";
 
     try {
@@ -449,6 +467,25 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
 
       sourceUrl = URL.createObjectURL(sourceFile);
       const pdfjs = await withAbort(loadPdfJsModule(), signal);
+
+      // Advanced source-operator reconstruction deliberately stays on the
+      // normal-size path. pdf-lib requires an in-memory ArrayBuffer; making a
+      // second 75-250 MB copy on mobile Safari would trade fidelity for a
+      // crash. Large/extreme documents keep the proven streaming/OPFS +
+      // PDF.js path while normal documents gain exact operator/font metrics.
+      if (mode === "normal") {
+        try {
+          const sourceBytes = await withAbort(sourceFile.arrayBuffer(), signal);
+          sourceStructureDocument = await PdfLibDocument.load(sourceBytes, {
+            updateMetadata: false,
+          });
+          sourceFontRegistry = new PdfFontRegistry(sourceStructureDocument);
+        } catch (structureError) {
+          if (signal.aborted) throw structureError;
+          sourceStructureDocument = null;
+          sourceFontRegistry = null;
+        }
+      }
 
       try {
         document = (await withAbort(
@@ -509,13 +546,49 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           textContent.items,
           textContent.styles,
         );
-        let lines = reconstructTextLines(
+        const pdfJsLines = reconstructTextLines(
           textContent.items as never,
           viewport.transform,
           viewport.width,
           viewport.height,
           textStyles,
         );
+
+        const pdfJsCharacterCount = pdfJsLines.reduce(
+          (count, line) => count + line.text.length,
+          0,
+        );
+        let lines = pdfJsLines;
+        let operatorCoverageRatio = 0;
+
+        if (sourceStructureDocument && sourceFontRegistry) {
+          try {
+            const sourceRuns = reconstructOperatorTextRuns({
+              document: sourceStructureDocument,
+              registry: sourceFontRegistry,
+              pageIndex: pageNumber - 1,
+              viewportTransform: viewport.transform,
+            });
+            operatorCoverageRatio = Math.min(
+              1,
+              sourceRuns.decodedCharacterCount /
+                Math.max(1, pdfJsCharacterCount),
+            );
+            // Prefer source operators only when they explain most of the
+            // visible text. This protects unusual/custom encoded PDFs:
+            // incomplete low-level decoding never silently drops material
+            // that PDF.js can still display.
+            if (
+              sourceRuns.lines.length > 0 &&
+              operatorCoverageRatio >= 0.78
+            ) {
+              lines = sourceRuns.lines;
+            }
+          } catch {
+            operatorCoverageRatio = 0;
+            lines = pdfJsLines;
+          }
+        }
 
         const imageCount = countImageOperators(pdfjs, operatorList.fnArray);
         const vectorLayoutCount = countVectorLayoutOperators(
@@ -524,9 +597,34 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
         );
         const shouldRasterize =
           lines.length === 0 ||
+          lines.some((line) => line.visualOnly) ||
           imageCount >= 2 ||
           (imageCount >= 1 && lines.length < 6) ||
           vectorLayoutCount > 0;
+
+        const classification = classifyPageReconstruction({
+          lines,
+          imageCount,
+          vectorLayoutCount,
+          pageWidthPt: viewport.width,
+        });
+        for (const region of classification.regions) {
+          if (region.kind !== "fixed-layout-table") continue;
+          for (const index of region.lineIndices) {
+            if (lines[index]) lines[index].regionKind = "fixed-layout-table";
+          }
+        }
+        lines.forEach((line) => {
+          if (line.regionKind) return;
+          if (line.yPt < viewport.height * 0.09) line.regionKind = "header";
+          else if (line.yPt + line.heightPt > viewport.height * 0.91)
+            line.regionKind = "footer";
+          else
+            line.regionKind =
+              classification.mode === "semantic-text"
+                ? "semantic-text"
+                : "fixed-layout";
+        });
 
         let backgroundImage: Blob | File | null = null;
         // When a native-text page only needs raster fallback for vector
@@ -579,13 +677,16 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           backgroundImage,
           backgroundExtension: backgroundImage ? "jpg" : undefined,
           backgroundTextMasked,
+          regions: classification.regions,
+          reconstructionMode: classification.mode,
+          operatorCoverageRatio,
         };
         pages.push(reconstructed);
 
         if (workspace) {
           await writeCheckpoint(workspace, reconstructed);
           await workspace.appendLog(
-            `Page ${pageNumber}: ${lines.length} editable lines, ${imageCount} image operators, ${vectorLayoutCount} vector layout operators, raster=${Boolean(backgroundImage)}.`,
+            `Page ${pageNumber}: ${lines.filter((line) => !line.visualOnly).length} editable lines, ${lines.filter((line) => line.visualOnly).length} visual-only lines, operatorCoverage=${operatorCoverageRatio.toFixed(3)}, mode=${classification.mode}, ${imageCount} image operators, ${vectorLayoutCount} vector layout operators, raster=${Boolean(backgroundImage)}.`,
           );
         }
       }
@@ -613,7 +714,9 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
         await validateGeneratedDocx(blob, {
           expectedPageCount: pages.length,
           minimumEditableTextRuns: pages.reduce(
-            (count, page) => count + page.lines.length,
+            (count, page) =>
+              count +
+              page.lines.filter((line) => !line.visualOnly).length,
             0,
           ),
           expectedBackgroundImages: pages.filter(
