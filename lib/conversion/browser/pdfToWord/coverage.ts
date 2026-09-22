@@ -51,19 +51,31 @@ function horizontalAffinity(
   return sourceRight >= left && sourceLeft <= right;
 }
 
-function candidateTextForVisibleRun(
+function candidateSourceIndicesForVisibleRun(
   visible: ReconstructedTextLine,
   sourceLines: ReconstructedTextLine[],
-): string {
+): number[] {
   return sourceLines
+    .map((source, index) => ({ source, index }))
     .filter(
-      (source) =>
+      ({ source }) =>
+        !source.visualOnly &&
         verticalAffinity(visible, source) &&
         horizontalAffinity(visible, source),
     )
-    .sort((a, b) => a.xPt - b.xPt)
-    .map((line) => line.text)
-    .join("");
+    .sort((a, b) => a.source.xPt - b.source.xPt)
+    .map(({ index }) => index);
+}
+
+function candidateTextForVisibleRun(
+  visible: ReconstructedTextLine,
+  sourceLines: ReconstructedTextLine[],
+): { text: string; indices: number[] } {
+  const indices = candidateSourceIndicesForVisibleRun(visible, sourceLines);
+  return {
+    indices,
+    text: indices.map((index) => sourceLines[index].text).join(""),
+  };
 }
 
 export type OperatorCoverageAssessment = {
@@ -109,8 +121,8 @@ export function assessOperatorRunCoverage(
   for (const line of visible) {
     const normalizedLength = normalizedCharacters(line.text).length;
     totalCharacters += normalizedLength;
-    const sourceText = candidateTextForVisibleRun(line, sourceLines);
-    if (sameCharacterMultiset(line.text, sourceText)) {
+    const candidate = candidateTextForVisibleRun(line, sourceLines);
+    if (sameCharacterMultiset(line.text, candidate.text)) {
       explainedVisibleRuns += 1;
       explainedCharacters += normalizedLength;
     } else {
@@ -132,5 +144,89 @@ export function assessOperatorRunCoverage(
       explainedVisibleRuns === visible.length &&
       characterCoverageRatio === 1,
     unexplainedVisibleText,
+  };
+}
+
+
+export type ReconciledOperatorRuns = {
+  lines: ReconstructedTextLine[];
+  assessment: OperatorCoverageAssessment;
+};
+
+/**
+ * Build a lossless hybrid page model.
+ *
+ * Proven source-operator runs replace their corresponding PDF.js runs so
+ * columns, font metrics and paint metadata stay precise. If a visible PDF.js
+ * run cannot be explained exactly (custom encoding, unsupported glyph map,
+ * etc.), every source fragment intersecting that visible region is suppressed
+ * and the complete PDF.js run is kept once. This prevents both missing text
+ * and duplicate partial text.
+ */
+export function reconcileOperatorRunsWithVisibleText(
+  visibleLines: ReconstructedTextLine[],
+  sourceLines: ReconstructedTextLine[],
+): ReconciledOperatorRuns {
+  const assessment = assessOperatorRunCoverage(visibleLines, sourceLines);
+  if (sourceLines.length === 0) {
+    return {
+      lines: visibleLines.map((line) => ({ ...line })),
+      assessment,
+    };
+  }
+
+  const retainedSourceIndices = new Set<number>();
+  const suppressedSourceIndices = new Set<number>();
+  const fallbackVisibleLines: ReconstructedTextLine[] = [];
+
+  for (const visible of visibleLines) {
+    if (!visible.text.trim()) continue;
+    const candidate = candidateTextForVisibleRun(visible, sourceLines);
+    const explained = sameCharacterMultiset(visible.text, candidate.text);
+
+    if (explained) {
+      for (const index of candidate.indices) retainedSourceIndices.add(index);
+    } else {
+      for (const index of candidate.indices) suppressedSourceIndices.add(index);
+      fallbackVisibleLines.push({
+        ...visible,
+        sourceKind: visible.sourceKind ?? "pdfjs",
+      });
+    }
+  }
+
+  // A source fragment that intersects any unresolved visible run must not be
+  // emitted independently, even if it was also considered by another visible
+  // run. The complete PDF.js fallback owns that ambiguous region.
+  for (const index of suppressedSourceIndices) {
+    retainedSourceIndices.delete(index);
+  }
+
+  const reconciled: ReconstructedTextLine[] = [
+    ...sourceLines.filter(
+      (line, index) =>
+        line.visualOnly || retainedSourceIndices.has(index),
+    ),
+    ...fallbackVisibleLines,
+  ];
+
+  // Logical/editable order is geometry-derived for the hybrid result. Source
+  // operator order remains available separately on sourceOrderIndex.
+  reconciled
+    .sort(
+      (a, b) =>
+        a.yPt - b.yPt ||
+        a.xPt - b.xPt ||
+        (a.sourceOrderIndex ?? Number.MAX_SAFE_INTEGER) -
+          (b.sourceOrderIndex ?? Number.MAX_SAFE_INTEGER),
+    )
+    .forEach((line, visualOrderIndex) => {
+      line.visualOrderIndex = visualOrderIndex;
+      line.readingOrderIndex = visualOrderIndex;
+    });
+
+  return {
+    lines: reconciled,
+    assessment,
   };
 }
