@@ -26,6 +26,39 @@ function colorDistance(a: Rgb, b: Rgb): number {
   return Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b);
 }
 
+/**
+ * Canvas anti-aliasing blends source paint with the white page background:
+ * observed = alpha * source + (1 - alpha) * white.
+ *
+ * A fixed RGB-distance threshold rejects legitimate thin-rule edge pixels,
+ * especially saturated colours. Project the observed pixel onto that
+ * source-to-white segment instead and accept it when the residual is small.
+ */
+function matchesPaintOrAntialias(pixel: Rgb, paint: Rgb): boolean {
+  const white: Rgb = { r: 255, g: 255, b: 255 };
+  const vx = paint.r - white.r;
+  const vy = paint.g - white.g;
+  const vz = paint.b - white.b;
+  const wx = pixel.r - white.r;
+  const wy = pixel.g - white.g;
+  const wz = pixel.b - white.b;
+  const denominator = vx * vx + vy * vy + vz * vz;
+  if (denominator <= 1) return colorDistance(pixel, paint) <= 32;
+
+  const alpha = Math.max(
+    0,
+    Math.min(1, (wx * vx + wy * vy + wz * vz) / denominator),
+  );
+  if (alpha < 0.08) return false;
+
+  const expected: Rgb = {
+    r: white.r + alpha * vx,
+    g: white.g + alpha * vy,
+    b: white.b + alpha * vz,
+  };
+  return colorDistance(pixel, expected) <= 26;
+}
+
 function isInk(pixel: Rgb): boolean {
   return pixel.r < 238 || pixel.g < 238 || pixel.b < 238;
 }
@@ -150,7 +183,7 @@ function hasUnderlineNearBaseline(
       const pixel = pixelAt(image.data, image.width, x, y);
       const matches =
         isInk(pixel) &&
-        (!preferredColor || colorDistance(pixel, preferredColor) <= 72);
+        (!preferredColor || matchesPaintOrAntialias(pixel, preferredColor));
       if (matches) {
         matching += 1;
         current += 1;
@@ -161,8 +194,8 @@ function hasUnderlineNearBaseline(
     }
 
     if (
-      matching / image.width >= 0.58 ||
-      longest / image.width >= 0.55
+      matching / image.width >= 0.42 ||
+      longest / image.width >= 0.40
     ) {
       return true;
     }
