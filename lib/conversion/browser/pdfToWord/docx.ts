@@ -517,21 +517,90 @@ function documentXml(
     const rel = imageRels.get(page.pageNumber);
     if (rel) body.push(imageParagraph(rel, page, page.pageNumber));
 
-    const orderedLines = [...page.lines]
-      .filter((line) => !line.visualOnly)
-      .sort(
-        (a, b) =>
-          (a.readingOrderIndex ?? a.visualOrderIndex ?? 0) -
-          (b.readingOrderIndex ?? b.visualOrderIndex ?? 0),
-      );
+    const semanticTables = (page.regions ?? []).filter(
+      (region) => region.kind === "semantic-table",
+    );
+    const tableLineIndices = new Set(
+      semanticTables.flatMap((region) => region.lineIndices),
+    );
 
-    for (const line of orderedLines) {
+    const semanticParagraphPlans =
+      page.reconstructionMode === "semantic-text" && !rel
+        ? inferSemanticParagraphs(page)
+        : [];
+    const semanticLineIndices = new Set(
+      semanticParagraphPlans.flatMap((plan) =>
+        plan.rows.flatMap((row) => row.indices),
+      ),
+    );
+
+    type PageBlock =
+      | { kind: "paragraph"; yPt: number; plan: SemanticParagraphPlan }
+      | {
+          kind: "table";
+          yPt: number;
+          region: NonNullable<ReconstructedPage["regions"]>[number];
+        }
+      | { kind: "fixed"; yPt: number; line: ReconstructedTextLine };
+
+    const blocks: PageBlock[] = [
+      ...semanticParagraphPlans.map(
+        (plan): PageBlock => ({
+          kind: "paragraph",
+          yPt: plan.topPt,
+          plan,
+        }),
+      ),
+      ...semanticTables.map(
+        (region): PageBlock => ({
+          kind: "table",
+          yPt: region.yPt,
+          region,
+        }),
+      ),
+      ...page.lines
+        .map((line, lineIndex) => ({ line, lineIndex }))
+        .filter(
+          ({ line, lineIndex }) =>
+            !line.visualOnly &&
+            !semanticLineIndices.has(lineIndex) &&
+            !tableLineIndices.has(lineIndex),
+        )
+        .map(
+          ({ line }): PageBlock => ({
+            kind: "fixed",
+            yPt: line.yPt,
+            line,
+          }),
+        ),
+    ].sort((a, b) => a.yPt - b.yPt);
+
+    let semanticCursorBottomPt = 0;
+    for (const block of blocks) {
+      if (block.kind === "paragraph") {
+        body.push(
+          semanticParagraph(
+            block.plan,
+            page,
+            Math.max(0, block.plan.topPt - semanticCursorBottomPt),
+            hyperlinkRels,
+          ),
+        );
+        semanticCursorBottomPt = block.plan.bottomPt;
+        continue;
+      }
+      if (block.kind === "table") {
+        body.push(semanticTable(page, block.region, hyperlinkRels));
+        continue;
+      }
       body.push(
         lineParagraph(
-          line,
+          block.line,
           Boolean(rel) && !page.backgroundTextMasked,
           page.widthPt,
-          line.hyperlinkUrl ? hyperlinkRels.get(line.hyperlinkUrl) ?? null : null,
+          block.line.hyperlinkUrl
+            ? hyperlinkRels.get(block.line.hyperlinkUrl) ?? null
+            : null,
         ),
       );
     }
