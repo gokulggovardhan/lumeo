@@ -63,11 +63,13 @@ import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
 import { buildPdfPageTextModel, type PdfPageTextModel } from "@/lib/pdf/edit/documentModel";
 import { PercentSpatialIndex } from "@/lib/pdf/edit/spatialIndex";
 import {
+  buildPdfTextSearchPageIndex,
   nextSearchMatchIndex,
   replacementTextForSearchMatch,
-  searchPdfDocumentText,
+  searchPdfDocumentIndex,
   searchPdfPageText,
   type PdfTextSearchMatch,
+  type PdfTextSearchPageIndex,
   type PdfTextSearchScope,
 } from "@/lib/pdf/edit/textSearch";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
@@ -582,7 +584,7 @@ export default function EditPdfTool() {
   const [textSearchCaseSensitive, setTextSearchCaseSensitive] = useState(false);
   const [textSearchWholeWord, setTextSearchWholeWord] = useState(false);
   const [textSearchActiveIndex, setTextSearchActiveIndex] = useState(-1);
-  const [textSearchPageModels, setTextSearchPageModels] = useState<ReadonlyMap<number, PdfPageTextModel>>(
+  const [textSearchPageIndexes, setTextSearchPageIndexes] = useState<ReadonlyMap<number, PdfTextSearchPageIndex>>(
     () => new Map(),
   );
   const [textSearchIndexBusy, setTextSearchIndexBusy] = useState(false);
@@ -652,7 +654,7 @@ export default function EditPdfTool() {
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
-  const textSearchPageModelsRef = useRef<Map<number, PdfPageTextModel>>(new Map());
+  const textSearchPageIndexesRef = useRef<Map<number, PdfTextSearchPageIndex>>(new Map());
   const textSearchBuildGenerationRef = useRef(0);
   // Phase 22: the render effect below already fetches this exact page and
   // computes its scaled viewport once per pageIndex -- the operator-matching
@@ -812,11 +814,11 @@ export default function EditPdfTool() {
     [textRunSpatialIndex],
   );
 
-  const searchablePageModels = useMemo(() => {
-    const models = new Map(textSearchPageModels);
-    if (pageTextModel) models.set(pageIndex, pageTextModel);
-    return [...models.values()].sort((a, b) => a.pageIndex - b.pageIndex);
-  }, [textSearchPageModels, pageTextModel, pageIndex]);
+  const searchablePageIndexes = useMemo(() => {
+    const indexes = new Map(textSearchPageIndexes);
+    if (pageTextModel) indexes.set(pageIndex, buildPdfTextSearchPageIndex(pageTextModel));
+    return [...indexes.values()].sort((a, b) => a.pageIndex - b.pageIndex);
+  }, [textSearchPageIndexes, pageTextModel, pageIndex]);
 
   const textSearchMatches = useMemo(() => {
     const options = {
@@ -829,14 +831,14 @@ export default function EditPdfTool() {
         ? searchPdfPageText(pageTextModel, textSearchQuery, options)
         : [];
     }
-    return searchPdfDocumentText(searchablePageModels, textSearchQuery, options);
+    return searchPdfDocumentIndex(searchablePageIndexes, textSearchQuery, options);
   }, [
     textSearchQuery,
     textSearchScope,
     textSearchCaseSensitive,
     textSearchWholeWord,
     pageTextModel,
-    searchablePageModels,
+    searchablePageIndexes,
   ]);
 
   const normalizedTextSearchIndex =
@@ -880,7 +882,7 @@ export default function EditPdfTool() {
     const doc = pdfJsDocRef.current;
     const generation = textSearchBuildGenerationRef.current;
     const missingPages = Array.from({ length: pdf.pageCount }, (_, index) => index).filter(
-      (index) => index !== pageIndex && !textSearchPageModelsRef.current.has(index),
+      (index) => index !== pageIndex && !textSearchPageIndexesRef.current.has(index),
     );
     if (missingPages.length === 0) return;
 
@@ -899,11 +901,12 @@ export default function EditPdfTool() {
           if (current >= missingPages.length) return;
           const targetPageIndex = missingPages[current];
 
+          let backgroundPage: PDFPageProxy | null = null;
           try {
-            const page = await doc.getPage(targetPageIndex + 1);
-            const viewport = page.getViewport({ scale: 1 });
+            backgroundPage = await doc.getPage(targetPageIndex + 1);
+            const viewport = backgroundPage.getViewport({ scale: 1 });
             const content = await withPageTimeout(
-              page.getTextContent(),
+              backgroundPage.getTextContent(),
               targetPageIndex + 1,
               PAGE_RENDER_TIMEOUT_MS,
               "extract text from",
@@ -922,15 +925,23 @@ export default function EditPdfTool() {
               runs,
               matches: runs.map(() => null),
             });
-            textSearchPageModelsRef.current.set(targetPageIndex, model);
+            textSearchPageIndexesRef.current.set(
+              targetPageIndex,
+              buildPdfTextSearchPageIndex(model),
+            );
             completedSincePublish += 1;
             if (completedSincePublish >= 4) {
               completedSincePublish = 0;
-              setTextSearchPageModels(new Map(textSearchPageModelsRef.current));
+              setTextSearchPageIndexes(new Map(textSearchPageIndexesRef.current));
             }
           } catch {
             // Search is best-effort per page. One pathological page should
             // not block searching every other page or the core editor.
+          } finally {
+            // Background indexing needs text geometry only. Release pdf.js
+            // page-level font/image/operator caches immediately instead of
+            // retaining resources for up to the full 500-page upload limit.
+            if (targetPageIndex !== pageIndex) backgroundPage?.cleanup();
           }
         }
       };
@@ -942,7 +953,7 @@ export default function EditPdfTool() {
         ),
       );
       if (cancelled || generation !== textSearchBuildGenerationRef.current) return;
-      setTextSearchPageModels(new Map(textSearchPageModelsRef.current));
+      setTextSearchPageIndexes(new Map(textSearchPageIndexesRef.current));
       setTextSearchIndexBusy(false);
     })();
 
@@ -1020,8 +1031,8 @@ export default function EditPdfTool() {
     setTextSearchWholeWord(false);
     setTextSearchActiveIndex(-1);
     setTextSearchIndexBusy(false);
-    textSearchPageModelsRef.current.clear();
-    setTextSearchPageModels(new Map());
+    textSearchPageIndexesRef.current.clear();
+    setTextSearchPageIndexes(new Map());
     textSearchBuildGenerationRef.current += 1;
     runOverlayNodesRef.current.clear();
     setActiveTool("select");
@@ -1035,10 +1046,10 @@ export default function EditPdfTool() {
   useEffect(() => {
     let cancelled = false;
     const searchGeneration = ++textSearchBuildGenerationRef.current;
-    textSearchPageModelsRef.current.clear();
+    textSearchPageIndexesRef.current.clear();
     void Promise.resolve().then(() => {
       if (cancelled || searchGeneration !== textSearchBuildGenerationRef.current) return;
-      setTextSearchPageModels(new Map());
+      setTextSearchPageIndexes(new Map());
       setTextSearchIndexBusy(false);
       setTextSearchActiveIndex(-1);
     });
