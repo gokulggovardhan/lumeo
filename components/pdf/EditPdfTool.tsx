@@ -2553,7 +2553,11 @@ export default function EditPdfTool() {
   }
 
   return (
-    <section className="relative l2-workspace-deep grid gap-4 pb-40 lg:pb-28">
+    <section
+      className="relative l2-workspace-deep grid gap-4 pb-40 lg:pb-28"
+      data-edit-operation-count={historyState.session.operations.length}
+      data-edit-session-next-sequence={historyState.session.nextSequence}
+    >
       <L2WorkspaceHeader
         title="Edit PDF"
         description={`${pdf.file.name} · ${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
