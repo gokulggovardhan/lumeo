@@ -9,6 +9,7 @@ function plan(overrides: Partial<{
   replacementWidthPt: number;
   fontSizePt: number;
   replacementGlyphCodes: number[];
+  replacementTextState: null;
 }> = {}) {
   return {
     editable: true,
@@ -17,6 +18,7 @@ function plan(overrides: Partial<{
     replacementWidthPt: 100,
     fontSizePt: 12,
     replacementGlyphCodes: [1, 2, 3, 4, 5],
+    replacementTextState: null,
     ...overrides,
   };
 }

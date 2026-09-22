@@ -364,3 +364,96 @@ test("buildEditPlan end-to-end: a real pdf-lib-authored Tj operator plans a vali
   );
   assert.ok(slice.endsWith("Tj"));
 });
+
+
+test("buildEditPlan: direct formatting measures replacement under the requested text state", () => {
+  const { resolvedFont, fontMetrics } = fixedWidthsFont();
+  const operator = fixedOperator({
+    kind: "TJ",
+    strings: [Uint8Array.from([65, 66])], // AB
+    fontSizePt: 10,
+    charSpacing: 0,
+    wordSpacing: 0,
+    horizontalScalingPct: 100,
+  });
+
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator,
+    replacementText: "AB",
+    resolvedFont,
+    fontMetrics,
+    replacementTextState: {
+      fontSizePt: 12,
+      charSpacing: 0.4,
+      wordSpacing: 0,
+      horizontalScalingPct: 95,
+    },
+  });
+
+  assert.equal(plan.editable, true);
+  assert.deepEqual(plan.replacementTextState, {
+    fontSizePt: 12,
+    charSpacing: 0.4,
+    wordSpacing: 0,
+    horizontalScalingPct: 95,
+  });
+  assert.equal(plan.fontSizePt, 10, "original text state remains the restoration state");
+  assert.equal(plan.horizontalScalingPct, 100);
+  assert.notEqual(plan.replacementWidthPt, plan.originalWidthPt);
+  assert.notEqual(plan.tjSpacingDelta, 0);
+});
+
+test("buildEditPlan: direct formatting validates ranges and rejects quote operators honestly", () => {
+  const { resolvedFont, fontMetrics } = fixedWidthsFont();
+
+  const invalidScale = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: fixedOperator(),
+    replacementText: "A",
+    resolvedFont,
+    fontMetrics,
+    replacementTextState: { horizontalScalingPct: 0 },
+  });
+  assert.equal(invalidScale.editable, false);
+  assert.match(invalidScale.reason ?? "", /horizontal scale/i);
+
+  const quote = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: fixedOperator({ kind: "'" }),
+    replacementText: "A",
+    resolvedFont,
+    fontMetrics,
+    replacementTextState: { fontSizePt: 11 },
+  });
+  assert.equal(quote.editable, false);
+  assert.match(quote.reason ?? "", /quote operators/i);
+});
+
+test("buildEditPlan: unchanged direct-format values collapse back to the established text-only path", () => {
+  const { resolvedFont, fontMetrics } = fixedWidthsFont();
+  const operator = fixedOperator();
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator,
+    replacementText: "A",
+    resolvedFont,
+    fontMetrics,
+    replacementTextState: {
+      fontSizePt: operator.fontSizePt,
+      charSpacing: operator.charSpacing,
+      wordSpacing: operator.wordSpacing,
+      horizontalScalingPct: operator.horizontalScalingPct,
+    },
+  });
+  assert.equal(plan.editable, true);
+  assert.equal(plan.replacementTextState, null);
+});
