@@ -519,25 +519,6 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
       sourceUrl = URL.createObjectURL(sourceFile);
       const pdfjs = await withAbort(loadPdfJsModule(), signal);
 
-      // Advanced source-operator reconstruction deliberately stays on the
-      // normal-size path. pdf-lib requires an in-memory ArrayBuffer; making a
-      // second 75-250 MB copy on mobile Safari would trade fidelity for a
-      // crash. Large/extreme documents keep the proven streaming/OPFS +
-      // PDF.js path while normal documents gain exact operator/font metrics.
-      if (mode === "normal") {
-        try {
-          const sourceBytes = await withAbort(sourceFile.arrayBuffer(), signal);
-          sourceStructureDocument = await PdfLibDocument.load(sourceBytes, {
-            updateMetadata: false,
-          });
-          sourceFontRegistry = new PdfFontRegistry(sourceStructureDocument);
-        } catch (structureError) {
-          if (signal.aborted) throw structureError;
-          sourceStructureDocument = null;
-          sourceFontRegistry = null;
-        }
-      }
-
       try {
         document = (await withAbort(
           pdfjs.getDocument({
@@ -556,6 +537,28 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           message: pageCountError,
           technicalMessage: pageCountError,
         });
+      }
+
+      // Page count is now known, so make the final memory decision here.
+      // A physically small PDF can still be a 150-page document; loading a
+      // second full pdf-lib object graph for it on mobile Safari would be an
+      // unnecessary peak-memory spike.
+      const reconstructionMode = selectConversionProcessingMode({
+        fileSizeBytes: input.file.size,
+        pageCount: document.numPages,
+      });
+      if (reconstructionMode === "normal") {
+        try {
+          const sourceBytes = await withAbort(sourceFile.arrayBuffer(), signal);
+          sourceStructureDocument = await PdfLibDocument.load(sourceBytes, {
+            updateMetadata: false,
+          });
+          sourceFontRegistry = new PdfFontRegistry(sourceStructureDocument);
+        } catch (structureError) {
+          if (signal.aborted) throw structureError;
+          sourceStructureDocument = null;
+          sourceFontRegistry = null;
+        }
       }
 
       const pages: ReconstructedPage[] = [];
