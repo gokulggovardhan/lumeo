@@ -7,6 +7,11 @@ import type {
 
 const TWIPS_PER_PT = 20;
 const EMU_PER_PT = 12_700;
+// Word/LibreOffice fixed-frame paragraphs render their first text baseline
+// slightly below the source-PDF top box even with zero paragraph spacing.
+// Measured across the privacy-safe fidelity corpus and the private acceptance
+// benchmark, 0.75 pt removes that renderer inset without touching source X/Y.
+const FRAME_TEXT_TOP_COMPENSATION_PT = 0.75;
 
 function xmlEscape(value: string): string {
   return value
@@ -28,6 +33,7 @@ function lineParagraph(
   line: ReconstructedTextLine,
   useOpaqueBackground: boolean,
   pageWidthPt: number,
+  hyperlinkRelationshipId: string | null = null,
 ): string {
   const fontSizeHalfPt = Math.max(12, Math.round(line.fontSizePt * 2));
   const family = xmlEscape(line.fontFamily || "Arial");
@@ -36,6 +42,20 @@ function lineParagraph(
     : "";
   const bold = line.bold ? "<w:b/>" : "";
   const italic = line.italic ? "<w:i/>" : "";
+  const color = /^#[0-9A-Fa-f]{6}$/.test(line.colorHex ?? "")
+    ? `<w:color w:val="${xmlEscape((line.colorHex ?? "#000000").slice(1).toUpperCase())}"/>`
+    : "";
+  const underlineColor =
+    line.underline && /^#[0-9A-Fa-f]{6}$/.test(line.underlineColorHex ?? line.colorHex ?? "")
+      ? (line.underlineColorHex ?? line.colorHex ?? "#000000").slice(1).toUpperCase()
+      : null;
+  const underline = line.underline
+    ? `<w:u w:val="single"${underlineColor ? ` w:color="${xmlEscape(underlineColor)}"` : ""}/>`
+    : "";
+  const wordScale =
+    typeof line.wordScalePct === "number" && Number.isFinite(line.wordScalePct)
+      ? `<w:w w:val="${Math.max(70, Math.min(130, Math.round(line.wordScalePct)))}"/>`
+      : "";
   // A PDF run's measured advance is often a few points narrower than the
   // width Word needs after font substitution. A narrow frame therefore turns
   // one fixed-layout run into two flowing lines. Give the frame the remaining
@@ -55,24 +75,29 @@ function lineParagraph(
       w:h="${twips(Math.max(line.heightPt, line.fontSizePt * 1.2))}"
       w:hRule="atLeast"
       w:x="${twips(line.xPt)}"
-      w:y="${twips(line.yPt)}"
+      w:y="${twips(Math.max(0, line.yPt - FRAME_TEXT_TOP_COMPENSATION_PT))}"
       w:hAnchor="page"
       w:vAnchor="page"
       w:wrap="notBeside"/>
-    <w:spacing w:before="0" w:after="0" w:line="${twips(line.fontSizePt * 1.15)}" w:lineRule="atLeast"/>
+    <w:spacing w:before="0" w:after="0" w:line="${twips(line.fontSizePt * 1.15)}" w:lineRule="exact"/>
     ${shade}
   </w:pPr>
+  ${hyperlinkRelationshipId ? `<w:hyperlink r:id="${hyperlinkRelationshipId}" w:history="1">` : ""}
   <w:r>
     <w:rPr>
       <w:rFonts w:ascii="${family}" w:hAnsi="${family}" w:cs="${family}"/>
       <w:sz w:val="${fontSizeHalfPt}"/>
       <w:szCs w:val="${fontSizeHalfPt}"/>
       <w:fitText w:val="${twips(Math.max(line.widthPt, 1))}"/>
+      ${wordScale}
+      ${color}
+      ${underline}
       ${bold}
       ${italic}
     </w:rPr>
     <w:t xml:space="preserve">${xmlEscape(line.text)}</w:t>
   </w:r>
+  ${hyperlinkRelationshipId ? "</w:hyperlink>" : ""}
 </w:p>`;
 }
 
@@ -141,19 +166,32 @@ function sectionProperties(page: ReconstructedPage, nextPage: boolean): string {
 </w:sectPr>`;
 }
 
-function documentXml(pages: ReconstructedPage[], imageRels: Map<number, string>): string {
+function documentXml(
+  pages: ReconstructedPage[],
+  imageRels: Map<number, string>,
+  hyperlinkRels: Map<string, string>,
+): string {
   const body: string[] = [];
 
   pages.forEach((page, index) => {
     const rel = imageRels.get(page.pageNumber);
     if (rel) body.push(imageParagraph(rel, page, page.pageNumber));
 
-    for (const line of page.lines) {
+    const orderedLines = [...page.lines]
+      .filter((line) => !line.visualOnly)
+      .sort(
+        (a, b) =>
+          (a.readingOrderIndex ?? a.visualOrderIndex ?? 0) -
+          (b.readingOrderIndex ?? b.visualOrderIndex ?? 0),
+      );
+
+    for (const line of orderedLines) {
       body.push(
         lineParagraph(
           line,
           Boolean(rel) && !page.backgroundTextMasked,
           page.widthPt,
+          line.hyperlinkUrl ? hyperlinkRels.get(line.hyperlinkUrl) ?? null : null,
         ),
       );
     }
@@ -191,6 +229,22 @@ export async function buildReconstructedDocx(
   const zip = new JSZip();
   const imageRelationships: string[] = [];
   const imageRels = new Map<number, string>();
+  const hyperlinkRelationships: string[] = [];
+  const hyperlinkRels = new Map<string, string>();
+
+  let hyperlinkIndex = 1;
+  for (const page of pages) {
+    for (const line of page.lines) {
+      const url = line.hyperlinkUrl;
+      if (!url || hyperlinkRels.has(url)) continue;
+      const relationshipId = `rIdHyperlink${hyperlinkIndex}`;
+      hyperlinkRels.set(url, relationshipId);
+      hyperlinkRelationships.push(
+        `<Relationship Id="${relationshipId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="${xmlEscape(url)}" TargetMode="External"/>`,
+      );
+      hyperlinkIndex += 1;
+    }
+  }
 
   let imageIndex = 1;
   for (const page of pages) {
@@ -235,7 +289,10 @@ export async function buildReconstructedDocx(
 </Relationships>`,
   );
 
-  zip.folder("word")?.file("document.xml", documentXml(pages, imageRels));
+  zip.folder("word")?.file(
+    "document.xml",
+    documentXml(pages, imageRels, hyperlinkRels),
+  );
   zip.folder("word")?.file(
     "styles.xml",
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -257,6 +314,7 @@ export async function buildReconstructedDocx(
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rIdStyles" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   ${imageRelationships.join("\n")}
+  ${hyperlinkRelationships.join("\n")}
 </Relationships>`,
   );
 
