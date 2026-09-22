@@ -66,7 +66,7 @@ test("operator reconstruction keeps independently positioned source operators sp
   assert.match(blue.colorHex ?? "", /^#0000E[CD-F]$/);
   assert.equal(blue.readingOrderIndex, 3);
 
-  await pdfjs.destroy();
+  await (pdfjs as { destroy?: () => Promise<void> | void }).destroy?.();
 });
 
 test("operator reconstruction carries real font metrics and source reading order separately from visual order", async () => {
@@ -118,7 +118,7 @@ test("operator reconstruction carries real font metrics and source reading order
   assert.ok((firstVisual.wordScalePct ?? 0) > 90);
   assert.ok((firstVisual.wordScalePct ?? 0) < 110);
 
-  await pdfjs.destroy();
+  await (pdfjs as { destroy?: () => Promise<void> | void }).destroy?.();
 });
 
 test("page classifier recognizes repeated invoice columns without forcing a Word table", () => {
