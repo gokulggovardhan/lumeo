@@ -2074,6 +2074,7 @@ export default function EditPdfTool() {
     ];
 
     let blankedBytes: ArrayBuffer | null = null;
+    let blankSemanticOperation: ReturnType<typeof nativeTextOperation> | null = null;
     const doc = pdfLibDocRef.current;
     const engine = editEngineRef.current;
     if (doc && engine && resolvedEditContext.kind === "single") {
@@ -2098,6 +2099,17 @@ export default function EditPdfTool() {
           });
           const saved = await doc.save();
           blankedBytes = saved.buffer.slice(saved.byteOffset, saved.byteOffset + saved.byteLength) as ArrayBuffer;
+          const selectedIndex = selectedRunIndices[0];
+          blankSemanticOperation = nativeTextOperation({
+            pageIndex,
+            spanIds: [pageTextModel?.spans[selectedIndex]?.id ?? `p${pageIndex}-span-${selectedIndex}`],
+            contentStreamIndex: blankPlan.formPath ? null : blankPlan.contentStreamIndex,
+            formPath: blankPlan.formPath,
+            operatorIndices: [blankPlan.operatorIndex],
+            fontResourceName: blankPlan.fontResourceName,
+            originalText: blankPlan.originalText,
+            replacementText: "",
+          });
         } catch {
           // Leave the original text in place rather than half-applying an
           // edit; the notice below tells the user what actually happened.
@@ -2106,10 +2118,19 @@ export default function EditPdfTool() {
       }
     }
 
-    setHistoryState((current) => ({
-      elements: [...current.elements, ...added],
-      pdfBytes: blankedBytes ?? current.pdfBytes,
-    }));
+    setHistoryState((current) => {
+      const nextElements = [...current.elements, ...added];
+      const elementOperations = deriveElementOperations(current.elements, nextElements);
+      const operations = blankSemanticOperation
+        ? [blankSemanticOperation, ...elementOperations]
+        : elementOperations;
+      return {
+        ...current,
+        elements: nextElements,
+        pdfBytes: blankedBytes ?? current.pdfBytes,
+        session: appendPdfEditOperations(current.session, operations),
+      };
+    });
     setRestyleKeptOriginalText(blankedBytes === null);
     // The download URL is cleared by setHistoryState itself -- see its
     // wrapper near the top of this component.
@@ -2137,26 +2158,45 @@ export default function EditPdfTool() {
   // so a restructured document can never stay downloadable at its old
   // shape. That is the whole reason the invalidation was centralised.
   async function runPageOperation(
-    operation: () => Promise<{ bytes: ArrayBuffer; pageMap: PageMap; pageCount: number }>,
+    execute: () => Promise<{ bytes: ArrayBuffer; pageMap: PageMap; pageCount: number }>,
     describe: (droppedElements: number) => string,
+    semantic: {
+      operation: "reorder" | "delete" | "merge";
+      affectedPageIndices: number[];
+    },
   ) {
     if (pageOpBusy) return;
     setPageOpBusy(true);
     setPageOpNotice("");
     setError("");
     try {
-      const { bytes, pageMap, pageCount } = await operation();
+      const { bytes, pageMap, pageCount } = await execute();
       const dropped = countElementsOnRemovedPages(elements, pageMap);
+      const description = describe(dropped);
+      const beforePageCount = pdfMeta?.pageCount ?? pageCount;
 
-      setHistoryState((current) => ({
-        elements: remapElements(current.elements, pageMap),
-        pdfBytes: bytes,
-      }));
+      setHistoryState((current) => {
+        const nextElements = remapElements(current.elements, pageMap);
+        const elementOperations = deriveElementOperations(current.elements, nextElements);
+        const pageEdit = createPageEditOperation({
+          operation: semantic.operation,
+          beforePageCount,
+          afterPageCount: pageCount,
+          affectedPageIndices: semantic.affectedPageIndices,
+          description,
+        });
+        return {
+          ...current,
+          elements: nextElements,
+          pdfBytes: bytes,
+          session: appendPdfEditOperations(current.session, [pageEdit, ...elementOperations]),
+        };
+      });
       setPageIndex((current) => remapPageIndex(current, pageMap, pageCount));
       setSelectedPages(new Set());
       setSelectedId(null);
       selectTextRun(null);
-      setPageOpNotice(describe(dropped));
+      setPageOpNotice(description);
     } catch (operationError) {
       setError(operationError instanceof Error ? operationError.message : "That page operation could not be completed.");
     } finally {
@@ -2171,6 +2211,7 @@ export default function EditPdfTool() {
     void runPageOperation(
       () => reorderPages(historyState.pdfBytes, order),
       () => `Moved page ${fromIndex + 1} to position ${toIndex + 1}.`,
+      { operation: "reorder", affectedPageIndices: [fromIndex, toIndex] },
     );
   }
 
@@ -2184,6 +2225,7 @@ export default function EditPdfTool() {
         // Named explicitly rather than left to be discovered: the elements
         // are gone from the document and only Undo brings them back.
         (dropped > 0 ? `, along with ${dropped} placed item${dropped === 1 ? "" : "s"} on them.` : "."),
+      { operation: "delete", affectedPageIndices: targets },
     );
   }
 
@@ -2196,6 +2238,7 @@ export default function EditPdfTool() {
     void runPageOperation(
       () => mergePdf(historyState.pdfBytes, incoming, insertAt),
       () => `Added ${sanitizePdfFileName(file.name)} after page ${pageIndex + 1}.`,
+      { operation: "merge", affectedPageIndices: [insertAt] },
     );
   }
 
@@ -2310,7 +2353,23 @@ export default function EditPdfTool() {
         return { ...mask, widthPct: box.widthPct, heightPct: box.heightPct };
       });
 
-      setHistoryState((current) => ({ elements: [...current.elements, ...masks], pdfBytes: outcome.bytes }));
+      setHistoryState((current) => {
+        const nextElements = [...current.elements, ...masks];
+        const elementOperations = deriveElementOperations(current.elements, nextElements);
+        const redactionEdit = createPageEditOperation({
+          operation: "redact",
+          beforePageCount: pdfMeta?.pageCount ?? 0,
+          afterPageCount: pdfMeta?.pageCount ?? 0,
+          affectedPageIndices: [pageIndex],
+          description: `Redacted ${redactionTargets.length} detected text region${redactionTargets.length === 1 ? "" : "s"} on page ${pageIndex + 1}.`,
+        });
+        return {
+          ...current,
+          elements: nextElements,
+          pdfBytes: outcome.bytes,
+          session: appendPdfEditOperations(current.session, [redactionEdit, ...elementOperations]),
+        };
+      });
       setRedactionOutcome(outcome);
       setRedactionBoxes([]);
       setSelectedId(null);
