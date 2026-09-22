@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { TEXT_ONLY_PDF, writeFixtures } from "./fixtures.ts";
 
 const EDITABLE_RUN = 'div[role="button"][aria-label^="Editable text"]';
@@ -59,7 +60,7 @@ test.beforeAll(async () => {
   await writeFixtures();
 });
 
-test("production Edit PDF loads the deployed pdf.js worker and detects text", async ({
+test("production Edit PDF detects, edits, exports and reopens native text", async ({
   page,
 }) => {
   const assetFailures = collectProductionAssetFailures(page);
@@ -70,13 +71,56 @@ test("production Edit PDF loads the deployed pdf.js worker and detects text", as
   await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
 
   const editableRuns = page.locator(EDITABLE_RUN);
-  await expect(editableRuns.first()).toBeVisible();
+  await expect(editableRuns.first()).toBeVisible({ timeout: 90_000 });
+  await expect(page.locator("[data-edit-page-capability]")).toHaveAttribute(
+    "data-edit-page-capability",
+    /native-editable|mixed/,
+  );
 
   const labels = await editableRuns.evaluateAll((nodes) =>
     nodes.map((node) => node.getAttribute("aria-label") ?? "").join(" "),
   );
   expect(labels).toContain("Employee record");
   expect(labels).toContain("123-45-6789");
+
+  const employeeRun = page
+    .locator('div[role="button"][aria-label^="Editable text"][aria-label*="Employee record"]')
+    .first();
+  await employeeRun.click();
+
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await editor.fill("Employee file");
+  await page.getByRole("button", { name: "Apply edit" }).click();
+
+  const changedRun = page.locator(
+    'div[role="button"][aria-label^="Editable text"][aria-label*="Employee file"]',
+  );
+  await expect(changedRun).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", { name: "Download edited PDF" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const outputPath = await (await downloadPromise).path();
+  expect(outputPath).not.toBeNull();
+
+  const bytes = await readFile(outputPath!);
+  expect(bytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+  const exported = await PDFDocument.load(bytes);
+  expect(exported.getPageCount()).toBe(1);
+
+  const textDoc = await pdfjsLib.getDocument({ data: new Uint8Array(bytes) }).promise;
+  const textPage = await textDoc.getPage(1);
+  const content = await textPage.getTextContent();
+  const extracted = content.items
+    .map((item) => ("str" in item ? item.str : ""))
+    .join(" ");
+  expect(extracted).toContain("Employee file");
+  expect(extracted).not.toContain("Employee record");
+  await textDoc.destroy();
 
   expect(assetFailures).toEqual([]);
   expect(pageErrors).toEqual([]);
