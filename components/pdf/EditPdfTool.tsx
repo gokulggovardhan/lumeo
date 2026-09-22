@@ -72,6 +72,15 @@ import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import {
+  appendPdfEditOperations,
+  createPdfEditSession,
+  deriveElementOperations,
+  nativeTextOperation,
+  pageOperation as createPageEditOperation,
+  type PdfEditSessionState,
+} from "@/lib/pdf/edit/editSession";
+import { decideReplacementLayout } from "@/lib/pdf/edit/replacementLayout";
+import {
   countElementsOnRemovedPages,
   deletePages,
   mergePdf,
@@ -119,7 +128,16 @@ type RunMatch = { locatedOperator: LocatedTextOperator; operator: LocatedTextOpe
 // one -- an elements-only action's snapshot reuses the SAME ArrayBuffer
 // reference, so the undo stack never duplicates multi-MB PDF bytes for
 // actions that didn't touch them.
-type EditHistorySnapshot = { elements: EditElement[]; pdfBytes: ArrayBuffer };
+type EditHistorySnapshot = {
+  elements: EditElement[];
+  /**
+   * Materialized result of the semantic session operations for compatibility
+   * with the proven pdf-lib/content-stream writer. This is a cache, not the
+   * only record of what the user did.
+   */
+  pdfBytes: ArrayBuffer;
+  session: PdfEditSessionState;
+};
 
 // Phase 9.2: a live, dry-run preview of what "Apply edit" would do for the
 // CURRENT selection + draft text -- computed synchronously (buildEditPlan/
@@ -411,7 +429,7 @@ export default function EditPdfTool() {
     canRedo,
     reset: resetHistory,
   } = useHistoryState<EditHistorySnapshot>(
-    { elements: [], pdfBytes: new ArrayBuffer(0) },
+    { elements: [], pdfBytes: new ArrayBuffer(0), session: createPdfEditSession(0) },
     { maxTotalSize: EDIT_HISTORY_MAX_BYTES, sizeOf: (snapshot) => snapshot.pdfBytes.byteLength },
   );
   // Every document mutation -- placing, moving, restyling or deleting an
@@ -445,10 +463,18 @@ export default function EditPdfTool() {
   // widened to also carry pdfBytes alongside elements. (Full-snapshot
   // resets go through resetHistory directly -- see resetTool/addFile.)
   const setElements = useCallback((updater: EditElement[] | ((current: EditElement[]) => EditElement[])) => {
-    setHistoryState((current) => ({
-      ...current,
-      elements: typeof updater === "function" ? (updater as (c: EditElement[]) => EditElement[])(current.elements) : updater,
-    }));
+    setHistoryState((current) => {
+      const nextElements =
+        typeof updater === "function"
+          ? (updater as (c: EditElement[]) => EditElement[])(current.elements)
+          : updater;
+      const operations = deriveElementOperations(current.elements, nextElements);
+      return {
+        ...current,
+        elements: nextElements,
+        session: appendPdfEditOperations(current.session, operations),
+      };
+    });
   }, [setHistoryState]);
   // Tracks the ORIGINAL uploaded bytes (set once per upload in addFile) so
   // "has this document had a true text edit applied" can be derived by
@@ -759,7 +785,7 @@ export default function EditPdfTool() {
     setPagePointSize(null);
     setError("");
     setOriginalBytes(null);
-    resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0) });
+    resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0), session: createPdfEditSession(0) });
     setSelectedId(null);
     setDetectedTextRuns([]);
     setRunMatches([]);
@@ -1390,7 +1416,7 @@ export default function EditPdfTool() {
       setPdfMeta({ file, pageCount });
       setPageIndex(0);
       setOriginalBytes(bytes);
-      resetHistory({ elements: [], pdfBytes: bytes });
+      resetHistory({ elements: [], pdfBytes: bytes, session: createPdfEditSession(bytes.byteLength) });
       setSelectedId(null);
       setDownloadUrl("");
     } catch (uploadError) {
