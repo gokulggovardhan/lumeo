@@ -359,6 +359,18 @@ function clampPct(value: number) {
   return Math.min(100, Math.max(0, value));
 }
 
+function cssTextPaint(
+  hex: string | null | undefined,
+  opacity: number | null | undefined,
+): string | undefined {
+  if (!hex) return undefined;
+  if (opacity === null || opacity === undefined || opacity >= 0.999) return hex;
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!match) return hex;
+  const alpha = Math.min(1, Math.max(0, opacity));
+  return `rgba(${Number.parseInt(match[1], 16)}, ${Number.parseInt(match[2], 16)}, ${Number.parseInt(match[3], 16)}, ${alpha})`;
+}
+
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName.toLowerCase();
@@ -3490,6 +3502,8 @@ export default function EditPdfTool() {
                           }
                         }}
                         aria-label="Edit text"
+                        data-native-fill-color={singleSelectedSpan?.style.fillColor?.cssHex ?? undefined}
+                        data-native-fill-opacity={singleSelectedSpan?.style.fillOpacity ?? undefined}
                         // lumeo-page-overlay-input opts out of the app-chrome
                         // input styling in globals.css, whose themed
                         // --surface-input was beating this bg-white on
@@ -3514,6 +3528,10 @@ export default function EditPdfTool() {
                           fontFamily: inlineEditorFontFamily,
                           fontWeight: singleSelectedSpan?.style.weight ?? 600,
                           fontStyle: singleSelectedSpan?.style.italic ? "italic" : "normal",
+                          color: cssTextPaint(
+                            singleSelectedSpan?.style.fillColor?.cssHex,
+                            singleSelectedSpan?.style.fillOpacity,
+                          ),
                           letterSpacing:
                             activeNativeStyleDraft && activeNativeStyleDraft.charSpacing !== 0
                               ? `${(activeNativeStyleDraft.charSpacing / Math.max(1, activeNativeStyleDraft.fontSizePt)).toFixed(4)}em`
