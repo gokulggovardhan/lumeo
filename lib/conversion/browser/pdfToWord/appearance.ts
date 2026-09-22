@@ -121,18 +121,25 @@ function dominantInkColor(
   };
 }
 
-function hasUnderlineNearBottom(
+function hasUnderlineNearBaseline(
   image: ImageData,
-  textBottomPx: number,
+  baselinePx: number,
   preferredColor: Rgb | null,
-  searchRadiusPx: number,
+  scaleY: number,
 ): boolean {
   if (image.width < 8) return false;
 
-  const y0 = Math.max(0, Math.floor(textBottomPx - searchRadiusPx));
+  // PDF underline geometry is baseline-relative, not text-box-bottom-relative.
+  // Typical producers paint the rule roughly 0.5-2 pt below the baseline.
+  // Keep the search band tight so invoice/table rules farther below a label
+  // are not misclassified as character underlines.
+  const y0 = Math.max(
+    0,
+    Math.floor(baselinePx + 0.25 * scaleY),
+  );
   const y1 = Math.min(
     image.height - 1,
-    Math.ceil(textBottomPx + searchRadiusPx),
+    Math.ceil(baselinePx + 2.5 * scaleY),
   );
 
   for (let y = y0; y <= y1; y += 1) {
@@ -191,10 +198,14 @@ export function enrichTextAppearanceFromCanvas(
       Math.ceil((line.xPt + line.widthPt) * scaleX),
     );
     const textBottom = (line.yPt + line.heightPt) * scaleY;
-    const underlineRadiusPx = Math.max(1, 1.25 * scaleY);
+    const baseline =
+      typeof line.baselinePt === "number"
+        ? line.baselinePt * scaleY
+        : textBottom - Math.max(1, line.fontSizePt * 0.15 * scaleY);
+    const underlineBottom = baseline + 2.5 * scaleY;
     const bottom = Math.min(
       canvas.height,
-      Math.ceil(textBottom + underlineRadiusPx),
+      Math.ceil(Math.max(textBottom, underlineBottom)),
     );
     const width = right - left;
     const height = bottom - top;
@@ -212,6 +223,10 @@ export function enrichTextAppearanceFromCanvas(
       local.height - 1,
       Math.max(0, textBottom - top),
     );
+    const localBaseline = Math.min(
+      local.height - 1,
+      Math.max(0, baseline - top),
+    );
     const sampled = dominantInkColor(local, localTextBottom);
 
     // Content-stream colour is authoritative when available. Sampling fills
@@ -222,11 +237,11 @@ export function enrichTextAppearanceFromCanvas(
 
     const preferred = parseHex(line.colorHex) ?? sampled;
     if (
-      hasUnderlineNearBottom(
+      hasUnderlineNearBaseline(
         local,
-        localTextBottom,
+        localBaseline,
         preferred,
-        underlineRadiusPx,
+        scaleY,
       )
     ) {
       line.underline = true;
