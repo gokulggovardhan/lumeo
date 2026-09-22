@@ -125,7 +125,8 @@ test("runtime manifest must match the immutable release and pinned helper", () =
 
 test("runtime manifest requires every expected Office payload file", () => {
   const manifest = validManifest();
-  const { ["soffice.wasm"]: _removed, ...files } = manifest.files;
+  const files = { ...manifest.files };
+  delete files["soffice.wasm"];
 
   assert.throws(
     () =>

@@ -5,7 +5,7 @@ import { maybeHandleOfficeRuntimeRequest } from "./office-runtime";
 
 type FetchArgs = Parameters<typeof handler.fetch>;
 
-export default {
+const worker = {
   async fetch(...args: FetchArgs) {
     const request = args[0];
     const redirectUrl = canonicalRedirectUrl(
@@ -27,3 +27,5 @@ export default {
     return withProductionSecurityHeaders(request, response);
   },
 };
+
+export default worker;
