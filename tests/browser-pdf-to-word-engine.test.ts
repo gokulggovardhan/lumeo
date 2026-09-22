@@ -234,3 +234,82 @@ test("PDF reconstruction preserves vector-heavy geometry while masking native te
   assert.match(source, /imageCount === 0/);
   assert.match(source, /backgroundTextMasked/);
 });
+
+
+test("DOCX fixed-layout output preserves color, underline, metric scale, hyperlink and source reading order", async () => {
+  const blob = await buildReconstructedDocx([
+    {
+      pageNumber: 1,
+      widthPt: 612,
+      heightPt: 792,
+      lines: [
+        {
+          text: "SECOND-SOURCE",
+          xPt: 72,
+          yPt: 160,
+          widthPt: 82,
+          heightPt: 12,
+          fontSizePt: 10.7,
+          fontFamily: "Arial",
+          bold: false,
+          italic: false,
+          readingOrderIndex: 0,
+          visualOrderIndex: 1,
+          colorHex: "#0000EE",
+          underline: true,
+          underlineColorHex: "#0000EE",
+          wordScalePct: 103.4,
+          hyperlinkUrl: "https://example.com/fidelity",
+        },
+        {
+          text: "FIRST-VISUAL",
+          xPt: 72,
+          yPt: 100,
+          widthPt: 75,
+          heightPt: 12,
+          fontSizePt: 10.7,
+          fontFamily: "Arial",
+          bold: false,
+          italic: false,
+          readingOrderIndex: 1,
+          visualOrderIndex: 0,
+        },
+        {
+          text: "ROTATED-BACKGROUND-ONLY",
+          xPt: 500,
+          yPt: 200,
+          widthPt: 100,
+          heightPt: 12,
+          fontSizePt: 10,
+          fontFamily: "Arial",
+          bold: false,
+          italic: false,
+          visualOnly: true,
+        },
+      ],
+      backgroundImage: null,
+    },
+  ]);
+
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+  const documentXml = await zip.file("word/document.xml")?.async("string");
+  const rels = await zip
+    .file("word/_rels/document.xml.rels")
+    ?.async("string");
+
+  assert.ok(documentXml && rels);
+  assert.match(documentXml, /<w:color w:val="0000EE"\/>/);
+  assert.match(documentXml, /<w:u w:val="single" w:color="0000EE"\/>/);
+  assert.match(documentXml, /<w:w w:val="103"\/>/);
+  assert.match(documentXml, /w:lineRule="exact"/);
+  assert.match(documentXml, /w:y="3185"/);
+  assert.match(documentXml, /<w:hyperlink r:id="rIdHyperlink1"/);
+  assert.match(rels, /relationships\/hyperlink/);
+  assert.match(rels, /Target="https:\/\/example\.com\/fidelity"/);
+  assert.ok(
+    documentXml.indexOf("SECOND-SOURCE") <
+      documentXml.indexOf("FIRST-VISUAL"),
+    "XML/read order follows source order rather than visual Y order",
+  );
+  assert.doesNotMatch(documentXml, /ROTATED-BACKGROUND-ONLY/);
+});
