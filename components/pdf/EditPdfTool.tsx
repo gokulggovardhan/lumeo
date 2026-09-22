@@ -839,6 +839,17 @@ export default function EditPdfTool() {
     normalizedTextSearchIndex >= 0
       ? textSearchMatches[normalizedTextSearchIndex] ?? null
       : null;
+  const activeTextSearchReplacementPlan = useMemo(
+    () =>
+      pageTextModel && activeTextSearchMatch?.pageIndex === pageIndex
+        ? replacementTextForSearchMatch(
+            pageTextModel,
+            activeTextSearchMatch,
+            textSearchReplacement,
+          )
+        : null,
+    [pageTextModel, activeTextSearchMatch, pageIndex, textSearchReplacement],
+  );
   const currentPageTextSearchMatches = useMemo(
     () => textSearchMatches.filter((match) => match.pageIndex === pageIndex),
     [textSearchMatches, pageIndex],
@@ -1895,6 +1906,61 @@ export default function EditPdfTool() {
     // this is imperative, not stylable.
     const reduceMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     input.scrollIntoView({ block: "center", behavior: reduceMotion ? "auto" : "smooth" });
+  }
+
+  function activateTextSearchMatch(index: number) {
+    if (textSearchMatches.length === 0) return;
+    const bounded = Math.max(0, Math.min(index, textSearchMatches.length - 1));
+    const match = textSearchMatches[bounded];
+    setTextSearchActiveIndex(bounded);
+    if (!match) return;
+    if (match.pageIndex !== pageIndex) {
+      setPageIndex(match.pageIndex);
+      return;
+    }
+    const firstRun = match.sourceRunIndices[0];
+    if (firstRun !== undefined) {
+      setFocusedRunIndex(firstRun);
+      requestAnimationFrame(() => {
+        runOverlayNodesRef.current.get(firstRun)?.scrollIntoView({
+          block: "center",
+          inline: "nearest",
+          behavior: "smooth",
+        });
+      });
+    }
+  }
+
+  function stepTextSearch(direction: 1 | -1) {
+    const next = nextSearchMatchIndex(
+      textSearchMatches,
+      normalizedTextSearchIndex,
+      direction,
+    );
+    if (next >= 0) activateTextSearchMatch(next);
+  }
+
+  function prepareActiveTextSearchReplacement() {
+    const plan = activeTextSearchReplacementPlan;
+    if (!plan || !activeTextSearchMatch || activeTextSearchMatch.pageIndex !== pageIndex) return;
+    const indices = [...new Set(plan.sourceRunIndices)].sort((a, b) => a - b);
+    if (indices.length === 0) return;
+
+    setActiveTool("select");
+    setSelectedId(null);
+    setSelectionAnchorIndex(indices[0]);
+    setSelectedRunIndices(indices);
+    setEditDraftText(plan.replacementText);
+    setEditApplyError("");
+    setUseSubstituteFont(false);
+    setNativeFormatOpen(false);
+
+    if (indices.length === 1) {
+      requestAnimationFrame(() => {
+        inlineEditInputRef.current?.focus();
+        inlineEditInputRef.current?.select();
+      });
+    }
   }
 
   // Hover highlighting for the select tool -- a discrete "did the hit-test
