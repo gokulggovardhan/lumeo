@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { AdminContext, AdminMembership, AdminRole } from "@/lib/admin/types";
 
@@ -77,9 +78,13 @@ export async function getAdminContextWithClient(
   };
 }
 
-export async function getAdminContext(): Promise<AdminContext> {
+const getRequestAdminContext = cache(async (): Promise<AdminContext> => {
   const supabase = await createClient();
   return getAdminContextWithClient(supabase);
+});
+
+export async function getAdminContext(): Promise<AdminContext> {
+  return getRequestAdminContext();
 }
 
 export async function requireAdmin() {

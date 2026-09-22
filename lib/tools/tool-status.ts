@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
+import { resolveEffectivePublicToolState } from "@/lib/tools/public-state";
 
 export type ToolBlockedState =
   | { blocked: false }
@@ -15,14 +16,12 @@ export type ToolBlockedState =
 export async function getToolBlockedState(slug: string): Promise<ToolBlockedState> {
   const catalog = await getPublicPdfCatalog();
   const dbTool = catalog.tools.find((tool) => tool.toolSlug === slug);
-  if (!dbTool) return { blocked: false };
-
-  const live = dbTool.isEnabled && (dbTool.status === "active" || dbTool.status === "beta");
-  if (live) return { blocked: false };
+  const state = resolveEffectivePublicToolState(dbTool);
+  if (state.usable) return { blocked: false };
 
   return {
     blocked: true,
-    status: dbTool.isEnabled ? dbTool.status : "hidden",
-    message: dbTool.maintenanceMessage,
+    status: state.status,
+    message: state.message,
   };
 }
