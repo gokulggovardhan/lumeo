@@ -22,7 +22,7 @@ import { encodeWithFallbackFont, fallbackFontMetrics, firstUnencodableChar, pick
 import type { ResolvedFont } from "./fontEncoding.ts";
 import { classifyReplacementChar } from "./fontEncoding.ts";
 import type { FontMetrics } from "./fontMetrics.ts";
-import { compareAdvance, compareAdvanceAcrossFonts, type TextShowState } from "./fontMetrics.ts";
+import { compareAdvance, compareAdvanceAcrossFonts, compareAdvanceAcrossStates, type TextShowState } from "./fontMetrics.ts";
 
 // All four PDF text-showing operators are in scope for in-place editing:
 // Tj, TJ (#197, #198), and ' and " (this slice). ' and " each also
@@ -109,6 +109,12 @@ export type EditPlan = {
    */
   wordSpacing: number;
   charSpacing: number;
+  /**
+   * Null for the established text-only rewrite path. When set, the replacement
+   * is rendered under this exact PDF text state and the writer restores the
+   * original state immediately afterwards.
+   */
+  replacementTextState: TextShowState | null;
   originalText: string;
   replacementText: string;
   originalGlyphCodes: number[];
@@ -133,6 +139,46 @@ function rejectionReasonFor(char: string, classification: "requires-fallback" | 
     : `Character "${char}" cannot be encoded in this font at all.`;
 }
 
+function normalizeReplacementTextState(
+  original: TextShowState,
+  override: Partial<TextShowState> | null,
+): { state: TextShowState; error: string | null } {
+  if (!override) return { state: original, error: null };
+  const state: TextShowState = {
+    fontSizePt: override.fontSizePt ?? original.fontSizePt,
+    charSpacing: override.charSpacing ?? original.charSpacing,
+    wordSpacing: override.wordSpacing ?? original.wordSpacing,
+    horizontalScalingPct: override.horizontalScalingPct ?? original.horizontalScalingPct,
+  };
+
+  if (!Number.isFinite(state.fontSizePt) || state.fontSizePt < 1 || state.fontSizePt > 500) {
+    return { state, error: "Font size must be between 1 and 500 PDF points." };
+  }
+  if (!Number.isFinite(state.charSpacing) || Math.abs(state.charSpacing) > 1000) {
+    return { state, error: "Character spacing is outside the safe PDF text-state range." };
+  }
+  if (!Number.isFinite(state.wordSpacing) || Math.abs(state.wordSpacing) > 1000) {
+    return { state, error: "Word spacing is outside the safe PDF text-state range." };
+  }
+  if (
+    !Number.isFinite(state.horizontalScalingPct) ||
+    state.horizontalScalingPct < 10 ||
+    state.horizontalScalingPct > 500
+  ) {
+    return { state, error: "Horizontal scale must be between 10% and 500%." };
+  }
+  return { state, error: null };
+}
+
+function sameTextShowState(a: TextShowState, b: TextShowState): boolean {
+  return (
+    a.fontSizePt === b.fontSizePt &&
+    a.charSpacing === b.charSpacing &&
+    a.wordSpacing === b.wordSpacing &&
+    a.horizontalScalingPct === b.horizontalScalingPct
+  );
+}
+
 // Builds a dry-run EditPlan for replacing one matched text-show operator's
 // string content with `replacementText`. Never touches PDF bytes -- every
 // field here is either copied straight from an already-resolved input or
@@ -147,6 +193,7 @@ export function buildEditPlan({
   resolvedFont,
   fontMetrics,
   fallbackStyleHints = null,
+  replacementTextState = null,
 }: {
   pageIndex: number;
   contentStreamIndex: number;
@@ -164,6 +211,11 @@ export function buildEditPlan({
    * same-font-only behaviour, where such a character is rejected outright.
    */
   fallbackStyleHints?: FallbackStyleHints | null;
+  /**
+   * Optional direct-formatting override. Existing callers omit this and retain
+   * the original text state byte-for-byte.
+   */
+  replacementTextState?: Partial<TextShowState> | null;
 }): EditPlan {
   const originalCodes = operator.strings.flatMap((bytes) => bytesToCodes(bytes, resolvedFont.bytesPerCode));
   const { text: originalText, allDecoded: originalFullyDecoded } = decodeCodes(originalCodes, resolvedFont);
@@ -174,6 +226,9 @@ export function buildEditPlan({
     wordSpacing: operator.wordSpacing,
     horizontalScalingPct: operator.horizontalScalingPct,
   };
+  const normalizedReplacementState = normalizeReplacementTextState(state, replacementTextState);
+  const targetState = normalizedReplacementState.state;
+  const effectiveReplacementState = sameTextShowState(state, targetState) ? null : targetState;
 
   const base: Omit<EditPlan, "replacementGlyphCodes" | "replacementWidthPt" | "tjSpacingDelta" | "editable" | "reason"> = {
     pageIndex,
@@ -185,6 +240,7 @@ export function buildEditPlan({
     fontSizePt: operator.fontSizePt,
     wordSpacing: operator.wordSpacing,
     charSpacing: operator.charSpacing,
+    replacementTextState: effectiveReplacementState,
     originalText,
     replacementText,
     originalGlyphCodes: originalCodes,
@@ -200,6 +256,43 @@ export function buildEditPlan({
   // --- Safety invariant checks, in a fixed, deterministic order --------
   // Each one that fails immediately produces a non-editable plan with a
   // specific reason; none of them are skipped or guessed past.
+
+  if (normalizedReplacementState.error) {
+    return {
+      ...base,
+      originalWidthPt: 0,
+      replacementGlyphCodes: [],
+      replacementWidthPt: 0,
+      tjSpacingDelta: 0,
+      editable: false,
+      reason: normalizedReplacementState.error,
+    };
+  }
+
+  if (effectiveReplacementState && (operator.kind === "'" || operator.kind === '"')) {
+    return {
+      ...base,
+      originalWidthPt: 0,
+      replacementGlyphCodes: [],
+      replacementWidthPt: 0,
+      tjSpacingDelta: 0,
+      editable: false,
+      reason:
+        "Direct formatting is limited to Tj/TJ text runs for now because quote operators combine line movement with text-state changes.",
+    };
+  }
+
+  if (effectiveReplacementState?.fontSizePt !== undefined && !operator.fontResourceName) {
+    return {
+      ...base,
+      originalWidthPt: 0,
+      replacementGlyphCodes: [],
+      replacementWidthPt: 0,
+      tjSpacingDelta: 0,
+      editable: false,
+      reason: "This text's font resource could not be identified, so its size cannot be changed safely.",
+    };
+  }
 
   if (!SUPPORTED_OPERATOR_KINDS.has(operator.kind)) {
     return {
@@ -284,7 +377,9 @@ export function buildEditPlan({
   }
 
   if (!blocked) {
-    const comparison = compareAdvance(originalCodes, replacementGlyphCodes, fontMetrics, state);
+    const comparison = effectiveReplacementState
+      ? compareAdvanceAcrossStates(originalCodes, replacementGlyphCodes, fontMetrics, state, targetState)
+      : compareAdvance(originalCodes, replacementGlyphCodes, fontMetrics, state);
     return {
       ...base,
       originalWidthPt: comparison.originalAdvancePt,
@@ -319,6 +414,14 @@ export function buildEditPlan({
     return {
       ...rejection,
       reason: `Character "${blocked.char}" needs a substitute font, but this text's own font resource couldn't be identified, so the substitute couldn't be switched back off afterwards.`,
+    };
+  }
+
+  if (effectiveReplacementState) {
+    return {
+      ...rejection,
+      reason:
+        "A substitute font and direct text-state formatting cannot be combined in one in-place edit yet. Apply the text change first, then format the resulting run.",
     };
   }
 
