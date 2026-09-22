@@ -17,6 +17,8 @@ import {
   makeFixedLayoutInvoicePdf,
 } from "./fixed-layout-pdf-fixture";
 import { makeProfessionalDocx } from "./professional-docx-fixture";
+import { TEXT_ONLY_PDF, writeFixtures } from "./fixtures";
+import { waitForStageReady } from "./helpers";
 
 type FailedRequest = {
   method: string;
@@ -192,6 +194,66 @@ async function downloadBytes(download: Download): Promise<Buffer> {
   if (!path) throw new Error("Downloaded file has no local path.");
   return readFile(path);
 }
+
+test.beforeAll(async () => {
+  await writeFixtures();
+});
+
+test("production Edit PDF applies native formatting and exports a valid PDF", async ({
+  page,
+}) => {
+  const runtime = watchConversionRuntime(page);
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
+  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
+
+  const employeeRun = page
+    .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]')
+    .first();
+  await expect(employeeRun).toBeVisible({ timeout: 90_000 });
+  await waitForStageReady(page);
+  await employeeRun.click();
+
+  const workspace = page.locator("[data-edit-operation-count]");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+
+  await page.getByRole("button", { name: "Format" }).click();
+  const panel = page.locator("[data-native-text-formatting]");
+  await expect(panel).toBeVisible();
+  const scale = page.getByRole("spinbutton", { name: "Native horizontal scale" });
+  await expect(scale).toHaveValue("100");
+  await scale.fill("95");
+
+  await page.getByRole("button", { name: "Apply edit" }).click();
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
+  await waitForStageReady(page);
+
+  const refreshedRun = page
+    .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]')
+    .first();
+  await expect(refreshedRun).toBeVisible({ timeout: 90_000 });
+  await refreshedRun.click();
+  await page.getByRole("button", { name: "Format" }).click();
+  await expect(page.getByRole("spinbutton", { name: "Native horizontal scale" })).toHaveValue("95");
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", { name: "Download edited PDF" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const bytes = await downloadBytes(await downloadPromise);
+
+  expect(bytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+  const exported = await PDFDocument.load(bytes);
+  expect(exported.getPageCount()).toBe(1);
+
+  expect(consoleErrors).toEqual([]);
+  expectCleanRuntime(runtime);
+});
 
 test("production Word to PDF converts locally and downloaded PDF opens", async ({
   page,
