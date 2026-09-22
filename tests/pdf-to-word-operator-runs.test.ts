@@ -17,6 +17,7 @@ import {
 } from "../lib/conversion/browser/pdfToWord/classifier.ts";
 import {
   assessOperatorRunCoverage,
+  reconcileOperatorRunsWithVisibleText,
 } from "../lib/conversion/browser/pdfToWord/coverage.ts";
 import {
   reconstructTextLines,
@@ -324,12 +325,55 @@ test("privacy-safe invoice fixture reaches lossless source-operator coverage on 
         viewportTransform: viewport.transform,
       });
       const coverage = assessOperatorRunCoverage(visible, source.lines);
+      const reconciled = reconcileOperatorRunsWithVisibleText(
+        visible,
+        source.lines,
+      );
 
-      assert.equal(
-        coverage.safeToUseOperatorRuns,
-        true,
+      assert.ok(
+        coverage.characterCoverageRatio >= 0.97,
         `page ${pageNumber} operator coverage ${coverage.characterCoverageRatio.toFixed(4)}; unexplained=${JSON.stringify(coverage.unexplainedVisibleText)}`,
       );
+
+      const expectedVisibleText = visible
+        .map((line) => line.text)
+        .join("")
+        .replace(/\s+/gu, "");
+      const reconciledText = reconciled.lines
+        .filter((line) => !line.visualOnly)
+        .map((line) => line.text)
+        .join("")
+        .replace(/\s+/gu, "");
+      assert.equal(
+        reconciledText.split("").sort().join(""),
+        expectedVisibleText.split("").sort().join(""),
+        `page ${pageNumber} hybrid reconstruction must preserve every visible character exactly`,
+      );
+
+      if (pageNumber === 1) {
+        assert.deepEqual(
+          coverage.unexplainedVisibleText,
+          ["Unicode café résumé €"],
+        );
+        const unicodeFallback = reconciled.lines.filter(
+          (line) => line.text === "Unicode café résumé €",
+        );
+        assert.equal(unicodeFallback.length, 1);
+        assert.equal(unicodeFallback[0].sourceKind, "pdfjs");
+
+        const link = reconciled.lines.find(
+          (line) => line.text === "support.example/fidelity",
+        );
+        assert.ok(link);
+        assert.equal(link.sourceKind, "operator");
+        assert.equal(link.colorHex, "#0000ED");
+      } else {
+        assert.equal(
+          coverage.safeToUseOperatorRuns,
+          true,
+          `page ${pageNumber} should be fully operator-decodable`,
+        );
+      }
     }
   } finally {
     await (pdfjs as { destroy?: () => Promise<void> | void }).destroy?.();
