@@ -2950,6 +2950,15 @@ export default function EditPdfTool() {
 
         <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
 
+        <L2ToolbarButton
+          onClick={() => {
+            setTextSearchOpen((open) => !open);
+            requestAnimationFrame(() => textSearchInputRef.current?.focus());
+          }}
+        >
+          Find
+        </L2ToolbarButton>
+
         <label className="ml-auto flex items-center gap-1.5">
           <span className="sr-only">File name</span>
           <input
@@ -2982,6 +2991,145 @@ export default function EditPdfTool() {
           Start new
         </L2ToolbarButton>
       </div>
+
+      {textSearchOpen ? (
+        <div
+          data-edit-search-panel
+          className="aura-glass-thin grid gap-3 rounded-[var(--radius-xl)] border border-[var(--text-primary)]/10 p-3 shadow-[var(--v2-elevation-1)]"
+        >
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="min-w-[min(100%,18rem)] flex-1">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                Find
+              </span>
+              <input
+                ref={textSearchInputRef}
+                role="searchbox"
+                aria-label="Find text in PDF"
+                value={textSearchQuery}
+                onChange={(event) => {
+                  setTextSearchQuery(event.target.value);
+                  setTextSearchActiveIndex(-1);
+                }}
+                placeholder="Search PDF text"
+                className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)] focus:ring-2 focus:ring-[var(--lumeo-gold)]/20"
+              />
+            </label>
+
+            <label className="min-w-32">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                Scope
+              </span>
+              <select
+                aria-label="Search scope"
+                value={textSearchScope}
+                onChange={(event) => {
+                  setTextSearchScope(event.target.value as PdfTextSearchScope);
+                  setTextSearchActiveIndex(-1);
+                }}
+                className="h-10 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 text-xs font-semibold text-[var(--text-primary)]"
+              >
+                <option value="document">Document</option>
+                <option value="page">This page</option>
+              </select>
+            </label>
+
+            <label className="flex h-10 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-2 text-xs font-semibold text-[var(--text-secondary)]">
+              <input
+                type="checkbox"
+                checked={textSearchCaseSensitive}
+                onChange={(event) => {
+                  setTextSearchCaseSensitive(event.target.checked);
+                  setTextSearchActiveIndex(-1);
+                }}
+              />
+              Aa
+            </label>
+            <label className="flex h-10 items-center gap-1.5 rounded-[var(--radius-md)] border border-[var(--border-default)] px-2 text-xs font-semibold text-[var(--text-secondary)]">
+              <input
+                type="checkbox"
+                checked={textSearchWholeWord}
+                onChange={(event) => {
+                  setTextSearchWholeWord(event.target.checked);
+                  setTextSearchActiveIndex(-1);
+                }}
+              />
+              Whole word
+            </label>
+
+            <div className="ml-auto flex h-10 items-center gap-1">
+              <span
+                data-edit-search-match-count={textSearchMatches.length}
+                className="min-w-20 px-2 text-center text-xs font-semibold text-[var(--text-secondary)]"
+              >
+                {textSearchIndexBusy && textSearchScope === "document"
+                  ? `Indexing… ${textSearchMatches.length} found`
+                  : textSearchMatches.length > 0
+                    ? `${normalizedTextSearchIndex + 1} / ${textSearchMatches.length}`
+                    : textSearchQuery.trim()
+                      ? "No matches"
+                      : "Type to find"}
+              </span>
+              <button
+                type="button"
+                aria-label="Previous search match"
+                disabled={textSearchMatches.length === 0}
+                onClick={() => stepTextSearch(-1)}
+                className="h-9 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 text-xs font-bold text-[var(--text-primary)] disabled:opacity-35"
+              >
+                Prev
+              </button>
+              <button
+                type="button"
+                aria-label="Next search match"
+                disabled={textSearchMatches.length === 0}
+                onClick={() => stepTextSearch(1)}
+                className="h-9 rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 text-xs font-bold text-[var(--text-primary)] disabled:opacity-35"
+              >
+                Next
+              </button>
+              <button
+                type="button"
+                aria-label="Close find"
+                onClick={() => setTextSearchOpen(false)}
+                className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-sm font-bold text-[var(--text-secondary)] hover:bg-[var(--text-primary)]/[0.06]"
+              >
+                ×
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-end gap-2 border-t border-[var(--text-primary)]/8 pt-2">
+            <label className="min-w-[min(100%,18rem)] flex-1">
+              <span className="mb-1 block text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
+                Replace with
+              </span>
+              <input
+                aria-label="Replace search match with"
+                value={textSearchReplacement}
+                onChange={(event) => setTextSearchReplacement(event.target.value)}
+                placeholder="Leave empty to delete the match"
+                className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)] focus:ring-2 focus:ring-[var(--lumeo-gold)]/20"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={prepareActiveTextSearchReplacement}
+              disabled={!activeTextSearchReplacementPlan}
+              className="h-10 rounded-[var(--radius-md)] bg-[var(--lumeo-gold)] px-4 text-xs font-bold text-[var(--atelier-surface-0)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Replace this match
+            </button>
+            <span className="pb-2 text-[10px] leading-4 text-[var(--text-secondary)]">
+              {activeTextSearchMatch?.pageIndex !== pageIndex
+                ? "Navigate to the match first."
+                : activeTextSearchMatch?.capability === "editable"
+                  ? "Prepared replacements still pass the normal layout/fidelity check before Apply."
+                  : activeTextSearchMatch?.capabilityReason ?? "Only safely editable native text can be replaced."}
+            </span>
+          </div>
+        </div>
+      ) : null}
 
       <div className="relative min-w-0">
         {/* Phase 27: the canvas panel is now the unambiguous hero -- no file
@@ -3157,6 +3305,31 @@ export default function EditPdfTool() {
                       strokeWidthPx={inkStrokeWidth}
                       onStrokeComplete={handleInkStroke}
                     />
+                  ) : null}
+
+                  {textSearchOpen && currentPageTextSearchMatches.length > 0 ? (
+                    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-[12]">
+                      {currentPageTextSearchMatches.map((match) => {
+                        const active = activeTextSearchMatch?.id === match.id;
+                        return (
+                          <div
+                            key={match.id}
+                            data-edit-search-highlight={active ? "active" : "match"}
+                            className={
+                              active
+                                ? "absolute rounded-[2px] border-2 border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/28 shadow-[0_0_0_1px_rgba(255,255,255,0.6)]"
+                                : "absolute rounded-[2px] border border-[var(--lumeo-gold)]/60 bg-[var(--lumeo-gold)]/14"
+                            }
+                            style={{
+                              left: `${match.boundsPct.xPct}%`,
+                              top: `${match.boundsPct.yPct}%`,
+                              width: `${match.boundsPct.widthPct}%`,
+                              height: `${match.boundsPct.heightPct}%`,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
                   ) : null}
 
                   {detectedTextRuns.length > 0 ? (
