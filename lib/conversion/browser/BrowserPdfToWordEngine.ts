@@ -794,6 +794,21 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           expectedBackgroundImages: pages.filter(
             (page) => Boolean(page.backgroundImage),
           ).length,
+          expectedHyperlinks: new Set(
+            pages.flatMap((page) =>
+              page.lines
+                .map((line) => line.hyperlinkUrl)
+                .filter((url): url is string => Boolean(url)),
+            ),
+          ).size,
+          expectedEditableTables: pages.reduce(
+            (count, page) =>
+              count +
+              (page.regions ?? []).filter(
+                (region) => region.kind === "semantic-table",
+              ).length,
+            0,
+          ),
         });
       } catch (error) {
         throw normalizeConversionError(error, "output");
