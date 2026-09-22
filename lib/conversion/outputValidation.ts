@@ -1,7 +1,6 @@
 import JSZip from "jszip";
 import { XMLValidator } from "fast-xml-parser";
-
-import { loadPdfJsModule } from "@/lib/pdf/pdfjs";
+import { PDFDocument } from "pdf-lib";
 
 const PDF_SIGNATURE = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]);
 const MIN_PDF_BYTES = 64;
@@ -120,33 +119,24 @@ export async function validateGeneratedPdf(blob: Blob): Promise<number> {
     throw new Error("Generated PDF is missing the PDF signature.");
   }
 
-  const sourceUrl = URL.createObjectURL(blob);
-  let document:
-    | {
-        numPages: number;
-        destroy?(): Promise<void> | void;
-      }
-    | null = null;
-
+  let document: PDFDocument;
   try {
-    const pdfjs = await loadPdfJsModule();
-    document = (await pdfjs.getDocument({
-      url: sourceUrl,
-      useWorkerFetch: false,
-    }).promise) as unknown as {
-      numPages: number;
-      destroy?(): Promise<void> | void;
-    };
-
-    if (!Number.isInteger(document.numPages) || document.numPages < 1) {
-      throw new Error("Generated PDF contains no readable pages.");
-    }
-    return document.numPages;
-  } finally {
-    try {
-      await document?.destroy?.();
-    } finally {
-      URL.revokeObjectURL(sourceUrl);
-    }
+    // This validation runs after LibreOffice has already produced the output.
+    // Use the worker-free OOXML/PDF utility already shipped in the browser
+    // bundle instead of starting PDF.js solely to count pages. That keeps the
+    // validation local while avoiding a redundant worker network request.
+    document = await PDFDocument.load(await blob.arrayBuffer());
+  } catch (error) {
+    throw new Error(
+      `Generated PDF could not be parsed: ${
+        error instanceof Error ? error.message : "unknown PDF parse error"
+      }`,
+    );
   }
+
+  const pageCount = document.getPageCount();
+  if (!Number.isInteger(pageCount) || pageCount < 1) {
+    throw new Error("Generated PDF contains no readable pages.");
+  }
+  return pageCount;
 }
