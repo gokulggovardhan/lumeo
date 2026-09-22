@@ -108,3 +108,53 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
   expect(pageErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
 });
+
+
+test("vinext Edit PDF applies native formatting without converting text to an overlay", async ({ page }) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
+  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
+
+  const employeeRun = page
+    .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]')
+    .first();
+  await expect(employeeRun).toBeVisible({ timeout: 90_000 });
+  await waitForStageReady(page);
+  await employeeRun.click();
+
+  await page.getByRole("button", { name: "Format" }).click();
+  const panel = page.locator("[data-native-text-formatting]");
+  await expect(panel).toBeVisible();
+  await expect(panel).toContainText(/Helvetica|Arial/i);
+
+  const scale = page.getByRole("spinbutton", { name: "Native horizontal scale" });
+  await expect(scale).toHaveValue("100");
+  await scale.fill("95");
+
+  const workspace = page.locator("[data-edit-operation-count]");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+  await page.getByRole("button", { name: "Apply edit" }).click();
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
+
+  await waitForStageReady(page);
+  const refreshedRun = page
+    .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]')
+    .first();
+  await expect(refreshedRun).toBeVisible({ timeout: 90_000 });
+  await refreshedRun.click();
+  await page.getByRole("button", { name: "Format" }).click();
+  await expect(page.getByRole("spinbutton", { name: "Native horizontal scale" })).toHaveValue("95");
+
+  // The operation stayed a native-text rewrite: no placed overlay text was
+  // introduced just to change formatting.
+  await expect(page.locator('[data-edit-operation-count="1"]')).toBeVisible();
+
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
