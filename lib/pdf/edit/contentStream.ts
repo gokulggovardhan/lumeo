@@ -240,6 +240,33 @@ export type Matrix2x3 = [number, number, number, number, number, number];
 
 export const IDENTITY_MATRIX: Matrix2x3 = [1, 0, 0, 1, 0, 0];
 
+export type PdfPaintColorSpace = "DeviceGray" | "DeviceRGB" | "DeviceCMYK";
+
+export type PdfPaintColor = {
+  colorSpace: PdfPaintColorSpace;
+  components: number[];
+  /**
+   * Exact CSS-equivalent colour only when the PDF colour space maps
+   * deterministically to browser RGB. DeviceCMYK is intentionally left null
+   * rather than converted with an arbitrary monitor/profile assumption.
+   */
+  cssHex: string | null;
+};
+
+export type PdfGraphicsPaintState = {
+  fillColor: PdfPaintColor | null;
+  strokeColor: PdfPaintColor | null;
+  fillOpacity: number | null;
+  strokeOpacity: number | null;
+};
+
+export type PdfExtGStateAlpha = {
+  fillOpacity?: number;
+  strokeOpacity?: number;
+};
+
+export type PdfExtGStateResolver = (resourceName: string) => PdfExtGStateAlpha | null;
+
 // m1 applied after m2 -- same convention as pdfjs's Util.transform (see
 // lib/pdf/edit/textRuns.ts's transformPoint2x3, which matches it exactly).
 // Exported for lib/pdf/edit/formXObjects.ts, which needs the identical CTM
@@ -278,6 +305,11 @@ export type TextShowOperator = {
   leading: number;
   textRise: number;
   renderMode: number;
+  /** Fill/stroke paint state proven at this exact text-show operator. */
+  fillColor?: PdfPaintColor | null;
+  strokeColor?: PdfPaintColor | null;
+  fillOpacity?: number | null;
+  strokeOpacity?: number | null;
 };
 
 type TextState = {
@@ -308,6 +340,123 @@ function asNumber(token: ContentStreamToken | undefined): number {
   return token && token.type === "number" ? token.value : 0;
 }
 
+function clampUnit(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+function hexByte(value: number): string {
+  return Math.round(clampUnit(value) * 255).toString(16).padStart(2, "0");
+}
+
+function paintColor(
+  colorSpace: PdfPaintColorSpace,
+  components: number[],
+): PdfPaintColor {
+  const normalized = components.map(clampUnit);
+  let cssHex: string | null = null;
+  if (colorSpace === "DeviceGray") {
+    const channel = hexByte(normalized[0] ?? 0);
+    cssHex = `#${channel}${channel}${channel}`;
+  } else if (colorSpace === "DeviceRGB") {
+    cssHex = `#${hexByte(normalized[0] ?? 0)}${hexByte(normalized[1] ?? 0)}${hexByte(normalized[2] ?? 0)}`;
+  }
+  return { colorSpace, components: normalized, cssHex };
+}
+
+export function defaultPdfGraphicsPaintState(): PdfGraphicsPaintState {
+  // PDF 32000 default graphics state: DeviceGray black and alpha constant 1.
+  return {
+    fillColor: paintColor("DeviceGray", [0]),
+    strokeColor: paintColor("DeviceGray", [0]),
+    fillOpacity: 1,
+    strokeOpacity: 1,
+  };
+}
+
+function clonePaintState(state: PdfGraphicsPaintState): PdfGraphicsPaintState {
+  return {
+    fillColor: state.fillColor
+      ? { ...state.fillColor, components: [...state.fillColor.components] }
+      : null,
+    strokeColor: state.strokeColor
+      ? { ...state.strokeColor, components: [...state.strokeColor.components] }
+      : null,
+    fillOpacity: state.fillOpacity,
+    strokeOpacity: state.strokeOpacity,
+  };
+}
+
+export function applyPdfPaintOperator(
+  state: PdfGraphicsPaintState,
+  operator: string,
+  operands: readonly ContentStreamToken[],
+  resolveExtGState?: PdfExtGStateResolver,
+): PdfGraphicsPaintState {
+  switch (operator) {
+    case "g":
+      return { ...state, fillColor: paintColor("DeviceGray", [asNumber(operands[0])]) };
+    case "G":
+      return { ...state, strokeColor: paintColor("DeviceGray", [asNumber(operands[0])]) };
+    case "rg":
+      return {
+        ...state,
+        fillColor: paintColor("DeviceRGB", [
+          asNumber(operands[0]),
+          asNumber(operands[1]),
+          asNumber(operands[2]),
+        ]),
+      };
+    case "RG":
+      return {
+        ...state,
+        strokeColor: paintColor("DeviceRGB", [
+          asNumber(operands[0]),
+          asNumber(operands[1]),
+          asNumber(operands[2]),
+        ]),
+      };
+    case "k":
+      return {
+        ...state,
+        fillColor: paintColor("DeviceCMYK", [
+          asNumber(operands[0]),
+          asNumber(operands[1]),
+          asNumber(operands[2]),
+          asNumber(operands[3]),
+        ]),
+      };
+    case "K":
+      return {
+        ...state,
+        strokeColor: paintColor("DeviceCMYK", [
+          asNumber(operands[0]),
+          asNumber(operands[1]),
+          asNumber(operands[2]),
+          asNumber(operands[3]),
+        ]),
+      };
+    case "gs": {
+      const name = operands[0]?.type === "name" ? operands[0].value : null;
+      if (!name) return state;
+      const resolved = resolveExtGState?.(name) ?? null;
+      if (!resolved) {
+        // The named graphics state may alter alpha, but the bytes alone do
+        // not contain its dictionary. Mark alpha unknown rather than assuming.
+        return { ...state, fillOpacity: null, strokeOpacity: null };
+      }
+      return {
+        ...state,
+        fillOpacity:
+          resolved.fillOpacity === undefined ? state.fillOpacity : clampUnit(resolved.fillOpacity),
+        strokeOpacity:
+          resolved.strokeOpacity === undefined ? state.strokeOpacity : clampUnit(resolved.strokeOpacity),
+      };
+    }
+    default:
+      return state;
+  }
+}
+
 // Walks a decoded content stream's tokens, tracking the graphics-state (CTM
 // via q/Q/cm) and text-state (Tf/Tc/Tw/Tz/TL/Ts/Tr, and the text/text-line
 // matrices via BT/Td/TD/Tm/T*) needed to compute each text-showing
@@ -323,12 +472,21 @@ function asNumber(token: ContentStreamToken | undefined): number {
 // (the `Do` operator) composed with the Form's own /Matrix entry -- per
 // spec 8.10.1. Every existing caller omits this argument and gets
 // byte-for-byte the same identity-CTM behavior as before.
-export function walkTextShowOperators(bytes: Uint8Array, initialCtm: Matrix2x3 = IDENTITY_MATRIX): TextShowOperator[] {
+export function walkTextShowOperators(
+  bytes: Uint8Array,
+  initialCtm: Matrix2x3 = IDENTITY_MATRIX,
+  options: {
+    initialPaintState?: PdfGraphicsPaintState;
+    resolveExtGState?: PdfExtGStateResolver;
+  } = {},
+): TextShowOperator[] {
   const tokens = tokenizeContentStream(bytes);
   const results: TextShowOperator[] = [];
 
   const ctmStack: Matrix2x3[] = [];
+  const paintStack: PdfGraphicsPaintState[] = [];
   let ctm: Matrix2x3 = initialCtm;
+  let paintState = clonePaintState(options.initialPaintState ?? defaultPdfGraphicsPaintState());
   let textMatrix: Matrix2x3 = IDENTITY_MATRIX;
   let textLineMatrix: Matrix2x3 = IDENTITY_MATRIX;
   const textState = defaultTextState();
@@ -369,6 +527,14 @@ export function walkTextShowOperators(bytes: Uint8Array, initialCtm: Matrix2x3 =
       leading: textState.leading,
       textRise: textState.textRise,
       renderMode: textState.renderMode,
+      fillColor: paintState.fillColor
+        ? { ...paintState.fillColor, components: [...paintState.fillColor.components] }
+        : null,
+      strokeColor: paintState.strokeColor
+        ? { ...paintState.strokeColor, components: [...paintState.strokeColor.components] }
+        : null,
+      fillOpacity: paintState.fillOpacity,
+      strokeOpacity: paintState.strokeOpacity,
     });
   }
 
@@ -384,9 +550,25 @@ export function walkTextShowOperators(bytes: Uint8Array, initialCtm: Matrix2x3 =
     switch (op) {
       case "q":
         ctmStack.push(ctm);
+        paintStack.push(clonePaintState(paintState));
         break;
       case "Q":
         ctm = ctmStack.pop() ?? IDENTITY_MATRIX;
+        paintState = paintStack.pop() ?? defaultPdfGraphicsPaintState();
+        break;
+      case "g":
+      case "G":
+      case "rg":
+      case "RG":
+      case "k":
+      case "K":
+      case "gs":
+        paintState = applyPdfPaintOperator(
+          paintState,
+          op,
+          operands,
+          options.resolveExtGState,
+        );
         break;
       case "cm": {
         const m: Matrix2x3 = [
