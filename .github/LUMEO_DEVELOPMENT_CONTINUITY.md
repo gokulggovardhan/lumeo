@@ -1,6 +1,8 @@
-# Lumeo Development Continuity
+# Lumeo Development Continuity Protocol
 
-This file is the durable handoff record for ChatGPT-assisted Lumeo development.
+This file defines the stable recovery protocol for ChatGPT-assisted Lumeo development.
+
+The mutable current handoff state lives in GitHub issue **#365 — Lumeo Development Continuity — Active State**. Keeping mutable state in one issue avoids noisy repository commits at every checkpoint.
 
 ## Source-of-truth order
 
@@ -11,37 +13,33 @@ When resuming work, prefer current external state over chat history:
 3. Pull requests and GitHub Actions.
 4. Cloudflare production/build information when available.
 5. Supabase/infrastructure state when relevant.
-6. This continuity record.
+6. GitHub issue #365 as the durable mutable handoff snapshot.
 7. Chat history as supporting context only.
 
-Never commit passwords, credentials, session data, private customer files, private acceptance documents, or sensitive source material here.
+Always re-read live external state before acting. The continuity issue is a checkpoint snapshot, not permission to override newer repository/deployment facts.
+
+Never store passwords, credentials, session data, private customer files, private acceptance documents, or sensitive source material in the continuity issue or this file.
 
 ## DEV CONTINUE convention
 
 When the user types exactly `DEV CONTINUE` in a Lumeo development chat:
 
-- recover this file first;
-- inspect current protected `main`, open development branches/PRs, CI, deployment state, and relevant Supabase state;
-- treat external verified state as authoritative when it differs from older chat text;
+- fetch GitHub issue #365 and this file first;
+- inspect current protected `main`, relevant development branches/commits, open PRs, GitHub Actions, deployment evidence, and relevant Supabase state;
+- reconcile the durable snapshot with live state; verified external state wins;
 - preserve completed work and architectural decisions;
 - continue the active objective without repeating completed investigation;
-- proceed through implementation, tests, safe fixes, CI, merge, deployment, production verification, smoke tests, and cleanup when those stages are authorized and relevant;
+- proceed through implementation, tests, safe fixes, CI, authorized merge/deployment, production verification, smoke tests, cleanup, and final audit where relevant;
 - retry transient errors safely without duplicating side effects;
 - stop only for genuine user input/approval or when the overall objective is complete.
 
+A fresh chat should not require the full previous conversation when these sources contain sufficient state.
 
-## ChatGPT Project Instructions block
+## Checkpoint policy
 
-Paste this once into the Lumeo ChatGPT Project instructions when project-level behavior is desired:
+Update GitHub issue #365 only at meaningful checkpoints:
 
-> Treat GitHub/protected main, current branch/commits, PRs/Actions, deployment evidence, Supabase when relevant, and `.github/LUMEO_DEVELOPMENT_CONTINUITY.md` as the authoritative development state. If the user types exactly `DEV CONTINUE`, recover and reconcile those sources first, preserve verified work, then continue the current objective autonomously without repeating completed investigation. Continue through implementation, tests, safe fixes, CI, authorized merge/deployment, production verification, smoke testing, cleanup, and final audit. Retry transient failures safely without duplicating side effects. Never expose or persist secrets/private acceptance files. Give concise progress updates without stopping while safe autonomous work remains; stop only for genuine user input/approval or when the overall objective is complete.
-
-## Update policy
-
-Update this file only at meaningful checkpoints, such as:
-
-- implementation checkpoint;
-- durable commit/branch creation;
+- material implementation/commit;
 - PR creation or material PR update;
 - CI outcome;
 - merge;
@@ -52,74 +50,20 @@ Update this file only at meaningful checkpoints, such as:
 
 Do not update it for ordinary conversational progress.
 
----
+If safe uncommitted work would otherwise exist only in an ephemeral environment, preserve it on the existing feature branch/draft PR or another durable development mechanism before relying on a new chat. Never preserve secrets/private acceptance files merely for continuity.
 
-## Current development state
+## ChatGPT Project Instructions block
 
-**Overall objective:** Continue Premium Edit PDF development from the merged #362 foundation and complete the remaining production-certification/follow-up work without regressing the proven editing engine or unrelated conversion infrastructure.
+Paste this once into the Lumeo ChatGPT Project instructions:
 
-**Current workstream:** Premium Edit PDF — #362 production certification / follow-up.
+> Treat GitHub/protected main, current branch/commits, PRs/Actions, deployment evidence, Supabase when relevant, GitHub issue #365, and `.github/LUMEO_DEVELOPMENT_CONTINUITY.md` as the authoritative Lumeo development state. If I type exactly `DEV CONTINUE`, recover and reconcile those sources first, preserve verified work, then continue the current objective autonomously without repeating completed investigation. Continue through implementation, tests, safe fixes, CI, authorized merge/deployment, production verification, smoke testing, cleanup, and final audit. Retry transient failures safely without duplicating side effects. Never expose or persist secrets or private acceptance files. Give concise progress updates without stopping while safe autonomous work remains; stop only for genuine user input/approval or when the overall objective is complete.
 
-**Protected main SHA:** `d81fd383155645779e6e5db10df22215885e8f40`
+## Scheduled supervision
 
-**Feature branch:** `test/edit-pdf-362-production-certification`
+The persistent Scheduled Task should be named **Lumeo Global Development Supervisor**.
 
-**Latest development commit:** `56e2e0ed579989077a20d12b101f769eb263313b`
+It is repository/project supervision, not a live-chat watchdog. It may periodically inspect durable external state and take safe actions available to that scheduled execution, but it must never claim to observe the live ChatGPT `Thinking` state, automatically press `Retry`, enumerate arbitrary chats, or inject a turn into another normal ChatGPT conversation.
 
-**Pull request:** #363 — `test(edit): certify #362 on live production`
+Individual workstream watchers are optional and should be created only when they provide demonstrated additional value. Do not create one merely because a chat exists.
 
-**PR intent:** Certification-only test branch. **Do not merge PR #363** unless its scope is deliberately changed and re-reviewed.
-
-**CI/check status:**
-- Cloudflare Production Audit run #39: failed overall.
-  - `Audit lumeo.in on Cloudflare`: passed.
-  - Browser smoke failed because the new certification test calls `textDoc.destroy()`, but the typed/runtime object used by the test does not expose that method.
-- Lumeo CI run #1292: failed.
-  - Unit tests passed.
-  - Type check failed at `e2e/cloudflare-production.spec.ts(123,17)`: `TS2339 Property 'destroy' does not exist on type 'PDFDocumentProxy'`.
-  - Admin/browser startup failure is downstream of the same type-check failure.
-
-**Cloudflare production state:** Existing production has already been exact-SHA verified at `d81fd383155645779e6e5db10df22215885e8f40`; the current production routing/header audit also passed. Re-verify exact build information before final production certification.
-
-**Supabase relevance:** No known change is required for this certification-only workstream. Inspect current Supabase state only if a later Edit PDF change actually touches shared data/infrastructure.
-
-### Completed
-
-- PR #362 merged into protected `main`.
-- Page → Block → Line → Span document model added.
-- `PdfCoordinateMapper` added.
-- `PercentSpatialIndex` added.
-- `PdfFontRegistry` and font-profile handling added.
-- Embedded FontFile2/OpenType extraction and browser `FontFace` preview path added.
-- Capability classification and editor integration added.
-- Existing low-level in-place content-stream rewrite/export engine preserved.
-- Production base routing/header audit passes on Cloudflare.
-- PR #363 added live certification coverage only; no intended production-code changes.
-
-### Architectural decisions that must not regress
-
-- Preserve the existing proven content-stream rewrite/export semantics.
-- Preserve browser-side Word → PDF and PDF → Word engines.
-- Preserve `/office-runtime/...` delivery and Cloudflare runtime behavior.
-- Preserve HTML → PDF.
-- Preserve Supabase/Admin infrastructure unless a new requirement demonstrably needs changes.
-- Keep capability limitations explicit rather than pretending unsupported PDFs are fully editable.
-- Do not commit private acceptance/reference documents or their private contents.
-
-### Current blocker
-
-The #363 certification test uses `textDoc.destroy()`. The test object's `PDFDocumentProxy` typing/runtime does not provide that method in this path, causing both TypeScript failure and three-browser runtime failures.
-
-### Exact next action
-
-Fix only the certification-test document cleanup/lifecycle on the existing #363 branch without weakening coverage or changing production behavior; rerun the failed CI/audit jobs; then complete live Edit PDF production certification. Because #363 is certification-only, close it after successful certification rather than merging it unless its intended scope is explicitly changed.
-
-### Remaining work
-
-- Correct the #363 certification test cleanup API.
-- Re-run TypeScript/unit/Cloudflare production audit coverage.
-- Confirm live native-text detection, edit, write-back, export, reopen, and changed-text extraction on production.
-- Confirm no Lumeo JS/MJS/WASM request failures or page errors.
-- Record final production verification.
-- Close certification-only PR #363 after success.
-- Update this continuity record at the next meaningful checkpoint.
+When a workstream completes, mark issue #365 accordingly. The global supervisor remains enabled for future Lumeo work.
