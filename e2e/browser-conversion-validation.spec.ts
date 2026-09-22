@@ -21,6 +21,7 @@ import {
   makeFixedLayoutInvoicePdf,
 } from "./fixed-layout-pdf-fixture";
 import { makeProfessionalDocx } from "./professional-docx-fixture";
+import { makeAdvancedLayoutDocx } from "./advanced-word-docx-fixture";
 import {
   makeSemanticLetterPdf,
   makeTwoColumnReportPdf,
@@ -938,6 +939,78 @@ test.describe("browser conversion validation lab", () => {
       await assertRenderedPdfSimilarity(referencePdf, browserPdf, {
         maxMae: 20,
         maxChanged: 0.22,
+      });
+    }
+  });
+
+  test("Word to PDF preserves multi-column sections and vector text-box shapes against native reference", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    test.skip(
+      browserName !== "chromium",
+      "Threaded Office fidelity comparison runs once in Chromium.",
+    );
+
+    await expect(page.getByTestId("capabilities")).toContainText(
+      "Threads ready: yes",
+      { timeout: 30_000 },
+    );
+
+    const source = await makeAdvancedLayoutDocx();
+    await page.getByTestId("word-input").setInputFiles({
+      name: "advanced-columns-shape.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: source,
+    });
+    await page.getByTestId("word-convert").click();
+    await expect(page.getByTestId("word-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 420_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("word-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const generated = await PDFDocument.load(bytes);
+    expect(generated.getPageCount()).toBe(2);
+
+    if (process.env.LUMEO_FIDELITY_CLI === "1") {
+      const outputDirectory = testInfo.outputPath("advanced-word-layout");
+      const referencePdf = await renderDocxWithLibreOffice(
+        source,
+        outputDirectory,
+        "advanced-reference",
+      );
+      const browserPdf = await writePdfFixture(
+        bytes,
+        outputDirectory,
+        "advanced-browser",
+      );
+
+      await assertPdfLineAnchorFidelity(
+        referencePdf,
+        browserPdf,
+        outputDirectory,
+        [
+          {
+            page: 1,
+            contains: "Advanced multi-column fidelity fixture",
+            horizontal: "center",
+          },
+          { page: 1, contains: "First column content begins" },
+          { page: 1, contains: "Second column content begins here" },
+          { page: 1, contains: "Vector text-box shape fixture" },
+          { page: 2, contains: "Second page after columns" },
+          { page: 2, contains: "section break restores ordinary" },
+        ],
+        0.025,
+      );
+      await assertRenderedPdfSimilarity(referencePdf, browserPdf, {
+        maxMae: 18,
+        maxChanged: 0.20,
       });
     }
   });
