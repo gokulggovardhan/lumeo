@@ -1,3 +1,7 @@
+import {
+  clusterVisualTextRows,
+  inferRegularTableEvidence,
+} from "./structure.ts";
 import type {
   ReconstructedRegion,
   ReconstructedTextLine,
@@ -93,8 +97,27 @@ function boundsFor(
 export function inferFixedLayoutRegions(
   lines: ReconstructedTextLine[],
   pageWidthPt: number,
+  options: { allowSemanticTables?: boolean } = {},
 ): ReconstructedRegion[] {
   if (!lines.length) return [];
+
+  const regularTable = inferRegularTableEvidence(lines, pageWidthPt);
+  if (regularTable) {
+    const tableIndices = regularTable.tableLineIndices;
+    return [
+      {
+        id: "table-0",
+        kind: options.allowSemanticTables
+          ? "semantic-table"
+          : "fixed-layout-table",
+        lineIndices: tableIndices,
+        ...boundsFor(lines, tableIndices),
+        columnAnchorsPt: regularTable.columnAnchorsPt,
+        rowGroups: regularTable.rows.map((row) => [...row.indices]),
+        tableConfidence: regularTable.confidence,
+      },
+    ];
+  }
 
   const rows = clusterRows(lines);
   const multiCellRows = rows.filter((row) => row.indices.length >= 3);
@@ -146,21 +169,31 @@ export function classifyPageReconstruction({
 } {
   if (!lines.length) return { mode: "image", regions: [] };
 
-  const regions = inferFixedLayoutRegions(lines, pageWidthPt);
-  const hasTable = regions.some((region) => region.kind === "fixed-layout-table");
+  const allowSemanticTables = imageCount === 0 && vectorLayoutCount === 0;
+  const regions = inferFixedLayoutRegions(lines, pageWidthPt, {
+    allowSemanticTables,
+  });
+  const hasFixedTable = regions.some(
+    (region) => region.kind === "fixed-layout-table",
+  );
+  const hasSemanticTable = regions.some(
+    (region) => region.kind === "semantic-table",
+  );
 
   if (imageCount > 0 && lines.length > 0) {
     return { mode: "mixed", regions };
   }
   if (vectorLayoutCount > 0) {
     return {
-      mode: hasTable ? "fixed-layout" : "complex-vector",
+      mode: hasFixedTable ? "fixed-layout" : "complex-vector",
       regions,
     };
   }
-  if (hasTable) return { mode: "fixed-layout", regions };
+  if (hasFixedTable || hasSemanticTable) {
+    return { mode: "fixed-layout", regions };
+  }
 
-  const rows = clusterRows(lines);
+  const rows = clusterVisualTextRows(lines);
   const averagePerRow =
     rows.reduce((sum, row) => sum + row.indices.length, 0) /
     Math.max(1, rows.length);
