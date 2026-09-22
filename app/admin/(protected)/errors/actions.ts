@@ -25,8 +25,13 @@ async function setErrorStatus(formData: FormData, status: ErrorStatus) {
     payload.resolved_by = null;
   }
 
-  const { error } = await supabase.from("error_logs").update(payload).eq("id", id);
-  if (error) return errorState("Error log could not be updated.");
+  const { data: updated, error } = await supabase
+    .from("error_logs")
+    .update(payload)
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
+  if (error || !updated) return errorState("Error log could not be updated.");
 
   await writeAuditLog({
     action: `error_log.${status}`,

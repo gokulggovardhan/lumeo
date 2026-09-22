@@ -122,7 +122,7 @@ export default async function AdminPage() {
     attention.push({
       title: `${unreadInbox.data} unread Inbox message${unreadInbox.data === 1 ? "" : "s"}`,
       detail: "Feedback or enquiries are waiting for a first read.",
-      href: "/admin/inbox",
+      href: "/admin/inbox?read=unread",
       tone: "warning",
     });
   }
@@ -144,8 +144,8 @@ export default async function AdminPage() {
   }
   if (tools.error || settings.error || inbox.error || errorSummary.error || recentErrors.error || audit.error) {
     attention.push({
-      title: "Some Admin data could not be verified",
-      detail: "One or more protected database reads are unavailable.",
+      title: "Operational health is degraded",
+      detail: "One or more protected Admin data readers are unavailable.",
       href: "/admin/health",
       tone: "warning",
     });
