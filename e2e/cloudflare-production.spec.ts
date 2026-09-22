@@ -82,6 +82,63 @@ test("production Edit PDF loads the deployed pdf.js worker and detects text", as
   expect(pageErrors).toEqual([]);
 });
 
+test("production Edit PDF applies native formatting and exports a valid PDF", async ({
+  page,
+}) => {
+  const assetFailures = collectProductionAssetFailures(page);
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
+  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
+
+  const employeeRun = page
+    .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]')
+    .first();
+  await expect(employeeRun).toBeVisible({ timeout: 90_000 });
+  await employeeRun.click();
+
+  const workspace = page.locator("[data-edit-operation-count]");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+  await page.getByRole("button", { name: "Format" }).click();
+  const scale = page.getByRole("spinbutton", { name: "Native horizontal scale" });
+  await expect(scale).toHaveValue("100");
+  await scale.fill("95");
+
+  await page.getByRole("button", { name: "Apply edit" }).click();
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
+
+  const refreshedRun = page
+    .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]')
+    .first();
+  await expect(refreshedRun).toBeVisible({ timeout: 90_000 });
+  await refreshedRun.click();
+  await page.getByRole("button", { name: "Format" }).click();
+  await expect(page.getByRole("spinbutton", { name: "Native horizontal scale" })).toHaveValue("95");
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", { name: "Download edited PDF" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  const outputPath = await download.path();
+  expect(outputPath).not.toBeNull();
+
+  const bytes = await readFile(outputPath!);
+  expect(bytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+  const exported = await PDFDocument.load(bytes);
+  expect(exported.getPageCount()).toBe(1);
+
+  expect(assetFailures).toEqual([]);
+  expect(pageErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+});
+
 test("production HEIC/HEIF worker preserves full-resolution output and download", async ({
   page,
 }, testInfo) => {
