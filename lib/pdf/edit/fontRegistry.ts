@@ -1,0 +1,310 @@
+import {
+  PDFArray,
+  PDFDict,
+  PDFName,
+  PDFRawStream,
+  PDFRef,
+  decodePDFRawStream,
+  type PDFContext,
+  type PDFDocument,
+} from "pdf-lib";
+import { resolveFont, type ResolvedFont } from "./fontEncoding.ts";
+import { resolveFontMetrics, type FontMetrics } from "./fontMetrics.ts";
+import {
+  pickFallbackFont,
+  readFallbackStyleHints,
+  type FallbackFontFamily,
+  type FallbackStyleHints,
+} from "./fallbackFont.ts";
+
+const SUBSET_PREFIX = /^[A-Z]{6}\+/;
+const BOLD_NAME = /bold|black|heavy|semib|demib?|ultra/i;
+const ITALIC_NAME = /italic|oblique/i;
+
+export type BrowserFontProgramFormat =
+  | "truetype"
+  | "opentype"
+  | "type1"
+  | "cff"
+  | "unknown";
+
+export type EmbeddedFontProgram = {
+  bytes: Uint8Array;
+  format: BrowserFontProgramFormat;
+  browserLoadable: boolean;
+};
+
+export type PdfFontProfile = {
+  resourceName: string;
+  kind: ResolvedFont["kind"];
+  baseFont: string;
+  familyName: string;
+  isEmbedded: boolean;
+  isSubset: boolean;
+  encodingSource: ResolvedFont["encodingSource"];
+  metricsSource: FontMetrics["source"];
+  bytesPerCode: 1 | 2;
+  weight: number;
+  italic: boolean;
+  serif: boolean;
+  monospace: boolean;
+  descriptorFlags: number | null;
+  italicAngle: number | null;
+  fallbackPdfFont: FallbackFontFamily;
+  cssFallbackFamily: string;
+  browserFamilyName: string;
+  browserPreviewPossible: boolean;
+  resolvedFont: ResolvedFont;
+  metrics: FontMetrics;
+  styleHints: FallbackStyleHints;
+};
+
+function nameString(value: unknown): string | null {
+  return value instanceof PDFName ? value.asString().replace(/^\//, "") : null;
+}
+
+function resolveObject(value: unknown, context: PDFContext): unknown {
+  return value instanceof PDFRef ? context.lookup(value) : value;
+}
+
+function resolveDict(value: unknown, context: PDFContext): PDFDict | null {
+  const resolved = resolveObject(value, context);
+  return resolved instanceof PDFDict ? resolved : null;
+}
+
+function resolveArray(value: unknown, context: PDFContext): PDFArray | null {
+  const resolved = resolveObject(value, context);
+  return resolved instanceof PDFArray ? resolved : null;
+}
+
+function descriptorForFont(fontDict: PDFDict, context: PDFContext): PDFDict | null {
+  const subtype = nameString(fontDict.get(PDFName.of("Subtype")));
+  let descriptorHost: PDFDict | null = fontDict;
+
+  if (subtype === "Type0") {
+    const descendants = resolveArray(fontDict.get(PDFName.of("DescendantFonts")), context);
+    descriptorHost =
+      descendants && descendants.size() > 0
+        ? resolveDict(descendants.get(0), context)
+        : null;
+  }
+
+  return descriptorHost
+    ? resolveDict(descriptorHost.get(PDFName.of("FontDescriptor")), context)
+    : null;
+}
+
+function familyNameFromBaseFont(baseFont: string): string {
+  const withoutSubset = baseFont.replace(SUBSET_PREFIX, "");
+  return withoutSubset
+    .replace(/,(?:Bold|Italic|Oblique|Regular).*$/i, "")
+    .replace(/-(?:BoldItalic|BoldOblique|Bold|Italic|Oblique|Roman|Regular).*$/i, "")
+    .replace(/PSMT$/i, "")
+    .replace(/MT$/i, "")
+    .trim() || "PDF font";
+}
+
+function safeFamilyToken(value: string): string {
+  const token = value.replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
+  return token.slice(0, 48) || "Font";
+}
+
+function fallbackCssStack(fallback: FallbackFontFamily): string {
+  if (fallback.startsWith("Times")) {
+    return '"Times New Roman", Times, serif';
+  }
+  if (fallback.startsWith("Courier")) {
+    return '"Courier New", Courier, monospace';
+  }
+  return 'Arial, Helvetica, sans-serif';
+}
+
+function programFormatFor(
+  descriptor: PDFDict,
+  context: PDFContext,
+): { entry: unknown; format: BrowserFontProgramFormat; browserLoadable: boolean } | null {
+  const trueType = descriptor.get(PDFName.of("FontFile2"));
+  if (trueType) return { entry: trueType, format: "truetype", browserLoadable: true };
+
+  const fontFile3 = descriptor.get(PDFName.of("FontFile3"));
+  if (fontFile3) {
+    const resolved = resolveObject(fontFile3, context);
+    if (resolved instanceof PDFRawStream) {
+      const subtype = nameString(resolved.dict.get(PDFName.of("Subtype")));
+      if (subtype === "OpenType") {
+        return { entry: fontFile3, format: "opentype", browserLoadable: true };
+      }
+      if (subtype === "Type1C" || subtype === "CIDFontType0C") {
+        return { entry: fontFile3, format: "cff", browserLoadable: false };
+      }
+    }
+    return { entry: fontFile3, format: "unknown", browserLoadable: false };
+  }
+
+  const type1 = descriptor.get(PDFName.of("FontFile"));
+  if (type1) return { entry: type1, format: "type1", browserLoadable: false };
+  return null;
+}
+
+function readEmbeddedProgram(fontDict: PDFDict, context: PDFContext): EmbeddedFontProgram | null {
+  const descriptor = descriptorForFont(fontDict, context);
+  if (!descriptor) return null;
+  const candidate = programFormatFor(descriptor, context);
+  if (!candidate) return null;
+
+  const resolved = resolveObject(candidate.entry, context);
+  if (!(resolved instanceof PDFRawStream)) return null;
+
+  try {
+    const bytes = decodePDFRawStream(resolved).decode();
+    return {
+      bytes,
+      format: candidate.format,
+      browserLoadable: candidate.browserLoadable && bytes.byteLength > 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function resolveFontDict(
+  resources: PDFDict,
+  resourceName: string,
+  context: PDFContext,
+): PDFDict | null {
+  const fonts = resolveDict(resources.get(PDFName.of("Font")), context);
+  if (!fonts) return null;
+  return resolveDict(fonts.get(PDFName.of(resourceName)), context);
+}
+
+/**
+ * Per-document font resolver/cache.
+ *
+ * Font parsing is intentionally centralized here instead of repeated by
+ * React selection logic. The registry never guesses that an embedded subset
+ * can render a new glyph: fontEncoding.ts remains the authority for safe
+ * write-back. Browser FontFace loading is preview-only and best effort.
+ */
+export class PdfFontRegistry {
+  private readonly profileCache = new WeakMap<PDFDict, PdfFontProfile>();
+  private readonly programCache = new WeakMap<PDFDict, EmbeddedFontProgram | null>();
+  private readonly browserFaceCache = new WeakMap<PDFDict, Promise<string | null>>();
+  private readonly context: PDFContext;
+
+  constructor(document: PDFDocument) {
+    this.context = document.context;
+  }
+
+  resolve(resources: PDFDict, resourceName: string): PdfFontProfile | null {
+    const fontDict = resolveFontDict(resources, resourceName, this.context);
+    if (!fontDict) return null;
+
+    const cached = this.profileCache.get(fontDict);
+    if (cached) return cached;
+
+    const resolvedFont = resolveFont(fontDict, this.context);
+    const metrics = resolveFontMetrics(fontDict, this.context, resolvedFont);
+    const styleHints = readFallbackStyleHints(fontDict, this.context);
+    const fallbackPdfFont = pickFallbackFont(styleHints);
+    const familyName = familyNameFromBaseFont(resolvedFont.baseFont);
+    const weight =
+      styleHints.fontWeight ??
+      (BOLD_NAME.test(resolvedFont.baseFont) || fallbackPdfFont.includes("Bold")
+        ? 700
+        : 400);
+    const italic =
+      ITALIC_NAME.test(resolvedFont.baseFont) ||
+      (styleHints.italicAngle !== null && styleHints.italicAngle !== 0) ||
+      fallbackPdfFont.includes("Italic") ||
+      fallbackPdfFont.includes("Oblique");
+    const serif = fallbackPdfFont.startsWith("Times");
+    const monospace = fallbackPdfFont.startsWith("Courier");
+    const embeddedProgram = this.embeddedProgramFor(fontDict);
+
+    const profile: PdfFontProfile = {
+      resourceName,
+      kind: resolvedFont.kind,
+      baseFont: resolvedFont.baseFont,
+      familyName,
+      isEmbedded: resolvedFont.isEmbedded,
+      isSubset: resolvedFont.isSubset,
+      encodingSource: resolvedFont.encodingSource,
+      metricsSource: metrics.source,
+      bytesPerCode: resolvedFont.bytesPerCode,
+      weight,
+      italic,
+      serif,
+      monospace,
+      descriptorFlags: styleHints.flags,
+      italicAngle: styleHints.italicAngle,
+      fallbackPdfFont,
+      cssFallbackFamily: fallbackCssStack(fallbackPdfFont),
+      browserFamilyName: `LumeoPdf_${safeFamilyToken(resourceName)}_${safeFamilyToken(resolvedFont.baseFont)}`,
+      browserPreviewPossible: Boolean(embeddedProgram?.browserLoadable),
+      resolvedFont,
+      metrics,
+      styleHints,
+    };
+    this.profileCache.set(fontDict, profile);
+    return profile;
+  }
+
+  embeddedProgram(resources: PDFDict, resourceName: string): EmbeddedFontProgram | null {
+    const fontDict = resolveFontDict(resources, resourceName, this.context);
+    return fontDict ? this.embeddedProgramFor(fontDict) : null;
+  }
+
+  private embeddedProgramFor(fontDict: PDFDict): EmbeddedFontProgram | null {
+    if (this.programCache.has(fontDict)) {
+      return this.programCache.get(fontDict) ?? null;
+    }
+    const program = readEmbeddedProgram(fontDict, this.context);
+    this.programCache.set(fontDict, program);
+    return program;
+  }
+
+  /**
+   * Registers a browser-compatible embedded font for editing preview.
+   * Returns the unique FontFace family when successful, otherwise null.
+   * This never changes export/write-back decisions.
+   */
+  ensureBrowserFont(resources: PDFDict, resourceName: string): Promise<string | null> {
+    const fontDict = resolveFontDict(resources, resourceName, this.context);
+    if (!fontDict) return Promise.resolve(null);
+
+    const cached = this.browserFaceCache.get(fontDict);
+    if (cached) return cached;
+
+    const profile = this.resolve(resources, resourceName);
+    const program = this.embeddedProgramFor(fontDict);
+    const promise = (async () => {
+      if (!profile || !program?.browserLoadable) return null;
+      if (
+        typeof FontFace === "undefined" ||
+        typeof document === "undefined" ||
+        !document.fonts
+      ) {
+        return null;
+      }
+
+      try {
+        const bytes = program.bytes.slice().buffer as ArrayBuffer;
+        const face = new FontFace(profile.browserFamilyName, bytes, {
+          weight: String(profile.weight),
+          style: profile.italic ? "italic" : "normal",
+        });
+        const loaded = await face.load();
+        document.fonts.add(loaded);
+        return profile.browserFamilyName;
+      } catch {
+        // Embedded PDF subsets commonly omit browser-facing cmap metadata.
+        // A failed preview registration is expected and must never make the
+        // underlying PDF text uneditable.
+        return null;
+      }
+    })();
+
+    this.browserFaceCache.set(fontDict, promise);
+    return promise;
+  }
+}
