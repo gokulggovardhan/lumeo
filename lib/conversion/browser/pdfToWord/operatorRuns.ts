@@ -33,6 +33,7 @@ import type {
 
 type StreamAppearance = {
   fillColorHex: string;
+  strokeColorHex: string;
   tjAdjustmentTotal: number;
 };
 
@@ -81,8 +82,9 @@ function colorFromOperands(values: number[]): string | null {
 function appearanceByOperatorStart(bytes: Uint8Array): Map<number, StreamAppearance> {
   const tokens = tokenizeContentStream(bytes);
   const appearances = new Map<number, StreamAppearance>();
-  const stack: string[] = [];
+  const stack: Array<{ fill: string; stroke: string }> = [];
   let fillColorHex = "#000000";
+  let strokeColorHex = "#000000";
   let operands: typeof tokens = [];
   let operandStart = 0;
 
@@ -99,19 +101,31 @@ function appearanceByOperatorStart(bytes: Uint8Array): Map<number, StreamAppeara
 
     switch (token.value) {
       case "q":
-        stack.push(fillColorHex);
+        stack.push({ fill: fillColorHex, stroke: strokeColorHex });
         break;
-      case "Q":
-        fillColorHex = stack.pop() ?? "#000000";
+      case "Q": {
+        const restored = stack.pop();
+        fillColorHex = restored?.fill ?? "#000000";
+        strokeColorHex = restored?.stroke ?? "#000000";
         break;
+      }
       case "g":
         if (values.length >= 1) fillColorHex = rgbHex(values[0], values[0], values[0]);
+        break;
+      case "G":
+        if (values.length >= 1) strokeColorHex = rgbHex(values[0], values[0], values[0]);
         break;
       case "rg":
         if (values.length >= 3) fillColorHex = rgbHex(values[0], values[1], values[2]);
         break;
+      case "RG":
+        if (values.length >= 3) strokeColorHex = rgbHex(values[0], values[1], values[2]);
+        break;
       case "k":
         if (values.length >= 4) fillColorHex = cmykHex(values[0], values[1], values[2], values[3]);
+        break;
+      case "K":
+        if (values.length >= 4) strokeColorHex = cmykHex(values[0], values[1], values[2], values[3]);
         break;
       case "sc":
       case "scn": {
@@ -119,17 +133,25 @@ function appearanceByOperatorStart(bytes: Uint8Array): Map<number, StreamAppeara
         if (inferred) fillColorHex = inferred;
         break;
       }
+      case "SC":
+      case "SCN": {
+        const inferred = colorFromOperands(values);
+        if (inferred) strokeColorHex = inferred;
+        break;
+      }
       case "Tj":
       case "'":
       case '"':
         appearances.set(operandStart, {
           fillColorHex,
+          strokeColorHex,
           tjAdjustmentTotal: 0,
         });
         break;
       case "TJ":
         appearances.set(operandStart, {
           fillColorHex,
+          strokeColorHex,
           // Numeric operands inside a TJ array alter the text position.
           // Summing them is sufficient for the run's total advance even
           // though per-glyph shaping still remains represented separately.
@@ -429,6 +451,7 @@ export function reconstructOperatorTextRuns({
     const sourceAppearance =
       appearance.get(operator.start) ?? {
         fillColorHex: "#000000",
+        strokeColorHex: "#000000",
         tjAdjustmentTotal: 0,
       };
 
@@ -485,13 +508,19 @@ export function reconstructOperatorTextRuns({
       horizontalScalingPct: operator.horizontalScalingPct,
       wordScalePct,
       textRisePt: operator.textRise,
-      colorHex: sourceAppearance.fillColorHex,
+      colorHex:
+        operator.renderingMode === 1
+          ? sourceAppearance.strokeColorHex
+          : sourceAppearance.fillColorHex,
       underline: false,
       underlineColorHex: null,
       hyperlinkUrl: null,
       readingOrderIndex,
       sourceKind: "operator",
-      visualOnly: Math.abs(origin.rotationDeg) > ROTATION_EPSILON_DEG,
+      visualOnly:
+        Math.abs(origin.rotationDeg) > ROTATION_EPSILON_DEG ||
+        operator.renderingMode === 3 ||
+        operator.renderingMode >= 4,
       glyphs,
     };
     lines.push(line);
