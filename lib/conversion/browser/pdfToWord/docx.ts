@@ -509,19 +509,40 @@ function documentXml(
     );
 
     type PageBlock =
-      | { kind: "paragraph"; yPt: number; plan: SemanticParagraphPlan }
+      | {
+          kind: "paragraph";
+          yPt: number;
+          order: number;
+          plan: SemanticParagraphPlan;
+        }
       | {
           kind: "table";
           yPt: number;
+          order: number;
           region: NonNullable<ReconstructedPage["regions"]>[number];
         }
-      | { kind: "fixed"; yPt: number; line: ReconstructedTextLine };
+      | {
+          kind: "fixed";
+          yPt: number;
+          order: number;
+          line: ReconstructedTextLine;
+        };
 
     const blocks: PageBlock[] = [
       ...semanticParagraphPlans.map(
         (plan): PageBlock => ({
           kind: "paragraph",
           yPt: plan.topPt,
+          order: Math.min(
+            ...plan.rows.flatMap((row) =>
+              row.indices.map(
+                (index) =>
+                  page.lines[index].readingOrderIndex ??
+                  page.lines[index].visualOrderIndex ??
+                  index,
+              ),
+            ),
+          ),
           plan,
         }),
       ),
@@ -529,6 +550,14 @@ function documentXml(
         (region): PageBlock => ({
           kind: "table",
           yPt: region.yPt,
+          order: Math.min(
+            ...region.lineIndices.map(
+              (index) =>
+                page.lines[index].readingOrderIndex ??
+                page.lines[index].visualOrderIndex ??
+                index,
+            ),
+          ),
           region,
         }),
       ),
@@ -541,13 +570,17 @@ function documentXml(
             !tableLineIndices.has(lineIndex),
         )
         .map(
-          ({ line }): PageBlock => ({
+          ({ line, lineIndex }): PageBlock => ({
             kind: "fixed",
             yPt: line.yPt,
+            order:
+              line.readingOrderIndex ??
+              line.visualOrderIndex ??
+              lineIndex,
             line,
           }),
         ),
-    ].sort((a, b) => a.yPt - b.yPt);
+    ].sort((a, b) => a.order - b.order || a.yPt - b.yPt);
 
     let semanticCursorBottomPt = 0;
     for (const block of blocks) {
