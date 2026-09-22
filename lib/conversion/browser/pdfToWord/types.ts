@@ -42,7 +42,13 @@ export type ReconstructedTextLine = {
   underline?: boolean;
   underlineColorHex?: string | null;
   hyperlinkUrl?: string | null;
-  /** Original content-stream order, independent from absolute positioning. */
+  /** Original content-stream operator order. It is evidence, not semantics. */
+  sourceOrderIndex?: number;
+  /**
+   * Logical/editable Word order. This is derived independently from absolute
+   * positioning because PDF content-stream order is not guaranteed to be a
+   * human reading order.
+   */
   readingOrderIndex?: number;
   /** Deterministic top-to-bottom/left-to-right visual order. */
   visualOrderIndex?: number;
