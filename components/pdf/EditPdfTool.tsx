@@ -76,8 +76,11 @@ import {
   createPdfEditSession,
   deriveElementOperations,
   nativeTextOperation,
+  nativeTextStyleOperation,
   pageOperation as createPageEditOperation,
+  type NativeTextTarget,
   type PdfEditSessionState,
+  type PdfEditTextStyle,
 } from "@/lib/pdf/edit/editSession";
 import { decideReplacementLayout } from "@/lib/pdf/edit/replacementLayout";
 import {
@@ -117,6 +120,14 @@ import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount }
 // (Type3 font, or a page/text shape this engine doesn't cover yet) -- in-
 // place editing genuinely isn't available for it, not an error.
 type RunMatch = { locatedOperator: LocatedTextOperator; operator: LocatedTextOperator["operator"] } | null;
+
+type NativeTextStyleDraft = {
+  spanId: string;
+  fontSizePt: number;
+  charSpacing: number;
+  wordSpacing: number;
+  horizontalScalingPct: number;
+};
 
 // Phase 9.2: the combined undo/redo snapshot -- reusing lib/sign/
 // useHistoryState.ts exactly as-is (no changes to that hook), just widening
@@ -552,6 +563,7 @@ export default function EditPdfTool() {
   // run. Export safety remains governed by fontEncoding/editPlan, not by
   // whether a browser happens to accept the embedded font bytes.
   const [browserFontPreview, setBrowserFontPreview] = useState<{ spanId: string; family: string } | null>(null);
+  const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
   // True when the last Restyle could not blank the original glyphs from the
   // content stream, so the covered text is still in the exported file. Drives
   // the disclosure notice -- see restyleSelectedRun for when that happens.
@@ -1793,6 +1805,46 @@ export default function EditPdfTool() {
 
     return { kind: "valid", contentStreamIndex: firstLocator.contentStreamIndex, operatorIndices, allOperators, resources: nonNull[0].locatedOperator.resources, fontResourceName };
   }
+
+  const selectedNativeSpan =
+    selectedRunIndices.length === 1
+      ? pageTextModel?.spans[selectedRunIndices[0]] ?? null
+      : null;
+
+  useEffect(() => {
+    if (!selectedNativeSpan) {
+      setNativeStyleDraft(null);
+      return;
+    }
+    setNativeStyleDraft((current) =>
+      current?.spanId === selectedNativeSpan.id
+        ? current
+        : {
+            spanId: selectedNativeSpan.id,
+            fontSizePt: selectedNativeSpan.style.fontSizePt,
+            charSpacing: selectedNativeSpan.style.charSpacingPt,
+            wordSpacing: selectedNativeSpan.style.wordSpacingPt,
+            horizontalScalingPct: selectedNativeSpan.style.horizontalScalingPct,
+          },
+    );
+  }, [selectedNativeSpan]);
+
+  const nativeStyleOverride = useMemo(() => {
+    if (!selectedNativeSpan || nativeStyleDraft?.spanId !== selectedNativeSpan.id) return null;
+    const before = selectedNativeSpan.style;
+    const changed =
+      nativeStyleDraft.fontSizePt !== before.fontSizePt ||
+      nativeStyleDraft.charSpacing !== before.charSpacingPt ||
+      nativeStyleDraft.wordSpacing !== before.wordSpacingPt ||
+      nativeStyleDraft.horizontalScalingPct !== before.horizontalScalingPct;
+    if (!changed) return null;
+    return {
+      fontSizePt: nativeStyleDraft.fontSizePt,
+      charSpacing: nativeStyleDraft.charSpacing,
+      wordSpacing: nativeStyleDraft.wordSpacing,
+      horizontalScalingPct: nativeStyleDraft.horizontalScalingPct,
+    };
+  }, [selectedNativeSpan, nativeStyleDraft]);
 
   // Phase 10: font resolution (resolveFont/resolveFontMetrics -- both parse
   // the font dictionary, the expensive part of building editPreview below)
