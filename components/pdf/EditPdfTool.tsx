@@ -1815,24 +1815,6 @@ export default function EditPdfTool() {
       ? pageTextModel?.spans[selectedRunIndices[0]] ?? null
       : null;
 
-  useEffect(() => {
-    if (!selectedNativeSpan) {
-      setNativeStyleDraft(null);
-      return;
-    }
-    setNativeStyleDraft((current) =>
-      current?.spanId === selectedNativeSpan.id
-        ? current
-        : {
-            spanId: selectedNativeSpan.id,
-            fontSizePt: selectedNativeSpan.style.fontSizePt,
-            charSpacing: selectedNativeSpan.style.charSpacingPt,
-            wordSpacing: selectedNativeSpan.style.wordSpacingPt,
-            horizontalScalingPct: selectedNativeSpan.style.horizontalScalingPct,
-          },
-    );
-  }, [selectedNativeSpan]);
-
   const nativeStyleOverride = useMemo(() => {
     if (!selectedNativeSpan || nativeStyleDraft?.spanId !== selectedNativeSpan.id) return null;
     const before = selectedNativeSpan.style;
@@ -3104,7 +3086,20 @@ export default function EditPdfTool() {
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
-                            setNativeFormatOpen((current) => !current);
+                            if (nativeFormatOpen) {
+                              setNativeFormatOpen(false);
+                              return;
+                            }
+                            if (singleSelectedSpan) {
+                              setNativeStyleDraft({
+                                spanId: singleSelectedSpan.id,
+                                fontSizePt: singleSelectedSpan.style.fontSizePt,
+                                charSpacing: singleSelectedSpan.style.charSpacingPt,
+                                wordSpacing: singleSelectedSpan.style.wordSpacingPt,
+                                horizontalScalingPct: singleSelectedSpan.style.horizontalScalingPct,
+                              });
+                              setNativeFormatOpen(true);
+                            }
                           }}
                           aria-expanded={nativeFormatOpen}
                           aria-controls="native-text-format-panel"
