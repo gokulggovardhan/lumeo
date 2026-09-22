@@ -29,6 +29,13 @@ When the user types exactly `DEV CONTINUE` in a Lumeo development chat:
 - retry transient errors safely without duplicating side effects;
 - stop only for genuine user input/approval or when the overall objective is complete.
 
+
+## ChatGPT Project Instructions block
+
+Paste this once into the Lumeo ChatGPT Project instructions when project-level behavior is desired:
+
+> Treat GitHub/protected main, current branch/commits, PRs/Actions, deployment evidence, Supabase when relevant, and `.github/LUMEO_DEVELOPMENT_CONTINUITY.md` as the authoritative development state. If the user types exactly `DEV CONTINUE`, recover and reconcile those sources first, preserve verified work, then continue the current objective autonomously without repeating completed investigation. Continue through implementation, tests, safe fixes, CI, authorized merge/deployment, production verification, smoke testing, cleanup, and final audit. Retry transient failures safely without duplicating side effects. Never expose or persist secrets/private acceptance files. Give concise progress updates without stopping while safe autonomous work remains; stop only for genuine user input/approval or when the overall objective is complete.
+
 ## Update policy
 
 Update this file only at meaningful checkpoints, such as:
