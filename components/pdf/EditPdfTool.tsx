@@ -2018,17 +2018,62 @@ export default function EditPdfTool() {
     setIsApplyingEdit(true);
     setEditApplyError("");
     try {
+      const nativeTarget: NativeTextSourceRef = {
+        kind: "native",
+        pageIndex,
+        spanIds: selectedRunIndices.map(
+          (index) => pageTextModel?.spans[index]?.id ?? `p${pageIndex}-span-${index}`,
+        ),
+        operators: selectedRunIndices.flatMap((index) => {
+          const match = runMatches[index];
+          if (!match) return [];
+          const locator = match.locatedOperator.locator;
+          return [{
+            streamKind: locator.kind,
+            contentStreamIndex: locator.kind === "page" ? locator.contentStreamIndex : 0,
+            formPath: locator.kind === "xobject" ? [...locator.formPath] : null,
+            operatorIndex: match.locatedOperator.operatorIndex,
+          }];
+        }),
+      };
+      const beforeText = editPreview.plan.originalText;
+      const layoutStrategy = editPreview.layoutDecision?.strategy ?? null;
+
       if (editPreview.kind === "single") {
-        const { plan, resolvedFont, locatedOperator } = editPreview;
-        await engine.applyEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode, { isolate: locatedOperator.locator.kind === "xobject" });
+        const { plan, resolvedFont, locatedOperator, layoutDecision } = editPreview;
+        await engine.applyEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode, {
+          isolate: locatedOperator.locator.kind === "xobject",
+          layoutDecision,
+        });
       } else {
-        const { plan, resolvedFont } = editPreview;
-        await engine.applyMultiRunEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode);
+        const { plan, resolvedFont, layoutDecision } = editPreview;
+        await engine.applyMultiRunEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode, {
+          layoutDecisions: plan.subPlans.map((_, index) => (index === 0 ? layoutDecision : null)),
+        });
       }
 
       const newBytes = await doc.save();
       const buffer = newBytes.buffer.slice(newBytes.byteOffset, newBytes.byteOffset + newBytes.byteLength) as ArrayBuffer;
-      setHistoryState((current) => ({ ...current, pdfBytes: buffer }));
+      setHistoryState((current) => ({
+        ...current,
+        pdfBytes: buffer,
+        journal:
+          editDraftText.length === 0
+            ? appendPdfEditOperation(current.journal, {
+                kind: "deleteText",
+                pageIndex,
+                target: nativeTarget,
+                beforeText,
+              })
+            : appendPdfEditOperation(current.journal, {
+                kind: "replaceText",
+                pageIndex,
+                target: nativeTarget,
+                beforeText,
+                afterText: editDraftText,
+                layoutStrategy,
+              }),
+      }));
       // The page-render effect (triggered by pdf.bytes changing, via the
       // sync effect above) will reset selection/hover/focus/draft state
       // itself once the refreshed preview and re-matched runs are ready --
@@ -2042,7 +2087,15 @@ export default function EditPdfTool() {
     } finally {
       setIsApplyingEdit(false);
     }
-  }, [editPreview, setHistoryState]);
+  }, [
+    editPreview,
+    editDraftText,
+    pageIndex,
+    selectedRunIndices,
+    pageTextModel,
+    runMatches,
+    setHistoryState,
+  ]);
 
   // Restyle covers a run with a whiteout and drops an editable text box in
   // its place. The whiteout hides the original glyphs, but hiding is not
