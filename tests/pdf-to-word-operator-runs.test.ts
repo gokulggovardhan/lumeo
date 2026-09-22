@@ -64,12 +64,13 @@ test("operator reconstruction keeps independently positioned source operators sp
   const blue = result.lines.find((line) => line.text === "BLUE-LINK");
   assert.ok(blue);
   assert.match(blue.colorHex ?? "", /^#0000E[CD-F]$/);
-  assert.equal(blue.readingOrderIndex, 3);
+  assert.equal(blue.sourceOrderIndex, 3);
+  assert.equal(blue.readingOrderIndex, 0);
 
   await (pdfjs as { destroy?: () => Promise<void> | void }).destroy?.();
 });
 
-test("operator reconstruction carries real font metrics and source reading order separately from visual order", async () => {
+test("operator reconstruction separates raw source order from logical editable order", async () => {
   const source = await PDFDocument.create();
   const regular = await source.embedFont(StandardFonts.Helvetica);
   const page = source.addPage([612, 792]);
@@ -104,12 +105,19 @@ test("operator reconstruction carries real font metrics and source reading order
 
   assert.deepEqual(
     result.lines.map((line) => line.text),
-    ["SECOND-VISUALLY", "FIRST-VISUALLY"],
-    "returned lines preserve source/content-stream reading order",
+    ["FIRST-VISUALLY", "SECOND-VISUALLY"],
+    "returned lines use geometric logical order rather than raw operator order",
   );
   const firstVisual = result.lines.find((line) => line.text === "FIRST-VISUALLY");
   const secondVisual = result.lines.find((line) => line.text === "SECOND-VISUALLY");
   assert.ok(firstVisual && secondVisual);
+  assert.equal(firstVisual.sourceOrderIndex, 1);
+  assert.equal(secondVisual.sourceOrderIndex, 0);
+  assert.ok(
+    (firstVisual.readingOrderIndex ?? 99) <
+      (secondVisual.readingOrderIndex ?? -1),
+    "logical/editable order follows visual reading geometry",
+  );
   assert.ok(
     (firstVisual.visualOrderIndex ?? 99) <
       (secondVisual.visualOrderIndex ?? -1),
