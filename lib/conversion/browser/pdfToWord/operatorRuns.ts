@@ -1,9 +1,7 @@
 import type { PDFDocument } from "pdf-lib";
 
 import {
-  multiplyMatrix,
   tokenizeContentStream,
-  type Matrix2x3,
   type TextShowOperator,
 } from "../../../pdf/edit/contentStream.ts";
 import {
@@ -357,7 +355,7 @@ function mergeContiguousOperatorFragments(
 
   for (const seed of byVisualOrder) {
     if (consumed.has(seed)) continue;
-    let current = { ...seed, glyphs: seed.glyphs ? [...seed.glyphs] : undefined };
+    const current = { ...seed, glyphs: seed.glyphs ? [...seed.glyphs] : undefined };
     consumed.add(seed);
 
     while (true) {
