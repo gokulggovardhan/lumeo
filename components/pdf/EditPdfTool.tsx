@@ -72,6 +72,15 @@ import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import {
+  appendPdfEditOperations,
+  createPdfEditSession,
+  deriveElementOperations,
+  nativeTextOperation,
+  pageOperation as createPageEditOperation,
+  type PdfEditSessionState,
+} from "@/lib/pdf/edit/editSession";
+import { decideReplacementLayout } from "@/lib/pdf/edit/replacementLayout";
+import {
   countElementsOnRemovedPages,
   deletePages,
   mergePdf,
@@ -119,7 +128,16 @@ type RunMatch = { locatedOperator: LocatedTextOperator; operator: LocatedTextOpe
 // one -- an elements-only action's snapshot reuses the SAME ArrayBuffer
 // reference, so the undo stack never duplicates multi-MB PDF bytes for
 // actions that didn't touch them.
-type EditHistorySnapshot = { elements: EditElement[]; pdfBytes: ArrayBuffer };
+type EditHistorySnapshot = {
+  elements: EditElement[];
+  /**
+   * Materialized result of the semantic session operations for compatibility
+   * with the proven pdf-lib/content-stream writer. This is a cache, not the
+   * only record of what the user did.
+   */
+  pdfBytes: ArrayBuffer;
+  session: PdfEditSessionState;
+};
 
 // Phase 9.2: a live, dry-run preview of what "Apply edit" would do for the
 // CURRENT selection + draft text -- computed synchronously (buildEditPlan/
@@ -411,7 +429,7 @@ export default function EditPdfTool() {
     canRedo,
     reset: resetHistory,
   } = useHistoryState<EditHistorySnapshot>(
-    { elements: [], pdfBytes: new ArrayBuffer(0) },
+    { elements: [], pdfBytes: new ArrayBuffer(0), session: createPdfEditSession(0) },
     { maxTotalSize: EDIT_HISTORY_MAX_BYTES, sizeOf: (snapshot) => snapshot.pdfBytes.byteLength },
   );
   // Every document mutation -- placing, moving, restyling or deleting an
@@ -445,10 +463,18 @@ export default function EditPdfTool() {
   // widened to also carry pdfBytes alongside elements. (Full-snapshot
   // resets go through resetHistory directly -- see resetTool/addFile.)
   const setElements = useCallback((updater: EditElement[] | ((current: EditElement[]) => EditElement[])) => {
-    setHistoryState((current) => ({
-      ...current,
-      elements: typeof updater === "function" ? (updater as (c: EditElement[]) => EditElement[])(current.elements) : updater,
-    }));
+    setHistoryState((current) => {
+      const nextElements =
+        typeof updater === "function"
+          ? (updater as (c: EditElement[]) => EditElement[])(current.elements)
+          : updater;
+      const operations = deriveElementOperations(current.elements, nextElements);
+      return {
+        ...current,
+        elements: nextElements,
+        session: appendPdfEditOperations(current.session, operations),
+      };
+    });
   }, [setHistoryState]);
   // Tracks the ORIGINAL uploaded bytes (set once per upload in addFile) so
   // "has this document had a true text edit applied" can be derived by
@@ -759,7 +785,7 @@ export default function EditPdfTool() {
     setPagePointSize(null);
     setError("");
     setOriginalBytes(null);
-    resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0) });
+    resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0), session: createPdfEditSession(0) });
     setSelectedId(null);
     setDetectedTextRuns([]);
     setRunMatches([]);
@@ -1390,7 +1416,7 @@ export default function EditPdfTool() {
       setPdfMeta({ file, pageCount });
       setPageIndex(0);
       setOriginalBytes(bytes);
-      resetHistory({ elements: [], pdfBytes: bytes });
+      resetHistory({ elements: [], pdfBytes: bytes, session: createPdfEditSession(bytes.byteLength) });
       setSelectedId(null);
       setDownloadUrl("");
     } catch (uploadError) {
@@ -1910,6 +1936,15 @@ export default function EditPdfTool() {
     }
   }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont]);
 
+  const replacementLayoutDecision = useMemo(() => {
+    if (editPreview.kind === "empty" || !editPreview.editable) return null;
+    const plan =
+      editPreview.kind === "single"
+        ? editPreview.plan
+        : editPreview.plan.subPlans[0];
+    return plan ? decideReplacementLayout(plan) : null;
+  }, [editPreview]);
+
   // Phase 9.2: the actual write-back for whatever editPreview currently
   // says is ready (single-operator via lib/pdf/edit/applyEditPlan.ts's
   // applyEditPlanToDocument, or a multi-run span via its
@@ -1953,7 +1988,36 @@ export default function EditPdfTool() {
 
       const newBytes = await doc.save();
       const buffer = newBytes.buffer.slice(newBytes.byteOffset, newBytes.byteOffset + newBytes.byteLength) as ArrayBuffer;
-      setHistoryState((current) => ({ ...current, pdfBytes: buffer }));
+      const spanIds = selectedRunIndices.map(
+        (index) => pageTextModel?.spans[index]?.id ?? `p${pageIndex}-span-${index}`,
+      );
+      const semanticOperation =
+        editPreview.kind === "single"
+          ? nativeTextOperation({
+              pageIndex,
+              spanIds,
+              contentStreamIndex: editPreview.plan.formPath ? null : editPreview.plan.contentStreamIndex,
+              formPath: editPreview.plan.formPath,
+              operatorIndices: [editPreview.plan.operatorIndex],
+              fontResourceName: editPreview.plan.fontResourceName,
+              originalText: editPreview.plan.originalText,
+              replacementText: editPreview.plan.replacementText,
+            })
+          : nativeTextOperation({
+              pageIndex,
+              spanIds,
+              contentStreamIndex: editPreview.plan.contentStreamIndex,
+              formPath: null,
+              operatorIndices: editPreview.plan.operatorIndices,
+              fontResourceName: editPreview.plan.subPlans[0]?.fontResourceName ?? null,
+              originalText: editPreview.plan.originalText,
+              replacementText: editPreview.plan.replacementText,
+            });
+      setHistoryState((current) => ({
+        ...current,
+        pdfBytes: buffer,
+        session: appendPdfEditOperations(current.session, [semanticOperation]),
+      }));
       // The page-render effect (triggered by pdf.bytes changing, via the
       // sync effect above) will reset selection/hover/focus/draft state
       // itself once the refreshed preview and re-matched runs are ready --
@@ -1967,7 +2031,7 @@ export default function EditPdfTool() {
     } finally {
       setIsApplyingEdit(false);
     }
-  }, [editPreview, setHistoryState]);
+  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex]);
 
   // Restyle covers a run with a whiteout and drops an editable text box in
   // its place. The whiteout hides the original glyphs, but hiding is not
@@ -2010,6 +2074,7 @@ export default function EditPdfTool() {
     ];
 
     let blankedBytes: ArrayBuffer | null = null;
+    let blankSemanticOperation: ReturnType<typeof nativeTextOperation> | null = null;
     const doc = pdfLibDocRef.current;
     const engine = editEngineRef.current;
     if (doc && engine && resolvedEditContext.kind === "single") {
@@ -2034,6 +2099,17 @@ export default function EditPdfTool() {
           });
           const saved = await doc.save();
           blankedBytes = saved.buffer.slice(saved.byteOffset, saved.byteOffset + saved.byteLength) as ArrayBuffer;
+          const selectedIndex = selectedRunIndices[0];
+          blankSemanticOperation = nativeTextOperation({
+            pageIndex,
+            spanIds: [pageTextModel?.spans[selectedIndex]?.id ?? `p${pageIndex}-span-${selectedIndex}`],
+            contentStreamIndex: blankPlan.formPath ? null : blankPlan.contentStreamIndex,
+            formPath: blankPlan.formPath,
+            operatorIndices: [blankPlan.operatorIndex],
+            fontResourceName: blankPlan.fontResourceName,
+            originalText: blankPlan.originalText,
+            replacementText: "",
+          });
         } catch {
           // Leave the original text in place rather than half-applying an
           // edit; the notice below tells the user what actually happened.
@@ -2042,10 +2118,19 @@ export default function EditPdfTool() {
       }
     }
 
-    setHistoryState((current) => ({
-      elements: [...current.elements, ...added],
-      pdfBytes: blankedBytes ?? current.pdfBytes,
-    }));
+    setHistoryState((current) => {
+      const nextElements = [...current.elements, ...added];
+      const elementOperations = deriveElementOperations(current.elements, nextElements);
+      const operations = blankSemanticOperation
+        ? [blankSemanticOperation, ...elementOperations]
+        : elementOperations;
+      return {
+        ...current,
+        elements: nextElements,
+        pdfBytes: blankedBytes ?? current.pdfBytes,
+        session: appendPdfEditOperations(current.session, operations),
+      };
+    });
     setRestyleKeptOriginalText(blankedBytes === null);
     // The download URL is cleared by setHistoryState itself -- see its
     // wrapper near the top of this component.
@@ -2073,26 +2158,45 @@ export default function EditPdfTool() {
   // so a restructured document can never stay downloadable at its old
   // shape. That is the whole reason the invalidation was centralised.
   async function runPageOperation(
-    operation: () => Promise<{ bytes: ArrayBuffer; pageMap: PageMap; pageCount: number }>,
+    execute: () => Promise<{ bytes: ArrayBuffer; pageMap: PageMap; pageCount: number }>,
     describe: (droppedElements: number) => string,
+    semantic: {
+      operation: "reorder" | "delete" | "merge";
+      affectedPageIndices: number[];
+    },
   ) {
     if (pageOpBusy) return;
     setPageOpBusy(true);
     setPageOpNotice("");
     setError("");
     try {
-      const { bytes, pageMap, pageCount } = await operation();
+      const { bytes, pageMap, pageCount } = await execute();
       const dropped = countElementsOnRemovedPages(elements, pageMap);
+      const description = describe(dropped);
+      const beforePageCount = pdfMeta?.pageCount ?? pageCount;
 
-      setHistoryState((current) => ({
-        elements: remapElements(current.elements, pageMap),
-        pdfBytes: bytes,
-      }));
+      setHistoryState((current) => {
+        const nextElements = remapElements(current.elements, pageMap);
+        const elementOperations = deriveElementOperations(current.elements, nextElements);
+        const pageEdit = createPageEditOperation({
+          operation: semantic.operation,
+          beforePageCount,
+          afterPageCount: pageCount,
+          affectedPageIndices: semantic.affectedPageIndices,
+          description,
+        });
+        return {
+          ...current,
+          elements: nextElements,
+          pdfBytes: bytes,
+          session: appendPdfEditOperations(current.session, [pageEdit, ...elementOperations]),
+        };
+      });
       setPageIndex((current) => remapPageIndex(current, pageMap, pageCount));
       setSelectedPages(new Set());
       setSelectedId(null);
       selectTextRun(null);
-      setPageOpNotice(describe(dropped));
+      setPageOpNotice(description);
     } catch (operationError) {
       setError(operationError instanceof Error ? operationError.message : "That page operation could not be completed.");
     } finally {
@@ -2107,6 +2211,7 @@ export default function EditPdfTool() {
     void runPageOperation(
       () => reorderPages(historyState.pdfBytes, order),
       () => `Moved page ${fromIndex + 1} to position ${toIndex + 1}.`,
+      { operation: "reorder", affectedPageIndices: [fromIndex, toIndex] },
     );
   }
 
@@ -2120,6 +2225,7 @@ export default function EditPdfTool() {
         // Named explicitly rather than left to be discovered: the elements
         // are gone from the document and only Undo brings them back.
         (dropped > 0 ? `, along with ${dropped} placed item${dropped === 1 ? "" : "s"} on them.` : "."),
+      { operation: "delete", affectedPageIndices: targets },
     );
   }
 
@@ -2132,6 +2238,7 @@ export default function EditPdfTool() {
     void runPageOperation(
       () => mergePdf(historyState.pdfBytes, incoming, insertAt),
       () => `Added ${sanitizePdfFileName(file.name)} after page ${pageIndex + 1}.`,
+      { operation: "merge", affectedPageIndices: [insertAt] },
     );
   }
 
@@ -2246,7 +2353,23 @@ export default function EditPdfTool() {
         return { ...mask, widthPct: box.widthPct, heightPct: box.heightPct };
       });
 
-      setHistoryState((current) => ({ elements: [...current.elements, ...masks], pdfBytes: outcome.bytes }));
+      setHistoryState((current) => {
+        const nextElements = [...current.elements, ...masks];
+        const elementOperations = deriveElementOperations(current.elements, nextElements);
+        const redactionEdit = createPageEditOperation({
+          operation: "redact",
+          beforePageCount: pdfMeta?.pageCount ?? 0,
+          afterPageCount: pdfMeta?.pageCount ?? 0,
+          affectedPageIndices: [pageIndex],
+          description: `Redacted ${redactionTargets.length} detected text region${redactionTargets.length === 1 ? "" : "s"} on page ${pageIndex + 1}.`,
+        });
+        return {
+          ...current,
+          elements: nextElements,
+          pdfBytes: outcome.bytes,
+          session: appendPdfEditOperations(current.session, [redactionEdit, ...elementOperations]),
+        };
+      });
       setRedactionOutcome(outcome);
       setRedactionBoxes([]);
       setSelectedId(null);
@@ -2285,6 +2408,7 @@ export default function EditPdfTool() {
     !isApplyingEdit &&
     editPreview.kind !== "empty" &&
     editPreview.editable &&
+    (replacementLayoutDecision?.safeToApplyWithCurrentWriter ?? true) &&
     editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
   // Phase 11: looked up once and reused throughout the inline on-page editor
   // JSX below, instead of repeatedly indexing detectedTextRuns/runMatches by
@@ -2429,7 +2553,11 @@ export default function EditPdfTool() {
   }
 
   return (
-    <section className="relative l2-workspace-deep grid gap-4 pb-40 lg:pb-28">
+    <section
+      className="relative l2-workspace-deep grid gap-4 pb-40 lg:pb-28"
+      data-edit-operation-count={historyState.session.operations.length}
+      data-edit-session-next-sequence={historyState.session.nextSequence}
+    >
       <L2WorkspaceHeader
         title="Edit PDF"
         description={`${pdf.file.name} · ${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
@@ -2914,6 +3042,10 @@ export default function EditPdfTool() {
                               </button>
                             </>
                           )}
+                        </div>
+                      ) : replacementLayoutDecision && !replacementLayoutDecision.safeToApplyWithCurrentWriter && replacementLayoutDecision.reason ? (
+                        <div role="alert" data-edit-layout-strategy={replacementLayoutDecision.strategy} className={`absolute z-30 max-w-[260px] rounded-md border border-[var(--lumeo-gold)]/30 bg-[var(--atelier-surface-1)]/95 px-2 py-1.5 text-[10px] font-semibold leading-4 text-[var(--text-primary)] shadow-lg ${inlineEditorTooltipPositionClass} ${inlineEditorHorizontalClass}`}>
+                          {replacementLayoutDecision.reason}
                         </div>
                       ) : editPreview.kind !== "empty" && !editPreview.editable && editPreview.reason ? (
                         <div role="alert" className={`absolute z-30 max-w-[220px] rounded-md border border-[var(--border-danger)]/25 bg-[var(--surface-danger)] px-2 py-1 text-[10px] font-semibold leading-4 text-[var(--text-danger)] shadow-lg ${inlineEditorTooltipPositionClass} ${inlineEditorHorizontalClass}`}>
