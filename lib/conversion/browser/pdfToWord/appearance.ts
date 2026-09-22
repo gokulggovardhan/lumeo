@@ -13,7 +13,11 @@ function parseHex(value: string | null | undefined): Rgb | null {
 
 function toHex({ r, g, b }: Rgb): string {
   return `#${[r, g, b]
-    .map((value) => Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, "0"))
+    .map((value) =>
+      Math.max(0, Math.min(255, Math.round(value)))
+        .toString(16)
+        .padStart(2, "0"),
+    )
     .join("")
     .toUpperCase()}`;
 }
@@ -31,7 +35,12 @@ function quantizedKey(pixel: Rgb): string {
   return `${q(pixel.r)},${q(pixel.g)},${q(pixel.b)}`;
 }
 
-function pixelAt(data: Uint8ClampedArray, width: number, x: number, y: number): Rgb {
+function pixelAt(
+  data: Uint8ClampedArray,
+  width: number,
+  x: number,
+  y: number,
+): Rgb {
   const offset = (y * width + x) * 4;
   return {
     r: data[offset],
@@ -41,23 +50,18 @@ function pixelAt(data: Uint8ClampedArray, width: number, x: number, y: number): 
 }
 
 function dominantInkColor(
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  left: number,
-  top: number,
-  right: number,
-  bottom: number,
+  image: ImageData,
+  textBottomPx: number,
 ): Rgb | null {
   const histogram = new Map<string, { count: number; sum: Rgb }>();
-  const x0 = Math.max(0, Math.floor(left));
-  const y0 = Math.max(0, Math.floor(top));
-  const x1 = Math.min(width - 1, Math.ceil(right));
-  const y1 = Math.min(height - 1, Math.ceil(bottom));
+  const bottom = Math.max(
+    0,
+    Math.min(image.height - 1, Math.ceil(textBottomPx)),
+  );
 
-  for (let y = y0; y <= y1; y += 1) {
-    for (let x = x0; x <= x1; x += 1) {
-      const pixel = pixelAt(data, width, x, y);
+  for (let y = 0; y <= bottom; y += 1) {
+    for (let x = 0; x < image.width; x += 1) {
+      const pixel = pixelAt(image.data, image.width, x, y);
       if (!isInk(pixel)) continue;
       const key = quantizedKey(pixel);
       const entry = histogram.get(key) ?? {
@@ -85,34 +89,25 @@ function dominantInkColor(
 }
 
 function hasUnderlineNearBottom(
-  data: Uint8ClampedArray,
-  width: number,
-  height: number,
-  line: ReconstructedTextLine,
-  scaleX: number,
-  scaleY: number,
+  image: ImageData,
+  textBottomPx: number,
   preferredColor: Rgb | null,
+  searchRadiusPx: number,
 ): boolean {
-  const x0 = Math.max(0, Math.floor(line.xPt * scaleX));
-  const x1 = Math.min(
-    width - 1,
-    Math.ceil((line.xPt + line.widthPt) * scaleX),
-  );
-  if (x1 - x0 < 8) return false;
+  if (image.width < 8) return false;
 
-  const bottom = (line.yPt + line.heightPt) * scaleY;
-  // True PDF underlines are typically within about one source point of the
-  // text box's visual bottom. Keeping the search this tight avoids confusing
-  // invoice/table rules several points below a heading with an underline.
-  const y0 = Math.max(0, Math.floor(bottom - 1.25 * scaleY));
-  const y1 = Math.min(height - 1, Math.ceil(bottom + 1.25 * scaleY));
+  const y0 = Math.max(0, Math.floor(textBottomPx - searchRadiusPx));
+  const y1 = Math.min(
+    image.height - 1,
+    Math.ceil(textBottomPx + searchRadiusPx),
+  );
 
   for (let y = y0; y <= y1; y += 1) {
     let matching = 0;
     let longest = 0;
     let current = 0;
-    for (let x = x0; x <= x1; x += 1) {
-      const pixel = pixelAt(data, width, x, y);
+    for (let x = 0; x < image.width; x += 1) {
+      const pixel = pixelAt(image.data, image.width, x, y);
       const matches =
         isInk(pixel) &&
         (!preferredColor || colorDistance(pixel, preferredColor) <= 72);
@@ -125,18 +120,25 @@ function hasUnderlineNearBottom(
       }
     }
 
-    const span = x1 - x0 + 1;
-    if (matching / span >= 0.58 || longest / span >= 0.55) return true;
+    if (
+      matching / image.width >= 0.58 ||
+      longest / image.width >= 0.55
+    ) {
+      return true;
+    }
   }
 
   return false;
 }
 
 /**
- * Raster appearance is a verification/enrichment path, not a text extractor.
- * Geometry/text comes from PDF operators/PDF.js; the already-rendered local
- * page bitmap supplies appearance details that PDFs do not encode
- * semantically, notably painted underlines and uncommon colour-space output.
+ * Raster appearance is an enrichment/verification path, not a text
+ * extractor. Geometry and text still come from source PDF operators/PDF.js.
+ *
+ * Memory note: do not call getImageData for the full rendered page. Safari
+ * can otherwise hold a second multi-megabyte RGBA page buffer while the
+ * original canvas is still live. Each run samples only its own small local
+ * rectangle, and that ImageData becomes unreachable before the next page.
  */
 export function enrichTextAppearanceFromCanvas(
   context: CanvasRenderingContext2D,
@@ -144,26 +146,40 @@ export function enrichTextAppearanceFromCanvas(
   scaleX: number,
   scaleY: number,
 ): void {
-  if (!lines.length) return;
-
   const canvas = context.canvas;
-  const image = context.getImageData(0, 0, canvas.width, canvas.height);
+
   for (const line of lines) {
     if (line.visualOnly) continue;
 
-    const left = line.xPt * scaleX;
-    const top = line.yPt * scaleY;
-    const right = (line.xPt + line.widthPt) * scaleX;
-    const bottom = (line.yPt + line.heightPt) * scaleY;
-    const sampled = dominantInkColor(
-      image.data,
-      image.width,
-      image.height,
-      left,
-      top,
-      right,
-      bottom,
+    const left = Math.max(0, Math.floor(line.xPt * scaleX));
+    const top = Math.max(0, Math.floor(line.yPt * scaleY));
+    const right = Math.min(
+      canvas.width,
+      Math.ceil((line.xPt + line.widthPt) * scaleX),
     );
+    const textBottom = (line.yPt + line.heightPt) * scaleY;
+    const underlineRadiusPx = Math.max(1, 1.25 * scaleY);
+    const bottom = Math.min(
+      canvas.height,
+      Math.ceil(textBottom + underlineRadiusPx),
+    );
+    const width = right - left;
+    const height = bottom - top;
+    if (width <= 0 || height <= 0) continue;
+
+    let local: ImageData;
+    try {
+      local = context.getImageData(left, top, width, height);
+    } catch {
+      // Canvas security/allocation failures must never block conversion.
+      continue;
+    }
+
+    const localTextBottom = Math.min(
+      local.height - 1,
+      Math.max(0, textBottom - top),
+    );
+    const sampled = dominantInkColor(local, localTextBottom);
 
     // Content-stream colour is authoritative when available. Sampling fills
     // gaps for custom colour spaces/PDF.js fallback runs.
@@ -174,17 +190,15 @@ export function enrichTextAppearanceFromCanvas(
     const preferred = parseHex(line.colorHex) ?? sampled;
     if (
       hasUnderlineNearBottom(
-        image.data,
-        image.width,
-        image.height,
-        line,
-        scaleX,
-        scaleY,
+        local,
+        localTextBottom,
         preferred,
+        underlineRadiusPx,
       )
     ) {
       line.underline = true;
-      line.underlineColorHex = line.colorHex ?? (sampled ? toHex(sampled) : null);
+      line.underlineColorHex =
+        line.colorHex ?? (sampled ? toHex(sampled) : null);
     }
   }
 }
