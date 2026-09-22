@@ -228,7 +228,7 @@ test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecuti
         const refreshedLabels = await page
           .locator('div[role="button"][aria-label^="Editable text: "]')
           .evaluateAll((nodes) =>
-            nodes.map((node) => (node.getAttribute("aria-label") ?? "").replace(/^Editable text:\\s*/, "")),
+            nodes.map((node) => (node.getAttribute("aria-label") ?? "").replace(/^Editable text:\s*/, "")),
           );
         return (
           refreshedLabels.some((label) => label.includes("SSN 000-00-0000")) ||
