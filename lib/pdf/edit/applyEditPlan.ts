@@ -127,10 +127,6 @@ function encodePdfName(name: string): string {
 // left in their own form for the reason the same-font path already gives:
 // each performs its own text-line move before showing, so what follows
 // starts a fresh line and has no horizontal position to preserve.
-type LayoutAwareRewriteOptions = {
-  layoutDecision?: PdfTextLayoutDecision | null;
-};
-
 function assertLayoutDecisionApplicable(decision: PdfTextLayoutDecision | null | undefined): void {
   if (!decision) return;
   if (!decision.supported || decision.strategy === "blocked" || decision.strategy === "local-reflow") {
@@ -168,13 +164,14 @@ function buildShowOperatorText(
   }
 
   const needsAdjustment = Math.abs(tailAdjustment) >= TJ_DELTA_EPSILON;
-  if (plan.operatorType === "Tj" && !decision && !needsAdjustment) {
-    // Backward-compatible byte shape for every pre-layout-engine caller.
-    return `<${hex}> Tj`;
-  }
-
-  if (plan.operatorType === "Tj" && decision?.strategy !== "natural") {
-    return `<${hex}> Tj`;
+  if (plan.operatorType === "Tj") {
+    // Preserve the simpler Tj form whenever no tail compensation is needed.
+    // Premium natural-layout edits promote it to TJ only when the measured
+    // width delta must be neutralized to keep later text in position.
+    if (!needsAdjustment || decision?.strategy !== "natural") {
+      return `<${hex}> Tj`;
+    }
+    return `[<${hex}> ${formatPdfNumber(tailAdjustment)}] TJ`;
   }
 
   return needsAdjustment
