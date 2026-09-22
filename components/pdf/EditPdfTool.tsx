@@ -1495,8 +1495,14 @@ export default function EditPdfTool() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      if (isTypingTarget(event.target)) return;
       const command = event.ctrlKey || event.metaKey;
+      if (command && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setTextSearchOpen(true);
+        requestAnimationFrame(() => textSearchInputRef.current?.focus());
+        return;
+      }
+      if (isTypingTarget(event.target)) return;
       if (command && event.key.toLowerCase() === "z" && event.shiftKey) {
         event.preventDefault();
         redo();
