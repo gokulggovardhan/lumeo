@@ -1936,6 +1936,15 @@ export default function EditPdfTool() {
     }
   }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont]);
 
+  const replacementLayoutDecision = useMemo(() => {
+    if (editPreview.kind === "empty" || !editPreview.editable) return null;
+    const plan =
+      editPreview.kind === "single"
+        ? editPreview.plan
+        : editPreview.plan.subPlans[0];
+    return plan ? decideReplacementLayout(plan) : null;
+  }, [editPreview]);
+
   // Phase 9.2: the actual write-back for whatever editPreview currently
   // says is ready (single-operator via lib/pdf/edit/applyEditPlan.ts's
   // applyEditPlanToDocument, or a multi-run span via its
@@ -1979,7 +1988,36 @@ export default function EditPdfTool() {
 
       const newBytes = await doc.save();
       const buffer = newBytes.buffer.slice(newBytes.byteOffset, newBytes.byteOffset + newBytes.byteLength) as ArrayBuffer;
-      setHistoryState((current) => ({ ...current, pdfBytes: buffer }));
+      const spanIds = selectedRunIndices.map(
+        (index) => pageTextModel?.spans[index]?.id ?? `p${pageIndex}-span-${index}`,
+      );
+      const semanticOperation =
+        editPreview.kind === "single"
+          ? nativeTextOperation({
+              pageIndex,
+              spanIds,
+              contentStreamIndex: editPreview.plan.formPath ? null : editPreview.plan.contentStreamIndex,
+              formPath: editPreview.plan.formPath,
+              operatorIndices: [editPreview.plan.operatorIndex],
+              fontResourceName: editPreview.plan.fontResourceName,
+              originalText: editPreview.plan.originalText,
+              replacementText: editPreview.plan.replacementText,
+            })
+          : nativeTextOperation({
+              pageIndex,
+              spanIds,
+              contentStreamIndex: editPreview.plan.contentStreamIndex,
+              formPath: null,
+              operatorIndices: editPreview.plan.operatorIndices,
+              fontResourceName: editPreview.plan.subPlans[0]?.fontResourceName ?? null,
+              originalText: editPreview.plan.originalText,
+              replacementText: editPreview.plan.replacementText,
+            });
+      setHistoryState((current) => ({
+        ...current,
+        pdfBytes: buffer,
+        session: appendPdfEditOperations(current.session, [semanticOperation]),
+      }));
       // The page-render effect (triggered by pdf.bytes changing, via the
       // sync effect above) will reset selection/hover/focus/draft state
       // itself once the refreshed preview and re-matched runs are ready --
@@ -1993,7 +2031,7 @@ export default function EditPdfTool() {
     } finally {
       setIsApplyingEdit(false);
     }
-  }, [editPreview, setHistoryState]);
+  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex]);
 
   // Restyle covers a run with a whiteout and drops an editable text box in
   // its place. The whiteout hides the original glyphs, but hiding is not
@@ -2311,6 +2349,7 @@ export default function EditPdfTool() {
     !isApplyingEdit &&
     editPreview.kind !== "empty" &&
     editPreview.editable &&
+    (replacementLayoutDecision?.safeToApplyWithCurrentWriter ?? true) &&
     editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
   // Phase 11: looked up once and reused throughout the inline on-page editor
   // JSX below, instead of repeatedly indexing detectedTextRuns/runMatches by
@@ -2940,6 +2979,10 @@ export default function EditPdfTool() {
                               </button>
                             </>
                           )}
+                        </div>
+                      ) : replacementLayoutDecision && !replacementLayoutDecision.safeToApplyWithCurrentWriter && replacementLayoutDecision.reason ? (
+                        <div role="alert" data-edit-layout-strategy={replacementLayoutDecision.strategy} className={`absolute z-30 max-w-[260px] rounded-md border border-[var(--lumeo-gold)]/30 bg-[var(--atelier-surface-1)]/95 px-2 py-1.5 text-[10px] font-semibold leading-4 text-[var(--text-primary)] shadow-lg ${inlineEditorTooltipPositionClass} ${inlineEditorHorizontalClass}`}>
+                          {replacementLayoutDecision.reason}
                         </div>
                       ) : editPreview.kind !== "empty" && !editPreview.editable && editPreview.reason ? (
                         <div role="alert" className={`absolute z-30 max-w-[220px] rounded-md border border-[var(--border-danger)]/25 bg-[var(--surface-danger)] px-2 py-1 text-[10px] font-semibold leading-4 text-[var(--text-danger)] shadow-lg ${inlineEditorTooltipPositionClass} ${inlineEditorHorizontalClass}`}>
