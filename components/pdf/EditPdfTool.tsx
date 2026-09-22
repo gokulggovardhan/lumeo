@@ -3037,13 +3037,23 @@ export default function EditPdfTool() {
                         // and a text box dropped next to it read identically.
                         className="lumeo-page-overlay-input h-full w-full rounded-[3px] border border-[var(--lumeo-gold)] bg-white px-0.5 font-semibold text-[#12141a] shadow-[0_0_0_3px_rgba(var(--lumeo-gold-rgb),0.16)] outline-none"
                         style={{
-                          fontSize: `${overlayFontSizePx(singleSelectedRun.fontSizePt, pagePointSize?.width ?? 0, stageWidthPx)}px`,
+                          fontSize: `${overlayFontSizePx(
+                            nativeStyleDraft?.spanId === singleSelectedSpan?.id
+                              ? nativeStyleDraft.fontSizePt
+                              : singleSelectedRun.fontSizePt,
+                            pagePointSize?.width ?? 0,
+                            stageWidthPx,
+                          )}px`,
                           fontFamily: inlineEditorFontFamily,
                           fontWeight: singleSelectedSpan?.style.weight ?? 600,
                           fontStyle: singleSelectedSpan?.style.italic ? "italic" : "normal",
                           letterSpacing:
-                            singleSelectedSpan && singleSelectedSpan.style.charSpacingPt !== 0
-                              ? `${(singleSelectedSpan.style.charSpacingPt / Math.max(1, singleSelectedSpan.style.fontSizePt)).toFixed(4)}em`
+                            nativeStyleDraft?.spanId === singleSelectedSpan?.id && nativeStyleDraft.charSpacing !== 0
+                              ? `${(nativeStyleDraft.charSpacing / Math.max(1, nativeStyleDraft.fontSizePt)).toFixed(4)}em`
+                              : undefined,
+                          wordSpacing:
+                            nativeStyleDraft?.spanId === singleSelectedSpan?.id && nativeStyleDraft.wordSpacing !== 0
+                              ? `${(nativeStyleDraft.wordSpacing / Math.max(1, nativeStyleDraft.fontSizePt)).toFixed(4)}em`
                               : undefined,
                         }}
                       />
@@ -3090,15 +3100,26 @@ export default function EditPdfTool() {
                             <path d="M5 5 15 15M15 5 5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                           </svg>
                         </button>
-                        {/* The in-place editor above can only swap the words:
-                            it rewrites glyph codes inside the original
-                            content-stream operator, which is exactly why font,
-                            size and colour survive untouched -- and exactly why
-                            it can't change them. Restyle is the deliberate
-                            trade: cover the original and drop an editable text
-                            box in its place, giving full formatting freedom at
-                            the cost of the original glyphs remaining hidden
-                            underneath rather than replaced. */}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setNativeFormatOpen((current) => !current);
+                          }}
+                          aria-expanded={nativeFormatOpen}
+                          aria-controls="native-text-format-panel"
+                          className={`grid h-9 shrink-0 place-items-center rounded-full border px-3 text-[10px] font-bold uppercase tracking-[0.1em] shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${
+                            nativeFormatOpen
+                              ? "border-[var(--lumeo-gold)]/60 bg-[var(--lumeo-gold)]/15 text-[var(--text-primary)]"
+                              : "border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 text-[var(--text-primary)]/70 hover:border-[var(--text-primary)]/24"
+                          }`}
+                        >
+                          Format
+                        </button>
+                        {/* Restyle is now the fallback for appearance changes
+                            the native writer cannot yet prove safe (font-face
+                            substitution, colour and alignment), not the normal
+                            path for size/spacing changes. */}
                         <button
                           type="button"
                           onClick={(event) => {
@@ -3106,12 +3127,128 @@ export default function EditPdfTool() {
                             void restyleSelectedRun();
                           }}
                           aria-label="Restyle this text"
-                          title="Restyle -- convert to an editable text box you can restyle (font size, colour, bold, italic)"
+                          title="Restyle -- use a replacement text box for font-face, colour or other appearance changes that cannot be applied safely in place"
                           className="grid h-9 shrink-0 place-items-center rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/70 shadow-lg transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
                         >
                           Restyle
                         </button>
                       </div>
+
+                      {nativeFormatOpen && nativeStyleDraft && singleSelectedSpan ? (
+                        <div
+                          id="native-text-format-panel"
+                          data-native-text-formatting
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                          className={`absolute z-40 w-[min(19rem,86vw)] rounded-xl border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/98 p-3 text-[11px] text-[var(--text-primary)] shadow-2xl ${nativeFormatPanelPositionClass} ${inlineEditorHorizontalClass}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-[var(--text-primary)]/40">
+                                Original PDF font
+                              </div>
+                              <div className="mt-0.5 truncate font-semibold">
+                                {singleSelectedSpan.style.fontFamily || singleSelectedSpan.style.baseFont || "PDF font"}
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 gap-1">
+                              <span className="rounded-full border border-[var(--text-primary)]/12 px-2 py-0.5 text-[9px] font-semibold text-[var(--text-primary)]/65">
+                                {singleSelectedSpan.style.weight >= 600 ? "Bold" : "Regular"}
+                              </span>
+                              {singleSelectedSpan.style.italic ? (
+                                <span className="rounded-full border border-[var(--text-primary)]/12 px-2 py-0.5 text-[9px] font-semibold italic text-[var(--text-primary)]/65">
+                                  Italic
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <label className="grid gap-1">
+                              <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/45">Size pt</span>
+                              <input
+                                aria-label="Native font size"
+                                type="number"
+                                min={1}
+                                max={500}
+                                step={0.5}
+                                value={nativeStyleDraft.fontSizePt}
+                                onChange={(event) => {
+                                  const value = event.currentTarget.valueAsNumber;
+                                  if (Number.isFinite(value)) setNativeStyleDraft((current) => current ? { ...current, fontSizePt: value } : current);
+                                }}
+                                className="h-9 rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 font-semibold outline-none focus:border-[var(--lumeo-gold)]/55"
+                              />
+                            </label>
+                            <label className="grid gap-1">
+                              <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/45">Width %</span>
+                              <input
+                                aria-label="Native horizontal scale"
+                                type="number"
+                                min={10}
+                                max={500}
+                                step={1}
+                                value={nativeStyleDraft.horizontalScalingPct}
+                                onChange={(event) => {
+                                  const value = event.currentTarget.valueAsNumber;
+                                  if (Number.isFinite(value)) setNativeStyleDraft((current) => current ? { ...current, horizontalScalingPct: value } : current);
+                                }}
+                                className="h-9 rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 font-semibold outline-none focus:border-[var(--lumeo-gold)]/55"
+                              />
+                            </label>
+                            <label className="grid gap-1">
+                              <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/45">Letter pt</span>
+                              <input
+                                aria-label="Native character spacing"
+                                type="number"
+                                step={0.1}
+                                value={nativeStyleDraft.charSpacing}
+                                onChange={(event) => {
+                                  const value = event.currentTarget.valueAsNumber;
+                                  if (Number.isFinite(value)) setNativeStyleDraft((current) => current ? { ...current, charSpacing: value } : current);
+                                }}
+                                className="h-9 rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 font-semibold outline-none focus:border-[var(--lumeo-gold)]/55"
+                              />
+                            </label>
+                            <label className="grid gap-1">
+                              <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/45">Word pt</span>
+                              <input
+                                aria-label="Native word spacing"
+                                type="number"
+                                step={0.1}
+                                value={nativeStyleDraft.wordSpacing}
+                                onChange={(event) => {
+                                  const value = event.currentTarget.valueAsNumber;
+                                  if (Number.isFinite(value)) setNativeStyleDraft((current) => current ? { ...current, wordSpacing: value } : current);
+                                }}
+                                className="h-9 rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 font-semibold outline-none focus:border-[var(--lumeo-gold)]/55"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between gap-3">
+                            <p className="text-[9px] leading-4 text-[var(--text-primary)]/48">
+                              Font face, weight, italic, colour and alignment stay inherited until Lumeo can restore those PDF graphics states exactly.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNativeStyleDraft({
+                                  spanId: singleSelectedSpan.id,
+                                  fontSizePt: singleSelectedSpan.style.fontSizePt,
+                                  charSpacing: singleSelectedSpan.style.charSpacingPt,
+                                  wordSpacing: singleSelectedSpan.style.wordSpacingPt,
+                                  horizontalScalingPct: singleSelectedSpan.style.horizontalScalingPct,
+                                })
+                              }
+                              className="shrink-0 rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/65 hover:text-[var(--text-primary)]"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
                       {/* Three mutually exclusive states, in priority order:
                           an error from the last Apply; the substitute-font
                           offer (a rejection the user CAN act on); and a plain
