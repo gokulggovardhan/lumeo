@@ -297,9 +297,14 @@ test("operator coverage is geometry-aware and rejects matching text from the wro
 
 test("privacy-safe invoice fixture reaches lossless source-operator coverage on every page", async () => {
   const bytes = await makeFixedLayoutInvoicePdf();
-  const structural = await PDFDocument.load(bytes.slice());
+  const byteArray = new Uint8Array(
+    bytes.buffer,
+    bytes.byteOffset,
+    bytes.byteLength,
+  );
+  const structural = await PDFDocument.load(byteArray.slice());
   const registry = new PdfFontRegistry(structural);
-  const pdfjs = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const pdfjs = await pdfjsLib.getDocument({ data: byteArray.slice() }).promise;
 
   try {
     for (let pageNumber = 1; pageNumber <= pdfjs.numPages; pageNumber += 1) {
