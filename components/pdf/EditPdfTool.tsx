@@ -64,6 +64,7 @@ import { buildPdfPageTextModel, type PdfPageTextModel } from "@/lib/pdf/edit/doc
 import { PercentSpatialIndex } from "@/lib/pdf/edit/spatialIndex";
 import {
   nextSearchMatchIndex,
+  replacementTextForSearchMatch,
   searchPdfDocumentText,
   searchPdfPageText,
   type PdfTextSearchMatch,
@@ -576,6 +577,7 @@ export default function EditPdfTool() {
   const [nativeFormatOpen, setNativeFormatOpen] = useState(false);
   const [textSearchOpen, setTextSearchOpen] = useState(false);
   const [textSearchQuery, setTextSearchQuery] = useState("");
+  const [textSearchReplacement, setTextSearchReplacement] = useState("");
   const [textSearchScope, setTextSearchScope] = useState<PdfTextSearchScope>("document");
   const [textSearchCaseSensitive, setTextSearchCaseSensitive] = useState(false);
   const [textSearchWholeWord, setTextSearchWholeWord] = useState(false);
@@ -592,6 +594,7 @@ export default function EditPdfTool() {
   // editable text run -- see the JSX below (rendered next to the run's
   // TextRunOverlay) and the autofocus effect just below this.
   const inlineEditInputRef = useRef<HTMLInputElement | null>(null);
+  const textSearchInputRef = useRef<HTMLInputElement | null>(null);
 
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
   // Phase 11: live drag-to-create preview for the Whiteout tool -- see
@@ -989,6 +992,7 @@ export default function EditPdfTool() {
     setRestyleKeptOriginalText(false);
     setTextSearchOpen(false);
     setTextSearchQuery("");
+    setTextSearchReplacement("");
     setTextSearchScope("document");
     setTextSearchCaseSensitive(false);
     setTextSearchWholeWord(false);
