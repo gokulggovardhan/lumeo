@@ -325,10 +325,16 @@ function sameVisualLine(a: ReconstructedTextLine, b: ReconstructedTextLine): boo
 function compatibleStyle(a: ReconstructedTextLine, b: ReconstructedTextLine): boolean {
   return (
     a.fontFamily === b.fontFamily &&
+    a.sourceFontName === b.sourceFontName &&
     a.bold === b.bold &&
     a.italic === b.italic &&
+    a.visualOnly === b.visualOnly &&
     (a.colorHex ?? "#000000") === (b.colorHex ?? "#000000") &&
-    Math.abs(a.fontSizePt - b.fontSizePt) <= 0.15
+    Math.abs(a.fontSizePt - b.fontSizePt) <= 0.15 &&
+    Math.abs((a.charSpacingPt ?? 0) - (b.charSpacingPt ?? 0)) <= 0.05 &&
+    Math.abs((a.wordSpacingPt ?? 0) - (b.wordSpacingPt ?? 0)) <= 0.05 &&
+    Math.abs((a.horizontalScalingPct ?? 100) - (b.horizontalScalingPct ?? 100)) <= 0.1 &&
+    Math.abs((a.wordScalePct ?? 100) - (b.wordScalePct ?? 100)) <= 0.5
   );
 }
 
