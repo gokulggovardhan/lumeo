@@ -582,7 +582,9 @@ export default function EditPdfTool() {
   const [textSearchCaseSensitive, setTextSearchCaseSensitive] = useState(false);
   const [textSearchWholeWord, setTextSearchWholeWord] = useState(false);
   const [textSearchActiveIndex, setTextSearchActiveIndex] = useState(-1);
-  const [textSearchIndexRevision, setTextSearchIndexRevision] = useState(0);
+  const [textSearchPageModels, setTextSearchPageModels] = useState<ReadonlyMap<number, PdfPageTextModel>>(
+    () => new Map(),
+  );
   const [textSearchIndexBusy, setTextSearchIndexBusy] = useState(false);
   // True when the last Restyle could not blank the original glyphs from the
   // content stream, so the covered text is still in the exported file. Drives
@@ -802,10 +804,10 @@ export default function EditPdfTool() {
   );
 
   const searchablePageModels = useMemo(() => {
-    const models = new Map(textSearchPageModelsRef.current);
+    const models = new Map(textSearchPageModels);
     if (pageTextModel) models.set(pageIndex, pageTextModel);
     return [...models.values()].sort((a, b) => a.pageIndex - b.pageIndex);
-  }, [textSearchIndexRevision, pageTextModel, pageIndex, pdf?.bytes]);
+  }, [textSearchPageModels, pageTextModel, pageIndex]);
 
   const textSearchMatches = useMemo(() => {
     const options = {
@@ -915,7 +917,7 @@ export default function EditPdfTool() {
             completedSincePublish += 1;
             if (completedSincePublish >= 4) {
               completedSincePublish = 0;
-              setTextSearchIndexRevision((revision) => revision + 1);
+              setTextSearchPageModels(new Map(textSearchPageModelsRef.current));
             }
           } catch {
             // Search is best-effort per page. One pathological page should
@@ -931,7 +933,7 @@ export default function EditPdfTool() {
         ),
       );
       if (cancelled || generation !== textSearchBuildGenerationRef.current) return;
-      setTextSearchIndexRevision((revision) => revision + 1);
+      setTextSearchPageModels(new Map(textSearchPageModelsRef.current));
       setTextSearchIndexBusy(false);
     })();
 
@@ -1010,6 +1012,7 @@ export default function EditPdfTool() {
     setTextSearchActiveIndex(-1);
     setTextSearchIndexBusy(false);
     textSearchPageModelsRef.current.clear();
+    setTextSearchPageModels(new Map());
     textSearchBuildGenerationRef.current += 1;
     runOverlayNodesRef.current.clear();
     setActiveTool("select");
@@ -1026,7 +1029,7 @@ export default function EditPdfTool() {
     textSearchPageModelsRef.current.clear();
     void Promise.resolve().then(() => {
       if (cancelled || searchGeneration !== textSearchBuildGenerationRef.current) return;
-      setTextSearchIndexRevision((current) => current + 1);
+      setTextSearchPageModels(new Map());
       setTextSearchIndexBusy(false);
       setTextSearchActiveIndex(-1);
     });
@@ -2952,7 +2955,11 @@ export default function EditPdfTool() {
 
         <L2ToolbarButton
           onClick={() => {
-            setTextSearchOpen((open) => !open);
+            setTextSearchOpen((open) => {
+              const next = !open;
+              if (!next) setTextSearchIndexBusy(false);
+              return next;
+            });
             requestAnimationFrame(() => textSearchInputRef.current?.focus());
           }}
         >
@@ -3009,6 +3016,7 @@ export default function EditPdfTool() {
                 value={textSearchQuery}
                 onChange={(event) => {
                   setTextSearchQuery(event.target.value);
+                  if (!event.target.value.trim()) setTextSearchIndexBusy(false);
                   setTextSearchActiveIndex(-1);
                 }}
                 placeholder="Search PDF text"
@@ -3024,7 +3032,9 @@ export default function EditPdfTool() {
                 aria-label="Search scope"
                 value={textSearchScope}
                 onChange={(event) => {
-                  setTextSearchScope(event.target.value as PdfTextSearchScope);
+                  const nextScope = event.target.value as PdfTextSearchScope;
+                  setTextSearchScope(nextScope);
+                  if (nextScope === "page") setTextSearchIndexBusy(false);
                   setTextSearchActiveIndex(-1);
                 }}
                 className="h-10 rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-2 text-xs font-semibold text-[var(--text-primary)]"
@@ -3091,7 +3101,10 @@ export default function EditPdfTool() {
               <button
                 type="button"
                 aria-label="Close find"
-                onClick={() => setTextSearchOpen(false)}
+                onClick={() => {
+                  setTextSearchOpen(false);
+                  setTextSearchIndexBusy(false);
+                }}
                 className="grid h-9 w-9 place-items-center rounded-[var(--radius-md)] text-sm font-bold text-[var(--text-secondary)] hover:bg-[var(--text-primary)]/[0.06]"
               >
                 ×
