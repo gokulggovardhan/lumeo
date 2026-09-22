@@ -367,6 +367,10 @@ test.describe("browser conversion validation lab", () => {
       "Co check",
       "Pick up &amp; drop",
       "Authorised Signatory",
+      "Long service description",
+      "continues on a second line",
+      "Unicode café résumé €",
+      "Serif text validates mixed-family metrics.",
     ]) {
       expect(documentXml).toContain(expected);
     }
@@ -400,6 +404,21 @@ test.describe("browser conversion validation lab", () => {
     expect(docx.file("word/media/page-1.jpg")).toBeTruthy();
     expect(docx.file("word/media/page-2.jpg")).toBeTruthy();
     expect(documentXml).not.toContain("<w:shd ");
+    expect(documentXml).toContain('<w:color w:val="0000ED"');
+    expect(documentXml).toContain('<w:u w:val="single"');
+    expect(documentXml).toContain("<w:w w:val=");
+    expect(documentXml).toContain('w:lineRule="exact"');
+    expect(documentXml).not.toContain("ROTATED NOTE");
+
+    const relationships = await docx
+      .file("word/_rels/document.xml.rels")
+      ?.async("string");
+    expect(relationships).toContain(
+      "https://example.com/fidelity",
+    );
+    expect(relationships).toContain(
+      "relationships/hyperlink",
+    );
 
     if (
       browserName === "chromium" &&
