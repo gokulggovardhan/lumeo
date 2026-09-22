@@ -32,7 +32,7 @@ export async function updateTool(formData: FormData) {
   if (!validateToolStatus(status)) return errorState("Choose a valid tool status.");
 
   const supabase = await createClient();
-  const { error } = await supabase
+  const { data: updatedTool, error } = await supabase
     .from("pdf_tools")
     .update({
       category_id: categoryId,
@@ -40,16 +40,23 @@ export async function updateTool(formData: FormData) {
       maintenance_message: maintenanceMessage || null,
       is_enabled: isEnabled,
     })
-    .eq("id", id);
+    .eq("id", id)
+    .select("id")
+    .maybeSingle();
 
-  if (error) return errorState("Tool could not be updated.");
+  if (error || !updatedTool) return errorState("Tool could not be updated.");
 
   await writeAuditLog({
     action: "tool.update",
     entityType: "pdf_tool",
     entityId: id,
     summary: "Updated a PDF tool's catalog controls.",
-    changes: { category_id: categoryId, status, is_enabled: isEnabled },
+    changes: {
+      category_id: categoryId,
+      status,
+      is_enabled: isEnabled,
+      maintenance_message: maintenanceMessage || null,
+    },
   });
   revalidatePath("/admin/tools");
   // getToolBlockedState/resolveLumeoTools read this row through

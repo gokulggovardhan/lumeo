@@ -61,7 +61,8 @@ try {
 
   assert(launcher.includes("getPublicPdfCatalog"), "Homepage tools must remain catalog driven.");
   assert(launcher.includes("resolveLumeoTools"), "Homepage tools must resolve current availability.");
-  assert(launcher.includes("buildTiles(resolved)"), "Homepage must render the current resolved tile model.");
+  assert(launcher.includes("buildDiscoveryTiles(resolved)"), "Homepage must render the current resolved discovery-state model.");
+  assert(launcher.includes("available ? (") && launcher.includes("<article"), "Unavailable homepage tools must remain visible but non-actionable.");
   assert(footer.includes("All PDF Tools"), "All PDF Tools navigation must remain available.");
 
   assert(chrome.includes("L2PublicHeader"), "Public navigation must use the Lumeo 2 header surface.");

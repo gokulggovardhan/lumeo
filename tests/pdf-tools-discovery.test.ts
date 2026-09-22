@@ -86,7 +86,8 @@ test("directory keeps heavy PDF engines out of its component graph", () => {
 test("resolved discovery availability comes from the shared public catalog status", () => {
   const resolver = readFileSync("lib/tools/resolve.ts", "utf8");
   const tiles = readFileSync("lib/tools/tiles.ts", "utf8");
-  assert.match(resolver, /dbStatus: dbTool\.isEnabled \? dbTool\.status : "hidden"/);
+  assert.match(resolver, /resolveEffectivePublicToolState\(dbTool\)/);
+  assert.match(resolver, /dbStatus: state\.status/);
   assert.match(tiles, /action\.dbStatus === "maintenance"/);
   assert.match(tiles, /action\.dbStatus === "coming_soon"/);
   assert.match(tiles, /action\.dbStatus === "hidden"/);
