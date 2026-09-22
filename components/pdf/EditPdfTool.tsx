@@ -797,7 +797,8 @@ export default function EditPdfTool() {
     setPagePointSize(null);
     setError("");
     setOriginalBytes(null);
-    resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0) });
+    editSessionRef.current = null;
+    resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0), journal: createPdfEditJournal() });
     setSelectedId(null);
     setDetectedTextRuns([]);
     setRunMatches([]);
@@ -1428,7 +1429,8 @@ export default function EditPdfTool() {
       setPdfMeta({ file, pageCount });
       setPageIndex(0);
       setOriginalBytes(bytes);
-      resetHistory({ elements: [], pdfBytes: bytes });
+      editSessionRef.current = new PdfEditSession(bytes);
+      resetHistory({ elements: [], pdfBytes: bytes, journal: createPdfEditJournal() });
       setSelectedId(null);
       setDownloadUrl("");
     } catch (uploadError) {
