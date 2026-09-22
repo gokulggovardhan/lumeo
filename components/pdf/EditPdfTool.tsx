@@ -60,8 +60,15 @@ import {
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { overlayFontSizePx, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
-import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
+import { buildPdfPageTextModel, type PdfPageTextModel } from "@/lib/pdf/edit/documentModel";
 import { PercentSpatialIndex } from "@/lib/pdf/edit/spatialIndex";
+import {
+  nextSearchMatchIndex,
+  searchPdfDocumentText,
+  searchPdfPageText,
+  type PdfTextSearchMatch,
+  type PdfTextSearchScope,
+} from "@/lib/pdf/edit/textSearch";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
@@ -567,6 +574,14 @@ export default function EditPdfTool() {
   const [browserFontPreview, setBrowserFontPreview] = useState<{ spanId: string; family: string } | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
   const [nativeFormatOpen, setNativeFormatOpen] = useState(false);
+  const [textSearchOpen, setTextSearchOpen] = useState(false);
+  const [textSearchQuery, setTextSearchQuery] = useState("");
+  const [textSearchScope, setTextSearchScope] = useState<PdfTextSearchScope>("document");
+  const [textSearchCaseSensitive, setTextSearchCaseSensitive] = useState(false);
+  const [textSearchWholeWord, setTextSearchWholeWord] = useState(false);
+  const [textSearchActiveIndex, setTextSearchActiveIndex] = useState(-1);
+  const [textSearchIndexRevision, setTextSearchIndexRevision] = useState(0);
+  const [textSearchIndexBusy, setTextSearchIndexBusy] = useState(false);
   // True when the last Restyle could not blank the original glyphs from the
   // content stream, so the covered text is still in the exported file. Drives
   // the disclosure notice -- see restyleSelectedRun for when that happens.
@@ -623,6 +638,8 @@ export default function EditPdfTool() {
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
+  const textSearchPageModelsRef = useRef<Map<number, PdfPageTextModel>>(new Map());
+  const textSearchBuildGenerationRef = useRef(0);
   // Phase 22: the render effect below already fetches this exact page and
   // computes its scaled viewport once per pageIndex -- the operator-matching
   // effect used to independently re-fetch and re-derive both from scratch
