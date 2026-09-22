@@ -83,7 +83,12 @@ async function buildTjFixture(entries: Array<string | number>): Promise<Uint8Arr
   return doc.save();
 }
 
-async function buildPlanForOperatorIndex(pdfBytes: Uint8Array, operatorIndex: number, replacementText: string) {
+async function buildPlanForOperatorIndex(
+  pdfBytes: Uint8Array,
+  operatorIndex: number,
+  replacementText: string,
+  replacementTextState: Partial<import("../lib/pdf/edit/fontMetrics.ts").TextShowState> | null = null,
+) {
   const loaded = await PDFDocument.load(pdfBytes.slice());
   const page = loaded.getPages()[0];
   const fontDict = firstFontDict(page.node.Resources()!, loaded.context);
@@ -101,6 +106,7 @@ async function buildPlanForOperatorIndex(pdfBytes: Uint8Array, operatorIndex: nu
     replacementText,
     resolvedFont,
     fontMetrics,
+    replacementTextState,
   });
   return { plan, resolvedFont, operators, streamBytes };
 }
@@ -291,4 +297,90 @@ test("applyEditPlanToBytes accepts replacing a TJ run with empty text (produces 
   const newOperators = walkTextShowOperators(newBytes);
   assert.equal(newOperators.length, 1);
   assert.equal(newOperators[0].strings[0].length, 0);
+});
+
+
+test("direct formatting localizes text state and preserves the following run position", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.setFont(font);
+  const fontKey = page.node.newFontDictionary(font.name, font.ref);
+
+  page.pushOperators(
+    beginText(),
+    setFontAndSize(fontKey, 12),
+    moveText(50, 700),
+    PDFOperator.of(PDFOperatorNames.ShowText, [PDFHexString.of(hexOf("First"))]),
+    PDFOperator.of(PDFOperatorNames.ShowText, [PDFHexString.of(hexOf("Second"))]),
+    endText(),
+  );
+  const original = await doc.save();
+
+  async function positions(bytes: Uint8Array) {
+    const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+    const pdfPage = await pdf.getPage(1);
+    const content = await pdfPage.getTextContent();
+    return content.items
+      .filter((item): item is Extract<(typeof content.items)[number], { str: string }> => "str" in item)
+      .map((item) => ({ text: item.str, x: item.transform[4], height: item.height }));
+  }
+
+  const before = await positions(original);
+  assert.equal(before.map((item) => item.text).join(""), "FirstSecond");
+  assert.equal(before.length, 2);
+
+  const { plan, resolvedFont } = await buildPlanForOperatorIndex(
+    original,
+    0,
+    "First",
+    {
+      fontSizePt: 18,
+      charSpacing: 0.6,
+      wordSpacing: 0,
+      horizontalScalingPct: 92,
+    },
+  );
+  assert.equal(plan.editable, true);
+  assert.ok(plan.replacementTextState);
+  assert.notEqual(plan.replacementWidthPt, plan.originalWidthPt);
+
+  const editedDoc = await PDFDocument.load(original.slice());
+  await applyEditPlanToDocument(editedDoc, plan, resolvedFont.bytesPerCode);
+  const editedBytes = await editedDoc.save();
+  const after = await positions(editedBytes);
+
+  assert.equal(after.map((item) => item.text).join(""), "FirstSecond");
+  assert.equal(after.length, 2);
+  assert.ok(Math.abs(after[1].x - before[1].x) < 0.05, `following run moved from ${before[1].x} to ${after[1].x}`);
+  assert.ok(after[0].height > before[0].height, "formatted run should render at the larger requested size");
+
+  const stream = await decodedContentStreamBytes(editedBytes.slice());
+  const text = Buffer.from(stream).toString("latin1");
+  assert.match(text, /18 Tf/);
+  assert.match(text, /0\.6 Tc/);
+  assert.match(text, /92 Tz/);
+  assert.match(text, /12 Tf/);
+  assert.match(text, /0 Tc/);
+  assert.match(text, /100 Tz/);
+});
+
+test("direct formatting rejects quote operators and invalid state ranges explicitly", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.setFont(font);
+  const fontKey = page.node.newFontDictionary(font.name, font.ref);
+  page.pushOperators(
+    beginText(),
+    setFontAndSize(fontKey, 12),
+    moveText(50, 700),
+    PDFOperator.of(PDFOperatorNames.ShowText, [PDFHexString.of(hexOf("Safe"))]),
+    endText(),
+  );
+  const bytes = await doc.save();
+
+  const invalid = await buildPlanForOperatorIndex(bytes, 0, "Safe", { horizontalScalingPct: 0 });
+  assert.equal(invalid.plan.editable, false);
+  assert.match(invalid.plan.reason ?? "", /horizontal scale/i);
 });
