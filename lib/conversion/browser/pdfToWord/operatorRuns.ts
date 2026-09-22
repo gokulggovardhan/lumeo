@@ -12,8 +12,13 @@ import {
 } from "../../../pdf/edit/formXObjects.ts";
 import {
   glyphAdvancePt,
+  stringAdvancePt,
   type FontMetrics,
 } from "../../../pdf/edit/fontMetrics.ts";
+import {
+  encodeWithFallbackFont,
+  fallbackFontMetrics,
+} from "../../../pdf/edit/fallbackFont.ts";
 import {
   PdfFontRegistry,
   type PdfFontProfile,
@@ -243,6 +248,33 @@ function glyphsFor(
   });
 }
 
+function wordFallbackScalePct(
+  text: string,
+  profile: PdfFontProfile,
+  operator: TextShowOperator,
+  sourceAdvancePt: number,
+  transformedXAxisScale: number,
+): number {
+  const fallbackCodes = encodeWithFallbackFont(text);
+  if (!fallbackCodes || fallbackCodes.length === 0) return 100;
+
+  const metrics = fallbackFontMetrics(profile.fallbackPdfFont);
+  const naturalPt =
+    stringAdvancePt(fallbackCodes, metrics, {
+      fontSizePt: operator.fontSizePt,
+      charSpacing: 0,
+      wordSpacing: 0,
+      horizontalScalingPct: 100,
+    }) * transformedXAxisScale;
+  if (!Number.isFinite(naturalPt) || naturalPt <= 0.1) return 100;
+
+  const scale = (sourceAdvancePt / naturalPt) * 100;
+  // Word supports a broad character-scale range, but values outside this
+  // conservative band are a signal that this is not a metric-compatible
+  // fallback. fitText remains as a final containment guard in that case.
+  return Math.max(70, Math.min(130, scale));
+}
+
 function totalAdvancePt(
   glyphs: ReconstructedGlyph[],
   operator: TextShowOperator,
@@ -420,6 +452,13 @@ export function reconstructOperatorTextRuns({
       0.5,
       totalAdvancePt(glyphs, operator, sourceAppearance, axisScale),
     );
+    const wordScalePct = wordFallbackScalePct(
+      decoded.text,
+      profile,
+      operator,
+      widthPt,
+      axisScale,
+    );
 
     const line: ReconstructedTextLine = {
       text: decoded.text,
@@ -444,6 +483,7 @@ export function reconstructOperatorTextRuns({
         (operator.horizontalScalingPct / 100) *
         axisScale,
       horizontalScalingPct: operator.horizontalScalingPct,
+      wordScalePct,
       textRisePt: operator.textRise,
       colorHex: sourceAppearance.fillColorHex,
       underline: false,
