@@ -509,7 +509,7 @@ export function reconstructOperatorTextRuns({
       wordScalePct,
       textRisePt: operator.textRise,
       colorHex:
-        operator.renderingMode === 1
+        operator.renderMode === 1
           ? sourceAppearance.strokeColorHex
           : sourceAppearance.fillColorHex,
       underline: false,
@@ -519,8 +519,8 @@ export function reconstructOperatorTextRuns({
       sourceKind: "operator",
       visualOnly:
         Math.abs(origin.rotationDeg) > ROTATION_EPSILON_DEG ||
-        operator.renderingMode === 3 ||
-        operator.renderingMode >= 4,
+        operator.renderMode === 3 ||
+        operator.renderMode >= 4,
       glyphs,
     };
     lines.push(line);
