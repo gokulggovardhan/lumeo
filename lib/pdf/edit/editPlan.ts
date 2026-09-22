@@ -60,6 +60,17 @@ function decodeCodes(codes: number[], font: ResolvedFont): { text: string; allDe
   return { text, allDecoded };
 }
 
+export function decodeTextShowOperator(
+  operator: TextShowOperator,
+  resolvedFont: ResolvedFont,
+): { text: string; glyphCodes: number[]; allDecoded: boolean } {
+  const glyphCodes = operator.strings.flatMap((bytes) =>
+    bytesToCodes(bytes, resolvedFont.bytesPerCode),
+  );
+  const decoded = decodeCodes(glyphCodes, resolvedFont);
+  return { ...decoded, glyphCodes };
+}
+
 /**
  * Set on a plan whose replacement text is shown in a SUBSTITUTE standard
  * font rather than the run's own (lib/pdf/edit/fallbackFont.ts). Null on
@@ -218,8 +229,10 @@ export function buildEditPlan({
    */
   replacementTextState?: Partial<TextShowState> | null;
 }): EditPlan {
-  const originalCodes = operator.strings.flatMap((bytes) => bytesToCodes(bytes, resolvedFont.bytesPerCode));
-  const { text: originalText, allDecoded: originalFullyDecoded } = decodeCodes(originalCodes, resolvedFont);
+  const decodedOriginal = decodeTextShowOperator(operator, resolvedFont);
+  const originalCodes = decodedOriginal.glyphCodes;
+  const originalText = decodedOriginal.text;
+  const originalFullyDecoded = decodedOriginal.allDecoded;
 
   const state: TextShowState = {
     fontSizePt: operator.fontSizePt,
