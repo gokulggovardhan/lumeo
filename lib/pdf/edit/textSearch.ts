@@ -146,3 +146,39 @@ export function nextSearchMatchIndex(
   }
   return (currentIndex + direction + matches.length) % matches.length;
 }
+
+
+export function replacementTextForSearchMatch(
+  page: PdfPageTextModel,
+  match: PdfTextSearchMatch,
+  replacement: string,
+): { sourceRunIndices: number[]; replacementText: string } | null {
+  if (match.pageIndex !== page.pageIndex || match.capability !== "editable") return null;
+  const line = page.lines.find((candidate) => candidate.id === match.lineId);
+  if (!line) return null;
+
+  const relevantSegments = line.segments.filter(
+    (segment) => segment.end > match.start && segment.start < match.end,
+  );
+  if (relevantSegments.length === 0) return null;
+
+  const spanById = new Map(line.spans.map((span) => [span.id, span] as const));
+  const firstSegment = relevantSegments[0];
+  const lastSegment = relevantSegments[relevantSegments.length - 1];
+  const firstSpan = spanById.get(firstSegment.spanId);
+  const lastSpan = spanById.get(lastSegment.spanId);
+  if (!firstSpan || !lastSpan) return null;
+
+  const localStart = Math.max(0, match.start - firstSegment.start);
+  const localEnd = Math.max(0, Math.min(lastSpan.text.length, match.end - lastSegment.start));
+  const prefix = firstSpan.text.slice(0, localStart);
+  const suffix = lastSpan.text.slice(localEnd);
+
+  const sourceRunIndices = relevantSegments.map((segment) => segment.sourceRunIndex);
+  if (new Set(sourceRunIndices).size !== sourceRunIndices.length) return null;
+
+  return {
+    sourceRunIndices,
+    replacementText: prefix + replacement + suffix,
+  };
+}
