@@ -13,6 +13,7 @@ import {
 import { buildReconstructedDocx } from "@/lib/conversion/browser/pdfToWord/docx";
 import { enrichTextAppearanceFromCanvas } from "@/lib/conversion/browser/pdfToWord/appearance";
 import { classifyPageReconstruction } from "@/lib/conversion/browser/pdfToWord/classifier";
+import { assessOperatorRunCoverage } from "@/lib/conversion/browser/pdfToWord/coverage";
 import { reconstructOperatorTextRuns } from "@/lib/conversion/browser/pdfToWord/operatorRuns";
 import {
   ocrLinesToReconstructed,
@@ -615,10 +616,6 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
           textStyles,
         );
 
-        const pdfJsCharacterCount = pdfJsLines.reduce(
-          (count, line) => count + line.text.length,
-          0,
-        );
         let lines = pdfJsLines;
         let operatorCoverageRatio = 0;
 
@@ -630,19 +627,15 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
               pageIndex: pageNumber - 1,
               viewportTransform: viewport.transform,
             });
-            operatorCoverageRatio = Math.min(
-              1,
-              sourceRuns.decodedCharacterCount /
-                Math.max(1, pdfJsCharacterCount),
+            const coverage = assessOperatorRunCoverage(
+              pdfJsLines,
+              sourceRuns.lines,
             );
-            // Prefer source operators only when they explain most of the
-            // visible text. This protects unusual/custom encoded PDFs:
-            // incomplete low-level decoding never silently drops material
-            // that PDF.js can still display.
-            if (
-              sourceRuns.lines.length > 0 &&
-              operatorCoverageRatio >= 0.78
-            ) {
+            operatorCoverageRatio = coverage.characterCoverageRatio;
+            // Advanced source operators are used only when EVERY visible
+            // PDF.js text run is accounted for in the same page region.
+            // Partial decoding never trades editability for missing text.
+            if (coverage.safeToUseOperatorRuns) {
               lines = sourceRuns.lines;
             }
           } catch {
