@@ -473,3 +473,14 @@ test("two-column prose is not misclassified as an editable Word table", () => {
     false,
   );
 });
+
+
+test("PDF reconstruction releases page-local PDF.js caches between pages", async () => {
+  const source = await readFile(
+    "lib/conversion/browser/BrowserPdfToWordEngine.ts",
+    "utf8",
+  );
+  assert.match(source, /page\.cleanup\?\.\(\)/);
+  assert.match(source, /document\.destroy\?\.\(\)/);
+  assert.match(source, /URL\.revokeObjectURL\(sourceUrl\)/);
+});
