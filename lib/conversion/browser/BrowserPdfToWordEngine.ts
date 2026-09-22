@@ -13,7 +13,9 @@ import {
 import { buildReconstructedDocx } from "@/lib/conversion/browser/pdfToWord/docx";
 import { enrichTextAppearanceFromCanvas } from "@/lib/conversion/browser/pdfToWord/appearance";
 import { classifyPageReconstruction } from "@/lib/conversion/browser/pdfToWord/classifier";
-import { assessOperatorRunCoverage } from "@/lib/conversion/browser/pdfToWord/coverage";
+import {
+  reconcileOperatorRunsWithVisibleText,
+} from "@/lib/conversion/browser/pdfToWord/coverage";
 import { reconstructOperatorTextRuns } from "@/lib/conversion/browser/pdfToWord/operatorRuns";
 import {
   ocrLinesToReconstructed,
@@ -630,16 +632,18 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
               pageIndex: pageNumber - 1,
               viewportTransform: viewport.transform,
             });
-            const coverage = assessOperatorRunCoverage(
+            const reconciled = reconcileOperatorRunsWithVisibleText(
               pdfJsLines,
               sourceRuns.lines,
             );
-            operatorCoverageRatio = coverage.characterCoverageRatio;
-            // Advanced source operators are used only when EVERY visible
-            // PDF.js text run is accounted for in the same page region.
-            // Partial decoding never trades editability for missing text.
-            if (coverage.safeToUseOperatorRuns) {
-              lines = sourceRuns.lines;
+            operatorCoverageRatio =
+              reconciled.assessment.characterCoverageRatio;
+            // Use source operators wherever they are proven equivalent to
+            // visible PDF.js text, and retain PDF.js only for unresolved
+            // regions. This keeps the page lossless without discarding
+            // fixed-layout precision because of one unusual encoded run.
+            if (reconciled.assessment.explainedVisibleRuns > 0) {
+              lines = reconciled.lines;
             }
           } catch {
             operatorCoverageRatio = 0;
