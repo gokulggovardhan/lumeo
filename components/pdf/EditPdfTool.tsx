@@ -3515,6 +3515,7 @@ export default function EditPdfTool() {
                       <div className={`absolute z-30 flex gap-1.5 whitespace-nowrap ${inlineEditorToolbarPositionClass} ${inlineEditorHorizontalClass}`}>
                         <button
                           type="button"
+                          data-edit-inline-apply
                           onClick={(event) => {
                             event.stopPropagation();
                             void applyTextRunEdit();
