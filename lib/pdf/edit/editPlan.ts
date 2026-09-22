@@ -286,6 +286,23 @@ export function buildEditPlan({
 
   if (
     effectiveReplacementState &&
+    effectiveReplacementState.wordSpacing !== state.wordSpacing &&
+    fontMetrics.bytesPerCode !== 1
+  ) {
+    return {
+      ...base,
+      originalWidthPt: 0,
+      replacementGlyphCodes: [],
+      replacementWidthPt: 0,
+      tjSpacingDelta: 0,
+      editable: false,
+      reason:
+        "PDF word spacing applies only to simple single-byte fonts; this composite/CID font ignores Tw, so Lumeo will not pretend the change was applied.",
+    };
+  }
+
+  if (
+    effectiveReplacementState &&
     effectiveReplacementState.fontSizePt !== state.fontSizePt &&
     !operator.fontResourceName
   ) {
