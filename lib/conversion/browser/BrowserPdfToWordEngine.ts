@@ -843,6 +843,12 @@ export class BrowserPdfToWordEngine implements ConversionEngine {
       if (document) {
         await document.destroy?.();
       }
+      // pdf-lib has no destroy lifecycle. Drop the read-only structure/font
+      // graph explicitly after every job so mobile Safari can reclaim its
+      // object graph before the next conversion instead of retaining it
+      // through these function-local references.
+      sourceFontRegistry = null;
+      sourceStructureDocument = null;
     }
   }
 }
