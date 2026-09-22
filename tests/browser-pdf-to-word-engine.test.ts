@@ -262,6 +262,8 @@ test("DOCX fixed-layout output preserves color, underline, metric scale, hyperli
           underline: true,
           underlineColorHex: "#0000EE",
           wordScalePct: 103.4,
+          charSpacingPt: 0.5,
+          textRisePt: 1.5,
           hyperlinkUrl: "https://example.com/fidelity",
         },
         {
@@ -304,6 +306,8 @@ test("DOCX fixed-layout output preserves color, underline, metric scale, hyperli
   assert.match(documentXml, /<w:color w:val="0000EE"\/>/);
   assert.match(documentXml, /<w:u w:val="single" w:color="0000EE"\/>/);
   assert.match(documentXml, /<w:w w:val="103"\/>/);
+  assert.match(documentXml, /<w:spacing w:val="10"\/>/);
+  assert.match(documentXml, /<w:position w:val="3"\/>/);
   assert.match(documentXml, /w:lineRule="exact"/);
   assert.match(documentXml, /w:y="3185"/);
   assert.match(documentXml, /<w:hyperlink r:id="rIdHyperlink1"/);
