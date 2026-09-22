@@ -182,7 +182,8 @@ test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecuti
   await expect(editor).toHaveValue(/SSN 123-45-6789/);
   await editor.fill("SSN 000-00-0000");
 
-  const apply = page.getByRole("button", { name: "Apply edit" });
+  const apply = page.locator("[data-edit-inline-apply]");
+  await expect(apply).toHaveCount(1);
   await expect(apply).toBeEnabled();
   await apply.click();
 
