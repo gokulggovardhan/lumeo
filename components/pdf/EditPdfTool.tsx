@@ -3442,6 +3442,7 @@ export default function EditPdfTool() {
                     // comment for why they're derived up there and not
                     // inline here.
                     <div
+                      data-edit-multi-run-panel
                       className="absolute z-30"
                       style={{
                         left: `${singleSelectedRun.xPct}%`,
@@ -3809,6 +3810,8 @@ export default function EditPdfTool() {
                       <div className="w-64 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 p-3 shadow-lg">
                         <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with ({selectedRunIndices.length} runs selected)</span>
                         <input
+                          data-edit-multi-run-input
+                          aria-label="Edit selected text runs"
                           value={editDraftText}
                           onChange={(event) => {
                             setEditDraftText(event.target.value);
@@ -3819,6 +3822,7 @@ export default function EditPdfTool() {
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"
+                            data-edit-multi-run-apply
                             disabled={!canApplyEdit}
                             onClick={() => void applyTextRunEdit()}
                             className="min-h-11 flex-1 rounded-lg border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-2.5 text-xs font-bold text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-not-allowed disabled:opacity-40"
