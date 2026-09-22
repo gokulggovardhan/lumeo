@@ -2281,6 +2281,7 @@ export default function EditPdfTool() {
     void runPageOperation(
       () => reorderPages(historyState.pdfBytes, order),
       () => `Moved page ${fromIndex + 1} to position ${toIndex + 1}.`,
+      { action: "reorder", detail: { fromIndex, toIndex } },
     );
   }
 
@@ -2294,6 +2295,7 @@ export default function EditPdfTool() {
         // Named explicitly rather than left to be discovered: the elements
         // are gone from the document and only Undo brings them back.
         (dropped > 0 ? `, along with ${dropped} placed item${dropped === 1 ? "" : "s"} on them.` : "."),
+      { action: "delete", detail: { pages: targets } },
     );
   }
 
@@ -2306,6 +2308,14 @@ export default function EditPdfTool() {
     void runPageOperation(
       () => mergePdf(historyState.pdfBytes, incoming, insertAt),
       () => `Added ${sanitizePdfFileName(file.name)} after page ${pageIndex + 1}.`,
+      {
+        action: "merge",
+        detail: {
+          insertAt,
+          fileName: sanitizePdfFileName(file.name),
+          byteLength: incoming.byteLength,
+        },
+      },
     );
   }
 
