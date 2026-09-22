@@ -331,6 +331,33 @@ jobs:
       - name: Test deployed PDF.js and HEIC/HEIF paths
         run: npx playwright test --config=playwright.cloudflare-production.config.ts
 
+      - name: Verify live production contains Premium Edit PDF foundation
+        shell: bash
+        env:
+          EDIT_FOUNDATION_SHA: d81fd383155645779e6e5db10df22215885e8f40
+        run: |
+          set -euo pipefail
+          body="$(curl --silent --show-error --fail --max-time 30 https://lumeo.in/api/build-info)"
+          deployed_commit="$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.commit ?? "")' "$body")"
+          deployed_environment="$(node -e 'const value=JSON.parse(process.argv[1]); process.stdout.write(value.environment ?? "")' "$body")"
+          [ "$deployed_environment" = "production" ] || { echo "FAIL production environment was $deployed_environment"; exit 1; }
+          test -n "$deployed_commit" || { echo "FAIL production commit missing"; exit 1; }
+          git fetch --no-tags origin "$deployed_commit" --depth=200 || git fetch --no-tags origin main --depth=200
+          git merge-base --is-ancestor "$EDIT_FOUNDATION_SHA" "$deployed_commit" || {
+            echo "FAIL deployed revision $deployed_commit does not contain Edit PDF foundation $EDIT_FOUNDATION_SHA"
+            exit 1
+          }
+          echo "PASS deployed production $deployed_commit contains Edit PDF foundation $EDIT_FOUNDATION_SHA"
+          echo "CERTIFIED_PRODUCTION_SHA=$deployed_commit" >> "$GITHUB_ENV"
+
+      - name: Install deterministic conversion fidelity tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils python3-pil
+
+      - name: Re-run live Word PDF and HTML conversion regression
+        run: xvfb-run -a npx playwright test --config=playwright.production-conversion.config.ts
+
       - name: Upload browser traces on failure
         if: failure()
         uses: actions/upload-artifact@v7
