@@ -798,6 +798,141 @@ export default function EditPdfTool() {
     [textRunSpatialIndex],
   );
 
+  const searchablePageModels = useMemo(() => {
+    const models = new Map(textSearchPageModelsRef.current);
+    if (pageTextModel) models.set(pageIndex, pageTextModel);
+    return [...models.values()].sort((a, b) => a.pageIndex - b.pageIndex);
+  }, [textSearchIndexRevision, pageTextModel, pageIndex, pdf?.bytes]);
+
+  const textSearchMatches = useMemo(() => {
+    const options = {
+      caseSensitive: textSearchCaseSensitive,
+      wholeWord: textSearchWholeWord,
+    };
+    if (!textSearchQuery.trim()) return [];
+    if (textSearchScope === "page") {
+      return pageTextModel
+        ? searchPdfPageText(pageTextModel, textSearchQuery, options)
+        : [];
+    }
+    return searchPdfDocumentText(searchablePageModels, textSearchQuery, options);
+  }, [
+    textSearchQuery,
+    textSearchScope,
+    textSearchCaseSensitive,
+    textSearchWholeWord,
+    pageTextModel,
+    searchablePageModels,
+  ]);
+
+  const normalizedTextSearchIndex =
+    textSearchMatches.length === 0
+      ? -1
+      : Math.min(
+          textSearchActiveIndex < 0 ? 0 : textSearchActiveIndex,
+          textSearchMatches.length - 1,
+        );
+  const activeTextSearchMatch: PdfTextSearchMatch | null =
+    normalizedTextSearchIndex >= 0
+      ? textSearchMatches[normalizedTextSearchIndex] ?? null
+      : null;
+  const currentPageTextSearchMatches = useMemo(
+    () => textSearchMatches.filter((match) => match.pageIndex === pageIndex),
+    [textSearchMatches, pageIndex],
+  );
+
+  useEffect(() => {
+    if (
+      !pdf ||
+      !textSearchOpen ||
+      textSearchScope !== "document" ||
+      !textSearchQuery.trim() ||
+      !pdfJsDocRef.current
+    ) {
+      return;
+    }
+
+    const doc = pdfJsDocRef.current;
+    const generation = textSearchBuildGenerationRef.current;
+    const missingPages = Array.from({ length: pdf.pageCount }, (_, index) => index).filter(
+      (index) => index !== pageIndex && !textSearchPageModelsRef.current.has(index),
+    );
+    if (missingPages.length === 0) return;
+
+    let cancelled = false;
+    void (async () => {
+      await Promise.resolve();
+      if (cancelled || generation !== textSearchBuildGenerationRef.current) return;
+      setTextSearchIndexBusy(true);
+
+      let cursor = 0;
+      let completedSincePublish = 0;
+      const worker = async () => {
+        while (!cancelled && generation === textSearchBuildGenerationRef.current) {
+          const current = cursor;
+          cursor += 1;
+          if (current >= missingPages.length) return;
+          const targetPageIndex = missingPages[current];
+
+          try {
+            const page = await doc.getPage(targetPageIndex + 1);
+            const viewport = page.getViewport({ scale: 1 });
+            const content = await withPageTimeout(
+              page.getTextContent(),
+              targetPageIndex + 1,
+              PAGE_RENDER_TIMEOUT_MS,
+              "extract text from",
+            );
+            if (cancelled || generation !== textSearchBuildGenerationRef.current) return;
+            const runs = textRunsFromContent(
+              content.items as never,
+              viewport.transform,
+              viewport.width,
+              viewport.height,
+            );
+            const model = buildPdfPageTextModel({
+              pageIndex: targetPageIndex,
+              widthPt: viewport.width,
+              heightPt: viewport.height,
+              runs,
+              matches: runs.map(() => null),
+            });
+            textSearchPageModelsRef.current.set(targetPageIndex, model);
+            completedSincePublish += 1;
+            if (completedSincePublish >= 4) {
+              completedSincePublish = 0;
+              setTextSearchIndexRevision((revision) => revision + 1);
+            }
+          } catch {
+            // Search is best-effort per page. One pathological page should
+            // not block searching every other page or the core editor.
+          }
+        }
+      };
+
+      await Promise.all(
+        Array.from(
+          { length: Math.min(2, missingPages.length) },
+          () => worker(),
+        ),
+      );
+      if (cancelled || generation !== textSearchBuildGenerationRef.current) return;
+      setTextSearchIndexRevision((revision) => revision + 1);
+      setTextSearchIndexBusy(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    pdf,
+    pageIndex,
+    docReady,
+    textSearchOpen,
+    textSearchScope,
+    textSearchQuery,
+  ]);
+
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
     const result = track({ eventName: "tool_opened", toolSlug: "edit" });
@@ -852,6 +987,15 @@ export default function EditPdfTool() {
     setEditApplyError("");
     setUseSubstituteFont(false);
     setRestyleKeptOriginalText(false);
+    setTextSearchOpen(false);
+    setTextSearchQuery("");
+    setTextSearchScope("document");
+    setTextSearchCaseSensitive(false);
+    setTextSearchWholeWord(false);
+    setTextSearchActiveIndex(-1);
+    setTextSearchIndexBusy(false);
+    textSearchPageModelsRef.current.clear();
+    textSearchBuildGenerationRef.current += 1;
     runOverlayNodesRef.current.clear();
     setActiveTool("select");
     setZoom(1);
@@ -863,6 +1007,14 @@ export default function EditPdfTool() {
   // per-page preview effect below to reuse (no re-parsing on page turns).
   useEffect(() => {
     let cancelled = false;
+    const searchGeneration = ++textSearchBuildGenerationRef.current;
+    textSearchPageModelsRef.current.clear();
+    void Promise.resolve().then(() => {
+      if (cancelled || searchGeneration !== textSearchBuildGenerationRef.current) return;
+      setTextSearchIndexRevision((current) => current + 1);
+      setTextSearchIndexBusy(false);
+      setTextSearchActiveIndex(-1);
+    });
     void (async () => {
       const previousDoc = pdfJsDocRef.current;
       pdfJsDocRef.current = null;
