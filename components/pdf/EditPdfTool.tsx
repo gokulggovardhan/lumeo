@@ -438,7 +438,7 @@ export default function EditPdfTool() {
     canRedo,
     reset: resetHistory,
   } = useHistoryState<EditHistorySnapshot>(
-    { elements: [], pdfBytes: new ArrayBuffer(0) },
+    { elements: [], pdfBytes: new ArrayBuffer(0), journal: createPdfEditJournal() },
     { maxTotalSize: EDIT_HISTORY_MAX_BYTES, sizeOf: (snapshot) => snapshot.pdfBytes.byteLength },
   );
   // Every document mutation -- placing, moving, restyling or deleting an
@@ -472,10 +472,17 @@ export default function EditPdfTool() {
   // widened to also carry pdfBytes alongside elements. (Full-snapshot
   // resets go through resetHistory directly -- see resetTool/addFile.)
   const setElements = useCallback((updater: EditElement[] | ((current: EditElement[]) => EditElement[])) => {
-    setHistoryState((current) => ({
-      ...current,
-      elements: typeof updater === "function" ? (updater as (c: EditElement[]) => EditElement[])(current.elements) : updater,
-    }));
+    setHistoryState((current) => {
+      const nextElements =
+        typeof updater === "function"
+          ? (updater as (c: EditElement[]) => EditElement[])(current.elements)
+          : updater;
+      return {
+        ...current,
+        elements: nextElements,
+        journal: recordElementMutation(current.journal, current.elements, nextElements),
+      };
+    });
   }, [setHistoryState]);
   // Tracks the ORIGINAL uploaded bytes (set once per upload in addFile) so
   // "has this document had a true text edit applied" can be derived by
@@ -485,6 +492,10 @@ export default function EditPdfTool() {
   // ref: hasTextEdits reads this during render, and React forbids reading
   // a ref's value there.
   const [originalBytes, setOriginalBytes] = useState<ArrayBuffer | null>(null);
+  // Immutable source owner for the current editing session. Working PDF
+  // documents operate on materialized copies; the uploaded baseline itself
+  // never becomes a mutable pdf-lib/pdf.js buffer.
+  const editSessionRef = useRef<PdfEditSession | null>(null);
   // The single source of truth every other effect/handler reads as `pdf` --
   // combines pdfMeta (file/pageCount, upload-only) with historyState.pdfBytes
   // (the live, undo/redo-aware document bytes). A NEW object every time
