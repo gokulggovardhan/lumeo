@@ -36,6 +36,7 @@ import type { PDFContext, PDFDict, PDFPage } from "pdf-lib";
 import type { EditPlan } from "./editPlan.ts";
 import { ensureFallbackFontResource, resolveFallbackFontsDict } from "./fallbackFont.ts";
 import type { MultiRunEditPlan } from "./multiRunEditPlan.ts";
+import type { PdfTextLayoutDecision } from "./layoutEngine.ts";
 import { resolveStreamTarget, resolveIsolatedStreamTarget } from "./formXObjects.ts";
 
 export class EditPlanRejectedError extends Error {}
@@ -126,66 +127,121 @@ function encodePdfName(name: string): string {
 // left in their own form for the reason the same-font path already gives:
 // each performs its own text-line move before showing, so what follows
 // starts a fresh line and has no horizontal position to preserve.
-function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string): string {
-  const fallback = plan.fallbackFont;
-  if (!fallback) throw new EditPlanRejectedError("This plan does not use a substitute font.");
+type LayoutAwareRewriteOptions = {
+  layoutDecision?: PdfTextLayoutDecision | null;
+};
 
-  const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, fallback.bytesPerCode);
-  const size = formatPdfNumber(plan.fontSizePt);
-  const selectSubstitute = `${encodePdfName(fallbackResourceName)} ${size} Tf`;
-  const restoreOriginal = `${encodePdfName(fallback.originalFontResourceName)} ${size} Tf`;
-
-  let show: string;
-  if (plan.operatorType === "'") {
-    show = `<${hex}> '`;
-  } else if (plan.operatorType === '"') {
-    show = `${formatPdfNumber(plan.wordSpacing)} ${formatPdfNumber(plan.charSpacing)} <${hex}> "`;
-  } else {
-    const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
-    show = needsAdjustment ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ` : `[<${hex}>] TJ`;
+function assertLayoutDecisionApplicable(decision: PdfTextLayoutDecision | null | undefined): void {
+  if (!decision) return;
+  if (!decision.supported || decision.strategy === "blocked" || decision.strategy === "local-reflow") {
+    throw new EditPlanRejectedError(
+      decision.reason ?? "This replacement cannot preserve the original layout safely.",
+    );
   }
-
-  return `${selectSubstitute} ${show} ${restoreOriginal}`;
 }
 
-// Builds the exact replacement operator invocation text for `plan`:
-// - Tj: `<hex> Tj`.
-// - TJ: `[<hex>] TJ` or `[<hex> delta] TJ`. A TJ replacement always
-//   collapses to a single combined string operand (task 3: rewrite only
-//   text operands) -- the original's own inter-string kerning numbers are
-//   dropped rather than kept, since they were tuned for the ORIGINAL
-//   text's specific glyph boundaries and have no coherent attachment
-//   point once the text itself changes (task 4: leave spacing operands
-//   untouched *unless recalculation is required* -- here it is required).
-//   In their place, a single trailing adjustment equal to
-//   plan.tjSpacingDelta (fontMetrics.ts's compareAdvance, task 5: use the
-//   existing spacing engine) keeps whatever text follows this operator
-//   from shifting position -- omitted entirely when negligible.
-// - ' (quote): `<hex> '`. No spacing operands to preserve -- ' takes only
-//   a string.
-// - " (double-quote): `aw ac <hex> "`, where aw/ac are plan.wordSpacing/
-//   plan.charSpacing -- these ARE this operator's own two leading numeric
-//   operands (word spacing, char spacing), carried through EditPlan
-//   unchanged from the original operator (task 5: preserve all non-text
-//   operands verbatim; these are never recomputed).
-// No compensating spacing delta is added for ' or ", unlike TJ: each
-// already performs its own text-line move (equivalent to T*) before
-// showing text, so whatever normally follows starts a fresh line rather
-// than continuing this one -- there is no established "keep the next
-// glyph in place" need the way there is mid-line in a TJ/Tj run.
-function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): string {
+function buildShowOperatorText(
+  plan: EditPlan,
+  bytesPerCode: 1 | 2,
+  decision?: PdfTextLayoutDecision | null,
+): string {
   const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, bytesPerCode);
-  if (plan.operatorType === "Tj") {
-    return `<${hex}> Tj`;
-  }
+  const targetCharSpacing =
+    decision?.strategy === "distributed-char-spacing"
+      ? decision.targetCharSpacingPt
+      : null;
+  const tailAdjustment =
+    decision && (plan.operatorType === "Tj" || plan.operatorType === "TJ")
+      ? decision.tailTjAdjustment
+      : plan.operatorType === "TJ"
+        ? plan.tjSpacingDelta
+        : 0;
+
   if (plan.operatorType === "'") {
     return `<${hex}> '`;
   }
+
   if (plan.operatorType === '"') {
-    return `${formatPdfNumber(plan.wordSpacing)} ${formatPdfNumber(plan.charSpacing)} <${hex}> "`;
+    const charSpacing =
+      targetCharSpacing == null ? plan.charSpacing : targetCharSpacing;
+    return `${formatPdfNumber(plan.wordSpacing)} ${formatPdfNumber(charSpacing)} <${hex}> "`;
   }
-  const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
-  return needsAdjustment ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ` : `[<${hex}>] TJ`;
+
+  const needsAdjustment = Math.abs(tailAdjustment) >= TJ_DELTA_EPSILON;
+  if (plan.operatorType === "Tj" && !decision && !needsAdjustment) {
+    // Backward-compatible byte shape for every pre-layout-engine caller.
+    return `<${hex}> Tj`;
+  }
+
+  if (plan.operatorType === "Tj" && decision?.strategy !== "natural") {
+    return `<${hex}> Tj`;
+  }
+
+  return needsAdjustment
+    ? `[<${hex}> ${formatPdfNumber(tailAdjustment)}] TJ`
+    : `[<${hex}>] TJ`;
+}
+
+function wrapShowWithLayoutState(
+  plan: EditPlan,
+  show: string,
+  decision?: PdfTextLayoutDecision | null,
+): string {
+  if (!decision || decision.strategy === "natural") return show;
+  assertLayoutDecisionApplicable(decision);
+
+  if (decision.strategy === "distributed-char-spacing") {
+    const target = decision.targetCharSpacingPt;
+    if (target == null) {
+      throw new EditPlanRejectedError("Layout plan did not provide target character spacing.");
+    }
+
+    // The double-quote operator carries its own aw/ac operands, so its show
+    // text already applies target Tc. Every other operator needs a local Tc
+    // wrapper. In both cases restore the original text state immediately
+    // after the show so downstream operators are byte-semantically unchanged.
+    return plan.operatorType === '"'
+      ? `${show} ${formatPdfNumber(decision.originalCharSpacingPt)} Tc`
+      : `${formatPdfNumber(target)} Tc ${show} ${formatPdfNumber(decision.originalCharSpacingPt)} Tc`;
+  }
+
+  if (decision.strategy === "horizontal-scale") {
+    const target = decision.targetHorizontalScalingPct;
+    if (target == null) {
+      throw new EditPlanRejectedError("Layout plan did not provide target horizontal scaling.");
+    }
+    return `${formatPdfNumber(target)} Tz ${show} ${formatPdfNumber(decision.originalHorizontalScalingPct)} Tz`;
+  }
+
+  return show;
+}
+
+function buildFallbackOperatorText(
+  plan: EditPlan,
+  fallbackResourceName: string,
+  decision?: PdfTextLayoutDecision | null,
+): string {
+  const fallback = plan.fallbackFont;
+  if (!fallback) throw new EditPlanRejectedError("This plan does not use a substitute font.");
+  assertLayoutDecisionApplicable(decision);
+
+  const size = formatPdfNumber(plan.fontSizePt);
+  const selectSubstitute = `${encodePdfName(fallbackResourceName)} ${size} Tf`;
+  const restoreOriginal = `${encodePdfName(fallback.originalFontResourceName)} ${size} Tf`;
+  const show = buildShowOperatorText(plan, fallback.bytesPerCode, decision);
+  const laidOutShow = wrapShowWithLayoutState(plan, show, decision);
+
+  return `${selectSubstitute} ${laidOutShow} ${restoreOriginal}`;
+}
+
+function buildReplacementOperatorText(
+  plan: EditPlan,
+  bytesPerCode: 1 | 2,
+  decision?: PdfTextLayoutDecision | null,
+): string {
+  assertLayoutDecisionApplicable(decision);
+  const show = buildShowOperatorText(plan, bytesPerCode, decision);
+  return wrapShowWithLayoutState(plan, show, decision);
 }
 
 // Pure byte-level rewrite: replaces exactly the operator's own byte range
@@ -206,7 +262,10 @@ export function applyEditPlanToBytes(
   contentStreamBytes: Uint8Array,
   plan: EditPlan,
   bytesPerCode: 1 | 2,
-  options: { fallbackResourceName?: string } = {},
+  options: {
+    fallbackResourceName?: string;
+    layoutDecision?: PdfTextLayoutDecision | null;
+  } = {},
 ): Uint8Array {
   assertApplicable(plan);
 
@@ -222,9 +281,9 @@ export function applyEditPlanToBytes(
         "This edit needs a substitute font, but no resource name was supplied for it -- the font must be registered in the target stream's /Resources /Font first.",
       );
     }
-    operatorText = buildFallbackOperatorText(plan, options.fallbackResourceName);
+    operatorText = buildFallbackOperatorText(plan, options.fallbackResourceName, options.layoutDecision);
   } else {
-    operatorText = buildReplacementOperatorText(plan, bytesPerCode);
+    operatorText = buildReplacementOperatorText(plan, bytesPerCode, options.layoutDecision);
   }
 
   const newOperatorBytes = new TextEncoder().encode(operatorText);
@@ -390,7 +449,10 @@ export async function applyEditPlanToDocument(
   doc: PDFDocument,
   plan: EditPlan,
   bytesPerCode: 1 | 2,
-  options: { isolate?: boolean } = {},
+  options: {
+    isolate?: boolean;
+    layoutDecision?: PdfTextLayoutDecision | null;
+  } = {},
 ): Promise<void> {
   assertApplicable(plan);
 
@@ -406,7 +468,10 @@ export async function applyEditPlanToDocument(
     // copyStreamDictExceptLengthAndFilter, and adding one font name to a
     // shared Form's resources is purely additive for every other site.
     const fallbackResourceName = await registerFallbackFont(doc, plan, target.originalStream.dict);
-    const newBytes = applyEditPlanToBytes(target.decodedBytes, plan, bytesPerCode, { fallbackResourceName });
+    const newBytes = applyEditPlanToBytes(target.decodedBytes, plan, bytesPerCode, {
+      fallbackResourceName,
+      layoutDecision: options.layoutDecision,
+    });
     const wasFlate = isFlateEncoded(target.originalStream);
     const newStream = wasFlate ? target.context.flateStream(newBytes) : target.context.stream(newBytes);
     copyStreamDictExceptLengthAndFilter(target.originalStream, newStream);
@@ -417,7 +482,10 @@ export async function applyEditPlanToDocument(
   const page = doc.getPages()[plan.pageIndex];
   const located = locateContentStream(doc, plan.pageIndex, plan.contentStreamIndex);
   const fallbackResourceName = await registerFallbackFont(doc, plan, null);
-  const newBytes = applyEditPlanToBytes(located.decodedBytes, plan, bytesPerCode, { fallbackResourceName });
+  const newBytes = applyEditPlanToBytes(located.decodedBytes, plan, bytesPerCode, {
+    fallbackResourceName,
+    layoutDecision: options.layoutDecision,
+  });
   replaceContentStream(page, located, plan.contentStreamIndex, newBytes);
 }
 
@@ -451,6 +519,7 @@ export async function applyMultiRunEditPlanToDocument(
   doc: PDFDocument,
   plan: MultiRunEditPlan,
   bytesPerCode: 1 | 2,
+  options: { layoutDecisions?: readonly (PdfTextLayoutDecision | null)[] } = {},
 ): Promise<void> {
   if (!plan.editable) {
     throw new EditPlanRejectedError(plan.reason ?? "This multi-run edit plan is not editable.");
@@ -471,7 +540,9 @@ export async function applyMultiRunEditPlanToDocument(
 
   let bytes = located.decodedBytes;
   for (let i = plan.subPlans.length - 1; i >= 0; i -= 1) {
-    bytes = applyEditPlanToBytes(bytes, plan.subPlans[i], bytesPerCode);
+    bytes = applyEditPlanToBytes(bytes, plan.subPlans[i], bytesPerCode, {
+      layoutDecision: options.layoutDecisions?.[i] ?? null,
+    });
   }
 
   replaceContentStream(page, located, plan.contentStreamIndex, bytes);
