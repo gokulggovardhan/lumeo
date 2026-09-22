@@ -41,6 +41,12 @@ export type ReconstructedTextLine = {
   /** Deterministic top-to-bottom/left-to-right visual order. */
   visualOrderIndex?: number;
   sourceKind?: "operator" | "pdfjs" | "ocr";
+  /**
+   * Kept in the visual background but not emitted as editable Word text when
+   * Word's cross-renderer fixed-layout primitives cannot safely reproduce the
+   * source transform (for example arbitrary rotated/clipping text).
+   */
+  visualOnly?: boolean;
   glyphs?: ReconstructedGlyph[];
   regionKind?: "semantic-text" | "fixed-layout-table" | "fixed-layout" | "footer" | "header";
 };
