@@ -35,5 +35,9 @@ export default defineConfig({
       name: "webkit-production-conversion",
       use: { ...devices["Desktop Safari"] },
     },
+    {
+      name: "webkit-mobile-production-conversion",
+      use: { ...devices["iPhone 15 Pro"] },
+    },
   ],
 });
