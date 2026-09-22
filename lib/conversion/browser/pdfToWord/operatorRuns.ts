@@ -30,8 +30,8 @@ import type {
 } from "./types.ts";
 
 type StreamAppearance = {
-  fillColorHex: string;
-  strokeColorHex: string;
+  fillColorHex: string | null;
+  strokeColorHex: string | null;
   tjAdjustmentTotal: number;
 };
 
@@ -61,10 +61,28 @@ function cmykHex(cyan: number, magenta: number, yellow: number, black: number): 
   );
 }
 
-function colorFromOperands(values: number[]): string | null {
-  if (values.length === 1) return rgbHex(values[0], values[0], values[0]);
-  if (values.length === 3) return rgbHex(values[0], values[1], values[2]);
-  if (values.length === 4) return cmykHex(values[0], values[1], values[2], values[3]);
+function colorFromOperands(
+  values: number[],
+  colorSpace: string,
+): string | null {
+  if (
+    (colorSpace === "DeviceGray" || colorSpace === "CalGray") &&
+    values.length >= 1
+  ) {
+    return rgbHex(values[0], values[0], values[0]);
+  }
+  if (
+    (colorSpace === "DeviceRGB" || colorSpace === "CalRGB") &&
+    values.length >= 3
+  ) {
+    return rgbHex(values[0], values[1], values[2]);
+  }
+  if (colorSpace === "DeviceCMYK" && values.length >= 4) {
+    return cmykHex(values[0], values[1], values[2], values[3]);
+  }
+  // Indexed, ICCBased, Separation, DeviceN, Pattern and unknown resource
+  // colour spaces need their own dictionaries/profiles to interpret sc/scn.
+  // Do not guess: leave appearance unresolved for local raster sampling.
   return null;
 }
 
@@ -80,9 +98,16 @@ function colorFromOperands(values: number[]): string | null {
 function appearanceByOperatorStart(bytes: Uint8Array): Map<number, StreamAppearance> {
   const tokens = tokenizeContentStream(bytes);
   const appearances = new Map<number, StreamAppearance>();
-  const stack: Array<{ fill: string; stroke: string }> = [];
-  let fillColorHex = "#000000";
-  let strokeColorHex = "#000000";
+  const stack: Array<{
+    fill: string | null;
+    stroke: string | null;
+    fillSpace: string;
+    strokeSpace: string;
+  }> = [];
+  let fillColorHex: string | null = "#000000";
+  let strokeColorHex: string | null = "#000000";
+  let fillColorSpace = "DeviceGray";
+  let strokeColorSpace = "DeviceGray";
   let operands: typeof tokens = [];
   let operandStart = 0;
 
@@ -99,44 +124,63 @@ function appearanceByOperatorStart(bytes: Uint8Array): Map<number, StreamAppeara
 
     switch (token.value) {
       case "q":
-        stack.push({ fill: fillColorHex, stroke: strokeColorHex });
+        stack.push({
+          fill: fillColorHex,
+          stroke: strokeColorHex,
+          fillSpace: fillColorSpace,
+          strokeSpace: strokeColorSpace,
+        });
         break;
       case "Q": {
         const restored = stack.pop();
         fillColorHex = restored?.fill ?? "#000000";
         strokeColorHex = restored?.stroke ?? "#000000";
+        fillColorSpace = restored?.fillSpace ?? "DeviceGray";
+        strokeColorSpace = restored?.strokeSpace ?? "DeviceGray";
         break;
       }
       case "g":
+        fillColorSpace = "DeviceGray";
         if (values.length >= 1) fillColorHex = rgbHex(values[0], values[0], values[0]);
         break;
       case "G":
+        strokeColorSpace = "DeviceGray";
         if (values.length >= 1) strokeColorHex = rgbHex(values[0], values[0], values[0]);
         break;
       case "rg":
+        fillColorSpace = "DeviceRGB";
         if (values.length >= 3) fillColorHex = rgbHex(values[0], values[1], values[2]);
         break;
       case "RG":
+        strokeColorSpace = "DeviceRGB";
         if (values.length >= 3) strokeColorHex = rgbHex(values[0], values[1], values[2]);
         break;
       case "k":
+        fillColorSpace = "DeviceCMYK";
         if (values.length >= 4) fillColorHex = cmykHex(values[0], values[1], values[2], values[3]);
         break;
       case "K":
+        strokeColorSpace = "DeviceCMYK";
         if (values.length >= 4) strokeColorHex = cmykHex(values[0], values[1], values[2], values[3]);
         break;
+      case "cs": {
+        const name = operands.find((item) => item.type === "name");
+        if (name?.type === "name") fillColorSpace = name.value;
+        break;
+      }
+      case "CS": {
+        const name = operands.find((item) => item.type === "name");
+        if (name?.type === "name") strokeColorSpace = name.value;
+        break;
+      }
       case "sc":
-      case "scn": {
-        const inferred = colorFromOperands(values);
-        if (inferred) fillColorHex = inferred;
+      case "scn":
+        fillColorHex = colorFromOperands(values, fillColorSpace);
         break;
-      }
       case "SC":
-      case "SCN": {
-        const inferred = colorFromOperands(values);
-        if (inferred) strokeColorHex = inferred;
+      case "SCN":
+        strokeColorHex = colorFromOperands(values, strokeColorSpace);
         break;
-      }
       case "Tj":
       case "'":
       case '"':
