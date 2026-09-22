@@ -71,6 +71,7 @@ import type { ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
+import { reconstructFragmentedRun, type FragmentedRunReconstruction } from "@/lib/pdf/edit/fragmentedRun";
 import {
   appendPdfEditOperations,
   createPdfEditSession,
@@ -725,6 +726,25 @@ export default function EditPdfTool() {
     [detectedTextRuns, runMatches, fontRegistry],
   );
 
+  const fragmentedRunReconstructions = useMemo(() => {
+    const reconstructed = new Map<number, FragmentedRunReconstruction>();
+    for (let index = 0; index < detectedTextRuns.length; index += 1) {
+      const run = detectedTextRuns[index];
+      const match = runMatches[index];
+      const profile = pageFontProfiles[index];
+      if (!match || !profile) continue;
+      const fragment = reconstructFragmentedRun({
+        fullDetectedText: run.str,
+        matched: match.locatedOperator,
+        pageOperators,
+        resolvedFont: profile.resolvedFont,
+      });
+      if (fragment) reconstructed.set(index, fragment);
+    }
+    return reconstructed;
+  }, [detectedTextRuns, runMatches, pageFontProfiles, pageOperators]);
+
+
   // Document → Page → Block → Line → Span model. This is a read-only view
   // over the current page's already-proven low-level detection/matching
   // pipeline; it does not mutate the source PDF or replace the existing
@@ -739,9 +759,10 @@ export default function EditPdfTool() {
             runs: detectedTextRuns,
             matches: runMatches,
             fontProfiles: pageFontProfiles,
+            fragmentedRunIndices: new Set(fragmentedRunReconstructions.keys()),
           })
         : null,
-    [pageIndex, pagePointSize, detectedTextRuns, runMatches, pageFontProfiles],
+    [pageIndex, pagePointSize, detectedTextRuns, runMatches, pageFontProfiles, fragmentedRunReconstructions],
   );
 
   const textRunSpatialIndex = useMemo(() => {
@@ -1869,6 +1890,18 @@ export default function EditPdfTool() {
         const resolvedFont = resolveFont(fontDict, pdfLibDoc.context);
         const fontMetrics = resolveFontMetrics(fontDict, pdfLibDoc.context, resolvedFont);
         const fallbackStyleHints = readFallbackStyleHints(fontDict, pdfLibDoc.context);
+        const fragmented = fragmentedRunReconstructions.get(selectedRunIndices[0]);
+        if (fragmented) {
+          const validation: Extract<MultiRunValidation, { kind: "valid" }> = {
+            kind: "valid",
+            contentStreamIndex: fragmented.contentStreamIndex,
+            operatorIndices: fragmented.operatorIndices,
+            allOperators: fragmented.allOperators,
+            resources: fragmented.resources,
+            fontResourceName: fragmented.fontResourceName,
+          };
+          return { kind: "multi", resolvedFont, fontMetrics, validation };
+        }
         return { kind: "single", resolvedFont, fontMetrics, locatedOperator, operator, fallbackStyleHints };
       }
 
@@ -1884,7 +1917,7 @@ export default function EditPdfTool() {
       return { kind: "error", reason, multi: selectedRunIndices.length > 1 };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
-  }, [pdfLibDoc, editEngine, selectedRunIndices, runMatches, pageOperators, pageIndex]);
+  }, [pdfLibDoc, editEngine, selectedRunIndices, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions]);
 
   // Phase 9.2: the live dry-run preview driving both the Apply button's
   // disabled state and the specific reason shown next to it -- see
