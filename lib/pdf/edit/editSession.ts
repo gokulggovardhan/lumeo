@@ -9,11 +9,15 @@ export type PdfEditGeometry = {
 };
 
 export type PdfEditTextStyle = {
+  fontFamily?: string;
   fontSizePt?: number;
   color?: string;
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  charSpacingPt?: number;
+  wordSpacingPt?: number;
+  horizontalScalingPct?: number;
 };
 
 export type NativeTextTarget = {
@@ -60,7 +64,7 @@ export type PdfEditOperation =
     })
   | (OperationBase & {
       kind: "changeStyle";
-      target: ElementTextTarget;
+      target: PdfTextTarget;
       before: PdfEditTextStyle;
       after: PdfEditTextStyle;
     })
@@ -167,7 +171,11 @@ function sameStyle(a: PdfEditTextStyle, b: PdfEditTextStyle): boolean {
     a.color === b.color &&
     a.bold === b.bold &&
     a.italic === b.italic &&
-    a.underline === b.underline
+    a.underline === b.underline &&
+    a.fontFamily === b.fontFamily &&
+    a.charSpacingPt === b.charSpacingPt &&
+    a.wordSpacingPt === b.wordSpacingPt &&
+    a.horizontalScalingPct === b.horizontalScalingPct
   );
 }
 
@@ -263,6 +271,23 @@ export function deriveElementOperations(
   }
 
   return drafts;
+}
+
+export function nativeTextStyleOperation({
+  target,
+  before,
+  after,
+}: {
+  target: NativeTextTarget;
+  before: PdfEditTextStyle;
+  after: PdfEditTextStyle;
+}): PdfEditOperationDraft {
+  return {
+    kind: "changeStyle",
+    target,
+    before,
+    after,
+  };
 }
 
 export function nativeTextOperation({

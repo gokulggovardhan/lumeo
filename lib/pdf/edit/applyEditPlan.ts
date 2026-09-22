@@ -176,7 +176,17 @@ function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string)
 function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): string {
   const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, bytesPerCode);
   if (plan.operatorType === "Tj") {
-    return `<${hex}> Tj`;
+    // A direct text-state change can alter this run's natural advance even
+    // when the text itself is unchanged. Promote only that formatting case
+    // to TJ so the already-computed spacing compensation keeps downstream
+    // text anchored. Ordinary text-only Tj edits retain their established
+    // byte shape.
+    const needsAdjustment =
+      Boolean(plan.replacementTextState) &&
+      Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
+    return needsAdjustment
+      ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ`
+      : `<${hex}> Tj`;
   }
   if (plan.operatorType === "'") {
     return `<${hex}> '`;
@@ -186,6 +196,48 @@ function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): stri
   }
   const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
   return needsAdjustment ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ` : `[<${hex}>] TJ`;
+}
+
+function buildTextStateOverrideWrapper(plan: EditPlan): { prefix: string; suffix: string } {
+  const target = plan.replacementTextState;
+  if (!target) return { prefix: "", suffix: "" };
+
+  const before: string[] = [];
+  const after: string[] = [];
+
+  if (target.fontSizePt !== plan.fontSizePt) {
+    if (!plan.fontResourceName) {
+      throw new EditPlanRejectedError(
+        "This text's font resource could not be identified, so its size cannot be changed safely.",
+      );
+    }
+    before.push(
+      `${encodePdfName(plan.fontResourceName)} ${formatPdfNumber(target.fontSizePt)} Tf`,
+    );
+    after.unshift(
+      `${encodePdfName(plan.fontResourceName)} ${formatPdfNumber(plan.fontSizePt)} Tf`,
+    );
+  }
+
+  if (target.charSpacing !== plan.charSpacing) {
+    before.push(`${formatPdfNumber(target.charSpacing)} Tc`);
+    after.unshift(`${formatPdfNumber(plan.charSpacing)} Tc`);
+  }
+
+  if (target.wordSpacing !== plan.wordSpacing) {
+    before.push(`${formatPdfNumber(target.wordSpacing)} Tw`);
+    after.unshift(`${formatPdfNumber(plan.wordSpacing)} Tw`);
+  }
+
+  if (target.horizontalScalingPct !== plan.horizontalScalingPct) {
+    before.push(`${formatPdfNumber(target.horizontalScalingPct)} Tz`);
+    after.unshift(`${formatPdfNumber(plan.horizontalScalingPct)} Tz`);
+  }
+
+  return {
+    prefix: before.join(" "),
+    suffix: after.join(" "),
+  };
 }
 
 // Pure byte-level rewrite: replaces exactly the operator's own byte range
@@ -225,6 +277,13 @@ export function applyEditPlanToBytes(
     operatorText = buildFallbackOperatorText(plan, options.fallbackResourceName);
   } else {
     operatorText = buildReplacementOperatorText(plan, bytesPerCode);
+  }
+
+  const textState = buildTextStateOverrideWrapper(plan);
+  if (textState.prefix || textState.suffix) {
+    operatorText = [textState.prefix, operatorText, textState.suffix]
+      .filter(Boolean)
+      .join(" ");
   }
 
   const newOperatorBytes = new TextEncoder().encode(operatorText);

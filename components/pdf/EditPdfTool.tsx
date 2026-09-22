@@ -76,8 +76,12 @@ import {
   createPdfEditSession,
   deriveElementOperations,
   nativeTextOperation,
+  nativeTextStyleOperation,
   pageOperation as createPageEditOperation,
+  type NativeTextTarget,
+  type PdfEditOperationDraft,
   type PdfEditSessionState,
+  type PdfEditTextStyle,
 } from "@/lib/pdf/edit/editSession";
 import { decideReplacementLayout } from "@/lib/pdf/edit/replacementLayout";
 import {
@@ -117,6 +121,14 @@ import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount }
 // (Type3 font, or a page/text shape this engine doesn't cover yet) -- in-
 // place editing genuinely isn't available for it, not an error.
 type RunMatch = { locatedOperator: LocatedTextOperator; operator: LocatedTextOperator["operator"] } | null;
+
+type NativeTextStyleDraft = {
+  spanId: string;
+  fontSizePt: number;
+  charSpacing: number;
+  wordSpacing: number;
+  horizontalScalingPct: number;
+};
 
 // Phase 9.2: the combined undo/redo snapshot -- reusing lib/sign/
 // useHistoryState.ts exactly as-is (no changes to that hook), just widening
@@ -552,6 +564,8 @@ export default function EditPdfTool() {
   // run. Export safety remains governed by fontEncoding/editPlan, not by
   // whether a browser happens to accept the embedded font bytes.
   const [browserFontPreview, setBrowserFontPreview] = useState<{ spanId: string; family: string } | null>(null);
+  const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
+  const [nativeFormatOpen, setNativeFormatOpen] = useState(false);
   // True when the last Restyle could not blank the original glyphs from the
   // content stream, so the covered text is still in the exported file. Drives
   // the disclosure notice -- see restyleSelectedRun for when that happens.
@@ -1631,6 +1645,7 @@ export default function EditPdfTool() {
       setEditDraftText("");
       setEditApplyError("");
       setUseSubstituteFont(false);
+      setNativeFormatOpen(false);
       return;
     }
     const range =
@@ -1645,6 +1660,7 @@ export default function EditPdfTool() {
     setEditDraftText(range.map((i) => detectedTextRuns[i]?.str ?? "").join(""));
     setEditApplyError("");
     setUseSubstituteFont(false);
+    if (!extend) setNativeFormatOpen(false);
   }
 
   // Bug fix (reported from iPhone 15 Plus / Safari): tapping editable text
@@ -1794,6 +1810,28 @@ export default function EditPdfTool() {
     return { kind: "valid", contentStreamIndex: firstLocator.contentStreamIndex, operatorIndices, allOperators, resources: nonNull[0].locatedOperator.resources, fontResourceName };
   }
 
+  const selectedNativeSpan =
+    selectedRunIndices.length === 1
+      ? pageTextModel?.spans[selectedRunIndices[0]] ?? null
+      : null;
+
+  const nativeStyleOverride = useMemo(() => {
+    if (!selectedNativeSpan || nativeStyleDraft?.spanId !== selectedNativeSpan.id) return null;
+    const before = selectedNativeSpan.style;
+    const changed =
+      nativeStyleDraft.fontSizePt !== before.fontSizePt ||
+      nativeStyleDraft.charSpacing !== before.charSpacingPt ||
+      nativeStyleDraft.wordSpacing !== before.wordSpacingPt ||
+      nativeStyleDraft.horizontalScalingPct !== before.horizontalScalingPct;
+    if (!changed) return null;
+    return {
+      fontSizePt: nativeStyleDraft.fontSizePt,
+      charSpacing: nativeStyleDraft.charSpacing,
+      wordSpacing: nativeStyleDraft.wordSpacing,
+      horizontalScalingPct: nativeStyleDraft.horizontalScalingPct,
+    };
+  }, [selectedNativeSpan, nativeStyleDraft]);
+
   // Phase 10: font resolution (resolveFont/resolveFontMetrics -- both parse
   // the font dictionary, the expensive part of building editPreview below)
   // depends only on WHICH run(s) are selected, never on the draft replacement
@@ -1876,6 +1914,7 @@ export default function EditPdfTool() {
         replacementText: editDraftText,
         resolvedFont,
         fontMetrics,
+        replacementTextState: nativeStyleOverride,
       };
       // Always planned strictly first, in the run's OWN font. A substitute
       // is only ever considered when the real font genuinely can't do the
@@ -1883,9 +1922,9 @@ export default function EditPdfTool() {
       // and the substitution path can never quietly pre-empt a perfect
       // same-font edit.
       const strictPlan = buildEditPlan(planInputs);
-      const substitutePlan = strictPlan.editable
+      const substitutePlan = strictPlan.editable || nativeStyleOverride
         ? null
-        : buildEditPlan({ ...planInputs, fallbackStyleHints });
+        : buildEditPlan({ ...planInputs, fallbackStyleHints, replacementTextState: null });
       const substituteAvailable = substitutePlan?.editable ? substitutePlan : null;
       const plan = useSubstituteFont && substituteAvailable ? substituteAvailable : strictPlan;
 
@@ -1934,7 +1973,7 @@ export default function EditPdfTool() {
       const reason = previewError instanceof Error ? previewError.message : "Could not validate this edit.";
       return { kind: "multi", editable: false, reason, plan: null as never, resolvedFont: null as never };
     }
-  }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont]);
+  }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont, nativeStyleOverride]);
 
   const replacementLayoutDecision = useMemo(() => {
     if (editPreview.kind === "empty" || !editPreview.editable) return null;
@@ -1991,32 +2030,72 @@ export default function EditPdfTool() {
       const spanIds = selectedRunIndices.map(
         (index) => pageTextModel?.spans[index]?.id ?? `p${pageIndex}-span-${index}`,
       );
-      const semanticOperation =
-        editPreview.kind === "single"
-          ? nativeTextOperation({
+      const semanticOperations: PdfEditOperationDraft[] = [];
+      if (editPreview.kind === "single") {
+        const plan = editPreview.plan;
+        const target: NativeTextTarget = {
+          kind: "native-text",
+          pageIndex,
+          spanIds,
+          contentStreamIndex: plan.formPath ? null : plan.contentStreamIndex,
+          formPath: plan.formPath,
+          operatorIndices: [plan.operatorIndex],
+          fontResourceName: plan.fontResourceName,
+        };
+
+        if (plan.originalText !== plan.replacementText) {
+          semanticOperations.push(
+            nativeTextOperation({
               pageIndex,
               spanIds,
-              contentStreamIndex: editPreview.plan.formPath ? null : editPreview.plan.contentStreamIndex,
-              formPath: editPreview.plan.formPath,
-              operatorIndices: [editPreview.plan.operatorIndex],
-              fontResourceName: editPreview.plan.fontResourceName,
-              originalText: editPreview.plan.originalText,
-              replacementText: editPreview.plan.replacementText,
-            })
-          : nativeTextOperation({
-              pageIndex,
-              spanIds,
-              contentStreamIndex: editPreview.plan.contentStreamIndex,
-              formPath: null,
-              operatorIndices: editPreview.plan.operatorIndices,
-              fontResourceName: editPreview.plan.subPlans[0]?.fontResourceName ?? null,
-              originalText: editPreview.plan.originalText,
-              replacementText: editPreview.plan.replacementText,
-            });
+              contentStreamIndex: target.contentStreamIndex,
+              formPath: target.formPath,
+              operatorIndices: target.operatorIndices,
+              fontResourceName: target.fontResourceName,
+              originalText: plan.originalText,
+              replacementText: plan.replacementText,
+            }),
+          );
+        }
+
+        if (plan.replacementTextState) {
+          const beforeStyle: PdfEditTextStyle = {
+            fontFamily: selectedNativeSpan?.style.fontFamily,
+            fontSizePt: plan.fontSizePt,
+            bold: (selectedNativeSpan?.style.weight ?? 400) >= 600,
+            italic: selectedNativeSpan?.style.italic ?? false,
+            charSpacingPt: plan.charSpacing,
+            wordSpacingPt: plan.wordSpacing,
+            horizontalScalingPct: plan.horizontalScalingPct,
+          };
+          const afterStyle: PdfEditTextStyle = {
+            ...beforeStyle,
+            fontSizePt: plan.replacementTextState.fontSizePt,
+            charSpacingPt: plan.replacementTextState.charSpacing,
+            wordSpacingPt: plan.replacementTextState.wordSpacing,
+            horizontalScalingPct: plan.replacementTextState.horizontalScalingPct,
+          };
+          semanticOperations.push(nativeTextStyleOperation({ target, before: beforeStyle, after: afterStyle }));
+        }
+      } else {
+        semanticOperations.push(
+          nativeTextOperation({
+            pageIndex,
+            spanIds,
+            contentStreamIndex: editPreview.plan.contentStreamIndex,
+            formPath: null,
+            operatorIndices: editPreview.plan.operatorIndices,
+            fontResourceName: editPreview.plan.subPlans[0]?.fontResourceName ?? null,
+            originalText: editPreview.plan.originalText,
+            replacementText: editPreview.plan.replacementText,
+          }),
+        );
+      }
+
       setHistoryState((current) => ({
         ...current,
         pdfBytes: buffer,
-        session: appendPdfEditOperations(current.session, [semanticOperation]),
+        session: appendPdfEditOperations(current.session, semanticOperations),
       }));
       // The page-render effect (triggered by pdf.bytes changing, via the
       // sync effect above) will reset selection/hover/focus/draft state
@@ -2031,7 +2110,7 @@ export default function EditPdfTool() {
     } finally {
       setIsApplyingEdit(false);
     }
-  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex]);
+  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan]);
 
   // Restyle covers a run with a whiteout and drops an editable text box in
   // its place. The whiteout hides the original glyphs, but hiding is not
@@ -2404,19 +2483,24 @@ export default function EditPdfTool() {
   // shared by both the inline on-page toolbar and the sidebar panel -- was
   // previously computed inline in one place only; extracted so the two
   // Apply buttons can never disagree about when they're enabled.
+  const nativeStyleChanged =
+    editPreview.kind === "single" && Boolean(editPreview.plan.replacementTextState);
+  const textDraftChanged =
+    editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
   const canApplyEdit =
     !isApplyingEdit &&
     editPreview.kind !== "empty" &&
     editPreview.editable &&
     (replacementLayoutDecision?.safeToApplyWithCurrentWriter ?? true) &&
-    editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
+    (textDraftChanged || nativeStyleChanged);
   // Phase 11: looked up once and reused throughout the inline on-page editor
   // JSX below, instead of repeatedly indexing detectedTextRuns/runMatches by
   // selectedRunIndices[0] at each use site.
   const singleSelectedRun = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
   const singleSelectedRunMatch = selectedRunIndices.length === 1 ? runMatches[selectedRunIndices[0]] : null;
-  const singleSelectedSpan =
-    selectedRunIndices.length === 1 ? pageTextModel?.spans[selectedRunIndices[0]] ?? null : null;
+  const singleSelectedSpan = selectedNativeSpan;
+  const activeNativeStyleDraft =
+    nativeStyleDraft?.spanId === singleSelectedSpan?.id ? nativeStyleDraft : null;
   const inlineEditorFontFamily =
     singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
       ? browserFontPreview.family
@@ -2473,7 +2557,14 @@ export default function EditPdfTool() {
     ? pickHorizontalAlign(singleSelectedRun.xPct, singleSelectedRun.xPct + singleSelectedRun.widthPct)
     : "start";
   const inlineEditorToolbarPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-1" : "bottom-full mb-1";
-  const inlineEditorTooltipPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-11" : "bottom-full mb-11";
+  const nativeFormatPanelPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-12" : "bottom-full mb-12";
+  const inlineEditorTooltipPositionClass = nativeFormatOpen
+    ? inlineEditorVerticalPlacement === "below"
+      ? "top-full mt-[12rem]"
+      : "bottom-full mb-[12rem]"
+    : inlineEditorVerticalPlacement === "below"
+      ? "top-full mt-11"
+      : "bottom-full mb-11";
   const inlineEditorHorizontalClass = inlineEditorHorizontalAlign === "end" ? "right-0" : "left-0";
 
   const generateEditedPdf = useCallback(async () => {
@@ -2930,13 +3021,21 @@ export default function EditPdfTool() {
                         // and a text box dropped next to it read identically.
                         className="lumeo-page-overlay-input h-full w-full rounded-[3px] border border-[var(--lumeo-gold)] bg-white px-0.5 font-semibold text-[#12141a] shadow-[0_0_0_3px_rgba(var(--lumeo-gold-rgb),0.16)] outline-none"
                         style={{
-                          fontSize: `${overlayFontSizePx(singleSelectedRun.fontSizePt, pagePointSize?.width ?? 0, stageWidthPx)}px`,
+                          fontSize: `${overlayFontSizePx(
+                            activeNativeStyleDraft?.fontSizePt ?? singleSelectedRun.fontSizePt,
+                            pagePointSize?.width ?? 0,
+                            stageWidthPx,
+                          )}px`,
                           fontFamily: inlineEditorFontFamily,
                           fontWeight: singleSelectedSpan?.style.weight ?? 600,
                           fontStyle: singleSelectedSpan?.style.italic ? "italic" : "normal",
                           letterSpacing:
-                            singleSelectedSpan && singleSelectedSpan.style.charSpacingPt !== 0
-                              ? `${(singleSelectedSpan.style.charSpacingPt / Math.max(1, singleSelectedSpan.style.fontSizePt)).toFixed(4)}em`
+                            activeNativeStyleDraft && activeNativeStyleDraft.charSpacing !== 0
+                              ? `${(activeNativeStyleDraft.charSpacing / Math.max(1, activeNativeStyleDraft.fontSizePt)).toFixed(4)}em`
+                              : undefined,
+                          wordSpacing:
+                            activeNativeStyleDraft && activeNativeStyleDraft.wordSpacing !== 0
+                              ? `${(activeNativeStyleDraft.wordSpacing / Math.max(1, activeNativeStyleDraft.fontSizePt)).toFixed(4)}em`
                               : undefined,
                         }}
                       />
@@ -2983,15 +3082,39 @@ export default function EditPdfTool() {
                             <path d="M5 5 15 15M15 5 5 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                           </svg>
                         </button>
-                        {/* The in-place editor above can only swap the words:
-                            it rewrites glyph codes inside the original
-                            content-stream operator, which is exactly why font,
-                            size and colour survive untouched -- and exactly why
-                            it can't change them. Restyle is the deliberate
-                            trade: cover the original and drop an editable text
-                            box in its place, giving full formatting freedom at
-                            the cost of the original glyphs remaining hidden
-                            underneath rather than replaced. */}
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (nativeFormatOpen) {
+                              setNativeFormatOpen(false);
+                              return;
+                            }
+                            if (singleSelectedSpan) {
+                              setNativeStyleDraft({
+                                spanId: singleSelectedSpan.id,
+                                fontSizePt: singleSelectedSpan.style.fontSizePt,
+                                charSpacing: singleSelectedSpan.style.charSpacingPt,
+                                wordSpacing: singleSelectedSpan.style.wordSpacingPt,
+                                horizontalScalingPct: singleSelectedSpan.style.horizontalScalingPct,
+                              });
+                              setNativeFormatOpen(true);
+                            }
+                          }}
+                          aria-expanded={nativeFormatOpen}
+                          aria-controls="native-text-format-panel"
+                          className={`grid h-9 shrink-0 place-items-center rounded-full border px-3 text-[10px] font-bold uppercase tracking-[0.1em] shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${
+                            nativeFormatOpen
+                              ? "border-[var(--lumeo-gold)]/60 bg-[var(--lumeo-gold)]/15 text-[var(--text-primary)]"
+                              : "border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 text-[var(--text-primary)]/70 hover:border-[var(--text-primary)]/24"
+                          }`}
+                        >
+                          Format
+                        </button>
+                        {/* Restyle is now the fallback for appearance changes
+                            the native writer cannot yet prove safe (font-face
+                            substitution, colour and alignment), not the normal
+                            path for size/spacing changes. */}
                         <button
                           type="button"
                           onClick={(event) => {
@@ -2999,12 +3122,128 @@ export default function EditPdfTool() {
                             void restyleSelectedRun();
                           }}
                           aria-label="Restyle this text"
-                          title="Restyle -- convert to an editable text box you can restyle (font size, colour, bold, italic)"
+                          title="Restyle -- use a replacement text box for font-face, colour or other appearance changes that cannot be applied safely in place"
                           className="grid h-9 shrink-0 place-items-center rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/70 shadow-lg transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
                         >
                           Restyle
                         </button>
                       </div>
+
+                      {nativeFormatOpen && nativeStyleDraft && singleSelectedSpan ? (
+                        <div
+                          id="native-text-format-panel"
+                          data-native-text-formatting
+                          onClick={(event) => event.stopPropagation()}
+                          onKeyDown={(event) => event.stopPropagation()}
+                          className={`absolute z-40 w-[min(19rem,86vw)] rounded-xl border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/98 p-3 text-[11px] text-[var(--text-primary)] shadow-2xl ${nativeFormatPanelPositionClass} ${inlineEditorHorizontalClass}`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-[9px] font-bold uppercase tracking-[0.14em] text-[var(--text-primary)]/40">
+                                Original PDF font
+                              </div>
+                              <div className="mt-0.5 truncate font-semibold">
+                                {singleSelectedSpan.style.fontFamily || singleSelectedSpan.style.baseFont || "PDF font"}
+                              </div>
+                            </div>
+                            <div className="flex shrink-0 gap-1">
+                              <span className="rounded-full border border-[var(--text-primary)]/12 px-2 py-0.5 text-[9px] font-semibold text-[var(--text-primary)]/65">
+                                {singleSelectedSpan.style.weight >= 600 ? "Bold" : "Regular"}
+                              </span>
+                              {singleSelectedSpan.style.italic ? (
+                                <span className="rounded-full border border-[var(--text-primary)]/12 px-2 py-0.5 text-[9px] font-semibold italic text-[var(--text-primary)]/65">
+                                  Italic
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <label className="grid gap-1">
+                              <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/45">Size pt</span>
+                              <input
+                                aria-label="Native font size"
+                                type="number"
+                                min={1}
+                                max={500}
+                                step={0.5}
+                                value={nativeStyleDraft.fontSizePt}
+                                onChange={(event) => {
+                                  const value = event.currentTarget.valueAsNumber;
+                                  if (Number.isFinite(value)) setNativeStyleDraft((current) => current ? { ...current, fontSizePt: value } : current);
+                                }}
+                                className="h-9 rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 font-semibold outline-none focus:border-[var(--lumeo-gold)]/55"
+                              />
+                            </label>
+                            <label className="grid gap-1">
+                              <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/45">Width %</span>
+                              <input
+                                aria-label="Native horizontal scale"
+                                type="number"
+                                min={10}
+                                max={500}
+                                step={1}
+                                value={nativeStyleDraft.horizontalScalingPct}
+                                onChange={(event) => {
+                                  const value = event.currentTarget.valueAsNumber;
+                                  if (Number.isFinite(value)) setNativeStyleDraft((current) => current ? { ...current, horizontalScalingPct: value } : current);
+                                }}
+                                className="h-9 rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 font-semibold outline-none focus:border-[var(--lumeo-gold)]/55"
+                              />
+                            </label>
+                            <label className="grid gap-1">
+                              <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/45">Letter pt</span>
+                              <input
+                                aria-label="Native character spacing"
+                                type="number"
+                                step={0.1}
+                                value={nativeStyleDraft.charSpacing}
+                                onChange={(event) => {
+                                  const value = event.currentTarget.valueAsNumber;
+                                  if (Number.isFinite(value)) setNativeStyleDraft((current) => current ? { ...current, charSpacing: value } : current);
+                                }}
+                                className="h-9 rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 font-semibold outline-none focus:border-[var(--lumeo-gold)]/55"
+                              />
+                            </label>
+                            <label className="grid gap-1">
+                              <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/45">Word pt</span>
+                              <input
+                                aria-label="Native word spacing"
+                                type="number"
+                                step={0.1}
+                                value={nativeStyleDraft.wordSpacing}
+                                onChange={(event) => {
+                                  const value = event.currentTarget.valueAsNumber;
+                                  if (Number.isFinite(value)) setNativeStyleDraft((current) => current ? { ...current, wordSpacing: value } : current);
+                                }}
+                                className="h-9 rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 font-semibold outline-none focus:border-[var(--lumeo-gold)]/55"
+                              />
+                            </label>
+                          </div>
+
+                          <div className="mt-3 flex items-center justify-between gap-3">
+                            <p className="text-[9px] leading-4 text-[var(--text-primary)]/48">
+                              Font face, weight, italic, colour and alignment stay inherited until Lumeo can restore those PDF graphics states exactly.
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNativeStyleDraft({
+                                  spanId: singleSelectedSpan.id,
+                                  fontSizePt: singleSelectedSpan.style.fontSizePt,
+                                  charSpacing: singleSelectedSpan.style.charSpacingPt,
+                                  wordSpacing: singleSelectedSpan.style.wordSpacingPt,
+                                  horizontalScalingPct: singleSelectedSpan.style.horizontalScalingPct,
+                                })
+                              }
+                              className="shrink-0 rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/65 hover:text-[var(--text-primary)]"
+                            >
+                              Reset
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
                       {/* Three mutually exclusive states, in priority order:
                           an error from the last Apply; the substitute-font
                           offer (a rejection the user CAN act on); and a plain

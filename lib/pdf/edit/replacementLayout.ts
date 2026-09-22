@@ -43,7 +43,13 @@ export const DEFAULT_REPLACEMENT_LAYOUT_POLICY: ReplacementLayoutPolicy = {
 export function decideReplacementLayout(
   plan: Pick<
     EditPlan,
-    "editable" | "reason" | "originalWidthPt" | "replacementWidthPt" | "fontSizePt" | "replacementGlyphCodes"
+    | "editable"
+    | "reason"
+    | "originalWidthPt"
+    | "replacementWidthPt"
+    | "fontSizePt"
+    | "replacementGlyphCodes"
+    | "replacementTextState"
   >,
   policy: ReplacementLayoutPolicy = DEFAULT_REPLACEMENT_LAYOUT_POLICY,
 ): ReplacementLayoutDecision {
@@ -120,7 +126,8 @@ export function decideReplacementLayout(
   const glyphCount = plan.replacementGlyphCodes.length;
   const charSpacingDelta =
     glyphCount > 0 ? (original - replacement) / glyphCount : Number.NEGATIVE_INFINITY;
-  const maxCharSpacingDelta = Math.max(0, plan.fontSizePt * policy.maxLetterSpacingDeltaEm);
+  const effectiveFontSizePt = plan.replacementTextState?.fontSizePt ?? plan.fontSizePt;
+  const maxCharSpacingDelta = Math.max(0, effectiveFontSizePt * policy.maxLetterSpacingDeltaEm);
 
   if (
     Number.isFinite(charSpacingDelta) &&

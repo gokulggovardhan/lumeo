@@ -247,6 +247,31 @@ export function compareAdvance(
   return compareAdvanceAcrossFonts(originalCodes, metrics, replacementCodes, metrics, state);
 }
 
+/**
+ * Same-font comparison where the replacement is rendered under a different
+ * text state (for example a user-selected font size, character spacing or
+ * horizontal scale). The TJ compensation is expressed in the replacement
+ * state's current text-space units because that is the state active while
+ * the compensating TJ number is consumed.
+ */
+export function compareAdvanceAcrossStates(
+  originalCodes: number[],
+  replacementCodes: number[],
+  metrics: FontMetrics,
+  originalState: TextShowState,
+  replacementState: TextShowState,
+): SpacingComparison {
+  const originalAdvancePt = stringAdvancePt(originalCodes, metrics, originalState);
+  const replacementAdvancePt = stringAdvancePt(replacementCodes, metrics, replacementState);
+  const deltaPt = replacementAdvancePt - originalAdvancePt;
+  const scale = replacementState.horizontalScalingPct / 100;
+  const tjAdjustment =
+    scale === 0 || replacementState.fontSizePt === 0
+      ? 0
+      : (deltaPt / (replacementState.fontSizePt * scale)) * 1000;
+  return { originalAdvancePt, replacementAdvancePt, deltaPt, tjAdjustment };
+}
+
 // The two-font form of compareAdvance, for lib/pdf/edit/fallbackFont.ts's
 // substitute-font path: the original run is measured in its OWN font's
 // metrics while the replacement is measured in the substitute's, because

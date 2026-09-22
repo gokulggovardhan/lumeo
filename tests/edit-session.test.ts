@@ -5,6 +5,7 @@ import {
   createPdfEditSession,
   deriveElementOperations,
   nativeTextOperation,
+  nativeTextStyleOperation,
   pageOperation,
 } from "../lib/pdf/edit/editSession.ts";
 import { createShapeElement, createTextElement } from "../lib/pdf/edit/elements.ts";
@@ -100,4 +101,40 @@ test("page operations retain page counts and affected indices for deterministic 
     affectedPageIndices: [1, 3],
     description: "Removed pages 2 and 4.",
   });
+});
+
+
+test("native text formatting is journaled as a real changeStyle operation", () => {
+  const target = {
+    kind: "native-text" as const,
+    pageIndex: 0,
+    spanIds: ["p0-span-2"],
+    contentStreamIndex: 0,
+    formPath: null,
+    operatorIndices: [3],
+    fontResourceName: "F1",
+  };
+  const operation = nativeTextStyleOperation({
+    target,
+    before: {
+      fontFamily: "Helvetica",
+      fontSizePt: 12,
+      charSpacingPt: 0,
+      wordSpacingPt: 0,
+      horizontalScalingPct: 100,
+    },
+    after: {
+      fontFamily: "Helvetica",
+      fontSizePt: 14,
+      charSpacingPt: 0.2,
+      wordSpacingPt: 0,
+      horizontalScalingPct: 96,
+    },
+  });
+
+  assert.equal(operation.kind, "changeStyle");
+  assert.equal(operation.target.kind, "native-text");
+  assert.equal(operation.before.fontSizePt, 12);
+  assert.equal(operation.after.fontSizePt, 14);
+  assert.equal(operation.after.horizontalScalingPct, 96);
 });
