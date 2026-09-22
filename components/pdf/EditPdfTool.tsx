@@ -79,6 +79,7 @@ import {
   nativeTextStyleOperation,
   pageOperation as createPageEditOperation,
   type NativeTextTarget,
+  type PdfEditOperationDraft,
   type PdfEditSessionState,
   type PdfEditTextStyle,
 } from "@/lib/pdf/edit/editSession";
@@ -1928,6 +1929,7 @@ export default function EditPdfTool() {
         replacementText: editDraftText,
         resolvedFont,
         fontMetrics,
+        replacementTextState: nativeStyleOverride,
       };
       // Always planned strictly first, in the run's OWN font. A substitute
       // is only ever considered when the real font genuinely can't do the
@@ -1935,9 +1937,9 @@ export default function EditPdfTool() {
       // and the substitution path can never quietly pre-empt a perfect
       // same-font edit.
       const strictPlan = buildEditPlan(planInputs);
-      const substitutePlan = strictPlan.editable
+      const substitutePlan = strictPlan.editable || nativeStyleOverride
         ? null
-        : buildEditPlan({ ...planInputs, fallbackStyleHints });
+        : buildEditPlan({ ...planInputs, fallbackStyleHints, replacementTextState: null });
       const substituteAvailable = substitutePlan?.editable ? substitutePlan : null;
       const plan = useSubstituteFont && substituteAvailable ? substituteAvailable : strictPlan;
 
@@ -1986,7 +1988,7 @@ export default function EditPdfTool() {
       const reason = previewError instanceof Error ? previewError.message : "Could not validate this edit.";
       return { kind: "multi", editable: false, reason, plan: null as never, resolvedFont: null as never };
     }
-  }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont]);
+  }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont, nativeStyleOverride]);
 
   const replacementLayoutDecision = useMemo(() => {
     if (editPreview.kind === "empty" || !editPreview.editable) return null;
@@ -2043,32 +2045,72 @@ export default function EditPdfTool() {
       const spanIds = selectedRunIndices.map(
         (index) => pageTextModel?.spans[index]?.id ?? `p${pageIndex}-span-${index}`,
       );
-      const semanticOperation =
-        editPreview.kind === "single"
-          ? nativeTextOperation({
+      const semanticOperations: PdfEditOperationDraft[] = [];
+      if (editPreview.kind === "single") {
+        const plan = editPreview.plan;
+        const target: NativeTextTarget = {
+          kind: "native-text",
+          pageIndex,
+          spanIds,
+          contentStreamIndex: plan.formPath ? null : plan.contentStreamIndex,
+          formPath: plan.formPath,
+          operatorIndices: [plan.operatorIndex],
+          fontResourceName: plan.fontResourceName,
+        };
+
+        if (plan.originalText !== plan.replacementText) {
+          semanticOperations.push(
+            nativeTextOperation({
               pageIndex,
               spanIds,
-              contentStreamIndex: editPreview.plan.formPath ? null : editPreview.plan.contentStreamIndex,
-              formPath: editPreview.plan.formPath,
-              operatorIndices: [editPreview.plan.operatorIndex],
-              fontResourceName: editPreview.plan.fontResourceName,
-              originalText: editPreview.plan.originalText,
-              replacementText: editPreview.plan.replacementText,
-            })
-          : nativeTextOperation({
-              pageIndex,
-              spanIds,
-              contentStreamIndex: editPreview.plan.contentStreamIndex,
-              formPath: null,
-              operatorIndices: editPreview.plan.operatorIndices,
-              fontResourceName: editPreview.plan.subPlans[0]?.fontResourceName ?? null,
-              originalText: editPreview.plan.originalText,
-              replacementText: editPreview.plan.replacementText,
-            });
+              contentStreamIndex: target.contentStreamIndex,
+              formPath: target.formPath,
+              operatorIndices: target.operatorIndices,
+              fontResourceName: target.fontResourceName,
+              originalText: plan.originalText,
+              replacementText: plan.replacementText,
+            }),
+          );
+        }
+
+        if (plan.replacementTextState) {
+          const beforeStyle: PdfEditTextStyle = {
+            fontFamily: selectedNativeSpan?.style.fontFamily,
+            fontSizePt: plan.fontSizePt,
+            bold: (selectedNativeSpan?.style.weight ?? 400) >= 600,
+            italic: selectedNativeSpan?.style.italic ?? false,
+            charSpacingPt: plan.charSpacing,
+            wordSpacingPt: plan.wordSpacing,
+            horizontalScalingPct: plan.horizontalScalingPct,
+          };
+          const afterStyle: PdfEditTextStyle = {
+            ...beforeStyle,
+            fontSizePt: plan.replacementTextState.fontSizePt,
+            charSpacingPt: plan.replacementTextState.charSpacing,
+            wordSpacingPt: plan.replacementTextState.wordSpacing,
+            horizontalScalingPct: plan.replacementTextState.horizontalScalingPct,
+          };
+          semanticOperations.push(nativeTextStyleOperation({ target, before: beforeStyle, after: afterStyle }));
+        }
+      } else {
+        semanticOperations.push(
+          nativeTextOperation({
+            pageIndex,
+            spanIds,
+            contentStreamIndex: editPreview.plan.contentStreamIndex,
+            formPath: null,
+            operatorIndices: editPreview.plan.operatorIndices,
+            fontResourceName: editPreview.plan.subPlans[0]?.fontResourceName ?? null,
+            originalText: editPreview.plan.originalText,
+            replacementText: editPreview.plan.replacementText,
+          }),
+        );
+      }
+
       setHistoryState((current) => ({
         ...current,
         pdfBytes: buffer,
-        session: appendPdfEditOperations(current.session, [semanticOperation]),
+        session: appendPdfEditOperations(current.session, semanticOperations),
       }));
       // The page-render effect (triggered by pdf.bytes changing, via the
       // sync effect above) will reset selection/hover/focus/draft state
@@ -2083,7 +2125,7 @@ export default function EditPdfTool() {
     } finally {
       setIsApplyingEdit(false);
     }
-  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex]);
+  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan]);
 
   // Restyle covers a run with a whiteout and drops an editable text box in
   // its place. The whiteout hides the original glyphs, but hiding is not
