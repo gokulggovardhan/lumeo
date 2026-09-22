@@ -17,6 +17,8 @@ export type PdfTextLayoutDecision = {
   targetCharSpacingPt: number | null;
   targetHorizontalScalingPct: number | null;
   tailTjAdjustment: number;
+  originalCharSpacingPt: number;
+  originalHorizontalScalingPct: number;
 };
 
 export type PdfTextLayoutInput = {
@@ -83,6 +85,8 @@ export function decideTextReplacementLayout(
       targetCharSpacingPt: null,
       targetHorizontalScalingPct: null,
       tailTjAdjustment: 0,
+      originalCharSpacingPt: input.originalCharSpacingPt,
+      originalHorizontalScalingPct: input.originalHorizontalScalingPct,
     };
   }
 
@@ -99,6 +103,8 @@ export function decideTextReplacementLayout(
         input.operatorType === "Tj" || input.operatorType === "TJ"
           ? input.existingTjAdjustment
           : 0,
+      originalCharSpacingPt: input.originalCharSpacingPt,
+      originalHorizontalScalingPct: input.originalHorizontalScalingPct,
     };
   }
 
@@ -120,6 +126,8 @@ export function decideTextReplacementLayout(
         targetCharSpacingPt: input.originalCharSpacingPt + charSpacingDelta,
         targetHorizontalScalingPct: null,
         tailTjAdjustment: 0,
+        originalCharSpacingPt: input.originalCharSpacingPt,
+        originalHorizontalScalingPct: input.originalHorizontalScalingPct,
       };
     }
   }
@@ -157,6 +165,8 @@ export function decideTextReplacementLayout(
       targetCharSpacingPt: null,
       targetHorizontalScalingPct: null,
       tailTjAdjustment: 0,
+      originalCharSpacingPt: input.originalCharSpacingPt,
+      originalHorizontalScalingPct: input.originalHorizontalScalingPct,
     };
   }
 
@@ -169,12 +179,17 @@ export function decideTextReplacementLayout(
     targetCharSpacingPt: null,
     targetHorizontalScalingPct: null,
     tailTjAdjustment: 0,
+    originalCharSpacingPt: input.originalCharSpacingPt,
+    originalHorizontalScalingPct: input.originalHorizontalScalingPct,
   };
 }
 
 export function decideEditPlanLayout(
   plan: EditPlan,
-  options: { safeReflowWidthPt?: number | null } = {},
+  options: {
+    safeReflowWidthPt?: number | null;
+    originalHorizontalScalingPct?: number;
+  } = {},
   limits: PdfTextLayoutLimits = DEFAULT_TEXT_LAYOUT_LIMITS,
 ): PdfTextLayoutDecision {
   return decideTextReplacementLayout(
@@ -185,7 +200,7 @@ export function decideEditPlanLayout(
       glyphCount: plan.replacementGlyphCodes.length,
       fontSizePt: plan.fontSizePt,
       originalCharSpacingPt: plan.charSpacing,
-      originalHorizontalScalingPct: 100,
+      originalHorizontalScalingPct: options.originalHorizontalScalingPct ?? 100,
       existingTjAdjustment: plan.tjSpacingDelta,
       safeReflowWidthPt: options.safeReflowWidthPt,
     },
