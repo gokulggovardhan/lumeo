@@ -146,6 +146,12 @@ try {
   assert(!/secret[_-]?key/i.test(adminSource), "New admin source must not reference secret keys.");
 
   const healthSource = read("lib/admin/health.ts");
+  const healthPage = read("app/admin/(protected)/health/page.tsx");
+  const errorsPage = read("app/admin/(protected)/errors/page.tsx");
+  const errorsData = read("lib/admin/errors.ts");
+  const inboxPage = read("app/admin/(protected)/inbox/page.tsx");
+  const inboxClient = read("components/admin/InboxClient.tsx");
+  const inboxActions = read("app/admin/(protected)/inbox/actions.ts");
   const overviewSource = read("app/admin/(protected)/page.tsx");
   const timezoneSource = read("lib/admin/timezone.ts");
   const errorCaptureSource = read("lib/errors/server.ts");
@@ -173,6 +179,23 @@ try {
   }
   assert(buildInfoSource.includes("LUMEO_BUILD_SHA"), "Build-info endpoint must expose Cloudflare build SHA metadata.");
   assert(errorCaptureSource.includes("LUMEO_BUILD_SHA"), "Server error capture must tag Cloudflare build SHA metadata.");
+  for (const check of ["Admin authorization", "Supabase database", "Maintenance state", "Analytics aggregates", "Error monitoring", "Feedback Inbox", "Cloudflare runtime"]) {
+    assert(healthSource.includes(check), `Health V2 evidence check missing: ${check}.`);
+  }
+  assert(healthPage.includes("Core operations") && healthPage.includes("Supporting operations"), "Health V2 must separate core and supporting checks.");
+  assert(healthPage.includes("Unavailable"), "Health V2 must label failed checks honestly.");
+  for (const filterName of ["search", "route", "status", "severity", "source", "sort"]) {
+    assert(errorsPage.includes(`name="${filterName}"`), `Errors V2 filter missing: ${filterName}.`);
+  }
+  assert(errorsData.includes('count: "exact"'), "Errors V2 pagination must use an exact filtered count.");
+  assert(errorsPage.includes("first_seen_at") && errorsPage.includes("last_seen_at"), "Errors V2 must show first and last seen timestamps.");
+  assert(inboxPage.includes("PAGE_SIZE + 1"), "Inbox V2 must probe for an exact next page.");
+  for (const state of ["readFilter", "typeFilter", "sortOrder"]) {
+    assert(inboxClient.includes(state), `Inbox V2 control missing: ${state}.`);
+  }
+  assert(inboxClient.includes("setFeedbackReadState"), "Inbox V2 must support explicit read/unread changes.");
+  assert(inboxActions.includes("canViewInbox(admin.role)"), "Inbox read-state writes must remain role-authorized.");
+  assert(inboxActions.includes("canManageInbox(admin.role)"), "Inbox delete must remain owner/admin-authorized.");
 
   const analyticsPage = read("app/admin/(protected)/analytics/page.tsx");
   const analyticsActivityPage = read("app/admin/(protected)/analytics/activity/page.tsx");
@@ -324,6 +347,7 @@ try {
   console.log("PASS no getSession, service_role, or secret key usage in new admin source");
   console.log("PASS Admin deployment metadata is Cloudflare-native and free of retired-host dependencies");
   console.log("PASS current range-based Analytics control center UI is present");
+  console.log("PASS Admin Operations V2 health, errors, inbox, and settings contracts are present");
   console.log("PASS Settings exposes only live runtime controls");
   console.log("PASS protected package versions are unchanged");
   console.log("PASS protected non-admin files are untouched");

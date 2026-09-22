@@ -8,17 +8,19 @@ import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { AdminSubmitButton } from "@/components/admin/AdminSubmitButton";
 import { requireAdmin } from "@/lib/admin/auth";
 import { sanitizeErrorDiagnostic } from "@/lib/admin/error-display";
-import { getErrorLogSummary, getErrorLogs } from "@/lib/admin/errors";
+import { getErrorLogPage, getErrorLogSummary } from "@/lib/admin/errors";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { ignoreErrorLog, reopenErrorLog, resolveErrorLog } from "@/app/admin/(protected)/errors/actions";
 import { pageNumber } from "@/lib/admin/pagination";
 import { canManageErrors, canViewErrors } from "@/lib/admin/permissions";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
-import type { ErrorSeverity, ErrorStatus } from "@/lib/supabase/database.types";
+import type { ErrorSeverity, ErrorSource, ErrorStatus } from "@/lib/supabase/database.types";
 
 const PAGE_SIZE = 50;
 const statuses: ErrorStatus[] = ["open", "resolved", "ignored"];
 const severities: ErrorSeverity[] = ["low", "medium", "high", "critical"];
+const sources: ErrorSource[] = ["client", "server_action", "route_handler", "error_boundary", "unhandled_rejection"];
+const sorts = ["recent", "oldest", "occurrences"] as const;
 
 const severityTone: Record<ErrorSeverity, "success" | "warning" | "danger" | "neutral"> = {
   low: "neutral",
@@ -45,7 +47,15 @@ function buildQuery(params: Record<string, string | undefined>) {
 export default async function ErrorsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ page?: string; status?: string; severity?: string; search?: string }>;
+  searchParams?: Promise<{
+    page?: string;
+    status?: string;
+    severity?: string;
+    source?: string;
+    search?: string;
+    route?: string;
+    sort?: string;
+  }>;
 }) {
   const admin = await requireAdmin();
   const params = (await searchParams) ?? {};
@@ -63,11 +73,16 @@ export default async function ErrorsPage({
   const page = pageNumber(params.page);
   const status = statuses.includes(params.status as ErrorStatus) ? (params.status as ErrorStatus) : undefined;
   const severity = severities.includes(params.severity as ErrorSeverity) ? (params.severity as ErrorSeverity) : undefined;
-  const search = params.search?.trim() || undefined;
+  const source = sources.includes(params.source as ErrorSource) ? (params.source as ErrorSource) : undefined;
+  const search = params.search?.trim().slice(0, 120) || undefined;
+  const route = params.route?.trim().slice(0, 200) || undefined;
+  const sort = sorts.includes(params.sort as (typeof sorts)[number])
+    ? (params.sort as (typeof sorts)[number])
+    : "recent";
 
   const [summary, logs] = await Promise.all([
     getErrorLogSummary(),
-    getErrorLogs(PAGE_SIZE, (page - 1) * PAGE_SIZE, { status, severity, search }),
+    getErrorLogPage(PAGE_SIZE, (page - 1) * PAGE_SIZE, { status, severity, source, search, route, sort }),
   ]);
 
   if (summary.error || logs.error) {
@@ -86,7 +101,16 @@ export default async function ErrorsPage({
     );
   }
 
-  const carryParams = { status: params.status, severity: params.severity, search: params.search };
+  const carryParams = {
+    status: params.status,
+    severity: params.severity,
+    source: params.source,
+    search: params.search,
+    route: params.route,
+    sort: params.sort,
+  };
+  const pageStart = logs.data.rows.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const pageEnd = logs.data.rows.length === 0 ? 0 : pageStart + logs.data.rows.length - 1;
 
   return (
     <div className="space-y-7">
@@ -103,8 +127,8 @@ export default async function ErrorsPage({
         <AdminMetricCard label="Total occurrences" value={summary.data.totalOccurrences} detail="Across all logged errors, all time." tone="neutral" />
       </div>
 
-      <AdminSectionCard title="Filters" description="Narrow by status, severity, or message text.">
-        <form method="get" className="grid gap-4 md:grid-cols-4">
+      <AdminSectionCard title="Filters" description="Narrow verified error records without exposing raw diagnostics.">
+        <form method="get" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <label className="block text-sm font-semibold text-[#F0EAD6]">
             Message contains
             <input
@@ -112,6 +136,16 @@ export default async function ErrorsPage({
               name="search"
               defaultValue={params.search}
               placeholder="e.g. Failed to fetch"
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] placeholder:text-[var(--lumeo-paper-600)] sm:text-sm"
+            />
+          </label>
+          <label className="block text-sm font-semibold text-[#F0EAD6]">
+            Route contains
+            <input
+              type="text"
+              name="route"
+              defaultValue={params.route}
+              placeholder="e.g. /pdf/merge"
               className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] placeholder:text-[var(--lumeo-paper-600)] sm:text-sm"
             />
           </label>
@@ -141,11 +175,36 @@ export default async function ErrorsPage({
               ))}
             </select>
           </label>
+          <label className="block text-sm font-semibold text-[#F0EAD6]">
+            Source
+            <select
+              name="source"
+              defaultValue={params.source ?? ""}
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm"
+            >
+              <option value="">All</option>
+              {sources.map((value) => (
+                <option key={value} value={value}>{value.replaceAll("_", " ")}</option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm font-semibold text-[#F0EAD6]">
+            Order
+            <select
+              name="sort"
+              defaultValue={sort}
+              className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm"
+            >
+              <option value="recent">Newest activity</option>
+              <option value="occurrences">Most occurrences</option>
+              <option value="oldest">Oldest activity</option>
+            </select>
+          </label>
           <div className="flex items-end gap-3">
             <button type="submit" className="min-h-11 rounded-xl bg-[var(--emerald-600)] px-5 text-sm font-semibold text-[var(--text-on-accent)] transition hover:bg-[var(--emerald-500)]">
               Apply filters
             </button>
-            {(params.status || params.severity || params.search) && (
+            {(params.status || params.severity || params.source || params.search || params.route || params.sort) && (
               <Link href="/admin/errors" className="min-h-11 rounded-xl border border-[#E8DFC8]/12 px-5 text-sm font-semibold leading-[2.75rem] text-[#F0EAD6]/70">
                 Clear
               </Link>
@@ -154,10 +213,10 @@ export default async function ErrorsPage({
         </form>
       </AdminSectionCard>
 
-      <AdminSectionCard title="Error log" description={`Showing ${PAGE_SIZE} per page, most recently seen first.`}>
+      <AdminSectionCard title="Error log" description={`Showing ${pageStart}–${pageEnd} of ${logs.data.total} matching records.`}>
         <AdminDataTable
-          columns={["Severity", "Message", "Route", "Occurrences", "Last seen", "Status", canManage ? "Actions" : "" ].filter(Boolean)}
-          rows={logs.data.map((log) => {
+          columns={["Severity", "Message", "Route", "Occurrences", "First seen", "Last seen", "Status", canManage ? "Actions" : "" ].filter(Boolean)}
+          rows={logs.data.rows.map((log) => {
             const safeMessage = sanitizeErrorDiagnostic(log.message, 2000) ?? "Unknown error";
             const safeStack = sanitizeErrorDiagnostic(log.stack, 4000);
             const cells: React.ReactNode[] = [
@@ -175,6 +234,7 @@ export default async function ErrorsPage({
               </details>,
               log.route ?? "—",
               log.occurrence_count,
+              formatAdminDateTime(log.first_seen_at),
               formatAdminDateTime(log.last_seen_at),
               <AdminStatusBadge key="status" tone={statusTone[log.status]}>{log.status}</AdminStatusBadge>,
             ];
@@ -214,7 +274,7 @@ export default async function ErrorsPage({
               Previous
             </Link>
           )}
-          {logs.data.length === PAGE_SIZE && (
+          {page * PAGE_SIZE < logs.data.total && (
             <Link className="rounded-xl border border-[#E8DFC8]/12 px-4 py-2 text-sm font-semibold" href={`/admin/errors${buildQuery({ ...carryParams, page: String(page + 1) })}`}>
               Next
             </Link>

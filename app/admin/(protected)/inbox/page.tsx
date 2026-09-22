@@ -4,11 +4,17 @@ import { InboxClient } from "@/components/admin/InboxClient";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getFeedbackQueries } from "@/lib/admin/data";
 import { canManageInbox, canViewInbox } from "@/lib/admin/permissions";
+import type { InboxReadFilter } from "@/lib/admin/inbox-view";
 
 const PAGE_SIZE = 25;
 
-export default async function InboxPage() {
+export default async function InboxPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ read?: string }>;
+}) {
   const admin = await requireAdmin();
+  const params = (await searchParams) ?? {};
 
   if (!canViewInbox(admin.role)) {
     return (
@@ -19,7 +25,9 @@ export default async function InboxPage() {
     );
   }
 
-  const initial = await getFeedbackQueries(PAGE_SIZE, 0);
+  const initial = await getFeedbackQueries(PAGE_SIZE + 1, 0);
+  const initialReadFilter: InboxReadFilter =
+    params.read === "unread" || params.read === "read" ? params.read : "all";
 
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col space-y-5">
@@ -30,8 +38,10 @@ export default async function InboxPage() {
       />
       <div className="min-h-0 flex-1">
         <InboxClient
-          initialItems={initial.data}
+          initialItems={initial.data.slice(0, PAGE_SIZE)}
           initialError={initial.error}
+          initialHasMore={initial.data.length > PAGE_SIZE}
+          initialReadFilter={initialReadFilter}
           pageSize={PAGE_SIZE}
           canManage={canManageInbox(admin.role)}
         />

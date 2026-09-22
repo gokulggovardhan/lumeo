@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { ErrorLog, ErrorSeverity, ErrorStatus } from "@/lib/supabase/database.types";
+import type { ErrorLog, ErrorSeverity, ErrorSource, ErrorStatus } from "@/lib/supabase/database.types";
 
 type DataResult<T> = {
   data: T;
@@ -18,28 +18,60 @@ function safe<T>(data: T, error: unknown): DataResult<T> {
 export type ErrorLogFilters = {
   status?: ErrorStatus;
   severity?: ErrorSeverity;
+  source?: ErrorSource;
   search?: string;
+  route?: string;
+  sort?: "recent" | "oldest" | "occurrences";
 };
+
+export type ErrorLogPage = {
+  rows: ErrorLog[];
+  total: number;
+};
+
+export async function getErrorLogPage(
+  limit = 50,
+  offset = 0,
+  filters: ErrorLogFilters = {},
+): Promise<DataResult<ErrorLogPage>> {
+  const supabase = await createClient();
+  let query = supabase
+    .from("error_logs")
+    .select("*", { count: "exact" });
+
+  if (filters.status) query = query.eq("status", filters.status);
+  if (filters.severity) query = query.eq("severity", filters.severity);
+  if (filters.source) query = query.eq("source", filters.source);
+  if (filters.search) query = query.ilike("message", `%${filters.search}%`);
+  if (filters.route) query = query.ilike("route", `%${filters.route}%`);
+
+  if (filters.sort === "oldest") {
+    query = query.order("last_seen_at", { ascending: true });
+  } else if (filters.sort === "occurrences") {
+    query = query
+      .order("occurrence_count", { ascending: false })
+      .order("last_seen_at", { ascending: false });
+  } else {
+    query = query.order("last_seen_at", { ascending: false });
+  }
+
+  const { data, error, count } = await query.range(offset, offset + limit - 1);
+  return safe(
+    {
+      rows: (data ?? []) as ErrorLog[],
+      total: count ?? 0,
+    },
+    error,
+  );
+}
 
 export async function getErrorLogs(
   limit = 50,
   offset = 0,
   filters: ErrorLogFilters = {},
 ): Promise<DataResult<ErrorLog[]>> {
-  const supabase = await createClient();
-  let query = supabase
-    .from("error_logs")
-    .select("*")
-    .order("last_seen_at", { ascending: false })
-    .range(offset, offset + limit - 1);
-
-  if (filters.status) query = query.eq("status", filters.status);
-  if (filters.severity) query = query.eq("severity", filters.severity);
-  if (filters.search) query = query.ilike("message", `%${filters.search}%`);
-
-  const { data, error } = await query;
-
-  return safe((data ?? []) as ErrorLog[], error);
+  const page = await getErrorLogPage(limit, offset, filters);
+  return { data: page.data.rows, error: page.error };
 }
 
 export type ErrorLogSummary = {

@@ -1,7 +1,8 @@
+import Link from "next/link";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
-import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
+import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getHealthSnapshot, type HealthCheckStatus } from "@/lib/admin/health";
 import { canViewHealth } from "@/lib/admin/permissions";
@@ -19,7 +20,7 @@ const statusTone: Record<HealthCheckStatus, "success" | "warning" | "danger" | "
 const statusLabel: Record<HealthCheckStatus, string> = {
   ok: "Operational",
   degraded: "Degraded",
-  down: "Down",
+  down: "Unavailable",
   not_configured: "Not configured",
 };
 
@@ -36,7 +37,21 @@ export default async function HealthPage() {
     );
   }
 
-  const snapshot = await getHealthSnapshot();
+  const snapshot = await getHealthSnapshot({ adminRole: admin.role });
+  const requiredChecks = snapshot.checks.filter((check) => check.required);
+  const supportingChecks = snapshot.checks.filter((check) => !check.required);
+  const groups = [
+    {
+      title: "Core operations",
+      description: "Required checks determine whether Lumeo can operate safely.",
+      checks: requiredChecks,
+    },
+    {
+      title: "Supporting operations",
+      description: "Optional operational readers can degrade without taking down the public product.",
+      checks: supportingChecks,
+    },
+  ];
 
   return (
     <div className="space-y-7">
@@ -52,17 +67,30 @@ export default async function HealthPage() {
         }
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {snapshot.checks.map((check) => (
-          <AdminMetricCard
-            key={check.name}
-            label={`${check.name}${check.required ? "" : " · Optional"}`}
-            value={statusLabel[check.status]}
-            detail={check.latencyMs !== null ? `${check.detail} (${check.latencyMs}ms)` : check.detail}
-            tone={statusTone[check.status]}
-          />
-        ))}
-      </div>
+      {groups.map((group) => (
+        <AdminSectionCard key={group.title} title={group.title} description={group.description}>
+          <div className="divide-y divide-[var(--border-hairline)]">
+            {group.checks.map((check) => (
+              <div key={check.name} className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-[var(--text-primary)]">{check.name}</p>
+                    <AdminStatusBadge tone={statusTone[check.status]}>{statusLabel[check.status]}</AdminStatusBadge>
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">
+                    {check.detail}{check.latencyMs !== null ? ` (${check.latencyMs}ms)` : ""}
+                  </p>
+                </div>
+                {check.href && check.status !== "ok" ? (
+                  <Link href={check.href} className="shrink-0 text-sm font-semibold text-[var(--text-accent)] hover:underline">
+                    Review →
+                  </Link>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        </AdminSectionCard>
+      ))}
 
       <AdminSectionCard title="Build" description="Version and deployment info for the currently running instance.">
         <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

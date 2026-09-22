@@ -4,6 +4,7 @@ import { AdminFormField } from "@/components/admin/AdminFormField";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminSubmitButton } from "@/components/admin/AdminSubmitButton";
+import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { MaintenanceModeSubmitButton } from "@/components/admin/MaintenanceModeSubmitButton";
 import { requireAdmin } from "@/lib/admin/auth";
 import { getSiteSettings } from "@/lib/admin/data";
@@ -42,6 +43,17 @@ function isEnabled(value: unknown) {
       "enabled" in value &&
       (value as { enabled?: unknown }).enabled === true,
   );
+}
+
+function settingImpact(key: string, enabled: boolean) {
+  if (key === "maintenance_mode") {
+    return enabled
+      ? "Public visitors see the maintenance experience; Admin access remains available."
+      : "Public routes operate normally."
+  }
+  return enabled
+    ? "Privacy-preserving public analytics events may be accepted when Do Not Track is off."
+    : "Public analytics collection remains off and event recording defaults to disabled."
 }
 
 export default async function SettingsPage() {
@@ -109,15 +121,16 @@ export default async function SettingsPage() {
                     <p className="text-sm font-semibold text-[#F0EAD6]">
                       {label}
                     </p>
-                    {isMaintenanceMode && enabled ? (
-                      <span className="rounded-full bg-[var(--surface-danger)] px-2.5 py-1 text-xs font-bold text-[var(--text-danger)]">
-                        Live: site is down for visitors
-                      </span>
-                    ) : null}
+                    <AdminStatusBadge tone={enabled ? (isMaintenanceMode ? "danger" : "success") : "neutral"}>
+                      {enabled ? "Enabled" : "Disabled"}
+                    </AdminStatusBadge>
                   </div>
 
                   <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/48">
                     {description}
+                  </p>
+                  <p className="mt-2 rounded-xl bg-[rgba(var(--lumeo-paper-rgb),0.035)] px-3 py-2 text-xs leading-5 text-[var(--text-muted)]">
+                    Current effect: {settingImpact(key, enabled)}
                   </p>
 
                   <label className="mt-3 flex min-h-11 items-center gap-3 text-sm font-semibold text-[#F0EAD6]">
