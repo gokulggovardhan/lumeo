@@ -28,7 +28,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Apply controlled certification repair v2
+      - name: Apply controlled certification repair v3
         run: python3 .github/scripts/patch-production-native-colour-certification.py
 
       - name: Static validation
