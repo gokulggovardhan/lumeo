@@ -60,7 +60,7 @@ test("rotateItem and rotateItems accumulate and normalize rotation", () => {
   const items = createInitialItems(2);
   const oneTurn = rotateItem(items, 0, "right");
   assert.equal(oneTurn[0].rotation, 90);
-  const fourTurns = [1, 2, 3].reduce((acc, _n) => rotateItem(acc, 0, "right"), oneTurn);
+  const fourTurns = [1, 2, 3].reduce((acc) => rotateItem(acc, 0, "right"), oneTurn);
   assert.equal(fourTurns[0].rotation, 0);
 
   const bulk = rotateItems(items, new Set([0, 1]), "left");

@@ -3,6 +3,7 @@ import type {
   PdfPageTextModel,
   PdfTextCapability,
   PdfTextLine,
+  PdfTextLineSegment,
   PdfTextSpan,
 } from "./documentModel.ts";
 
@@ -27,7 +28,36 @@ export type PdfTextSearchMatch = {
   capabilityReason: string | null;
 };
 
-function unionBoxes(spans: readonly PdfTextSpan[]): PercentBox {
+/**
+ * Compact document-search representation.
+ *
+ * The live editor page keeps the richer Page → Block → Line → Span model.
+ * Background document indexing keeps only fields search/navigation need, so
+ * opening Find in a 500-page PDF does not retain every page's font profiles,
+ * source matrices, visual-point boxes and block graph in React state.
+ */
+export type PdfTextSearchSpanIndex = {
+  id: string;
+  sourceRunIndex: number;
+  text: string;
+  boundsPct: PercentBox;
+  capability: PdfTextCapability;
+  capabilityReason: string | null;
+};
+
+export type PdfTextSearchLineIndex = {
+  id: string;
+  text: string;
+  segments: PdfTextLineSegment[];
+  spans: PdfTextSearchSpanIndex[];
+};
+
+export type PdfTextSearchPageIndex = {
+  pageIndex: number;
+  lines: PdfTextSearchLineIndex[];
+};
+
+function unionBoxes(spans: readonly { boundsPct: PercentBox }[]): PercentBox {
   const left = Math.min(...spans.map((span) => span.boundsPct.xPct));
   const top = Math.min(...spans.map((span) => span.boundsPct.yPct));
   const right = Math.max(...spans.map((span) => span.boundsPct.xPct + span.boundsPct.widthPct));
@@ -39,10 +69,9 @@ function isEditableCapability(capability: PdfTextCapability): boolean {
   return capability === "native-editable" || capability === "fragmented-editable";
 }
 
-function matchCapability(spans: readonly PdfTextSpan[]): Pick<
-  PdfTextSearchMatch,
-  "capability" | "capabilityReason"
-> {
+function matchCapability(
+  spans: readonly PdfTextSearchSpanIndex[],
+): Pick<PdfTextSearchMatch, "capability" | "capabilityReason"> {
   const editable = spans.filter((span) => isEditableCapability(span.capability)).length;
   if (editable === spans.length) return { capability: "editable", capabilityReason: null };
   if (editable > 0) {
@@ -68,7 +97,38 @@ function wholeWordAt(text: string, start: number, end: number): boolean {
   return !isWordChar(text[start - 1]) && !isWordChar(text[end]);
 }
 
-function spansForRange(line: PdfTextLine, start: number, end: number): PdfTextSpan[] {
+function indexSpan(span: PdfTextSpan): PdfTextSearchSpanIndex {
+  return {
+    id: span.id,
+    sourceRunIndex: span.sourceRunIndex,
+    text: span.text,
+    boundsPct: span.boundsPct,
+    capability: span.capability,
+    capabilityReason: span.capabilityReason,
+  };
+}
+
+function indexLine(line: PdfTextLine): PdfTextSearchLineIndex {
+  return {
+    id: line.id,
+    text: line.text,
+    segments: line.segments.map((segment) => ({ ...segment })),
+    spans: line.spans.map(indexSpan),
+  };
+}
+
+export function buildPdfTextSearchPageIndex(page: PdfPageTextModel): PdfTextSearchPageIndex {
+  return {
+    pageIndex: page.pageIndex,
+    lines: page.lines.map(indexLine),
+  };
+}
+
+function spansForRange(
+  line: PdfTextSearchLineIndex,
+  start: number,
+  end: number,
+): PdfTextSearchSpanIndex[] {
   const ids = new Set(
     line.segments
       .filter((segment) => segment.end > start && segment.start < end)
@@ -77,8 +137,8 @@ function spansForRange(line: PdfTextLine, start: number, end: number): PdfTextSp
   return line.spans.filter((span) => ids.has(span.id));
 }
 
-export function searchPdfPageText(
-  page: PdfPageTextModel,
+function searchIndexedPage(
+  page: PdfTextSearchPageIndex,
   query: string,
   options: PdfTextSearchOptions = {},
 ): PdfTextSearchMatch[] {
@@ -125,14 +185,42 @@ export function searchPdfPageText(
   return results;
 }
 
-export function searchPdfDocumentText(
-  pages: readonly PdfPageTextModel[],
+export function searchPdfPageIndex(
+  page: PdfTextSearchPageIndex,
+  query: string,
+  options: PdfTextSearchOptions = {},
+): PdfTextSearchMatch[] {
+  return searchIndexedPage(page, query, options);
+}
+
+export function searchPdfPageText(
+  page: PdfPageTextModel,
+  query: string,
+  options: PdfTextSearchOptions = {},
+): PdfTextSearchMatch[] {
+  return searchIndexedPage(buildPdfTextSearchPageIndex(page), query, options);
+}
+
+export function searchPdfDocumentIndex(
+  pages: readonly PdfTextSearchPageIndex[],
   query: string,
   options: PdfTextSearchOptions = {},
 ): PdfTextSearchMatch[] {
   return [...pages]
     .sort((a, b) => a.pageIndex - b.pageIndex)
-    .flatMap((page) => searchPdfPageText(page, query, options));
+    .flatMap((page) => searchPdfPageIndex(page, query, options));
+}
+
+export function searchPdfDocumentText(
+  pages: readonly PdfPageTextModel[],
+  query: string,
+  options: PdfTextSearchOptions = {},
+): PdfTextSearchMatch[] {
+  return searchPdfDocumentIndex(
+    pages.map(buildPdfTextSearchPageIndex),
+    query,
+    options,
+  );
 }
 
 export function nextSearchMatchIndex(
@@ -146,7 +234,6 @@ export function nextSearchMatchIndex(
   }
   return (currentIndex + direction + matches.length) % matches.length;
 }
-
 
 export function replacementTextForSearchMatch(
   page: PdfPageTextModel,

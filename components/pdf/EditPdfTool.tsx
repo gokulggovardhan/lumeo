@@ -60,14 +60,16 @@ import {
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { overlayFontSizePx, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
-import { buildPdfPageTextModel, type PdfPageTextModel } from "@/lib/pdf/edit/documentModel";
+import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
 import { PercentSpatialIndex } from "@/lib/pdf/edit/spatialIndex";
 import {
+  buildPdfTextSearchPageIndex,
   nextSearchMatchIndex,
   replacementTextForSearchMatch,
-  searchPdfDocumentText,
+  searchPdfDocumentIndex,
   searchPdfPageText,
   type PdfTextSearchMatch,
+  type PdfTextSearchPageIndex,
   type PdfTextSearchScope,
 } from "@/lib/pdf/edit/textSearch";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
@@ -357,6 +359,18 @@ function clampPct(value: number) {
   return Math.min(100, Math.max(0, value));
 }
 
+function cssTextPaint(
+  hex: string | null | undefined,
+  opacity: number | null | undefined,
+): string | undefined {
+  if (!hex) return undefined;
+  if (opacity === null || opacity === undefined || opacity >= 0.999) return hex;
+  const match = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex);
+  if (!match) return hex;
+  const alpha = Math.min(1, Math.max(0, opacity));
+  return `rgba(${Number.parseInt(match[1], 16)}, ${Number.parseInt(match[2], 16)}, ${Number.parseInt(match[3], 16)}, ${alpha})`;
+}
+
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
   const tag = target.tagName.toLowerCase();
@@ -582,7 +596,7 @@ export default function EditPdfTool() {
   const [textSearchCaseSensitive, setTextSearchCaseSensitive] = useState(false);
   const [textSearchWholeWord, setTextSearchWholeWord] = useState(false);
   const [textSearchActiveIndex, setTextSearchActiveIndex] = useState(-1);
-  const [textSearchPageModels, setTextSearchPageModels] = useState<ReadonlyMap<number, PdfPageTextModel>>(
+  const [textSearchPageIndexes, setTextSearchPageIndexes] = useState<ReadonlyMap<number, PdfTextSearchPageIndex>>(
     () => new Map(),
   );
   const [textSearchIndexBusy, setTextSearchIndexBusy] = useState(false);
@@ -652,7 +666,7 @@ export default function EditPdfTool() {
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
-  const textSearchPageModelsRef = useRef<Map<number, PdfPageTextModel>>(new Map());
+  const textSearchPageIndexesRef = useRef<Map<number, PdfTextSearchPageIndex>>(new Map());
   const textSearchBuildGenerationRef = useRef(0);
   // Phase 22: the render effect below already fetches this exact page and
   // computes its scaled viewport once per pageIndex -- the operator-matching
@@ -812,11 +826,11 @@ export default function EditPdfTool() {
     [textRunSpatialIndex],
   );
 
-  const searchablePageModels = useMemo(() => {
-    const models = new Map(textSearchPageModels);
-    if (pageTextModel) models.set(pageIndex, pageTextModel);
-    return [...models.values()].sort((a, b) => a.pageIndex - b.pageIndex);
-  }, [textSearchPageModels, pageTextModel, pageIndex]);
+  const searchablePageIndexes = useMemo(() => {
+    const indexes = new Map(textSearchPageIndexes);
+    if (pageTextModel) indexes.set(pageIndex, buildPdfTextSearchPageIndex(pageTextModel));
+    return [...indexes.values()].sort((a, b) => a.pageIndex - b.pageIndex);
+  }, [textSearchPageIndexes, pageTextModel, pageIndex]);
 
   const textSearchMatches = useMemo(() => {
     const options = {
@@ -829,14 +843,14 @@ export default function EditPdfTool() {
         ? searchPdfPageText(pageTextModel, textSearchQuery, options)
         : [];
     }
-    return searchPdfDocumentText(searchablePageModels, textSearchQuery, options);
+    return searchPdfDocumentIndex(searchablePageIndexes, textSearchQuery, options);
   }, [
     textSearchQuery,
     textSearchScope,
     textSearchCaseSensitive,
     textSearchWholeWord,
     pageTextModel,
-    searchablePageModels,
+    searchablePageIndexes,
   ]);
 
   const normalizedTextSearchIndex =
@@ -880,7 +894,7 @@ export default function EditPdfTool() {
     const doc = pdfJsDocRef.current;
     const generation = textSearchBuildGenerationRef.current;
     const missingPages = Array.from({ length: pdf.pageCount }, (_, index) => index).filter(
-      (index) => index !== pageIndex && !textSearchPageModelsRef.current.has(index),
+      (index) => index !== pageIndex && !textSearchPageIndexesRef.current.has(index),
     );
     if (missingPages.length === 0) return;
 
@@ -899,11 +913,12 @@ export default function EditPdfTool() {
           if (current >= missingPages.length) return;
           const targetPageIndex = missingPages[current];
 
+          let backgroundPage: PDFPageProxy | null = null;
           try {
-            const page = await doc.getPage(targetPageIndex + 1);
-            const viewport = page.getViewport({ scale: 1 });
+            backgroundPage = await doc.getPage(targetPageIndex + 1);
+            const viewport = backgroundPage.getViewport({ scale: 1 });
             const content = await withPageTimeout(
-              page.getTextContent(),
+              backgroundPage.getTextContent(),
               targetPageIndex + 1,
               PAGE_RENDER_TIMEOUT_MS,
               "extract text from",
@@ -922,15 +937,23 @@ export default function EditPdfTool() {
               runs,
               matches: runs.map(() => null),
             });
-            textSearchPageModelsRef.current.set(targetPageIndex, model);
+            textSearchPageIndexesRef.current.set(
+              targetPageIndex,
+              buildPdfTextSearchPageIndex(model),
+            );
             completedSincePublish += 1;
             if (completedSincePublish >= 4) {
               completedSincePublish = 0;
-              setTextSearchPageModels(new Map(textSearchPageModelsRef.current));
+              setTextSearchPageIndexes(new Map(textSearchPageIndexesRef.current));
             }
           } catch {
             // Search is best-effort per page. One pathological page should
             // not block searching every other page or the core editor.
+          } finally {
+            // Background indexing needs text geometry only. Release pdf.js
+            // page-level font/image/operator caches immediately instead of
+            // retaining resources for up to the full 500-page upload limit.
+            if (targetPageIndex !== pageIndex) backgroundPage?.cleanup();
           }
         }
       };
@@ -942,7 +965,7 @@ export default function EditPdfTool() {
         ),
       );
       if (cancelled || generation !== textSearchBuildGenerationRef.current) return;
-      setTextSearchPageModels(new Map(textSearchPageModelsRef.current));
+      setTextSearchPageIndexes(new Map(textSearchPageIndexesRef.current));
       setTextSearchIndexBusy(false);
     })();
 
@@ -1020,8 +1043,8 @@ export default function EditPdfTool() {
     setTextSearchWholeWord(false);
     setTextSearchActiveIndex(-1);
     setTextSearchIndexBusy(false);
-    textSearchPageModelsRef.current.clear();
-    setTextSearchPageModels(new Map());
+    textSearchPageIndexesRef.current.clear();
+    setTextSearchPageIndexes(new Map());
     textSearchBuildGenerationRef.current += 1;
     runOverlayNodesRef.current.clear();
     setActiveTool("select");
@@ -1035,10 +1058,10 @@ export default function EditPdfTool() {
   useEffect(() => {
     let cancelled = false;
     const searchGeneration = ++textSearchBuildGenerationRef.current;
-    textSearchPageModelsRef.current.clear();
+    textSearchPageIndexesRef.current.clear();
     void Promise.resolve().then(() => {
       if (cancelled || searchGeneration !== textSearchBuildGenerationRef.current) return;
-      setTextSearchPageModels(new Map());
+      setTextSearchPageIndexes(new Map());
       setTextSearchIndexBusy(false);
       setTextSearchActiveIndex(-1);
     });
@@ -1677,7 +1700,18 @@ export default function EditPdfTool() {
     // simple-tap-with-no-drag fallback -- handling it here too would create
     // a SECOND element, since a plain tap fires both a pointerup and a click.
     if (activeTool === "whiteout") return;
-    if ((event.target as HTMLElement).closest('[role="button"]')) return;
+    // Inline editor controls live inside the stage. Native <button>/<input>
+    // elements do not necessarily carry an explicit role attribute, and
+    // desktop WebKit can deliver the stage click after scrolling a floating
+    // control into view. Treat every native interactive descendant as UI,
+    // never as a click on the PDF canvas that should clear selection.
+    if (
+      (event.target as HTMLElement).closest(
+        'button, input, textarea, select, [contenteditable="true"], [role="button"]',
+      )
+    ) {
+      return;
+    }
     const rect = stageRef.current?.getBoundingClientRect();
     if (!rect) return;
 
@@ -3479,6 +3513,8 @@ export default function EditPdfTool() {
                           }
                         }}
                         aria-label="Edit text"
+                        data-native-fill-color={singleSelectedSpan?.style.fillColor?.cssHex ?? undefined}
+                        data-native-fill-opacity={singleSelectedSpan?.style.fillOpacity ?? undefined}
                         // lumeo-page-overlay-input opts out of the app-chrome
                         // input styling in globals.css, whose themed
                         // --surface-input was beating this bg-white on
@@ -3503,6 +3539,10 @@ export default function EditPdfTool() {
                           fontFamily: inlineEditorFontFamily,
                           fontWeight: singleSelectedSpan?.style.weight ?? 600,
                           fontStyle: singleSelectedSpan?.style.italic ? "italic" : "normal",
+                          color: cssTextPaint(
+                            singleSelectedSpan?.style.fillColor?.cssHex,
+                            singleSelectedSpan?.style.fillOpacity,
+                          ),
                           letterSpacing:
                             activeNativeStyleDraft && activeNativeStyleDraft.charSpacing !== 0
                               ? `${(activeNativeStyleDraft.charSpacing / Math.max(1, activeNativeStyleDraft.fontSizePt)).toFixed(4)}em`

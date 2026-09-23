@@ -24,11 +24,15 @@ import {
 } from "pdf-lib";
 import {
   IDENTITY_MATRIX,
+  applyPdfPaintOperator,
+  defaultPdfGraphicsPaintState,
   multiplyMatrix,
   tokenizeContentStream,
   walkTextShowOperators,
   type ContentStreamToken,
   type Matrix2x3,
+  type PdfExtGStateAlpha,
+  type PdfGraphicsPaintState,
   type TextShowOperator,
 } from "./contentStream.ts";
 
@@ -51,21 +55,45 @@ export type LocatedTextOperator = {
   resources: PDFDict;
 };
 
-type FormInvocation = { xObjectName: string; ctmAtInvocation: Matrix2x3 };
+type FormInvocation = {
+  xObjectName: string;
+  ctmAtInvocation: Matrix2x3;
+  paintAtInvocation: PdfGraphicsPaintState;
+};
 
 function asNumber(token: ContentStreamToken | undefined): number {
   return token && token.type === "number" ? token.value : 0;
+}
+
+function clonePaintState(state: PdfGraphicsPaintState): PdfGraphicsPaintState {
+  return {
+    fillColor: state.fillColor
+      ? { ...state.fillColor, components: [...state.fillColor.components] }
+      : null,
+    strokeColor: state.strokeColor
+      ? { ...state.strokeColor, components: [...state.strokeColor.components] }
+      : null,
+    fillOpacity: state.fillOpacity,
+    strokeOpacity: state.strokeOpacity,
+  };
 }
 
 // Finds every `Do` operator in a content stream and the CTM in effect at
 // that exact point -- only q/Q/cm tracking is needed (Do's position
 // relative to a BT/ET text object never affects the CTM, so this doesn't
 // need contentStream.ts's fuller text-state machinery).
-export function findFormInvocations(bytes: Uint8Array, initialCtm: Matrix2x3 = IDENTITY_MATRIX): FormInvocation[] {
+export function findFormInvocations(
+  bytes: Uint8Array,
+  initialCtm: Matrix2x3 = IDENTITY_MATRIX,
+  initialPaintState: PdfGraphicsPaintState = defaultPdfGraphicsPaintState(),
+  resolveExtGState?: (resourceName: string) => PdfExtGStateAlpha | null,
+): FormInvocation[] {
   const tokens = tokenizeContentStream(bytes);
   const results: FormInvocation[] = [];
   const ctmStack: Matrix2x3[] = [];
+  const paintStack: PdfGraphicsPaintState[] = [];
   let ctm: Matrix2x3 = initialCtm;
+  let paintState = clonePaintState(initialPaintState);
   let operands: ContentStreamToken[] = [];
 
   for (const token of tokens) {
@@ -76,9 +104,20 @@ export function findFormInvocations(bytes: Uint8Array, initialCtm: Matrix2x3 = I
     switch (token.value) {
       case "q":
         ctmStack.push(ctm);
+        paintStack.push(clonePaintState(paintState));
         break;
       case "Q":
         ctm = ctmStack.pop() ?? IDENTITY_MATRIX;
+        paintState = paintStack.pop() ?? defaultPdfGraphicsPaintState();
+        break;
+      case "g":
+      case "G":
+      case "rg":
+      case "RG":
+      case "k":
+      case "K":
+      case "gs":
+        paintState = applyPdfPaintOperator(paintState, token.value, operands, resolveExtGState);
         break;
       case "cm": {
         const m: Matrix2x3 = [
@@ -95,7 +134,11 @@ export function findFormInvocations(bytes: Uint8Array, initialCtm: Matrix2x3 = I
       case "Do": {
         const nameToken = operands[0];
         if (nameToken?.type === "name") {
-          results.push({ xObjectName: nameToken.value, ctmAtInvocation: ctm });
+          results.push({
+            xObjectName: nameToken.value,
+            ctmAtInvocation: ctm,
+            paintAtInvocation: clonePaintState(paintState),
+          });
         }
         break;
       }
@@ -130,6 +173,30 @@ function getResourcesDict(dict: PDFDict, context: PDFContext): PDFDict | undefin
 function getXObjectDict(resources: PDFDict, context: PDFContext): PDFDict | undefined {
   const resolved = resolveMaybe(resources.get(PDFName.of("XObject")), context);
   return resolved instanceof PDFDict ? resolved : undefined;
+}
+
+function getExtGStateDict(resources: PDFDict, context: PDFContext): PDFDict | undefined {
+  const resolved = resolveMaybe(resources.get(PDFName.of("ExtGState")), context);
+  return resolved instanceof PDFDict ? resolved : undefined;
+}
+
+function extGStateAlphaResolver(
+  resources: PDFDict,
+  context: PDFContext,
+): (resourceName: string) => PdfExtGStateAlpha | null {
+  return (resourceName) => {
+    const states = getExtGStateDict(resources, context);
+    if (!states) return null;
+    const entry = resolveMaybe(states.get(PDFName.of(resourceName)), context);
+    if (!(entry instanceof PDFDict)) return null;
+
+    const fill = resolveMaybe(entry.get(PDFName.of("ca")), context);
+    const stroke = resolveMaybe(entry.get(PDFName.of("CA")), context);
+    const result: PdfExtGStateAlpha = {};
+    if (fill instanceof PDFNumber) result.fillOpacity = fill.asNumber();
+    if (stroke instanceof PDFNumber) result.strokeOpacity = stroke.asNumber();
+    return result;
+  };
 }
 
 function lookupRawStream(ref: PDFRef, context: PDFContext): PDFRawStream | undefined {
@@ -195,19 +262,29 @@ export function collectPageTextOperators(
   function walkStream(
     bytes: Uint8Array,
     initialCtm: Matrix2x3,
+    initialPaintState: PdfGraphicsPaintState,
     resources: PDFDict,
     locator: StreamLocator,
     formPath: string[],
     openRefs: ReadonlySet<PDFRef>,
     depth: number,
   ): void {
-    const operators = walkTextShowOperators(bytes, initialCtm);
+    const resolveExtGState = extGStateAlphaResolver(resources, context);
+    const operators = walkTextShowOperators(bytes, initialCtm, {
+      initialPaintState,
+      resolveExtGState,
+    });
     operators.forEach((operator, operatorIndex) => {
       results.push({ locator, operatorIndex, operator, streamBytes: bytes, resources });
     });
 
     if (depth >= maxDepth) return;
-    const invocations = findFormInvocations(bytes, initialCtm);
+    const invocations = findFormInvocations(
+      bytes,
+      initialCtm,
+      initialPaintState,
+      resolveExtGState,
+    );
     if (invocations.length === 0) return;
     const xObjectDict = getXObjectDict(resources, context);
     if (!xObjectDict) return;
@@ -241,6 +318,7 @@ export function collectPageTextOperators(
       walkStream(
         formBytes,
         formInitialCtm,
+        invocation.paintAtInvocation,
         formResources,
         { kind: "xobject", formPath: nextPath },
         nextPath,
@@ -255,7 +333,16 @@ export function collectPageTextOperators(
     const stream = lookupRawStream(ref, context);
     if (!stream) return;
     const bytes = decodePDFRawStream(stream).decode();
-    walkStream(bytes, IDENTITY_MATRIX, pageResources, { kind: "page", contentStreamIndex }, [], new Set([ref]), 0);
+    walkStream(
+      bytes,
+      IDENTITY_MATRIX,
+      defaultPdfGraphicsPaintState(),
+      pageResources,
+      { kind: "page", contentStreamIndex },
+      [],
+      new Set([ref]),
+      0,
+    );
   });
 
   return results;

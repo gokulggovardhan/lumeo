@@ -151,3 +151,37 @@ test("document model preserves source matrix and operator text state", () => {
   assert.equal(span.style.textRisePt, 2);
   assert.equal(span.style.renderingMode, 2);
 });
+
+
+test("document model preserves proven fill/stroke paint and alpha from the matched operator", () => {
+  const model = buildPdfPageTextModel({
+    pageIndex: 0,
+    widthPt: 600,
+    heightPt: 800,
+    runs: [run("Painted", 20, 20)],
+    matches: [
+      match(0, {
+        fillColor: {
+          colorSpace: "DeviceRGB",
+          components: [0.2, 0.4, 0.6],
+          cssHex: "#336699",
+        },
+        strokeColor: {
+          colorSpace: "DeviceGray",
+          components: [0.25],
+          cssHex: "#404040",
+        },
+        fillOpacity: 0.5,
+        strokeOpacity: 0.75,
+      }),
+    ],
+  });
+
+  assert.deepEqual(model.spans[0].style.fillColor, {
+    colorSpace: "DeviceRGB",
+    components: [0.2, 0.4, 0.6],
+    cssHex: "#336699",
+  });
+  assert.equal(model.spans[0].style.fillOpacity, 0.5);
+  assert.equal(model.spans[0].style.strokeOpacity, 0.75);
+});

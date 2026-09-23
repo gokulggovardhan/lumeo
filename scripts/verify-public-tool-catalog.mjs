@@ -15,6 +15,8 @@ const newFiles = [
   "components/public/PublicPdfToolsMenuClient.tsx",
   "components/tools/ToolsExplorer.tsx",
   "lib/tools/catalog.ts",
+  "lib/tools/public-state.ts",
+  "lib/tools/tool-status.ts",
   "lib/tools/tiles.ts",
   "lib/tools/discovery-search.ts",
   "lib/command-palette/index.ts",
@@ -74,6 +76,11 @@ try {
     fallback.includes('const fallbackOrder = ["merge", "split", "compress", "jpg-to-pdf", "pdf-to-jpg"]'),
     "Fallback order must be Merge, Split, Compress, JPG to PDF, PDF to JPG.",
   );
+  assert(fallback.includes("const localTools = pdfTools.map"), "Fallback catalog must include every live local registry tool.");
+  assert(fallback.includes('tool.slug === "organize" ? "reorder"'), "Fallback catalog must map Organize to its Admin catalog slug.");
+  for (const slug of ["crop", "page-numbers", "header-footer", "heic-to-jpeg"]) {
+    assert(fallback.includes(`slug: "${slug}"`), `Fallback catalog must include the live ${slug} route.`);
+  }
 
   // The 5-slot admin-configured homepage (getPublicHomepageTools /
   // homepage_tool_slots) was deliberately retired in favor of a fixed,
@@ -81,7 +88,8 @@ try {
   // comment in components/pdf/PdfToolLauncher.tsx for the rationale.
   const launcher = read("components/pdf/PdfToolLauncher.tsx");
   assert(launcher.includes("getPublicPdfCatalog") && launcher.includes("resolveLumeoTools"), "Homepage launcher must use the public PDF catalog and resolved Lumeo tools.");
-  assert(launcher.includes("buildTiles(resolved)"), "Homepage launcher must build tiles from the resolved catalog.");
+  assert(launcher.includes("buildDiscoveryTiles(resolved)"), "Homepage launcher must include truthful enabled coming-soon and maintenance states.");
+  assert(launcher.includes("available ? (") && launcher.includes("<article"), "Unavailable homepage tools must be visible but non-actionable.");
   // The permanent "All PDF Tools" card no longer lives in the launcher itself
   // -- the homepage now shows every live tool directly, so the "see all"
   // link moved to the public footer instead.
@@ -99,6 +107,7 @@ try {
   const directory = read("app/pdf-tools/page.tsx");
   const explorer = read("components/tools/ToolsExplorer.tsx");
   const toolCatalog = read("lib/tools/catalog.ts");
+  const resolver = read("lib/tools/resolve.ts");
   const tiles = read("lib/tools/tiles.ts");
   const commandIndex = read("lib/command-palette/index.ts");
   assert(directory.includes("buildDiscoveryTiles") && directory.includes("ToolsExplorer"), "Directory must render resolved direct-action tools.");
@@ -113,6 +122,12 @@ try {
   assert(explorer.includes("On device") && explorer.includes("Server-assisted"), "Directory processing labels are incomplete.");
   assert(toolCatalog.includes("searchAliases") && toolCatalog.includes('processing: "browser"'), "Canonical tool actions must own aliases and action-level processing overrides.");
   assert(tiles.includes("action.dbStatus") && tiles.includes("buildDiscoveryTiles"), "Discovery availability must derive from resolved catalog status.");
+  const publicState = read("lib/tools/public-state.ts");
+  const routeGate = read("lib/tools/tool-status.ts");
+  assert(publicState.includes("resolveEffectivePublicToolState"), "Central effective public tool-state resolver is missing.");
+  assert(resolver.includes("resolveEffectivePublicToolState(dbTool)"), "Discovery must use the central effective tool-state resolver.");
+  assert(routeGate.includes("resolveEffectivePublicToolState(dbTool)"), "Direct routes must use the central effective tool-state resolver.");
+  assert(!routeGate.includes("if (!dbTool) return { blocked: false }"), "Missing Admin catalog rows must not fail open on direct routes.");
   assert(commandIndex.includes("...tile.aliases") && commandIndex.includes("...tile.capabilities"), "Command palette must reuse canonical discovery aliases.");
   assert(!commandIndex.includes("const TOOL_ALIASES"), "Command palette must not maintain a second tool alias index.");
   assert(!/pdfjs-dist|pdf-lib|heic-decode|JSZip/.test([directory, explorer, tiles].join("\n")), "Directory must not import heavy processing engines.");

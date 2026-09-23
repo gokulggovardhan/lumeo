@@ -1,4 +1,4 @@
-import type { Matrix2x3, TextShowOperator } from "./contentStream.ts";
+import type { Matrix2x3, PdfPaintColor, TextShowOperator } from "./contentStream.ts";
 import { PdfCoordinateMapper, type PercentBox, type VisualBox } from "./coordinateMapper.ts";
 import type { LocatedTextOperator, StreamLocator } from "./formXObjects.ts";
 import type { PdfFontProfile } from "./fontRegistry.ts";
@@ -34,9 +34,10 @@ export type PdfTextStyle = {
   horizontalScalingPct: number;
   textRisePt: number;
   renderingMode: number;
-  fillColor: string | null;
-  strokeColor: string | null;
-  opacity: number | null;
+  fillColor: PdfPaintColor | null;
+  strokeColor: PdfPaintColor | null;
+  fillOpacity: number | null;
+  strokeOpacity: number | null;
 };
 
 export type PdfTextSpan = {
@@ -182,13 +183,10 @@ function styleFor(
     horizontalScalingPct: operator?.horizontalScalingPct ?? 100,
     textRisePt: operator?.textRise ?? 0,
     renderingMode: operator?.renderMode ?? 0,
-    // The current content-stream walker deliberately tracks text geometry
-    // and text state, not the full graphics-state colour/alpha stack yet.
-    // Explicit null keeps that limitation visible in the model instead of
-    // inventing a colour from the rendered bitmap.
-    fillColor: null,
-    strokeColor: null,
-    opacity: null,
+    fillColor: operator?.fillColor ?? null,
+    strokeColor: operator?.strokeColor ?? null,
+    fillOpacity: operator?.fillOpacity ?? null,
+    strokeOpacity: operator?.strokeOpacity ?? null,
   };
 }
 

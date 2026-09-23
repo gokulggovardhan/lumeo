@@ -7,8 +7,10 @@ import {
   type PdfTextSourceMatch,
 } from "../lib/pdf/edit/documentModel.ts";
 import {
+  buildPdfTextSearchPageIndex,
   nextSearchMatchIndex,
   replacementTextForSearchMatch,
+  searchPdfDocumentIndex,
   searchPdfDocumentText,
   searchPdfPageText,
 } from "../lib/pdf/edit/textSearch.ts";
@@ -136,4 +138,20 @@ test("search-only page models remain searchable but refuse replacement preparati
   assert.ok(matchResult);
   assert.equal(matchResult.capability, "view-only");
   assert.equal(replacementTextForSearchMatch(page, matchResult, "Find"), null);
+});
+
+
+test("compact document index preserves search geometry without retaining full page analysis", () => {
+  const page = pageModel();
+  const index = buildPdfTextSearchPageIndex(page);
+  assert.equal(index.pageIndex, page.pageIndex);
+  assert.equal(index.lines.length, page.lines.length);
+  assert.equal("blocks" in index, false);
+  assert.equal("boundsPt" in index.lines[0].spans[0], false);
+  assert.equal("fontProfile" in index.lines[0].spans[0], false);
+
+  const matches = searchPdfDocumentIndex([index], "employee record");
+  assert.equal(matches.length, 1);
+  assert.deepEqual(matches[0].sourceRunIndices, [0, 1]);
+  assert.deepEqual(matches[0].boundsPct, searchPdfPageText(page, "employee record")[0].boundsPct);
 });
