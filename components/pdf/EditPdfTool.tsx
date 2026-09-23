@@ -83,6 +83,12 @@ import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import { reconstructFragmentedRun, type FragmentedRunReconstruction } from "@/lib/pdf/edit/fragmentedRun";
 import {
+  buildNativePaintPlan,
+  describeNativeFillColorCapability,
+  paintColorFromCssHex,
+  type NativePaintPlan,
+} from "@/lib/pdf/edit/nativePaint";
+import {
   appendPdfEditOperations,
   createPdfEditSession,
   deriveElementOperations,
@@ -139,6 +145,7 @@ type NativeTextStyleDraft = {
   charSpacing: number;
   wordSpacing: number;
   horizontalScalingPct: number;
+  fillColorHex: string | null;
 };
 
 // Phase 9.2: the combined undo/redo snapshot -- reusing lib/sign/
@@ -2126,6 +2133,34 @@ export default function EditPdfTool() {
     selectedRunIndices.length === 1
       ? pageTextModel?.spans[selectedRunIndices[0]] ?? null
       : null;
+  const selectedNativeRunMatch =
+    selectedRunIndices.length === 1
+      ? runMatches[selectedRunIndices[0]] ?? null
+      : null;
+  const nativeFillCapability = useMemo(
+    () =>
+      selectedNativeRunMatch
+        ? describeNativeFillColorCapability(selectedNativeRunMatch.operator)
+        : null,
+    [selectedNativeRunMatch],
+  );
+  const nativePaintPlan = useMemo<NativePaintPlan | null>(() => {
+    if (
+      !selectedNativeSpan ||
+      !selectedNativeRunMatch ||
+      !nativeFillCapability?.editable ||
+      nativeStyleDraft?.spanId !== selectedNativeSpan.id ||
+      !nativeStyleDraft.fillColorHex
+    ) {
+      return null;
+    }
+    const sourceHex = nativeFillCapability.sourceColor?.cssHex;
+    if (sourceHex?.toLowerCase() === nativeStyleDraft.fillColorHex.toLowerCase()) return null;
+    const requested = paintColorFromCssHex(nativeStyleDraft.fillColorHex);
+    return requested
+      ? buildNativePaintPlan(selectedNativeRunMatch.operator, { fillColor: requested })
+      : null;
+  }, [selectedNativeSpan, selectedNativeRunMatch, nativeFillCapability, nativeStyleDraft]);
 
   const nativeStyleOverride = useMemo(() => {
     if (!selectedNativeSpan || nativeStyleDraft?.spanId !== selectedNativeSpan.id) return null;
@@ -2343,7 +2378,10 @@ export default function EditPdfTool() {
     try {
       if (editPreview.kind === "single") {
         const { plan, resolvedFont, locatedOperator } = editPreview;
-        await engine.applyEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode, { isolate: locatedOperator.locator.kind === "xobject" });
+        await engine.applyEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode, {
+          isolate: locatedOperator.locator.kind === "xobject",
+          nativePaintPlan: nativePaintPlan?.editable ? nativePaintPlan : undefined,
+        });
       } else {
         const { plan, resolvedFont } = editPreview;
         await engine.applyMultiRunEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode);
@@ -2382,7 +2420,7 @@ export default function EditPdfTool() {
           );
         }
 
-        if (plan.replacementTextState) {
+        if (plan.replacementTextState || nativePaintPlan?.editable) {
           const beforeStyle: PdfEditTextStyle = {
             fontFamily: selectedNativeSpan?.style.fontFamily,
             fontSizePt: plan.fontSizePt,
@@ -2391,13 +2429,17 @@ export default function EditPdfTool() {
             charSpacingPt: plan.charSpacing,
             wordSpacingPt: plan.wordSpacing,
             horizontalScalingPct: plan.horizontalScalingPct,
+            color: selectedNativeSpan?.style.fillColor?.cssHex ?? undefined,
           };
           const afterStyle: PdfEditTextStyle = {
             ...beforeStyle,
-            fontSizePt: plan.replacementTextState.fontSizePt,
-            charSpacingPt: plan.replacementTextState.charSpacing,
-            wordSpacingPt: plan.replacementTextState.wordSpacing,
-            horizontalScalingPct: plan.replacementTextState.horizontalScalingPct,
+            fontSizePt: plan.replacementTextState?.fontSizePt ?? beforeStyle.fontSizePt,
+            charSpacingPt: plan.replacementTextState?.charSpacing ?? beforeStyle.charSpacingPt,
+            wordSpacingPt: plan.replacementTextState?.wordSpacing ?? beforeStyle.wordSpacingPt,
+            horizontalScalingPct: plan.replacementTextState?.horizontalScalingPct ?? beforeStyle.horizontalScalingPct,
+            color: nativePaintPlan?.editable
+              ? nativePaintPlan.override.fillColor?.cssHex ?? beforeStyle.color
+              : beforeStyle.color,
           };
           semanticOperations.push(nativeTextStyleOperation({ target, before: beforeStyle, after: afterStyle }));
         }
@@ -2434,7 +2476,7 @@ export default function EditPdfTool() {
     } finally {
       setIsApplyingEdit(false);
     }
-  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan]);
+  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan, nativePaintPlan]);
 
   // Restyle covers a run with a whiteout and drops an editable text box in
   // its place. The whiteout hides the original glyphs, but hiding is not
@@ -2809,6 +2851,7 @@ export default function EditPdfTool() {
   // Apply buttons can never disagree about when they're enabled.
   const nativeStyleChanged =
     editPreview.kind === "single" && Boolean(editPreview.plan.replacementTextState);
+  const nativePaintChanged = Boolean(nativePaintPlan?.editable);
   const textDraftChanged =
     editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
   const canApplyEdit =
@@ -2816,7 +2859,7 @@ export default function EditPdfTool() {
     editPreview.kind !== "empty" &&
     editPreview.editable &&
     (replacementLayoutDecision?.safeToApplyWithCurrentWriter ?? true) &&
-    (textDraftChanged || nativeStyleChanged);
+    (textDraftChanged || nativeStyleChanged || nativePaintChanged);
   // Phase 11: looked up once and reused throughout the inline on-page editor
   // JSX below, instead of repeatedly indexing detectedTextRuns/runMatches by
   // selectedRunIndices[0] at each use site.
@@ -3513,7 +3556,7 @@ export default function EditPdfTool() {
                           }
                         }}
                         aria-label="Edit text"
-                        data-native-fill-color={singleSelectedSpan?.style.fillColor?.cssHex ?? undefined}
+                        data-native-fill-color={activeNativeStyleDraft?.fillColorHex ?? singleSelectedSpan?.style.fillColor?.cssHex ?? undefined}
                         data-native-fill-opacity={singleSelectedSpan?.style.fillOpacity ?? undefined}
                         // lumeo-page-overlay-input opts out of the app-chrome
                         // input styling in globals.css, whose themed
@@ -3540,7 +3583,7 @@ export default function EditPdfTool() {
                           fontWeight: singleSelectedSpan?.style.weight ?? 600,
                           fontStyle: singleSelectedSpan?.style.italic ? "italic" : "normal",
                           color: cssTextPaint(
-                            singleSelectedSpan?.style.fillColor?.cssHex,
+                            activeNativeStyleDraft?.fillColorHex ?? singleSelectedSpan?.style.fillColor?.cssHex,
                             singleSelectedSpan?.style.fillOpacity,
                           ),
                           letterSpacing:
@@ -3612,6 +3655,9 @@ export default function EditPdfTool() {
                                 charSpacing: singleSelectedSpan.style.charSpacingPt,
                                 wordSpacing: singleSelectedSpan.style.wordSpacingPt,
                                 horizontalScalingPct: singleSelectedSpan.style.horizontalScalingPct,
+                                fillColorHex: nativeFillCapability?.editable
+                                  ? nativeFillCapability.sourceColor?.cssHex ?? null
+                                  : null,
                               });
                               setNativeFormatOpen(true);
                             }
@@ -3626,10 +3672,10 @@ export default function EditPdfTool() {
                         >
                           Format
                         </button>
-                        {/* Restyle is now the fallback for appearance changes
-                            the native writer cannot yet prove safe (font-face
-                            substitution, colour and alignment), not the normal
-                            path for size/spacing changes. */}
+                        {/* Restyle remains the fallback for appearance changes
+                            the native writer cannot prove safe (font-face,
+                            unsupported paint states and alignment), not the normal
+                            path for supported native formatting. */}
                         <button
                           type="button"
                           onClick={(event) => {
@@ -3637,7 +3683,7 @@ export default function EditPdfTool() {
                             void restyleSelectedRun();
                           }}
                           aria-label="Restyle this text"
-                          title="Restyle -- use a replacement text box for font-face, colour or other appearance changes that cannot be applied safely in place"
+                          title="Restyle -- use a replacement text box for font-face or other appearance changes that cannot be applied safely in place"
                           className="grid h-9 shrink-0 place-items-center rounded-full border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-3 text-[10px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/70 shadow-lg transition hover:border-[var(--text-primary)]/24 hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
                         >
                           Restyle
@@ -3671,6 +3717,50 @@ export default function EditPdfTool() {
                                 </span>
                               ) : null}
                             </div>
+                          </div>
+
+                          <div className="mt-3 rounded-lg border border-[var(--text-primary)]/10 p-2.5">
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/45">Fill colour</span>
+                              {nativeFillCapability?.sourceColor ? (
+                                <span className="rounded-full border border-[var(--text-primary)]/12 px-2 py-0.5 text-[9px] font-semibold text-[var(--text-primary)]/60">
+                                  {nativeFillCapability.sourceColor.colorSpace === "DeviceGray"
+                                    ? "Gray"
+                                    : nativeFillCapability.sourceColor.colorSpace === "DeviceRGB"
+                                      ? "RGB"
+                                      : "CMYK"}
+                                </span>
+                              ) : null}
+                            </div>
+                            {nativeFillCapability?.editable && nativeStyleDraft.fillColorHex ? (
+                              <label className="mt-2 flex items-center gap-2">
+                                <input
+                                  aria-label="Native fill colour"
+                                  type="color"
+                                  value={nativeStyleDraft.fillColorHex}
+                                  onChange={(event) => {
+                                    const value = event.currentTarget.value.toLowerCase();
+                                    setNativeStyleDraft((current) => current ? { ...current, fillColorHex: value } : current);
+                                    setEditApplyError("");
+                                  }}
+                                  className="h-9 w-12 cursor-pointer rounded-md border border-[var(--text-primary)]/14 bg-transparent p-1"
+                                />
+                                <code data-native-fill-value className="text-[10px] font-semibold text-[var(--text-primary)]/70">
+                                  {nativeStyleDraft.fillColorHex}
+                                </code>
+                              </label>
+                            ) : (
+                              <div data-native-fill-limited className="mt-2 grid gap-1 text-[9px] leading-4 text-[var(--text-primary)]/58">
+                                <div className="font-semibold text-[var(--text-primary)]/72">
+                                  {nativeFillCapability?.sourceColor?.colorSpace === "DeviceCMYK"
+                                    ? `CMYK ${nativeFillCapability.sourceColor.components.map((value) => Number(value.toFixed(4))).join(" ")}`
+                                    : nativeFillCapability?.sourceColor
+                                      ? `${nativeFillCapability.sourceColor.colorSpace} ${nativeFillCapability.sourceColor.cssHex ?? "native paint"}`
+                                      : "Unknown native fill"}
+                                </div>
+                                <div>{nativeFillCapability?.reason ?? "This selection does not expose a proven editable native fill colour."}</div>
+                              </div>
+                            )}
                           </div>
 
                           <div className="mt-3 grid grid-cols-2 gap-2">
@@ -3738,7 +3828,7 @@ export default function EditPdfTool() {
 
                           <div className="mt-3 flex items-center justify-between gap-3">
                             <p className="text-[9px] leading-4 text-[var(--text-primary)]/48">
-                              Font face, weight, italic, colour and alignment stay inherited until Lumeo can restore those PDF graphics states exactly.
+                              Font face, weight, italic and alignment stay inherited. Fill colour is editable only when the native PDF paint state can be restored exactly.
                             </p>
                             <button
                               type="button"
@@ -3749,6 +3839,9 @@ export default function EditPdfTool() {
                                   charSpacing: singleSelectedSpan.style.charSpacingPt,
                                   wordSpacing: singleSelectedSpan.style.wordSpacingPt,
                                   horizontalScalingPct: singleSelectedSpan.style.horizontalScalingPct,
+                                  fillColorHex: nativeFillCapability?.editable
+                                    ? nativeFillCapability.sourceColor?.cssHex ?? null
+                                    : null,
                                 })
                               }
                               className="shrink-0 rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/65 hover:text-[var(--text-primary)]"

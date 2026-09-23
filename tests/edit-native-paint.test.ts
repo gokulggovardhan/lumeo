@@ -3,6 +3,7 @@ import test from "node:test";
 import type { PdfPaintColor } from "../lib/pdf/edit/contentStream.ts";
 import {
   buildNativePaintPlan,
+  describeNativeFillColorCapability,
   paintColorFromCssHex,
   paintOperator,
   paintChannelsForRenderingMode,
@@ -141,4 +142,45 @@ test("alpha remains untouched by colour-only planning", () => {
   assert.equal(plan.wrapper.prefix, "1 0 0 rg");
   assert.equal(plan.wrapper.suffix, "0 0 1 rg");
   assert.equal("fillOpacity" in plan.override, false);
+});
+
+
+test("native fill capability enables exact Gray and RGB picker states", () => {
+  const gray = describeNativeFillColorCapability(operator({ fillColor: black }));
+  assert.equal(gray.editable, true);
+  assert.equal(gray.sourceColor?.colorSpace, "DeviceGray");
+  assert.equal(gray.sourceColor?.cssHex, "#000000");
+
+  const rgb = describeNativeFillColorCapability(operator({ fillColor: blue }));
+  assert.equal(rgb.editable, true);
+  assert.equal(rgb.sourceColor?.colorSpace, "DeviceRGB");
+  assert.equal(rgb.sourceColor?.cssHex, "#0000ff");
+});
+
+test("native fill capability reports CMYK exactly without inventing RGB", () => {
+  const capability = describeNativeFillColorCapability(operator({ fillColor: cmyk }));
+  assert.equal(capability.editable, false);
+  assert.deepEqual(capability.sourceColor, cmyk);
+  assert.equal(capability.sourceColor?.cssHex, null);
+  assert.match(capability.reason ?? "", /does not guess-convert CMYK to RGB/i);
+});
+
+test("native fill capability blocks unknown, stroke-only, invisible and clipping paint", () => {
+  const unknown = describeNativeFillColorCapability(operator({ fillColor: null }));
+  assert.equal(unknown.editable, false);
+  assert.match(unknown.reason ?? "", /unknown/i);
+
+  const strokeOnly = describeNativeFillColorCapability(operator({ renderMode: 1 }));
+  assert.equal(strokeOnly.editable, false);
+  assert.match(strokeOnly.reason ?? "", /stroke-only/i);
+
+  const invisible = describeNativeFillColorCapability(operator({ renderMode: 3 }));
+  assert.equal(invisible.editable, false);
+  assert.match(invisible.reason ?? "", /invisible/i);
+
+  for (const renderMode of [4, 5, 6, 7]) {
+    const clipping = describeNativeFillColorCapability(operator({ renderMode }));
+    assert.equal(clipping.editable, false);
+    assert.match(clipping.reason ?? "", /clipping path/i);
+  }
 });
