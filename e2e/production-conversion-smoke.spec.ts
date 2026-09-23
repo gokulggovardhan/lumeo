@@ -121,6 +121,17 @@ function isRecoveredPdfWorkerBootstrapFailure(
   return isBundledPdfWorker && successfulResponseUrls.has(failure.url);
 }
 
+function isExpectedAnalyticsNavigationAbort(failure: FailedRequest): boolean {
+  if (failure.method !== "POST") return false;
+
+  const url = new URL(failure.url);
+  if (url.pathname !== "/rest/v1/rpc/record_public_analytics_event") return false;
+
+  return /(?:Load request cancelled|NS_BINDING_ABORTED|net::ERR_ABORTED)/i.test(
+    failure.errorText,
+  );
+}
+
 function expectCleanRuntime(watch: RuntimeWatch) {
   expect(watch.pageErrors).toEqual([]);
   const unrecoveredFailures = watch.failedRequests.filter(
@@ -128,7 +139,7 @@ function expectCleanRuntime(watch: RuntimeWatch) {
       !isRecoveredPdfWorkerBootstrapFailure(
         failure,
         watch.successfulResponseUrls,
-      ),
+      ) && !isExpectedAnalyticsNavigationAbort(failure),
   );
   expect(
     unrecoveredFailures.map(

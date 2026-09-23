@@ -36,7 +36,7 @@ test("buildHtml2PdfOptions maps page size, orientation, and margin correctly", (
   assert.equal(options.image.type, "jpeg");
 });
 
-test("buildHtml2PdfOptions passes explicit width/height to html2canvas instead of relying on viewport auto-detection", () => {
+test("buildHtml2PdfOptions pins page width but lets the cloned document determine its reflowed height", () => {
   const options = buildHtml2PdfOptions({
     fileName: "lumeo-html.pdf",
     pageSize: "a4",
@@ -46,9 +46,9 @@ test("buildHtml2PdfOptions passes explicit width/height to html2canvas instead o
     contentHeightPx: 1200,
   });
   assert.equal(options.html2canvas.width, 794);
-  assert.equal(options.html2canvas.height, 1200);
   assert.equal(options.html2canvas.windowWidth, 794);
-  assert.equal(options.html2canvas.windowHeight, 1200);
+  assert.equal("height" in options.html2canvas, false);
+  assert.equal("windowHeight" in options.html2canvas, false);
 });
 
 test("buildHtml2PdfOptions enables CSS-aware page-break slicing", () => {

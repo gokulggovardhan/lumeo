@@ -15,9 +15,7 @@ export interface Html2PdfOptions {
     useCORS: boolean;
     backgroundColor: string;
     width: number;
-    height: number;
     windowWidth: number;
-    windowHeight: number;
   };
   jsPDF: {
     unit: string;
@@ -71,25 +69,24 @@ export function buildHtml2PdfOptions(options: {
     filename: options.fileName,
     margin: MARGIN_MM[options.margin],
     image: { type: "jpeg", quality: 0.95 },
-    // width/height/windowWidth/windowHeight are passed explicitly rather
-    // than left for html2canvas to auto-detect from the source element's
-    // iframe viewport -- an off-screen iframe's viewport can still report
-    // its pre-resize height at capture time (a real, observed cross-frame
-    // layout timing gap), silently producing a zero-height, blank capture.
+    // Width stays explicit so the hidden export surface maps to the physical
+    // PDF page width. Height deliberately remains automatic: html2pdf.js
+    // clones and reflows the source into its own page-width container before
+    // html2canvas captures it. Pinning that clone to a height measured before
+    // the reflow can clip long documents in WebKit/Safari to a single page.
+    // The current export surface is same-document Shadow DOM, so the older
+    // cross-iframe height workaround is no longer needed.
     html2canvas: {
       scale: 2,
       useCORS: true,
       backgroundColor: "#ffffff",
       width: options.contentWidthPx,
-      height: options.contentHeightPx,
       windowWidth: options.contentWidthPx,
-      windowHeight: options.contentHeightPx,
     },
     jsPDF: { unit: "mm", format: options.pageSize, orientation: options.orientation },
     // "css" mode makes html2pdf.js honor page-break-before/after/inside
     // rules in the source HTML when slicing the captured canvas into pages;
-    // without it, only fixed-page-height ("legacy") slicing is applied and
-    // an explicit forced page break in the user's CSS is ignored.
+    // "legacy" keeps fixed-page-height slicing as a fallback for long flow.
     pagebreak: { mode: ["css", "legacy"] },
   };
 }
