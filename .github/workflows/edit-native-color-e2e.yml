@@ -29,7 +29,9 @@ jobs:
       - run: npm ci
 
       - name: Apply browser regression patch
-        run: python3 .github/scripts/patch-native-color-e2e.py
+        run: |
+          python3 .github/scripts/patch-native-color-e2e.py
+          python3 .github/scripts/fix-native-color-e2e-input.py
 
       - name: Static validation
         run: |
@@ -97,7 +99,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/scripts/patch-native-color-e2e.py .github/workflows/edit-native-color-e2e.yml
+          git rm .github/scripts/patch-native-color-e2e.py .github/scripts/fix-native-color-e2e-input.py .github/workflows/edit-native-color-e2e.yml
           git add e2e/edit-vinext.spec.ts
           git diff --cached --check
           git status --short
