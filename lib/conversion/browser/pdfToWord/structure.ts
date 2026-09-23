@@ -153,7 +153,7 @@ export function inferRegularTableEvidence(
   );
   if (allRows.length < 3) return null;
 
-  const { columnCount, occurrences } = modalColumnCount(allRows);
+  const { columnCount } = modalColumnCount(allRows);
   if (columnCount < 2 || columnCount > 10) return null;
 
   const rows = allRows.filter((row) => row.indices.length === columnCount);
