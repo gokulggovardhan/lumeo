@@ -8,6 +8,26 @@ import {
 } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 
+import {
+  assertPdfAnchorFidelity,
+  assertPdfLineAnchorFidelity,
+  assertRenderedPdfSimilarity,
+  countPdfImages,
+  renderDocxWithLibreOffice,
+  writePdfFixture,
+} from "./conversion-fidelity-helpers";
+import {
+  frameXForText,
+  makeFixedLayoutInvoicePdf,
+} from "./fixed-layout-pdf-fixture";
+import { makeProfessionalDocx } from "./professional-docx-fixture";
+import { makeAdvancedLayoutDocx } from "./advanced-word-docx-fixture";
+import {
+  makeSemanticLetterPdf,
+  makeTwoColumnReportPdf,
+  makeWhitespaceStatementPdf,
+} from "./semantic-pdf-fixtures";
+
 const ONE_PIXEL_PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFElEQVR4nGP8z8Dwn4GBgYGJAQoAHxcCAk+Uzr4AAAAASUVORK5CYII=",
   "base64",
@@ -210,6 +230,8 @@ async function makePdf({
   return Buffer.from(await pdf.save());
 }
 
+
+
 async function downloadBytes(download: Download) {
   const path = await download.path();
   if (!path) throw new Error("Playwright download has no local path.");
@@ -311,6 +333,368 @@ test.describe("browser conversion validation lab", () => {
     await validateDocxDownload(bytes, "Lumeo page 2");
   });
 
+
+  test("PDF to Word preserves invoice and AMC column geometry as independent editable runs", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    const pdf = await makeFixedLayoutInvoicePdf();
+
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "synthetic-fixed-layout-invoice.pdf",
+      mimeType: "application/pdf",
+      buffer: pdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const docx = await validateDocxDownload(bytes, "ITEM-A101");
+    const documentXml = await docx.file("word/document.xml")!.async("string");
+
+    for (const expected of [
+      "Cleaning fluid 50 ml",
+      "ITEM-B202",
+      "ITEM-C303",
+      "SYNTHETIC LUBRICANT 1200 ML",
+      "Parts Total",
+      "Labour Total",
+      "Grand Total",
+      "Amc No.",
+      "Valid Till",
+      "Water wash",
+      "Co check",
+      "Pick up &amp; drop",
+      "Authorised Signatory",
+      "Long service description",
+      "continues on a second line",
+      "Unicode café résumé €",
+      "Serif text validates mixed-family metrics.",
+    ]) {
+      expect(documentXml).toContain(expected);
+    }
+
+    expect(documentXml).not.toContain(
+      "Service Water wash Co check chain Pick up &amp; drop",
+    );
+    expect(documentXml).not.toContain(
+      "ITEM-A101 Cleaning fluid 50 ml 1.00 83.90",
+    );
+
+    expect(frameXForText(documentXml, "ITEM-A101")).toBeLessThan(
+      frameXForText(documentXml, "Cleaning fluid 50 ml"),
+    );
+    expect(frameXForText(documentXml, "Cleaning fluid 50 ml")).toBeLessThan(
+      frameXForText(documentXml, "1.00"),
+    );
+    expect(frameXForText(documentXml, "Amc No.")).toBeLessThan(
+      frameXForText(documentXml, "Valid Till"),
+    );
+    expect(frameXForText(documentXml, "Valid Till")).toBeLessThan(
+      frameXForText(documentXml, "Service"),
+    );
+    expect(frameXForText(documentXml, "Service")).toBeLessThan(
+      frameXForText(documentXml, "Water wash"),
+    );
+    expect(frameXForText(documentXml, "Water wash")).toBeLessThan(
+      frameXForText(documentXml, "Co check"),
+    );
+
+    expect(docx.file("word/media/page-1.jpg")).toBeTruthy();
+    expect(docx.file("word/media/page-2.jpg")).toBeTruthy();
+    expect(documentXml).not.toContain("<w:shd ");
+    expect(documentXml).toContain('<w:color w:val="0000ED"');
+    expect(documentXml).toContain('<w:u w:val="single"');
+    expect(documentXml).toContain("<w:w w:val=");
+    expect(documentXml).toContain('w:lineRule="exact"');
+    expect(documentXml).not.toContain("ROTATED NOTE");
+
+    const relationships = await docx
+      .file("word/_rels/document.xml.rels")
+      ?.async("string");
+    expect(relationships).toContain(
+      "https://example.com/fidelity",
+    );
+    expect(relationships).toContain(
+      "relationships/hyperlink",
+    );
+
+    if (
+      browserName === "chromium" &&
+      process.env.LUMEO_FIDELITY_CLI === "1"
+    ) {
+      const outputDirectory = testInfo.outputPath("pdf-to-word-fidelity");
+      const sourcePdf = await writePdfFixture(
+        pdf,
+        outputDirectory,
+        "synthetic-invoice-source",
+      );
+      const reconstructedPdf = await renderDocxWithLibreOffice(
+        bytes,
+        outputDirectory,
+        "synthetic-invoice-current",
+      );
+
+      await assertPdfAnchorFidelity(
+        sourcePdf,
+        reconstructedPdf,
+        outputDirectory,
+        [
+          { page: 1, text: "ITEM-A101" },
+          { page: 1, text: "ITEM-B202" },
+          { page: 1, text: "ITEM-C303" },
+          { page: 1, text: "1842.75" },
+          { page: 2, text: "AMC9007" },
+          { page: 2, text: "1843.00" },
+          { page: 2, text: "Authorised" },
+          { page: 2, text: "Signatory" },
+        ],
+        0.03,
+      );
+      await assertRenderedPdfSimilarity(sourcePdf, reconstructedPdf, {
+        maxMae: 20,
+        maxChanged: 0.22,
+      });
+    }
+  });
+
+  test("PDF to Word emits normal editable paragraphs for semantic letter content", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    const pdf = await makeSemanticLetterPdf();
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "semantic-professional-letter.pdf",
+      mimeType: "application/pdf",
+      buffer: pdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const docx = await validateDocxDownload(
+      bytes,
+      "This document exercises normal paragraph reconstruction",
+    );
+    const documentXml = await docx.file("word/document.xml")!.async("string");
+    const relationships = await docx
+      .file("word/_rels/document.xml.rels")
+      ?.async("string");
+
+    const marker =
+      "This document exercises normal paragraph reconstruction";
+    const textIndex = documentXml.indexOf(marker);
+    expect(textIndex).toBeGreaterThan(0);
+    const paragraphStart = documentXml.lastIndexOf("<w:p>", textIndex);
+    const paragraphEnd = documentXml.indexOf("</w:p>", textIndex);
+    const bodyParagraph = documentXml.slice(paragraphStart, paragraphEnd + 6);
+
+    expect(bodyParagraph).toContain("<w:br/>");
+    expect(bodyParagraph).not.toContain("w:framePr");
+    expect(bodyParagraph).not.toContain("w:fitText");
+    expect(bodyParagraph).toContain(
+      "The second visual line continues the same paragraph with stable spacing, baseline placement and selectable text.",
+    );
+    expect(relationships).toContain(
+      "https://example.com/semantic-letter",
+    );
+    expect(relationships).toContain("relationships/hyperlink");
+
+    if (
+      browserName === "chromium" &&
+      process.env.LUMEO_FIDELITY_CLI === "1"
+    ) {
+      const outputDirectory = testInfo.outputPath("semantic-letter-fidelity");
+      const sourcePdf = await writePdfFixture(
+        pdf,
+        outputDirectory,
+        "semantic-letter-source",
+      );
+      const reconstructedPdf = await renderDocxWithLibreOffice(
+        bytes,
+        outputDirectory,
+        "semantic-letter-current",
+      );
+      await assertPdfLineAnchorFidelity(
+        sourcePdf,
+        reconstructedPdf,
+        outputDirectory,
+        [
+          { page: 1, contains: "Lumeo Professional Letter" },
+          { page: 1, contains: "This document exercises" },
+          { page: 1, contains: "The second visual line" },
+          { page: 1, contains: "A separate paragraph follows" },
+          { page: 1, contains: "Kind regards" },
+        ],
+        0.03,
+      );
+      await assertRenderedPdfSimilarity(sourcePdf, reconstructedPdf, {
+        maxMae: 20,
+        maxChanged: 0.22,
+      });
+    }
+  });
+
+  test("PDF to Word emits a real Word table only for high-confidence whitespace statements", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    const pdf = await makeWhitespaceStatementPdf();
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "synthetic-whitespace-statement.pdf",
+      mimeType: "application/pdf",
+      buffer: pdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const docx = await validateDocxDownload(bytes, "Monthly service");
+    const documentXml = await docx.file("word/document.xml")!.async("string");
+
+    expect(documentXml).toContain("<w:tbl>");
+    expect(documentXml).toContain('<w:tblLayout w:type="fixed"/>');
+    expect(documentXml).toContain('w:vertAnchor="page"');
+    expect(documentXml).toContain("Priority support");
+    expect(documentXml).toContain("205.00");
+    expect(documentXml).toContain('<w:jc w:val="right"/>');
+
+    const tableStart = documentXml.indexOf("<w:tbl>");
+    const tableEnd = documentXml.indexOf("</w:tbl>", tableStart);
+    const tableXml = documentXml.slice(tableStart, tableEnd + 8);
+    expect(tableXml).not.toContain("w:framePr");
+
+    if (
+      browserName === "chromium" &&
+      process.env.LUMEO_FIDELITY_CLI === "1"
+    ) {
+      const outputDirectory = testInfo.outputPath("semantic-table-fidelity");
+      const sourcePdf = await writePdfFixture(
+        pdf,
+        outputDirectory,
+        "statement-source",
+      );
+      const reconstructedPdf = await renderDocxWithLibreOffice(
+        bytes,
+        outputDirectory,
+        "statement-current",
+      );
+      await assertPdfLineAnchorFidelity(
+        sourcePdf,
+        reconstructedPdf,
+        outputDirectory,
+        [
+          { page: 1, contains: "Account activity statement" },
+          { page: 1, contains: "Description" },
+          { page: 1, contains: "Monthly service" },
+          { page: 1, contains: "Priority support" },
+          { page: 1, contains: "205.00", horizontal: "right" },
+        ],
+        0.03,
+      );
+      await assertRenderedPdfSimilarity(sourcePdf, reconstructedPdf, {
+        maxMae: 20,
+        maxChanged: 0.22,
+      });
+    }
+  });
+
+  test("PDF to Word keeps two-column prose independent instead of inventing a table", async ({
+    page,
+  }) => {
+    const pdf = await makeTwoColumnReportPdf();
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "two-column-report.pdf",
+      mimeType: "application/pdf",
+      buffer: pdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const docx = await validateDocxDownload(
+      bytes,
+      "Left column introduces the first topic.",
+    );
+    const documentXml = await docx.file("word/document.xml")!.async("string");
+
+    expect(documentXml).not.toContain("<w:tbl>");
+    expect(documentXml).toContain("w:framePr");
+    expect(documentXml).toContain("Left column introduces the first topic.");
+    expect(documentXml).toContain("Right column begins an independent topic.");
+    expect(frameXForText(documentXml, "Left column introduces the first topic."))
+      .toBeLessThan(
+        frameXForText(documentXml, "Right column begins an independent topic."),
+      );
+  });
+
+  test("PDF to Word remains stable across ten sequential conversions and Unicode filenames", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "Sequential stress is exercised once in Chromium; WebKit and Firefox run the functional corpus.",
+    );
+
+    for (let index = 0; index < 10; index += 1) {
+      const pdf = await makePdf({ pages: index % 3 === 0 ? 2 : 1 });
+      const name =
+        index === 4
+          ? "invoice résumé 日本語 04.pdf"
+          : index === 7
+            ? "duplicate name.pdf"
+            : index === 8
+              ? "duplicate name.pdf"
+              : `sequential conversion ${index + 1}.pdf`;
+
+      await page.getByTestId("pdf-input").setInputFiles({
+        name,
+        mimeType: "application/pdf",
+        buffer: pdf,
+      });
+      await page.getByTestId("pdf-convert").click();
+      await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+        "data-state",
+        "success",
+        { timeout: 120_000 },
+      );
+
+      const downloadPromise = page.waitForEvent("download");
+      await page.getByTestId("pdf-download").click();
+      const bytes = await downloadBytes(await downloadPromise);
+      await validateDocxDownload(
+        bytes,
+        "Lumeo editable PDF reconstruction fixture",
+      );
+    }
+  });
+
   test("PDF to Word cancellation cleans up and permits retry", async ({ page }) => {
     const slowPdf = await makePdf({ rich: true, pages: 90 });
 
@@ -365,7 +749,7 @@ test.describe("browser conversion validation lab", () => {
   test("Word to PDF converts small and rich DOCX and generated PDFs really open", async ({
     page,
     browserName,
-  }) => {
+  }, testInfo) => {
     test.skip(browserName !== "chromium", "LibreOffice WASM validation runs once in Chromium.");
 
     await expect(page.getByTestId("capabilities")).toContainText(
@@ -413,6 +797,483 @@ test.describe("browser conversion validation lab", () => {
     bytes = await downloadBytes(await downloadPromise);
     const pdf = await PDFDocument.load(bytes);
     expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
+
+    if (process.env.LUMEO_FIDELITY_CLI === "1") {
+      const outputDirectory = testInfo.outputPath("word-to-pdf-fidelity");
+      const referencePdf = await renderDocxWithLibreOffice(
+        rich,
+        outputDirectory,
+        "rich-word-reference",
+      );
+      const browserPdf = await writePdfFixture(
+        bytes,
+        outputDirectory,
+        "rich-word-browser",
+      );
+
+      await assertPdfLineAnchorFidelity(
+        referencePdf,
+        browserPdf,
+        outputDirectory,
+        [
+          { page: 1, contains: "Lumeo formatted heading" },
+          { page: 1, contains: "Table A1" },
+          { page: 1, contains: "Table B2" },
+          {
+            page: 2,
+            contains: "Lumeo second page centered text",
+            horizontal: "center",
+          },
+        ],
+        0.025,
+      );
+      const [referenceImages, browserImages] = await Promise.all([
+        countPdfImages(referencePdf),
+        countPdfImages(browserPdf),
+      ]);
+      expect(referenceImages).toBeGreaterThan(0);
+      expect(browserImages).toBeGreaterThanOrEqual(referenceImages);
+      await assertRenderedPdfSimilarity(referencePdf, browserPdf, {
+        maxMae: 18,
+        maxChanged: 0.20,
+      });
+    }
+  });
+
+
+
+  test("Word to PDF preserves professional formatting against native LibreOffice reference", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    test.skip(
+      browserName !== "chromium",
+      "Professional Office fidelity comparison runs once in Chromium.",
+    );
+
+    await expect(page.getByTestId("capabilities")).toContainText(
+      "Threads ready: yes",
+      { timeout: 30_000 },
+    );
+
+    const source = await makeProfessionalDocx();
+    await page.getByTestId("word-input").setInputFiles({
+      name: "professional-fidelity-fixture.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: source,
+    });
+    await page.getByTestId("word-convert").click();
+    await expect(page.getByTestId("word-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 420_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("word-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const generated = await PDFDocument.load(bytes);
+    expect(generated.getPageCount()).toBe(2);
+
+    if (process.env.LUMEO_FIDELITY_CLI === "1") {
+      const outputDirectory = testInfo.outputPath("professional-word-fidelity");
+      const referencePdf = await renderDocxWithLibreOffice(
+        source,
+        outputDirectory,
+        "professional-reference",
+      );
+      const browserPdf = await writePdfFixture(
+        bytes,
+        outputDirectory,
+        "professional-browser",
+      );
+
+      await assertPdfLineAnchorFidelity(
+        referencePdf,
+        browserPdf,
+        outputDirectory,
+        [
+          {
+            page: 1,
+            contains: "Lumeo Professional Header",
+            horizontal: "right",
+          },
+          { page: 1, contains: "Professional fidelity fixture" },
+          { page: 1, contains: "Times italic underlined sample" },
+          { page: 1, contains: "Unicode:" },
+          { page: 1, contains: "Merged table heading" },
+          { page: 1, contains: "Table A1" },
+          {
+            page: 1,
+            contains: "Professional Footer",
+            horizontal: "center",
+          },
+          {
+            page: 2,
+            contains: "Lumeo Professional Header",
+            horizontal: "right",
+          },
+          {
+            page: 2,
+            contains: "Landscape section content",
+            horizontal: "center",
+          },
+          { page: 2, contains: "Landscape Table A" },
+          {
+            page: 2,
+            contains: "Professional Footer",
+            horizontal: "center",
+          },
+        ],
+        0.025,
+      );
+
+      const [referenceImages, browserImages] = await Promise.all([
+        countPdfImages(referencePdf),
+        countPdfImages(browserPdf),
+      ]);
+      expect(referenceImages).toBeGreaterThan(0);
+      expect(browserImages).toBeGreaterThanOrEqual(referenceImages);
+
+      await assertRenderedPdfSimilarity(referencePdf, browserPdf, {
+        maxMae: 20,
+        maxChanged: 0.22,
+      });
+    }
+  });
+
+  test("Word to PDF preserves multi-column sections and vector text-box shapes against native reference", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    test.skip(
+      browserName !== "chromium",
+      "Threaded Office fidelity comparison runs once in Chromium.",
+    );
+
+    await expect(page.getByTestId("capabilities")).toContainText(
+      "Threads ready: yes",
+      { timeout: 30_000 },
+    );
+
+    const source = await makeAdvancedLayoutDocx();
+    await page.getByTestId("word-input").setInputFiles({
+      name: "advanced-columns-shape.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: source,
+    });
+    await page.getByTestId("word-convert").click();
+    await expect(page.getByTestId("word-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 420_000 },
+    );
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("word-download").click();
+    const bytes = await downloadBytes(await downloadPromise);
+    const generated = await PDFDocument.load(bytes);
+    expect(generated.getPageCount()).toBe(2);
+
+    if (process.env.LUMEO_FIDELITY_CLI === "1") {
+      const outputDirectory = testInfo.outputPath("advanced-word-layout");
+      const referencePdf = await renderDocxWithLibreOffice(
+        source,
+        outputDirectory,
+        "advanced-reference",
+      );
+      const browserPdf = await writePdfFixture(
+        bytes,
+        outputDirectory,
+        "advanced-browser",
+      );
+
+      await assertPdfLineAnchorFidelity(
+        referencePdf,
+        browserPdf,
+        outputDirectory,
+        [
+          {
+            page: 1,
+            contains: "Advanced multi-column",
+            horizontal: "center",
+          },
+          { page: 1, contains: "First column content begins" },
+          { page: 1, contains: "Second column content begins here" },
+          { page: 1, contains: "Vector text-box shape fixture" },
+          { page: 2, contains: "Second page after columns" },
+          { page: 2, contains: "section break restores ordinary" },
+        ],
+        0.025,
+      );
+      await assertRenderedPdfSimilarity(referencePdf, browserPdf, {
+        maxMae: 18,
+        maxChanged: 0.20,
+      });
+    }
+  });
+
+  test("Word to PDF stays stable across five sequential conversions", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "Threaded Office sequential stress runs once in Chromium.",
+    );
+
+    await expect(page.getByTestId("capabilities")).toContainText(
+      "Threads ready: yes",
+      { timeout: 30_000 },
+    );
+
+    for (let index = 0; index < 5; index += 1) {
+      const source = await makeDocx({ rich: index % 2 === 1 });
+      await page.getByTestId("word-input").setInputFiles({
+        name:
+          index === 2
+            ? "professional résumé 日本語.docx"
+            : `sequential word ${index + 1}.docx`,
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        buffer: source,
+      });
+      await page.getByTestId("word-convert").click();
+      await expect(page.getByTestId("word-lab")).toHaveAttribute(
+        "data-state",
+        "success",
+        { timeout: 420_000 },
+      );
+      const downloadPromise = page.waitForEvent("download");
+      await page.getByTestId("word-download").click();
+      await validatePdfDownload(await downloadBytes(await downloadPromise));
+    }
+  });
+
+  test("browser converters preserve semantic structure through PDF to Word to PDF round trip", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    test.skip(
+      browserName !== "chromium",
+      "Office round-trip validation runs once in Chromium.",
+    );
+
+    const retiredTransport: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      const retiredApi =
+        url.pathname === "/api/tools/word-to-pdf" ||
+        url.pathname === "/api/tools/pdf-to-word" ||
+        url.pathname === "/api/tools/word-to-pdf/cleanup";
+      const storageWrite =
+        url.pathname.startsWith("/storage/v1/") &&
+        request.method() !== "GET";
+      const retiredRender =
+        url.hostname === "lumeo-word-to-pdf-converter.onrender.com";
+      if (retiredApi || storageWrite || retiredRender) {
+        retiredTransport.push(`${request.method()} ${request.url()}`);
+      }
+    });
+
+    const sourcePdf = await makeSemanticLetterPdf();
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "semantic round trip source.pdf",
+      mimeType: "application/pdf",
+      buffer: sourcePdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+
+    let downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const reconstructedWord = await downloadBytes(await downloadPromise);
+    const reconstructedZip = await validateDocxDownload(
+      reconstructedWord,
+      "This document exercises normal paragraph reconstruction",
+    );
+    const reconstructedXml = await reconstructedZip
+      .file("word/document.xml")!
+      .async("string");
+    const semanticMarker =
+      "This document exercises normal paragraph reconstruction";
+    const markerIndex = reconstructedXml.indexOf(semanticMarker);
+    const paragraphStart = reconstructedXml.lastIndexOf("<w:p>", markerIndex);
+    const paragraphEnd = reconstructedXml.indexOf("</w:p>", markerIndex);
+    expect(
+      reconstructedXml.slice(paragraphStart, paragraphEnd + 6),
+    ).not.toContain("w:framePr");
+
+    await page.getByTestId("word-input").setInputFiles({
+      name: "semantic round trip reconstructed.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: reconstructedWord,
+    });
+    await page.getByTestId("word-convert").click();
+    await expect(page.getByTestId("word-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 420_000 },
+    );
+    downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("word-download").click();
+    const roundTripPdf = await downloadBytes(await downloadPromise);
+    await validatePdfDownload(roundTripPdf);
+
+    if (process.env.LUMEO_FIDELITY_CLI === "1") {
+      const outputDirectory = testInfo.outputPath("pdf-word-pdf-roundtrip");
+      const sourcePath = await writePdfFixture(
+        sourcePdf,
+        outputDirectory,
+        "source",
+      );
+      const roundTripPath = await writePdfFixture(
+        roundTripPdf,
+        outputDirectory,
+        "roundtrip",
+      );
+      await assertPdfLineAnchorFidelity(
+        sourcePath,
+        roundTripPath,
+        outputDirectory,
+        [
+          { page: 1, contains: "Lumeo Professional Letter" },
+          { page: 1, contains: "This document exercises" },
+          { page: 1, contains: "The second visual line" },
+          { page: 1, contains: "A separate paragraph follows" },
+          { page: 1, contains: "Kind regards" },
+        ],
+        0.035,
+      );
+      await assertRenderedPdfSimilarity(sourcePath, roundTripPath, {
+        maxMae: 22,
+        maxChanged: 0.25,
+      });
+    }
+
+    expect(retiredTransport).toEqual([]);
+  });
+
+  test("browser converters survive Word to PDF to Word to PDF round trip without retired transport", async ({
+    page,
+    browserName,
+  }, testInfo) => {
+    test.skip(
+      browserName !== "chromium",
+      "Office round-trip validation runs once in Chromium.",
+    );
+
+    const retiredTransport: string[] = [];
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      const retiredApi =
+        url.pathname === "/api/tools/word-to-pdf" ||
+        url.pathname === "/api/tools/pdf-to-word" ||
+        url.pathname === "/api/tools/word-to-pdf/cleanup";
+      const storageWrite =
+        url.pathname.startsWith("/storage/v1/") &&
+        request.method() !== "GET";
+      const retiredRender =
+        url.hostname === "lumeo-word-to-pdf-converter.onrender.com";
+      if (retiredApi || storageWrite || retiredRender) {
+        retiredTransport.push(`${request.method()} ${request.url()}`);
+      }
+    });
+
+    const sourceWord = await makeDocx({ rich: true });
+    await page.getByTestId("word-input").setInputFiles({
+      name: "round trip source.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: sourceWord,
+    });
+    await page.getByTestId("word-convert").click();
+    await expect(page.getByTestId("word-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 420_000 },
+    );
+    let downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("word-download").click();
+    const firstPdf = await downloadBytes(await downloadPromise);
+    await validatePdfDownload(firstPdf);
+
+    await page.getByTestId("pdf-input").setInputFiles({
+      name: "round trip intermediate.pdf",
+      mimeType: "application/pdf",
+      buffer: firstPdf,
+    });
+    await page.getByTestId("pdf-convert").click();
+    await expect(page.getByTestId("pdf-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 180_000 },
+    );
+    downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("pdf-download").click();
+    const reconstructedWord = await downloadBytes(await downloadPromise);
+    await validateDocxDownload(
+      reconstructedWord,
+      "Lumeo browser-only Word conversion fixture",
+    );
+
+    await page.getByTestId("word-input").setInputFiles({
+      name: "round trip reconstructed.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: reconstructedWord,
+    });
+    await page.getByTestId("word-convert").click();
+    await expect(page.getByTestId("word-lab")).toHaveAttribute(
+      "data-state",
+      "success",
+      { timeout: 420_000 },
+    );
+    downloadPromise = page.waitForEvent("download");
+    await page.getByTestId("word-download").click();
+    const finalPdf = await downloadBytes(await downloadPromise);
+    await validatePdfDownload(finalPdf);
+
+    if (process.env.LUMEO_FIDELITY_CLI === "1") {
+      const outputDirectory = testInfo.outputPath("word-pdf-word-pdf-roundtrip");
+      const firstPdfPath = await writePdfFixture(
+        firstPdf,
+        outputDirectory,
+        "first-pdf",
+      );
+      const reconstructedWordPdf = await renderDocxWithLibreOffice(
+        reconstructedWord,
+        outputDirectory,
+        "reconstructed-word",
+      );
+      const finalPdfPath = await writePdfFixture(
+        finalPdf,
+        outputDirectory,
+        "final-pdf",
+      );
+
+      await assertRenderedPdfSimilarity(
+        firstPdfPath,
+        reconstructedWordPdf,
+        {
+          maxMae: 22,
+          maxChanged: 0.25,
+        },
+      );
+      await assertRenderedPdfSimilarity(firstPdfPath, finalPdfPath, {
+        maxMae: 22,
+        maxChanged: 0.25,
+      });
+    }
+
+    expect(retiredTransport).toEqual([]);
   });
 
   test("Word to PDF cancellation resets runtime and a retry can start cleanly", async ({

@@ -35,9 +35,12 @@ export async function saveAnnouncement(formData: FormData) {
   const isActive = formBoolean(formData, "is_active");
 
   if (!title || !message || !tones.has(tone)) return errorState("Enter a title, message, and valid tone.");
+  if (Boolean(linkLabel) !== Boolean(linkUrl)) {
+    return errorState("Add both a link label and link URL, or leave both blank.");
+  }
   if (!validateLinkUrl(linkUrl ?? "")) return errorState("Announcement links must begin with / or https://.");
   if (!validateAnnouncementSchedule(startsAtRaw ?? "", endsAtRaw ?? "")) {
-    return errorState("End time must be after the start time.");
+    return errorState("Use valid schedule times, with the end after the start.");
   }
 
   const startsAt = startsAtRaw ? istInputValueToUtcIso(startsAtRaw) : null;

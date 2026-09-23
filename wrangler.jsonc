@@ -20,11 +20,6 @@
 			"id": "75b64086aab24c498267c2d61489874a"
 		}
 	],
-	"triggers": {
-		"crons": [
-			"0 3 * * *"
-		]
-	},
 	"observability": {
 		"enabled": true
 	}

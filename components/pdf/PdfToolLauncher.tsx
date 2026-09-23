@@ -13,29 +13,60 @@ import Link from "next/link";
 import { ToolGlyph } from "@/components/pdf/ToolGlyph";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
 import { resolveLumeoTools, type ResolvedTool } from "@/lib/tools/resolve";
-import { buildTiles, type Tile } from "@/lib/tools/tiles";
+import { buildDiscoveryTiles, type Tile } from "@/lib/tools/tiles";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 
+function availabilityLabel(tile: Tile) {
+  if (tile.availability === "beta") return "Beta";
+  if (tile.availability === "coming_soon") return "Coming soon";
+  if (tile.availability === "maintenance") return "Maintenance";
+  return null;
+}
+
 function ToolTile({ tile, index }: { tile: Tile; index: number }) {
+  const available = tile.availability === "active" || tile.availability === "beta";
+  const status = availabilityLabel(tile);
+  const contents = (
+    <>
+      <div className="lumeo-tile-icon">
+        <ToolGlyph name={tile.glyph} className="h-[22px] w-[22px]" />
+      </div>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-serif font-semibold text-[1.05rem] leading-tight text-[var(--text-primary)]">
+            {tile.label}
+          </h3>
+          {status ? (
+            <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--text-premium)]">
+              {status}
+            </span>
+          ) : null}
+        </div>
+        <p className="mt-1.5 text-[13px] leading-[1.45] text-[var(--text-secondary)]">{tile.description}</p>
+      </div>
+    </>
+  );
+
   return (
     <li className="min-w-0">
       <ScrollReveal index={index} className="h-full">
-        <Link
-          href={tile.route}
-          data-accent={tile.accent === "brass" ? "brass" : undefined}
-          aria-label={tile.label}
-          className="lumeo-tile group backdrop-blur-[18px]"
-        >
-          <div className="lumeo-tile-icon">
-            <ToolGlyph name={tile.glyph} className="h-[22px] w-[22px]" />
-          </div>
-          <div className="min-w-0">
-            <h3 className="font-serif font-semibold text-[1.05rem] leading-tight text-[var(--text-primary)]">
-              {tile.label}
-            </h3>
-            <p className="mt-1.5 text-[13px] leading-[1.45] text-[var(--text-secondary)]">{tile.description}</p>
-          </div>
-        </Link>
+        {available ? (
+          <Link
+            href={tile.route}
+            data-accent={tile.accent === "brass" ? "brass" : undefined}
+            aria-label={`${tile.label}${status ? `, ${status}` : ""}`}
+            className="lumeo-tile group backdrop-blur-[18px]"
+          >
+            {contents}
+          </Link>
+        ) : (
+          <article
+            aria-label={`${tile.label}, ${status ?? "Unavailable"}`}
+            className="lumeo-tile cursor-default opacity-80 backdrop-blur-[18px]"
+          >
+            {contents}
+          </article>
+        )}
       </ScrollReveal>
     </li>
   );
@@ -62,7 +93,7 @@ function ComingSoonLine({ tools }: { tools: ResolvedTool[] }) {
 export async function PdfToolLauncher({ showHeading = true }: { showHeading?: boolean }) {
   const catalog = await getPublicPdfCatalog();
   const resolved = resolveLumeoTools(catalog.tools);
-  const tiles = buildTiles(resolved);
+  const tiles = buildDiscoveryTiles(resolved);
   const comingSoon = resolved.filter((tool) => tool.availability === "soon");
 
   return (

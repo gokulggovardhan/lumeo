@@ -12,6 +12,8 @@
 // actions ship by flipping `live` and adding a route -- no discovery-page code
 // changes needed.
 
+import type { PublicToolStatus } from "@/lib/public-catalog/types";
+
 export type ToolProcessing = "browser" | "server" | "hybrid";
 export type ToolAvailability = "available" | "soon";
 export type ToolDiscoveryCategory = "organize" | "edit-sign" | "optimize" | "convert";
@@ -35,7 +37,7 @@ export type ToolAction = {
   searchAliases?: string[];
   // Populated by resolveLumeoTools() when the admin-controlled DB row says
   // this action isn't live right now -- undefined in the static catalog.
-  dbStatus?: string;
+  dbStatus?: PublicToolStatus;
   maintenanceMessage?: string | null;
 };
 

@@ -61,6 +61,7 @@ test("premium converter UI uses meaningful stages, local privacy copy and access
     "Loading conversion engine",
     "Processing document",
     "Generating PDF",
+    "Validating output",
     "Finalizing file",
   ]) {
     assert.match(experience, new RegExp(label));

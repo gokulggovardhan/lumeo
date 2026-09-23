@@ -58,13 +58,12 @@ test("Word to PDF resolves the production Office runtime only when conversion st
 });
 
 
-test("Word runtime is reset after heavy or failed conversions to bound memory growth", async () => {
+test("Word engine reuses the page runtime and leaves job cleanup to the runtime", async () => {
   const source = await readFile(
     "lib/conversion/browser/BrowserWordToPdfEngine.ts",
     "utf8",
   );
 
-  assert.match(source, /let completed = false/);
-  assert.match(source, /mode !== "normal" \|\| !completed/);
-  assert.match(source, /runtime\.destroy\(\)/);
+  assert.doesNotMatch(source, /runtime\.destroy\(\)/);
+  assert.doesNotMatch(source, /let completed = false/);
 });

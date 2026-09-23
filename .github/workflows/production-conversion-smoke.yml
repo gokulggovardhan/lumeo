@@ -3,7 +3,28 @@ name: Production Conversion Smoke
 on:
   push:
     branches:
-      - release/conversion-production-smoke
+      - main
+    paths:
+      - ".github/workflows/production-conversion-smoke.yml"
+      - "components/pdf/WordToPdfTool.tsx"
+      - "components/pdf/PdfToWordTool.tsx"
+      - "components/pdf/HtmlToPdfTool.tsx"
+      - "components/pdf/EditPdfTool.tsx"
+      - "lib/pdf/edit/**"
+      - "e2e/edit-vinext.spec.ts"
+      - "e2e/fixtures.ts"
+      - "lib/conversion/**"
+      - "lib/pdf/htmlToPdfOptions.ts"
+      - "worker/**"
+      - "config/office-runtime-release.json"
+      - "app/office-runtime/**"
+      - "e2e/production-conversion-smoke.spec.ts"
+      - "e2e/conversion-fidelity-helpers.ts"
+      - "e2e/fixed-layout-pdf-fixture.ts"
+      - "e2e/professional-docx-fixture.ts"
+      - "scripts/compare-pdf-fidelity.py"
+      - "playwright.production-conversion.config.ts"
+      - "supabase/migrations/*word*pdf*.sql"
   workflow_dispatch:
 
 permissions:
@@ -15,7 +36,7 @@ concurrency:
 
 jobs:
   smoke:
-    name: Live Word ↔ PDF smoke
+    name: Live Word ↔ PDF + HTML smoke
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -31,6 +52,37 @@ jobs:
 
       - name: Install exact dependencies
         run: npm ci
+
+      - name: Wait for exact Cloudflare production revision
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          deployed_commit=""
+          deployed_environment=""
+
+          for attempt in {1..30}; do
+            body="$(curl --silent --show-error --fail --max-time 30 https://lumeo.in/api/build-info || true)"
+            deployed_commit="$(node -e 'try { const value = JSON.parse(process.argv[1]); process.stdout.write(value.commit ?? ""); } catch {}' "$body")"
+            deployed_environment="$(node -e 'try { const value = JSON.parse(process.argv[1]); process.stdout.write(value.environment ?? ""); } catch {}' "$body")"
+
+            if [ "$deployed_commit" = "$EXPECTED_SHA" ] && [ "$deployed_environment" = "production" ]; then
+              echo "PASS production revision $deployed_commit"
+              exit 0
+            fi
+
+            echo "Waiting for Cloudflare revision: expected $EXPECTED_SHA, observed ${deployed_commit:-none} (${deployed_environment:-unknown}) attempt $attempt/30"
+            sleep 10
+          done
+
+          echo "FAIL production did not reach expected revision $EXPECTED_SHA"
+          exit 1
+
+      - name: Install deterministic document fidelity tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils python3-pil
 
       - name: Install Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit

@@ -14,6 +14,7 @@ import {
   normalizeConversionError,
 } from "@/lib/conversion/errors";
 import { validateWordConversionFile } from "@/lib/conversion/fileValidation";
+import { validateGeneratedPdf } from "@/lib/conversion/outputValidation";
 import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import type {
@@ -24,6 +25,12 @@ import type {
 } from "@/lib/conversion/types";
 
 const PDF_MIME = "application/pdf";
+
+function throwIfAborted(signal: AbortSignal): void {
+  if (signal.aborted) {
+    throw signal.reason ?? new DOMException("Conversion cancelled", "AbortError");
+  }
+}
 
 export class BrowserWordToPdfEngine implements ConversionEngine {
   readonly id = "browser-libreoffice-word-to-pdf";
@@ -82,7 +89,6 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
 
     let workspace: BrowserConversionWorkspace | null = null;
     let runtime: ReturnType<typeof getBrowserLibreOfficeRuntime> | null = null;
-    let completed = false;
 
     try {
       let conversionFile = input.file;
@@ -149,6 +155,18 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
       }
 
       options.onProgress?.({
+        phase: "validating",
+        message: "Validating PDF",
+      });
+
+      try {
+        await validateGeneratedPdf(blob);
+      } catch (error) {
+        throw normalizeConversionError(error, "output");
+      }
+
+      throwIfAborted(signal);
+      options.onProgress?.({
         phase: "finalizing",
         message: "Finalizing file",
       });
@@ -175,7 +193,6 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
           engineId: this.id,
         },
       };
-      completed = true;
       return result;
     } catch (error) {
       const normalized = normalizeConversionError(error);
@@ -190,14 +207,6 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
           .catch(() => {});
       }
       throw normalized;
-    } finally {
-      // Normal conversions can reuse the already-loaded runtime for a fast
-      // second conversion. Large/extreme jobs release WASM threads and memory
-      // immediately, and any failed/cancelled job resets the runtime so retry
-      // starts from a clean process.
-      if (runtime && (mode !== "normal" || !completed)) {
-        runtime.destroy();
-      }
     }
   }
 }

@@ -11,6 +11,7 @@ const WORD_STAGES: Array<{ phase: ConversionPhase; label: string }> = [
   { phase: "loading-engine", label: "Loading conversion engine" },
   { phase: "converting", label: "Processing document" },
   { phase: "generating", label: "Generating PDF" },
+  { phase: "validating", label: "Validating output" },
   { phase: "finalizing", label: "Finalizing file" },
 ];
 
@@ -19,6 +20,7 @@ const PDF_STAGES: Array<{ phase: ConversionPhase; label: string }> = [
   { phase: "loading-engine", label: "Loading PDF engine" },
   { phase: "converting", label: "Reconstructing document" },
   { phase: "generating", label: "Generating Word document" },
+  { phase: "validating", label: "Validating output" },
   { phase: "finalizing", label: "Finalizing file" },
 ];
 
@@ -47,7 +49,7 @@ export function ConversionStageIndicator({
       <p className="text-sm font-bold text-[var(--text-primary)]">{detail}</p>
       <ol
         aria-label="Conversion stages"
-        className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-5"
+        className="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-6"
       >
         {stages.map((stage, index) => {
           const completed = index < currentIndex;

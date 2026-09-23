@@ -189,3 +189,70 @@ test("walkTextShowOperators handles TJ arrays (multiple string runs in one opera
   assert.equal(Buffer.from(operators[0].strings[0]).toString("latin1"), "AB");
   assert.equal(Buffer.from(operators[0].strings[1]).toString("latin1"), "CD");
 });
+
+
+test("walkTextShowOperators tracks fill/stroke colour and q/Q restoration without raster guessing", () => {
+  const bytes = new TextEncoder().encode(
+    "0.1 0.2 0.3 rg 0.8 G BT /F1 12 Tf 1 0 0 1 10 700 Tm (A) Tj ET " +
+    "q 0.75 g 1 0 0 RG BT /F1 12 Tf 1 0 0 1 10 680 Tm (B) Tj ET Q " +
+    "BT /F1 12 Tf 1 0 0 1 10 660 Tm (C) Tj ET",
+  );
+  const operators = walkTextShowOperators(bytes);
+  assert.equal(operators.length, 3);
+
+  assert.deepEqual(operators[0].fillColor, {
+    colorSpace: "DeviceRGB",
+    components: [0.1, 0.2, 0.3],
+    cssHex: "#1a334d",
+  });
+  assert.deepEqual(operators[0].strokeColor, {
+    colorSpace: "DeviceGray",
+    components: [0.8],
+    cssHex: "#cccccc",
+  });
+
+  assert.deepEqual(operators[1].fillColor, {
+    colorSpace: "DeviceGray",
+    components: [0.75],
+    cssHex: "#bfbfbf",
+  });
+  assert.deepEqual(operators[1].strokeColor, {
+    colorSpace: "DeviceRGB",
+    components: [1, 0, 0],
+    cssHex: "#ff0000",
+  });
+
+  assert.deepEqual(operators[2].fillColor, operators[0].fillColor);
+  assert.deepEqual(operators[2].strokeColor, operators[0].strokeColor);
+  assert.equal(operators[2].fillOpacity, 1);
+  assert.equal(operators[2].strokeOpacity, 1);
+});
+
+test("walkTextShowOperators resolves ExtGState alpha only through a trusted resource resolver", () => {
+  const bytes = new TextEncoder().encode(
+    "/GSalpha gs BT /F1 12 Tf 1 0 0 1 10 700 Tm (Alpha) Tj ET",
+  );
+
+  const resolved = walkTextShowOperators(bytes, undefined, {
+    resolveExtGState: (name) =>
+      name === "GSalpha" ? { fillOpacity: 0.35, strokeOpacity: 0.8 } : null,
+  });
+  assert.equal(resolved[0].fillOpacity, 0.35);
+  assert.equal(resolved[0].strokeOpacity, 0.8);
+
+  const unresolved = walkTextShowOperators(bytes);
+  assert.equal(unresolved[0].fillOpacity, null);
+  assert.equal(unresolved[0].strokeOpacity, null);
+});
+
+test("walkTextShowOperators preserves DeviceCMYK components without inventing an RGB preview", () => {
+  const bytes = new TextEncoder().encode(
+    "0.1 0.2 0.3 0.4 k BT /F1 12 Tf 1 0 0 1 10 700 Tm (CMYK) Tj ET",
+  );
+  const [operator] = walkTextShowOperators(bytes);
+  assert.deepEqual(operator.fillColor, {
+    colorSpace: "DeviceCMYK",
+    components: [0.1, 0.2, 0.3, 0.4],
+    cssHex: null,
+  });
+});

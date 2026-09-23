@@ -202,8 +202,11 @@ test("Admin database-backed pages distinguish unavailable data from valid empty 
 
 test("Audit filters reject malformed date input without throwing", () => {
   const audit = read("app/admin/(protected)/audit/page.tsx");
-  assert.match(audit, /function validDateIso/);
-  assert.match(audit, /Number\.isNaN\(date\.getTime\(\)\)/);
+  const filters = read("lib/admin/governance-filters.ts");
+  assert.match(audit, /resolveAuditFilters/);
+  assert.match(filters, /function parseIsoDate/);
+  assert.match(filters, /Number\.isNaN\(date\.getTime\(\)\)/);
+  assert.match(filters, /date\.toISOString\(\)\.slice\(0, 10\) !== value/);
   assert.doesNotMatch(audit, /new Date\(params\.start\)\.toISOString/);
   assert.match(audit, /if \(!canView\)/);
 });

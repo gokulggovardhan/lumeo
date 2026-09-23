@@ -3,13 +3,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Inbox as InboxIcon, Loader2, Mail, MailOpen, Phone, Search, Trash2 } from "lucide-react";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
-import { deleteFeedbackQuery } from "@/app/admin/(protected)/inbox/actions";
+import { deleteFeedbackQuery, setFeedbackReadState } from "@/app/admin/(protected)/inbox/actions";
+import {
+  filterAndSortInboxItems,
+  type InboxReadFilter,
+  type InboxSortOrder,
+  type InboxTypeFilter,
+} from "@/lib/admin/inbox-view";
 import { createClient } from "@/lib/supabase/client";
 import { applyInboxRealtimeEvent, selectedInboxIdAfterEvent } from "@/lib/admin/inbox-realtime";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
-import type { FeedbackQuery, FeedbackQueryType } from "@/lib/supabase/database.types";
-
-type TypeFilter = "all" | FeedbackQueryType;
+import type { FeedbackQuery } from "@/lib/supabase/database.types";
 
 function relativeTime(iso: string) {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -31,20 +35,26 @@ function absoluteTime(iso: string) {
 export function InboxClient({
   initialItems,
   initialError,
+  initialHasMore,
+  initialReadFilter,
   pageSize,
   canManage,
 }: {
   initialItems: FeedbackQuery[];
   initialError: string | null;
+  initialHasMore: boolean;
+  initialReadFilter: InboxReadFilter;
   pageSize: number;
   canManage: boolean;
 }) {
   const [items, setItems] = useState<FeedbackQuery[]>(initialItems);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const [typeFilter, setTypeFilter] = useState<InboxTypeFilter>("all");
+  const [readFilter, setReadFilter] = useState<InboxReadFilter>(initialReadFilter);
+  const [sortOrder, setSortOrder] = useState<InboxSortOrder>("newest");
   const [search, setSearch] = useState("");
   const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(initialItems.length === pageSize);
+  const [hasMore, setHasMore] = useState(initialHasMore);
   const [serverOffset, setServerOffset] = useState(initialItems.length);
   const [deleting, setDeleting] = useState(false);
   const [banner, setBanner] = useState<{ tone: "error" | "success"; message: string } | null>(
@@ -98,34 +108,26 @@ export function InboxClient({
     };
   }, [removeItem]);
 
-  const filteredItems = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    return items.filter((item) => {
-      if (typeFilter !== "all" && item.type !== typeFilter) return false;
-      if (query) {
-        const haystack = `${item.name} ${item.subject} ${item.message}`.toLowerCase();
-        if (!haystack.includes(query)) return false;
-      }
-      return true;
-    });
-  }, [items, typeFilter, search]);
+  const filteredItems = useMemo(
+    () => filterAndSortInboxItems(items, { query: search, read: readFilter, type: typeFilter, sort: sortOrder }),
+    [items, readFilter, search, sortOrder, typeFilter],
+  );
 
   const selected = items.find((item) => item.id === selectedId) ?? null;
 
-  const markAsRead = useCallback(async (item: FeedbackQuery) => {
-    if (item.is_read) return;
-    setItems((current) => current.map((row) => (row.id === item.id ? { ...row, is_read: true } : row)));
-    const supabase = supabaseRef.current;
-    const { error } = await supabase.from("feedback_queries").update({ is_read: true }).eq("id", item.id);
-    if (error) {
-      // Revert on failure -- the optimistic update was wrong.
-      setItems((current) => current.map((row) => (row.id === item.id ? { ...row, is_read: false } : row)));
+  const updateReadState = useCallback(async (item: FeedbackQuery, isRead: boolean) => {
+    if (item.is_read === isRead) return;
+    setItems((current) => current.map((row) => (row.id === item.id ? { ...row, is_read: isRead } : row)));
+    const result = await setFeedbackReadState(item.id, isRead);
+    if (!result.ok) {
+      setItems((current) => current.map((row) => (row.id === item.id ? { ...row, is_read: item.is_read } : row)));
+      setBanner({ tone: "error", message: result.message });
     }
   }, []);
 
   function selectItem(item: FeedbackQuery) {
     setSelectedId(item.id);
-    void markAsRead(item);
+    void updateReadState(item, true);
   }
 
   async function loadMore() {
@@ -136,7 +138,7 @@ export function InboxClient({
         .from("feedback_queries")
         .select("id, type, name, email, phone, subject, message, location, is_read, created_at")
         .order("created_at", { ascending: false })
-        .range(serverOffset, serverOffset + pageSize - 1);
+        .range(serverOffset, serverOffset + pageSize);
 
       if (error) {
         setBanner({ tone: "error", message: "Couldn't load more messages. Try again." });
@@ -144,13 +146,14 @@ export function InboxClient({
       }
 
       const rows = (data ?? []) as FeedbackQuery[];
-      for (const row of rows) serverLoadedIdsRef.current.add(row.id);
-      setServerOffset((current) => current + rows.length);
+      const pageRows = rows.slice(0, pageSize);
+      for (const row of pageRows) serverLoadedIdsRef.current.add(row.id);
+      setServerOffset((current) => current + pageRows.length);
       setItems((current) => {
         const seen = new Set(current.map((row) => row.id));
-        return [...current, ...rows.filter((row) => !seen.has(row.id))];
+        return [...current, ...pageRows.filter((row) => !seen.has(row.id))];
       });
-      setHasMore(rows.length === pageSize);
+      setHasMore(rows.length > pageSize);
     } finally {
       setLoadingMore(false);
     }
@@ -190,19 +193,47 @@ export function InboxClient({
               className="min-h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] py-2 pl-9 pr-3 text-base text-[var(--lumeo-paper-50)] sm:text-sm outline-none placeholder:text-[var(--lumeo-paper-600)] focus:border-[var(--border-focus)]"
             />
           </div>
-          <select
-            value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value as TypeFilter)}
-            className="min-h-9 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base font-semibold text-[var(--lumeo-paper-50)] sm:text-xs"
-          >
-            <option value="all">All messages</option>
-            <option value="Query">Queries</option>
-            <option value="Feedback">Feedback</option>
-          </select>
+          <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+            <label className="text-xs font-semibold text-[var(--text-muted)]">
+              Type
+              <select
+                value={typeFilter}
+                onChange={(event) => setTypeFilter(event.target.value as InboxTypeFilter)}
+                className="mt-1 min-h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base font-semibold text-[var(--lumeo-paper-50)] sm:text-xs"
+              >
+                <option value="all">All</option>
+                <option value="Query">Queries</option>
+                <option value="Feedback">Feedback</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">
+              State
+              <select
+                value={readFilter}
+                onChange={(event) => setReadFilter(event.target.value as InboxReadFilter)}
+                className="mt-1 min-h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base font-semibold text-[var(--lumeo-paper-50)] sm:text-xs"
+              >
+                <option value="all">All</option>
+                <option value="unread">Unread</option>
+                <option value="read">Read</option>
+              </select>
+            </label>
+            <label className="text-xs font-semibold text-[var(--text-muted)]">
+              Order
+              <select
+                value={sortOrder}
+                onChange={(event) => setSortOrder(event.target.value as InboxSortOrder)}
+                className="mt-1 min-h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base font-semibold text-[var(--lumeo-paper-50)] sm:text-xs"
+              >
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </label>
+          </div>
         </div>
 
         {banner ? (
-          <div className={`mx-3 mt-3 rounded-[var(--radius-md)] px-3 py-2 text-xs font-semibold ${banner.tone === "error" ? "bg-[var(--surface-danger)] text-[var(--text-danger)]" : "bg-[var(--surface-success)] text-[var(--text-success)]"}`}>
+          <div aria-live="polite" className={`mx-3 mt-3 rounded-[var(--radius-md)] px-3 py-2 text-xs font-semibold ${banner.tone === "error" ? "bg-[var(--surface-danger)] text-[var(--text-danger)]" : "bg-[var(--surface-success)] text-[var(--text-success)]"}`}>
             {banner.message}
           </div>
         ) : null}
@@ -279,7 +310,7 @@ export function InboxClient({
           </div>
         ) : (
           <div className="flex h-full min-h-0 flex-col">
-            <div className="flex items-center justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border-subtle)] p-4">
               <button
                 type="button"
                 onClick={() => setSelectedId(null)}
@@ -292,6 +323,14 @@ export function InboxClient({
                 {selected.is_read ? <MailOpen className="h-4 w-4" aria-hidden="true" /> : <Mail className="h-4 w-4" aria-hidden="true" />}
                 {selected.is_read ? "Read" : "Unread"}
               </div>
+              <button
+                type="button"
+                onClick={() => void updateReadState(selected, !selected.is_read)}
+                className="inline-flex min-h-9 items-center gap-2 rounded-[var(--radius-md)] border border-[var(--border-subtle)] px-3 text-xs font-semibold text-[var(--text-secondary)] transition hover:border-[var(--border-premium)] hover:text-[var(--text-primary)]"
+              >
+                {selected.is_read ? <Mail className="h-3.5 w-3.5" aria-hidden="true" /> : <MailOpen className="h-3.5 w-3.5" aria-hidden="true" />}
+                Mark {selected.is_read ? "unread" : "read"}
+              </button>
               {canManage ? (
                 <button
                   type="button"

@@ -17,6 +17,10 @@ export default defineConfig({
   projects: [
     { name: "chromium-conversion", use: { ...devices["Desktop Chrome"] } },
     { name: "webkit-conversion", use: { ...devices["Desktop Safari"] } },
+    {
+      name: "webkit-mobile-conversion",
+      use: { ...devices["iPhone 15 Pro"] },
+    },
     { name: "firefox-conversion", use: { ...devices["Desktop Firefox"] } },
   ],
   webServer: {

@@ -8,24 +8,12 @@ import { getAuditLogs, resolveAdminEmails } from "@/lib/admin/data";
 import { canViewAudit } from "@/lib/admin/permissions";
 import { pageNumber } from "@/lib/admin/pagination";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
+import {
+  AUDIT_ENTITY_TYPES,
+  resolveAuditFilters,
+} from "@/lib/admin/governance-filters";
 
-const entityTypes = [
-  "admin_member",
-  "announcement",
-  "feature_flag",
-  "feedback_query",
-  "pdf_tool",
-  "seo_setting",
-  "site_setting",
-];
-
-function validDateIso(value: string | undefined, addDays = 0) {
-  if (!value) return undefined;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return undefined;
-  if (addDays) date.setUTCDate(date.getUTCDate() + addDays);
-  return date.toISOString();
-}
+const PAGE_SIZE = 50;
 
 function buildQuery(params: Record<string, string | undefined>) {
   const search = new URLSearchParams();
@@ -39,11 +27,11 @@ function buildQuery(params: Record<string, string | undefined>) {
 export default async function AuditPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ page?: string; action?: string; entity_type?: string; start?: string; end?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const admin = await requireAdmin();
   const params = (await searchParams) ?? {};
-  const page = pageNumber(params.page);
+  const page = pageNumber(Array.isArray(params.page) ? params.page[0] : params.page);
   const canView = canViewAudit(admin.role);
 
   if (!canView) {
@@ -62,14 +50,15 @@ export default async function AuditPage({
     );
   }
 
-  const filters = {
-    action: params.action?.trim() || undefined,
-    entityType: params.entity_type?.trim() || undefined,
-    startDate: validDateIso(params.start),
-    endDate: validDateIso(params.end, 1),
-  };
-
-  const logs = await getAuditLogs(50, (page - 1) * 50, filters);
+  const filters = resolveAuditFilters(params);
+  const logs = filters.dateError
+    ? { data: [], error: null }
+    : await getAuditLogs(PAGE_SIZE + 1, (page - 1) * PAGE_SIZE, {
+        action: filters.action || undefined,
+        entityType: filters.entityType || undefined,
+        startDate: filters.startIso,
+        endDate: filters.endExclusiveIso,
+      });
   if (logs.error) {
     return (
       <div className="space-y-7">
@@ -86,11 +75,18 @@ export default async function AuditPage({
     );
   }
 
+  const hasNextPage = logs.data.length > PAGE_SIZE;
+  const visibleLogs = logs.data.slice(0, PAGE_SIZE);
   const actorEmails = await resolveAdminEmails(
-    logs.data.map((log) => log.actor_user_id).filter((id): id is string => Boolean(id)),
+    visibleLogs.map((log) => log.actor_user_id).filter((id): id is string => Boolean(id)),
   );
 
-  const carryParams = { action: params.action, entity_type: params.entity_type, start: params.start, end: params.end };
+  const carryParams = {
+    action: filters.action || undefined,
+    entity_type: filters.entityType || undefined,
+    start: filters.startDate || undefined,
+    end: filters.endDate || undefined,
+  };
 
   return (
     <div className="space-y-7">
@@ -107,7 +103,7 @@ export default async function AuditPage({
             <input
               type="text"
               name="action"
-              defaultValue={params.action}
+              defaultValue={filters.action}
               placeholder="e.g. update"
               className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] placeholder:text-[var(--lumeo-paper-600)] sm:text-sm"
             />
@@ -116,11 +112,11 @@ export default async function AuditPage({
             Entity type
             <select
               name="entity_type"
-              defaultValue={params.entity_type ?? ""}
+              defaultValue={filters.entityType}
               className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base sm:text-sm"
             >
               <option value="">All</option>
-              {entityTypes.map((type) => (
+              {AUDIT_ENTITY_TYPES.map((type) => (
                 <option key={type} value={type}>{type}</option>
               ))}
             </select>
@@ -130,7 +126,7 @@ export default async function AuditPage({
             <input
               type="date"
               name="start"
-              defaultValue={params.start}
+              defaultValue={filters.startDate}
               className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--lumeo-paper-50)] sm:text-sm"
             />
           </label>
@@ -139,7 +135,7 @@ export default async function AuditPage({
             <input
               type="date"
               name="end"
-              defaultValue={params.end}
+              defaultValue={filters.endDate}
               className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-sm text-[var(--lumeo-paper-50)]"
             />
           </label>
@@ -147,19 +143,24 @@ export default async function AuditPage({
             <button type="submit" className="min-h-11 rounded-xl bg-[var(--emerald-600)] px-5 text-sm font-semibold text-[var(--text-on-accent)] transition hover:bg-[var(--emerald-500)]">
               Apply filters
             </button>
-            {(params.action || params.entity_type || params.start || params.end) && (
+            {(filters.action || filters.entityType || filters.startDate || filters.endDate) && (
               <Link href="/admin/audit" className="min-h-11 rounded-xl border border-[#E8DFC8]/12 px-5 text-sm font-semibold leading-[2.75rem] text-[#F0EAD6]/70">
                 Clear
               </Link>
             )}
           </div>
+          {filters.dateError ? (
+            <p role="alert" className="md:col-span-4 text-sm font-semibold text-[var(--text-danger)]">
+              {filters.dateError}
+            </p>
+          ) : null}
         </form>
       </AdminSectionCard>
 
       <AdminSectionCard title="Recent administrative actions" description="Showing 50 records per page. Actor identifiers are resolved to email when the actor is a known administrator.">
         <AdminDataTable
           columns={["Time", "Actor", "Role", "Action", "Entity", "Summary"]}
-          rows={logs.data.map((log) => [
+          rows={visibleLogs.map((log) => [
             formatAdminDateTime(log.created_at),
             log.actor_user_id ? (actorEmails[log.actor_user_id] ?? log.actor_user_id) : "Unknown",
             log.actor_role ?? "Unknown",
@@ -172,7 +173,12 @@ export default async function AuditPage({
               </p>
             </details>,
           ])}
-          empty={<AdminEmptyState title="No audit records" description="Audit records will appear after Control Center actions are performed, or try clearing your filters." />}
+          empty={
+            <AdminEmptyState
+              title={filters.dateError ? "Choose a valid date range" : "No audit records"}
+              description={filters.dateError ?? "Audit records will appear after Control Center actions are performed, or try clearing your filters."}
+            />
+          }
         />
         <div className="mt-4 flex gap-3">
           {page > 1 && (
@@ -180,7 +186,7 @@ export default async function AuditPage({
               Previous
             </Link>
           )}
-          {logs.data.length === 50 && (
+          {hasNextPage && (
             <Link className="rounded-xl border border-[#E8DFC8]/12 px-4 py-2 text-sm font-semibold" href={`/admin/audit${buildQuery({ ...carryParams, page: String(page + 1) })}`}>
               Next
             </Link>

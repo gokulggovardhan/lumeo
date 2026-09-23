@@ -30,7 +30,7 @@ jobs:
   verify:
     name: Edit PDF — vinext Worker browsers
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
@@ -45,6 +45,28 @@ jobs:
       - name: Install exact dependencies
         run: npm ci
 
+      - name: Initialize and start isolated Supabase catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+
+      - name: Configure public catalog environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/lumeo-edit-supabase.env
+          set -a
+          source /tmp/lumeo-edit-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+
       - name: Install Chromium, WebKit and Firefox
         run: npx playwright install --with-deps chromium webkit firefox
 
@@ -55,7 +77,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler dev --config dist/server/wrangler.json --port 8787 > /tmp/lumeo-vinext.log 2>&1 &
+          npx wrangler dev \
+            --config dist/server/wrangler.json \
+            --port 8787 \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            > /tmp/lumeo-vinext.log 2>&1 &
           server_pid=$!
           trap 'kill "$server_pid" 2>/dev/null || true' EXIT
 
@@ -75,6 +102,15 @@ jobs:
           if [ "$ready" != "true" ]; then
             cat /tmp/lumeo-vinext.log
             echo "Local vinext Worker did not become ready." >&2
+            exit 1
+          fi
+
+          # Fail clearly if the isolated catalog did not expose Edit PDF as
+          # active. This preserves the public fail-closed policy while making
+          # the editor regression test exercise the real workspace.
+          if curl --fail --silent http://127.0.0.1:8787/pdf/edit | grep -q "Temporarily unavailable"; then
+            cat /tmp/lumeo-vinext.log
+            echo "Edit PDF remained blocked in the isolated test catalog." >&2
             exit 1
           fi
 

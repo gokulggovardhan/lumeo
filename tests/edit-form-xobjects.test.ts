@@ -384,3 +384,40 @@ test("resolveStreamTarget for a page-level (non-Form) location matches the plain
   const text = Buffer.from(target.decodedBytes).toString("latin1");
   assert.match(text, /Tj/);
 });
+
+
+test("Form XObject text inherits proven page paint colour and ExtGState alpha", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const formRef = buildFormXObject(doc, "Inherited paint");
+  const gsRef = doc.context.register(
+    doc.context.obj({
+      Type: "ExtGState",
+      ca: 0.35,
+      CA: 0.8,
+    }),
+  );
+
+  const resources = page.node.Resources()!;
+  resources.set(PDFName.of("XObject"), doc.context.obj({ FmPaint: formRef }));
+  resources.set(PDFName.of("ExtGState"), doc.context.obj({ GSalpha: gsRef }));
+  page.node.set(
+    PDFName.of("Contents"),
+    doc.context.register(
+      doc.context.stream(
+        "0 0 1 rg /GSalpha gs q 1 0 0 1 50 600 cm /FmPaint Do Q",
+      ),
+    ),
+  );
+
+  const loaded = await PDFDocument.load((await doc.save()).slice());
+  const [located] = collectPageTextOperators(loaded, 0);
+  assert.ok(located);
+  assert.deepEqual(located.operator.fillColor, {
+    colorSpace: "DeviceRGB",
+    components: [0, 0, 1],
+    cssHex: "#0000ff",
+  });
+  assert.equal(located.operator.fillOpacity, 0.35);
+  assert.equal(located.operator.strokeOpacity, 0.8);
+});

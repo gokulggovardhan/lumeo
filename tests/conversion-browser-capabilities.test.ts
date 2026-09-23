@@ -11,7 +11,9 @@ test("capability detection is feature-based and reports storage details", async 
   class FakeSharedArrayBuffer extends ArrayBuffer {}
   class FakeMemory {
     buffer = new FakeSharedArrayBuffer(64);
-    constructor(_options: unknown) {}
+    constructor(options: unknown) {
+      void options;
+    }
   }
   class FakeFile {
     stream() {}
@@ -19,7 +21,9 @@ test("capability detection is feature-based and reports storage details", async 
   class FakeWorker {
     onmessage: ((event: MessageEvent<boolean>) => void) | null = null;
     onerror: ((event: ErrorEvent) => void) | null = null;
-    constructor(_url: string | URL) {}
+    constructor(url: string | URL) {
+      void url;
+    }
     postMessage() {
       queueMicrotask(() => {
         this.onmessage?.({ data: true } as MessageEvent<boolean>);

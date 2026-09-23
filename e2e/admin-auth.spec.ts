@@ -125,10 +125,7 @@ test.describe("Control Center authentication", () => {
     await overviewNavigation.getByRole("link", { name: "Analytics" }).click();
     await expect(page).toHaveURL(/\/admin\/analytics/);
     await expect(
-      page.getByRole("heading", {
-        name: "Discovery & operation analytics",
-        exact: true,
-      }),
+      page.getByRole("heading", { name: "Analytics", exact: true }),
     ).toBeVisible();
 
     // vinext may retain a hidden previous route tree during navigation.
@@ -199,14 +196,40 @@ test.describe("Control Center authentication", () => {
     await errorsNavigation.getByRole("link", { name: "Health" }).click();
     await expect(page).toHaveURL(/\/admin\/health/);
     await expect(page.getByRole("heading", { name: "Health" })).toBeVisible();
+    const healthMain = page.locator("#main-content");
     await expect(
-      page.locator("#main-content").getByText("LibreOffice converter", {
-        exact: true,
-      }),
+      healthMain.getByText("Supabase database", { exact: true }),
     ).toBeVisible();
+    await expect(
+      healthMain.getByText("LibreOffice converter", { exact: true }),
+    ).toHaveCount(0);
 
     const { navigation: healthNavigation } = await openAdminNavigation(page);
-    await healthNavigation.getByRole("link", { name: "Settings" }).click();
+    await healthNavigation.getByRole("link", { name: "Audit Log" }).click();
+    await expect(page).toHaveURL(/\/admin\/audit/);
+    const auditMain = page.locator("#main-content");
+    await expect(auditMain.getByRole("heading", { name: "Audit Log" })).toBeVisible();
+    await expect(auditMain.getByLabel("Entity type")).toContainText("error_log");
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      ),
+    ).toBe(false);
+
+    const { navigation: auditNavigation } = await openAdminNavigation(page);
+    await auditNavigation.getByRole("link", { name: "Administrators" }).click();
+    await expect(page).toHaveURL(/\/admin\/members/);
+    const membersMain = page.locator("#main-content");
+    await expect(
+      membersMain.getByRole("heading", { name: "Administrators", exact: true }),
+    ).toBeVisible();
+    const memberFilters = membersMain.locator('form[method="get"]');
+    await expect(memberFilters.getByLabel("Search")).toBeVisible();
+    await expect(memberFilters.getByLabel("Role")).toBeVisible();
+    await expect(memberFilters.getByLabel("Access")).toBeVisible();
+
+    const { navigation: membersNavigation } = await openAdminNavigation(page);
+    await membersNavigation.getByRole("link", { name: "Settings" }).click();
     await expect(page).toHaveURL(/\/admin\/settings/);
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
 

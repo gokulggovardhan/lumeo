@@ -323,8 +323,8 @@ function isEmbedded(descriptor: PDFDict | undefined): boolean {
 }
 
 function fontDescriptorOf(fontDict: PDFDict, context: PDFContext): PDFDict | undefined {
-  const ref = fontDict.get(PDFName.of("FontDescriptor"));
-  return ref instanceof PDFRef ? lookupDict(ref, context) : undefined;
+  const entry = fontDict.get(PDFName.of("FontDescriptor"));
+  return resolveDictMaybe(entry, context);
 }
 
 // Resolves a font resource dictionary (the object a matched
