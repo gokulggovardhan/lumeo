@@ -76,6 +76,10 @@ test("Word runtime cancellation resets worker resources and temporary MEMFS file
   assert.match(source, /helper\.FS\.unlink\(from\)/);
   assert.match(source, /helper\.FS\.unlink\(to\)/);
   assert.match(source, /onAbort/);
+  assert.match(source, /waitForPromiseOrAbort/);
+  assert.match(source, /this\.startPromise && !this\.ready/);
+  assert.match(source, /this\.destroyAfterStart = true/);
+  assert.match(source, /this\.destroyAfterStart = false/);
 });
 
 

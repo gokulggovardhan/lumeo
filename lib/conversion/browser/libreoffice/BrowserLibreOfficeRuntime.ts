@@ -77,6 +77,30 @@ function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) throw abortError(signal);
 }
 
+async function waitForPromiseOrAbort(
+  promise: Promise<void>,
+  signal: AbortSignal,
+): Promise<void> {
+  throwIfAborted(signal);
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      callback();
+    };
+    const onAbort = () => finish(() => reject(abortError(signal)));
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      () => finish(resolve),
+      (error) => finish(() => reject(error)),
+    );
+  });
+}
+
 function safeExtension(fileName: string): string {
   const match = /\.(docx?|odt)$/i.exec(fileName);
   if (!match) throw new Error("Use a DOC, DOCX, or ODT document.");
@@ -318,12 +342,27 @@ export class BrowserLibreOfficeRuntime {
   private helper: ZetaHelperMainInstance | null = null;
   private officeThreadUrl: string | null = null;
   private queue: Promise<unknown> = Promise.resolve();
+  private startPromise: Promise<void> | null = null;
+  private ready = false;
+  private destroyAfterStart = false;
 
   constructor(private readonly assets: OfficeAssetConfig) {}
 
   async start(signal: AbortSignal): Promise<void> {
     throwIfAborted(signal);
-    if (this.helper) return;
+    if (this.ready && this.helper) return;
+
+    while (!this.ready) {
+      this.startPromise ??= this.initialize().finally(() => {
+        this.startPromise = null;
+      });
+      await waitForPromiseOrAbort(this.startPromise, signal);
+      throwIfAborted(signal);
+    }
+  }
+
+  private async initialize(): Promise<void> {
+    const bootstrapSignal = new AbortController().signal;
 
     if (
       !crossOriginIsolated ||
@@ -337,11 +376,9 @@ export class BrowserLibreOfficeRuntime {
     }
 
     ensureOfficeCanvas();
-    await preflightOfficeAssetOrigin(this.assets, signal);
-    throwIfAborted(signal);
+    await preflightOfficeAssetOrigin(this.assets, bootstrapSignal);
 
     const ZetaHelperMain = await loadZetaHelperConstructor(this.assets.helperUrl);
-    throwIfAborted(signal);
 
     this.officeThreadUrl = createOfficeThreadModule(this.assets.helperUrl);
     const helper = new ZetaHelperMain(this.officeThreadUrl, {
@@ -352,9 +389,14 @@ export class BrowserLibreOfficeRuntime {
     this.helper = helper;
 
     try {
-      await waitForReady(helper, signal);
+      await waitForReady(helper, bootstrapSignal);
+      this.ready = true;
+      if (this.destroyAfterStart) {
+        this.destroyAfterStart = false;
+        this.destroyNow();
+      }
     } catch (error) {
-      this.destroy();
+      this.destroyNow();
       throw error;
     }
   }
@@ -492,8 +534,24 @@ export class BrowserLibreOfficeRuntime {
    * retained so a recoverable retry can initialize a fresh Office runtime.
    */
   destroy(): void {
+    if (this.startPromise && !this.ready) {
+      // Emscripten/ZetaJS must finish asynchronous module compilation before
+      // its globals are removed. Tearing them down mid-bootstrap poisons the
+      // next runtime in the same page. The caller still observes cancellation
+      // immediately; a retry waits for this bootstrap to settle, then starts
+      // from a fully released runtime.
+      this.destroyAfterStart = true;
+      return;
+    }
+
+    this.destroyNow();
+  }
+
+  private destroyNow(): void {
     const helper = this.helper;
     this.helper = null;
+    this.ready = false;
+    this.destroyAfterStart = false;
 
     try {
       helper?.thrPort?.close();
