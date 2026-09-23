@@ -19,9 +19,11 @@ on:
       - "config/office-runtime-release.json"
       - "app/office-runtime/**"
       - "e2e/production-conversion-smoke.spec.ts"
+      - "e2e/production-conversion-certification.spec.ts"
       - "e2e/conversion-fidelity-helpers.ts"
       - "e2e/fixed-layout-pdf-fixture.ts"
       - "e2e/professional-docx-fixture.ts"
+      - "e2e/semantic-pdf-fixtures.ts"
       - "scripts/compare-pdf-fidelity.py"
       - "playwright.production-conversion.config.ts"
       - "supabase/migrations/*word*pdf*.sql"
@@ -38,7 +40,7 @@ jobs:
   smoke:
     name: Live Word ↔ PDF + HTML smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 60
 
     steps:
       - name: Checkout repository
@@ -84,8 +86,8 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils python3-pil
 
-      - name: Install Chromium and WebKit
-        run: npx playwright install --with-deps chromium webkit
+      - name: Install Chromium, WebKit and Firefox
+        run: npx playwright install --with-deps chromium webkit firefox
 
       - name: Verify production converters and downloaded files
         run: xvfb-run -a npx playwright test --config=playwright.production-conversion.config.ts
