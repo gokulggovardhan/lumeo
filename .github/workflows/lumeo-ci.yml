@@ -162,7 +162,16 @@ jobs:
         run: node scripts/verify-admin-inbox-rls.mjs
 
       - name: Verify error and feedback ingestion rate limits
-        run: node scripts/verify-error-ingest-rate-limit.mjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The verifier intentionally consumes the complete authenticated
+          # error-reporting bucket. Give it its own disposable local identity
+          # so the real Admin browser lifecycle retains a clean diagnostic
+          # budget and a genuine browser error is never masked by a 429.
+          export ADMIN_E2E_EMAIL="rate-limit-e2e@lumeo.local"
+          node scripts/seed-admin-e2e.mjs
+          node scripts/verify-error-ingest-rate-limit.mjs
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit

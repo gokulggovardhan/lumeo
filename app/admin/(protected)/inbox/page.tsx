@@ -5,6 +5,7 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { getFeedbackQueries } from "@/lib/admin/data";
 import { canManageInbox, canViewInbox } from "@/lib/admin/permissions";
 import type { InboxReadFilter } from "@/lib/admin/inbox-view";
+import { INITIAL_RELATIVE_TIME_REFERENCE_MS } from "@/lib/admin/relative-time";
 
 const PAGE_SIZE = 25;
 
@@ -42,6 +43,7 @@ export default async function InboxPage({
           initialError={initial.error}
           initialHasMore={initial.data.length > PAGE_SIZE}
           initialReadFilter={initialReadFilter}
+          initialNowMs={INITIAL_RELATIVE_TIME_REFERENCE_MS}
           pageSize={PAGE_SIZE}
           canManage={canManageInbox(admin.role)}
         />
