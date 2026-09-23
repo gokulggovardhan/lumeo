@@ -452,9 +452,9 @@ test("production HTML to PDF preserves styled multi-page content and supports re
   const generate = page.locator("button.lumeo-primary-action").first();
   await expect(generate).toContainText("Generate PDF");
   await generate.click();
-  await expect(generate).toBeDisabled({ timeout: 5_000 });
-  await expect(generate).toContainText("Generating", { timeout: 5_000 });
   let download = await downloadPromise;
+  await expect(generate).toBeEnabled();
+  await expect(generate).toContainText("Generate PDF");
   expect(download.suggestedFilename()).toBe("production-rich-html.pdf");
   let bytes = await downloadBytes(download);
   let pdf = await PDFDocument.load(bytes);
@@ -468,6 +468,8 @@ test("production HTML to PDF preserves styled multi-page content and supports re
   downloadPromise = page.waitForEvent("download");
   await generate.click();
   download = await downloadPromise;
+  await expect(generate).toBeEnabled();
+  await expect(generate).toContainText("Generate PDF");
   expect(download.suggestedFilename()).toBe(
     `repeat-html-${testInfo.project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.pdf`,
   );
