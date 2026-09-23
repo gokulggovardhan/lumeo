@@ -84,11 +84,11 @@ test("native paint composes with existing Tc/Tw/Tz/Tf text-state formatting insi
 
   const edited = applyEditPlanWithNativePaintToBytes(bytes, plan, 1, paint);
   const text = new TextDecoder().decode(edited);
-  assert.match(text, /0 0\.5 0 rg .*14 Tf.*0\.5 Tc.*1 Tw.*96 Tz.*<43> Tj/s);
+  assert.match(text, /0 0\.5 0 rg[\s\S]*14 Tf[\s\S]*0\.5 Tc[\s\S]*1 Tw[\s\S]*96 Tz[\s\S]*<43> Tj/);
   // The established writer restores text state in reverse dependency order,
   // then native paint restores colour. Assert that exact sequence rather
   // than imposing an alternative ordering that the proven writer never used.
-  assert.match(text, /100 Tz.*0 Tw.*0 Tc.*\/F1 12 Tf.*0 g <42> Tj/s);
+  assert.match(text, /100 Tz[\s\S]*0 Tw[\s\S]*0 Tc[\s\S]*\/F1 12 Tf[\s\S]*0 g <42> Tj/);
 
   const reparsed = walkTextShowOperators(edited);
   assert.equal(reparsed[0].fontSizePt, 14);
