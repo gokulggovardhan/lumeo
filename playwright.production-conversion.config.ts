@@ -1,9 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
-
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "production-conversion-smoke.spec.ts",
+  testMatch: [
+    "production-conversion-smoke.spec.ts",
+    "production-conversion-certification.spec.ts",
+  ],
   timeout: 480_000,
   expect: { timeout: 120_000 },
   fullyParallel: false,
@@ -38,6 +40,10 @@ export default defineConfig({
     {
       name: "webkit-mobile-production-conversion",
       use: { ...devices["iPhone 15 Pro"] },
+    },
+    {
+      name: "firefox-production-conversion",
+      use: { ...devices["Desktop Firefox"] },
     },
   ],
 });
