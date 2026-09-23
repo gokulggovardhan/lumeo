@@ -36,6 +36,7 @@ import type { PDFContext, PDFDict, PDFPage } from "pdf-lib";
 import type { EditPlan } from "./editPlan.ts";
 import { ensureFallbackFontResource, resolveFallbackFontsDict } from "./fallbackFont.ts";
 import type { MultiRunEditPlan } from "./multiRunEditPlan.ts";
+import type { NativePaintPlan } from "./nativePaint.ts";
 import { resolveStreamTarget, resolveIsolatedStreamTarget } from "./formXObjects.ts";
 
 export class EditPlanRejectedError extends Error {}
@@ -445,11 +446,31 @@ function replaceContentStream(
 // resolveIsolatedStreamTarget) so every OTHER invocation stays untouched;
 // a Form that isn't actually shared anywhere else is resolved with no
 // clone at all, identically to isolate: false.
+async function applyPlanToTargetBytes(
+  bytes: Uint8Array,
+  plan: EditPlan,
+  bytesPerCode: 1 | 2,
+  fallbackResourceName: string | undefined,
+  nativePaintPlan: NativePaintPlan | undefined,
+): Promise<Uint8Array> {
+  if (!nativePaintPlan) {
+    return applyEditPlanToBytes(bytes, plan, bytesPerCode, { fallbackResourceName });
+  }
+  const { applyEditPlanWithNativePaintToBytes } = await import("./nativePaintApply.ts");
+  return applyEditPlanWithNativePaintToBytes(
+    bytes,
+    plan,
+    bytesPerCode,
+    nativePaintPlan,
+    { fallbackResourceName },
+  );
+}
+
 export async function applyEditPlanToDocument(
   doc: PDFDocument,
   plan: EditPlan,
   bytesPerCode: 1 | 2,
-  options: { isolate?: boolean } = {},
+  options: { isolate?: boolean; nativePaintPlan?: NativePaintPlan } = {},
 ): Promise<void> {
   assertApplicable(plan);
 
@@ -465,7 +486,7 @@ export async function applyEditPlanToDocument(
     // copyStreamDictExceptLengthAndFilter, and adding one font name to a
     // shared Form's resources is purely additive for every other site.
     const fallbackResourceName = await registerFallbackFont(doc, plan, target.originalStream.dict);
-    const newBytes = applyEditPlanToBytes(target.decodedBytes, plan, bytesPerCode, { fallbackResourceName });
+    const newBytes = await applyPlanToTargetBytes(target.decodedBytes, plan, bytesPerCode, fallbackResourceName, options.nativePaintPlan);
     const wasFlate = isFlateEncoded(target.originalStream);
     const newStream = wasFlate ? target.context.flateStream(newBytes) : target.context.stream(newBytes);
     copyStreamDictExceptLengthAndFilter(target.originalStream, newStream);
@@ -476,7 +497,7 @@ export async function applyEditPlanToDocument(
   const page = doc.getPages()[plan.pageIndex];
   const located = locateContentStream(doc, plan.pageIndex, plan.contentStreamIndex);
   const fallbackResourceName = await registerFallbackFont(doc, plan, null);
-  const newBytes = applyEditPlanToBytes(located.decodedBytes, plan, bytesPerCode, { fallbackResourceName });
+  const newBytes = await applyPlanToTargetBytes(located.decodedBytes, plan, bytesPerCode, fallbackResourceName, options.nativePaintPlan);
   replaceContentStream(page, located, plan.contentStreamIndex, newBytes);
 }
 

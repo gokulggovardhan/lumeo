@@ -114,6 +114,76 @@ export function paintChannelsForRenderingMode(
   }
 }
 
+export type NativeFillColorCapability = {
+  editable: boolean;
+  sourceColor: PdfPaintColor | null;
+  reason: string | null;
+};
+
+/**
+ * Classifies whether a normal browser RGB colour picker can safely edit
+ * this operator's native glyph fill. DeviceCMYK is preserved and reported
+ * exactly, but deliberately stays read-only because converting it to RGB
+ * would require an output-profile assumption the PDF does not provide.
+ */
+export function describeNativeFillColorCapability(
+  operator: Pick<TextShowOperator, "renderMode" | "fillColor">,
+): NativeFillColorCapability {
+  const sourceColor = operator.fillColor ?? null;
+  if (!Number.isInteger(operator.renderMode) || operator.renderMode < 0 || operator.renderMode > 7) {
+    return {
+      editable: false,
+      sourceColor,
+      reason: "This text has an invalid PDF rendering mode, so its fill colour cannot be changed safely.",
+    };
+  }
+  if (operator.renderMode >= 4) {
+    return {
+      editable: false,
+      sourceColor,
+      reason: "This text contributes to a clipping path. Fill-colour editing is disabled for rendering modes 4–7.",
+    };
+  }
+  if (operator.renderMode === 3) {
+    return {
+      editable: false,
+      sourceColor,
+      reason: "This text is invisible (rendering mode 3), so a visible fill-colour change is blocked.",
+    };
+  }
+  if (!paintChannelsForRenderingMode(operator.renderMode).fill) {
+    return {
+      editable: false,
+      sourceColor,
+      reason: "This text uses a stroke-only rendering mode, so changing its fill colour would not affect the glyphs.",
+    };
+  }
+  if (!sourceColor) {
+    return {
+      editable: false,
+      sourceColor: null,
+      reason: "The native fill colour is unknown, so Lumeo cannot restore the surrounding graphics state exactly.",
+    };
+  }
+  const validation = validateNativePaintColor(sourceColor);
+  if (validation) return { editable: false, sourceColor, reason: validation };
+  if (sourceColor.colorSpace === "DeviceCMYK") {
+    return {
+      editable: false,
+      sourceColor,
+      reason: "DeviceCMYK fill was detected exactly. It stays read-only because Lumeo does not guess-convert CMYK to RGB.",
+    };
+  }
+  if (!sourceColor.cssHex) {
+    return {
+      editable: false,
+      sourceColor,
+      reason: "This native fill cannot be represented exactly by the RGB colour picker.",
+    };
+  }
+  return { editable: true, sourceColor, reason: null };
+}
+
 /**
  * Builds a local graphics-paint wrapper for exactly one native text-show
  * operator. The selected colour is set immediately before the operator and
