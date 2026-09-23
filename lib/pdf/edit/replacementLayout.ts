@@ -30,27 +30,34 @@ export type ReplacementLayoutPolicy = {
 export const DEFAULT_REPLACEMENT_LAYOUT_POLICY: ReplacementLayoutPolicy = {
   naturalTolerancePt: 0.75,
   naturalToleranceRatio: 0.03,
-  // The current low-level writer preserves the following text position with
-  // TJ compensation but does not yet reshape the replacement itself. Keep a
-  // small bounded overflow window while the premium scaling/reflow writer is
-  // introduced incrementally.
   maxCurrentWriterOverflowRatio: 0.08,
   maxLetterSpacingDeltaEm: 0.045,
   minHorizontalScaleFactor: 0.88,
   allowLocalReflow: false,
 };
 
+type LocalReflowTaggedPlan = Pick<
+  EditPlan,
+  | "editable"
+  | "reason"
+  | "originalWidthPt"
+  | "replacementWidthPt"
+  | "fontSizePt"
+  | "replacementGlyphCodes"
+  | "replacementTextState"
+> & {
+  /**
+   * Added only by the proven multi-line planner. This metadata is deliberately
+   * runtime-local: the low-level writer still consumes ordinary EditPlans.
+   */
+  __localReflowLayout?: {
+    capacityPt: number;
+    replacementWidthPt: number;
+  };
+};
+
 export function decideReplacementLayout(
-  plan: Pick<
-    EditPlan,
-    | "editable"
-    | "reason"
-    | "originalWidthPt"
-    | "replacementWidthPt"
-    | "fontSizePt"
-    | "replacementGlyphCodes"
-    | "replacementTextState"
-  >,
+  plan: LocalReflowTaggedPlan,
   policy: ReplacementLayoutPolicy = DEFAULT_REPLACEMENT_LAYOUT_POLICY,
 ): ReplacementLayoutDecision {
   if (!plan.editable) {
@@ -62,6 +69,24 @@ export function decideReplacementLayout(
       suggestedCharSpacingDeltaPt: null,
       suggestedHorizontalScaleFactor: null,
       reason: plan.reason ?? "This replacement is not editable.",
+    };
+  }
+
+  const localReflow = plan.__localReflowLayout;
+  if (localReflow) {
+    const capacity = Math.max(0, localReflow.capacityPt);
+    const replacement = Math.max(0, localReflow.replacementWidthPt);
+    return {
+      strategy: "local-reflow",
+      safeToApplyWithCurrentWriter: capacity > 0 && replacement <= capacity + 0.5,
+      widthRatio: capacity > 0 ? replacement / capacity : 1,
+      overflowPt: Math.max(0, replacement - capacity),
+      suggestedCharSpacingDeltaPt: null,
+      suggestedHorizontalScaleFactor: null,
+      reason:
+        capacity > 0 && replacement <= capacity + 0.5
+          ? null
+          : "The replacement no longer fits the proven local text region.",
     };
   }
 
