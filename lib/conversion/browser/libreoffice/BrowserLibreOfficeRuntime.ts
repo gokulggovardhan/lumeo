@@ -30,15 +30,8 @@ type EmscriptenFs = {
   unlink(path: string): void;
 };
 
-type EmscriptenModule = {
-  PThread?: {
-    terminateAllThreads?: () => void;
-  };
-};
-
 type ZetaHelperMainInstance = {
   FS: EmscriptenFs;
-  Module?: EmscriptenModule;
   thrPort: MessagePort;
   start(callback: () => void): void;
 };
@@ -528,10 +521,12 @@ export class BrowserLibreOfficeRuntime {
 
   /**
    * ZetaJS 1.2.0 does not expose a public destroy API. We close the message
-   * port, terminate Emscripten pthreads when available, revoke our generated
-   * worker module, remove the runtime script, and clear large global runtime
-   * references. The cached lightweight ZetaJS constructor is intentionally
-   * retained so a recoverable retry can initialize a fresh Office runtime.
+   * port, revoke our generated worker module, remove the runtime script, and
+   * clear large global runtime references. We deliberately do not read
+   * Module.PThread: this ZetaOffice build does not export it, and Emscripten
+   * aborts the runtime when an unexported runtime method is accessed. The
+   * cached lightweight ZetaJS constructor is retained so a recoverable retry
+   * can initialize a fresh Office runtime.
    */
   destroy(): void {
     if (this.startPromise && !this.ready) {
@@ -555,9 +550,6 @@ export class BrowserLibreOfficeRuntime {
 
     try {
       helper?.thrPort?.close();
-    } catch {}
-    try {
-      helper?.Module?.PThread?.terminateAllThreads?.();
     } catch {}
 
     if (this.officeThreadUrl) {

@@ -70,7 +70,8 @@ test("Word runtime cancellation resets worker resources and temporary MEMFS file
     "utf8",
   );
 
-  assert.match(source, /terminateAllThreads/);
+  assert.doesNotMatch(source, /\.Module\?\.PThread|terminateAllThreads/);
+  assert.match(source, /does not export it/);
   assert.match(source, /thrPort\?\.close/);
   assert.match(source, /URL\.revokeObjectURL\(this\.officeThreadUrl\)/);
   assert.match(source, /helper\.FS\.unlink\(from\)/);
