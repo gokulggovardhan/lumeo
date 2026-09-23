@@ -29,7 +29,9 @@ jobs:
       - run: npm ci
 
       - name: Apply controlled product patch
-        run: python3 .github/scripts/apply-native-color-ui.py
+        run: |
+          python3 .github/scripts/apply-native-color-ui.py
+          python3 .github/scripts/fix-native-color-test.py
 
       - name: Review staged implementation diff
         run: |
@@ -50,7 +52,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/scripts/apply-native-color-ui.py .github/workflows/edit-native-color-ui-implementation.yml
+          git rm .github/scripts/apply-native-color-ui.py .github/scripts/fix-native-color-test.py .github/workflows/edit-native-color-ui-implementation.yml
           git add components/pdf/EditPdfTool.tsx lib/pdf/edit/nativePaint.ts lib/pdf/edit/applyEditPlan.ts tests/edit-native-paint.test.ts tests/edit-native-paint-document.test.ts
           git diff --cached --check
           git status --short
