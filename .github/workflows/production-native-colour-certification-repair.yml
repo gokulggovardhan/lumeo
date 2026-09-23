@@ -1,0 +1,60 @@
+name: Production native colour certification repair
+
+on:
+  push:
+    branches:
+      - fix/production-native-colour-certification
+    paths:
+      - .github/workflows/production-native-colour-certification-repair.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: fix/production-native-colour-certification
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.x
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply controlled certification repair
+        run: python3 .github/scripts/patch-production-native-colour-certification.py
+
+      - name: Static validation
+        run: |
+          git diff --check
+          npx eslint e2e/production-conversion-certification.spec.ts e2e/production-conversion-smoke.spec.ts
+          npx tsc --noEmit
+
+      - name: Install deterministic document tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils python3-pil
+
+      - name: Install production browser matrix
+        run: npx playwright install --with-deps chromium webkit firefox
+
+      - name: Re-run live production certification against current deployed main
+        run: xvfb-run -a npx playwright test --config=playwright.production-conversion.config.ts
+
+      - name: Commit verified repair only
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/scripts/patch-production-native-colour-certification.py .github/workflows/production-native-colour-certification-repair.yml
+          git add e2e/production-conversion-certification.spec.ts e2e/production-conversion-smoke.spec.ts
+          git diff --cached --check
+          git status --short
+          git commit -m "test(production): harden conversion certification"
+          git push origin HEAD:fix/production-native-colour-certification
