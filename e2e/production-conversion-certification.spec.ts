@@ -112,8 +112,21 @@ function isRecoveredPdfWorkerBootstrapFailure(
   );
 }
 
-function expectCleanRuntime(watch: RuntimeWatch): void {
-  expect(watch.pageErrors).toEqual([]);
+function isFirefoxUnsupportedClipboardPermissionError(message: string): boolean {
+  return /^'(clipboard-read|clipboard-write)' \(value of 'name' member of PermissionDescriptor\) is not a valid value for enumeration PermissionName\.$/.test(
+    message,
+  );
+}
+
+function expectCleanRuntime(watch: RuntimeWatch, browserName?: string): void {
+  const pageErrors =
+    browserName === "firefox"
+      ? watch.pageErrors.filter(
+          (message) => !isFirefoxUnsupportedClipboardPermissionError(message),
+        )
+      : watch.pageErrors;
+
+  expect(pageErrors).toEqual([]);
   expect(watch.consoleErrors).toEqual([]);
   expect(
     watch.failedRequests
@@ -205,7 +218,9 @@ async function convertPdfToWord(
     mimeType: "application/pdf",
     buffer: input.buffer,
   });
-  await expect(page.getByTitle(input.name)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: `Remove ${input.name}` }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Convert to Word" }).click();
   await expect(page.getByText("Word document ready")).toBeVisible({ timeout: 180_000 });
@@ -229,7 +244,9 @@ async function convertWordToPdf(
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: input.buffer,
   });
-  await expect(page.getByTitle(input.name)).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: `Remove ${input.name}` }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Convert to PDF" }).click();
   await expect(page.getByText("PDF ready")).toBeVisible({ timeout: 420_000 });
@@ -247,6 +264,7 @@ async function convertWordToPdf(
 
 test("production PDF to Word preserves semantic/table/two-column classification across repeated public conversions", async ({
   page,
+  browserName,
 }) => {
   const runtime = watchConversionRuntime(page);
   await page.goto("/pdf/pdf-to-word", { waitUntil: "domcontentloaded" });
@@ -293,7 +311,7 @@ test("production PDF to Word preserves semantic/table/two-column classification 
   expect(occurrences(columns.xml, "Left column introduces the first topic.")).toBe(1);
   expect(occurrences(columns.xml, "Right column begins an independent topic.")).toBe(1);
 
-  expectCleanRuntime(runtime);
+  expectCleanRuntime(runtime, browserName);
 });
 
 test("production Word to PDF reuses Office runtime, survives cancellation, and converts again on the public page", async ({
@@ -350,7 +368,7 @@ test("production Word to PDF reuses Office runtime, survives cancellation, and c
     expectedFileName: "post-cancellation-retry.pdf",
   });
 
-  expectCleanRuntime(runtime);
+  expectCleanRuntime(runtime, browserName);
 });
 
 test("production Word to PDF is capability-honest on non-Chromium browsers", async ({
@@ -388,11 +406,12 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
     await expect(alert).toContainText(/browser|local conversion engine|supported/i);
   }
 
-  expectCleanRuntime(runtime);
+  expectCleanRuntime(runtime, browserName);
 });
 
 test("production HTML to PDF preserves styled multi-page content and supports repeat generation", async ({
   page,
+  browserName,
 }, testInfo) => {
   const runtime = watchConversionRuntime(page);
   await page.goto("/pdf/html-to-pdf", { waitUntil: "domcontentloaded" });
@@ -430,8 +449,10 @@ test("production HTML to PDF preserves styled multi-page content and supports re
   await page.getByLabel("File name").fill("Production Rich HTML");
 
   let downloadPromise = page.waitForEvent("download");
-  const generate = page.getByRole("button", { name: "Generate PDF" });
+  const generate = page.locator("button.lumeo-primary-action").first();
+  await expect(generate).toContainText("Generate PDF");
   await generate.click();
+  await expect(generate).toBeDisabled({ timeout: 5_000 });
   await expect(generate).toContainText("Generating", { timeout: 5_000 });
   let download = await downloadPromise;
   expect(download.suggestedFilename()).toBe("production-rich-html.pdf");
@@ -445,7 +466,7 @@ test("production HTML to PDF preserves styled multi-page content and supports re
   );
   await page.getByLabel("File name").fill(`Repeat HTML ${testInfo.project.name}`);
   downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Generate PDF" }).click();
+  await generate.click();
   download = await downloadPromise;
   expect(download.suggestedFilename()).toBe(
     `repeat-html-${testInfo.project.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.pdf`,
@@ -455,5 +476,5 @@ test("production HTML to PDF preserves styled multi-page content and supports re
   expect(pdf.getPageCount()).toBeGreaterThan(0);
   expect(bytes.length).toBeGreaterThan(1_000);
 
-  expectCleanRuntime(runtime);
+  expectCleanRuntime(runtime, browserName);
 });
