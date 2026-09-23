@@ -83,8 +83,8 @@ replace_once(
 # failure remains fatal.
 replace_once(
     cert,
-    '''  expectCleanRuntime(runtime);\n});''',
-    '''  expectCleanRuntime(runtime, {\n    allowConsoleError: isExpectedSandboxedHtmlPreviewScriptBlock,\n  });\n});''',
+    '''  pdf = await PDFDocument.load(bytes);\n  expect(pdf.getPageCount()).toBeGreaterThan(0);\n  expect(bytes.length).toBeGreaterThan(1_000);\n\n  expectCleanRuntime(runtime);\n});''',
+    '''  pdf = await PDFDocument.load(bytes);\n  expect(pdf.getPageCount()).toBeGreaterThan(0);\n  expect(bytes.length).toBeGreaterThan(1_000);\n\n  expectCleanRuntime(runtime, {\n    allowConsoleError: isExpectedSandboxedHtmlPreviewScriptBlock,\n  });\n});''',
     "HTML sandbox runtime allowance",
 )
 
@@ -115,7 +115,7 @@ smoke.write_text(smoke_text)
 replace_once(
     smoke,
     '''  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });\n  await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });\n  await page.locator('input[type="file"]').first().setInputFiles({\n    name: "native-colour-production-reopened.pdf",\n    mimeType: "application/pdf",\n    buffer: bytes,\n  });\n  const reopened = await selectEmployeeAndOpenFormat();\n  await expect(reopened.colour).toHaveValue("#3366cc");\n  await expect(reopened.scale).toHaveValue("95");\n\n  expect(consoleErrors).toEqual([]);\n  expectCleanRuntime(runtime);''',
-    '''  const reopenedPage = await page.context().newPage();\n  const reopenedRuntime = watchConversionRuntime(reopenedPage);\n  const reopenedConsoleErrors: string[] = [];\n  reopenedPage.on("console", (message) => {\n    if (message.type() === "error") reopenedConsoleErrors.push(message.text());\n  });\n  await reopenedPage.goto("/pdf/edit", { waitUntil: "domcontentloaded" });\n  await expect(reopenedPage.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });\n  await reopenedPage.locator('input[type="file"]').first().setInputFiles({\n    name: "native-colour-production-reopened.pdf",\n    mimeType: "application/pdf",\n    buffer: bytes,\n  });\n  const reopened = await selectEmployeeAndOpenFormat(reopenedPage);\n  await expect(reopened.colour).toHaveValue("#3366cc");\n  await expect(reopened.scale).toHaveValue("95");\n  await reopenedPage.waitForLoadState("networkidle");\n\n  expect(reopenedConsoleErrors).toEqual([]);\n  expectCleanRuntime(reopenedRuntime);\n  expect(consoleErrors).toEqual([]);\n  expectCleanRuntime(runtime);\n  await reopenedPage.close();''',
+    '''  const reopenedPage = await page.context().newPage();\n  const reopenedRuntime = watchConversionRuntime(reopenedPage);\n  const reopenedConsoleErrors: string[] = [];\n  reopenedPage.on("console", (message) => {\n    if (message.type() === "error") reopenedConsoleErrors.push(message.text());\n  });\n  await reopenedPage.goto("/pdf/edit", { waitUntil: "domcontentloaded" });\n  await expect(reopenedPage.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });\n  await reopenedPage.locator('input[type="file"]').first().setInputFiles({\n    name: "native-colour-production-reopened.pdf",\n    mimeType: "application/pdf",\n    buffer: bytes,\n  });\n  const reopened = await selectEmployeeAndOpenFormat(reopenedPage);\n  await expect(reopened.colour).toHaveValue("#3366cc");\n  await expect(reopened.scale).toHaveValue("95");\n\n  expect(reopenedConsoleErrors).toEqual([]);\n  expectCleanRuntime(reopenedRuntime);\n  expect(consoleErrors).toEqual([]);\n  expectCleanRuntime(runtime);\n  await reopenedPage.close();''',
     "Edit PDF isolated reopen page",
 )
 
