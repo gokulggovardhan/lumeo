@@ -1,0 +1,95 @@
+name: Bootstrap Edit Native Colour UI V2
+
+on:
+  push:
+    branches:
+      - feat/edit-native-text-color-ui
+    paths:
+      - ".github/workflows/edit-native-color-bootstrap-v2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  implement:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Apply corrected focused implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+
+          workflow = Path('.github/workflows/edit-native-color-bootstrap.yml').read_text()
+          marker = "          python - <<'PY'\n"
+          start = workflow.index(marker) + len(marker)
+          end = workflow.index("\n          PY\n", start)
+          source = textwrap.dedent(workflow[start:end])
+
+          stale = '''  const selectedNativeSpan =
+            selectedRunIndices.length === 1
+              ? pageTextModel?.spans[selectedRunIndices[0]] ?? null
+              : null;
+
+            const nativeStyleOverride = useMemo(() => {'''
+          exact = '''  const selectedNativeSpan =
+                selectedRunIndices.length === 1
+                  ? pageTextModel?.spans[selectedRunIndices[0]] ?? null
+                  : null;
+
+            const nativeStyleOverride = useMemo(() => {'''
+          if stale not in source:
+              raise SystemExit('bootstrap source no longer contains the stale selectedNativeSpan anchor')
+          source = source.replace(stale, exact, 1)
+          exec(compile(source, '<native-colour-bootstrap>', 'exec'))
+          PY
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Run focused native colour regression tests
+        run: >-
+          node --no-warnings --test --experimental-strip-types
+          tests/edit-native-paint.test.ts
+          tests/edit-native-paint-apply.test.ts
+          tests/edit-native-fill-color-control.test.ts
+          tests/edit-native-paint-document.test.ts
+          tests/edit-session.test.ts
+
+      - name: Lint touched implementation and tests
+        run: >-
+          npx eslint
+          components/pdf/EditPdfTool.tsx
+          lib/pdf/edit/applyEditPlan.ts
+          lib/pdf/edit/nativePaint.ts
+          tests/edit-native-fill-color-control.test.ts
+          tests/edit-native-paint-document.test.ts
+          e2e/edit-vinext.spec.ts
+          e2e/production-conversion-smoke.spec.ts
+
+      - name: Build application
+        run: npm run build
+
+      - name: Commit implementation and remove bootstrap workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm .github/workflows/edit-native-color-bootstrap.yml .github/workflows/edit-native-color-bootstrap-v2.yml
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add components/pdf/EditPdfTool.tsx lib/pdf/edit/applyEditPlan.ts lib/pdf/edit/nativePaint.ts tests/edit-native-fill-color-control.test.ts tests/edit-native-paint-document.test.ts e2e/edit-vinext.spec.ts e2e/production-conversion-smoke.spec.ts .github/workflows/edit-native-color-bootstrap.yml .github/workflows/edit-native-color-bootstrap-v2.yml
+          git commit -m "Add safe native PDF text colour controls"
+          git push origin HEAD:feat/edit-native-text-color-ui
