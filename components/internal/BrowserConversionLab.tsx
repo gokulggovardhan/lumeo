@@ -13,7 +13,7 @@ import {
   BrowserLibreOfficeRuntime,
 } from "@/lib/conversion/browser/libreoffice/BrowserLibreOfficeRuntime";
 import {
-  DEV_ZETAOFFICE_BASE_URL,
+  LUMEO_OFFICE_RUNTIME_ROUTE,
   resolveOfficeAssetConfig,
 } from "@/lib/conversion/browser/libreoffice/assetConfig";
 import { normalizeConversionError } from "@/lib/conversion/errors";
@@ -76,7 +76,7 @@ export default function BrowserConversionLab() {
   const [capabilitySummary, setCapabilitySummary] = useState(
     "Checking browser capabilities...",
   );
-  const [runtimeBase, setRuntimeBase] = useState(DEV_ZETAOFFICE_BASE_URL);
+  const [runtimeBase, setRuntimeBase] = useState(LUMEO_OFFICE_RUNTIME_ROUTE);
 
   const [wordFile, setWordFile] = useState<File | null>(null);
   const [wordState, setWordState] = useState<LabState>("idle");
@@ -121,7 +121,10 @@ export default function BrowserConversionLab() {
   }, []);
 
   function wordCoordinator(): ConversionCoordinator {
-    const normalizedBase = runtimeBase.trim();
+    const normalizedBase = new URL(
+      runtimeBase.trim(),
+      window.location.origin,
+    ).toString();
     const current = wordRuntimeRef.current;
 
     if (current?.baseUrl === normalizedBase) {
@@ -285,7 +288,7 @@ export default function BrowserConversionLab() {
                 data-testid="word-convert"
                 type="button"
                 onClick={convertWord}
-                disabled={!wordFile || wordState === "converting"}
+                disabled={!runtimeBase || !wordFile || wordState === "converting"}
                 className="rounded-xl bg-white px-4 py-2.5 text-sm font-semibold text-black disabled:opacity-50"
               >
                 Convert

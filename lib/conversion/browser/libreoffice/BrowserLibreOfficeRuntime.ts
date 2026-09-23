@@ -337,7 +337,6 @@ export class BrowserLibreOfficeRuntime {
   private queue: Promise<unknown> = Promise.resolve();
   private startPromise: Promise<void> | null = null;
   private ready = false;
-  private destroyAfterStart = false;
 
   constructor(private readonly assets: OfficeAssetConfig) {}
 
@@ -384,10 +383,6 @@ export class BrowserLibreOfficeRuntime {
     try {
       await waitForReady(helper, bootstrapSignal);
       this.ready = true;
-      if (this.destroyAfterStart) {
-        this.destroyAfterStart = false;
-        this.destroyNow();
-      }
     } catch (error) {
       this.destroyNow();
       throw error;
@@ -520,25 +515,14 @@ export class BrowserLibreOfficeRuntime {
   }
 
   /**
-   * ZetaJS 1.2.0 does not expose a public destroy API. We close the message
-   * port, revoke our generated worker module, remove the runtime script, and
-   * clear large global runtime references. We deliberately do not read
-   * Module.PThread: this ZetaOffice build does not export it, and Emscripten
-   * aborts the runtime when an unexported runtime method is accessed. The
-   * cached lightweight ZetaJS constructor is retained so a recoverable retry
-   * can initialize a fresh Office runtime.
+   * ZetaJS 1.2.0 does not expose a public worker termination API. Its Office
+   * thread continues to use window.Module after initialization, so deleting
+   * globals or closing its port poisons all later conversions in this page.
+   * Job files are removed in convertDocumentToPdfExclusive; the initialized
+   * runtime itself is retained and reused until the browser releases the page.
    */
   destroy(): void {
-    if (this.startPromise && !this.ready) {
-      // Emscripten/ZetaJS must finish asynchronous module compilation before
-      // its globals are removed. Tearing them down mid-bootstrap poisons the
-      // next runtime in the same page. The caller still observes cancellation
-      // immediately; a retry waits for this bootstrap to settle, then starts
-      // from a fully released runtime.
-      this.destroyAfterStart = true;
-      return;
-    }
-
+    if (this.ready || this.startPromise) return;
     this.destroyNow();
   }
 
@@ -546,7 +530,6 @@ export class BrowserLibreOfficeRuntime {
     const helper = this.helper;
     this.helper = null;
     this.ready = false;
-    this.destroyAfterStart = false;
 
     try {
       helper?.thrPort?.close();
