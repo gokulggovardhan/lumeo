@@ -20,6 +20,12 @@ export type LocalReflowLineInput = {
   operatorIndices: number[];
   sourceRunIndices: number[];
   boundsPt: LocalReflowBounds;
+  /**
+   * Horizontal room proven by the Page → Block → Line model. This may be
+   * wider than the line's currently painted glyphs, but never wider than the
+   * already-owned local block region.
+   */
+  availableWidthPt: number;
   rotationDeg: number;
   writingDirection: "ltr" | "rtl" | "vertical";
 };
@@ -33,6 +39,7 @@ export type LocalReflowLinePlan =
       replacementText: string;
       originalWidthPt: number;
       replacementWidthPt: number;
+      availableWidthPt: number;
       plan: EditPlan;
     }
   | {
@@ -43,6 +50,7 @@ export type LocalReflowLinePlan =
       replacementText: string;
       originalWidthPt: number;
       replacementWidthPt: number;
+      availableWidthPt: number;
       plan: MultiRunEditPlan;
     };
 
@@ -110,10 +118,6 @@ function linePlanWidth(plan: EditPlan | MultiRunEditPlan): {
   };
 }
 
-function linePlanText(plan: EditPlan | MultiRunEditPlan): string {
-  return plan.originalText;
-}
-
 function buildLinePlan(
   input: BuildSafeLocalReflowPlanInput,
   line: LocalReflowLineInput,
@@ -122,9 +126,7 @@ function buildLinePlan(
   if (line.operatorIndices.length === 1) {
     const operatorIndex = line.operatorIndices[0];
     const operator = input.allOperators[operatorIndex];
-    if (!operator) {
-      throw new Error(`Text operator ${operatorIndex} no longer exists.`);
-    }
+    if (!operator) throw new Error(`Text operator ${operatorIndex} no longer exists.`);
     return buildEditPlan({
       pageIndex: input.pageIndex,
       contentStreamIndex: input.contentStreamIndex,
@@ -158,10 +160,11 @@ function materializeLinePlan(
   const common = {
     lineId: line.lineId,
     sourceRunIndices: [...line.sourceRunIndices],
-    originalText: linePlanText(plan),
+    originalText: plan.originalText,
     replacementText,
     originalWidthPt: widths.originalWidthPt,
     replacementWidthPt: widths.replacementWidthPt,
+    availableWidthPt: line.availableWidthPt,
   };
   return "subPlans" in plan
     ? { kind: "multi", ...common, plan }
@@ -186,12 +189,11 @@ function withinPage(bounds: LocalReflowBounds, widthPt: number, heightPt: number
 /**
  * Reflows text only inside already-existing native text line slots.
  *
- * This deliberately does NOT create new lines, move line origins, enlarge a
- * line box, enter Form XObjects, rotate/skew text, or cross font/text-state
- * boundaries. Every line keeps its original advance by using the existing
- * EditPlan/TJ-compensation writer, so unrelated page objects cannot be pushed
- * or newly overlapped. If any ownership/geometry invariant is ambiguous the
- * planner fails closed.
+ * The line origins/matrices never move. A line may use empty horizontal room
+ * already proven to belong to the same text block, but it may not exceed that
+ * block-owned width. Every operator's post-show advance is still restored by
+ * the existing TJ compensation engine, so following PDF content is not pushed.
+ * No new line, Form edit, rotation, skew, font or graphics state is invented.
  */
 export function buildSafeLocalReflowPlan(
   input: BuildSafeLocalReflowPlanInput,
@@ -228,6 +230,13 @@ export function buildSafeLocalReflowPlan(
     }
     if (!withinPage(line.boundsPt, input.pageWidthPt, input.pageHeightPt)) {
       return reject(input, "This text region touches or exceeds the page boundary, so local reflow is not safe.");
+    }
+    if (
+      !Number.isFinite(line.availableWidthPt) ||
+      line.availableWidthPt + WIDTH_TOLERANCE_PT < line.boundsPt.widthPt ||
+      line.boundsPt.xPt + line.availableWidthPt > input.pageWidthPt + WIDTH_TOLERANCE_PT
+    ) {
+      return reject(input, "The available local line width is not proven inside the page/block geometry.");
     }
     if (line.operatorIndices.length === 0) {
       return reject(input, "A line has no uniquely owned text-show operator.");
@@ -296,13 +305,13 @@ export function buildSafeLocalReflowPlan(
       if (!candidatePlan) {
         return reject(input, `The text cannot be encoded safely in line ${lineIndex + 1}'s verified PDF font.`);
       }
-      if (candidatePlan.replacementWidthPt <= candidatePlan.originalWidthPt + WIDTH_TOLERANCE_PT) {
+      if (candidatePlan.replacementWidthPt <= input.lines[lineIndex].availableWidthPt + WIDTH_TOLERANCE_PT) {
         current = candidate;
         wordIndex += 1;
         continue;
       }
       if (!current) {
-        return reject(input, `A word is wider than line ${lineIndex + 1}'s original text region; Lumeo will not squeeze or overlap it silently.`);
+        return reject(input, `A word is wider than line ${lineIndex + 1}'s proven local region; Lumeo will not squeeze or overlap it silently.`);
       }
       break;
     }
@@ -320,15 +329,13 @@ export function buildSafeLocalReflowPlan(
     if (!planned) {
       return reject(input, `Line ${lineIndex + 1} could not be rebuilt safely after reflow.`);
     }
-    if (planned.replacementWidthPt > planned.originalWidthPt + WIDTH_TOLERANCE_PT) {
-      return reject(input, `Line ${lineIndex + 1} would exceed its original text region after reflow.`);
+    if (planned.replacementWidthPt > input.lines[lineIndex].availableWidthPt + WIDTH_TOLERANCE_PT) {
+      return reject(input, `Line ${lineIndex + 1} would exceed its proven local region after reflow.`);
     }
     if (planned.originalText !== planned.replacementText) linePlans.push(planned);
   }
 
-  if (linePlans.length === 0) {
-    return reject(input, "The reflow would not change any text.");
-  }
+  if (linePlans.length === 0) return reject(input, "The reflow would not change any text.");
 
   return {
     editable: true,
