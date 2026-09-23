@@ -35,8 +35,8 @@ replace_once(
 
 replace_once(
     cert,
-    '''  expect(runtime.officeRuntimeRequests.length).toBe(officeRequestsAfterFirstConversion);\n  expectCleanRuntime(runtime);\n});\n\ntest("production Word to PDF is capability-honest on non-Chromium browsers",''',
-    '''  expect(runtime.officeRuntimeRequests.length).toBe(officeRequestsAfterFirstConversion);\n  expectCleanRuntime(runtime, {\n    allowConsoleError: isExpectedChromiumOfficeRuntimeDiagnostic,\n  });\n});\n\ntest("production Word to PDF is capability-honest on non-Chromium browsers",''',
+    '''  expectCleanRuntime(runtime);\n});\n\ntest("production Word to PDF is capability-honest on non-Chromium browsers", async ({''',
+    '''  expectCleanRuntime(runtime, {\n    allowConsoleError: isExpectedChromiumOfficeRuntimeDiagnostic,\n  });\n});\n\ntest("production Word to PDF is capability-honest on non-Chromium browsers", async ({''',
     "Chromium Office runtime diagnostics",
 )
 
