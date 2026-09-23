@@ -28,6 +28,7 @@ export default async function InboxPage({
   const initial = await getFeedbackQueries(PAGE_SIZE + 1, 0);
   const initialReadFilter: InboxReadFilter =
     params.read === "unread" || params.read === "read" ? params.read : "all";
+  const initialNowMs = Date.now();
 
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col space-y-5">
@@ -42,6 +43,7 @@ export default async function InboxPage({
           initialError={initial.error}
           initialHasMore={initial.data.length > PAGE_SIZE}
           initialReadFilter={initialReadFilter}
+          initialNowMs={initialNowMs}
           pageSize={PAGE_SIZE}
           canManage={canManageInbox(admin.role)}
         />
