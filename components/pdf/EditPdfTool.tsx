@@ -60,7 +60,7 @@ import {
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { overlayFontSizePx, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
-import { buildPdfPageTextModel, type PdfPageTextModel } from "@/lib/pdf/edit/documentModel";
+import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
 import { PercentSpatialIndex } from "@/lib/pdf/edit/spatialIndex";
 import {
   buildPdfTextSearchPageIndex,

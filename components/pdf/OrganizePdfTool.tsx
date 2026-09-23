@@ -222,9 +222,10 @@ export default function OrganizePdfTool() {
   }, [result?.url]);
 
   useEffect(() => {
+    const thumbnailUrls = thumbnailUrlsRef.current;
     return () => {
-      thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      thumbnailUrlsRef.current.clear();
+      thumbnailUrls.forEach((url) => URL.revokeObjectURL(url));
+      thumbnailUrls.clear();
       void destroyPdfJsDocument();
     };
   }, []);
