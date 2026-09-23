@@ -1,0 +1,105 @@
+name: Edit native colour browser regression
+
+on:
+  push:
+    branches:
+      - feat/edit-native-text-color-ui-clean
+    paths:
+      - .github/workflows/edit-native-color-e2e.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: feat/edit-native-text-color-ui-clean
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply browser regression patch
+        run: python3 .github/scripts/patch-native-color-e2e.py
+
+      - name: Static validation
+        run: |
+          git diff --check
+          npx eslint e2e/edit-vinext.spec.ts
+          npx tsc --noEmit
+
+      - name: Initialize isolated Supabase catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+          npx supabase status -o env > /tmp/lumeo-edit-supabase.env
+          set -a
+          source /tmp/lumeo-edit-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Cloudflare Worker
+        run: npm run build:vinext
+
+      - name: Run native colour workflow against local Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev \
+            --config dist/server/wrangler.json \
+            --port 8787 \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            > /tmp/lumeo-native-colour-vinext.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          ready=false
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/pdf/edit >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/lumeo-native-colour-vinext.log
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" != "true" ]; then
+            cat /tmp/lumeo-native-colour-vinext.log
+            exit 1
+          fi
+          npx playwright test \
+            --config=playwright.vinext.config.ts \
+            --project=chromium-vinext \
+            --grep "applies native formatting and colour"
+
+      - name: Commit validated browser regression
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/scripts/patch-native-color-e2e.py .github/workflows/edit-native-color-e2e.yml
+          git add e2e/edit-vinext.spec.ts
+          git diff --cached --check
+          git status --short
+          git commit -m "test(edit): certify native text colour workflow"
+          git push origin HEAD:feat/edit-native-text-color-ui-clean
