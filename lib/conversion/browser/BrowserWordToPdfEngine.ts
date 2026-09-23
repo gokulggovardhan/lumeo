@@ -89,7 +89,6 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
 
     let workspace: BrowserConversionWorkspace | null = null;
     let runtime: ReturnType<typeof getBrowserLibreOfficeRuntime> | null = null;
-    let completed = false;
 
     try {
       let conversionFile = input.file;
@@ -194,7 +193,6 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
           engineId: this.id,
         },
       };
-      completed = true;
       return result;
     } catch (error) {
       const normalized = normalizeConversionError(error);
@@ -209,14 +207,6 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
           .catch(() => {});
       }
       throw normalized;
-    } finally {
-      // Normal conversions can reuse the already-loaded runtime for a fast
-      // second conversion. Large/extreme jobs release WASM threads and memory
-      // immediately, and any failed/cancelled job resets the runtime so retry
-      // starts from a clean process.
-      if (runtime && (mode !== "normal" || !completed)) {
-        runtime.destroy();
-      }
     }
   }
 }

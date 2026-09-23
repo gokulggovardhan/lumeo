@@ -60,18 +60,22 @@ export type ReconstructedTextLine = {
    */
   visualOnly?: boolean;
   glyphs?: ReconstructedGlyph[];
-  regionKind?: "semantic-text" | "fixed-layout-table" | "fixed-layout" | "footer" | "header";
+  regionKind?: "semantic-text" | "semantic-table" | "fixed-layout-table" | "fixed-layout" | "footer" | "header";
 };
 
 export type ReconstructedRegion = {
   id: string;
-  kind: "semantic-text" | "fixed-layout-table" | "fixed-layout" | "image" | "mixed";
+  kind: "semantic-text" | "semantic-table" | "fixed-layout-table" | "fixed-layout" | "image" | "mixed";
   lineIndices: number[];
   xPt: number;
   yPt: number;
   widthPt: number;
   heightPt: number;
   columnAnchorsPt?: number[];
+  /** Row membership for high-confidence editable Word-table reconstruction. */
+  rowGroups?: number[][];
+  /** Geometry-only confidence; semantic tables require a conservative score. */
+  tableConfidence?: number;
 };
 
 export type ReconstructedPage = {

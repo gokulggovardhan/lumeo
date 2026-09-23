@@ -64,18 +64,32 @@ test("PDF engine validates page count and maps protected-document errors", async
   assert.match(errors, /password\|encrypted/);
 });
 
-test("Word runtime cancellation resets worker resources and temporary MEMFS files", async () => {
+test("Word runtime cancellation preserves the runtime and removes temporary MEMFS files", async () => {
   const source = await readFile(
     "lib/conversion/browser/libreoffice/BrowserLibreOfficeRuntime.ts",
     "utf8",
   );
 
-  assert.match(source, /terminateAllThreads/);
-  assert.match(source, /thrPort\?\.close/);
+  assert.doesNotMatch(source, /\.Module\?\.PThread|terminateAllThreads/);
+  assert.match(source, /does not expose a public worker termination API/);
   assert.match(source, /URL\.revokeObjectURL\(this\.officeThreadUrl\)/);
   assert.match(source, /helper\.FS\.unlink\(from\)/);
   assert.match(source, /helper\.FS\.unlink\(to\)/);
   assert.match(source, /onAbort/);
+  assert.match(source, /waitForPromiseOrAbort/);
+  assert.match(source, /if \(this\.ready \|\| this\.startPromise\) return/);
+  assert.match(source, /runtime itself is retained and reused/);
+});
+
+test("conversion lab validates the immutable same-origin Office runtime", async () => {
+  const source = await readFile(
+    "components/internal/BrowserConversionLab.tsx",
+    "utf8",
+  );
+
+  assert.match(source, /useState\(LUMEO_OFFICE_RUNTIME_ROUTE\)/);
+  assert.match(source, /new URL\([\s\S]*window\.location\.origin/);
+  assert.doesNotMatch(source, /DEV_ZETAOFFICE_BASE_URL/);
 });
 
 

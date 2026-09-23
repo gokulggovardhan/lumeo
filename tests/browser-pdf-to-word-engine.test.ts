@@ -9,6 +9,10 @@ import {
 import {
   buildReconstructedDocx,
 } from "../lib/conversion/browser/pdfToWord/docx.ts";
+import {
+  classifyPageReconstruction,
+} from "../lib/conversion/browser/pdfToWord/classifier.ts";
+import type { ReconstructedTextLine } from "../lib/conversion/browser/pdfToWord/types.ts";
 
 test("PDF same-baseline cells remain independently positioned editable runs", () => {
   const items = [
@@ -259,6 +263,8 @@ test("DOCX fixed-layout output preserves color, underline, metric scale, hyperli
           underline: true,
           underlineColorHex: "#0000EE",
           wordScalePct: 103.4,
+          charSpacingPt: 0.5,
+          textRisePt: 1.5,
           hyperlinkUrl: "https://example.com/fidelity",
         },
         {
@@ -301,6 +307,8 @@ test("DOCX fixed-layout output preserves color, underline, metric scale, hyperli
   assert.match(documentXml, /<w:color w:val="0000EE"\/>/);
   assert.match(documentXml, /<w:u w:val="single" w:color="0000EE"\/>/);
   assert.match(documentXml, /<w:w w:val="103"\/>/);
+  assert.match(documentXml, /<w:spacing w:val="10"\/>/);
+  assert.match(documentXml, /<w:position w:val="3"\/>/);
   assert.match(documentXml, /w:lineRule="exact"/);
   assert.match(documentXml, /w:y="3185"/);
   assert.match(documentXml, /<w:hyperlink r:id="rIdHyperlink1"/);
@@ -312,4 +320,168 @@ test("DOCX fixed-layout output preserves color, underline, metric scale, hyperli
     "XML/read order follows source order rather than visual Y order",
   );
   assert.doesNotMatch(documentXml, /ROTATED-BACKGROUND-ONLY/);
+});
+
+
+test("semantic text pages become normal editable Word paragraphs rather than isolated frames", async () => {
+  const blob = await buildReconstructedDocx([
+    {
+      pageNumber: 1,
+      widthPt: 612,
+      heightPt: 792,
+      reconstructionMode: "semantic-text",
+      lines: [
+        {
+          text: "This is a deliberately long first line of an ordinary paragraph that fills most of the available measure.",
+          xPt: 72,
+          yPt: 72,
+          widthPt: 410,
+          heightPt: 13,
+          fontSizePt: 11,
+          fontFamily: "Times New Roman",
+          bold: false,
+          italic: false,
+          baselinePt: 81.5,
+          regionKind: "semantic-text",
+        },
+        {
+          text: "The wrapped continuation remains in the same editable paragraph.",
+          xPt: 72,
+          yPt: 85.5,
+          widthPt: 300,
+          heightPt: 13,
+          fontSizePt: 11,
+          fontFamily: "Times New Roman",
+          bold: false,
+          italic: false,
+          baselinePt: 95,
+          regionKind: "semantic-text",
+        },
+      ],
+      backgroundImage: null,
+    },
+  ]);
+
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+  const documentXml = await zip.file("word/document.xml")?.async("string");
+  assert.ok(documentXml);
+  assert.match(documentXml, /ordinary paragraph/);
+  assert.match(documentXml, /wrapped continuation/);
+  assert.match(documentXml, /<w:br\/>/);
+  assert.match(documentXml, /<w:ind w:left="1440"/);
+  assert.doesNotMatch(documentXml, /w:framePr/);
+  assert.doesNotMatch(documentXml, /w:fitText/);
+});
+
+test("high-confidence whitespace tables become fixed-layout editable Word tables", async () => {
+  const lines: ReconstructedTextLine[] = [
+    ["Description", 72, 100, 130, false],
+    ["Qty", 300, 100, 28, true],
+    ["Amount", 390, 100, 55, true],
+    ["Service A", 72, 122, 90, false],
+    ["2", 300, 122, 10, true],
+    ["125.00", 390, 122, 42, true],
+    ["Service B", 72, 144, 90, false],
+    ["1", 300, 144, 10, true],
+    ["80.00", 390, 144, 35, true],
+    ["Total", 72, 166, 40, false],
+    ["3", 300, 166, 10, true],
+    ["205.00", 390, 166, 42, true],
+  ].map(([text, xPt, yPt, widthPt, bold], index) => ({
+    text: String(text),
+    xPt: Number(xPt),
+    yPt: Number(yPt),
+    widthPt: Number(widthPt),
+    heightPt: 11,
+    fontSizePt: 10,
+    fontFamily: "Arial",
+    bold: Boolean(bold),
+    italic: false,
+    baselinePt: Number(yPt) + 8.5,
+    readingOrderIndex: index,
+    visualOrderIndex: index,
+  }));
+
+  const classification = classifyPageReconstruction({
+    lines,
+    imageCount: 0,
+    vectorLayoutCount: 0,
+    pageWidthPt: 612,
+  });
+  const table = classification.regions.find(
+    (region) => region.kind === "semantic-table",
+  );
+  assert.ok(table, "regular whitespace table should be structurally safe");
+  assert.ok((table.tableConfidence ?? 0) >= 0.82);
+  assert.deepEqual(table.columnAnchorsPt?.map(Math.round), [72, 300, 390]);
+
+  for (const index of table.lineIndices) {
+    lines[index].regionKind = "semantic-table";
+  }
+
+  const blob = await buildReconstructedDocx([
+    {
+      pageNumber: 1,
+      widthPt: 612,
+      heightPt: 792,
+      reconstructionMode: "fixed-layout",
+      lines,
+      regions: classification.regions,
+      backgroundImage: null,
+    },
+  ]);
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+  const documentXml = await zip.file("word/document.xml")?.async("string");
+  assert.ok(documentXml);
+  assert.match(documentXml, /<w:tbl>/);
+  assert.match(documentXml, /<w:tblLayout w:type="fixed"\/>/);
+  assert.match(documentXml, /<w:tblpPr [^>]*w:vertAnchor="page"/);
+  assert.match(documentXml, /<w:jc w:val="right"\/>/);
+  assert.doesNotMatch(documentXml, /w:framePr/);
+});
+
+test("two-column prose is not misclassified as an editable Word table", () => {
+  const lines = [
+    ["Left column paragraph one", 54, 90],
+    ["Right column paragraph one", 320, 90],
+    ["Left column paragraph two", 54, 108],
+    ["Right column paragraph two", 320, 108],
+    ["Left column paragraph three", 54, 126],
+    ["Right column paragraph three", 320, 126],
+  ].map(([text, xPt, yPt], index) => ({
+    text: String(text),
+    xPt: Number(xPt),
+    yPt: Number(yPt),
+    widthPt: 190,
+    heightPt: 12,
+    fontSizePt: 10,
+    fontFamily: "Arial",
+    bold: false,
+    italic: false,
+    baselinePt: Number(yPt) + 8.5,
+    readingOrderIndex: index,
+    visualOrderIndex: index,
+  }));
+
+  const classification = classifyPageReconstruction({
+    lines,
+    imageCount: 0,
+    vectorLayoutCount: 0,
+    pageWidthPt: 612,
+  });
+  assert.equal(
+    classification.regions.some((region) => region.kind === "semantic-table"),
+    false,
+  );
+});
+
+
+test("PDF reconstruction releases page-local PDF.js caches between pages", async () => {
+  const source = await readFile(
+    "lib/conversion/browser/BrowserPdfToWordEngine.ts",
+    "utf8",
+  );
+  assert.match(source, /page\.cleanup\?\.\(\)/);
+  assert.match(source, /document\.destroy\?\.\(\)/);
+  assert.match(source, /URL\.revokeObjectURL\(sourceUrl\)/);
 });

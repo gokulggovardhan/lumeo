@@ -30,15 +30,8 @@ type EmscriptenFs = {
   unlink(path: string): void;
 };
 
-type EmscriptenModule = {
-  PThread?: {
-    terminateAllThreads?: () => void;
-  };
-};
-
 type ZetaHelperMainInstance = {
   FS: EmscriptenFs;
-  Module?: EmscriptenModule;
   thrPort: MessagePort;
   start(callback: () => void): void;
 };
@@ -75,6 +68,30 @@ function abortError(signal: AbortSignal): unknown {
 
 function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) throw abortError(signal);
+}
+
+async function waitForPromiseOrAbort(
+  promise: Promise<void>,
+  signal: AbortSignal,
+): Promise<void> {
+  throwIfAborted(signal);
+
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const finish = (callback: () => void) => {
+      if (settled) return;
+      settled = true;
+      signal.removeEventListener("abort", onAbort);
+      callback();
+    };
+    const onAbort = () => finish(() => reject(abortError(signal)));
+
+    signal.addEventListener("abort", onAbort, { once: true });
+    promise.then(
+      () => finish(resolve),
+      (error) => finish(() => reject(error)),
+    );
+  });
 }
 
 function safeExtension(fileName: string): string {
@@ -318,12 +335,26 @@ export class BrowserLibreOfficeRuntime {
   private helper: ZetaHelperMainInstance | null = null;
   private officeThreadUrl: string | null = null;
   private queue: Promise<unknown> = Promise.resolve();
+  private startPromise: Promise<void> | null = null;
+  private ready = false;
 
   constructor(private readonly assets: OfficeAssetConfig) {}
 
   async start(signal: AbortSignal): Promise<void> {
     throwIfAborted(signal);
-    if (this.helper) return;
+    if (this.ready && this.helper) return;
+
+    while (!this.ready) {
+      this.startPromise ??= this.initialize().finally(() => {
+        this.startPromise = null;
+      });
+      await waitForPromiseOrAbort(this.startPromise, signal);
+      throwIfAborted(signal);
+    }
+  }
+
+  private async initialize(): Promise<void> {
+    const bootstrapSignal = new AbortController().signal;
 
     if (
       !crossOriginIsolated ||
@@ -337,11 +368,9 @@ export class BrowserLibreOfficeRuntime {
     }
 
     ensureOfficeCanvas();
-    await preflightOfficeAssetOrigin(this.assets, signal);
-    throwIfAborted(signal);
+    await preflightOfficeAssetOrigin(this.assets, bootstrapSignal);
 
     const ZetaHelperMain = await loadZetaHelperConstructor(this.assets.helperUrl);
-    throwIfAborted(signal);
 
     this.officeThreadUrl = createOfficeThreadModule(this.assets.helperUrl);
     const helper = new ZetaHelperMain(this.officeThreadUrl, {
@@ -352,9 +381,10 @@ export class BrowserLibreOfficeRuntime {
     this.helper = helper;
 
     try {
-      await waitForReady(helper, signal);
+      await waitForReady(helper, bootstrapSignal);
+      this.ready = true;
     } catch (error) {
-      this.destroy();
+      this.destroyNow();
       throw error;
     }
   }
@@ -485,21 +515,24 @@ export class BrowserLibreOfficeRuntime {
   }
 
   /**
-   * ZetaJS 1.2.0 does not expose a public destroy API. We close the message
-   * port, terminate Emscripten pthreads when available, revoke our generated
-   * worker module, remove the runtime script, and clear large global runtime
-   * references. The cached lightweight ZetaJS constructor is intentionally
-   * retained so a recoverable retry can initialize a fresh Office runtime.
+   * ZetaJS 1.2.0 does not expose a public worker termination API. Its Office
+   * thread continues to use window.Module after initialization, so deleting
+   * globals or closing its port poisons all later conversions in this page.
+   * Job files are removed in convertDocumentToPdfExclusive; the initialized
+   * runtime itself is retained and reused until the browser releases the page.
    */
   destroy(): void {
+    if (this.ready || this.startPromise) return;
+    this.destroyNow();
+  }
+
+  private destroyNow(): void {
     const helper = this.helper;
     this.helper = null;
+    this.ready = false;
 
     try {
       helper?.thrPort?.close();
-    } catch {}
-    try {
-      helper?.Module?.PThread?.terminateAllThreads?.();
     } catch {}
 
     if (this.officeThreadUrl) {
