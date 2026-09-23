@@ -81,6 +81,34 @@ test("every functional public tool route renders behind the server state gate", 
   }
 });
 
+test("catalog fallback keeps every functional gated route available", () => {
+  const fallback = readFileSync("lib/public-catalog/fallback.ts", "utf8");
+  const registry = readFileSync("components/pdf/PdfToolRegistry.tsx", "utf8");
+
+  assert.match(fallback, /const localTools = pdfTools\.map/);
+  assert.match(fallback, /tool\.slug === "organize" \? "reorder" : tool\.slug/);
+  for (const slug of ["crop", "page-numbers", "header-footer", "heic-to-jpeg"]) {
+    assert.match(fallback, new RegExp(`slug: "${slug}"`));
+  }
+  for (const slug of [
+    "merge",
+    "split",
+    "compress",
+    "jpg-to-pdf",
+    "pdf-to-jpg",
+    "sign",
+    "word-to-pdf",
+    "pdf-to-word",
+    "organize",
+    "html-to-pdf",
+    "extract-text",
+    "edit",
+    "watermark",
+  ]) {
+    assert.match(registry, new RegExp(`slug: "${slug}"`));
+  }
+});
+
 test("homepage exposes truthful beta and unavailable states without actionable links", () => {
   const source = readFileSync("components/pdf/PdfToolLauncher.tsx", "utf8");
   assert.match(source, /buildDiscoveryTiles\(resolved\)/);

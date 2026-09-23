@@ -76,6 +76,11 @@ try {
     fallback.includes('const fallbackOrder = ["merge", "split", "compress", "jpg-to-pdf", "pdf-to-jpg"]'),
     "Fallback order must be Merge, Split, Compress, JPG to PDF, PDF to JPG.",
   );
+  assert(fallback.includes("const localTools = pdfTools.map"), "Fallback catalog must include every live local registry tool.");
+  assert(fallback.includes('tool.slug === "organize" ? "reorder"'), "Fallback catalog must map Organize to its Admin catalog slug.");
+  for (const slug of ["crop", "page-numbers", "header-footer", "heic-to-jpeg"]) {
+    assert(fallback.includes(`slug: "${slug}"`), `Fallback catalog must include the live ${slug} route.`);
+  }
 
   // The 5-slot admin-configured homepage (getPublicHomepageTools /
   // homepage_tool_slots) was deliberately retired in favor of a fixed,
