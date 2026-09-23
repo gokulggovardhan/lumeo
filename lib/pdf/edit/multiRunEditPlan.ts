@@ -1,27 +1,28 @@
 // lib/pdf/edit/multiRunEditPlan.ts
 //
-// Phase 4 of true PDF text editing: lets one logical text replacement
-// span multiple content-stream operators (e.g. a selection that crosses
-// a Tj/TJ boundary, or several adjacent runs the user wants replaced as
-// one). Never touches PDF bytes -- purely read-only planning, exactly
-// like lib/pdf/edit/editPlan.ts (single-operator plans), which this
-// module builds N of internally and merges into one MultiRunEditPlan.
-//
-// Design: the FIRST operator in the span receives the entire replacement
-// text; every OTHER operator in the span is emptied (rewritten to show
-// nothing) rather than deleted from the content stream outright -- an
-// emptied ' or " still performs its own text-line move, which is needed
-// to keep whatever comes after the span correctly positioned (task:
-// preserve untouched operators/graphics state). This mirrors how a single
-// TJ operator's own rewrite already collapses multiple string operands
-// into one (see applyEditPlan.ts's buildReplacementOperatorText) --
-// applied here one level up, across operators instead of within one.
+// Plans one logical replacement across several consecutive PDF text-show
+// operators. The established default remains: replacement text is written to
+// the first operator and the rest are emptied, with one combined advance
+// compensation. A conservative local-reflow path is now added for a proven
+// multi-line selection when that default would overflow but the replacement
+// fits inside the already-existing paragraph width.
 
 import type { TextShowOperator } from "./contentStream.ts";
-import type { ResolvedFont } from "./fontEncoding.ts";
-import type { FontMetrics, TextShowState } from "./fontMetrics.ts";
-import { compareAdvance } from "./fontMetrics.ts";
 import { buildEditPlan, type EditPlan } from "./editPlan.ts";
+import type { ResolvedFont } from "./fontEncoding.ts";
+import { compareAdvance, type FontMetrics, type TextShowState } from "./fontMetrics.ts";
+import { allocateLocalReflowText } from "./localReflowAllocation.ts";
+
+const REFLOW_EPSILON = 0.001;
+const REFLOW_WIDTH_TOLERANCE_PT = 0.5;
+const MAX_REFLOW_LINES = 4;
+
+type LocalReflowMetadata = {
+  lineTexts: string[];
+  lineOperatorIndices: number[][];
+  capacityPt: number;
+  replacementWidthPt: number;
+};
 
 export type MultiRunEditPlan = {
   pageIndex: number;
@@ -32,15 +33,9 @@ export type MultiRunEditPlan = {
   replacementText: string;
   editable: boolean;
   reason: string | null;
-  /**
-   * One EditPlan per spanned operator, in the same order as
-   * operatorIndices. Only the first carries the actual replacement text;
-   * the rest are emptied. Apply with
-   * lib/pdf/edit/applyEditPlan.ts's applyMultiRunEditPlanToDocument,
-   * never by applying these individually (their byte offsets are only
-   * mutually consistent when applied together, back-to-front).
-   */
   subPlans: EditPlan[];
+  /** Present only when text was safely redistributed across existing lines. */
+  localReflow?: LocalReflowMetadata;
 };
 
 function rejected(
@@ -69,17 +64,248 @@ function isConsecutiveAscending(indices: number[]): boolean {
   return true;
 }
 
-// Builds a dry-run MultiRunEditPlan for replacing a span of two or more
-// consecutive text-show operators with one logical replacement. Every
-// safety invariant is checked before any per-operator plan is built:
-// - At least two operators (a single operator belongs to editPlan.ts's
-//   buildEditPlan instead).
-// - Operator indices must be consecutive and ascending -- a gap could
-//   mean an untouched operator sits between the ones being edited, whose
-//   own content this function was never asked to reason about.
-// - Every spanned operator must reference the SAME font resource --
-//   crossing fonts mid-selection is a materially different, harder
-//   problem (glyph re-encoding per font) this slice doesn't attempt.
+function sameNumber(a: number, b: number): boolean {
+  return Math.abs(a - b) <= REFLOW_EPSILON;
+}
+
+function textState(operator: TextShowOperator): TextShowState {
+  return {
+    fontSizePt: operator.fontSizePt,
+    charSpacing: operator.charSpacing,
+    wordSpacing: operator.wordSpacing,
+    horizontalScalingPct: operator.horizontalScalingPct,
+  };
+}
+
+function sameReflowTextState(a: TextShowOperator, b: TextShowOperator): boolean {
+  return (
+    a.fontResourceName === b.fontResourceName &&
+    sameNumber(a.fontSizePt, b.fontSizePt) &&
+    sameNumber(a.charSpacing, b.charSpacing) &&
+    sameNumber(a.wordSpacing, b.wordSpacing) &&
+    sameNumber(a.horizontalScalingPct, b.horizontalScalingPct) &&
+    sameNumber(a.textRise, b.textRise) &&
+    a.renderMode === b.renderMode &&
+    sameNumber(a.textRenderingMatrix[0], b.textRenderingMatrix[0]) &&
+    sameNumber(a.textRenderingMatrix[1], b.textRenderingMatrix[1]) &&
+    sameNumber(a.textRenderingMatrix[2], b.textRenderingMatrix[2]) &&
+    sameNumber(a.textRenderingMatrix[3], b.textRenderingMatrix[3])
+  );
+}
+
+function simpleFlowWhitespace(text: string): boolean {
+  if (text.length === 0) return true;
+  return text === text.trim() && !/[\t\r\n]/u.test(text) && !/ {2,}/u.test(text);
+}
+
+function buildSubPlansForOperatorGroup({
+  pageIndex,
+  contentStreamIndex,
+  allOperators,
+  operatorIndices,
+  replacementText,
+  resolvedFont,
+  fontMetrics,
+}: {
+  pageIndex: number;
+  contentStreamIndex: number;
+  allOperators: TextShowOperator[];
+  operatorIndices: number[];
+  replacementText: string;
+  resolvedFont: ResolvedFont;
+  fontMetrics: FontMetrics;
+}): EditPlan[] | null {
+  const operators = operatorIndices.map((index) => allOperators[index]);
+  if (operators.some((operator) => !operator)) return null;
+
+  const plans = operators.map((operator, position) =>
+    buildEditPlan({
+      pageIndex,
+      contentStreamIndex,
+      operatorIndex: operatorIndices[position],
+      operator,
+      replacementText: position === 0 ? replacementText : "",
+      resolvedFont,
+      fontMetrics,
+    }),
+  );
+  if (plans.some((plan) => !plan.editable)) return null;
+
+  const combinedOriginalCodes = plans.flatMap((plan) => plan.originalGlyphCodes);
+  const comparison = compareAdvance(
+    combinedOriginalCodes,
+    plans[0].replacementGlyphCodes,
+    fontMetrics,
+    textState(operators[0]),
+  );
+  const first: EditPlan = {
+    ...plans[0],
+    originalWidthPt: comparison.originalAdvancePt,
+    replacementWidthPt: comparison.replacementAdvancePt,
+    tjSpacingDelta: comparison.tjAdjustment,
+  };
+  return [first, ...plans.slice(1).map((plan) => ({ ...plan, tjSpacingDelta: 0 }))];
+}
+
+function lineGroupsForSafeReflow(
+  operators: TextShowOperator[],
+  indices: number[],
+): number[][] | null {
+  const first = operators[0];
+  if (!first || first.kind === "'" || first.kind === '"' || first.renderMode >= 4) return null;
+  if (Math.abs(first.textRenderingMatrix[1]) > REFLOW_EPSILON || Math.abs(first.textRenderingMatrix[2]) > REFLOW_EPSILON) {
+    return null;
+  }
+
+  for (const operator of operators) {
+    if (
+      (operator.kind !== "Tj" && operator.kind !== "TJ") ||
+      operator.renderMode >= 4 ||
+      !sameReflowTextState(first, operator) ||
+      Math.abs(operator.textRenderingMatrix[1]) > REFLOW_EPSILON ||
+      Math.abs(operator.textRenderingMatrix[2]) > REFLOW_EPSILON
+    ) {
+      return null;
+    }
+  }
+
+  const yTolerance = Math.max(1, first.fontSizePt * 0.35);
+  const groups: number[][] = [];
+  let current: number[] = [];
+  let currentY: number | null = null;
+  for (let position = 0; position < operators.length; position += 1) {
+    const y = operators[position].textRenderingMatrix[5];
+    if (currentY === null || Math.abs(y - currentY) <= yTolerance) {
+      current.push(indices[position]);
+      if (currentY === null) currentY = y;
+    } else {
+      groups.push(current);
+      current = [indices[position]];
+      currentY = y;
+    }
+  }
+  if (current.length > 0) groups.push(current);
+  if (groups.length < 2 || groups.length > MAX_REFLOW_LINES) return null;
+
+  // The widest existing selected line defines the owned paragraph width only
+  // when every line starts at the same proven text origin. Otherwise this may
+  // be columns/indentation and is intentionally not reflowed.
+  const firstXs = groups.map((group) => allOperatorForIndex(operators, indices, group[0]).textRenderingMatrix[4]);
+  const xTolerance = Math.max(1, first.fontSizePt * 0.5);
+  if (firstXs.some((x) => Math.abs(x - firstXs[0]) > xTolerance)) return null;
+  return groups;
+}
+
+function allOperatorForIndex(
+  operators: TextShowOperator[],
+  indices: number[],
+  operatorIndex: number,
+): TextShowOperator {
+  const position = indices.indexOf(operatorIndex);
+  return operators[position];
+}
+
+function tryBuildLocalReflow({
+  pageIndex,
+  contentStreamIndex,
+  allOperators,
+  sortedIndices,
+  spanOperators,
+  replacementText,
+  resolvedFont,
+  fontMetrics,
+  combinedOriginalWidthPt,
+  replacementWidthPt,
+}: {
+  pageIndex: number;
+  contentStreamIndex: number;
+  allOperators: TextShowOperator[];
+  sortedIndices: number[];
+  spanOperators: TextShowOperator[];
+  replacementText: string;
+  resolvedFont: ResolvedFont;
+  fontMetrics: FontMetrics;
+  combinedOriginalWidthPt: number;
+  replacementWidthPt: number;
+}): { subPlans: EditPlan[]; metadata: LocalReflowMetadata } | null {
+  if (!simpleFlowWhitespace(replacementText)) return null;
+  if (replacementWidthPt <= combinedOriginalWidthPt + REFLOW_WIDTH_TOLERANCE_PT) return null;
+
+  const groups = lineGroupsForSafeReflow(spanOperators, sortedIndices);
+  if (!groups) return null;
+
+  const baseGroupPlans = groups.map((group) =>
+    buildSubPlansForOperatorGroup({
+      pageIndex,
+      contentStreamIndex,
+      allOperators,
+      operatorIndices: group,
+      replacementText: "",
+      resolvedFont,
+      fontMetrics,
+    }),
+  );
+  if (baseGroupPlans.some((plans) => !plans)) return null;
+
+  const lineWidths = (baseGroupPlans as EditPlan[][]).map((plans) => plans[0].originalWidthPt);
+  const blockWidth = Math.max(...lineWidths);
+  const totalCapacity = blockWidth * groups.length;
+  if (replacementWidthPt > totalCapacity + REFLOW_WIDTH_TOLERANCE_PT) return null;
+
+  const allocation = allocateLocalReflowText({
+    text: replacementText,
+    capacitiesPt: groups.map(() => blockWidth),
+    measure: (lineIndex, text) => {
+      const plans = buildSubPlansForOperatorGroup({
+        pageIndex,
+        contentStreamIndex,
+        allOperators,
+        operatorIndices: groups[lineIndex],
+        replacementText: text,
+        resolvedFont,
+        fontMetrics,
+      });
+      return plans?.[0].replacementWidthPt ?? null;
+    },
+    tolerancePt: REFLOW_WIDTH_TOLERANCE_PT,
+  });
+  if (!allocation) return null;
+
+  const reflowPlans: EditPlan[] = [];
+  for (let lineIndex = 0; lineIndex < groups.length; lineIndex += 1) {
+    const plans = buildSubPlansForOperatorGroup({
+      pageIndex,
+      contentStreamIndex,
+      allOperators,
+      operatorIndices: groups[lineIndex],
+      replacementText: allocation.lineTexts[lineIndex],
+      resolvedFont,
+      fontMetrics,
+    });
+    if (!plans) return null;
+    if (plans[0].replacementWidthPt > blockWidth + REFLOW_WIDTH_TOLERANCE_PT) return null;
+    reflowPlans.push(...plans);
+  }
+
+  // Runtime-only metadata consumed by replacementLayout.ts. The writer uses
+  // only the ordinary EditPlan fields, keeping the proven mutation boundary
+  // unchanged.
+  const first = reflowPlans[0] as EditPlan & {
+    __localReflowLayout?: { capacityPt: number; replacementWidthPt: number };
+  };
+  first.__localReflowLayout = { capacityPt: totalCapacity, replacementWidthPt };
+
+  return {
+    subPlans: reflowPlans,
+    metadata: {
+      lineTexts: allocation.lineTexts,
+      lineOperatorIndices: groups,
+      capacityPt: totalCapacity,
+      replacementWidthPt,
+    },
+  };
+}
+
 export function buildMultiRunEditPlan({
   pageIndex,
   contentStreamIndex,
@@ -140,9 +366,7 @@ export function buildMultiRunEditPlan({
     );
   }
 
-  // One EditPlan per spanned operator: the first carries the full
-  // replacement text, every other one is emptied.
-  const subPlans: EditPlan[] = spanOperators.map((operator, position) =>
+  const defaultSubPlans = spanOperators.map((operator, position) =>
     buildEditPlan({
       pageIndex,
       contentStreamIndex,
@@ -153,10 +377,8 @@ export function buildMultiRunEditPlan({
       fontMetrics,
     }),
   );
-
-  const originalText = subPlans.map((plan) => plan.originalText).join("");
-
-  const firstRejected = subPlans.find((plan) => !plan.editable);
+  const originalText = defaultSubPlans.map((plan) => plan.originalText).join("");
+  const firstRejected = defaultSubPlans.find((plan) => !plan.editable);
   if (firstRejected) {
     return {
       pageIndex,
@@ -166,37 +388,53 @@ export function buildMultiRunEditPlan({
       replacementText,
       editable: false,
       reason: firstRejected.reason,
-      subPlans,
+      subPlans: defaultSubPlans,
     };
   }
 
-  // Recompute the first sub-plan's width/delta against the SPAN's true
-  // combined original width (every spanned operator's own original
-  // glyphs), not just the first operator's own -- otherwise the emptied
-  // operators' widths would be uncounted. Reuses fontMetrics.ts's own
-  // compareAdvance (the existing spacing engine), not a new calculation.
-  const combinedOriginalCodes = subPlans.flatMap((plan) => plan.originalGlyphCodes);
-  const firstOperator = spanOperators[0];
-  const state: TextShowState = {
-    fontSizePt: firstOperator.fontSizePt,
-    charSpacing: firstOperator.charSpacing,
-    wordSpacing: firstOperator.wordSpacing,
-    horizontalScalingPct: firstOperator.horizontalScalingPct,
-  };
-  const comparison = compareAdvance(combinedOriginalCodes, subPlans[0].replacementGlyphCodes, fontMetrics, state);
+  const combinedOriginalCodes = defaultSubPlans.flatMap((plan) => plan.originalGlyphCodes);
+  const comparison = compareAdvance(
+    combinedOriginalCodes,
+    defaultSubPlans[0].replacementGlyphCodes,
+    fontMetrics,
+    textState(spanOperators[0]),
+  );
+
+  const localReflow = tryBuildLocalReflow({
+    pageIndex,
+    contentStreamIndex,
+    allOperators,
+    sortedIndices,
+    spanOperators,
+    replacementText,
+    resolvedFont,
+    fontMetrics,
+    combinedOriginalWidthPt: comparison.originalAdvancePt,
+    replacementWidthPt: comparison.replacementAdvancePt,
+  });
+  if (localReflow) {
+    return {
+      pageIndex,
+      contentStreamIndex,
+      operatorIndices: sortedIndices,
+      originalText,
+      replacementText,
+      editable: true,
+      reason: null,
+      subPlans: localReflow.subPlans,
+      localReflow: localReflow.metadata,
+    };
+  }
 
   const mergedFirstPlan: EditPlan = {
-    ...subPlans[0],
+    ...defaultSubPlans[0],
     originalWidthPt: comparison.originalAdvancePt,
     replacementWidthPt: comparison.replacementAdvancePt,
     tjSpacingDelta: comparison.tjAdjustment,
   };
-
-  // Every OTHER spanned operator is emptied with NO compensating
-  // adjustment of its own -- mergedFirstPlan above already accounts for
-  // the whole span's width difference in one place; a second, separate
-  // adjustment on an emptied operator would double-compensate.
-  const mergedRestPlans: EditPlan[] = subPlans.slice(1).map((plan) => ({ ...plan, tjSpacingDelta: 0 }));
+  const mergedRestPlans: EditPlan[] = defaultSubPlans
+    .slice(1)
+    .map((plan) => ({ ...plan, tjSpacingDelta: 0 }));
 
   return {
     pageIndex,
