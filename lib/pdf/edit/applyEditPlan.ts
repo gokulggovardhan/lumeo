@@ -35,6 +35,7 @@ import { PDFArray, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFStream, decode
 import type { PDFContext, PDFDict, PDFPage } from "pdf-lib";
 import type { EditPlan } from "./editPlan.ts";
 import { ensureFallbackFontResource, resolveFallbackFontsDict } from "./fallbackFont.ts";
+import type { SafeLocalReflowPlan } from "./localReflow.ts";
 import type { MultiRunEditPlan } from "./multiRunEditPlan.ts";
 import { resolveStreamTarget, resolveIsolatedStreamTarget } from "./formXObjects.ts";
 
@@ -61,37 +62,15 @@ function assertApplicable(plan: EditPlan): void {
   if (!SUPPORTED_OPERATOR_TYPES.has(plan.operatorType)) {
     throw new EditPlanRejectedError(`This rewrite engine does not support the "${plan.operatorType}" operator.`);
   }
-  // A plan with zero replacement glyphs (any operator kind) produces
-  // `<>`/`[<>]` -- an empty string/array, syntactically valid PDF that
-  // shows nothing. Proven safe and real, not just theoretically legal:
-  // lib/pdf/edit/multiRunEditPlan.ts intentionally empties every operator
-  // in a merged span except the first, and its own tests confirm the
-  // resulting PDF opens and extracts correctly.
 }
 
-// A numeric PDF operand can carry many decimal places when computed
-// (e.g. a spacing delta); format with just enough precision to round-trip
-// through the tokenizer cleanly without accumulating stray floating-point
-// noise like "12.000000000000002".
 function formatPdfNumber(value: number): string {
   const rounded = Math.round(value * 1000) / 1000;
   return rounded.toString();
 }
 
-// The minimum adjustment magnitude worth writing into the TJ array at
-// all -- anything smaller is imperceptible and would only add byte-stream
-// noise (an explicit "0" or near-0 entry), so an equal-width replacement
-// naturally produces the cleanest possible array: just the new string,
-// no adjustment number.
 const TJ_DELTA_EPSILON = 0.01;
 
-// Writes a resource name back into content-stream syntax. Necessary rather
-// than cosmetic: lib/pdf/edit/contentStream.ts's tokenizer DECODES a name's
-// #xx escapes when it reads one, so a font named `/F#231` in the stream
-// arrives here as the three characters `F#1`. Emitting that verbatim would
-// produce `/F#1`, which re-reads as `F\x01` -- a different font, silently.
-// Escapes `#` itself, every delimiter and whitespace character, and
-// anything outside printable ASCII, per PDF 32000-1 7.3.5.
 function encodePdfName(name: string): string {
   let out = "/";
   for (let i = 0; i < name.length; i += 1) {
@@ -103,29 +82,6 @@ function encodePdfName(name: string): string {
   return out;
 }
 
-// The replacement operator for a plan that renders its text in a
-// substitute font (EditPlan.fallbackFont, lib/pdf/edit/fallbackFont.ts):
-//
-//   /Substitute <size> Tf  <the show operator>  /Original <size> Tf
-//
-// The trailing Tf is what keeps this a genuinely local edit. Tf sets the
-// font in the text state, which persists until the next Tf or the enclosing
-// q/Q restore -- so without it, every later text run in the same BT/ET
-// block would silently switch typeface too. Restoring with the plan's own
-// fontSizePt is exact, not approximate: fontSizePt IS the size the
-// applicable Tf had set (contentStream.ts tracks it into the operator), and
-// the substitution changes only the typeface, never the size.
-//
-// A Tj is deliberately promoted to a single-element TJ here, unlike the
-// same-font path which leaves Tj alone. `<hex> Tj` and `[<hex>] TJ` are
-// exactly equivalent per spec 9.4.3, but only the TJ form has anywhere to
-// put the spacing adjustment -- and a substitute font is precisely the case
-// where the replacement's natural width is most likely to differ from the
-// original's (measured across the standard families: -7.1% to +22.0%), so
-// having somewhere to absorb that difference matters most here. ' and " are
-// left in their own form for the reason the same-font path already gives:
-// each performs its own text-line move before showing, so what follows
-// starts a fresh line and has no horizontal position to preserve.
 function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string): string {
   const fallback = plan.fallbackFont;
   if (!fallback) throw new EditPlanRejectedError("This plan does not use a substitute font.");
@@ -148,39 +104,9 @@ function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string)
   return `${selectSubstitute} ${show} ${restoreOriginal}`;
 }
 
-// Builds the exact replacement operator invocation text for `plan`:
-// - Tj: `<hex> Tj`.
-// - TJ: `[<hex>] TJ` or `[<hex> delta] TJ`. A TJ replacement always
-//   collapses to a single combined string operand (task 3: rewrite only
-//   text operands) -- the original's own inter-string kerning numbers are
-//   dropped rather than kept, since they were tuned for the ORIGINAL
-//   text's specific glyph boundaries and have no coherent attachment
-//   point once the text itself changes (task 4: leave spacing operands
-//   untouched *unless recalculation is required* -- here it is required).
-//   In their place, a single trailing adjustment equal to
-//   plan.tjSpacingDelta (fontMetrics.ts's compareAdvance, task 5: use the
-//   existing spacing engine) keeps whatever text follows this operator
-//   from shifting position -- omitted entirely when negligible.
-// - ' (quote): `<hex> '`. No spacing operands to preserve -- ' takes only
-//   a string.
-// - " (double-quote): `aw ac <hex> "`, where aw/ac are plan.wordSpacing/
-//   plan.charSpacing -- these ARE this operator's own two leading numeric
-//   operands (word spacing, char spacing), carried through EditPlan
-//   unchanged from the original operator (task 5: preserve all non-text
-//   operands verbatim; these are never recomputed).
-// No compensating spacing delta is added for ' or ", unlike TJ: each
-// already performs its own text-line move (equivalent to T*) before
-// showing text, so whatever normally follows starts a fresh line rather
-// than continuing this one -- there is no established "keep the next
-// glyph in place" need the way there is mid-line in a TJ/Tj run.
 function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): string {
   const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, bytesPerCode);
   if (plan.operatorType === "Tj") {
-    // A direct text-state change can alter this run's natural advance even
-    // when the text itself is unchanged. Promote only that formatting case
-    // to TJ so the already-computed spacing compensation keeps downstream
-    // text anchored. Ordinary text-only Tj edits retain their established
-    // byte shape.
     const needsAdjustment =
       Boolean(plan.replacementTextState) &&
       Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
@@ -240,20 +166,6 @@ function buildTextStateOverrideWrapper(plan: EditPlan): { prefix: string; suffix
   };
 }
 
-// Pure byte-level rewrite: replaces exactly the operator's own byte range
-// (plan.byteOffset .. plan.byteOffset + plan.byteLength) in
-// `contentStreamBytes` with a new, self-contained operator invocation
-// (see buildReplacementOperatorText) encoding plan.replacementGlyphCodes.
-// Nothing outside that range is touched -- every other operator (BT/ET,
-// Tf, Tm, other text runs, spacing operators, graphics state) is
-// preserved byte-for-byte by construction, not by any explicit "preserve"
-// step.
-//
-// Always emits hex string operand(s) regardless of whether the original
-// used literal `(...)` strings -- Tj/TJ accept either form equivalently
-// per spec, and hex avoids the literal-string escaping rules entirely
-// (no risk of an unescaped '(' or ')' in re-encoded glyph bytes breaking
-// the stream's balanced-parens structure).
 export function applyEditPlanToBytes(
   contentStreamBytes: Uint8Array,
   plan: EditPlan,
@@ -262,11 +174,6 @@ export function applyEditPlanToBytes(
 ): Uint8Array {
   assertApplicable(plan);
 
-  // A substitute-font plan ignores the caller's bytesPerCode entirely: its
-  // replacementGlyphCodes are WinAnsi codes for a standard font, which is
-  // always single-byte, no matter what the run's own font used. Taking the
-  // caller's value here would write 2-byte codes for a Type0 original and
-  // render mojibake.
   let operatorText: string;
   if (plan.fallbackFont) {
     if (!options.fallbackResourceName) {
@@ -287,7 +194,6 @@ export function applyEditPlanToBytes(
   }
 
   const newOperatorBytes = new TextEncoder().encode(operatorText);
-
   const before = contentStreamBytes.subarray(0, plan.byteOffset);
   const after = contentStreamBytes.subarray(plan.byteOffset + plan.byteLength);
   const result = new Uint8Array(before.length + newOperatorBytes.length + after.length);
@@ -297,17 +203,6 @@ export function applyEditPlanToBytes(
   return result;
 }
 
-// Applies one verified EditPlan directly to a loaded PDFDocument's own
-// object graph -- decodes the target content stream, rewrites just the
-// one operator via applyEditPlanToBytes, and re-registers it as a new
-// stream object using the SAME compression the original stream used (so
-// the rewrite doesn't silently change every other page's/stream's
-// encoding convention). The old stream is explicitly deleted from the
-// context afterward: pdf-lib's writer serializes every object still
-// registered in the context regardless of reachability (the same
-// behavior PR #189's compress work already had to account for when
-// swapping an embedded image), so leaving the old stream registered would
-// silently bloat the saved file with orphaned bytes.
 type LocatedContentStream = {
   context: PDFContext;
   targetRef: PDFRef;
@@ -316,12 +211,6 @@ type LocatedContentStream = {
   decodedBytes: Uint8Array;
 };
 
-// Locates and decodes one page's content stream by index (0 for a page
-// with a single, non-array /Contents; an index into the array otherwise)
-// -- shared by applyEditPlanToDocument and
-// lib/pdf/edit/multiRunEditPlan.ts's applyMultiRunEditPlanToDocument,
-// since both need to find and decode the exact same target before
-// rewriting it (one operator at a time, or several in sequence).
 function locateContentStream(doc: PDFDocument, pageIndex: number, contentStreamIndex: number): LocatedContentStream {
   const page = doc.getPages()[pageIndex];
   if (!page) throw new EditPlanRejectedError(`Page ${pageIndex} does not exist in this document.`);
@@ -333,15 +222,6 @@ function locateContentStream(doc: PDFDocument, pageIndex: number, contentStreamI
   let contentsArray: PDFArray | null = null;
 
   if (contentsEntry instanceof PDFRef) {
-    // context.lookupMaybe(ref, Type) is not a graceful "maybe this type"
-    // helper despite its name -- it only returns undefined for a
-    // missing/null object; for an object that resolves but is the WRONG
-    // type (e.g. a single, non-array-wrapped /Contents stream, a common
-    // real-world shape), it throws UnexpectedObjectTypeError just like the
-    // strict lookup(ref, Type). Proven directly: a bare-stream /Contents
-    // ref made this line throw instead of falling through to the `else`
-    // branch below. Fixed the same way as lib/pdf/edit/formXObjects.ts's
-    // resolveMaybe -- untyped lookup() + instanceof, never throws on type.
     const untyped = context.lookup(contentsEntry);
     const resolved = untyped instanceof PDFArray ? untyped : undefined;
     if (resolved) {
@@ -379,30 +259,11 @@ function locateContentStream(doc: PDFDocument, pageIndex: number, contentStreamI
   };
 }
 
-// Registers `newBytes` as a new stream object (using the SAME compression
-// `originalStream` used, so the rewrite doesn't silently change every
-// other page's/stream's encoding convention), swaps the page's /Contents
-// reference to it, and explicitly deletes the old stream from the
-// context: pdf-lib's writer serializes every object still registered in
-// the context regardless of reachability (the same behavior PR #189's
-// compress work already had to account for when swapping an embedded
-// image), so skipping the delete would silently bloat the saved file with
-// orphaned bytes.
 function isFlateEncoded(stream: PDFRawStream): boolean {
   const filter = stream.dict.get(PDFName.of("Filter"));
   return filter instanceof PDFName && filter.asString() === "/FlateDecode";
 }
 
-// A Form XObject's dict entries (Type/Subtype/BBox/Resources/Matrix/Group,
-// etc.) are its identity, not incidental metadata like a page content
-// stream's -- context.stream(bytes)/flateStream(bytes) with no dict arg
-// only produces {Length}, so writing back a Form's replacement bytes this
-// way would silently strip /Subtype /Form and everything else, making the
-// XObject unrecognizable on the next read (proven: pdfjs and
-// collectPageTextOperators both stopped seeing it). Copies every entry
-// from the original stream's dict onto the freshly built one, except
-// /Length and /Filter/DecodeParms, which context.stream/flateStream
-// already compute correctly for the new bytes/encoding.
 function copyStreamDictExceptLengthAndFilter(source: PDFRawStream, target: PDFRawStream): void {
   for (const [key, value] of source.dict.entries()) {
     const name = key.asString();
@@ -429,22 +290,6 @@ function replaceContentStream(
   context.delete(targetRef);
 }
 
-// Applies one verified EditPlan directly to a loaded PDFDocument's own
-// object graph -- decodes the target content stream, rewrites just the
-// one operator via applyEditPlanToBytes, and re-registers it (see
-// replaceContentStream).
-//
-// `isolate` (default false, so every existing caller's behavior is
-// unchanged byte-for-byte) only matters when plan.formPath is set: false
-// (the default) mutates the target Form XObject's stream directly, same
-// as always -- if that Form is reused elsewhere, every invocation shows
-// the edit (a Form is a stamp; this is correct PDF semantics, proven in
-// lib/pdf/edit/formXObjects.ts's "reused XObject" test). Pass `true` to
-// isolate the edit to just this one invocation site instead: a shared
-// Form gets cloned first (lib/pdf/edit/formXObjects.ts's
-// resolveIsolatedStreamTarget) so every OTHER invocation stays untouched;
-// a Form that isn't actually shared anywhere else is resolved with no
-// clone at all, identically to isolate: false.
 export async function applyEditPlanToDocument(
   doc: PDFDocument,
   plan: EditPlan,
@@ -457,13 +302,6 @@ export async function applyEditPlanToDocument(
     const target = options.isolate
       ? resolveIsolatedStreamTarget(doc, plan.pageIndex, plan.contentStreamIndex, plan.formPath)
       : resolveStreamTarget(doc, plan.pageIndex, plan.contentStreamIndex, plan.formPath);
-    // Registered against the Form's OWN stream dictionary, so a Form that
-    // carries its own /Resources gets the substitute in the name space its
-    // Tf will actually be resolved in (resolveFallbackFontsDict falls back
-    // to the page for a Form that inherits instead). Safe to do before the
-    // clone: the dict entry is copied to the replacement stream below by
-    // copyStreamDictExceptLengthAndFilter, and adding one font name to a
-    // shared Form's resources is purely additive for every other site.
     const fallbackResourceName = await registerFallbackFont(doc, plan, target.originalStream.dict);
     const newBytes = applyEditPlanToBytes(target.decodedBytes, plan, bytesPerCode, { fallbackResourceName });
     const wasFlate = isFlateEncoded(target.originalStream);
@@ -480,11 +318,6 @@ export async function applyEditPlanToDocument(
   replaceContentStream(page, located, plan.contentStreamIndex, newBytes);
 }
 
-// Embeds and registers the substitute font a plan asks for, returning the
-// resource name to write into its Tf -- or undefined for the ordinary
-// same-font plan, which needs nothing. Split out so both the page-content
-// and Form-XObject branches above resolve the resource dictionary through
-// the same rule (lib/pdf/edit/fallbackFont.ts's resolveFallbackFontsDict).
 async function registerFallbackFont(
   doc: PDFDocument,
   plan: EditPlan,
@@ -495,17 +328,6 @@ async function registerFallbackFont(
   return ensureFallbackFontResource(doc, fontsDict, plan.fallbackFont.family);
 }
 
-// Applies a verified MultiRunEditPlan (lib/pdf/edit/multiRunEditPlan.ts)
-// directly to a loaded PDFDocument -- rewrites every spanned operator's
-// sub-plan against the SAME decoded content-stream buffer, one after
-// another, in REVERSE operator order (last-in-the-stream first). This is
-// required, not a stylistic choice: each sub-plan's byteOffset/byteLength
-// were computed against the ORIGINAL (pre-edit) stream, and rewriting an
-// earlier (smaller-offset) operator first would change the stream's
-// length and silently invalidate every LATER sub-plan's own offsets.
-// Applying right-to-left means every edit only ever touches bytes to the
-// right of any position a not-yet-applied sub-plan still refers to, so
-// each remaining offset stays valid until its own turn.
 export async function applyMultiRunEditPlanToDocument(
   doc: PDFDocument,
   plan: MultiRunEditPlan,
@@ -515,12 +337,6 @@ export async function applyMultiRunEditPlanToDocument(
     throw new EditPlanRejectedError(plan.reason ?? "This multi-run edit plan is not editable.");
   }
   for (const subPlan of plan.subPlans) assertApplicable(subPlan);
-  // buildMultiRunEditPlan never opts into the substitute-font path (it
-  // calls buildEditPlan without style hints), so this can't currently
-  // trigger -- it's here so that if it ever starts to, the mismatch is a
-  // loud rejection rather than a silent one: this function rewrites
-  // several operators against a single shared buffer and has no
-  // per-operator place to register a substitute's resource name.
   if (plan.subPlans.some((subPlan) => subPlan.fallbackFont)) {
     throw new EditPlanRejectedError("Multi-line edits can't use a substitute font -- edit these lines one at a time.");
   }
@@ -533,5 +349,59 @@ export async function applyMultiRunEditPlanToDocument(
     bytes = applyEditPlanToBytes(bytes, plan.subPlans[i], bytesPerCode);
   }
 
+  replaceContentStream(page, located, plan.contentStreamIndex, bytes);
+}
+
+/**
+ * Applies a proven local-reflow plan as one atomic page-content rewrite.
+ *
+ * All operator byte offsets in a reflow plan refer to the same original
+ * decoded stream, so edits are flattened and applied right-to-left. This is
+ * the same offset-preservation rule used by MultiRunEditPlan, extended across
+ * several existing line slots. No new text matrices, line origins, resources
+ * or graphics-state operators are introduced here.
+ */
+export async function applySafeLocalReflowPlanToDocument(
+  doc: PDFDocument,
+  plan: SafeLocalReflowPlan,
+  bytesPerCode: 1 | 2,
+): Promise<void> {
+  if (!plan.editable) {
+    throw new EditPlanRejectedError(plan.reason ?? "This local reflow plan is not editable.");
+  }
+
+  const flatPlans = plan.linePlans.flatMap((line) =>
+    line.kind === "single" ? [line.plan] : line.plan.subPlans,
+  );
+  if (flatPlans.length === 0) {
+    throw new EditPlanRejectedError("This local reflow plan contains no text edits.");
+  }
+
+  for (const edit of flatPlans) {
+    assertApplicable(edit);
+    if (
+      edit.pageIndex !== plan.pageIndex ||
+      edit.contentStreamIndex !== plan.contentStreamIndex ||
+      edit.formPath !== null ||
+      edit.fallbackFont !== null ||
+      edit.replacementTextState !== null
+    ) {
+      throw new EditPlanRejectedError(
+        "Local reflow must remain inside one page content stream, one verified font, and the existing text state.",
+      );
+    }
+  }
+
+  const offsets = new Set(flatPlans.map((edit) => edit.byteOffset));
+  if (offsets.size !== flatPlans.length) {
+    throw new EditPlanRejectedError("Local reflow contains overlapping text operator ownership.");
+  }
+
+  const page = doc.getPages()[plan.pageIndex];
+  const located = locateContentStream(doc, plan.pageIndex, plan.contentStreamIndex);
+  let bytes = located.decodedBytes;
+  for (const edit of [...flatPlans].sort((a, b) => b.byteOffset - a.byteOffset)) {
+    bytes = applyEditPlanToBytes(bytes, edit, bytesPerCode);
+  }
   replaceContentStream(page, located, plan.contentStreamIndex, bytes);
 }
