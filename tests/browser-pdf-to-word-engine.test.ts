@@ -12,6 +12,7 @@ import {
 import {
   classifyPageReconstruction,
 } from "../lib/conversion/browser/pdfToWord/classifier.ts";
+import type { ReconstructedTextLine } from "../lib/conversion/browser/pdfToWord/types.ts";
 
 test("PDF same-baseline cells remain independently positioned editable runs", () => {
   const items = [
@@ -373,7 +374,7 @@ test("semantic text pages become normal editable Word paragraphs rather than iso
 });
 
 test("high-confidence whitespace tables become fixed-layout editable Word tables", async () => {
-  const lines = [
+  const lines: ReconstructedTextLine[] = [
     ["Description", 72, 100, 130, false],
     ["Qty", 300, 100, 28, true],
     ["Amount", 390, 100, 55, true],

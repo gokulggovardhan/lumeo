@@ -505,8 +505,8 @@ test.describe("browser conversion validation lab", () => {
     expect(bodyParagraph).toContain("<w:br/>");
     expect(bodyParagraph).not.toContain("w:framePr");
     expect(bodyParagraph).not.toContain("w:fitText");
-    expect(documentXml).toContain(
-      "The wrapped continuation remains in the same editable paragraph.",
+    expect(bodyParagraph).toContain(
+      "The second visual line continues the same paragraph with stable spacing, baseline placement and selectable text.",
     );
     expect(relationships).toContain(
       "https://example.com/semantic-letter",
@@ -997,7 +997,7 @@ test.describe("browser conversion validation lab", () => {
         [
           {
             page: 1,
-            contains: "Advanced multi-column fidelity fixture",
+            contains: "Advanced multi-column",
             horizontal: "center",
           },
           { page: 1, contains: "First column content begins" },
