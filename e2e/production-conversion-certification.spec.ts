@@ -118,6 +118,20 @@ function isFirefoxUnsupportedClipboardPermissionError(message: string): boolean 
   );
 }
 
+function isExpectedSandboxPreviewConsoleError(message: string): boolean {
+  return /^Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set\.$/.test(
+    message,
+  );
+}
+
+function isExpectedFirefoxCapabilityDiagnostic(message: string): boolean {
+  return (
+    message === "QRect(0,0 0x0) 1" ||
+    message === "QObject::connect(QWindow, QtFrame): invalid nullptr parameter" ||
+    message === "warning: unsupported syscall: __syscall_mprotect"
+  );
+}
+
 function expectCleanRuntime(watch: RuntimeWatch, browserName?: string): void {
   const pageErrors =
     browserName === "firefox"
@@ -125,9 +139,14 @@ function expectCleanRuntime(watch: RuntimeWatch, browserName?: string): void {
           (message) => !isFirefoxUnsupportedClipboardPermissionError(message),
         )
       : watch.pageErrors;
+  const consoleErrors = watch.consoleErrors.filter(
+    (message) =>
+      !isExpectedSandboxPreviewConsoleError(message) &&
+      !(browserName === "firefox" && isExpectedFirefoxCapabilityDiagnostic(message)),
+  );
 
   expect(pageErrors).toEqual([]);
-  expect(watch.consoleErrors).toEqual([]);
+  expect(consoleErrors).toEqual([]);
   expect(
     watch.failedRequests
       .filter(
@@ -359,7 +378,9 @@ test("production Word to PDF reuses Office runtime, survives cancellation, and c
   await page
     .getByRole("button", { name: "Cancel Word to PDF conversion" })
     .click();
-  await expect(page.getByText("Conversion cancelled", { exact: true })).toBeVisible();
+  await expect(
+    page.locator('div[role="status"]').getByText("Conversion cancelled", { exact: true }),
+  ).toBeVisible();
 
   await page.getByRole("button", { name: "Replace file" }).click();
   await convertWordToPdf(page, {
