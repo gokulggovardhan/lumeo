@@ -318,8 +318,6 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
 }) => {
   test.skip(browserName !== "chromium", "Threaded Office runtime production smoke runs in Chromium.");
 
-  const runtime = watchConversionRuntime(page);
-
   await page.goto("/pdf-tools", { waitUntil: "domcontentloaded" });
   expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(false);
 
@@ -333,6 +331,11 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
     })
     .toBe(true);
   await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
+
+  // Begin conversion/privacy observation after the intentional isolation reload
+  // so navigation-aborted framework requests cannot be mistaken for conversion
+  // transport failures. No user document has been selected at this point.
+  const runtime = watchConversionRuntime(page);
 
   const docx = await makeDocx();
   await page.locator('input[type="file"]').setInputFiles({
