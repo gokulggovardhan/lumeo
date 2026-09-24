@@ -464,6 +464,7 @@ export default function WordToPdfTool() {
                       : "neutral"
                   }
                   label={statusLabel || "File selected"}
+                  className="max-w-[8.5rem] sm:max-w-none"
                 />
               }
               onRemove={isBusy ? undefined : resetTool}
