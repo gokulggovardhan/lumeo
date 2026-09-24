@@ -445,28 +445,35 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
   });
 
   const convertButton = page.getByRole("button", { name: "Convert to PDF" });
-  const retryCompatibility = page.getByRole("button", {
-    name: "Retry compatibility check",
-  });
   const alert = page
     .getByRole("alert")
     .filter({ hasText: /Local Word to PDF/ })
     .first();
 
-  await expect
+  const capabilityOutcome = await expect
     .poll(
-      async () => {
-        if (await retryCompatibility.isVisible().catch(() => false)) {
-          return "unsupported";
-        }
-        if (await convertButton.isEnabled().catch(() => false)) return "ready";
-        return "waiting";
-      },
+      async () =>
+        page.evaluate(() => {
+          const buttons = Array.from(document.querySelectorAll("button"));
+          const retry = buttons.find(
+            (button) =>
+              button.textContent?.trim() === "Retry compatibility check",
+          );
+          if (retry) return "unsupported";
+
+          const convert = buttons.find(
+            (button) => button.textContent?.trim() === "Convert to PDF",
+          ) as HTMLButtonElement | undefined;
+          if (convert && !convert.disabled) return "ready";
+
+          return "waiting";
+        }),
       { timeout: 180_000 },
     )
     .not.toBe("waiting");
 
-  if (await convertButton.isEnabled().catch(() => false)) {
+  if (capabilityOutcome === "ready") {
+    await expect(convertButton).toBeEnabled();
     await convertButton.click();
     await expect(page.getByText("PDF ready")).toBeVisible({ timeout: 420_000 });
     const downloadPromise = page.waitForEvent("download");
