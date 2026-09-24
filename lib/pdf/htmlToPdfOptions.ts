@@ -42,14 +42,40 @@ const PAGE_DIMENSIONS_MM: Record<PageSize, { width: number; height: number }> = 
 const MM_PER_INCH = 25.4;
 const CSS_PX_PER_INCH = 96;
 
+function orientedPageDimensionsMm(
+  pageSize: PageSize,
+  orientation: Orientation,
+): { width: number; height: number } {
+  const dimensions = PAGE_DIMENSIONS_MM[pageSize];
+  return orientation === "landscape"
+    ? { width: dimensions.height, height: dimensions.width }
+    : dimensions;
+}
+
 // The captured DOM must be rendered at the PDF page's real pixel width, not
 // whatever arbitrary width the on-screen preview happens to have -- jsPDF
 // rescaling a differently-proportioned capture to fit the page is what
 // causes generated output to look misaligned/different from the preview.
 export function getPageContentWidthPx(pageSize: PageSize, orientation: Orientation): number {
-  const { width, height } = PAGE_DIMENSIONS_MM[pageSize];
-  const widthMm = orientation === "landscape" ? height : width;
-  return Math.round((widthMm / MM_PER_INCH) * CSS_PX_PER_INCH);
+  const { width } = orientedPageDimensionsMm(pageSize, orientation);
+  return Math.round((width / MM_PER_INCH) * CSS_PX_PER_INCH);
+}
+
+// html2pdf.js slices a supplied canvas using the printable page's inner
+// height/width ratio. Lumeo uses the same ratio while preparing CSS page-break
+// spacers on the live export surface, so direct browser capture and the final
+// PDF splitter agree on the exact page boundary even when margins change.
+export function getPageSliceHeightPx(
+  pageSize: PageSize,
+  orientation: Orientation,
+  margin: MarginPreset,
+  contentWidthPx: number,
+): number {
+  const { width, height } = orientedPageDimensionsMm(pageSize, orientation);
+  const marginMm = MARGIN_MM[margin];
+  const innerWidthMm = Math.max(width - marginMm * 2, 1);
+  const innerHeightMm = Math.max(height - marginMm * 2, 1);
+  return Math.max(1, Math.floor(contentWidthPx * (innerHeightMm / innerWidthMm)));
 }
 
 export function validateHtmlSource(source: string): string | null {
@@ -69,13 +95,9 @@ export function buildHtml2PdfOptions(options: {
     filename: options.fileName,
     margin: MARGIN_MM[options.margin],
     image: { type: "jpeg", quality: 0.95 },
-    // Width stays explicit so the hidden export surface maps to the physical
-    // PDF page width. Height deliberately remains automatic: html2pdf.js
-    // clones and reflows the source into its own page-width container before
-    // html2canvas captures it. Pinning that clone to a height measured before
-    // the reflow can clip long documents in WebKit/Safari to a single page.
-    // The current export surface is same-document Shadow DOM, so the older
-    // cross-iframe height workaround is no longer needed.
+    // Kept as a conservative fallback configuration for html2pdf.js. The
+    // production path captures Lumeo's sanitized live export surface directly
+    // and supplies that canvas to html2pdf.js, bypassing its lossy DOM clone.
     html2canvas: {
       scale: 2,
       useCORS: true,
@@ -84,9 +106,9 @@ export function buildHtml2PdfOptions(options: {
       windowWidth: options.contentWidthPx,
     },
     jsPDF: { unit: "mm", format: options.pageSize, orientation: options.orientation },
-    // "css" mode makes html2pdf.js honor page-break-before/after/inside
-    // rules in the source HTML when slicing the captured canvas into pages;
-    // "legacy" keeps fixed-page-height slicing as a fallback for long flow.
+    // Lumeo applies CSS/legacy page-break spacing on the live sanitized export
+    // surface before direct capture. Retain these modes as a safe fallback if
+    // html2pdf.js ever receives an element source again.
     pagebreak: { mode: ["css", "legacy"] },
   };
 }
