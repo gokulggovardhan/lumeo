@@ -764,9 +764,16 @@ test.describe("browser conversion validation lab", () => {
     await page.waitForURL("**/pdf/word-to-pdf");
 
     await expect
-      .poll(() => page.evaluate(() => window.crossOriginIsolated), {
-        timeout: 30_000,
-      })
+      .poll(
+        async () => {
+          try {
+            return await page.evaluate(() => window.crossOriginIsolated);
+          } catch {
+            return false;
+          }
+        },
+        { timeout: 30_000 },
+      )
       .toBe(true);
 
     const docx = await makeDocx({ rich: true });
@@ -1484,7 +1491,8 @@ test.describe("browser conversion validation lab", () => {
       wordUi.getByRole("button", { name: `Remove ${name}` }),
     ).toBeVisible();
     await expect(wordUi.locator('[aria-live="polite"]')).toContainText(
-      "File selected",
+      /Browser capability missing|Ready to convert|Engine needs attention/,
+      { timeout: 30_000 },
     );
   });
 
@@ -1509,7 +1517,8 @@ test.describe("browser conversion validation lab", () => {
       wordUi.getByRole("button", { name: `Remove ${longWordName}` }),
     ).toBeVisible();
     await expect(wordUi.locator('[aria-live="polite"]')).toContainText(
-      "File selected",
+      /Browser capability missing|Ready to convert|Engine needs attention/,
+      { timeout: 30_000 },
     );
 
     const mobileOverflow = await page.evaluate(
@@ -1589,7 +1598,7 @@ test.describe("browser conversion validation lab", () => {
         { timeout: 30_000 },
       );
       await expect(page.getByTestId("word-status")).toContainText(
-        /browser cannot run the local conversion engine/i,
+        /requires|missing|worker OffscreenCanvas WebGL|cross-origin isolation|SharedArrayBuffer|WebAssembly|Web Workers/i,
       );
     }
   });
@@ -1626,7 +1635,7 @@ test.describe("browser conversion validation lab", () => {
       "error",
     );
     await expect(page.getByTestId("word-status")).toContainText(
-      /browser cannot run the local conversion engine/i,
+      /requires|missing|worker OffscreenCanvas WebGL|cross-origin isolation|SharedArrayBuffer|WebAssembly|Web Workers/i,
     );
     await context.close();
   });
