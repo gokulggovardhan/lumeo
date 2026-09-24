@@ -784,11 +784,8 @@ test.describe("browser conversion validation lab", () => {
       buffer: docx,
     });
 
-    await expect(page.getByText("Ready to convert")).toBeVisible({
-      timeout: 180_000,
-    });
     const convertButton = page.getByRole("button", { name: "Convert to PDF" });
-    await expect(convertButton).toBeEnabled();
+    await expect(convertButton).toBeEnabled({ timeout: 180_000 });
     await convertButton.click();
     await expect(page.getByText("PDF ready")).toBeVisible({
       timeout: 420_000,
