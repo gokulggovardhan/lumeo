@@ -79,10 +79,20 @@ function releaseIdFromUrl(value: string): string {
   return releaseId;
 }
 
+function isLoopbackHost(hostname: string): boolean {
+  return (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "[::1]"
+  );
+}
+
 function assertProductionAssetUrl(value: string): void {
   const parsed = parseAbsoluteHttpUrl(value);
-  if (parsed.protocol !== "https:") {
-    throw new Error("Production office assets must use HTTPS.");
+  const loopbackHttp =
+    parsed.protocol === "http:" && isLoopbackHost(parsed.hostname);
+  if (parsed.protocol !== "https:" && !loopbackHttp) {
+    throw new Error("Production office assets must use HTTPS outside loopback development.");
   }
   if (/latest/i.test(parsed.pathname)) {
     throw new Error(
