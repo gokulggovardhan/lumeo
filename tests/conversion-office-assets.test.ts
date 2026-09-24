@@ -44,7 +44,7 @@ test("development may use the upstream latest runtime for the internal lab", () 
   assert.equal(config.manifestUrl, null);
 });
 
-test("production requires an explicit immutable HTTPS asset base", () => {
+test("production requires immutable HTTPS assets except on loopback development", () => {
   assert.throws(
     () => resolveOfficeAssetConfig("production", null),
     /required/,
@@ -65,6 +65,16 @@ test("production requires an explicit immutable HTTPS asset base", () => {
       ),
     /HTTPS/,
   );
+
+  const loopback = resolveOfficeAssetConfig(
+    "production",
+    "http://127.0.0.1:3100/office-runtime/release-1/",
+  );
+  assert.equal(
+    loopback.officeBaseUrl,
+    "http://127.0.0.1:3100/office-runtime/release-1/",
+  );
+  assert.equal(loopback.releaseId, "release-1");
 
   const config = resolveOfficeAssetConfig(
     "production",
