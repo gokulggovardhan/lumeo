@@ -67,3 +67,38 @@ test("Word engine reuses the page runtime and leaves job cleanup to the runtime"
   assert.doesNotMatch(source, /runtime\.destroy\(\)/);
   assert.doesNotMatch(source, /let completed = false/);
 });
+
+
+test("Word to PDF repairs client-navigation isolation before capability checks", async () => {
+  const [tool, isolation] = await Promise.all([
+    readFile("components/pdf/WordToPdfTool.tsx", "utf8"),
+    readFile("lib/conversion/browser/wordToPdfIsolation.ts", "utf8"),
+  ]);
+
+  assert.match(tool, /ensureWordToPdfCrossOriginIsolation\(\)/);
+  assert.match(isolation, /window\.location\.reload\(\)/);
+  assert.match(isolation, /sessionStorage/);
+  assert.match(isolation, /crossOriginIsolated/);
+});
+
+test("Word to PDF prepares the real local Office runtime before enabling conversion", async () => {
+  const source = await readFile("components/pdf/WordToPdfTool.tsx", "utf8");
+
+  assert.match(source, /validateWordConversionFile\(file\)/);
+  assert.match(source, /detectBrowserConversionCapabilities\(\)/);
+  assert.match(source, /getBrowserLibreOfficeRuntime\(\)/);
+  assert.match(source, /await runtime\.start\(controller\.signal\)/);
+  assert.match(source, /setStatusLabel\("Ready to convert"\)/);
+  assert.match(source, /if \(!selected \|\| isBusy \|\| !engineReady\) return/);
+});
+
+test("Word to PDF capability errors identify actual missing runtime features", async () => {
+  const source = await readFile(
+    "lib/conversion/browser/BrowserWordToPdfEngine.ts",
+    "utf8",
+  );
+
+  assert.match(source, /missingThreadedBrowserOfficeCapabilities/);
+  assert.match(source, /Threaded browser Office conversion missing:/);
+  assert.doesNotMatch(source, /worker OffscreenCanvas WebGL/);
+});
