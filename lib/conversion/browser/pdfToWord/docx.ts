@@ -1,6 +1,6 @@
 import JSZip from "jszip";
 
-import { sanitizeXml10Text } from "@/lib/conversion/xml10";
+import { sanitizeXml10Text } from "../../xml10.ts";
 
 import { clusterVisualTextRows, type VisualTextRow } from "./structure.ts";
 import type {
