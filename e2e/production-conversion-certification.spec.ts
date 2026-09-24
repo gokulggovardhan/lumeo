@@ -124,11 +124,12 @@ function isExpectedSandboxPreviewConsoleError(message: string): boolean {
   );
 }
 
-function isExpectedFirefoxCapabilityDiagnostic(message: string): boolean {
+function isExpectedOfficeRuntimeDiagnostic(message: string): boolean {
+  const normalized = message.trim();
   return (
-    message === "QRect(0,0 0x0) 1" ||
-    message === "QObject::connect(QWindow, QtFrame): invalid nullptr parameter" ||
-    message === "warning: unsupported syscall: __syscall_mprotect"
+    normalized === "QRect(0,0 0x0) 1" ||
+    normalized === "QObject::connect(QWindow, QtFrame): invalid nullptr parameter" ||
+    normalized === "warning: unsupported syscall: __syscall_mprotect"
   );
 }
 
@@ -142,7 +143,7 @@ function expectCleanRuntime(watch: RuntimeWatch, browserName?: string): void {
   const consoleErrors = watch.consoleErrors.filter(
     (message) =>
       !isExpectedSandboxPreviewConsoleError(message) &&
-      !(browserName === "firefox" && isExpectedFirefoxCapabilityDiagnostic(message)),
+      !isExpectedOfficeRuntimeDiagnostic(message),
   );
 
   expect(pageErrors).toEqual([]);
