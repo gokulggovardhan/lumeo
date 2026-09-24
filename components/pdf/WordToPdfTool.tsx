@@ -23,6 +23,13 @@ import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { ConversionCoordinator } from "@/lib/conversion/ConversionCoordinator";
 import { BrowserWordToPdfEngine } from "@/lib/conversion/browser/BrowserWordToPdfEngine";
+import {
+  canRunThreadedBrowserOffice,
+  detectBrowserConversionCapabilities,
+  missingThreadedBrowserOfficeCapabilities,
+} from "@/lib/conversion/browser/capabilities";
+import { getBrowserLibreOfficeRuntime } from "@/lib/conversion/browser/libreoffice/BrowserLibreOfficeRuntime";
+import { ensureWordToPdfCrossOriginIsolation } from "@/lib/conversion/browser/wordToPdfIsolation";
 import { cleanupOrphanedConversionJobs } from "@/lib/conversion/browser/workspace";
 import {
   conversionUserError,
@@ -30,7 +37,10 @@ import {
   toAnalyticsConversionErrorCode,
   type ConversionUserError,
 } from "@/lib/conversion/errors";
-import { isWordNamedFile } from "@/lib/conversion/fileValidation";
+import {
+  isWordNamedFile,
+  validateWordConversionFile,
+} from "@/lib/conversion/fileValidation";
 import { checkBrowserConversionFileSize } from "@/lib/conversion/limits";
 import type {
   ConversionPhase,
@@ -94,6 +104,11 @@ export default function WordToPdfTool() {
   const [statusLabel, setStatusLabel] = useState("");
   const [error, setError] = useState<ConversionUserError | null>(null);
   const [result, setResult] = useState<ConversionResult | null>(null);
+  const [engineReady, setEngineReady] = useState(false);
+
+  useEffect(() => {
+    ensureWordToPdfCrossOriginIsolation();
+  }, []);
 
   useEffect(() => {
     if (
@@ -129,6 +144,90 @@ export default function WordToPdfTool() {
     setStatusLabel("");
     setError(null);
     setResult(null);
+    setEngineReady(false);
+  }
+
+  async function prepareSelectedFile(file: File, currentSession: number) {
+    const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
+
+    setEngineReady(false);
+    setError(null);
+    setResult(null);
+    setStage("preparing");
+    setPhase("preparing");
+    setStatusLabel("Validating document");
+
+    try {
+      const validation = await validateWordConversionFile(file);
+      if (currentSession !== sessionRef.current) return;
+
+      if (!validation.ok) {
+        throw conversionUserError(validation.code, {
+          message: validation.message,
+        });
+      }
+
+      setStatusLabel("Checking browser capabilities");
+      const capabilities = await detectBrowserConversionCapabilities();
+      if (currentSession !== sessionRef.current) return;
+
+      if (!canRunThreadedBrowserOffice(capabilities)) {
+        const missing = missingThreadedBrowserOfficeCapabilities(capabilities);
+        throw conversionUserError("browser-unsupported", {
+          recoverable: false,
+          message:
+            missing.length === 1
+              ? `Local Word to PDF requires ${missing[0]}, which is not available in this browser session.`
+              : `Local Word to PDF cannot start because this browser session is missing: ${missing.join(", ")}.`,
+          technicalMessage: `Missing local Office capabilities: ${missing.join(", ") || "unknown"}.`,
+        });
+      }
+
+      setPhase("loading-engine");
+      setStatusLabel("Loading conversion engine");
+
+      const runtime = getBrowserLibreOfficeRuntime();
+      try {
+        await runtime.start(controller.signal);
+      } catch (runtimeError) {
+        throw normalizeConversionError(runtimeError, "runtime");
+      }
+
+      if (currentSession !== sessionRef.current) return;
+
+      setEngineReady(true);
+      setStage("selected");
+      setPhase(null);
+      setStatusLabel("Ready to convert");
+    } catch (prepareError) {
+      if (currentSession !== sessionRef.current) return;
+
+      const normalized = normalizeConversionError(prepareError);
+      if (normalized.code === "cancelled" || controller.signal.aborted) {
+        setPhase(null);
+        setStage("cancelled");
+        setStatusLabel("Preparation cancelled");
+        setError(null);
+        return;
+      }
+
+      setPhase(null);
+      setError(normalized);
+      setStage(
+        normalized.code === "browser-unsupported"
+          ? "unsupported"
+          : "recoverable-error",
+      );
+      setStatusLabel(
+        normalized.code === "browser-unsupported"
+          ? "Browser capability missing"
+          : "Engine needs attention",
+      );
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
+    }
   }
 
   function handleFiles(files: FileList | File[]) {
@@ -155,16 +254,25 @@ export default function WordToPdfTool() {
     }
 
     sessionRef.current += 1;
+    const currentSession = sessionRef.current;
     setSelected({ file });
-    setStage("selected");
-    setPhase(null);
-    setStatusLabel("File selected");
+    setStage("preparing");
+    setPhase("preparing");
+    setStatusLabel("Validating document");
     setError(null);
     setResult(null);
+    setEngineReady(false);
+    void prepareSelectedFile(file, currentSession);
+  }
+
+  function handlePrepareRetry() {
+    if (!selected || isBusy) return;
+    sessionRef.current += 1;
+    void prepareSelectedFile(selected.file, sessionRef.current);
   }
 
   async function handleConvert() {
-    if (!selected || isBusy) return;
+    if (!selected || isBusy || !engineReady) return;
 
     const currentSession = sessionRef.current;
     const { file } = selected;
@@ -258,7 +366,7 @@ export default function WordToPdfTool() {
     sessionRef.current += 1;
     setPhase(null);
     setStage("cancelled");
-    setStatusLabel("Conversion cancelled");
+    setStatusLabel(engineReady ? "Conversion cancelled" : "Preparation cancelled");
     setError(null);
     setResult(null);
   }
@@ -466,21 +574,34 @@ export default function WordToPdfTool() {
         ) : stage === "unsupported" ? (
           <button
             type="button"
-            onClick={resetTool}
+            onClick={handlePrepareRetry}
             className="lumeo-focus-ring inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--text-primary)]/14 px-5 text-sm font-bold text-[var(--text-primary)] sm:w-auto"
           >
-            Choose another file
+            Retry compatibility check
           </button>
         ) : (
           <button
             type="button"
-            onClick={handleConvert}
-            disabled={!selected}
+            onClick={
+              !engineReady &&
+              (stage === "recoverable-error" || stage === "cancelled")
+                ? handlePrepareRetry
+                : handleConvert
+            }
+            disabled={
+              !selected ||
+              (!engineReady &&
+                stage !== "recoverable-error" &&
+                stage !== "cancelled")
+            }
             className="lumeo-primary-action lumeo-focus-ring inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-55 sm:w-auto"
           >
-            {stage === "recoverable-error" || stage === "cancelled"
-              ? "Retry conversion"
-              : "Convert to PDF"}
+            {!engineReady &&
+            (stage === "recoverable-error" || stage === "cancelled")
+              ? "Retry engine"
+              : stage === "recoverable-error" || stage === "cancelled"
+                ? "Retry conversion"
+                : "Convert to PDF"}
           </button>
         )}
       </ToolActionBar>
