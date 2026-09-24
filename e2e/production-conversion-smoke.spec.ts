@@ -326,9 +326,16 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
   await wordToPdfLink.click();
   await page.waitForURL("**/pdf/word-to-pdf");
   await expect
-    .poll(() => page.evaluate(() => window.crossOriginIsolated), {
-      timeout: 30_000,
-    })
+    .poll(
+      async () => {
+        try {
+          return await page.evaluate(() => window.crossOriginIsolated);
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 30_000 },
+    )
     .toBe(true);
   await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
 
