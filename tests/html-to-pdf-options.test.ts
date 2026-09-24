@@ -75,7 +75,7 @@ test("getPageContentWidthPx returns the real page width in CSS px at 96dpi, orie
 test("getPageSliceHeightPx matches html2pdf printable-page slicing with margins", () => {
   assert.equal(getPageSliceHeightPx("a4", "portrait", "normal", 794), 1165);
   assert.equal(getPageSliceHeightPx("a4", "portrait", "none", 794), 1122);
-  assert.equal(getPageSliceHeightPx("a4", "landscape", "normal", 1123), 737);
+  assert.equal(getPageSliceHeightPx("a4", "landscape", "normal", 1123), 765);
   assert.ok(
     getPageSliceHeightPx("a4", "portrait", "wide", 794) >
       getPageSliceHeightPx("a4", "portrait", "normal", 794),
