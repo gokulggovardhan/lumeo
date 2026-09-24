@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   canRunThreadedBrowserOffice,
   detectBrowserConversionCapabilities,
+  missingThreadedBrowserOfficeCapabilities,
   selectConversionProcessingMode,
 } from "../lib/conversion/browser/capabilities.ts";
 
@@ -94,6 +95,66 @@ test("threaded office readiness fails closed without cross-origin isolation", as
 
   assert.equal(result.wasmThreadsReady, false);
   assert.equal(canRunThreadedBrowserOffice(result), false);
+});
+
+
+
+test("threaded Office readiness does not require optional OffscreenCanvas WebGL", () => {
+  const capabilities = {
+    webAssembly: true,
+    webWorkers: true,
+    sharedArrayBuffer: true,
+    crossOriginIsolated: true,
+    opfs: false,
+    storageManager: false,
+    storageEstimate: {
+      supported: false,
+      quotaBytes: null,
+      usageBytes: null,
+    },
+    persistentStorage: false,
+    offscreenCanvas: false,
+    workerOffscreenWebGl: false,
+    transferableArrayBuffer: true,
+    hardwareConcurrency: 4,
+    fileStream: true,
+    fileSystemAccess: false,
+    wasmSharedMemory: true,
+    wasmThreadsReady: true,
+  };
+
+  assert.deepEqual(missingThreadedBrowserOfficeCapabilities(capabilities), []);
+  assert.equal(canRunThreadedBrowserOffice(capabilities), true);
+});
+
+test("threaded Office readiness reports the actual missing runtime capability", () => {
+  const capabilities = {
+    webAssembly: true,
+    webWorkers: true,
+    sharedArrayBuffer: true,
+    crossOriginIsolated: false,
+    opfs: false,
+    storageManager: false,
+    storageEstimate: {
+      supported: false,
+      quotaBytes: null,
+      usageBytes: null,
+    },
+    persistentStorage: false,
+    offscreenCanvas: true,
+    workerOffscreenWebGl: true,
+    transferableArrayBuffer: true,
+    hardwareConcurrency: 4,
+    fileStream: true,
+    fileSystemAccess: false,
+    wasmSharedMemory: true,
+    wasmThreadsReady: false,
+  };
+
+  assert.deepEqual(missingThreadedBrowserOfficeCapabilities(capabilities), [
+    "cross-origin isolation",
+  ]);
+  assert.equal(canRunThreadedBrowserOffice(capabilities), false);
 });
 
 test("processing modes classify normal, large and extreme work without browser sniffing", () => {
