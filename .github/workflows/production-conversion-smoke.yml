@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - ".github/workflows/production-conversion-smoke.yml"
+      - "app/api/build-info/route.ts"
       - "components/pdf/WordToPdfTool.tsx"
       - "components/pdf/PdfToWordTool.tsx"
       - "components/pdf/HtmlToPdfTool.tsx"
