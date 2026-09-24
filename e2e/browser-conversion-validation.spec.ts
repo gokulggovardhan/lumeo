@@ -746,6 +746,58 @@ test.describe("browser conversion validation lab", () => {
     );
   });
 
+  test("public Word to PDF recovers cross-origin isolation after client navigation", async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(
+      browserName !== "chromium",
+      "Threaded Office client-navigation recovery is validated once in Chromium.",
+    );
+
+    await page.goto("/pdf-tools", { waitUntil: "domcontentloaded" });
+    expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(false);
+
+    const wordToPdfLink = page.locator('a[href="/pdf/word-to-pdf"]').first();
+    await expect(wordToPdfLink).toBeVisible();
+    await wordToPdfLink.click();
+    await page.waitForURL("**/pdf/word-to-pdf");
+
+    await expect
+      .poll(() => page.evaluate(() => window.crossOriginIsolated), {
+        timeout: 30_000,
+      })
+      .toBe(true);
+
+    const docx = await makeDocx({ rich: true });
+    await page.locator('input[type="file"]').setInputFiles({
+      name: "client-navigation-roundtrip.docx",
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      buffer: docx,
+    });
+
+    await expect(page.getByText("Ready to convert")).toBeVisible({
+      timeout: 180_000,
+    });
+    const convertButton = page.getByRole("button", { name: "Convert to PDF" });
+    await expect(convertButton).toBeEnabled();
+    await convertButton.click();
+    await expect(page.getByText("PDF ready")).toBeVisible({
+      timeout: 420_000,
+    });
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download PDF" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe(
+      "client-navigation-roundtrip.pdf",
+    );
+    const bytes = await downloadBytes(download);
+    await validatePdfDownload(bytes);
+  });
+
+
   test("Word to PDF converts small and rich DOCX and generated PDFs really open", async ({
     page,
     browserName,
