@@ -1,6 +1,8 @@
 import JSZip from "jszip";
 import { XMLValidator } from "fast-xml-parser";
-import { PDFDocument } from "pdf-lib";\n\nimport { hasInvalidXml10Characters } from "@/lib/conversion/xml10";
+import { PDFDocument } from "pdf-lib";
+
+import { hasInvalidXml10Characters } from "@/lib/conversion/xml10";
 
 const PDF_SIGNATURE = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]);
 const MIN_PDF_BYTES = 64;
