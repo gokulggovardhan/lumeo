@@ -150,12 +150,23 @@ function createExportSurface(html: string, widthPx: number): Promise<ExportSurfa
   document.body.appendChild(host);
 
   const shadow = host.attachShadow({ mode: "open" });
-  styleNodes.forEach((style) => shadow.appendChild(style.cloneNode(true)));
 
   const container = document.createElement("div");
   container.style.width = `${widthPx}px`;
   container.style.background = "#ffffff";
-  container.innerHTML = bodyHtml;
+
+  // html2pdf.js clones the element passed to .from(). Keep sanitized source
+  // styles inside that exact element so the clone carries page-break and
+  // layout rules in every browser. Leaving styles as ShadowRoot siblings
+  // makes them apply to the live surface but disappear from the cloned tree.
+  styleNodes.forEach((style) => container.appendChild(style.cloneNode(true)));
+
+  const content = document.createElement("div");
+  content.innerHTML = bodyHtml;
+  while (content.firstChild) {
+    container.appendChild(content.firstChild);
+  }
+
   shadow.appendChild(container);
 
   const images = Array.from(container.querySelectorAll("img"));
