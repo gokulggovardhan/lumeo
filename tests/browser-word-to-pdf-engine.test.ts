@@ -93,12 +93,15 @@ test("Word to PDF prepares the real local Office runtime before enabling convers
 });
 
 test("Word to PDF capability errors identify actual missing runtime features", async () => {
-  const source = await readFile(
-    "lib/conversion/browser/BrowserWordToPdfEngine.ts",
-    "utf8",
-  );
+  const [engine, capabilities] = await Promise.all([
+    readFile(
+      "lib/conversion/browser/BrowserWordToPdfEngine.ts",
+      "utf8",
+    ),
+    readFile("lib/conversion/browser/capabilities.ts", "utf8"),
+  ]);
 
-  assert.match(source, /missingThreadedBrowserOfficeCapabilities/);
-  assert.match(source, /Threaded browser Office conversion missing:/);
-  assert.match(source, /worker OffscreenCanvas WebGL/);
+  assert.match(engine, /missingThreadedBrowserOfficeCapabilities/);
+  assert.match(engine, /Threaded browser Office conversion missing:/);
+  assert.match(capabilities, /worker OffscreenCanvas WebGL/);
 });
