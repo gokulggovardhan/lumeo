@@ -42,7 +42,7 @@ const PAGE_DIMENSIONS_MM: Record<PageSize, { width: number; height: number }> = 
 const MM_PER_INCH = 25.4;
 const CSS_PX_PER_INCH = 96;
 
-function orientedPageDimensionsMm(
+export function getPageDimensionsMm(
   pageSize: PageSize,
   orientation: Orientation,
 ): { width: number; height: number } {
@@ -57,21 +57,20 @@ function orientedPageDimensionsMm(
 // rescaling a differently-proportioned capture to fit the page is what
 // causes generated output to look misaligned/different from the preview.
 export function getPageContentWidthPx(pageSize: PageSize, orientation: Orientation): number {
-  const { width } = orientedPageDimensionsMm(pageSize, orientation);
+  const { width } = getPageDimensionsMm(pageSize, orientation);
   return Math.round((width / MM_PER_INCH) * CSS_PX_PER_INCH);
 }
 
-// html2pdf.js slices a supplied canvas using the printable page's inner
-// height/width ratio. Lumeo uses the same ratio while preparing CSS page-break
-// spacers on the live export surface, so direct browser capture and the final
-// PDF splitter agree on the exact page boundary even when margins change.
+// Lumeo captures each printable PDF page into a bounded browser canvas. The
+// slice uses the printable page's inner height/width ratio so CSS page-break
+// spacing, the capture viewport, and final PDF page geometry share one boundary.
 export function getPageSliceHeightPx(
   pageSize: PageSize,
   orientation: Orientation,
   margin: MarginPreset,
   contentWidthPx: number,
 ): number {
-  const { width, height } = orientedPageDimensionsMm(pageSize, orientation);
+  const { width, height } = getPageDimensionsMm(pageSize, orientation);
   const marginMm = MARGIN_MM[margin];
   const innerWidthMm = Math.max(width - marginMm * 2, 1);
   const innerHeightMm = Math.max(height - marginMm * 2, 1);
@@ -95,9 +94,9 @@ export function buildHtml2PdfOptions(options: {
     filename: options.fileName,
     margin: MARGIN_MM[options.margin],
     image: { type: "jpeg", quality: 0.95 },
-    // Kept as a conservative fallback configuration for html2pdf.js. The
-    // production path captures Lumeo's sanitized live export surface directly
-    // and supplies that canvas to html2pdf.js, bypassing its lossy DOM clone.
+    // Conservative compatibility configuration retained for html2pdf.js callers.
+    // The production HTML tool now renders bounded page canvases and assembles
+    // them with pdf-lib to avoid Safari/WebKit tall-canvas limits.
     html2canvas: {
       scale: 2,
       useCORS: true,
