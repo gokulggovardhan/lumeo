@@ -238,6 +238,7 @@ test("production Edit PDF certifies native colour, formatting, history and expor
   };
 
   await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });
   await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
 
   const workspace = page.locator("[data-edit-operation-count]");
