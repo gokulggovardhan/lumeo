@@ -262,14 +262,23 @@ async function convertPdfToWord(
   page: Page,
   input: { name: string; buffer: Buffer; expectedFileName: string },
 ): Promise<{ bytes: Buffer; xml: string }> {
-  await page.locator('input[type="file"]').setInputFiles({
+  const fileInput = page.locator('input[type="file"]');
+  const removeButton = page.getByRole("button", { name: `Remove ${input.name}` });
+  const filePayload = {
     name: input.name,
     mimeType: "application/pdf",
     buffer: input.buffer,
-  });
-  await expect(
-    page.getByRole("button", { name: `Remove ${input.name}` }),
-  ).toBeVisible();
+  };
+
+  await fileInput.setInputFiles(filePayload);
+  if (!(await removeButton.isVisible({ timeout: 5_000 }).catch(() => false))) {
+    // Mobile WebKit can occasionally drop the first synthetic file-input change
+    // on the live page. Retry the same browser-local selection once, then keep
+    // the normal visible-file assertion so a real product failure still fails.
+    await fileInput.setInputFiles([]);
+    await fileInput.setInputFiles(filePayload);
+  }
+  await expect(removeButton).toBeVisible();
 
   await page.getByRole("button", { name: "Convert to Word" }).click();
   await expect(page.getByText("Word document ready")).toBeVisible({ timeout: 180_000 });
