@@ -12,7 +12,7 @@ import {
 async function makeMinimalDocx(options: {
   includeDocument?: boolean;
   includeMacro?: boolean;
-} = {}): Promise<Uint8Array> {
+} = {}): Promise<ArrayBuffer> {
   const zip = new JSZip();
   zip.file(
     "[Content_Types].xml",
@@ -31,7 +31,7 @@ async function makeMinimalDocx(options: {
   if (options.includeMacro) {
     zip.folder("word")?.file("vbaProject.bin", new Uint8Array([1, 2, 3]));
   }
-  return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+  return zip.generateAsync({ type: "arraybuffer", compression: "DEFLATE" });
 }
 
 test("Word conversion validates real DOCX package structure and legacy DOC signatures", async () => {
@@ -46,7 +46,7 @@ test("Word conversion validates real DOCX package structure and legacy DOC signa
     [
       new Uint8Array([
         0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 1, 2,
-      ]),
+      ]).buffer,
     ],
     "legacy.doc",
     { type: "application/msword" },
