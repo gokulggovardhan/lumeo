@@ -412,7 +412,7 @@ function createCaptureMirror(
     const style = document.createElement("style");
     style.setAttribute("data-lumeo-capture-pseudos", "true");
     style.textContent = pseudoRules.join("\n");
-    host.insertBefore(style, container);
+    host.insertBefore(style, viewport);
   }
 
   return { host, viewport, conveyor, container };
