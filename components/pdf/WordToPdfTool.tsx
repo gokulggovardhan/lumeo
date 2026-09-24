@@ -524,7 +524,7 @@ export default function WordToPdfTool() {
                   aria-hidden="true"
                   className="mt-0.5 h-4 w-4 shrink-0"
                 />
-                <span>{error.message}</span>
+                <span className="min-w-0 break-words">{error.message}</span>
               </div>
             ) : null}
           </L2WorkspacePanel>
