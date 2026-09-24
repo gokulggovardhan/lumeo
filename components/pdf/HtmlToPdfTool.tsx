@@ -7,6 +7,7 @@ import { L2ActionArea, L2PrivacyNote } from "@/components/pdf/workspace/ToolWork
 import {
   buildHtml2PdfOptions,
   getPageContentWidthPx,
+  getPageSliceHeightPx,
   validateHtmlSource,
   type MarginPreset,
   type Orientation,
@@ -119,6 +120,12 @@ type ExportSurface = {
   contentHeightPx: number;
 };
 
+type Html2PdfWorker = {
+  set(options: ReturnType<typeof buildHtml2PdfOptions>): Html2PdfWorker;
+  from(source: HTMLElement | HTMLCanvasElement, type?: "element" | "canvas"): Html2PdfWorker;
+  outputPdf(type: "blob"): Promise<Blob>;
+};
+
 // html2canvas cannot reliably paint content that lives in a different
 // document than the one calling it -- capturing an <iframe>'s contentDocument
 // (the previous approach here) produced a correctly-sized but genuinely
@@ -127,7 +134,7 @@ type ExportSurface = {
 // user's HTML into a Shadow DOM subtree of the *same* document keeps
 // html2canvas in a single realm (fixing that) while still isolating the
 // user's own <style> rules from leaking onto the rest of the page.
-function createExportSurface(html: string, widthPx: number): Promise<ExportSurface> {
+async function createExportSurface(html: string, widthPx: number): Promise<ExportSurface> {
   // Rendered in the app's own document (not a sandboxed iframe, see the note
   // above), so any <script> or event-handler attribute in the user's typed
   // HTML must be stripped before it ever touches the DOM -- otherwise it
@@ -159,31 +166,137 @@ function createExportSurface(html: string, widthPx: number): Promise<ExportSurfa
   shadow.appendChild(container);
 
   const images = Array.from(container.querySelectorAll("img"));
-  const imagesReady = images.length
-    ? Promise.race([
-        Promise.all(
-          images.map(
-            (img) =>
-              new Promise<void>((resolve) => {
-                if (img.complete) {
-                  resolve();
-                  return;
-                }
-                img.addEventListener("load", () => resolve(), { once: true });
-                img.addEventListener("error", () => resolve(), { once: true });
-              }),
-          ),
-        ).then(() => undefined),
-        new Promise<void>((resolve) => setTimeout(resolve, 4000)),
-      ])
-    : Promise.resolve();
+  if (images.length) {
+    await Promise.race([
+      Promise.all(
+        images.map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete) {
+                resolve();
+                return;
+              }
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+            }),
+        ),
+      ).then(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+    ]);
+  }
 
-  return imagesReady.then(() => ({
+  if (document.fonts?.ready) {
+    await Promise.race([
+      document.fonts.ready.then(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  }
+
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+  return {
     host,
     container,
     contentWidthPx: widthPx,
     contentHeightPx: Math.max(container.scrollHeight, 1),
-  }));
+  };
+}
+
+function isForcedPageBreak(value: string): boolean {
+  return ["always", "page", "left", "right"].includes(value);
+}
+
+function isAvoidPageBreak(value: string): boolean {
+  return value === "avoid" || value === "avoid-page";
+}
+
+function normalizedPageOffset(value: number, pageHeightPx: number): number {
+  return ((value % pageHeightPx) + pageHeightPx) % pageHeightPx;
+}
+
+function insertSpacerBefore(element: HTMLElement, heightPx: number): void {
+  if (heightPx <= 0.5 || !element.parentNode) return;
+  const spacer = document.createElement("div");
+  spacer.setAttribute("data-lumeo-page-break-spacer", "before");
+  spacer.style.display = "block";
+  spacer.style.height = `${heightPx}px`;
+  element.parentNode.insertBefore(spacer, element);
+}
+
+function insertSpacerAfter(element: HTMLElement, heightPx: number): void {
+  if (heightPx <= 0.5 || !element.parentNode) return;
+  const spacer = document.createElement("div");
+  spacer.setAttribute("data-lumeo-page-break-spacer", "after");
+  spacer.style.display = "block";
+  spacer.style.height = `${heightPx}px`;
+  element.parentNode.insertBefore(spacer, element.nextSibling);
+}
+
+// html2pdf.js normally applies these rules to its own cloned DOM. WebKit can
+// collapse that clone to only a few pixels when the source comes from our
+// Shadow DOM export surface, so apply the equivalent CSS/legacy spacing to the
+// live sanitized surface before direct capture instead. This keeps forced
+// breaks and break-inside avoidance without depending on the broken clone.
+function applyLivePageBreaks(container: HTMLElement, pageHeightPx: number): void {
+  const elements = Array.from(container.querySelectorAll<HTMLElement>("*"));
+
+  for (const element of elements) {
+    const style = window.getComputedStyle(element);
+    let before = isForcedPageBreak(style.breakBefore || style.pageBreakBefore);
+    const after =
+      isForcedPageBreak(style.breakAfter || style.pageBreakAfter) ||
+      element.classList.contains("html2pdf__page-break");
+    const avoid = isAvoidPageBreak(style.breakInside || style.pageBreakInside);
+
+    let containerTop = container.getBoundingClientRect().top;
+    let rect = element.getBoundingClientRect();
+    let top = rect.top - containerTop;
+    let bottom = rect.bottom - containerTop;
+
+    if (avoid && !before) {
+      const startPage = Math.floor(top / pageHeightPx);
+      const endPage = Math.floor(Math.max(bottom - 0.5, top) / pageHeightPx);
+      const pageSpan = Math.abs(bottom - top) / pageHeightPx;
+      if (endPage !== startPage && pageSpan <= 1) before = true;
+    }
+
+    if (before) {
+      const offset = normalizedPageOffset(top, pageHeightPx);
+      if (offset > 0.5) {
+        insertSpacerBefore(element, pageHeightPx - offset);
+        containerTop = container.getBoundingClientRect().top;
+        rect = element.getBoundingClientRect();
+        top = rect.top - containerTop;
+        bottom = rect.bottom - containerTop;
+      }
+    }
+
+    if (after) {
+      const offset = normalizedPageOffset(bottom, pageHeightPx);
+      if (offset > 0.5) insertSpacerAfter(element, pageHeightPx - offset);
+    }
+  }
+}
+
+async function captureExportSurface(surface: ExportSurface): Promise<HTMLCanvasElement> {
+  const html2canvas = (await import("html2canvas")).default;
+  const contentHeightPx = Math.max(surface.container.scrollHeight, surface.contentHeightPx, 1);
+
+  return runWithTimeout(
+    html2canvas(surface.container, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      width: surface.contentWidthPx,
+      height: contentHeightPx,
+      windowWidth: surface.contentWidthPx,
+      windowHeight: contentHeightPx,
+      scrollX: 0,
+      scrollY: 0,
+      logging: false,
+    }),
+    "Capturing the document took too long. Try simpler HTML/CSS or fewer images.",
+  );
 }
 
 export default function HtmlToPdfTool() {
@@ -255,8 +368,22 @@ export default function HtmlToPdfTool() {
       const pageWidthPx = getPageContentWidthPx(pageSize, orientation);
       exportSurface = await createExportSurface(source, pageWidthPx);
       const surface = exportSurface;
+      const pageSliceHeightPx = getPageSliceHeightPx(
+        pageSize,
+        orientation,
+        margin,
+        surface.contentWidthPx,
+      );
+      applyLivePageBreaks(surface.container, pageSliceHeightPx);
+      surface.contentHeightPx = Math.max(surface.container.scrollHeight, 1);
 
-      const html2pdf = (await import("html2pdf.js")).default;
+      // Capture the real, sanitized same-document surface directly. Production
+      // Safari/WebKit traces proved html2pdf.js's internal clone could collapse
+      // this long document to 794x48 px, which inevitably produced one page.
+      // Feeding html2pdf a canvas bypasses that clone while retaining its
+      // mature jsPDF page-splitting/output path.
+      const canvas = await captureExportSurface(surface);
+      const html2pdfFactory = (await import("html2pdf.js")).default as unknown as () => Html2PdfWorker;
       const options = buildHtml2PdfOptions({
         fileName: `${sanitizeFileStem(fileName, "lumeo-document")}.pdf`,
         pageSize,
@@ -265,16 +392,13 @@ export default function HtmlToPdfTool() {
         contentWidthPx: surface.contentWidthPx,
         contentHeightPx: surface.contentHeightPx,
       });
+
       // outputPdf("blob") instead of .save() -- .save() triggers the browser
       // download as a side effect inside html2pdf's own internal promise
-      // chain, which our timeout race below cannot cancel: if the race times
-      // out while html2canvas/jsPDF keep working in the background (neither
-      // supports abort), the abandoned work can still finish and fire a
-      // surprise download after the user has already seen a timeout error.
-      // Getting the PDF back as a blob and triggering the download ourselves
-      // means that only happens on the path that actually won the race.
+      // chain, which our timeout race below cannot cancel. Getting the PDF back
+      // as a blob means only the successful path triggers the user download.
       const blob: Blob = await runWithTimeout(
-        html2pdf().set(options).from(surface.container).outputPdf("blob"),
+        html2pdfFactory().set(options).from(canvas, "canvas").outputPdf("blob"),
         "Generating the PDF took too long. Try simpler HTML/CSS or fewer images.",
       );
       const blobUrl = URL.createObjectURL(blob);
