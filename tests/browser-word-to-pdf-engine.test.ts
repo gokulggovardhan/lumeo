@@ -58,6 +58,17 @@ test("Word to PDF resolves the production Office runtime only when conversion st
 });
 
 
+test("browser Office runtime keeps development and production asset modes separate", async () => {
+  const source = await readFile(
+    "lib/conversion/browser/libreoffice/BrowserLibreOfficeRuntime.ts",
+    "utf8",
+  );
+
+  assert.match(source, /process\.env\.NODE_ENV === "development"/);
+  assert.match(source, /\? "development" : "production"/);
+  assert.match(source, /resolveOfficeAssetConfig\(mode\)/);
+});
+
 test("Word engine reuses the page runtime and leaves job cleanup to the runtime", async () => {
   const source = await readFile(
     "lib/conversion/browser/BrowserWordToPdfEngine.ts",
