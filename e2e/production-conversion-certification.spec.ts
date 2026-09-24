@@ -445,7 +445,10 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
   });
 
   const convertButton = page.getByRole("button", { name: "Convert to PDF" });
-  const alert = page.getByRole("alert");
+  const alert = page
+    .locator('div[role="alert"]')
+    .filter({ hasText: /Local Word to PDF/ })
+    .first();
   await expect
     .poll(
       async () => {
