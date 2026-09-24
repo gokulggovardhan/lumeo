@@ -6,6 +6,7 @@ import {
 import {
   canRunThreadedBrowserOffice,
   detectBrowserConversionCapabilities,
+  missingThreadedBrowserOfficeCapabilities,
   selectConversionProcessingMode,
 } from "@/lib/conversion/browser/capabilities";
 import { getBrowserLibreOfficeRuntime } from "@/lib/conversion/browser/libreoffice/BrowserLibreOfficeRuntime";
@@ -68,10 +69,16 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
 
     const capabilities = await detectBrowserConversionCapabilities();
     if (!canRunThreadedBrowserOffice(capabilities)) {
+      const missing = missingThreadedBrowserOfficeCapabilities(capabilities);
+      const requirementList = missing.join(", ");
       throw conversionUserError("browser-unsupported", {
         recoverable: false,
+        message:
+          missing.length === 1
+            ? `Local Word to PDF requires ${requirementList}, which is not available in this browser session.`
+            : `Local Word to PDF requires browser capabilities that are not available in this session: ${requirementList}.`,
         technicalMessage:
-          "Threaded browser Office conversion requires WebAssembly, workers, SharedArrayBuffer, cross-origin isolation, shared WASM memory, and worker OffscreenCanvas WebGL.",
+          `Threaded browser Office conversion missing: ${requirementList || "unknown capability"}.`,
       });
     }
 
