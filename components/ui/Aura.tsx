@@ -367,11 +367,25 @@ export function AuraBadge({ tone = "neutral", className, ...props }: HTMLAttribu
   return <span {...props} className={cx("inline-flex items-center rounded-[var(--radius-pill)] border px-2.5 py-1 text-xs font-extrabold", toneClasses[tone], className)} />;
 }
 
-export function AuraStatus({ tone = "neutral", label }: { tone?: Tone; label: string }) {
+export function AuraStatus({
+  tone = "neutral",
+  label,
+  className,
+}: {
+  tone?: Tone;
+  label: string;
+  className?: string;
+}) {
   return (
-    <span className={cx("inline-flex items-center gap-2 rounded-[var(--radius-pill)] border px-2.5 py-1 text-xs font-extrabold", toneClasses[tone])}>
-      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
-      {label}
+    <span
+      className={cx(
+        "inline-flex items-center gap-2 rounded-[var(--radius-pill)] border px-2.5 py-1 text-xs font-extrabold",
+        toneClasses[tone],
+        className,
+      )}
+    >
+      <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
+      <span className="min-w-0 truncate">{label}</span>
     </span>
   );
 }

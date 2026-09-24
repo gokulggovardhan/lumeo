@@ -318,9 +318,31 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
 }) => {
   test.skip(browserName !== "chromium", "Threaded Office runtime production smoke runs in Chromium.");
 
-  const runtime = watchConversionRuntime(page);
-  await page.goto("/pdf/word-to-pdf");
+  await page.goto("/pdf-tools", { waitUntil: "domcontentloaded" });
+  expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(false);
+
+  const wordToPdfLink = page.locator('a[href="/pdf/word-to-pdf"]').first();
+  await expect(wordToPdfLink).toBeVisible();
+  await wordToPdfLink.click();
+  await page.waitForURL("**/pdf/word-to-pdf");
+  await expect
+    .poll(
+      async () => {
+        try {
+          return await page.evaluate(() => window.crossOriginIsolated);
+        } catch {
+          return false;
+        }
+      },
+      { timeout: 30_000 },
+    )
+    .toBe(true);
   await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
+
+  // Begin conversion/privacy observation after the intentional isolation reload
+  // so navigation-aborted framework requests cannot be mistaken for conversion
+  // transport failures. No user document has been selected at this point.
+  const runtime = watchConversionRuntime(page);
 
   const docx = await makeDocx();
   await page.locator('input[type="file"]').setInputFiles({
@@ -330,7 +352,9 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
     buffer: docx,
   });
 
-  await page.getByRole("button", { name: "Convert to PDF" }).click();
+  const convertButton = page.getByRole("button", { name: "Convert to PDF" });
+  await expect(convertButton).toBeEnabled({ timeout: 180_000 });
+  await convertButton.click();
 
   const ready = page.getByText("PDF ready");
   const failure = page.getByRole("alert");
@@ -370,7 +394,13 @@ test("production Word to PDF preserves professional formatting against native re
     buffer: source,
   });
 
-  await page.getByRole("button", { name: "Convert to PDF" }).click();
+  const professionalConvertButton = page.getByRole("button", {
+    name: "Convert to PDF",
+  });
+  await expect(professionalConvertButton).toBeEnabled({
+    timeout: 180_000,
+  });
+  await professionalConvertButton.click();
   await expect(page.getByText("PDF ready")).toBeVisible({
     timeout: 420_000,
   });

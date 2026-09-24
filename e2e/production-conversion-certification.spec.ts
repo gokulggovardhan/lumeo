@@ -297,7 +297,9 @@ async function convertWordToPdf(
     page.getByRole("button", { name: `Remove ${input.name}` }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Convert to PDF" }).click();
+  const convertButton = page.getByRole("button", { name: "Convert to PDF" });
+  await expect(convertButton).toBeEnabled({ timeout: 180_000 });
+  await convertButton.click();
   await expect(page.getByText("PDF ready")).toBeVisible({ timeout: 420_000 });
 
   const downloadPromise = page.waitForEvent("download");
@@ -399,7 +401,11 @@ test("production Word to PDF reuses Office runtime, survives cancellation, and c
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: cancellationDocx,
   });
-  await page.getByRole("button", { name: "Convert to PDF" }).click();
+  const cancellationConvertButton = page.getByRole("button", {
+    name: "Convert to PDF",
+  });
+  await expect(cancellationConvertButton).toBeEnabled({ timeout: 180_000 });
+  await cancellationConvertButton.click();
 
   const liveStatus = page.locator('p[aria-live="polite"]');
   await expect(liveStatus).toContainText(/Processing document|Generating PDF/, {
@@ -437,16 +443,23 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: source,
   });
-  await page.getByRole("button", { name: "Convert to PDF" }).click();
 
-  const ready = page.getByText("PDF ready");
+  const convertButton = page.getByRole("button", { name: "Convert to PDF" });
   const alert = page.getByRole("alert");
-  const outcome = await Promise.race([
-    ready.waitFor({ state: "visible", timeout: 420_000 }).then(() => "success" as const),
-    alert.waitFor({ state: "visible", timeout: 420_000 }).then(() => "error" as const),
-  ]);
+  await expect
+    .poll(
+      async () => {
+        if (await alert.isVisible().catch(() => false)) return "error";
+        if (await convertButton.isEnabled().catch(() => false)) return "ready";
+        return "waiting";
+      },
+      { timeout: 180_000 },
+    )
+    .not.toBe("waiting");
 
-  if (outcome === "success") {
+  if (await convertButton.isEnabled().catch(() => false)) {
+    await convertButton.click();
+    await expect(page.getByText("PDF ready")).toBeVisible({ timeout: 420_000 });
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download PDF" }).click();
     const download = await downloadPromise;
@@ -454,7 +467,9 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
     const pdf = await PDFDocument.load(await downloadBytes(download));
     expect(pdf.getPageCount()).toBeGreaterThan(0);
   } else {
-    await expect(alert).toContainText(/browser|local conversion engine|supported/i);
+    await expect(alert).toContainText(
+      /requires|missing|cross-origin isolation|SharedArrayBuffer|WebAssembly|Web Workers/i,
+    );
   }
 
   expectCleanRuntime(runtime, browserName, true);
