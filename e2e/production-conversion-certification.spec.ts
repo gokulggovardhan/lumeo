@@ -185,6 +185,18 @@ async function downloadBytes(download: Download): Promise<Buffer> {
   return readFile(path);
 }
 
+async function replaceControlledText(
+  page: Page,
+  label: string,
+  value: string,
+): Promise<void> {
+  const field = page.getByLabel(label);
+  await field.click();
+  await field.press("ControlOrMeta+A");
+  await page.keyboard.insertText(value);
+  await expect(field).toHaveValue(value);
+}
+
 async function readDocxXml(bytes: Buffer): Promise<string> {
   const zip = await JSZip.loadAsync(bytes);
   expect(zip.file("[Content_Types].xml")).toBeTruthy();
@@ -484,8 +496,9 @@ test("production HTML to PDF preserves styled multi-page content and supports re
 </body>
 </html>`;
 
-  await page.getByLabel("HTML and CSS source").fill(html);
+  await replaceControlledText(page, "HTML and CSS source", html);
   await page.getByLabel("File name").fill("Production Rich HTML");
+  await expect(page.getByLabel("HTML and CSS source")).toHaveValue(html);
 
   let downloadPromise = page.waitForEvent("download");
   const generate = page.locator("button.lumeo-primary-action").first();
@@ -500,10 +513,11 @@ test("production HTML to PDF preserves styled multi-page content and supports re
   expect(pdf.getPageCount()).toBeGreaterThanOrEqual(2);
   expect(bytes.length).toBeGreaterThan(5_000);
 
-  await page.getByLabel("HTML and CSS source").fill(
-    "<style>body{font-family:serif}table{border-collapse:collapse}td{border:1px solid #333;padding:6px}</style><h1>Second conversion</h1><table><tr><td>Repeat</td><td>Works</td></tr></table><p>Unicode Ω λ 漢字.</p>",
-  );
+  const repeatHtml =
+    "<style>body{font-family:serif}table{border-collapse:collapse}td{border:1px solid #333;padding:6px}</style><h1>Second conversion</h1><table><tr><td>Repeat</td><td>Works</td></tr></table><p>Unicode Ω λ 漢字.</p>";
+  await replaceControlledText(page, "HTML and CSS source", repeatHtml);
   await page.getByLabel("File name").fill(`Repeat HTML ${testInfo.project.name}`);
+  await expect(page.getByLabel("HTML and CSS source")).toHaveValue(repeatHtml);
   downloadPromise = page.waitForEvent("download");
   await generate.click();
   download = await downloadPromise;
