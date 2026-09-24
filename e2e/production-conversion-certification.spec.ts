@@ -130,7 +130,7 @@ function isExpectedOfficeRuntimeDiagnostic(
 ): boolean {
   const normalized = message.trim();
   if (
-    browserName === "chromium" &&
+    (browserName === "chromium" || browserName === "firefox") &&
     (normalized === "QRect(0,0 0x0) 1" ||
       normalized === "QObject::connect(QWindow, QtFrame): invalid nullptr parameter")
   ) {
