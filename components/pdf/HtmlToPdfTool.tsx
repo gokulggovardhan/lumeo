@@ -5,9 +5,10 @@ import DOMPurify from "dompurify";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { L2ActionArea, L2PrivacyNote } from "@/components/pdf/workspace/ToolWorkspace";
 import {
-  buildHtml2PdfOptions,
   getPageContentWidthPx,
+  getPageDimensionsMm,
   getPageSliceHeightPx,
+  MARGIN_MM,
   validateHtmlSource,
   type MarginPreset,
   type Orientation,
@@ -118,12 +119,6 @@ type ExportSurface = {
   container: HTMLElement;
   contentWidthPx: number;
   contentHeightPx: number;
-};
-
-type Html2PdfWorker = {
-  set(options: ReturnType<typeof buildHtml2PdfOptions>): Html2PdfWorker;
-  from(source: HTMLElement | HTMLCanvasElement, type?: "element" | "canvas"): Html2PdfWorker;
-  outputPdf(type: "blob"): Promise<Blob>;
 };
 
 // html2canvas cannot reliably paint content that lives in a different
@@ -282,6 +277,8 @@ type StyledElement = HTMLElement | SVGElement;
 
 type CaptureMirror = {
   host: HTMLDivElement;
+  viewport: HTMLDivElement;
+  conveyor: HTMLDivElement;
   container: HTMLElement;
 };
 
@@ -332,7 +329,10 @@ function serializeComputedStyle(style: CSSStyleDeclaration): string {
 //
 // No user stylesheet is attached globally: normal element styles become inline
 // declarations and pseudo-element rules are scoped to one unique mirror id.
-function createCaptureMirror(surface: ExportSurface): CaptureMirror {
+function createCaptureMirror(
+  surface: ExportSurface,
+  pageHeightPx: number,
+): CaptureMirror {
   const host = document.createElement("div");
   const mirrorId = `lumeo-html-capture-${++captureMirrorSequence}`;
   host.id = mirrorId;
@@ -344,8 +344,25 @@ function createCaptureMirror(surface: ExportSurface): CaptureMirror {
   host.style.pointerEvents = "none";
   host.style.zIndex = "-2147483648";
 
+  // Capture through a physical-page-sized viewport instead of one giant
+  // canvas. Safari/WebKit can clamp very tall canvases even when the DOM
+  // itself is laid out correctly; bounded page canvases avoid that limit.
+  const viewport = document.createElement("div");
+  viewport.style.position = "relative";
+  viewport.style.width = `${surface.contentWidthPx}px`;
+  viewport.style.height = `${pageHeightPx}px`;
+  viewport.style.overflow = "hidden";
+  viewport.style.background = "#ffffff";
+
+  const conveyor = document.createElement("div");
+  conveyor.style.position = "relative";
+  conveyor.style.width = `${surface.contentWidthPx}px`;
+  conveyor.style.transformOrigin = "top left";
+
   const container = surface.container.cloneNode(true) as HTMLElement;
-  host.appendChild(container);
+  conveyor.appendChild(container);
+  viewport.appendChild(conveyor);
+  host.appendChild(viewport);
   document.body.appendChild(host);
 
   const sourceElements: Element[] = [
@@ -398,12 +415,40 @@ function createCaptureMirror(surface: ExportSurface): CaptureMirror {
     host.insertBefore(style, container);
   }
 
-  return { host, container };
+  return { host, viewport, conveyor, container };
 }
 
-async function captureExportSurface(surface: ExportSurface): Promise<HTMLCanvasElement> {
-  const html2canvas = (await import("html2canvas")).default;
-  const mirror = createCaptureMirror(surface);
+function canvasToJpegBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+  return new Promise<Uint8Array>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Could not encode a PDF page."));
+          return;
+        }
+        void blob
+          .arrayBuffer()
+          .then((buffer) => resolve(new Uint8Array(buffer)))
+          .catch(reject);
+      },
+      "image/jpeg",
+      0.95,
+    );
+  });
+}
+
+async function generatePagedPdfBlob(
+  surface: ExportSurface,
+  pageHeightPx: number,
+  pageSize: PageSize,
+  orientation: Orientation,
+  margin: MarginPreset,
+): Promise<Blob> {
+  const [{ default: html2canvas }, { PDFDocument }] = await Promise.all([
+    import("html2canvas"),
+    import("pdf-lib"),
+  ]);
+  const mirror = createCaptureMirror(surface, pageHeightPx);
 
   try {
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
@@ -413,19 +458,59 @@ async function captureExportSurface(surface: ExportSurface): Promise<HTMLCanvasE
       surface.contentHeightPx,
       1,
     );
+    const pageCount = Math.max(1, Math.ceil(contentHeightPx / pageHeightPx));
 
-    return await runWithTimeout(
-      html2canvas(mirror.container, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        width: surface.contentWidthPx,
-        height: contentHeightPx,
-        windowWidth: surface.contentWidthPx,
-        windowHeight: contentHeightPx,
-      }),
-      "Capturing the document took too long. Try simpler HTML/CSS or fewer images.",
+    const { width: pageWidthMm, height: pageHeightMm } = getPageDimensionsMm(
+      pageSize,
+      orientation,
     );
+    const marginMm = MARGIN_MM[margin];
+    const pointsPerMm = 72 / 25.4;
+    const pageWidthPt = pageWidthMm * pointsPerMm;
+    const pageHeightPt = pageHeightMm * pointsPerMm;
+    const marginPt = marginMm * pointsPerMm;
+    const innerWidthPt = Math.max(pageWidthPt - marginPt * 2, 1);
+    const innerHeightPt = Math.max(pageHeightPt - marginPt * 2, 1);
+
+    const pdf = await PDFDocument.create();
+
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+      mirror.conveyor.style.transform =
+        `translateY(-${pageIndex * pageHeightPx}px)`;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+      const canvas = await runWithTimeout(
+        html2canvas(mirror.viewport, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          width: surface.contentWidthPx,
+          height: pageHeightPx,
+          windowWidth: surface.contentWidthPx,
+          windowHeight: pageHeightPx,
+        }),
+        "Capturing a PDF page took too long. Try simpler HTML/CSS or fewer images.",
+      );
+
+      const jpegBytes = await canvasToJpegBytes(canvas);
+      const image = await pdf.embedJpg(jpegBytes);
+      const page = pdf.addPage([pageWidthPt, pageHeightPt]);
+      page.drawImage(image, {
+        x: marginPt,
+        y: marginPt,
+        width: innerWidthPt,
+        height: innerHeightPt,
+      });
+
+      // Release the page-sized backing store before rendering the next page.
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+
+    const pdfBytes = await pdf.save();
+    const outputBytes = new Uint8Array(pdfBytes.byteLength);
+    outputBytes.set(pdfBytes);
+    return new Blob([outputBytes.buffer], { type: "application/pdf" });
   } finally {
     mirror.host.remove();
   }
@@ -509,34 +594,23 @@ export default function HtmlToPdfTool() {
       applyLivePageBreaks(surface.container, pageSliceHeightPx);
       surface.contentHeightPx = Math.max(surface.container.scrollHeight, 1);
 
-      // Capture the real, sanitized same-document surface directly. Production
-      // Safari/WebKit traces proved html2pdf.js's internal clone could collapse
-      // this long document to 794x48 px, which inevitably produced one page.
-      // Feeding html2pdf a canvas bypasses that clone while retaining its
-      // mature jsPDF page-splitting/output path.
-      const canvas = await captureExportSurface(surface);
-      const html2pdfFactory = (await import("html2pdf.js")).default as unknown as () => Html2PdfWorker;
-      const options = buildHtml2PdfOptions({
-        fileName: `${sanitizeFileStem(fileName, "lumeo-document")}.pdf`,
+      // Render one bounded physical-page canvas at a time. WebKit/Safari can
+      // clamp very tall canvases to a single page even when the source DOM has
+      // the correct height. Page-sized capture avoids that engine limit and
+      // pdf-lib assembles the final document entirely in the browser.
+      const outputFileName =
+        `${sanitizeFileStem(fileName, "lumeo-document")}.pdf`;
+      const blob = await generatePagedPdfBlob(
+        surface,
+        pageSliceHeightPx,
         pageSize,
         orientation,
         margin,
-        contentWidthPx: surface.contentWidthPx,
-        contentHeightPx: surface.contentHeightPx,
-      });
-
-      // outputPdf("blob") instead of .save() -- .save() triggers the browser
-      // download as a side effect inside html2pdf's own internal promise
-      // chain, which our timeout race below cannot cancel. Getting the PDF back
-      // as a blob means only the successful path triggers the user download.
-      const blob: Blob = await runWithTimeout(
-        html2pdfFactory().set(options).from(canvas, "canvas").outputPdf("blob"),
-        "Generating the PDF took too long. Try simpler HTML/CSS or fewer images.",
       );
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.download = options.filename;
+      link.download = outputFileName;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -548,7 +622,7 @@ export default function HtmlToPdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
-      recordRecentFile({ tool: "html-to-pdf", filename: `${sanitizeFileStem(fileName, "lumeo-document")}.pdf` });
+      recordRecentFile({ tool: "html-to-pdf", filename: outputFileName });
     } catch (generateError) {
       setError(
         generateError instanceof Error
