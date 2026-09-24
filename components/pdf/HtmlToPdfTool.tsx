@@ -278,22 +278,157 @@ function applyLivePageBreaks(container: HTMLElement, pageHeightPx: number): void
   }
 }
 
+type StyledElement = HTMLElement | SVGElement;
+
+type CaptureMirror = {
+  host: HTMLDivElement;
+  container: HTMLElement;
+};
+
+let captureMirrorSequence = 0;
+
+function isStyledElement(element: Element): element is StyledElement {
+  return element instanceof HTMLElement || element instanceof SVGElement;
+}
+
+function copyComputedStyleDeclaration(
+  source: CSSStyleDeclaration,
+  target: CSSStyleDeclaration,
+): void {
+  for (let index = 0; index < source.length; index += 1) {
+    const property = source.item(index);
+    if (!property) continue;
+    const value = source.getPropertyValue(property);
+    if (!value) continue;
+    try {
+      target.setProperty(property, value, source.getPropertyPriority(property));
+    } catch {
+      // Ignore browser-specific read-only/unsupported computed properties.
+    }
+  }
+}
+
+function hasRenderablePseudoElement(style: CSSStyleDeclaration): boolean {
+  const content = style.getPropertyValue("content").trim();
+  return (
+    style.getPropertyValue("display") !== "none" &&
+    content !== "" &&
+    content !== "none" &&
+    content !== "normal"
+  );
+}
+
+function serializeComputedStyle(style: CSSStyleDeclaration): string {
+  const scratch = document.createElement("span");
+  copyComputedStyleDeclaration(style, scratch.style);
+  return scratch.style.cssText;
+}
+
+// html2canvas 1.4.x clones the owning document before painting. Shadow-root
+// descendants are not cloned consistently in WebKit, which can collapse a
+// long source to a tiny one-page tree. Keep the live sanitized source inside
+// Shadow DOM for CSS isolation, then flatten its *resolved* styles into a
+// temporary light-DOM mirror that html2canvas can clone consistently.
+//
+// No user stylesheet is attached globally: normal element styles become inline
+// declarations and pseudo-element rules are scoped to one unique mirror id.
+function createCaptureMirror(surface: ExportSurface): CaptureMirror {
+  const host = document.createElement("div");
+  const mirrorId = `lumeo-html-capture-${++captureMirrorSequence}`;
+  host.id = mirrorId;
+  host.setAttribute("aria-hidden", "true");
+  host.style.position = "fixed";
+  host.style.top = "0";
+  host.style.left = "-20000px";
+  host.style.width = `${surface.contentWidthPx}px`;
+  host.style.pointerEvents = "none";
+  host.style.zIndex = "-2147483648";
+
+  const container = surface.container.cloneNode(true) as HTMLElement;
+  host.appendChild(container);
+  document.body.appendChild(host);
+
+  const sourceElements: Element[] = [
+    surface.container,
+    ...Array.from(surface.container.querySelectorAll("*")),
+  ];
+  const mirrorElements: Element[] = [
+    container,
+    ...Array.from(container.querySelectorAll("*")),
+  ];
+
+  if (sourceElements.length !== mirrorElements.length) {
+    host.remove();
+    throw new Error("Could not prepare the browser capture surface.");
+  }
+
+  const pseudoRules: string[] = [];
+  for (let index = 0; index < sourceElements.length; index += 1) {
+    const sourceElement = sourceElements[index];
+    const mirrorElement = mirrorElements[index];
+    if (!isStyledElement(sourceElement) || !isStyledElement(mirrorElement)) continue;
+
+    copyComputedStyleDeclaration(
+      window.getComputedStyle(sourceElement),
+      mirrorElement.style,
+    );
+
+    if (!(sourceElement instanceof HTMLElement) || !(mirrorElement instanceof HTMLElement)) {
+      continue;
+    }
+
+    const pseudoKey = String(index);
+    mirrorElement.setAttribute("data-lumeo-capture-node", pseudoKey);
+
+    for (const pseudo of ["::before", "::after"] as const) {
+      const pseudoStyle = window.getComputedStyle(sourceElement, pseudo);
+      if (!hasRenderablePseudoElement(pseudoStyle)) continue;
+      const declarations = serializeComputedStyle(pseudoStyle);
+      if (!declarations) continue;
+      pseudoRules.push(
+        `#${mirrorId} [data-lumeo-capture-node="${pseudoKey}"]${pseudo}{${declarations}}`,
+      );
+    }
+  }
+
+  if (pseudoRules.length) {
+    const style = document.createElement("style");
+    style.setAttribute("data-lumeo-capture-pseudos", "true");
+    style.textContent = pseudoRules.join("\n");
+    host.insertBefore(style, container);
+  }
+
+  return { host, container };
+}
+
 async function captureExportSurface(surface: ExportSurface): Promise<HTMLCanvasElement> {
   const html2canvas = (await import("html2canvas")).default;
-  const contentHeightPx = Math.max(surface.container.scrollHeight, surface.contentHeightPx, 1);
+  const mirror = createCaptureMirror(surface);
 
-  return runWithTimeout(
-    html2canvas(surface.container, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-      width: surface.contentWidthPx,
-      height: contentHeightPx,
-      windowWidth: surface.contentWidthPx,
-      windowHeight: contentHeightPx,
-    }),
-    "Capturing the document took too long. Try simpler HTML/CSS or fewer images.",
-  );
+  try {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const contentHeightPx = Math.max(
+      mirror.container.scrollHeight,
+      mirror.container.getBoundingClientRect().height,
+      surface.contentHeightPx,
+      1,
+    );
+
+    return await runWithTimeout(
+      html2canvas(mirror.container, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        width: surface.contentWidthPx,
+        height: contentHeightPx,
+        windowWidth: surface.contentWidthPx,
+        windowHeight: contentHeightPx,
+      }),
+      "Capturing the document took too long. Try simpler HTML/CSS or fewer images.",
+    );
+  } finally {
+    mirror.host.remove();
+  }
 }
 
 export default function HtmlToPdfTool() {
