@@ -99,7 +99,7 @@ test("threaded office readiness fails closed without cross-origin isolation", as
 
 
 
-test("threaded Office readiness does not require optional OffscreenCanvas WebGL", () => {
+test("threaded Office readiness requires worker OffscreenCanvas WebGL", () => {
   const capabilities = {
     webAssembly: true,
     webWorkers: true,
@@ -123,8 +123,10 @@ test("threaded Office readiness does not require optional OffscreenCanvas WebGL"
     wasmThreadsReady: true,
   };
 
-  assert.deepEqual(missingThreadedBrowserOfficeCapabilities(capabilities), []);
-  assert.equal(canRunThreadedBrowserOffice(capabilities), true);
+  assert.deepEqual(missingThreadedBrowserOfficeCapabilities(capabilities), [
+    "worker OffscreenCanvas WebGL",
+  ]);
+  assert.equal(canRunThreadedBrowserOffice(capabilities), false);
 });
 
 test("threaded Office readiness reports the actual missing runtime capability", () => {
