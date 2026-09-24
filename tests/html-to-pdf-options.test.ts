@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   buildHtml2PdfOptions,
   getPageContentWidthPx,
+  getPageDimensionsMm,
   getPageSliceHeightPx,
   MARGIN_MM,
   validateHtmlSource,
@@ -80,4 +81,10 @@ test("getPageSliceHeightPx matches html2pdf printable-page slicing with margins"
     getPageSliceHeightPx("a4", "portrait", "wide", 794) >
       getPageSliceHeightPx("a4", "portrait", "normal", 794),
   );
+});
+
+test("getPageDimensionsMm returns orientation-aware physical page geometry", () => {
+  assert.deepEqual(getPageDimensionsMm("a4", "portrait"), { width: 210, height: 297 });
+  assert.deepEqual(getPageDimensionsMm("a4", "landscape"), { width: 297, height: 210 });
+  assert.deepEqual(getPageDimensionsMm("letter", "portrait"), { width: 215.9, height: 279.4 });
 });
