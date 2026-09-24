@@ -100,5 +100,5 @@ test("Word to PDF capability errors identify actual missing runtime features", a
 
   assert.match(source, /missingThreadedBrowserOfficeCapabilities/);
   assert.match(source, /Threaded browser Office conversion missing:/);
-  assert.doesNotMatch(source, /worker OffscreenCanvas WebGL/);
+  assert.match(source, /worker OffscreenCanvas WebGL/);
 });
