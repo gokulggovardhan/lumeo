@@ -445,14 +445,20 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
   });
 
   const convertButton = page.getByRole("button", { name: "Convert to PDF" });
+  const retryCompatibility = page.getByRole("button", {
+    name: "Retry compatibility check",
+  });
   const alert = page
-    .locator('div[role="alert"]')
+    .getByRole("alert")
     .filter({ hasText: /Local Word to PDF/ })
     .first();
+
   await expect
     .poll(
       async () => {
-        if (await alert.isVisible().catch(() => false)) return "error";
+        if (await retryCompatibility.isVisible().catch(() => false)) {
+          return "unsupported";
+        }
         if (await convertButton.isEnabled().catch(() => false)) return "ready";
         return "waiting";
       },
