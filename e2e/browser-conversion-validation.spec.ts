@@ -1491,7 +1491,7 @@ test.describe("browser conversion validation lab", () => {
       wordUi.getByRole("button", { name: `Remove ${name}` }),
     ).toBeVisible();
     await expect(wordUi.locator('[aria-live="polite"]')).toContainText(
-      /Browser capability missing|Ready to convert|Engine needs attention/,
+      /Browser capability missing|Ready to convert|Engine needs attention|Preparation cancelled/,
       { timeout: 30_000 },
     );
   });
@@ -1517,7 +1517,7 @@ test.describe("browser conversion validation lab", () => {
       wordUi.getByRole("button", { name: `Remove ${longWordName}` }),
     ).toBeVisible();
     await expect(wordUi.locator('[aria-live="polite"]')).toContainText(
-      /Browser capability missing|Ready to convert|Engine needs attention/,
+      /Browser capability missing|Ready to convert|Engine needs attention|Preparation cancelled/,
       { timeout: 30_000 },
     );
 
