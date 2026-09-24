@@ -450,27 +450,30 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
     .filter({ hasText: /Local Word to PDF/ })
     .first();
 
-  const capabilityOutcome = await expect
-    .poll(
-      async () =>
-        page.evaluate(() => {
-          const buttons = Array.from(document.querySelectorAll("button"));
-          const retry = buttons.find(
-            (button) =>
-              button.textContent?.trim() === "Retry compatibility check",
-          );
-          if (retry) return "unsupported";
+  const readCapabilityOutcome = async (): Promise<
+    "ready" | "unsupported" | "waiting"
+  > =>
+    page.evaluate(() => {
+      const buttons = Array.from(document.querySelectorAll("button"));
+      const retry = buttons.find(
+        (button) =>
+          button.textContent?.trim() === "Retry compatibility check",
+      );
+      if (retry) return "unsupported";
 
-          const convert = buttons.find(
-            (button) => button.textContent?.trim() === "Convert to PDF",
-          ) as HTMLButtonElement | undefined;
-          if (convert && !convert.disabled) return "ready";
+      const convert = buttons.find(
+        (button) => button.textContent?.trim() === "Convert to PDF",
+      ) as HTMLButtonElement | undefined;
+      if (convert && !convert.disabled) return "ready";
 
-          return "waiting";
-        }),
-      { timeout: 180_000 },
-    )
+      return "waiting";
+    });
+
+  await expect
+    .poll(readCapabilityOutcome, { timeout: 180_000 })
     .not.toBe("waiting");
+
+  const capabilityOutcome = await readCapabilityOutcome();
 
   if (capabilityOutcome === "ready") {
     await expect(convertButton).toBeEnabled();
