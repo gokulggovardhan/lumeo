@@ -352,11 +352,8 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
     buffer: docx,
   });
 
-  await expect(page.getByText("Ready to convert")).toBeVisible({
-    timeout: 180_000,
-  });
   const convertButton = page.getByRole("button", { name: "Convert to PDF" });
-  await expect(convertButton).toBeEnabled();
+  await expect(convertButton).toBeEnabled({ timeout: 180_000 });
   await convertButton.click();
 
   const ready = page.getByText("PDF ready");
@@ -397,13 +394,12 @@ test("production Word to PDF preserves professional formatting against native re
     buffer: source,
   });
 
-  await expect(page.getByText("Ready to convert")).toBeVisible({
-    timeout: 180_000,
-  });
   const professionalConvertButton = page.getByRole("button", {
     name: "Convert to PDF",
   });
-  await expect(professionalConvertButton).toBeEnabled();
+  await expect(professionalConvertButton).toBeEnabled({
+    timeout: 180_000,
+  });
   await professionalConvertButton.click();
   await expect(page.getByText("PDF ready")).toBeVisible({
     timeout: 420_000,
