@@ -247,17 +247,29 @@ export function selectConversionProcessingMode(input: ProcessingModeInput): Conv
   return "normal";
 }
 
+export type ThreadedBrowserOfficeRequirement =
+  | "WebAssembly"
+  | "Web Workers"
+  | "SharedArrayBuffer"
+  | "cross-origin isolation"
+  | "shared WebAssembly memory";
+
+export function missingThreadedBrowserOfficeCapabilities(
+  capabilities: BrowserConversionCapabilities,
+): ThreadedBrowserOfficeRequirement[] {
+  const missing: ThreadedBrowserOfficeRequirement[] = [];
+
+  if (!capabilities.webAssembly) missing.push("WebAssembly");
+  if (!capabilities.webWorkers) missing.push("Web Workers");
+  if (!capabilities.sharedArrayBuffer) missing.push("SharedArrayBuffer");
+  if (!capabilities.crossOriginIsolated) missing.push("cross-origin isolation");
+  if (!capabilities.wasmSharedMemory) missing.push("shared WebAssembly memory");
+
+  return missing;
+}
+
 export function canRunThreadedBrowserOffice(
   capabilities: BrowserConversionCapabilities,
 ): boolean {
-  return (
-    capabilities.webAssembly &&
-    capabilities.webWorkers &&
-    capabilities.sharedArrayBuffer &&
-    capabilities.crossOriginIsolated &&
-    capabilities.wasmSharedMemory &&
-    capabilities.wasmThreadsReady &&
-    capabilities.offscreenCanvas &&
-    capabilities.workerOffscreenWebGl
-  );
+  return missingThreadedBrowserOfficeCapabilities(capabilities).length === 0;
 }
