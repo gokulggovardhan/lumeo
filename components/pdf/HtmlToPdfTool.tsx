@@ -291,8 +291,6 @@ async function captureExportSurface(surface: ExportSurface): Promise<HTMLCanvasE
       height: contentHeightPx,
       windowWidth: surface.contentWidthPx,
       windowHeight: contentHeightPx,
-      scrollX: 0,
-      scrollY: 0,
       logging: false,
     }),
     "Capturing the document took too long. Try simpler HTML/CSS or fewer images.",
