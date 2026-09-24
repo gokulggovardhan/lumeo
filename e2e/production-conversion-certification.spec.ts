@@ -297,7 +297,12 @@ async function convertWordToPdf(
     page.getByRole("button", { name: `Remove ${input.name}` }),
   ).toBeVisible();
 
-  await page.getByRole("button", { name: "Convert to PDF" }).click();
+  await expect(page.getByText("Ready to convert")).toBeVisible({
+    timeout: 180_000,
+  });
+  const convertButton = page.getByRole("button", { name: "Convert to PDF" });
+  await expect(convertButton).toBeEnabled();
+  await convertButton.click();
   await expect(page.getByText("PDF ready")).toBeVisible({ timeout: 420_000 });
 
   const downloadPromise = page.waitForEvent("download");
@@ -399,6 +404,9 @@ test("production Word to PDF reuses Office runtime, survives cancellation, and c
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: cancellationDocx,
   });
+  await expect(page.getByText("Ready to convert")).toBeVisible({
+    timeout: 180_000,
+  });
   await page.getByRole("button", { name: "Convert to PDF" }).click();
 
   const liveStatus = page.locator('p[aria-live="polite"]');
@@ -437,16 +445,23 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     buffer: source,
   });
-  await page.getByRole("button", { name: "Convert to PDF" }).click();
 
-  const ready = page.getByText("PDF ready");
+  const prepared = page.getByText("Ready to convert");
   const alert = page.getByRole("alert");
-  const outcome = await Promise.race([
-    ready.waitFor({ state: "visible", timeout: 420_000 }).then(() => "success" as const),
-    alert.waitFor({ state: "visible", timeout: 420_000 }).then(() => "error" as const),
+  const preparation = await Promise.race([
+    prepared
+      .waitFor({ state: "visible", timeout: 180_000 })
+      .then(() => "ready" as const),
+    alert
+      .waitFor({ state: "visible", timeout: 180_000 })
+      .then(() => "error" as const),
   ]);
 
-  if (outcome === "success") {
+  if (preparation === "ready") {
+    const convertButton = page.getByRole("button", { name: "Convert to PDF" });
+    await expect(convertButton).toBeEnabled();
+    await convertButton.click();
+    await expect(page.getByText("PDF ready")).toBeVisible({ timeout: 420_000 });
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download PDF" }).click();
     const download = await downloadPromise;
@@ -454,7 +469,9 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
     const pdf = await PDFDocument.load(await downloadBytes(download));
     expect(pdf.getPageCount()).toBeGreaterThan(0);
   } else {
-    await expect(alert).toContainText(/browser|local conversion engine|supported/i);
+    await expect(alert).toContainText(
+      /requires|missing|cross-origin isolation|SharedArrayBuffer|WebAssembly|Web Workers/i,
+    );
   }
 
   expectCleanRuntime(runtime, browserName, true);
