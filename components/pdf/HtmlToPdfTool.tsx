@@ -5,8 +5,10 @@ import DOMPurify from "dompurify";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { L2ActionArea, L2PrivacyNote } from "@/components/pdf/workspace/ToolWorkspace";
 import {
-  buildHtml2PdfOptions,
   getPageContentWidthPx,
+  getPageDimensionsMm,
+  getPageSliceHeightPx,
+  MARGIN_MM,
   validateHtmlSource,
   type MarginPreset,
   type Orientation,
@@ -127,7 +129,7 @@ type ExportSurface = {
 // user's HTML into a Shadow DOM subtree of the *same* document keeps
 // html2canvas in a single realm (fixing that) while still isolating the
 // user's own <style> rules from leaking onto the rest of the page.
-function createExportSurface(html: string, widthPx: number): Promise<ExportSurface> {
+async function createExportSurface(html: string, widthPx: number): Promise<ExportSurface> {
   // Rendered in the app's own document (not a sandboxed iframe, see the note
   // above), so any <script> or event-handler attribute in the user's typed
   // HTML must be stripped before it ever touches the DOM -- otherwise it
@@ -159,31 +161,359 @@ function createExportSurface(html: string, widthPx: number): Promise<ExportSurfa
   shadow.appendChild(container);
 
   const images = Array.from(container.querySelectorAll("img"));
-  const imagesReady = images.length
-    ? Promise.race([
-        Promise.all(
-          images.map(
-            (img) =>
-              new Promise<void>((resolve) => {
-                if (img.complete) {
-                  resolve();
-                  return;
-                }
-                img.addEventListener("load", () => resolve(), { once: true });
-                img.addEventListener("error", () => resolve(), { once: true });
-              }),
-          ),
-        ).then(() => undefined),
-        new Promise<void>((resolve) => setTimeout(resolve, 4000)),
-      ])
-    : Promise.resolve();
+  if (images.length) {
+    await Promise.race([
+      Promise.all(
+        images.map(
+          (img) =>
+            new Promise<void>((resolve) => {
+              if (img.complete) {
+                resolve();
+                return;
+              }
+              img.addEventListener("load", () => resolve(), { once: true });
+              img.addEventListener("error", () => resolve(), { once: true });
+            }),
+        ),
+      ).then(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+    ]);
+  }
 
-  return imagesReady.then(() => ({
+  if (document.fonts?.ready) {
+    await Promise.race([
+      document.fonts.ready.then(() => undefined),
+      new Promise<void>((resolve) => setTimeout(resolve, 1500)),
+    ]);
+  }
+
+  await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+  return {
     host,
     container,
     contentWidthPx: widthPx,
     contentHeightPx: Math.max(container.scrollHeight, 1),
-  }));
+  };
+}
+
+function isForcedPageBreak(value: string): boolean {
+  return ["always", "page", "left", "right"].includes(value);
+}
+
+function isAvoidPageBreak(value: string): boolean {
+  return value === "avoid" || value === "avoid-page";
+}
+
+function normalizedPageOffset(value: number, pageHeightPx: number): number {
+  return ((value % pageHeightPx) + pageHeightPx) % pageHeightPx;
+}
+
+function insertSpacerBefore(element: HTMLElement, heightPx: number): void {
+  if (heightPx <= 0.5 || !element.parentNode) return;
+  const spacer = document.createElement("div");
+  spacer.setAttribute("data-lumeo-page-break-spacer", "before");
+  spacer.style.display = "block";
+  spacer.style.height = `${heightPx}px`;
+  element.parentNode.insertBefore(spacer, element);
+}
+
+function insertSpacerAfter(element: HTMLElement, heightPx: number): void {
+  if (heightPx <= 0.5 || !element.parentNode) return;
+  const spacer = document.createElement("div");
+  spacer.setAttribute("data-lumeo-page-break-spacer", "after");
+  spacer.style.display = "block";
+  spacer.style.height = `${heightPx}px`;
+  element.parentNode.insertBefore(spacer, element.nextSibling);
+}
+
+// html2pdf.js normally applies these rules to its own cloned DOM. WebKit can
+// collapse that clone to only a few pixels when the source comes from our
+// Shadow DOM export surface, so apply the equivalent CSS/legacy spacing to the
+// live sanitized surface before direct capture instead. This keeps forced
+// breaks and break-inside avoidance without depending on the broken clone.
+function applyLivePageBreaks(container: HTMLElement, pageHeightPx: number): void {
+  const elements = Array.from(container.querySelectorAll<HTMLElement>("*"));
+
+  for (const element of elements) {
+    const style = window.getComputedStyle(element);
+    let before = isForcedPageBreak(style.breakBefore || style.pageBreakBefore);
+    const after =
+      isForcedPageBreak(style.breakAfter || style.pageBreakAfter) ||
+      element.classList.contains("html2pdf__page-break");
+    const avoid = isAvoidPageBreak(style.breakInside || style.pageBreakInside);
+
+    let containerTop = container.getBoundingClientRect().top;
+    let rect = element.getBoundingClientRect();
+    let top = rect.top - containerTop;
+    let bottom = rect.bottom - containerTop;
+
+    if (avoid && !before) {
+      const startPage = Math.floor(top / pageHeightPx);
+      const endPage = Math.floor(Math.max(bottom - 0.5, top) / pageHeightPx);
+      const pageSpan = Math.abs(bottom - top) / pageHeightPx;
+      if (endPage !== startPage && pageSpan <= 1) before = true;
+    }
+
+    if (before) {
+      const offset = normalizedPageOffset(top, pageHeightPx);
+      if (offset > 0.5) {
+        insertSpacerBefore(element, pageHeightPx - offset);
+        containerTop = container.getBoundingClientRect().top;
+        rect = element.getBoundingClientRect();
+        top = rect.top - containerTop;
+        bottom = rect.bottom - containerTop;
+      }
+    }
+
+    if (after) {
+      const offset = normalizedPageOffset(bottom, pageHeightPx);
+      if (offset > 0.5) insertSpacerAfter(element, pageHeightPx - offset);
+    }
+  }
+}
+
+type StyledElement = HTMLElement | SVGElement;
+
+type CaptureMirror = {
+  host: HTMLDivElement;
+  viewport: HTMLDivElement;
+  conveyor: HTMLDivElement;
+  container: HTMLElement;
+};
+
+let captureMirrorSequence = 0;
+
+function isStyledElement(element: Element): element is StyledElement {
+  return element instanceof HTMLElement || element instanceof SVGElement;
+}
+
+function copyComputedStyleDeclaration(
+  source: CSSStyleDeclaration,
+  target: CSSStyleDeclaration,
+): void {
+  for (let index = 0; index < source.length; index += 1) {
+    const property = source.item(index);
+    if (!property) continue;
+    const value = source.getPropertyValue(property);
+    if (!value) continue;
+    try {
+      target.setProperty(property, value, source.getPropertyPriority(property));
+    } catch {
+      // Ignore browser-specific read-only/unsupported computed properties.
+    }
+  }
+}
+
+function hasRenderablePseudoElement(style: CSSStyleDeclaration): boolean {
+  const content = style.getPropertyValue("content").trim();
+  return (
+    style.getPropertyValue("display") !== "none" &&
+    content !== "" &&
+    content !== "none" &&
+    content !== "normal"
+  );
+}
+
+function serializeComputedStyle(style: CSSStyleDeclaration): string {
+  const scratch = document.createElement("span");
+  copyComputedStyleDeclaration(style, scratch.style);
+  return scratch.style.cssText;
+}
+
+// html2canvas 1.4.x clones the owning document before painting. Shadow-root
+// descendants are not cloned consistently in WebKit, which can collapse a
+// long source to a tiny one-page tree. Keep the live sanitized source inside
+// Shadow DOM for CSS isolation, then flatten its *resolved* styles into a
+// temporary light-DOM mirror that html2canvas can clone consistently.
+//
+// No user stylesheet is attached globally: normal element styles become inline
+// declarations and pseudo-element rules are scoped to one unique mirror id.
+function createCaptureMirror(
+  surface: ExportSurface,
+  pageHeightPx: number,
+): CaptureMirror {
+  const host = document.createElement("div");
+  const mirrorId = `lumeo-html-capture-${++captureMirrorSequence}`;
+  host.id = mirrorId;
+  host.setAttribute("aria-hidden", "true");
+  host.style.position = "fixed";
+  host.style.top = "0";
+  host.style.left = "-20000px";
+  host.style.width = `${surface.contentWidthPx}px`;
+  host.style.pointerEvents = "none";
+  host.style.zIndex = "-2147483648";
+
+  // Capture through a physical-page-sized viewport instead of one giant
+  // canvas. Safari/WebKit can clamp very tall canvases even when the DOM
+  // itself is laid out correctly; bounded page canvases avoid that limit.
+  const viewport = document.createElement("div");
+  viewport.style.position = "relative";
+  viewport.style.width = `${surface.contentWidthPx}px`;
+  viewport.style.height = `${pageHeightPx}px`;
+  viewport.style.overflow = "hidden";
+  viewport.style.background = "#ffffff";
+
+  const conveyor = document.createElement("div");
+  conveyor.style.position = "relative";
+  conveyor.style.width = `${surface.contentWidthPx}px`;
+  conveyor.style.transformOrigin = "top left";
+
+  const container = surface.container.cloneNode(true) as HTMLElement;
+  conveyor.appendChild(container);
+  viewport.appendChild(conveyor);
+  host.appendChild(viewport);
+  document.body.appendChild(host);
+
+  const sourceElements: Element[] = [
+    surface.container,
+    ...Array.from(surface.container.querySelectorAll("*")),
+  ];
+  const mirrorElements: Element[] = [
+    container,
+    ...Array.from(container.querySelectorAll("*")),
+  ];
+
+  if (sourceElements.length !== mirrorElements.length) {
+    host.remove();
+    throw new Error("Could not prepare the browser capture surface.");
+  }
+
+  const pseudoRules: string[] = [];
+  for (let index = 0; index < sourceElements.length; index += 1) {
+    const sourceElement = sourceElements[index];
+    const mirrorElement = mirrorElements[index];
+    if (!isStyledElement(sourceElement) || !isStyledElement(mirrorElement)) continue;
+
+    copyComputedStyleDeclaration(
+      window.getComputedStyle(sourceElement),
+      mirrorElement.style,
+    );
+
+    if (!(sourceElement instanceof HTMLElement) || !(mirrorElement instanceof HTMLElement)) {
+      continue;
+    }
+
+    const pseudoKey = String(index);
+    mirrorElement.setAttribute("data-lumeo-capture-node", pseudoKey);
+
+    for (const pseudo of ["::before", "::after"] as const) {
+      const pseudoStyle = window.getComputedStyle(sourceElement, pseudo);
+      if (!hasRenderablePseudoElement(pseudoStyle)) continue;
+      const declarations = serializeComputedStyle(pseudoStyle);
+      if (!declarations) continue;
+      pseudoRules.push(
+        `#${mirrorId} [data-lumeo-capture-node="${pseudoKey}"]${pseudo}{${declarations}}`,
+      );
+    }
+  }
+
+  if (pseudoRules.length) {
+    const style = document.createElement("style");
+    style.setAttribute("data-lumeo-capture-pseudos", "true");
+    style.textContent = pseudoRules.join("\n");
+    host.insertBefore(style, viewport);
+  }
+
+  return { host, viewport, conveyor, container };
+}
+
+function canvasToJpegBytes(canvas: HTMLCanvasElement): Promise<Uint8Array> {
+  return new Promise<Uint8Array>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => {
+        if (!blob) {
+          reject(new Error("Could not encode a PDF page."));
+          return;
+        }
+        void blob
+          .arrayBuffer()
+          .then((buffer) => resolve(new Uint8Array(buffer)))
+          .catch(reject);
+      },
+      "image/jpeg",
+      0.95,
+    );
+  });
+}
+
+async function generatePagedPdfBlob(
+  surface: ExportSurface,
+  pageHeightPx: number,
+  pageSize: PageSize,
+  orientation: Orientation,
+  margin: MarginPreset,
+): Promise<Blob> {
+  const [{ default: html2canvas }, { PDFDocument }] = await Promise.all([
+    import("html2canvas"),
+    import("pdf-lib"),
+  ]);
+  const mirror = createCaptureMirror(surface, pageHeightPx);
+
+  try {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const contentHeightPx = Math.max(
+      mirror.container.scrollHeight,
+      mirror.container.getBoundingClientRect().height,
+      surface.contentHeightPx,
+      1,
+    );
+    const pageCount = Math.max(1, Math.ceil(contentHeightPx / pageHeightPx));
+
+    const { width: pageWidthMm, height: pageHeightMm } = getPageDimensionsMm(
+      pageSize,
+      orientation,
+    );
+    const marginMm = MARGIN_MM[margin];
+    const pointsPerMm = 72 / 25.4;
+    const pageWidthPt = pageWidthMm * pointsPerMm;
+    const pageHeightPt = pageHeightMm * pointsPerMm;
+    const marginPt = marginMm * pointsPerMm;
+    const innerWidthPt = Math.max(pageWidthPt - marginPt * 2, 1);
+    const innerHeightPt = Math.max(pageHeightPt - marginPt * 2, 1);
+
+    const pdf = await PDFDocument.create();
+
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+      mirror.conveyor.style.transform =
+        `translateY(-${pageIndex * pageHeightPx}px)`;
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
+      const canvas = await runWithTimeout(
+        html2canvas(mirror.viewport, {
+          scale: 2,
+          useCORS: true,
+          backgroundColor: "#ffffff",
+          width: surface.contentWidthPx,
+          height: pageHeightPx,
+          windowWidth: surface.contentWidthPx,
+          windowHeight: pageHeightPx,
+        }),
+        "Capturing a PDF page took too long. Try simpler HTML/CSS or fewer images.",
+      );
+
+      const jpegBytes = await canvasToJpegBytes(canvas);
+      const image = await pdf.embedJpg(jpegBytes);
+      const page = pdf.addPage([pageWidthPt, pageHeightPt]);
+      page.drawImage(image, {
+        x: marginPt,
+        y: marginPt,
+        width: innerWidthPt,
+        height: innerHeightPt,
+      });
+
+      // Release the page-sized backing store before rendering the next page.
+      canvas.width = 1;
+      canvas.height = 1;
+    }
+
+    const pdfBytes = await pdf.save();
+    const outputBytes = new Uint8Array(pdfBytes.byteLength);
+    outputBytes.set(pdfBytes);
+    return new Blob([outputBytes.buffer], { type: "application/pdf" });
+  } finally {
+    mirror.host.remove();
+  }
 }
 
 export default function HtmlToPdfTool() {
@@ -255,32 +585,32 @@ export default function HtmlToPdfTool() {
       const pageWidthPx = getPageContentWidthPx(pageSize, orientation);
       exportSurface = await createExportSurface(source, pageWidthPx);
       const surface = exportSurface;
-
-      const html2pdf = (await import("html2pdf.js")).default;
-      const options = buildHtml2PdfOptions({
-        fileName: `${sanitizeFileStem(fileName, "lumeo-document")}.pdf`,
+      const pageSliceHeightPx = getPageSliceHeightPx(
         pageSize,
         orientation,
         margin,
-        contentWidthPx: surface.contentWidthPx,
-        contentHeightPx: surface.contentHeightPx,
-      });
-      // outputPdf("blob") instead of .save() -- .save() triggers the browser
-      // download as a side effect inside html2pdf's own internal promise
-      // chain, which our timeout race below cannot cancel: if the race times
-      // out while html2canvas/jsPDF keep working in the background (neither
-      // supports abort), the abandoned work can still finish and fire a
-      // surprise download after the user has already seen a timeout error.
-      // Getting the PDF back as a blob and triggering the download ourselves
-      // means that only happens on the path that actually won the race.
-      const blob: Blob = await runWithTimeout(
-        html2pdf().set(options).from(surface.container).outputPdf("blob"),
-        "Generating the PDF took too long. Try simpler HTML/CSS or fewer images.",
+        surface.contentWidthPx,
+      );
+      applyLivePageBreaks(surface.container, pageSliceHeightPx);
+      surface.contentHeightPx = Math.max(surface.container.scrollHeight, 1);
+
+      // Render one bounded physical-page canvas at a time. WebKit/Safari can
+      // clamp very tall canvases to a single page even when the source DOM has
+      // the correct height. Page-sized capture avoids that engine limit and
+      // pdf-lib assembles the final document entirely in the browser.
+      const outputFileName =
+        `${sanitizeFileStem(fileName, "lumeo-document")}.pdf`;
+      const blob = await generatePagedPdfBlob(
+        surface,
+        pageSliceHeightPx,
+        pageSize,
+        orientation,
+        margin,
       );
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
-      link.download = options.filename;
+      link.download = outputFileName;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -292,7 +622,7 @@ export default function HtmlToPdfTool() {
         durationMs: performance.now() - startedAt,
         success: true,
       });
-      recordRecentFile({ tool: "html-to-pdf", filename: `${sanitizeFileStem(fileName, "lumeo-document")}.pdf` });
+      recordRecentFile({ tool: "html-to-pdf", filename: outputFileName });
     } catch (generateError) {
       setError(
         generateError instanceof Error

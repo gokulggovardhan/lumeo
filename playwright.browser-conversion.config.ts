@@ -2,7 +2,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "browser-conversion-validation.spec.ts",
+  testMatch: [
+    "browser-conversion-validation.spec.ts",
+    "html-to-pdf-browser-validation.spec.ts",
+  ],
   timeout: 480_000,
   expect: { timeout: 120_000 },
   fullyParallel: false,

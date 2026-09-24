@@ -3,6 +3,8 @@ import test from "node:test";
 import {
   buildHtml2PdfOptions,
   getPageContentWidthPx,
+  getPageDimensionsMm,
+  getPageSliceHeightPx,
   MARGIN_MM,
   validateHtmlSource,
 } from "../lib/pdf/htmlToPdfOptions.ts";
@@ -36,7 +38,7 @@ test("buildHtml2PdfOptions maps page size, orientation, and margin correctly", (
   assert.equal(options.image.type, "jpeg");
 });
 
-test("buildHtml2PdfOptions pins page width but lets the cloned document determine its reflowed height", () => {
+test("buildHtml2PdfOptions keeps clone fallback width-only", () => {
   const options = buildHtml2PdfOptions({
     fileName: "lumeo-html.pdf",
     pageSize: "a4",
@@ -51,7 +53,7 @@ test("buildHtml2PdfOptions pins page width but lets the cloned document determin
   assert.equal("windowHeight" in options.html2canvas, false);
 });
 
-test("buildHtml2PdfOptions enables CSS-aware page-break slicing", () => {
+test("buildHtml2PdfOptions retains CSS-aware page-break fallback modes", () => {
   const options = buildHtml2PdfOptions({
     fileName: "lumeo-html.pdf",
     pageSize: "a4",
@@ -69,4 +71,20 @@ test("getPageContentWidthPx returns the real page width in CSS px at 96dpi, orie
   assert.equal(getPageContentWidthPx("letter", "portrait"), 816);
   assert.equal(getPageContentWidthPx("legal", "portrait"), 816);
   assert.equal(getPageContentWidthPx("legal", "landscape"), 1344);
+});
+
+test("getPageSliceHeightPx matches html2pdf printable-page slicing with margins", () => {
+  assert.equal(getPageSliceHeightPx("a4", "portrait", "normal", 794), 1165);
+  assert.equal(getPageSliceHeightPx("a4", "portrait", "none", 794), 1122);
+  assert.equal(getPageSliceHeightPx("a4", "landscape", "normal", 1123), 765);
+  assert.ok(
+    getPageSliceHeightPx("a4", "portrait", "wide", 794) >
+      getPageSliceHeightPx("a4", "portrait", "normal", 794),
+  );
+});
+
+test("getPageDimensionsMm returns orientation-aware physical page geometry", () => {
+  assert.deepEqual(getPageDimensionsMm("a4", "portrait"), { width: 210, height: 297 });
+  assert.deepEqual(getPageDimensionsMm("a4", "landscape"), { width: 297, height: 210 });
+  assert.deepEqual(getPageDimensionsMm("letter", "portrait"), { width: 215.9, height: 279.4 });
 });
