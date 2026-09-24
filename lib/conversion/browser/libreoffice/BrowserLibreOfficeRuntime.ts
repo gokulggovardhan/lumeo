@@ -558,8 +558,10 @@ export class BrowserLibreOfficeRuntime {
 let productionRuntime: BrowserLibreOfficeRuntime | null = null;
 
 export function getBrowserLibreOfficeRuntime(): BrowserLibreOfficeRuntime {
+  const mode =
+    process.env.NODE_ENV === "development" ? "development" : "production";
   productionRuntime ??= new BrowserLibreOfficeRuntime(
-    resolveOfficeAssetConfig("production"),
+    resolveOfficeAssetConfig(mode),
   );
   return productionRuntime;
 }
