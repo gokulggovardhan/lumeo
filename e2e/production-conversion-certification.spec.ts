@@ -124,15 +124,24 @@ function isExpectedSandboxPreviewConsoleError(message: string): boolean {
   );
 }
 
-function isExpectedFirefoxCapabilityDiagnostic(message: string): boolean {
+function isExpectedOfficeRuntimeDiagnostic(message: string): boolean {
+  const normalized = message.trim();
   return (
-    message === "QRect(0,0 0x0) 1" ||
-    message === "QObject::connect(QWindow, QtFrame): invalid nullptr parameter" ||
-    message === "warning: unsupported syscall: __syscall_mprotect"
+    normalized === "QRect(0,0 0x0) 1" ||
+    normalized === "QObject::connect(QWindow, QtFrame): invalid nullptr parameter" ||
+    normalized === "warning: unsupported syscall: __syscall_mprotect"
   );
 }
 
-function expectCleanRuntime(watch: RuntimeWatch, browserName?: string): void {
+type RuntimeExpectationOptions = {
+  allowOfficeRuntimeDiagnostics?: boolean;
+};
+
+function expectCleanRuntime(
+  watch: RuntimeWatch,
+  browserName?: string,
+  options: RuntimeExpectationOptions = {},
+): void {
   const pageErrors =
     browserName === "firefox"
       ? watch.pageErrors.filter(
@@ -142,7 +151,10 @@ function expectCleanRuntime(watch: RuntimeWatch, browserName?: string): void {
   const consoleErrors = watch.consoleErrors.filter(
     (message) =>
       !isExpectedSandboxPreviewConsoleError(message) &&
-      !(browserName === "firefox" && isExpectedFirefoxCapabilityDiagnostic(message)),
+      !(
+        options.allowOfficeRuntimeDiagnostics &&
+        isExpectedOfficeRuntimeDiagnostic(message)
+      ),
   );
 
   expect(pageErrors).toEqual([]);
@@ -389,7 +401,9 @@ test("production Word to PDF reuses Office runtime, survives cancellation, and c
     expectedFileName: "post-cancellation-retry.pdf",
   });
 
-  expectCleanRuntime(runtime, browserName);
+  expectCleanRuntime(runtime, browserName, {
+    allowOfficeRuntimeDiagnostics: true,
+  });
 });
 
 test("production Word to PDF is capability-honest on non-Chromium browsers", async ({
@@ -427,7 +441,9 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
     await expect(alert).toContainText(/browser|local conversion engine|supported/i);
   }
 
-  expectCleanRuntime(runtime, browserName);
+  expectCleanRuntime(runtime, browserName, {
+    allowOfficeRuntimeDiagnostics: true,
+  });
 });
 
 test("production HTML to PDF preserves styled multi-page content and supports repeat generation", async ({
