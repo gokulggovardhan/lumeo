@@ -252,7 +252,8 @@ export type ThreadedBrowserOfficeRequirement =
   | "Web Workers"
   | "SharedArrayBuffer"
   | "cross-origin isolation"
-  | "shared WebAssembly memory";
+  | "shared WebAssembly memory"
+  | "worker OffscreenCanvas WebGL";
 
 export function missingThreadedBrowserOfficeCapabilities(
   capabilities: BrowserConversionCapabilities,
@@ -264,6 +265,9 @@ export function missingThreadedBrowserOfficeCapabilities(
   if (!capabilities.sharedArrayBuffer) missing.push("SharedArrayBuffer");
   if (!capabilities.crossOriginIsolated) missing.push("cross-origin isolation");
   if (!capabilities.wasmSharedMemory) missing.push("shared WebAssembly memory");
+  if (!capabilities.workerOffscreenWebGl) {
+    missing.push("worker OffscreenCanvas WebGL");
+  }
 
   return missing;
 }
