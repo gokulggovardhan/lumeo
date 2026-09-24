@@ -1,5 +1,7 @@
 import JSZip from "jszip";
 
+import { sanitizeXml10Text } from "../../xml10.ts";
+
 import { clusterVisualTextRows, type VisualTextRow } from "./structure.ts";
 import type {
   ReconstructedPage,
@@ -15,7 +17,7 @@ const EMU_PER_PT = 12_700;
 const FRAME_TEXT_TOP_COMPENSATION_PT = 0.75;
 
 function xmlEscape(value: string): string {
-  return value
+  return sanitizeXml10Text(value)
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")

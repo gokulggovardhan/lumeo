@@ -2,6 +2,8 @@ import JSZip from "jszip";
 import { XMLValidator } from "fast-xml-parser";
 import { PDFDocument } from "pdf-lib";
 
+import { hasInvalidXml10Characters } from "./xml10.ts";
+
 const PDF_SIGNATURE = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]);
 const MIN_PDF_BYTES = 64;
 const MIN_DOCX_BYTES = 512;
@@ -67,6 +69,12 @@ export async function validateGeneratedDocx(
     ["word/document.xml", documentXml],
     ["word/_rels/document.xml.rels", relationships],
   ] as const) {
+    if (hasInvalidXml10Characters(xml)) {
+      throw new Error(
+        `Generated DOCX contains XML 1.0-forbidden characters in ${name}.`,
+      );
+    }
+
     const result = XMLValidator.validate(xml);
     if (result !== true) {
       throw new Error(`Generated DOCX contains invalid XML in ${name}.`);

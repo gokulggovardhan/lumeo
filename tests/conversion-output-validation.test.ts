@@ -136,3 +136,71 @@ test("generated DOCX validation rejects hidden duplicate text", async () => {
     /hidden editable text/i,
   );
 });
+
+
+test("PDF to Word DOCX serialization strips XML 1.0-forbidden controls", async () => {
+  const blob = await buildReconstructedDocx([
+    {
+      pageNumber: 1,
+      widthPt: 612,
+      heightPt: 792,
+      reconstructionMode: "semantic-text",
+      lines: [
+        {
+          text: "Dividend per Share-Month \u0000₹1.388889\u000b",
+          xPt: 72,
+          yPt: 72,
+          widthPt: 240,
+          heightPt: 13,
+          fontSizePt: 11,
+          fontFamily: "Arial",
+          bold: false,
+          italic: false,
+          baselinePt: 81.5,
+          regionKind: "semantic-text",
+        },
+      ],
+      backgroundImage: null,
+    },
+  ]);
+
+  await validateGeneratedDocx(blob, {
+    expectedPageCount: 1,
+    minimumEditableTextRuns: 1,
+  });
+
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+  const documentXml = await zip.file("word/document.xml")!.async("string");
+  assert.equal(documentXml.includes("\u0000"), false);
+  assert.equal(documentXml.includes("\u000b"), false);
+  assert.match(documentXml, /Dividend per Share-Month ₹1\.388889/);
+});
+
+test("generated DOCX validation rejects XML 1.0-forbidden controls", async () => {
+  const blob = await validHyperlinkDocx();
+  const zip = await JSZip.loadAsync(await blob.arrayBuffer());
+  const path = "word/document.xml";
+  const documentXml = await zip.file(path)!.async("string");
+  zip.file(
+    path,
+    documentXml.replace(
+      "Editable linked paragraph",
+      "Editable\u0000 linked paragraph",
+    ),
+  );
+  const broken = await zip.generateAsync({
+    type: "blob",
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  });
+
+  await assert.rejects(
+    () =>
+      validateGeneratedDocx(broken, {
+        expectedPageCount: 1,
+        minimumEditableTextRuns: 1,
+        expectedHyperlinks: 1,
+      }),
+    /XML 1\.0-forbidden characters/i,
+  );
+});
