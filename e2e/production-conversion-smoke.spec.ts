@@ -462,9 +462,15 @@ test("production PDF to Word reconstructs locally and downloaded DOCX opens", as
   });
 
   await page.getByRole("button", { name: "Convert to Word" }).click();
-  await expect(page.getByText("Word document ready")).toBeVisible({
-    timeout: 180_000,
-  });
+  const ready = page.getByText("Word document ready");
+  const failure = page.getByRole("alert");
+  const outcome = await Promise.race([
+    ready.waitFor({ state: "visible", timeout: 180_000 }).then(() => "ready" as const),
+    failure.waitFor({ state: "visible", timeout: 180_000 }).then(() => "error" as const),
+  ]);
+  if (outcome === "error") {
+    throw new Error(`PDF to Word production smoke failed: ${await failure.innerText()}`);
+  }
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download Word document" }).click();
