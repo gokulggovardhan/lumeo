@@ -6,7 +6,6 @@ import PublicFooter from "@/components/PublicFooter";
 import { PublicNav } from "@/components/PublicPdfChrome";
 import { PdfToolLauncher } from "@/components/pdf/PdfToolLauncher";
 import { ContinueWorking } from "@/components/ContinueWorking";
-import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { withSeoOverride } from "@/lib/public-site/seo";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
 import { resolveLumeoTools } from "@/lib/tools/resolve";
@@ -284,10 +283,9 @@ export default async function Home() {
                 </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-3">
-                {privacyItems.map((item, index) => (
-                  <ScrollReveal
+                {privacyItems.map((item) => (
+                  <div
                     key={item.title}
-                    index={index}
                     className="rounded-[18px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-5"
                   >
                     <h3 className="font-serif text-[1.06rem] font-semibold text-[var(--text-primary)]">
@@ -296,7 +294,7 @@ export default async function Home() {
                     <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">
                       {item.description}
                     </p>
-                  </ScrollReveal>
+                  </div>
                 ))}
               </div>
             </div>
@@ -319,10 +317,9 @@ export default async function Home() {
               </p>
             </div>
             <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {categoryItems.map((item, index) => (
-                <ScrollReveal
+              {categoryItems.map((item) => (
+                <div
                   key={item.title}
-                  index={index}
                   className="rounded-[16px] border border-[var(--border-hairline)] bg-[var(--surface-base)] p-5"
                 >
                   <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
@@ -331,7 +328,7 @@ export default async function Home() {
                   <p className="mt-2 text-[13px] leading-5 text-[var(--text-muted)]">
                     {item.description}
                   </p>
-                </ScrollReveal>
+                </div>
               ))}
             </div>
           </section>
@@ -349,15 +346,15 @@ export default async function Home() {
               </h2>
             </div>
             <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {qualityItems.map((item, index) => (
-                <ScrollReveal key={item.title} index={index} className="text-center">
+              {qualityItems.map((item) => (
+                <div key={item.title} className="text-center">
                   <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
                     {item.title}
                   </h3>
                   <p className="mx-auto mt-2 max-w-[17rem] text-[13px] leading-5 text-[var(--text-muted)]">
                     {item.description}
                   </p>
-                </ScrollReveal>
+                </div>
               ))}
             </div>
           </section>
