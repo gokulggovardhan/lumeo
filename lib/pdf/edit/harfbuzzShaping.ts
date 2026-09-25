@@ -95,6 +95,36 @@ function assertAsciiLabel(
   return value;
 }
 
+function isSupportedSfnt(fontBytes: Uint8Array): boolean {
+  if (fontBytes.byteLength < 12) return false;
+  const view = new DataView(
+    fontBytes.buffer,
+    fontBytes.byteOffset,
+    fontBytes.byteLength,
+  );
+  const signature = view.getUint32(0, false);
+  const isSfnt =
+    signature === 0x00010000 || // TrueType outlines
+    signature === 0x4f54544f || // OTTO / CFF OpenType
+    signature === 0x74727565 || // legacy Apple true
+    signature === 0x74797031;   // legacy Apple typ1
+  if (!isSfnt) return false;
+
+  const numTables = view.getUint16(4, false);
+  if (numTables < 1 || numTables > 256) return false;
+  const directoryEnd = 12 + numTables * 16;
+  if (directoryEnd > fontBytes.byteLength) return false;
+
+  for (let index = 0; index < numTables; index += 1) {
+    const entry = 12 + index * 16;
+    const offset = view.getUint32(entry + 8, false);
+    const length = view.getUint32(entry + 12, false);
+    if (offset > fontBytes.byteLength) return false;
+    if (length > fontBytes.byteLength - offset) return false;
+  }
+  return true;
+}
+
 function segmentGraphemes(text: string): { start: number; end: number; text: string }[] {
   const segmenter = new Intl.Segmenter(undefined, { granularity: "grapheme" });
   const entries = Array.from(segmenter.segment(text));
@@ -204,6 +234,12 @@ export async function shapeEmbeddedFontText(
     throw new TextShapingError(
       "TEXT_TOO_LARGE",
       "Text exceeds the local shaping safety limit.",
+    );
+  }
+  if (!isSupportedSfnt(fontBytes)) {
+    throw new TextShapingError(
+      "INVALID_FONT",
+      "Embedded font is not a bounded, supported SFNT container.",
     );
   }
 
