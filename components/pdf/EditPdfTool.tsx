@@ -3064,7 +3064,7 @@ export default function EditPdfTool() {
       : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
   const pageCapabilityLabel = pageTextModel
     ? pageTextModel.classification?.primary === "SCANNED_IMAGE"
-      ? "Scanned page · text recognition needed"
+      ? "Image-only page · text recognition may be needed"
       : pageTextModel.classification?.primary === "HYBRID_TEXT_AND_IMAGE"
         ? `${pageTextModel.editableSpanCount} editable · mixed native/scanned content`
         : pageTextModel.capability === "native-editable"
@@ -4219,12 +4219,12 @@ export default function EditPdfTool() {
                     <div className="absolute left-3 top-3 z-20 max-w-[260px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
                         {pageCapabilityClassification?.primary === "SCANNED_IMAGE"
-                          ? "Scanned text detected"
+                          ? "Image-only page"
                           : "No editable text found"}
                       </span>
                       <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
                         {pageCapabilityClassification?.primary === "SCANNED_IMAGE"
-                          ? "This page appears to contain scanned text. Native text editing is unavailable until local OCR recognition is enabled."
+                          ? "This page contains image content but no native PDF text. Local text recognition may be needed if the image contains text."
                           : pageCapabilityClassification?.primary === "COMPLEX_VECTOR_TEXT"
                             ? "This page uses vector content rather than safely rewritable PDF text."
                             : "This page doesn’t contain safely rewritable text. Use Text to add new text."}
