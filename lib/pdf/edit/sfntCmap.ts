@@ -90,6 +90,16 @@ function tableDirectory(
   bytes: Uint8Array,
 ): ReadonlyMap<string, { offset: number; length: number }> | null {
   if (!within(bytes, 0, 12)) return null;
+  const signature = u32(bytes, 0);
+  const signatureTag = tag(bytes, 0);
+  if (
+    signature !== 0x00010000 &&
+    signatureTag !== "OTTO" &&
+    signatureTag !== "true" &&
+    signatureTag !== "typ1"
+  ) {
+    return null;
+  }
   const numTables = u16(bytes, 4);
   if (numTables === null || numTables <= 0 || numTables > MAX_TABLES) return null;
   if (!within(bytes, 12, numTables * 16)) return null;
@@ -170,7 +180,8 @@ function parseFormat12(
     groupCount > MAX_FORMAT12_GROUPS ||
     !within(bytes, offset, length) ||
     offset + length > cmapEnd ||
-    !within(bytes, offset + 16, groupCount * 12)
+    !within(bytes, offset + 16, groupCount * 12) ||
+    offset + 16 + groupCount * 12 > offset + length
   ) {
     return null;
   }
@@ -285,6 +296,11 @@ export function parseSfntGlyphCoverage(bytes: Uint8Array): SfntGlyphCoverage | n
   const maxp = directory.get("maxp");
   const glyphCount =
     maxp && maxp.length >= 6 ? u16(bytes, maxp.offset + 4) : null;
+  // maxp is mandatory for the SFNT outline formats supported here. Without
+  // numGlyphs we cannot prove a cmap result names a real glyph in the
+  // embedded subset, so fail closed rather than treating the cmap alone as
+  // sufficient evidence.
+  if (glyphCount === null || glyphCount <= 0) return null;
 
   const cmapVersion = u16(bytes, cmap.offset);
   const recordCount = u16(bytes, cmap.offset + 2);
