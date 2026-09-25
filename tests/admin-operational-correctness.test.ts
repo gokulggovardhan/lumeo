@@ -289,7 +289,15 @@ test("Admin Health scopes analytics checks to the IST calendar day", () => {
   assert.doesNotMatch(health, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
 });
 
-test("Cloudflare Worker config stays deployable on the current Free plan", () => {
+test("Cloudflare Worker configuration stays deployable on the production Free plan", () => {
   const wrangler = read("wrangler.jsonc");
-  assert.doesNotMatch(wrangler, /"cpu_ms"\s*:/);
+  const verifier = read("scripts/verify-cloudflare-worker-config.mjs");
+  const workflow = read(".github/workflows/lumeo-ci.yml");
+
+  assert.doesNotMatch(wrangler, /"cpu_ms"/);
+  assert.match(verifier, /Workers Free/);
+  assert.match(verifier, /limits\.cpu_ms/);
+  assert.match(verifier, /generatedPath/);
+  assert.match(workflow, /Verify Cloudflare Worker plan compatibility/);
+  assert.match(workflow, /verify-cloudflare-worker-config\.mjs dist\/server\/wrangler\.json/);
 });
