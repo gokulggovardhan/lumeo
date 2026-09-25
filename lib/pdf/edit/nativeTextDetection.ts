@@ -216,6 +216,11 @@ function synthesizeRun({
     heightPct: (height / pageHeightPt) * 100,
     fontSizePt: operator.fontSizePt,
     rotated: Math.abs(axisAngleDeg(tx[0], tx[1])) > 0.1,
+    baselineXPct: (base[0] / pageWidthPt) * 100,
+    baselineYPct: (base[1] / pageHeightPt) * 100,
+    ascentRatio: profile.ascentRatio,
+    descentRatio: profile.descentRatio,
+    verticalWriting: profile.resourceIdentity.writingMode === "vertical",
     detectionSource: "native",
     nativeSourceKey: key,
   };
