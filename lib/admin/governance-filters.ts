@@ -1,3 +1,4 @@
+import { istDateEndExclusiveUtcIso, istDateStartUtcIso } from "@/lib/admin/timezone";
 import type { AdminMemberView } from "@/lib/admin/data";
 import type { AdminRole } from "@/lib/admin/types";
 
@@ -79,12 +80,8 @@ export function filterAdminMembers(
   });
 }
 
-function parseIsoDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const date = new Date(`${value}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime())) return null;
-  if (date.toISOString().slice(0, 10) !== value) return null;
-  return date;
+function isValidIstCalendarDate(value: string) {
+  return Boolean(istDateStartUtcIso(value));
 }
 
 export function resolveAuditFilters(
@@ -99,13 +96,13 @@ export function resolveAuditFilters(
     : "";
   const startDate = first(params.start).trim();
   const endDate = first(params.end).trim();
-  const start = startDate ? parseIsoDate(startDate) : null;
-  const end = endDate ? parseIsoDate(endDate) : null;
+  const startValid = !startDate || isValidIstCalendarDate(startDate);
+  const endValid = !endDate || isValidIstCalendarDate(endDate);
 
   let dateError: string | null = null;
-  if ((startDate && !start) || (endDate && !end)) {
+  if (!startValid || !endValid) {
     dateError = "Choose valid calendar dates.";
-  } else if (start && end && start.getTime() > end.getTime()) {
+  } else if (startDate && endDate && startDate > endDate) {
     dateError = "The start date must be on or before the end date.";
   }
 
@@ -113,14 +110,13 @@ export function resolveAuditFilters(
     return { action, entityType, startDate, endDate, dateError };
   }
 
-  if (end) end.setUTCDate(end.getUTCDate() + 1);
   return {
     action,
     entityType,
     startDate,
     endDate,
-    startIso: start?.toISOString(),
-    endExclusiveIso: end?.toISOString(),
+    startIso: startDate ? istDateStartUtcIso(startDate) ?? undefined : undefined,
+    endExclusiveIso: endDate ? istDateEndExclusiveUtcIso(endDate) ?? undefined : undefined,
     dateError: null,
   };
 }
