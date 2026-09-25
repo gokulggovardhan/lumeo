@@ -249,6 +249,7 @@ test("page classifier identifies image-only evidence as scanned text candidate w
   const evidence: PageContentEvidence = {
     textOperatorCount: 0,
     imageXObjectInvocations: 1,
+    inlineImageInvocations: 0,
     formXObjectInvocations: 0,
     vectorPaintOperatorCount: 0,
   };
@@ -261,5 +262,27 @@ test("page classifier identifies image-only evidence as scanned text candidate w
 
   assert.equal(classification.primary, "SCANNED_IMAGE");
   assert.ok(classification.signals.includes("SCANNED_IMAGE"));
-  assert.match(classification.reasons.join(" "), /image XObject/i);
+  assert.match(classification.reasons.join(" "), /OCR candidate/i);
+});
+
+
+test("page classifier treats inline-image-only content as an OCR candidate without requiring an Image XObject", () => {
+  const classifier = new DocumentTextCapabilityClassifier();
+  const evidence: PageContentEvidence = {
+    textOperatorCount: 0,
+    imageXObjectInvocations: 0,
+    inlineImageInvocations: 1,
+    formXObjectInvocations: 0,
+    vectorPaintOperatorCount: 0,
+  };
+
+  const classification = classifier.classifyPage({
+    reconciled: [],
+    nativeSpans: [],
+    contentEvidence: evidence,
+  });
+
+  assert.equal(classification.primary, "SCANNED_IMAGE");
+  assert.equal(classification.counts.inlineImageInvocations, 1);
+  assert.match(classification.reasons.join(" "), /OCR candidate/i);
 });
