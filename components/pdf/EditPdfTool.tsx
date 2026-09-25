@@ -1019,6 +1019,7 @@ export default function EditPdfTool() {
               viewport.transform,
               viewport.width,
               viewport.height,
+              content.styles as never,
             );
             const model = buildPdfPageTextModel({
               pageIndex: targetPageIndex,
@@ -1460,7 +1461,13 @@ export default function EditPdfTool() {
         if (cancelled) return;
         // Point space, never the raster viewport -- see
         // lib/pdf/edit/textRuns.ts's DetectedTextRun.fontSizePt.
-        const runs = textRunsFromContent(content.items as never, pointViewport.transform, pointViewport.width, pointViewport.height);
+        const runs = textRunsFromContent(
+          content.items as never,
+          pointViewport.transform,
+          pointViewport.width,
+          pointViewport.height,
+          content.styles as never,
+        );
         setPdfJsDetectedRunCount(runs.length);
         setDetectedTextRuns(runs);
       } catch {

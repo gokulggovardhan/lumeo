@@ -46,6 +46,37 @@ function operatorOriginPx(operator: TextShowOperator, viewportTransform: number[
   return boxOriginFromTransform(tx);
 }
 
+function operatorBaselinePx(operator: TextShowOperator, viewportTransform: number[]) {
+  const tx = transformPoint2x3(viewportTransform, operator.textRenderingMatrix);
+  return { x: tx[4], y: tx[5] };
+}
+
+function runTargetPx(
+  run: DetectedTextRun,
+  pageWidthPx: number,
+  pageHeightPx: number,
+):
+  | { kind: "baseline"; x: number; y: number }
+  | { kind: "origin"; x: number; y: number } {
+  if (
+    typeof run.baselineXPct === "number" &&
+    Number.isFinite(run.baselineXPct) &&
+    typeof run.baselineYPct === "number" &&
+    Number.isFinite(run.baselineYPct)
+  ) {
+    return {
+      kind: "baseline",
+      x: (run.baselineXPct / 100) * pageWidthPx,
+      y: (run.baselineYPct / 100) * pageHeightPx,
+    };
+  }
+  return {
+    kind: "origin",
+    x: (run.xPct / 100) * pageWidthPx,
+    y: (run.yPct / 100) * pageHeightPx,
+  };
+}
+
 // Finds the content-stream operator whose own computed position is closest
 // to a detected run's box origin, within POSITION_TOLERANCE_PX. Returns
 // null if no operator is close enough -- this is a real, expected outcome
@@ -61,16 +92,23 @@ function operatorOriginPx(operator: TextShowOperator, viewportTransform: number[
 // what "closest" and "close enough" mean.
 function bestOperatorAmong(
   operators: TextShowOperator[],
-  targetLeftPx: number,
-  targetTopPx: number,
+  targetX: number,
+  targetY: number,
   viewportTransform: number[],
+  targetKind: "baseline" | "origin",
 ): TextShowOperator | null {
   let best: TextShowOperator | null = null;
   let bestDistance = Number.POSITIVE_INFINITY;
 
   for (const operator of operators) {
-    const origin = operatorOriginPx(operator, viewportTransform);
-    const distance = Math.hypot(origin.left - targetLeftPx, origin.top - targetTopPx);
+    const point =
+      targetKind === "baseline"
+        ? operatorBaselinePx(operator, viewportTransform)
+        : (() => {
+            const origin = operatorOriginPx(operator, viewportTransform);
+            return { x: origin.left, y: origin.top };
+          })();
+    const distance = Math.hypot(point.x - targetX, point.y - targetY);
     if (distance < bestDistance) {
       bestDistance = distance;
       best = operator;
@@ -87,9 +125,14 @@ export function matchDetectedRunToOperator(
   operators: TextShowOperator[],
   viewportTransform: number[],
 ): TextShowOperator | null {
-  const targetLeftPx = (run.xPct / 100) * pageWidthPx;
-  const targetTopPx = (run.yPct / 100) * pageHeightPx;
-  return bestOperatorAmong(operators, targetLeftPx, targetTopPx, viewportTransform);
+  const target = runTargetPx(run, pageWidthPx, pageHeightPx);
+  return bestOperatorAmong(
+    operators,
+    target.x,
+    target.y,
+    viewportTransform,
+    target.kind,
+  );
 }
 
 // Phase 24: EditPdfTool matches EVERY detected run against EVERY operator
@@ -119,7 +162,8 @@ export function matchDetectedRunToOperator(
 const INDEX_CELL_PX = POSITION_TOLERANCE_PX * 2;
 
 export type OperatorSpatialIndex = {
-  buckets: Map<string, TextShowOperator[]>;
+  originBuckets: Map<string, TextShowOperator[]>;
+  baselineBuckets: Map<string, TextShowOperator[]>;
   viewportTransform: number[];
 };
 
@@ -130,16 +174,30 @@ function cellKey(leftPx: number, topPx: number): string {
 // Builds the index once per page (see EditPdfTool.tsx's operator-matching
 // effect) -- O(operators), the same one-time cost matchDetectedRunToOperator
 // already pays per-run today, just paid once instead of once-per-run.
-export function buildOperatorSpatialIndex(operators: TextShowOperator[], viewportTransform: number[]): OperatorSpatialIndex {
-  const buckets = new Map<string, TextShowOperator[]>();
+function addToBucket(
+  buckets: Map<string, TextShowOperator[]>,
+  key: string,
+  operator: TextShowOperator,
+): void {
+  const bucket = buckets.get(key);
+  if (bucket) bucket.push(operator);
+  else buckets.set(key, [operator]);
+}
+
+export function buildOperatorSpatialIndex(
+  operators: TextShowOperator[],
+  viewportTransform: number[],
+): OperatorSpatialIndex {
+  const originBuckets = new Map<string, TextShowOperator[]>();
+  const baselineBuckets = new Map<string, TextShowOperator[]>();
   for (const operator of operators) {
     const origin = operatorOriginPx(operator, viewportTransform);
-    const key = cellKey(origin.left, origin.top);
-    const bucket = buckets.get(key);
-    if (bucket) bucket.push(operator);
-    else buckets.set(key, [operator]);
+    addToBucket(originBuckets, cellKey(origin.left, origin.top), operator);
+
+    const baseline = operatorBaselinePx(operator, viewportTransform);
+    addToBucket(baselineBuckets, cellKey(baseline.x, baseline.y), operator);
   }
-  return { buckets, viewportTransform };
+  return { originBuckets, baselineBuckets, viewportTransform };
 }
 
 export function matchDetectedRunToOperatorIndexed(
@@ -148,20 +206,27 @@ export function matchDetectedRunToOperatorIndexed(
   pageHeightPx: number,
   index: OperatorSpatialIndex,
 ): TextShowOperator | null {
-  const targetLeftPx = (run.xPct / 100) * pageWidthPx;
-  const targetTopPx = (run.yPct / 100) * pageHeightPx;
-  const cellX = Math.floor(targetLeftPx / INDEX_CELL_PX);
-  const cellY = Math.floor(targetTopPx / INDEX_CELL_PX);
+  const target = runTargetPx(run, pageWidthPx, pageHeightPx);
+  const cellX = Math.floor(target.x / INDEX_CELL_PX);
+  const cellY = Math.floor(target.y / INDEX_CELL_PX);
+  const buckets =
+    target.kind === "baseline" ? index.baselineBuckets : index.originBuckets;
 
   const candidates: TextShowOperator[] = [];
   for (let dx = -1; dx <= 1; dx += 1) {
     for (let dy = -1; dy <= 1; dy += 1) {
-      const bucket = index.buckets.get(`${cellX + dx},${cellY + dy}`);
+      const bucket = buckets.get(`${cellX + dx},${cellY + dy}`);
       if (bucket) candidates.push(...bucket);
     }
   }
 
-  return bestOperatorAmong(candidates, targetLeftPx, targetTopPx, index.viewportTransform);
+  return bestOperatorAmong(
+    candidates,
+    target.x,
+    target.y,
+    index.viewportTransform,
+    target.kind,
+  );
 }
 
 // Phase 9.2 UI regression: pdfjs's getTextContent() can merge several

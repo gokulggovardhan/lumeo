@@ -208,6 +208,47 @@ test("runSpansMultipleOperators flags a run pdfjs merged from two back-to-back T
   assert.equal(runSpansMultipleOperators(plan.originalText, runs[0].str), true);
 });
 
+test("operator matching uses retained baseline evidence instead of ascent-dependent box top", () => {
+  const pageWidthPx = 1000;
+  const pageHeightPx = 1000;
+  const viewportTransform: [number, number, number, number, number, number] = [1, 0, 0, 1, 0, 0];
+  const operator = makeFakeOperator(200, 300, "baseline-target");
+
+  const run: DetectedTextRun = {
+    str: "baseline-target",
+    fontName: "F1",
+    // Deliberately wrong visual-box origin: a top-left matcher would fail.
+    xPct: 80,
+    yPct: 80,
+    widthPct: 5,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    baselineXPct: 20,
+    // makeFakeOperator's baseline is its matrix translation, which is
+    // topPx + the legacy 0.85 ascent offset.
+    baselineYPct: ((300 + 0.85) / pageHeightPx) * 100,
+  };
+
+  const brute = matchDetectedRunToOperator(
+    run,
+    pageWidthPx,
+    pageHeightPx,
+    [operator],
+    viewportTransform,
+  );
+  const index = buildOperatorSpatialIndex([operator], viewportTransform);
+  const indexed = matchDetectedRunToOperatorIndexed(
+    run,
+    pageWidthPx,
+    pageHeightPx,
+    index,
+  );
+
+  assert.equal(brute, operator);
+  assert.equal(indexed, operator);
+});
+
 // Phase 24: matchDetectedRunToOperatorIndexed's spatial-grid prefilter must
 // return EXACTLY what the brute-force matchDetectedRunToOperator returns
 // for the same inputs -- it's a performance-only change (O(runs x operators)
