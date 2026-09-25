@@ -28,7 +28,7 @@
 // this file to pdfjs's internal layout rather than its public API
 // surface (page.getTextContent().items and page.getViewport().transform,
 // both used exactly as pdfjs itself documents them).
-type PdfTextItem = { str: string; transform: number[]; width: number; fontName: string };
+type PdfTextItem = { str: string; transform: number[]; width: number; height?: number; fontName: string; dir?: string; hasEOL?: boolean };
 type PdfTextMarkedContent = { type: string };
 type PdfViewportTransform = number[];
 
@@ -114,6 +114,12 @@ export type DetectedTextRun = {
    * work a rotated bounding box needs to stay pixel-accurate.
    */
   rotated: boolean;
+  /** Raw pdf.js extraction evidence retained only for diagnostics/reconciliation. */
+  pdfJsTransform?: readonly number[];
+  pdfJsWidth?: number;
+  pdfJsHeight?: number | null;
+  pdfJsDirection?: string | null;
+  pdfJsHasEOL?: boolean | null;
 };
 
 function isTextItem(item: PdfTextItem | PdfTextMarkedContent): item is PdfTextItem {
@@ -165,6 +171,11 @@ export function textRunsFromContent(
       // scale-1 (point-space) viewport so this is PDF points.
       fontSizePt: fontHeight,
       rotated,
+      pdfJsTransform: [...item.transform],
+      pdfJsWidth: item.width,
+      pdfJsHeight: item.height ?? null,
+      pdfJsDirection: item.dir ?? null,
+      pdfJsHasEOL: item.hasEOL ?? null,
     });
   }
 
