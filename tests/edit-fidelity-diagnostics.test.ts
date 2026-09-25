@@ -51,7 +51,7 @@ test("diagnostics retain raw source bytes, native decoding, font identity and ex
     fontProfiles: [profile],
   });
 
-  assert.equal(report.schemaVersion, 2);
+  assert.equal(report.schemaVersion, 3);
   assert.equal(report.pageNumber, 1);
   assert.equal(report.spans.length, 1);
   const span = report.spans[0];
@@ -63,6 +63,10 @@ test("diagnostics retain raw source bytes, native decoding, font identity and ex
   assert.match(span.font.objectRef ?? "", /^\d+ \d+ R$/);
   assert.equal(span.font.writingMode, "unknown");
   assert.equal(span.font.embeddedProgramSha256, null);
+  assert.deepEqual(span.font.embeddedCmapFormats, []);
+  assert.equal(span.font.embeddedGlyphCount, null);
+  assert.equal(span.font.embeddedUnicodeSubtableCount, 0);
+  assert.equal(span.font.embeddedGlyphEvidenceSafeForSimplePdfEncoding, false);
   assert.equal(span.font.nativeRewriteCapability, "proven");
   assert.equal(span.geometry.fontSizePt, 12);
   assert.equal(span.geometry.fontSizeDeltaPt, 0);

@@ -19,7 +19,7 @@
 import type { TextShowOperator, TextShowOperatorKind } from "./contentStream.ts";
 import type { FallbackFontFamily, FallbackStyleHints } from "./fallbackFont.ts";
 import { encodeWithFallbackFont, fallbackFontMetrics, firstUnencodableChar, pickFallbackFont } from "./fallbackFont.ts";
-import type { ResolvedFont } from "./fontEncoding.ts";
+import type { EmbeddedGlyphEvidence, ResolvedFont } from "./fontEncoding.ts";
 import { classifyReplacementChar } from "./fontEncoding.ts";
 import type { FontMetrics } from "./fontMetrics.ts";
 import { compareAdvance, compareAdvanceAcrossFonts, compareAdvanceAcrossStates, type TextShowState } from "./fontMetrics.ts";
@@ -204,6 +204,7 @@ export function buildEditPlan({
   replacementText,
   resolvedFont,
   fontMetrics,
+  embeddedGlyphEvidence = null,
   fallbackStyleHints = null,
   replacementTextState = null,
 }: {
@@ -215,6 +216,13 @@ export function buildEditPlan({
   replacementText: string;
   resolvedFont: ResolvedFont;
   fontMetrics: FontMetrics;
+  /**
+   * Optional proof from the exact embedded font program. This may upgrade a
+   * simple embedded subset from fallback-only when its Unicode cmap proves
+   * the requested glyph exists. Omit to preserve the historic fail-closed
+   * behaviour.
+   */
+  embeddedGlyphEvidence?: EmbeddedGlyphEvidence | null;
   /**
    * Opt in to lib/pdf/edit/fallbackFont.ts's substitute-font path for
    * characters the run's own font can't be proven to render: pass the
@@ -402,14 +410,35 @@ export function buildEditPlan({
   const replacementGlyphCodes: number[] = [];
   let blocked: { char: string; classification: "requires-fallback" | "impossible" } | null = null;
   for (const char of replacementText) {
-    const classification = classifyReplacementChar(resolvedFont, char);
+    const classification = classifyReplacementChar(
+      resolvedFont,
+      char,
+      embeddedGlyphEvidence,
+    );
     if (classification !== "editable") {
       blocked = { char, classification };
       break;
     }
     const code = resolvedFont.unicodeToGlyphCode.get(char);
     // classifyReplacementChar already proved this exists for "editable".
-    replacementGlyphCodes.push(code as number);
+    const verifiedCode = code as number;
+
+    if (
+      resolvedFont.kind !== "Type0" &&
+      resolvedFont.isEmbedded &&
+      resolvedFont.isSubset &&
+      !fontMetrics.glyphWidths.has(verifiedCode) &&
+      fontMetrics.defaultWidth <= 0
+    ) {
+      // The embedded cmap can prove a glyph exists, but without a positive
+      // /Widths entry or /MissingWidth the existing spacing engine still
+      // cannot prove its PDF advance. Do not trade a font mismatch for a
+      // layout mismatch.
+      blocked = { char, classification: "requires-fallback" };
+      break;
+    }
+
+    replacementGlyphCodes.push(verifiedCode);
   }
 
   if (!blocked) {

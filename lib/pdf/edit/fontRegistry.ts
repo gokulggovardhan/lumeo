@@ -11,7 +11,11 @@ import {
   type PDFContext,
   type PDFDocument,
 } from "pdf-lib";
-import { resolveFont, type ResolvedFont } from "./fontEncoding.ts";
+import {
+  resolveFont,
+  type EmbeddedGlyphEvidence,
+  type ResolvedFont,
+} from "./fontEncoding.ts";
 import { resolveFontMetrics, type FontMetrics } from "./fontMetrics.ts";
 import {
   pickFallbackFont,
@@ -20,10 +24,16 @@ import {
   type FallbackStyleHints,
 } from "./fallbackFont.ts";
 import { sha256Hex } from "./sha256.ts";
+import {
+  parseSfntGlyphCoverage,
+  type SfntGlyphCoverage,
+} from "./sfntCmap.ts";
 
 const SUBSET_PREFIX = /^[A-Z]{6}\+/;
 const BOLD_NAME = /bold|black|heavy|semib|demib?|ultra/i;
 const ITALIC_NAME = /italic|oblique/i;
+const FLAG_SYMBOLIC = 1 << 2;
+const FLAG_NONSYMBOLIC = 1 << 5;
 
 export type BrowserFontProgramFormat =
   | "truetype"
@@ -103,6 +113,8 @@ export type PdfFontProfile = {
   resourceIdentity: PdfFontResourceIdentity;
   embeddedProgramByteLength: number | null;
   embeddedProgramSha256: string | null;
+  embeddedGlyphCoverage: SfntGlyphCoverage | null;
+  embeddedGlyphEvidence: EmbeddedGlyphEvidence | null;
   resolvedFont: ResolvedFont;
   metrics: FontMetrics;
   styleHints: FallbackStyleHints;
@@ -417,6 +429,25 @@ export class PdfFontRegistry {
     const serif = fallbackPdfFont.startsWith("Times");
     const monospace = fallbackPdfFont.startsWith("Courier");
     const embeddedProgram = this.embeddedProgramFor(fontDict);
+    const embeddedGlyphCoverage =
+      embeddedProgram &&
+      (embeddedProgram.format === "truetype" || embeddedProgram.format === "opentype")
+        ? parseSfntGlyphCoverage(embeddedProgram.bytes)
+        : null;
+    const descriptorFlags = styleHints.flags;
+    const embeddedGlyphEvidence: EmbeddedGlyphEvidence | null =
+      embeddedGlyphCoverage && resolvedFont.kind === "TrueType"
+        ? {
+            // PDF symbolic TrueType fonts use producer-specific code->glyph
+            // conventions; a Unicode cmap alone is not enough proof there.
+            // Require explicit nonsymbolic evidence and no Symbolic flag.
+            safeForSimplePdfEncoding:
+              descriptorFlags !== null &&
+              (descriptorFlags & FLAG_NONSYMBOLIC) !== 0 &&
+              (descriptorFlags & FLAG_SYMBOLIC) === 0,
+            hasUnicodeCodePoint: embeddedGlyphCoverage.hasCodePoint,
+          }
+        : null;
 
     const profile: PdfFontProfile = {
       resourceName,
@@ -445,6 +476,8 @@ export class PdfFontRegistry {
       resourceIdentity: resourceIdentityFor(fontResource, this.context, embeddedProgram),
       embeddedProgramByteLength: embeddedProgram?.bytes.byteLength ?? null,
       embeddedProgramSha256: embeddedProgram?.sha256 ?? null,
+      embeddedGlyphCoverage,
+      embeddedGlyphEvidence,
       resolvedFont,
       metrics,
       styleHints,

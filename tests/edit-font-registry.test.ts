@@ -198,3 +198,138 @@ test("PdfFontRegistry retains exact Type0/CID resource provenance and vertical w
   assert.equal(profile.embeddedProgramSha256, program.sha256);
   assert.equal(profile.embeddedProgramByteLength, fakeTtf.byteLength);
 });
+
+
+function embeddedSubsetSfntAB(): Uint8Array {
+  const format4 = new Uint8Array(32);
+  const f4 = new DataView(format4.buffer);
+  f4.setUint16(0, 4, false);
+  f4.setUint16(2, 32, false);
+  f4.setUint16(6, 4, false);
+  f4.setUint16(8, 4, false);
+  f4.setUint16(10, 1, false);
+  f4.setUint16(14, 0x0042, false);
+  f4.setUint16(16, 0xffff, false);
+  f4.setUint16(20, 0x0041, false);
+  f4.setUint16(22, 0xffff, false);
+  f4.setInt16(24, 3 - 0x0041, false);
+  f4.setInt16(26, 1, false);
+
+  const cmapLength = 12 + format4.byteLength;
+  const cmapOffset = 44;
+  const maxpOffset = (cmapOffset + cmapLength + 3) & ~3;
+  const bytes = new Uint8Array(maxpOffset + 6);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(0, 0x00010000, false);
+  view.setUint16(4, 2, false);
+
+  for (const [record, name, offset, length] of [
+    [12, "cmap", cmapOffset, cmapLength],
+    [28, "maxp", maxpOffset, 6],
+  ] as const) {
+    for (let index = 0; index < 4; index += 1) {
+      view.setUint8(record + index, name.charCodeAt(index));
+    }
+    view.setUint32(record + 8, offset, false);
+    view.setUint32(record + 12, length, false);
+  }
+
+  view.setUint16(cmapOffset, 0, false);
+  view.setUint16(cmapOffset + 2, 1, false);
+  view.setUint16(cmapOffset + 4, 3, false);
+  view.setUint16(cmapOffset + 6, 1, false);
+  view.setUint32(cmapOffset + 8, 12, false);
+  bytes.set(format4, cmapOffset + 12);
+
+  view.setUint32(maxpOffset, 0x00010000, false);
+  view.setUint16(maxpOffset + 4, 10, false);
+  return bytes;
+}
+
+test("PdfFontRegistry promotes nonsymbolic embedded TrueType subset cmap to safe glyph evidence", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const fontProgram = embeddedSubsetSfntAB();
+  const fontFileRef = context.register(context.flateStream(fontProgram));
+  const descriptorRef = context.register(
+    context.obj({
+      Type: "FontDescriptor",
+      FontName: "ABCDEF+DemoSans",
+      Flags: 32,
+      ItalicAngle: 0,
+      Ascent: 800,
+      Descent: -200,
+      CapHeight: 700,
+      FontBBox: [0, -200, 1000, 900],
+      StemV: 80,
+      MissingWidth: 600,
+      FontFile2: fontFileRef,
+    }),
+  );
+  const fontRef = context.register(
+    context.obj({
+      Type: "Font",
+      Subtype: "TrueType",
+      BaseFont: "ABCDEF+DemoSans",
+      FirstChar: 65,
+      LastChar: 66,
+      Widths: [600, 610],
+      FontDescriptor: descriptorRef,
+      Encoding: "WinAnsiEncoding",
+    }),
+  );
+  const resources = context.obj({
+    Font: context.obj({ FSubset: fontRef }),
+  });
+
+  const profile = new PdfFontRegistry(doc).resolve(resources, "FSubset");
+  assert.ok(profile);
+  assert.equal(profile.kind, "TrueType");
+  assert.equal(profile.isSubset, true);
+  assert.deepEqual(profile.embeddedGlyphCoverage?.formats, [4]);
+  assert.equal(profile.embeddedGlyphCoverage?.glyphCount, 10);
+  assert.equal(profile.embeddedGlyphCoverage?.glyphIdForCodePoint(0x41), 3);
+  assert.equal(profile.embeddedGlyphCoverage?.glyphIdForCodePoint(0x42), 4);
+  assert.equal(profile.embeddedGlyphEvidence?.safeForSimplePdfEncoding, true);
+  assert.equal(profile.embeddedGlyphEvidence?.hasUnicodeCodePoint(0x42), true);
+  assert.equal(profile.embeddedGlyphEvidence?.hasUnicodeCodePoint(0x43), false);
+});
+
+test("PdfFontRegistry never treats symbolic embedded TrueType cmap as safe PDF simple-font evidence", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const fontFileRef = context.register(context.flateStream(embeddedSubsetSfntAB()));
+  const descriptorRef = context.register(
+    context.obj({
+      Type: "FontDescriptor",
+      FontName: "ABCDEF+SymbolicSubset",
+      Flags: 4,
+      ItalicAngle: 0,
+      Ascent: 800,
+      Descent: -200,
+      FontBBox: [0, -200, 1000, 900],
+      StemV: 80,
+      FontFile2: fontFileRef,
+    }),
+  );
+  const fontRef = context.register(
+    context.obj({
+      Type: "Font",
+      Subtype: "TrueType",
+      BaseFont: "ABCDEF+SymbolicSubset",
+      FirstChar: 65,
+      LastChar: 66,
+      Widths: [600, 610],
+      FontDescriptor: descriptorRef,
+      Encoding: "WinAnsiEncoding",
+    }),
+  );
+  const resources = context.obj({
+    Font: context.obj({ FSymbol: fontRef }),
+  });
+
+  const profile = new PdfFontRegistry(doc).resolve(resources, "FSymbol");
+  assert.ok(profile);
+  assert.ok(profile.embeddedGlyphCoverage);
+  assert.equal(profile.embeddedGlyphEvidence?.safeForSimplePdfEncoding, false);
+});
