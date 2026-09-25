@@ -67,5 +67,5 @@ export type AnalyticsProviderTrackResult =
     };
 
 export type AnalyticsRemoteTrackResult =
-  | { success: true; eventId: number | null }
+  | { success: true }
   | { success: false };
