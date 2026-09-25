@@ -1,4 +1,4 @@
-import { istCalendarDateStartToUtcIso } from "@/lib/admin/timezone";
+import { istCalendarDateStartToUtcIso } from "./timezone.ts";
 import type { AdminMemberView } from "@/lib/admin/data";
 import type { AdminRole } from "@/lib/admin/types";
 
