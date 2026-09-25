@@ -1,10 +1,11 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { GEO_COOKIE_NAME } from "@/lib/analytics/geo-cookie-name";
 import {
-  encodeAnalyticsGeoCookie,
-  readCloudflareApproximateLocation,
-} from "@/lib/cloudflare/request-location";
+  ACQUISITION_COOKIE_MAX_AGE_SECONDS,
+  ANALYTICS_ACQUISITION_COOKIE,
+  buildAcquisitionContext,
+  encodeAcquisitionCookie,
+} from "@/lib/analytics/acquisition";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
 const SESSION_CACHE_HEADERS = ["cache-control", "expires", "pragma"] as const;
@@ -38,22 +39,45 @@ function productionHttpsRedirect(request: NextRequest) {
   return response;
 }
 
-// Next's cookie serializer already percent-encodes the whole value on write
-// (that's a single encoding pass we don't control) -- pre-encoding each
-// segment here on top of that double-encodes it. The literal "|" join
-// character itself gets encoded to %7C by that pass, so the client-side
-// reader must decode the WHOLE value once before splitting on "|", not
-// split first and decode each part (see lib/analytics/geo.ts).
-function buildGeoCookieValue(request: NextRequest) {
-  return encodeAnalyticsGeoCookie(readCloudflareApproximateLocation(request));
+function shouldCaptureAcquisition(request: NextRequest) {
+  if (request.cookies.has(ANALYTICS_ACQUISITION_COOKIE)) return false;
+  if (request.method !== "GET") return false;
+
+  const pathname = request.nextUrl.pathname;
+  if (
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/api") ||
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/office-runtime") ||
+    pathname.startsWith("/maintenance")
+  ) {
+    return false;
+  }
+
+  const destination = request.headers.get("sec-fetch-dest");
+  const acceptsHtml = request.headers.get("accept")?.includes("text/html") ?? false;
+  return destination === "document" || acceptsHtml;
 }
 
-function applyGeoCookie(response: NextResponse, value: string | null) {
+function acquisitionCookieValue(request: NextRequest) {
+  if (!shouldCaptureAcquisition(request)) return null;
+  return encodeAcquisitionCookie(
+    buildAcquisitionContext(request.url, request.headers.get("referer")),
+  );
+}
+
+function applyAcquisitionCookie(
+  response: NextResponse,
+  request: NextRequest,
+  value: string | null,
+) {
   if (!value) return;
-  response.cookies.set(GEO_COOKIE_NAME, value, {
+  response.cookies.set(ANALYTICS_ACQUISITION_COOKIE, value, {
     path: "/",
-    maxAge: 60 * 60 * 24,
+    maxAge: ACQUISITION_COOKIE_MAX_AGE_SECONDS,
     sameSite: "lax",
+    httpOnly: true,
+    secure: request.nextUrl.protocol === "https:",
   });
 }
 
@@ -122,6 +146,11 @@ export async function updateSession(request: NextRequest) {
     const fallbackResponse = NextResponse.next({
       request,
     });
+    applyAcquisitionCookie(
+      fallbackResponse,
+      request,
+      acquisitionCookieValue(request),
+    );
     applyAdminCachePolicy(fallbackResponse, request.nextUrl.pathname);
     applyBaselineSecurityHeaders(fallbackResponse);
     return fallbackResponse;
@@ -164,7 +193,7 @@ export async function updateSession(request: NextRequest) {
   // Server Components read it.
   await supabase.auth.getClaims();
 
-  const geoCookieValue = buildGeoCookieValue(request);
+  const acquisitionValue = acquisitionCookieValue(request);
 
   if (!bypassesMaintenanceMode(request.nextUrl.pathname)) {
     // Fails open: any RPC error (migration not yet applied, DB unreachable)
@@ -184,13 +213,13 @@ export async function updateSession(request: NextRequest) {
       // and Supabase's cache-control metadata so auth state cannot go stale.
       copySessionMetadata(response, maintenanceResponse);
       maintenanceResponse.headers.set("X-Robots-Tag", "noindex");
-      applyGeoCookie(maintenanceResponse, geoCookieValue);
+      applyAcquisitionCookie(maintenanceResponse, request, acquisitionValue);
       applyBaselineSecurityHeaders(maintenanceResponse);
       return maintenanceResponse;
     }
   }
 
-  applyGeoCookie(response, geoCookieValue);
+  applyAcquisitionCookie(response, request, acquisitionValue);
   applyAdminCachePolicy(response, request.nextUrl.pathname);
   applyBaselineSecurityHeaders(response);
   return response;
