@@ -91,7 +91,7 @@ import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
-import type { ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
+import type { EmbeddedGlyphEvidence, ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
@@ -2362,12 +2362,18 @@ export default function EditPdfTool() {
         locatedOperator: LocatedTextOperator;
         operator: LocatedTextOperator["operator"];
         fallbackStyleHints: import("@/lib/pdf/edit/fallbackFont").FallbackStyleHints;
+        embeddedGlyphEvidence: EmbeddedGlyphEvidence | null;
       }
-    | { kind: "multi"; resolvedFont: ResolvedFont; fontMetrics: FontMetrics; validation: Extract<MultiRunValidation, { kind: "valid" }> };
+    | {
+        kind: "multi";
+        resolvedFont: ResolvedFont;
+        fontMetrics: FontMetrics;
+        embeddedGlyphEvidence: EmbeddedGlyphEvidence | null;
+        validation: Extract<MultiRunValidation, { kind: "valid" }>;
+      };
 
   const resolvedEditContext = useMemo((): ResolvedEditContext => {
-    if (!pdfLibDoc || !editEngine || selectedRunIndices.length === 0) return { kind: "empty" };
-    const { PDFName, PDFDict, resolveFont, resolveFontMetrics, readFallbackStyleHints } = editEngine;
+    if (!fontRegistry || selectedRunIndices.length === 0) return { kind: "empty" };
 
     try {
       if (selectedRunIndices.length === 1) {
@@ -2375,11 +2381,15 @@ export default function EditPdfTool() {
         if (!match) return { kind: "empty" };
         const { locatedOperator, operator } = match;
         if (!operator.fontResourceName) throw new Error("This text's font couldn't be identified, so it can't be edited here.");
-        const fontDict = locatedOperator.resources.lookup(PDFName.of("Font"), PDFDict)?.lookup(PDFName.of(operator.fontResourceName), PDFDict);
-        if (!fontDict) throw new Error("Could not resolve this text's font.");
-        const resolvedFont = resolveFont(fontDict, pdfLibDoc.context);
-        const fontMetrics = resolveFontMetrics(fontDict, pdfLibDoc.context, resolvedFont);
-        const fallbackStyleHints = readFallbackStyleHints(fontDict, pdfLibDoc.context);
+        const profile = fontRegistry.resolve(
+          locatedOperator.resources,
+          operator.fontResourceName,
+        );
+        if (!profile) throw new Error("Could not resolve this text's font.");
+        const resolvedFont = profile.resolvedFont;
+        const fontMetrics = profile.metrics;
+        const fallbackStyleHints = profile.styleHints;
+        const embeddedGlyphEvidence = profile.embeddedGlyphEvidence;
         const fragmented = fragmentedRunReconstructions.get(selectedRunIndices[0]);
         if (fragmented) {
           const validation: Extract<MultiRunValidation, { kind: "valid" }> = {
@@ -2390,24 +2400,45 @@ export default function EditPdfTool() {
             resources: fragmented.resources,
             fontResourceName: fragmented.fontResourceName,
           };
-          return { kind: "multi", resolvedFont, fontMetrics, validation };
+          return {
+            kind: "multi",
+            resolvedFont,
+            fontMetrics,
+            embeddedGlyphEvidence,
+            validation,
+          };
         }
-        return { kind: "single", resolvedFont, fontMetrics, locatedOperator, operator, fallbackStyleHints };
+        return {
+          kind: "single",
+          resolvedFont,
+          fontMetrics,
+          locatedOperator,
+          operator,
+          fallbackStyleHints,
+          embeddedGlyphEvidence,
+        };
       }
 
       const validation = validateMultiRunSelection(selectedRunIndices);
       if (validation.kind === "invalid") return { kind: "error", reason: validation.reason, multi: true };
-      const fontDict = validation.resources.lookup(PDFName.of("Font"), PDFDict)?.lookup(PDFName.of(validation.fontResourceName), PDFDict);
-      if (!fontDict) throw new Error("Could not resolve this text's font.");
-      const resolvedFont = resolveFont(fontDict, pdfLibDoc.context);
-      const fontMetrics = resolveFontMetrics(fontDict, pdfLibDoc.context, resolvedFont);
-      return { kind: "multi", resolvedFont, fontMetrics, validation };
+      const profile = fontRegistry.resolve(
+        validation.resources,
+        validation.fontResourceName,
+      );
+      if (!profile) throw new Error("Could not resolve this text's font.");
+      return {
+        kind: "multi",
+        resolvedFont: profile.resolvedFont,
+        fontMetrics: profile.metrics,
+        embeddedGlyphEvidence: profile.embeddedGlyphEvidence,
+        validation,
+      };
     } catch (resolveError) {
       const reason = resolveError instanceof Error ? resolveError.message : "Could not validate this edit.";
       return { kind: "error", reason, multi: selectedRunIndices.length > 1 };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
-  }, [pdfLibDoc, editEngine, selectedRunIndices, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions]);
+  }, [fontRegistry, selectedRunIndices, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions]);
 
   // Phase 9.2: the live dry-run preview driving both the Apply button's
   // disabled state and the specific reason shown next to it -- see
@@ -2427,7 +2458,14 @@ export default function EditPdfTool() {
     }
 
     if (resolvedEditContext.kind === "single") {
-      const { resolvedFont, fontMetrics, locatedOperator, operator, fallbackStyleHints } = resolvedEditContext;
+      const {
+        resolvedFont,
+        fontMetrics,
+        locatedOperator,
+        operator,
+        fallbackStyleHints,
+        embeddedGlyphEvidence,
+      } = resolvedEditContext;
       const planInputs = {
         pageIndex,
         contentStreamIndex: locatedOperator.locator.kind === "page" ? locatedOperator.locator.contentStreamIndex : 0,
@@ -2437,6 +2475,7 @@ export default function EditPdfTool() {
         replacementText: editDraftText,
         resolvedFont,
         fontMetrics,
+        embeddedGlyphEvidence,
         replacementTextState: nativeStyleOverride,
       };
       // Always planned strictly first, in the run's OWN font. A substitute
@@ -2480,7 +2519,12 @@ export default function EditPdfTool() {
       };
     }
 
-    const { resolvedFont, fontMetrics, validation } = resolvedEditContext;
+    const {
+      resolvedFont,
+      fontMetrics,
+      embeddedGlyphEvidence,
+      validation,
+    } = resolvedEditContext;
     try {
       const plan = buildMultiRunEditPlan({
         pageIndex,
@@ -2490,6 +2534,7 @@ export default function EditPdfTool() {
         replacementText: editDraftText,
         resolvedFont,
         fontMetrics,
+        embeddedGlyphEvidence,
       });
       return { kind: "multi", editable: plan.editable, reason: plan.reason, plan, resolvedFont };
     } catch (previewError) {
@@ -2687,7 +2732,13 @@ export default function EditPdfTool() {
     const doc = pdfLibDocRef.current;
     const engine = editEngineRef.current;
     if (doc && engine && resolvedEditContext.kind === "single") {
-      const { resolvedFont, fontMetrics, locatedOperator, operator } = resolvedEditContext;
+      const {
+        resolvedFont,
+        fontMetrics,
+        locatedOperator,
+        operator,
+        embeddedGlyphEvidence,
+      } = resolvedEditContext;
       const blankPlan = buildEditPlan({
         pageIndex,
         contentStreamIndex: locatedOperator.locator.kind === "page" ? locatedOperator.locator.contentStreamIndex : 0,
@@ -2697,6 +2748,7 @@ export default function EditPdfTool() {
         replacementText: "",
         resolvedFont,
         fontMetrics,
+        embeddedGlyphEvidence,
       });
       // Same guard the inline editor applies: if pdfjs merged this visual run
       // from several operators, emptying the one we matched would delete part
