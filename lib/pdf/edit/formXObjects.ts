@@ -362,6 +362,113 @@ export function collectPageTextOperators(
   return results;
 }
 
+export type PageContentEvidence = {
+  textOperatorCount: number;
+  imageXObjectInvocations: number;
+  formXObjectInvocations: number;
+  vectorPaintOperatorCount: number;
+};
+
+const VECTOR_PAINT_OPERATORS = new Set([
+  "S", "s", "f", "F", "f*", "B", "B*", "b", "b*", "sh",
+]);
+
+/**
+ * Read-only page-content evidence used by DocumentTextCapabilityClassifier.
+ * This intentionally does not infer OCR text. It only proves whether the
+ * page invokes image XObjects, Form XObjects, native text-show operators or
+ * vector-paint operators, so "scanned/image-only" classification has real
+ * structural evidence instead of being inferred from an empty text array.
+ */
+export function inspectPageContentEvidence(
+  doc: PDFDocument,
+  pageIndex: number,
+  options: { maxDepth?: number; fontRegistry?: PdfFontRegistry } = {},
+): PageContentEvidence {
+  const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const page = doc.getPages()[pageIndex];
+  if (!page) throw new Error(`Page ${pageIndex} does not exist in this document.`);
+
+  const context = doc.context;
+  const pageResources = getResourcesDict(page.node, context);
+  if (!pageResources) {
+    return {
+      textOperatorCount: 0,
+      imageXObjectInvocations: 0,
+      formXObjectInvocations: 0,
+      vectorPaintOperatorCount: 0,
+    };
+  }
+
+  const evidence: PageContentEvidence = {
+    textOperatorCount: collectPageTextOperators(doc, pageIndex, options).length,
+    imageXObjectInvocations: 0,
+    formXObjectInvocations: 0,
+    vectorPaintOperatorCount: 0,
+  };
+
+  function walk(
+    bytes: Uint8Array,
+    resources: PDFDict,
+    openRefs: ReadonlySet<PDFRef>,
+    depth: number,
+  ): void {
+    const tokens = tokenizeContentStream(bytes);
+    for (const token of tokens) {
+      if (token.type === "operator" && VECTOR_PAINT_OPERATORS.has(token.value)) {
+        evidence.vectorPaintOperatorCount += 1;
+      }
+    }
+
+    if (depth >= maxDepth) return;
+    const invocations = findFormInvocations(bytes);
+    if (invocations.length === 0) return;
+    const xObjects = getXObjectDict(resources, context);
+    if (!xObjects) return;
+
+    for (const invocation of invocations) {
+      const entry = xObjects.get(PDFName.of(invocation.xObjectName));
+      if (!(entry instanceof PDFRef)) continue;
+      const stream = lookupRawStream(entry, context);
+      if (!stream) continue;
+      const subtype = stream.dict.get(PDFName.of("Subtype"));
+      if (!(subtype instanceof PDFName)) continue;
+
+      if (subtype.asString() === "/Image") {
+        evidence.imageXObjectInvocations += 1;
+        continue;
+      }
+      if (subtype.asString() !== "/Form") continue;
+
+      evidence.formXObjectInvocations += 1;
+      if (openRefs.has(entry)) continue;
+
+      const formResources = getResourcesDict(stream.dict, context) ?? resources;
+      const nextOpen = new Set(openRefs);
+      nextOpen.add(entry);
+      walk(
+        decodePDFRawStream(stream).decode(),
+        formResources,
+        nextOpen,
+        depth + 1,
+      );
+    }
+  }
+
+  for (const ref of getPageContentStreamRefs(page.node, context)) {
+    const stream = lookupRawStream(ref, context);
+    if (!stream) continue;
+    walk(
+      decodePDFRawStream(stream).decode(),
+      pageResources,
+      new Set([ref]),
+      0,
+    );
+  }
+
+  return evidence;
+}
+
 export type ResolvedStreamTarget = {
   context: PDFContext;
   targetRef: PDFRef;
