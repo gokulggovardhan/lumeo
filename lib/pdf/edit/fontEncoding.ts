@@ -48,6 +48,9 @@ export type ResolvedFont = {
   isSubset: boolean;
   bytesPerCode: 1 | 2;
   encodingSource: EncodingSource;
+  /** Exact Type0 /Encoding name when directly named; null for simple/unknown encodings. */
+  compositeEncodingName: string | null;
+  writingMode: "horizontal" | "vertical" | "unknown";
   glyphCodeToUnicode: Map<number, string>;
   /**
    * Only populated with codes this module can vouch for -- see
@@ -337,6 +340,13 @@ export function resolveFont(fontDict: PDFDict, context: PDFContext): ResolvedFon
   const isSubset = SUBSET_PREFIX.test(baseFont);
 
   if (kind === "Type0") {
+    const compositeEncodingName = nameString(fontDict.get(PDFName.of("Encoding")));
+    const writingMode =
+      compositeEncodingName === "Identity-V" || compositeEncodingName?.endsWith("-V")
+        ? "vertical"
+        : compositeEncodingName === "Identity-H" || compositeEncodingName?.endsWith("-H")
+          ? "horizontal"
+          : "unknown";
     const descendantFonts = fontDict.get(PDFName.of("DescendantFonts"));
     const descendantDict =
       descendantFonts instanceof PDFArray && descendantFonts.size() > 0
@@ -354,6 +364,8 @@ export function resolveFont(fontDict: PDFDict, context: PDFContext): ResolvedFon
         isSubset,
         bytesPerCode: 2,
         encodingSource: "Unknown",
+        compositeEncodingName,
+        writingMode,
         glyphCodeToUnicode: new Map(),
         unicodeToGlyphCode: new Map(),
       };
@@ -375,6 +387,8 @@ export function resolveFont(fontDict: PDFDict, context: PDFContext): ResolvedFon
       isSubset,
       bytesPerCode: 2,
       encodingSource: "ToUnicode",
+      compositeEncodingName,
+      writingMode,
       glyphCodeToUnicode: toUnicode,
       unicodeToGlyphCode,
     };
@@ -400,6 +414,8 @@ export function resolveFont(fontDict: PDFDict, context: PDFContext): ResolvedFon
     isSubset,
     bytesPerCode: 1,
     encodingSource: source,
+    compositeEncodingName: null,
+    writingMode: "horizontal",
     glyphCodeToUnicode: codeToUnicode,
     unicodeToGlyphCode,
   };
