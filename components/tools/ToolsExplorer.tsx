@@ -258,9 +258,15 @@ export function ToolsExplorer({ tools }: { tools: Tile[] }) {
         </>
       )}
 
-      <aside className="mt-9 grid gap-3 rounded-[16px] border border-[var(--border-hairline)] bg-[var(--surface-base)] p-4 text-sm text-[var(--text-secondary)] sm:grid-cols-2 sm:p-5" aria-label="Processing information">
-        <p><strong className="text-[var(--atelier-sage-300)]">On device</strong> means the file is processed in your browser.</p>
-        <p><strong className="text-[var(--text-premium)]">Server-assisted</strong> tools are explicitly identified before upload.</p>
+      <aside
+        className="mt-9 rounded-[16px] border border-[var(--border-hairline)] bg-[var(--surface-base)] p-4 text-sm leading-6 text-[var(--text-secondary)] sm:p-5"
+        aria-label="Processing information"
+      >
+        <p>
+          <strong className="text-[var(--atelier-sage-300)]">Current live tools are browser-based.</strong>{" "}
+          Your tool page explains file handling and any browser capability requirements before you begin.
+          If a future workflow uses a different processing model, Lumeo will identify it clearly before file selection.
+        </p>
       </aside>
     </div>
   );
