@@ -193,7 +193,7 @@ export default async function SettingsPage() {
         }
       >
         <AdminDataTable
-          columns={["Control", "State", "Updated"]}
+          columns={["Control", "State", "Updated (IST)"]}
           rows={visibleSettings.map((setting) => [
             liveSettings.find(([key]) => key === setting.key)?.[1] ??
               setting.key,
