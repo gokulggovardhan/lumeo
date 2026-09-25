@@ -2,6 +2,9 @@ import type { PdfFontProfile } from "./fontRegistry.ts";
 import { stringAdvancePt } from "./fontMetrics.ts";
 import type { PdfPageTextModel, PdfTextSourceMatch } from "./documentModel.ts";
 import type { DetectedTextRun } from "./textRuns.ts";
+import type { NativeContentStreamSpan } from "./nativeTextDetection.ts";
+import type { TextSignalReconciliation } from "./textReconciliation.ts";
+import type { PageTextCapabilityClassification } from "./textCapabilityClassifier.ts";
 
 export const EDIT_PDF_DIAGNOSTIC_SCHEMA_VERSION = 1 as const;
 
@@ -116,6 +119,12 @@ export type EditPdfPageDiagnosticReport = {
     viewOnlySpanCount: number;
     unsupportedSpanCount: number;
   };
+  signals: {
+    nativeSpanCount: number;
+    pdfJsRunCount: number;
+    classification: PageTextCapabilityClassification | null;
+    reconciliations: readonly TextSignalReconciliation[];
+  };
   spans: readonly EditPdfSpanDiagnostic[];
 };
 
@@ -175,12 +184,20 @@ export function buildEditPdfPageDiagnosticReport({
   runs,
   matches,
   fontProfiles,
+  nativeSpans = [],
+  reconciliations = [],
+  pageClassification = null,
+  pdfJsRunCount = runs.filter((run) => run.detectionSource !== "native").length,
   generatedAtIso = null,
 }: {
   pageModel: PdfPageTextModel;
   runs: readonly DetectedTextRun[];
   matches: readonly PdfTextSourceMatch[];
   fontProfiles: readonly (PdfFontProfile | null)[];
+  nativeSpans?: readonly NativeContentStreamSpan[];
+  reconciliations?: readonly TextSignalReconciliation[];
+  pageClassification?: PageTextCapabilityClassification | null;
+  pdfJsRunCount?: number;
   generatedAtIso?: string | null;
 }): EditPdfPageDiagnosticReport {
   const spans = pageModel.spans.map((span, index): EditPdfSpanDiagnostic => {
@@ -202,7 +219,10 @@ export function buildEditPdfPageDiagnosticReport({
     unresolved.add("cid-to-gid-map-not-exposed");
     unresolved.add("glyph-ids-not-resolved");
     if (!run?.pdfJsTransform) unresolved.add("pdfjs-raw-transform-not-retained");
-    unresolved.add("native-pdfjs-baseline-not-reconciled");
+    const reconciliation = reconciliations[index] ?? null;
+    if (reconciliation?.confidence !== "high") {
+      unresolved.add("native-pdfjs-baseline-not-reconciled");
+    }
     if (!profile) unresolved.add("font-profile-unresolved");
 
     let nativeAdvance: number | null = null;
@@ -318,6 +338,12 @@ export function buildEditPdfPageDiagnosticReport({
       editableSpanCount: pageModel.editableSpanCount,
       viewOnlySpanCount: pageModel.viewOnlySpanCount,
       unsupportedSpanCount: pageModel.unsupportedSpanCount,
+    },
+    signals: {
+      nativeSpanCount: nativeSpans.length,
+      pdfJsRunCount,
+      classification: pageClassification,
+      reconciliations,
     },
     spans,
   };

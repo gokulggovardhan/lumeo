@@ -59,6 +59,20 @@ import {
 // in transitively regardless of the type-only import above. Their TYPE
 // exports are unaffected (same erased-at-compile-time reasoning).
 import { overlayFontSizePx, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
+import {
+  buildNativeContentStreamSpans,
+  nativeDetectedRuns,
+  type NativeContentStreamSpan,
+} from "@/lib/pdf/edit/nativeTextDetection";
+import {
+  reconcileTextSignals,
+  reconciliationMatchMap,
+  type TextSignalReconciliation,
+} from "@/lib/pdf/edit/textReconciliation";
+import {
+  DocumentTextCapabilityClassifier,
+  type PageTextCapabilityClassification,
+} from "@/lib/pdf/edit/textCapabilityClassifier";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
 import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
 import { PercentSpatialIndex } from "@/lib/pdf/edit/spatialIndex";
@@ -564,6 +578,9 @@ export default function EditPdfTool() {
   // state are all looked up by one shared index rather than juggling
   // separate DetectedTextRun object identities.
   const [runMatches, setRunMatches] = useState<RunMatch[]>([]);
+  const [nativeTextSpans, setNativeTextSpans] = useState<NativeContentStreamSpan[]>([]);
+  const [textReconciliations, setTextReconciliations] = useState<TextSignalReconciliation[]>([]);
+  const [pdfJsDetectedRunCount, setPdfJsDetectedRunCount] = useState(0);
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
   // runMatches was derived from), kept around so a multi-run selection can
   // reconstruct the FULL, in-order operator list one specific content
@@ -817,6 +834,15 @@ export default function EditPdfTool() {
     [pageIndex, pagePointSize, detectedTextRuns, runMatches, pageFontProfiles, fragmentedRunReconstructions],
   );
 
+  const pageTextCapability = useMemo<PageTextCapabilityClassification>(() => {
+    const classifier = new DocumentTextCapabilityClassifier();
+    return classifier.classifyPage({
+      nativeSpans: nativeTextSpans,
+      pdfJsRunCount: pdfJsDetectedRunCount,
+      reconciliations: textReconciliations,
+    });
+  }, [nativeTextSpans, pdfJsDetectedRunCount, textReconciliations]);
+
   // Development-only fidelity diagnostics. This deliberately never renders
   // debug noise in the normal product and is compiled behind NODE_ENV.
   // In a local development build, the current page report can be inspected
@@ -840,6 +866,10 @@ export default function EditPdfTool() {
         runs: detectedTextRuns,
         matches: runMatches,
         fontProfiles: pageFontProfiles,
+        nativeSpans: nativeTextSpans,
+        reconciliations: textReconciliations,
+        pageClassification: pageTextCapability,
+        pdfJsRunCount: pdfJsDetectedRunCount,
         generatedAtIso: new Date().toISOString(),
       });
     };
@@ -859,7 +889,16 @@ export default function EditPdfTool() {
       active = false;
       delete host.__LUMEO_EDIT_PDF_DIAGNOSTICS__;
     };
-  }, [pageTextModel, detectedTextRuns, runMatches, pageFontProfiles]);
+  }, [
+    pageTextModel,
+    detectedTextRuns,
+    runMatches,
+    pageFontProfiles,
+    nativeTextSpans,
+    textReconciliations,
+    pageTextCapability,
+    pdfJsDetectedRunCount,
+  ]);
 
   const textRunSpatialIndex = useMemo(() => {
     if (!pageTextModel) return null;
@@ -1075,6 +1114,9 @@ export default function EditPdfTool() {
     setSelectedId(null);
     setDetectedTextRuns([]);
     setRunMatches([]);
+    setNativeTextSpans([]);
+    setTextReconciliations([]);
+    setPdfJsDetectedRunCount(0);
     setPageOperators([]);
     setSelectionAnchorIndex(null);
     setSelectedRunIndices([]);
@@ -1419,9 +1461,13 @@ export default function EditPdfTool() {
         // Point space, never the raster viewport -- see
         // lib/pdf/edit/textRuns.ts's DetectedTextRun.fontSizePt.
         const runs = textRunsFromContent(content.items as never, pointViewport.transform, pointViewport.width, pointViewport.height);
+        setPdfJsDetectedRunCount(runs.length);
         setDetectedTextRuns(runs);
       } catch {
-        if (!cancelled) setDetectedTextRuns([]);
+        if (!cancelled) {
+          setPdfJsDetectedRunCount(0);
+          setDetectedTextRuns([]);
+        }
       } finally {
         // true means detection finished, successfully or not
         if (!cancelled) setTextDetectionReady(true);
@@ -1508,7 +1554,7 @@ export default function EditPdfTool() {
   // only disables in-place editing, never the read-only preview/highlight
   // this depends on.
   useEffect(() => {
-    if (!pdf || !pdfJsDocRef.current || !pdfLibDoc || detectedTextRuns.length === 0 || !pagePointSize) return;
+    if (!pdf || !pdfJsDocRef.current || !pdfLibDoc || !pagePointSize || !fontRegistry) return;
     const doc = pdfJsDocRef.current;
     const runs = detectedTextRuns;
     let cancelled = false;
@@ -1537,21 +1583,93 @@ export default function EditPdfTool() {
         const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
         if (cancelled) return;
         setPageOperators(located);
-        // Built once per page, not once per run -- see
-        // buildOperatorSpatialIndex's own doc comment. Paired with a
-        // Map for O(1) operator -> LocatedTextOperator lookup below,
-        // replacing what was previously an O(operators) `.find()` call
-        // repeated for every run (a second, separate O(runs x operators)
-        // cost stacked on top of the matching itself).
+
+        const nativeSpans = buildNativeContentStreamSpans({
+          operators: located,
+          viewportTransform: viewport.transform,
+          pageWidthPt: pagePointSize.width,
+          pageHeightPt: pagePointSize.height,
+          resolveFontProfile: (locatedOperator) => {
+            const resourceName = locatedOperator.operator.fontResourceName;
+            if (!resourceName) return null;
+            try {
+              return fontRegistry.resolve(locatedOperator.resources, resourceName);
+            } catch {
+              return null;
+            }
+          },
+        });
+        setNativeTextSpans(nativeSpans);
+
+        // If PDF.js exposes no text at all, retain the native parser as an
+        // independent detector. Only simple runs with complete decoding,
+        // deterministic metrics, descriptor ascent/descent and safe geometry
+        // are synthesized into clickable runs; every other native span stays
+        // diagnostic/capability evidence rather than being faked as editable.
+        if (runs.length === 0) {
+          const nativeRuns = nativeDetectedRuns(nativeSpans);
+          setTextReconciliations([]);
+          setRunMatches([]);
+          if (nativeRuns.length > 0) setDetectedTextRuns(nativeRuns);
+          return;
+        }
+
         const flatOperators = located.map((item) => item.operator);
         const operatorIndex = buildOperatorSpatialIndex(flatOperators, viewport.transform);
         const locatedByOperator = new Map(located.map((item) => [item.operator, item] as const));
+        const nativeByKey = new Map(nativeSpans.map((span) => [span.key, span] as const));
+
+        const legacyMatches = runs.map((run): RunMatch => {
+          if (run.nativeSourceKey) {
+            const native = nativeByKey.get(run.nativeSourceKey);
+            return native
+              ? { locatedOperator: native.locatedOperator, operator: native.locatedOperator.operator }
+              : null;
+          }
+          const matchedOperator = matchDetectedRunToOperatorIndexed(
+            run,
+            pagePointSize.width,
+            pagePointSize.height,
+            operatorIndex,
+          );
+          if (!matchedOperator) return null;
+          const locatedOperator = locatedByOperator.get(matchedOperator);
+          return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
+        });
+
+        const reconciliations = reconcileTextSignals({
+          runs,
+          legacyMatches,
+          nativeSpans,
+          viewportTransform: viewport.transform,
+        });
+        setTextReconciliations(reconciliations);
+
+        const evidenceMatches = reconciliationMatchMap(reconciliations, nativeSpans);
         setRunMatches(
-          runs.map((run): RunMatch => {
-            const matchedOperator = matchDetectedRunToOperatorIndexed(run, pagePointSize.width, pagePointSize.height, operatorIndex);
-            if (!matchedOperator) return null;
-            const locatedOperator = locatedByOperator.get(matchedOperator);
-            return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
+          runs.map((run, index): RunMatch => {
+            if (run.nativeSourceKey) {
+              const native = nativeByKey.get(run.nativeSourceKey);
+              return native
+                ? { locatedOperator: native.locatedOperator, operator: native.locatedOperator.operator }
+                : null;
+            }
+
+            const legacy = legacyMatches[index];
+            const reconciliation = reconciliations[index];
+            const evidence = evidenceMatches.get(index);
+
+            // A high-confidence evidence match may replace a bad positional
+            // legacy match. Otherwise retain the legacy provenance so the
+            // existing fragmented-run reconstruction and edit-plan guards can
+            // prove or reject multi-operator text exactly as before.
+            if (evidence && reconciliation?.source === "evidence-match") {
+              return {
+                locatedOperator: evidence.locatedOperator,
+                operator: evidence.locatedOperator.operator,
+              };
+            }
+            return legacy;
           }),
         );
       } catch (matchError) {
@@ -1563,6 +1681,8 @@ export default function EditPdfTool() {
               : { message: String(matchError) },
           );
           setRunMatches([]);
+          setNativeTextSpans([]);
+          setTextReconciliations([]);
           setPageOperators([]);
         }
       }
@@ -1577,7 +1697,7 @@ export default function EditPdfTool() {
     // on the raster size would re-run this whole match (and reset every
     // RunMatch the UI relies on) on every future zoom-driven re-render, for
     // a result that is by construction identical.
-  }, [pdf, pdfLibDoc, pageIndex, detectedTextRuns, pagePointSize]);
+  }, [pdf, pdfLibDoc, pageIndex, detectedTextRuns, pagePointSize, fontRegistry]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -4039,9 +4159,15 @@ export default function EditPdfTool() {
                   ) : null}
 
                   {activeTool === "select" && textDetectionReady && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
-                    <div className="absolute left-3 top-3 z-20 max-w-[240px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">No editable text found</span>
-                      <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">This page doesn&rsquo;t contain selectable text. Use Text to add new text.</p>
+                    <div className="absolute left-3 top-3 z-20 max-w-[260px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
+                        {pageTextCapability.nativeSpanCount > 0 ? "Text detected — editing limited" : "No editable text found"}
+                      </span>
+                      <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
+                        {pageTextCapability.nativeSpanCount > 0
+                          ? "This page contains native PDF text, but Lumeo cannot safely reconstruct its editable geometry or encoding yet."
+                          : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
+                      </p>
                     </div>
                   ) : null}
                   {redactMode ? (
