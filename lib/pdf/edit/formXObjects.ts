@@ -35,6 +35,8 @@ import {
   type PdfGraphicsPaintState,
   type TextShowOperator,
 } from "./contentStream.ts";
+import { PdfFontRegistry } from "./fontRegistry.ts";
+import { measureNativeTextShowAdvance } from "./nativeTextAdvance.ts";
 
 export class CyclicFormReferenceError extends Error {}
 
@@ -248,9 +250,10 @@ const DEFAULT_MAX_DEPTH = 12;
 export function collectPageTextOperators(
   doc: PDFDocument,
   pageIndex: number,
-  options: { maxDepth?: number } = {},
+  options: { maxDepth?: number; fontRegistry?: PdfFontRegistry } = {},
 ): LocatedTextOperator[] {
   const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
+  const fontRegistry = options.fontRegistry ?? new PdfFontRegistry(doc);
   const page = doc.getPages()[pageIndex];
   if (!page) throw new Error(`Page ${pageIndex} does not exist in this document.`);
 
@@ -273,6 +276,17 @@ export function collectPageTextOperators(
     const operators = walkTextShowOperators(bytes, initialCtm, {
       initialPaintState,
       resolveExtGState,
+      measureTextAdvance: (operator) => {
+        const resourceName = operator.fontResourceName;
+        if (!resourceName) return null;
+        let profile = null;
+        try {
+          profile = fontRegistry.resolve(resources, resourceName);
+        } catch {
+          return null;
+        }
+        return measureNativeTextShowAdvance(operator, profile).advancePt;
+      },
     });
     operators.forEach((operator, operatorIndex) => {
       results.push({ locator, operatorIndex, operator, streamBytes: bytes, resources });
