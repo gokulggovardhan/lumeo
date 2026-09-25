@@ -15,6 +15,7 @@ import {
   searchPdfPageText,
 } from "../lib/pdf/edit/textSearch.ts";
 import type { DetectedTextRun } from "../lib/pdf/edit/textRuns.ts";
+import type { PdfFontProfile } from "../lib/pdf/edit/fontRegistry.ts";
 
 function run(
   str: string,
@@ -32,6 +33,17 @@ function run(
     fontSizePt: 12,
     rotated: false,
   };
+}
+
+function safeFontProfile(): PdfFontProfile {
+  return {
+    kind: "Type1",
+    encodingSource: "WinAnsi",
+    metricsSource: "Widths",
+    resolvedFont: {
+      writingMode: "horizontal",
+    },
+  } as PdfFontProfile;
 }
 
 function match(operatorIndex: number): PdfTextSourceMatch {
@@ -74,6 +86,7 @@ function pageModel(pageIndex = 0) {
     heightPt: 800,
     runs,
     matches: runs.map((_, index) => match(index)),
+    fontProfiles: runs.map(() => safeFontProfile()),
   });
 }
 
