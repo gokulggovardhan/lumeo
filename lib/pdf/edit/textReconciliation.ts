@@ -231,10 +231,11 @@ export function reconcileTextDetections({
       }
     });
 
+    const selectedEvidence = bestEvidence as TextReconciliationEvidence | null;
     if (
       bestIndex >= 0 &&
-      bestEvidence &&
-      bestEvidence.confidence !== "unreconciled"
+      selectedEvidence !== null &&
+      selectedEvidence.confidence !== "unreconciled"
     ) {
       usedNative.add(bestIndex);
       const native = nativeSpans[bestIndex];
@@ -242,11 +243,11 @@ export function reconcileTextDetections({
         run: {
           ...pdfJsRun,
           detectionSource: "reconciled",
-          detectionConfidence: bestEvidence.confidence,
+          detectionConfidence: selectedEvidence.confidence,
         },
         locatedOperator: native.locatedOperator,
         nativeSpan: native,
-        evidence: bestEvidence,
+        evidence: selectedEvidence,
       });
       return;
     }
