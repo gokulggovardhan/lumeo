@@ -3063,13 +3063,19 @@ export default function EditPdfTool() {
       ? browserFontPreview.family
       : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
   const pageCapabilityLabel = pageTextModel
-    ? pageTextModel.capability === "native-editable"
-      ? `${pageTextModel.editableSpanCount} text span${pageTextModel.editableSpanCount === 1 ? "" : "s"} editable`
-      : pageTextModel.capability === "mixed"
-        ? `${pageTextModel.editableSpanCount} editable · ${pageTextModel.viewOnlySpanCount + pageTextModel.unsupportedSpanCount} limited`
-        : pageTextModel.capability === "no-detected-text"
-          ? "No native text detected"
-          : "Text detected · direct editing limited"
+    ? pageTextModel.classification?.primary === "SCANNED_IMAGE"
+      ? "Scanned page · text recognition needed"
+      : pageTextModel.classification?.primary === "HYBRID_TEXT_AND_IMAGE"
+        ? `${pageTextModel.editableSpanCount} editable · mixed native/scanned content`
+        : pageTextModel.capability === "native-editable"
+          ? `${pageTextModel.editableSpanCount} text span${pageTextModel.editableSpanCount === 1 ? "" : "s"} editable`
+          : pageTextModel.capability === "mixed"
+            ? `${pageTextModel.editableSpanCount} editable · ${pageTextModel.viewOnlySpanCount + pageTextModel.unsupportedSpanCount} limited`
+            : pageTextModel.capability === "no-detected-text"
+              ? pageTextModel.classification?.primary === "COMPLEX_VECTOR_TEXT"
+                ? "Vector text-like content · direct editing unavailable"
+                : "No native text detected"
+              : "Text detected · direct editing limited"
     : "";
 
   // Best-effort embedded-font preview. A failed FontFace registration is
@@ -4099,6 +4105,24 @@ export default function EditPdfTool() {
                     </div>
                   ) : null}
 
+                  {activeTool === "select" &&
+                  singleSelectedRun &&
+                  singleSelectedSpan &&
+                  singleSelectedSpan.capability !== "native-editable" &&
+                  singleSelectedSpan.capability !== "fragmented-editable" ? (
+                    <div
+                      role="status"
+                      className="absolute z-30 max-w-[260px] rounded-md border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-2.5 py-2 text-[10px] font-semibold leading-4 text-[var(--text-primary)]/75 shadow-lg"
+                      style={{
+                        left: `${singleSelectedRun.xPct}%`,
+                        top: `${Math.min(96, singleSelectedRun.yPct + singleSelectedRun.heightPct + 1)}%`,
+                      }}
+                    >
+                      {singleSelectedSpan.capabilityReason ??
+                        "This text can be selected, but Lumeo cannot safely rewrite it yet."}
+                    </div>
+                  ) : null}
+
                   {/* Shown only when a Restyle could NOT blank the original
                       glyphs (see restyleSelectedRun). In the common case the
                       text really is gone from the file and there is nothing
@@ -4192,9 +4216,19 @@ export default function EditPdfTool() {
                   ) : null}
 
                   {activeTool === "select" && textDetectionReady && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
-                    <div className="absolute left-3 top-3 z-20 max-w-[240px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
-                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">No editable text found</span>
-                      <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">This page doesn&rsquo;t contain selectable text. Use Text to add new text.</p>
+                    <div className="absolute left-3 top-3 z-20 max-w-[260px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
+                        {pageCapabilityClassification?.primary === "SCANNED_IMAGE"
+                          ? "Scanned text detected"
+                          : "No editable text found"}
+                      </span>
+                      <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
+                        {pageCapabilityClassification?.primary === "SCANNED_IMAGE"
+                          ? "This page appears to contain scanned text. Native text editing is unavailable until local OCR recognition is enabled."
+                          : pageCapabilityClassification?.primary === "COMPLEX_VECTOR_TEXT"
+                            ? "This page uses vector content rather than safely rewritable PDF text."
+                            : "This page doesn’t contain safely rewritable text. Use Text to add new text."}
+                      </p>
                     </div>
                   ) : null}
                   {redactMode ? (
