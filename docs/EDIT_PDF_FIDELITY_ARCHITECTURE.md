@@ -178,3 +178,61 @@ Candidate font/OCR dependencies will be evaluated in a later dependency-gate PR 
 ## Non-negotiable evidence rule
 
 A span is not promoted to a stronger capability merely because it is visible or selectable. Missing source mapping, unknown encoding, unproven glyph coverage, unsupported rendering modes or unresolved geometry must remain capability-limited until the required evidence exists.
+
+
+## PR B: native detection and reconciliation hardening
+
+PR B keeps the existing writer unchanged and makes detection genuinely dual-signal.
+
+### Parser-state root cause fixed
+
+The previous content-stream walker recorded the rendering matrix at each `Tj/TJ/'/"`
+operator but did not advance the current text matrix after glyphs were shown.
+PDF text-show operators change the current text position. Consecutive operators
+that rely on that implicit advance therefore inherited a stale origin in the
+native model.
+
+The walker now accepts a resource-scoped advance measurer. `collectPageTextOperators`
+supplies one using the exact active font resource and the existing PDF metrics
+resolver. Proven horizontal advances update the text matrix; unknown/vertical/
+unproven composite cases mark later implicit positions as degraded until an
+explicit `Tm/Td/TD/T*` or quote-line move re-establishes a known position.
+
+No DOM measurement is used for this correction.
+
+### Independent native detector
+
+`nativeTextDetection.ts` derives native text candidates from content-stream
+operators, resource-scoped decoding and PDF-space geometry. PDF.js remains an
+independent extraction/render oracle.
+
+The reconciliation layer compares:
+- Unicode agreement;
+- PDF-space origin distance;
+- font-size agreement;
+- width agreement;
+- writing direction;
+- source order.
+
+PDF.js-only text remains visible but is not automatically editable. Native-only
+text may be surfaced when PDF.js genuinely misses a region. A native fragment is
+not duplicated when it is already geometrically covered by a larger PDF.js item
+that merged adjacent Tj/TJ operators.
+
+### Evidence-based capability
+
+The page/run classifier now records native, scanned/image-only, hybrid,
+encoding-limited, font-limited, vector, Type3, Form-XObject, clipping, vertical
+and unknown/unsafe states.
+
+A source-operator match by itself is no longer sufficient to open the native
+editor. The UI, formatting controls, colour controls and multi-run path require
+the document model to classify the selected span as `native-editable` or
+`fragmented-editable`.
+
+Known unsupported cases stay selectable/readable and surface a concise reason
+rather than receiving a generic fallback font or an unsafe write.
+
+### Dependencies
+
+PR B adds no third-party dependency and does not modify package versions.
