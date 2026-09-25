@@ -149,7 +149,7 @@ export default async function ToolsPage({
         description={canEdit ? "Owner and admin roles can update each row as one audited change. Usage shows verified tool-open events for today when analytics is available." : "Analyst access is read-only. Usage shows verified tool-open events for today when analytics is available."}
       >
         <AdminDataTable
-          columns={["Tool", "Category", "Public route", "State", "Maintenance", "Today opens", "Updated", "Action"]}
+          columns={["Tool", "Category", "Public route", "State", "Maintenance", "Today opens", "Updated (IST)", "Action"]}
           rows={filteredTools.map((tool) => {
             const formId = `tool-form-${tool.id}`;
             const maintenance = tool.status === "maintenance";
