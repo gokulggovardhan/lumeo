@@ -241,7 +241,7 @@ export default function ExtractTextTool() {
 
   return (
     <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
-      <L2WorkspaceHeader title="Text Extract" description={summaryLine} />
+      <L2WorkspaceHeader title="Extract Text" description={summaryLine} />
 
       <L2WorkspaceToolbar>
         <L2ToolbarButton onClick={resetTool}>Start new</L2ToolbarButton>
