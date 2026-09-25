@@ -19,6 +19,11 @@ export type SizeBucket =
   | "over_50mb"
   | "unknown";
 export type DeviceClass = "desktop" | "tablet" | "mobile" | "unknown";
+export type AnalyticsTrafficClass =
+  | "real_audience"
+  | "synthetic"
+  | "known_bot"
+  | "suspected_automation";
 
 export type AdminAnalyticsSummaryResult = {
   summary: {
@@ -209,9 +214,33 @@ export type AnalyticsEvent = {
   browser_family: string | null;
   operating_system: string | null;
   country_code: string | null;
+  region: string | null;
+  city: string | null;
   success: boolean | null;
   error_code: string | null;
   metadata: Json;
+  visitor_key: string | null;
+  session_key: string | null;
+  traffic_class: AnalyticsTrafficClass | null;
+  traffic_class_reason: string | null;
+  geo_source: "cloudflare" | "unresolved" | null;
+  geo_precision: "city" | "region" | "country" | "unresolved" | null;
+  region_code: string | null;
+  page_path: string | null;
+  referrer_host: string | null;
+  landing_path: string | null;
+  acquisition_source:
+    | "direct"
+    | "google"
+    | "bing"
+    | "other_search"
+    | "referral"
+    | "campaign"
+    | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  analytics_schema_version: number;
 };
 
 export type DailyToolMetric = {
@@ -310,6 +339,37 @@ export type ControlCenterDatabase = {
       get_admin_analytics_summary: {
         Args: { p_start_date: string; p_end_date: string };
         Returns: AdminAnalyticsSummaryResult;
+      };
+      get_admin_analytics_dashboard: {
+        Args: {
+          p_start_date: string;
+          p_end_date: string;
+          p_traffic_scope?: "real_audience" | "synthetic" | "automation" | "all";
+        };
+        Returns: Json;
+      };
+      get_admin_recent_analytics_events_v2: {
+        Args: {
+          p_limit?: number;
+          p_traffic_scope?: "real_audience" | "synthetic" | "automation" | "all";
+        };
+        Returns: Array<{
+          occurred_at: string;
+          event_name: string;
+          tool_slug: string | null;
+          traffic_class: AnalyticsTrafficClass;
+          device_class: DeviceClass | null;
+          browser_family: string | null;
+          operating_system: string | null;
+          city: string | null;
+          region: string | null;
+          region_code: string | null;
+          country_code: string | null;
+          geo_precision: string | null;
+          page_path: string | null;
+          acquisition_source: string | null;
+          success: boolean | null;
+        }>;
       };
       get_public_maintenance_status: {
         Args: Record<string, never>;
