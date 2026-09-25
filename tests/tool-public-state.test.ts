@@ -119,6 +119,18 @@ test("homepage exposes truthful beta and unavailable states without actionable l
   assert.match(source, /<article/);
 });
 
+test("homepage surfaces every non-curated coming-soon tool exactly once", () => {
+  const source = readFileSync("components/pdf/PdfToolLauncher.tsx", "utf8");
+  assert.match(source, /const curatedRoutes = new Set/);
+  assert.match(
+    source,
+    /tile\.availability === "coming_soon" && !curatedRoutes\.has\(tile\.route\)/,
+  );
+  assert.match(source, /comingSoon\.length > 0/);
+  assert.match(source, /coming-soon-tools-heading/);
+  assert.match(source, /These tools are visible for discovery, but cannot be opened/);
+});
+
 test("Admin saves verify an updated row, audit maintenance copy, and invalidate the shared cache", () => {
   const source = readFileSync("app/admin/(protected)/tools/actions.ts", "utf8");
   assert.match(source, /\.select\("id"\)[\s\S]*\.maybeSingle\(\)/);
