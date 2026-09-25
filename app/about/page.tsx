@@ -52,7 +52,7 @@ export default function AboutPage() {
         title="A quieter, more private way to work with PDFs"
         description="Lumeo PDF Workspace is designed as a premium document environment where everyday PDF tasks feel clear, controlled, and professional."
         actions={[
-          { label: "Explore PDF tools", href: "/pdf" },
+          { label: "Explore PDF tools", href: "/pdf-tools" },
           { label: "Read our privacy approach", href: "/privacy" },
         ]}
       >
@@ -119,16 +119,17 @@ export default function AboutPage() {
 
         <InfoPageSection title="Current tools">
           <p>
-            Available now: Compose (organize — merge, split, reorder), Distill
-            (compress and optimize), Capture (images to PDF), and Render (PDF
-            to images and text). Editing, signing, protection, and Office
-            conversion are in development.
+            Lumeo currently includes 17 live public tools across organizing,
+            editing, conversion, signing, optimization, text extraction, and
+            image utilities. That includes Edit PDF, Sign PDF, Word to PDF,
+            PDF to Word, and the specialist tools available in the full
+            directory.
           </p>
           <InfoInlineLinks
             links={[
-              { label: "Compose", href: "/pdf/merge" },
-              { label: "Distill", href: "/pdf/compress" },
+              { label: "Popular PDF tools", href: "/" },
               { label: "All PDF tools", href: "/pdf-tools" },
+              { label: "Guides", href: "/guides" },
             ]}
           />
         </InfoPageSection>
