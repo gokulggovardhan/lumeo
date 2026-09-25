@@ -121,6 +121,10 @@ export async function PdfToolLauncher() {
   const tiles = buildDiscoveryTiles(resolved);
   const primary = selectTiles(tiles, PRIMARY_TOOL_SLUGS);
   const secondary = selectTiles(tiles, SECONDARY_TOOL_SLUGS);
+  const curatedRoutes = new Set([...primary, ...secondary].map((tile) => tile.route));
+  const comingSoon = tiles.filter(
+    (tile) => tile.availability === "coming_soon" && !curatedRoutes.has(tile.route),
+  );
 
   return (
     <div>
@@ -167,6 +171,28 @@ export async function PdfToolLauncher() {
           ))}
         </ul>
       </section>
+
+      {comingSoon.length > 0 ? (
+        <section aria-labelledby="coming-soon-tools-heading" className="mt-14 sm:mt-16">
+          <div className="mb-5 max-w-2xl">
+            <p className="aura-text-label text-[var(--text-premium)]">Coming soon</p>
+            <h2
+              id="coming-soon-tools-heading"
+              className="mt-2 font-serif text-[1.45rem] font-semibold text-[var(--text-primary)] sm:text-[1.6rem]"
+            >
+              Next on Lumeo
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+              These tools are visible for discovery, but cannot be opened until they are made active or beta.
+            </p>
+          </div>
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {comingSoon.map((tile, index) => (
+              <CuratedToolCard key={tile.route} tile={tile} index={index} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }
