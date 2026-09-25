@@ -4,7 +4,13 @@ import {
   formatAdminRelativeTime,
   INITIAL_RELATIVE_TIME_REFERENCE_MS,
 } from "../lib/admin/relative-time.ts";
-import { formatAdminDateTime } from "../lib/admin/timezone.ts";
+import {
+  formatAdminDate,
+  formatAdminDateTime,
+  istCalendarDateStartToUtcIso,
+  istInputValueToUtcIso,
+  utcIsoToIstInputValue,
+} from "../lib/admin/timezone.ts";
 
 const createdAt = "2026-09-23T12:00:00.000Z";
 const createdAtMs = Date.parse(createdAt);
@@ -37,4 +43,33 @@ test("admin relative time never depends on ambient Date.now during render", () =
 
 test("future timestamps fail closed to just now", () => {
   assert.equal(formatAdminRelativeTime(createdAt, createdAtMs - 60_000), "just now");
+});
+
+
+test("admin absolute timestamps are always formatted in IST", () => {
+  assert.match(formatAdminDateTime("2026-09-25T00:00:00.000Z"), /IST$/);
+  assert.equal(formatAdminDate("2026-09-24T20:30:00.000Z"), "25 Sept 2026");
+});
+
+test("admin scheduling converts IST wall-clock values to UTC and back", () => {
+  assert.equal(
+    istInputValueToUtcIso("2026-09-25T10:00"),
+    "2026-09-25T04:30:00.000Z",
+  );
+  assert.equal(
+    utcIsoToIstInputValue("2026-09-25T04:30:00.000Z"),
+    "2026-09-25T10:00",
+  );
+});
+
+test("admin date filters convert IST midnight boundaries to UTC", () => {
+  assert.equal(
+    istCalendarDateStartToUtcIso("2026-09-25"),
+    "2026-09-24T18:30:00.000Z",
+  );
+  assert.equal(
+    istCalendarDateStartToUtcIso("2026-09-25", 1),
+    "2026-09-25T18:30:00.000Z",
+  );
+  assert.equal(istCalendarDateStartToUtcIso("2026-02-31"), null);
 });
