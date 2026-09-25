@@ -118,7 +118,7 @@ try {
   assert(explorer.includes("aria-pressed={category === filter.id}"), "Directory filters must expose pressed state.");
   assert(explorer.includes("href={tool.route}"), "Available directory cards must link directly to tool routes.");
   assert(explorer.includes("Temporarily unavailable") && !explorer.includes("Notify me"), "Unavailable tools must be explicit and non-misleading.");
-  assert(explorer.includes("On device") && explorer.includes("Server-assisted"), "Directory processing labels are incomplete.");
+  assert(explorer.includes("Current live tools are browser-based"), "Directory browser-first processing guidance is missing.");
   assert(toolCatalog.includes("searchAliases") && toolCatalog.includes('processing: "browser"'), "Canonical tool actions must own aliases and action-level processing overrides.");
   assert(tiles.includes("action.dbStatus") && tiles.includes("buildDiscoveryTiles"), "Discovery availability must derive from resolved catalog status.");
   const publicState = read("lib/tools/public-state.ts");
