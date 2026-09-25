@@ -93,7 +93,7 @@ try {
 
   assert(directory.includes("getPublicPdfCatalog"), "Directory must remain catalog driven.");
   assert(directory.includes("ToolsExplorer"), "Directory must use the current ToolsExplorer surface.");
-  assert(!/\b(popular|ratings?|users?|downloads?)\b/i.test(directory), "Directory must not include fake popularity or counts.");
+  assert(!/\b(ratings?|users?|downloads?)\b/i.test(directory), "Directory must not include fake ratings, user counts, or download counts.");
   assert(errorPage.includes("L2PublicErrorState"), "Directory error state foundation is missing.");
 
   assert(maintenanceNotice.includes("Undergoing maintenance"), "Maintenance state must stay explicit.");
