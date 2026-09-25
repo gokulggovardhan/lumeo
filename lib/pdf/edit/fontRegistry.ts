@@ -326,9 +326,9 @@ function cidToGidMapFor(
   if (!descendant) return null;
   const entry = descendant.get(PDFName.of("CIDToGIDMap"));
   if (!entry) return null;
-  const name = nameString(entry);
-  if (name) return { kind: "name", name, objectRef: null };
   const resolved = resolveObject(entry, context);
+  const name = nameString(resolved);
+  if (name) return { kind: "name", name, objectRef: refString(entry) };
   if (resolved instanceof PDFRawStream) {
     return { kind: "stream", name: null, objectRef: refString(entry) };
   }
@@ -343,7 +343,7 @@ function resourceIdentityFor(
   const fontDict = fontResource.dict;
   const structure = structureForFont(fontDict, context);
   const encodingEntry = fontDict.get(PDFName.of("Encoding"));
-  const type0Encoding = nameString(encodingEntry);
+  const type0Encoding = nameString(resolveObject(encodingEntry, context));
   const toUnicodeEntry = fontDict.get(PDFName.of("ToUnicode"));
   const descriptorFontName = structure.descriptor
     ? nameString(structure.descriptor.get(PDFName.of("FontName")))
