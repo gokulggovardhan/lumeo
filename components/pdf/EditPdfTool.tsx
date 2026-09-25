@@ -866,6 +866,10 @@ export default function EditPdfTool() {
         runs: detectedTextRuns,
         matches: runMatches,
         fontProfiles: pageFontProfiles,
+        nativeSpans: nativeTextSpans,
+        reconciliations: textReconciliations,
+        pageClassification: pageTextCapability,
+        pdfJsRunCount: pdfJsDetectedRunCount,
         generatedAtIso: new Date().toISOString(),
       });
     };
@@ -885,7 +889,16 @@ export default function EditPdfTool() {
       active = false;
       delete host.__LUMEO_EDIT_PDF_DIAGNOSTICS__;
     };
-  }, [pageTextModel, detectedTextRuns, runMatches, pageFontProfiles]);
+  }, [
+    pageTextModel,
+    detectedTextRuns,
+    runMatches,
+    pageFontProfiles,
+    nativeTextSpans,
+    textReconciliations,
+    pageTextCapability,
+    pdfJsDetectedRunCount,
+  ]);
 
   const textRunSpatialIndex = useMemo(() => {
     if (!pageTextModel) return null;
