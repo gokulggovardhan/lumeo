@@ -243,7 +243,7 @@ export default async function AdminPage() {
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-[var(--text-primary)]">Important metrics</p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">Today · verified analytics only.</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Today (IST) · verified analytics only.</p>
           </div>
           <Link href="/admin/analytics" className="text-xs font-semibold text-[var(--text-accent)] hover:underline">
             Analytics →
@@ -295,7 +295,7 @@ export default async function AdminPage() {
       <section className="grid gap-4 xl:grid-cols-2">
         <AdminSectionCard
           title="Tool activity"
-          description="Most-opened tools today, mapped to the current catalog state."
+          description="Most-opened tools today (IST), mapped to the current catalog state."
           action={<Link href="/admin/tools" className="text-xs font-semibold text-[var(--text-accent)] hover:underline">Manage tools →</Link>}
         >
           {topTools.length === 0 ? (
