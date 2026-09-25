@@ -457,3 +457,138 @@ test("buildEditPlan: unchanged direct-format values collapse back to the establi
   assert.equal(plan.editable, true);
   assert.equal(plan.replacementTextState, null);
 });
+
+
+test("buildEditPlan: embedded TrueType subset stays in the original font when cmap and width evidence both prove the replacement glyph", () => {
+  const resolvedFont: ResolvedFont = {
+    kind: "TrueType",
+    baseFont: "ABCDEF+DemoSans",
+    isEmbedded: true,
+    isSubset: true,
+    bytesPerCode: 1,
+    encodingSource: "WinAnsi",
+    glyphCodeToUnicode: new Map([
+      [65, "A"],
+      [66, "B"],
+    ]),
+    unicodeToGlyphCode: new Map([
+      ["A", 65],
+      ["B", 66],
+    ]),
+  };
+  const fontMetrics: FontMetrics = {
+    bytesPerCode: 1,
+    defaultWidth: 0,
+    glyphWidths: new Map([
+      [65, 600],
+      [66, 610],
+    ]),
+    source: "Widths",
+  };
+
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: fixedOperator(),
+    replacementText: "B",
+    resolvedFont,
+    fontMetrics,
+    embeddedGlyphEvidence: {
+      safeForSimplePdfEncoding: true,
+      hasUnicodeCodePoint: (codePoint) => codePoint === 0x41 || codePoint === 0x42,
+    },
+  });
+
+  assert.equal(plan.editable, true);
+  assert.equal(plan.reason, null);
+  assert.equal(plan.fallbackFont, null);
+  assert.deepEqual(plan.replacementGlyphCodes, [66]);
+});
+
+test("buildEditPlan: embedded subset remains blocked when the cmap does not prove the glyph", () => {
+  const resolvedFont: ResolvedFont = {
+    kind: "TrueType",
+    baseFont: "ABCDEF+DemoSans",
+    isEmbedded: true,
+    isSubset: true,
+    bytesPerCode: 1,
+    encodingSource: "WinAnsi",
+    glyphCodeToUnicode: new Map([
+      [65, "A"],
+      [66, "B"],
+    ]),
+    unicodeToGlyphCode: new Map([
+      ["A", 65],
+      ["B", 66],
+    ]),
+  };
+  const fontMetrics: FontMetrics = {
+    bytesPerCode: 1,
+    defaultWidth: 0,
+    glyphWidths: new Map([
+      [65, 600],
+      [66, 610],
+    ]),
+    source: "Widths",
+  };
+
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: fixedOperator(),
+    replacementText: "B",
+    resolvedFont,
+    fontMetrics,
+    embeddedGlyphEvidence: {
+      safeForSimplePdfEncoding: true,
+      hasUnicodeCodePoint: (codePoint) => codePoint === 0x41,
+    },
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /verified glyph/i);
+});
+
+test("buildEditPlan: embedded subset with proven glyph still fails closed when PDF width evidence is missing", () => {
+  const resolvedFont: ResolvedFont = {
+    kind: "TrueType",
+    baseFont: "ABCDEF+DemoSans",
+    isEmbedded: true,
+    isSubset: true,
+    bytesPerCode: 1,
+    encodingSource: "WinAnsi",
+    glyphCodeToUnicode: new Map([
+      [65, "A"],
+      [66, "B"],
+    ]),
+    unicodeToGlyphCode: new Map([
+      ["A", 65],
+      ["B", 66],
+    ]),
+  };
+  const fontMetrics: FontMetrics = {
+    bytesPerCode: 1,
+    defaultWidth: 0,
+    glyphWidths: new Map([[65, 600]]),
+    source: "Widths",
+  };
+
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: fixedOperator(),
+    replacementText: "B",
+    resolvedFont,
+    fontMetrics,
+    embeddedGlyphEvidence: {
+      safeForSimplePdfEncoding: true,
+      hasUnicodeCodePoint: () => true,
+    },
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /verified glyph/i);
+});
