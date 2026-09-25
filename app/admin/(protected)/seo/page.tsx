@@ -101,7 +101,7 @@ export default async function SeoPage({
       )}
       <AdminSectionCard title="Route records" description={canEdit ? "Owner and admin roles can update or delete SEO records." : "Analyst access is read-only."}>
         <AdminDataTable
-          columns={["Route", "Title", "Description", "Robots", "Updated", "Action"]}
+          columns={["Route", "Title", "Description", "Robots", "Updated (IST)", "Action"]}
           rows={seo.data.map((record) => [
             record.route,
             record.title,
