@@ -5,7 +5,7 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed } from "../lib/pdf/edit/matchTextRun.ts";
-import { textRunsFromContent } from "../lib/pdf/edit/textRuns.ts";
+import { textRunsFromContent, transformPoint2x3 } from "../lib/pdf/edit/textRuns.ts";
 import { buildEditPdfFidelityCorpusReport, type EditPdfFidelityFixtureMeasurement } from "../lib/pdf/edit/fidelityMetrics.ts";
 
 type Fixture = {
@@ -34,7 +34,13 @@ async function measure(fixture: Fixture): Promise<EditPdfFidelityFixtureMeasurem
   const pdfJsPage = await pdfJsDoc.getPage(1);
   const viewport = pdfJsPage.getViewport({ scale: 1 });
   const content = await pdfJsPage.getTextContent();
-  const runs = textRunsFromContent(content.items as never, viewport.transform, viewport.width, viewport.height);
+  const runs = textRunsFromContent(
+    content.items as never,
+    viewport.transform,
+    viewport.width,
+    viewport.height,
+    content.styles as never,
+  );
 
   const pdfLibDoc = await PDFDocument.load(fixture.bytes.slice());
   const located = collectPageTextOperators(pdfLibDoc, 0);
@@ -46,6 +52,7 @@ async function measure(fixture: Fixture): Promise<EditPdfFidelityFixtureMeasurem
   let matchedSpans = 0;
   let correctFontResolutions = 0;
   let unresolvedFonts = 0;
+  const baselineErrorsPt: number[] = [];
 
   for (const run of runs) {
     const operator = matchDetectedRunToOperatorIndexed(run, viewport.width, viewport.height, index);
@@ -53,6 +60,25 @@ async function measure(fixture: Fixture): Promise<EditPdfFidelityFixtureMeasurem
     const source = byOperator.get(operator);
     if (!source) continue;
     matchedSpans += 1;
+    if (
+      typeof run.baselineXPct === "number" &&
+      Number.isFinite(run.baselineXPct) &&
+      typeof run.baselineYPct === "number" &&
+      Number.isFinite(run.baselineYPct)
+    ) {
+      const nativeBaseline = transformPoint2x3(
+        viewport.transform,
+        operator.textRenderingMatrix,
+      );
+      const detectedBaselineX = (run.baselineXPct / 100) * viewport.width;
+      const detectedBaselineY = (run.baselineYPct / 100) * viewport.height;
+      baselineErrorsPt.push(
+        Math.hypot(
+          detectedBaselineX - nativeBaseline[4],
+          detectedBaselineY - nativeBaseline[5],
+        ),
+      );
+    }
     if (!operator.fontResourceName) {
       unresolvedFonts += 1;
       continue;
@@ -78,7 +104,7 @@ async function measure(fixture: Fixture): Promise<EditPdfFidelityFixtureMeasurem
     unmatchedSpans: Math.max(0, runs.length - matchedSpans),
     correctFontResolutions,
     unresolvedFonts,
-    baselineErrorsPt: [],
+    baselineErrorsPt,
     unsupportedRuns: Math.max(0, runs.length - matchedSpans),
     nativeEditSuccess: null,
     exportSuccess: null,
@@ -112,6 +138,7 @@ async function main() {
       `Edit PDF fidelity seed report: ${report.fixtureCount} fixtures`,
       `text recall: ${report.aggregate.textRecall === null ? "n/a" : (report.aggregate.textRecall * 100).toFixed(2) + "%"}`,
       `matched spans: ${report.totals.matchedSpans}/${report.totals.matchedSpans + report.totals.unmatchedSpans}`,
+      `max baseline error: ${Math.max(0, ...report.fixtures.flatMap((fixture) => fixture.baselineErrorsPt.map((value) => Math.abs(value)))).toFixed(4)}pt`,
       `output: ${output}`,
     ].join("\n") + "\n",
   );
