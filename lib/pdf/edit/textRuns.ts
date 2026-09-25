@@ -120,6 +120,10 @@ export type DetectedTextRun = {
   pdfJsHeight?: number | null;
   pdfJsDirection?: string | null;
   pdfJsHasEOL?: boolean | null;
+  /** Detection provenance. Existing PDF.js runs remain the default path. */
+  detectionSource?: "pdfjs" | "native";
+  /** Exact native source operator identity when the run was synthesized from content-stream evidence. */
+  nativeSourceKey?: string;
 };
 
 function isTextItem(item: PdfTextItem | PdfTextMarkedContent): item is PdfTextItem {
@@ -176,6 +180,7 @@ export function textRunsFromContent(
       pdfJsHeight: item.height ?? null,
       pdfJsDirection: item.dir ?? null,
       pdfJsHasEOL: item.hasEOL ?? null,
+      detectionSource: "pdfjs",
     });
   }
 
