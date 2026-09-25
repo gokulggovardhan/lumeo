@@ -11,7 +11,7 @@ import type { NativeContentStreamSpan } from "./nativeTextDetection.ts";
 import type { TextSignalReconciliation } from "./textReconciliation.ts";
 import type { PageTextCapabilityClassification } from "./textCapabilityClassifier.ts";
 
-export const EDIT_PDF_DIAGNOSTIC_SCHEMA_VERSION = 2 as const;
+export const EDIT_PDF_DIAGNOSTIC_SCHEMA_VERSION = 3 as const;
 
 export type EditPdfDiagnosticReason =
   | "bt-et-scope-not-tracked"
@@ -76,6 +76,10 @@ export type EditPdfSpanDiagnostic = {
     embedded: boolean | null;
     embeddedProgramByteLength: number | null;
     embeddedProgramSha256: string | null;
+    embeddedCmapFormats: readonly number[];
+    embeddedGlyphCount: number | null;
+    embeddedUnicodeSubtableCount: number;
+    embeddedGlyphEvidenceSafeForSimplePdfEncoding: boolean;
     encodingType: string | null;
     encodingDifferences: readonly unknown[] | null;
     toUnicodeAvailable: boolean | null;
@@ -225,7 +229,25 @@ export function buildEditPdfPageDiagnosticReport({
     if (match?.operator.textObjectIndex === undefined) unresolved.add("bt-et-scope-not-tracked");
     unresolved.add("stream-object-ref-not-exposed");
     unresolved.add("encoding-differences-not-exposed");
-    unresolved.add("glyph-ids-not-resolved");
+
+    const embeddedGlyphIds =
+      profile?.kind === "TrueType" &&
+      profile.embeddedGlyphEvidence?.safeForSimplePdfEncoding &&
+      profile.embeddedGlyphCoverage &&
+      decoded.value
+        ? Array.from(decoded.value, (char) => {
+            const codePoint = char.codePointAt(0);
+            return codePoint === undefined
+              ? null
+              : profile.embeddedGlyphCoverage?.glyphIdForCodePoint(codePoint) ?? null;
+          })
+        : null;
+    const provenEmbeddedGlyphIds =
+      embeddedGlyphIds && embeddedGlyphIds.every((glyphId) => glyphId !== null)
+        ? (embeddedGlyphIds as number[])
+        : null;
+    if (!provenEmbeddedGlyphIds) unresolved.add("glyph-ids-not-resolved");
+
     if (!profile) {
       unresolved.add("font-object-ref-not-exposed");
       unresolved.add("font-descriptor-ref-not-exposed");
@@ -309,6 +331,12 @@ export function buildEditPdfPageDiagnosticReport({
         embedded: profile?.isEmbedded ?? null,
         embeddedProgramByteLength: profile?.embeddedProgramByteLength ?? null,
         embeddedProgramSha256: profile?.embeddedProgramSha256 ?? null,
+        embeddedCmapFormats: profile?.embeddedGlyphCoverage?.formats ?? [],
+        embeddedGlyphCount: profile?.embeddedGlyphCoverage?.glyphCount ?? null,
+        embeddedUnicodeSubtableCount:
+          profile?.embeddedGlyphCoverage?.unicodeSubtableCount ?? 0,
+        embeddedGlyphEvidenceSafeForSimplePdfEncoding:
+          profile?.embeddedGlyphEvidence?.safeForSimplePdfEncoding ?? false,
         encodingType: profile?.encodingSource ?? null,
         encodingDifferences: null,
         toUnicodeAvailable: profile ? profile.encodingSource === "ToUnicode" : null,
@@ -316,7 +344,7 @@ export function buildEditPdfPageDiagnosticReport({
         writingMode: profile?.resourceIdentity.writingMode ?? null,
         cidSystemInfo: profile?.resourceIdentity.cidSystemInfo ?? null,
         cidToGidMap: profile?.resourceIdentity.cidToGidMap ?? null,
-        glyphIds: null,
+        glyphIds: provenEmbeddedGlyphIds,
         browserPreviewCapability: profile?.browserPreviewPossible ?? null,
         nativeRewriteCapability: rewriteCapability(span.capability),
       },
