@@ -573,7 +573,13 @@ export default function EditPdfTool() {
   // elements. Nothing here writes back to the PDF yet -- that's a separate,
   // much harder follow-up (matching a run back to the specific content-
   // stream operator that produced it so it can be rewritten in place).
+  const [pdfJsDetectedTextRuns, setPdfJsDetectedTextRuns] = useState<DetectedTextRun[]>([]);
   const [detectedTextRuns, setDetectedTextRuns] = useState<DetectedTextRun[]>([]);
+  const [runReconciliationEvidence, setRunReconciliationEvidence] = useState<
+    Array<TextReconciliationEvidence | null>
+  >([]);
+  const [pageCapabilityClassification, setPageCapabilityClassification] =
+    useState<PageTextCapabilityClassification | null>(null);
   // True once text-run detection has genuinely finished for the current
   // page (successfully or with zero results) -- detectedTextRuns itself
   // (empty or populated) is the source of truth for the RESULT, this is
@@ -838,9 +844,20 @@ export default function EditPdfTool() {
             matches: runMatches,
             fontProfiles: pageFontProfiles,
             fragmentedRunIndices: new Set(fragmentedRunReconstructions.keys()),
+            reconciliationEvidence: runReconciliationEvidence,
+            classification: pageCapabilityClassification,
           })
         : null,
-    [pageIndex, pagePointSize, detectedTextRuns, runMatches, pageFontProfiles, fragmentedRunReconstructions],
+    [
+      pageIndex,
+      pagePointSize,
+      detectedTextRuns,
+      runMatches,
+      pageFontProfiles,
+      fragmentedRunReconstructions,
+      runReconciliationEvidence,
+      pageCapabilityClassification,
+    ],
   );
 
   // Development-only fidelity diagnostics. This deliberately never renders
@@ -1099,8 +1116,11 @@ export default function EditPdfTool() {
     setOriginalBytes(null);
     resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0), session: createPdfEditSession(0) });
     setSelectedId(null);
+    setPdfJsDetectedTextRuns([]);
     setDetectedTextRuns([]);
     setRunMatches([]);
+    setRunReconciliationEvidence([]);
+    setPageCapabilityClassification(null);
     setPageOperators([]);
     setSelectionAnchorIndex(null);
     setSelectedRunIndices([]);
@@ -1288,6 +1308,8 @@ export default function EditPdfTool() {
     // effect never briefly pairs a new page's detected runs with the
     // previous page's matches while it's catching up.
     setRunMatches([]);
+    setRunReconciliationEvidence([]);
+    setPageCapabilityClassification(null);
     setPageOperators([]);
     setPrivacyShieldMatches([]);
     setTextDetectionReady(false);
@@ -1445,9 +1467,16 @@ export default function EditPdfTool() {
         // Point space, never the raster viewport -- see
         // lib/pdf/edit/textRuns.ts's DetectedTextRun.fontSizePt.
         const runs = textRunsFromContent(content.items as never, pointViewport.transform, pointViewport.width, pointViewport.height);
+        setPdfJsDetectedTextRuns(runs);
+        // Fast first paint: native reconciliation replaces/augments this once
+        // the pdf-lib engine is ready. PDF.js-only runs remain visible but are
+        // never automatically promoted to native editability.
         setDetectedTextRuns(runs);
       } catch {
-        if (!cancelled) setDetectedTextRuns([]);
+        if (!cancelled) {
+          setPdfJsDetectedTextRuns([]);
+          setDetectedTextRuns([]);
+        }
       } finally {
         // true means detection finished, successfully or not
         if (!cancelled) setTextDetectionReady(true);
@@ -1534,9 +1563,9 @@ export default function EditPdfTool() {
   // only disables in-place editing, never the read-only preview/highlight
   // this depends on.
   useEffect(() => {
-    if (!pdf || !pdfJsDocRef.current || !pdfLibDoc || detectedTextRuns.length === 0 || !pagePointSize) return;
+    if (!pdf || !pdfJsDocRef.current || !pdfLibDoc || !pagePointSize || !fontRegistry || !editEngine) return;
     const doc = pdfJsDocRef.current;
-    const runs = detectedTextRuns;
+    const pdfJsRuns = pdfJsDetectedTextRuns;
     let cancelled = false;
 
     void (async () => {
@@ -1559,27 +1588,55 @@ export default function EditPdfTool() {
         const page =
           cached && cached.pageIndex === pageIndex ? cached.page : await doc.getPage(pageIndex + 1);
         const viewport = page.getViewport({ scale: 1 });
-        if (cancelled || !pdfLibDocRef.current || !editEngineRef.current) return;
-        const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
+        if (cancelled) return;
+        const located = editEngine.collectPageTextOperators(pdfLibDoc, pageIndex, {
+          fontRegistry,
+        });
+        if (cancelled) return;
+
+        const nativeSpans = editEngine.detectNativeTextSpans({
+          locatedOperators: located,
+          fontRegistry,
+          viewportTransform: viewport.transform,
+          pageWidthPt: viewport.width,
+          pageHeightPt: viewport.height,
+        });
+        const reconciled = editEngine.reconcileTextDetections({
+          pdfJsRuns,
+          nativeSpans,
+          pageWidthPt: viewport.width,
+          pageHeightPt: viewport.height,
+        });
+        const contentEvidence = editEngine.inspectPageContentEvidence(
+          pdfLibDoc,
+          pageIndex,
+          { fontRegistry },
+        );
+        const classifier = new editEngine.DocumentTextCapabilityClassifier();
+        const classification = classifier.classifyPage({
+          reconciled,
+          nativeSpans,
+          contentEvidence,
+        });
+
         if (cancelled) return;
         setPageOperators(located);
-        // Built once per page, not once per run -- see
-        // buildOperatorSpatialIndex's own doc comment. Paired with a
-        // Map for O(1) operator -> LocatedTextOperator lookup below,
-        // replacing what was previously an O(operators) `.find()` call
-        // repeated for every run (a second, separate O(runs x operators)
-        // cost stacked on top of the matching itself).
-        const flatOperators = located.map((item) => item.operator);
-        const operatorIndex = buildOperatorSpatialIndex(flatOperators, viewport.transform);
-        const locatedByOperator = new Map(located.map((item) => [item.operator, item] as const));
+        setDetectedTextRuns(reconciled.map((item) => item.run));
         setRunMatches(
-          runs.map((run): RunMatch => {
-            const matchedOperator = matchDetectedRunToOperatorIndexed(run, pagePointSize.width, pagePointSize.height, operatorIndex);
-            if (!matchedOperator) return null;
-            const locatedOperator = locatedByOperator.get(matchedOperator);
-            return locatedOperator ? { locatedOperator, operator: matchedOperator } : null;
-          }),
+          reconciled.map((item): RunMatch =>
+            item.locatedOperator
+              ? {
+                  locatedOperator: item.locatedOperator,
+                  operator: item.locatedOperator.operator,
+                }
+              : null,
+          ),
         );
+        setRunReconciliationEvidence(
+          reconciled.map((item) => item.evidence),
+        );
+        setPageCapabilityClassification(classification);
+        setTextDetectionReady(true);
       } catch (matchError) {
         if (!cancelled) {
           console.error(
@@ -1588,8 +1645,12 @@ export default function EditPdfTool() {
               ? { name: matchError.name, message: matchError.message }
               : { message: String(matchError) },
           );
-          setRunMatches([]);
+          setDetectedTextRuns(pdfJsRuns);
+          setRunMatches(pdfJsRuns.map(() => null));
+          setRunReconciliationEvidence(pdfJsRuns.map(() => null));
+          setPageCapabilityClassification(null);
           setPageOperators([]);
+          setTextDetectionReady(true);
         }
       }
     })();
@@ -1603,7 +1664,15 @@ export default function EditPdfTool() {
     // on the raster size would re-run this whole match (and reset every
     // RunMatch the UI relies on) on every future zoom-driven re-render, for
     // a result that is by construction identical.
-  }, [pdf, pdfLibDoc, pageIndex, detectedTextRuns, pagePointSize]);
+  }, [
+    pdf,
+    pdfLibDoc,
+    pageIndex,
+    pdfJsDetectedTextRuns,
+    pagePointSize,
+    fontRegistry,
+    editEngine,
+  ]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
