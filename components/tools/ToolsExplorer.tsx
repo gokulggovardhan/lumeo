@@ -36,22 +36,6 @@ function availabilityLabel(tool: Tile) {
   return "Available";
 }
 
-function ProcessingBadge({ tool }: { tool: Tile }) {
-  const browser = tool.processing === "browser";
-  return (
-    <span
-      className={`inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
-        browser
-          ? "border-[rgba(var(--atelier-sage-rgb),0.32)] bg-[rgba(var(--atelier-sage-rgb),0.1)] text-[var(--atelier-sage-300)]"
-          : "border-[rgba(var(--champagne-rgb),0.3)] bg-[rgba(var(--champagne-rgb),0.09)] text-[var(--text-premium)]"
-      }`}
-    >
-      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
-      {PROCESSING_LABEL[tool.processing]}
-    </span>
-  );
-}
-
 function ToolCard({ tool }: { tool: Tile }) {
   const available = tool.availability === "active" || tool.availability === "beta";
   const contents = (
@@ -72,20 +56,19 @@ function ToolCard({ tool }: { tool: Tile }) {
         <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">{tool.description}</p>
       </div>
 
-      <div className="mt-auto flex items-end justify-between gap-3 pt-3">
-        <div className="flex min-w-0 flex-col items-start gap-2">
-          <ProcessingBadge tool={tool} />
-          {!available ? (
-            <span className="text-xs font-bold text-[var(--atelier-warning)]">
-              {availabilityLabel(tool)}
-            </span>
-          ) : tool.availability === "beta" ? (
-            <span className="text-xs font-bold text-[var(--text-premium)]">Beta</span>
-          ) : null}
-        </div>
+      <div className="mt-auto flex min-h-11 items-center justify-between gap-3 pt-3">
+        {!available ? (
+          <span className="text-xs font-bold text-[var(--atelier-warning)]">
+            {availabilityLabel(tool)}
+          </span>
+        ) : tool.availability === "beta" ? (
+          <span className="text-xs font-bold text-[var(--text-premium)]">Beta</span>
+        ) : (
+          <span className="text-xs text-[var(--text-muted)]">{tool.categoryLabel}</span>
+        )}
         {available ? (
-          <span className="inline-flex min-h-11 shrink-0 items-center gap-1.5 self-end text-sm font-bold text-[var(--atelier-sage-300)]">
-            Open tool
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-bold text-[var(--atelier-sage-300)]">
+            Open
             <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none">→</span>
           </span>
         ) : null}
