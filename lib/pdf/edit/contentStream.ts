@@ -299,6 +299,11 @@ export type TextShowOperator = {
   fontSizePt: number;
   /** Text rendering matrix at the moment this operator runs: scale(Tfs*Th, Tfs) . translate(0, Trise) . Tm . CTM. */
   textRenderingMatrix: Matrix2x3;
+  /** Additive provenance snapshots used by fidelity diagnostics. */
+  textObjectIndex?: number | null;
+  textMatrix?: Matrix2x3;
+  textLineMatrix?: Matrix2x3;
+  ctm?: Matrix2x3;
   charSpacing: number;
   wordSpacing: number;
   horizontalScalingPct: number;
@@ -491,6 +496,8 @@ export function walkTextShowOperators(
   let textLineMatrix: Matrix2x3 = IDENTITY_MATRIX;
   const textState = defaultTextState();
   let inTextObject = false;
+  let currentTextObjectIndex: number | null = null;
+  let nextTextObjectIndex = 0;
 
   let operandStart = 0;
   let operands: ContentStreamToken[] = [];
@@ -521,6 +528,10 @@ export function walkTextShowOperators(
       fontResourceName: textState.fontResourceName,
       fontSizePt: textState.fontSizePt,
       textRenderingMatrix: computeTrm(),
+      textObjectIndex: currentTextObjectIndex,
+      textMatrix: [...textMatrix] as Matrix2x3,
+      textLineMatrix: [...textLineMatrix] as Matrix2x3,
+      ctm: [...ctm] as Matrix2x3,
       charSpacing: textState.charSpacing,
       wordSpacing: textState.wordSpacing,
       horizontalScalingPct: textState.horizontalScalingPct,
@@ -585,11 +596,14 @@ export function walkTextShowOperators(
       }
       case "BT":
         inTextObject = true;
+        currentTextObjectIndex = nextTextObjectIndex;
+        nextTextObjectIndex += 1;
         textMatrix = IDENTITY_MATRIX;
         textLineMatrix = IDENTITY_MATRIX;
         break;
       case "ET":
         inTextObject = false;
+        currentTextObjectIndex = null;
         break;
       case "Tc":
         textState.charSpacing = asNumber(operands[0]);

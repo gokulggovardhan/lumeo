@@ -94,6 +94,17 @@ jobs:
       - name: Run unit tests
         run: npm test
 
+      - name: Generate Edit PDF fidelity seed report
+        run: npm run report:edit-fidelity
+
+      - name: Upload Edit PDF fidelity report
+        uses: actions/upload-artifact@v7
+        with:
+          name: edit-pdf-fidelity-report
+          path: artifacts/edit-pdf-fidelity-report.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Type check
         run: npx tsc --noEmit
 
