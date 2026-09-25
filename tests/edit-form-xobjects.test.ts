@@ -17,7 +17,17 @@ import {
   concatTransformationMatrix,
 } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { collectPageTextOperators, resolveStreamTarget, CyclicFormReferenceError } from "../lib/pdf/edit/formXObjects.ts";
+import {
+  collectPageTextOperators,
+  inspectPageContentEvidence,
+  resolveStreamTarget,
+  CyclicFormReferenceError,
+} from "../lib/pdf/edit/formXObjects.ts";
+import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
+import { detectNativeTextSpans } from "../lib/pdf/edit/nativeTextDetection.ts";
+import { reconcileTextDetections } from "../lib/pdf/edit/textReconciliation.ts";
+import { DocumentTextCapabilityClassifier } from "../lib/pdf/edit/documentTextCapability.ts";
+import { textRunsFromContent } from "../lib/pdf/edit/textRuns.ts";
 import { resolveFont } from "../lib/pdf/edit/fontEncoding.ts";
 import { resolveFontMetrics } from "../lib/pdf/edit/fontMetrics.ts";
 import { buildEditPlan } from "../lib/pdf/edit/editPlan.ts";
@@ -151,6 +161,68 @@ test("Form XObject text is detected with an absolute (already-composed) renderin
   const reloaded = await PDFDocument.load(editedBytes.slice());
   assert.equal(reloaded.getPageCount(), 1);
   assert.deepEqual(await extractPageStrings(editedBytes), ["Edited form text"]);
+});
+
+test("Form XObject text is evidence-classified as FORM_XOBJECT_TEXT with safe native provenance", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const formRef = buildFormXObject(doc, "Form classified");
+  page.node.Resources()!.set(
+    PDFName.of("XObject"),
+    doc.context.obj({ Fm1: formRef }),
+  );
+  page.node.set(
+    PDFName.of("Contents"),
+    doc.context.register(
+      doc.context.stream("q 1 0 0 1 50 600 cm /Fm1 Do Q"),
+    ),
+  );
+
+  const bytes = await doc.save();
+  const pdfJsDoc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const pdfJsPage = await pdfJsDoc.getPage(1);
+  const viewport = pdfJsPage.getViewport({ scale: 1 });
+  const content = await pdfJsPage.getTextContent();
+  const pdfJsRuns = textRunsFromContent(
+    content.items as never,
+    viewport.transform,
+    viewport.width,
+    viewport.height,
+  );
+
+  const loaded = await PDFDocument.load(bytes.slice());
+  const registry = new PdfFontRegistry(loaded);
+  const located = collectPageTextOperators(loaded, 0, { fontRegistry: registry });
+  const nativeSpans = detectNativeTextSpans({
+    locatedOperators: located,
+    fontRegistry: registry,
+    viewportTransform: viewport.transform,
+    pageWidthPt: viewport.width,
+    pageHeightPt: viewport.height,
+  });
+  const reconciled = reconcileTextDetections({
+    pdfJsRuns,
+    nativeSpans,
+    pageWidthPt: viewport.width,
+    pageHeightPt: viewport.height,
+  });
+  const classification = new DocumentTextCapabilityClassifier().classifyPage({
+    reconciled,
+    nativeSpans,
+    contentEvidence: inspectPageContentEvidence(loaded, 0, {
+      fontRegistry: registry,
+    }),
+  });
+
+  assert.equal(located.length, 1);
+  assert.deepEqual(located[0].locator, {
+    kind: "xobject",
+    formPath: ["Fm1"],
+  });
+  assert.equal(classification.primary, "FORM_XOBJECT_TEXT");
+  assert.ok(classification.signals.includes("FORM_XOBJECT_TEXT"));
+  assert.equal(classification.counts.formXObjectInvocations, 1);
+  assert.equal(classification.counts.nativeOperators, 1);
 });
 
 test("nested Form XObjects: a Form invoking another Form is detected with a two-segment formPath and correctly composed absolute coordinates", async () => {
