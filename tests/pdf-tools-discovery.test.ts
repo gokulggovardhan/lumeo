@@ -61,7 +61,7 @@ test("directory uses direct links, combined filters, live counts, and truthful a
   assert.match(source, /Temporarily unavailable/);
   assert.doesNotMatch(source, /Notify me/);
   assert.match(source, /On device/);
-  assert.match(source, /Server-assisted/);
+  assert.match(source, /Current live tools are browser-based/);
 });
 
 test("slash and Escape keyboard contracts are explicit", () => {
