@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument, StandardFonts, degrees } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { textRunsFromContent, findTextRunAtPoint, overlayFontSizePx } from "../lib/pdf/edit/textRuns.ts";
+import {
+  textRunsFromContent,
+  findTextRunAtPoint,
+  overlayFontSizePx,
+  transformPoint2x3,
+} from "../lib/pdf/edit/textRuns.ts";
 
 async function loadPdfjsPage(bytes: Uint8Array, pageNumber = 1) {
   const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
@@ -40,6 +45,51 @@ test("textRunsFromContent places an unrotated run at the expected screen positio
   // A single short run can never be wider than the page itself -- locks in
   // the fix below (widthPx used to double-count the font-size scale).
   assert.ok(run.widthPct < 50, `expected a modest widthPct, got ${run.widthPct}`);
+});
+
+test("textRunsFromContent uses PDF.js ascent for visual bounds while retaining the exact baseline", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.TimesRoman);
+  page.drawText("Baseline proof", { x: 72, y: 650, size: 24, font });
+  const bytes = await doc.save();
+
+  const pdfjsPage = await loadPdfjsPage(bytes);
+  const viewport = pdfjsPage.getViewport({ scale: 1 });
+  const content = await pdfjsPage.getTextContent();
+  const [item] = content.items as unknown as Array<{
+    str: string;
+    fontName: string;
+    transform: number[];
+  }>;
+  assert.ok(item);
+  const style = (content.styles as Record<string, { ascent?: number; descent?: number }>)[item.fontName];
+  assert.ok(style);
+  assert.equal(typeof style.ascent, "number");
+
+  const [run] = textRunsFromContent(
+    content.items as never,
+    viewport.transform,
+    viewport.width,
+    viewport.height,
+    content.styles as never,
+  );
+  assert.ok(run);
+
+  const tx = transformPoint2x3(viewport.transform, item.transform);
+  const baselineXPx = (run.baselineXPct! / 100) * viewport.width;
+  const baselineYPx = (run.baselineYPct! / 100) * viewport.height;
+  assert.ok(Math.abs(baselineXPx - tx[4]) < 1e-6);
+  assert.ok(Math.abs(baselineYPx - tx[5]) < 1e-6);
+  assert.ok(Math.abs((run.ascentRatio ?? 0) - (style.ascent ?? 0)) < 1e-9);
+
+  const fontHeight = Math.hypot(tx[2], tx[3]);
+  const expectedTop = tx[5] - fontHeight * (style.ascent as number);
+  const actualTop = (run.yPct / 100) * viewport.height;
+  assert.ok(
+    Math.abs(actualTop - expectedTop) < 1e-6,
+    `expected PDF.js ascent top ${expectedTop}, got ${actualTop}`,
+  );
 });
 
 // Regression for a real, proven bug (Phase 9.1 of true PDF text editing):
