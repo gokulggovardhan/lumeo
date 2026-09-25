@@ -124,7 +124,10 @@ function textStringValue(value: unknown): string | null {
       return null;
     }
   }
-  return null;
+  // CIDSystemInfo is specified as PDF strings, but accepting a name here
+  // makes diagnostics robust to real-world producers that serialize these
+  // identifiers non-canonically.
+  return nameString(value);
 }
 
 function refString(value: unknown): string | null {
