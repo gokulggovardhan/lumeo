@@ -79,11 +79,22 @@ function axisAngleDeg(x: number, y: number): number {
 }
 
 function skewMagnitudeDeg(transform: readonly number[]): number {
-  const xAxis = axisAngleDeg(transform[0], transform[1]);
-  const yAxis = axisAngleDeg(-transform[2], transform[3]);
-  const delta = Math.abs(yAxis - xAxis);
-  const normalized = Math.min(delta, Math.abs(180 - delta));
-  return normalized;
+  const xLength = Math.hypot(transform[0], transform[1]);
+  const yLength = Math.hypot(transform[2], transform[3]);
+  if (xLength === 0 || yLength === 0) return 90;
+
+  // Measure deviation from an orthogonal basis via the normalized dot
+  // product. This is invariant under the PDF.js viewport's Y reflection;
+  // comparing signed axis angles directly can misclassify a perfectly
+  // orthogonal reflected basis.
+  const normalizedDot = Math.min(
+    1,
+    Math.abs(
+      (transform[0] * transform[2] + transform[1] * transform[3]) /
+        (xLength * yLength),
+    ),
+  );
+  return (Math.asin(normalizedDot) * 180) / Math.PI;
 }
 
 function normalizedAdvance(
