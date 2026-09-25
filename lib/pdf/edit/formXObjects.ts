@@ -365,6 +365,7 @@ export function collectPageTextOperators(
 export type PageContentEvidence = {
   textOperatorCount: number;
   imageXObjectInvocations: number;
+  inlineImageInvocations: number;
   formXObjectInvocations: number;
   vectorPaintOperatorCount: number;
 };
@@ -395,6 +396,7 @@ export function inspectPageContentEvidence(
     return {
       textOperatorCount: 0,
       imageXObjectInvocations: 0,
+      inlineImageInvocations: 0,
       formXObjectInvocations: 0,
       vectorPaintOperatorCount: 0,
     };
@@ -403,6 +405,7 @@ export function inspectPageContentEvidence(
   const evidence: PageContentEvidence = {
     textOperatorCount: collectPageTextOperators(doc, pageIndex, options).length,
     imageXObjectInvocations: 0,
+    inlineImageInvocations: 0,
     formXObjectInvocations: 0,
     vectorPaintOperatorCount: 0,
   };
@@ -415,7 +418,15 @@ export function inspectPageContentEvidence(
   ): void {
     const tokens = tokenizeContentStream(bytes);
     for (const token of tokens) {
-      if (token.type === "operator" && VECTOR_PAINT_OPERATORS.has(token.value)) {
+      if (token.type !== "operator") continue;
+      if (token.value === "BI") {
+        // Inline images do not live in /XObject resources. The tolerant
+        // tokenizer always sees the leading BI operator before the raw image
+        // payload, which is sufficient for capability evidence; no OCR or
+        // pixel interpretation happens here.
+        evidence.inlineImageInvocations += 1;
+      }
+      if (VECTOR_PAINT_OPERATORS.has(token.value)) {
         evidence.vectorPaintOperatorCount += 1;
       }
     }
