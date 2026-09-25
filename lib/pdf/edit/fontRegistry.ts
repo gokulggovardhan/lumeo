@@ -28,6 +28,10 @@ import {
   parseSfntGlyphCoverage,
   type SfntGlyphCoverage,
 } from "./sfntCmap.ts";
+import {
+  inspectPdfFontProgram,
+  type PdfFontProgramInspection,
+} from "./fontProgramIntelligence.ts";
 
 const SUBSET_PREFIX = /^[A-Z]{6}\+/;
 const BOLD_NAME = /bold|black|heavy|semib|demib?|ultra/i;
@@ -396,6 +400,7 @@ export class PdfFontRegistry {
   private readonly profileCache = new WeakMap<PDFDict, PdfFontProfile>();
   private readonly programCache = new WeakMap<PDFDict, EmbeddedFontProgram | null>();
   private readonly browserFaceCache = new WeakMap<PDFDict, Promise<string | null>>();
+  private readonly intelligenceCache = new WeakMap<PDFDict, Promise<PdfFontProgramInspection>>();
   private readonly context: PDFContext;
 
   constructor(document: PDFDocument) {
@@ -489,6 +494,45 @@ export class PdfFontRegistry {
   embeddedProgram(resources: PDFDict, resourceName: string): EmbeddedFontProgram | null {
     const fontDict = resolveFontDict(resources, resourceName, this.context);
     return fontDict ? this.embeddedProgramFor(fontDict) : null;
+  }
+
+  /**
+   * Lazily inspects the exact embedded font program with the professional
+   * font engine. This is diagnostic/font-intelligence evidence only: it does
+   * not replace PDF Encoding/ToUnicode/Widths or authorize native write-back.
+   */
+  inspectEmbeddedFontProgram(
+    resources: PDFDict,
+    resourceName: string,
+  ): Promise<PdfFontProgramInspection> {
+    const fontResource = resolveFontResource(resources, resourceName, this.context);
+    if (!fontResource) {
+      return Promise.resolve({
+        kind: "unavailable",
+        reason: "The PDF font resource could not be resolved.",
+      });
+    }
+
+    const cached = this.intelligenceCache.get(fontResource.dict);
+    if (cached) return cached;
+
+    const profile = this.resolve(resources, resourceName);
+    const program = this.embeddedProgramFor(fontResource.dict);
+    const promise = program
+      ? inspectPdfFontProgram(program.bytes, {
+          preferredPostScriptNames: [
+            profile?.resourceIdentity.descriptorFontName ?? "",
+            profile?.resourceIdentity.descendantBaseFont ?? "",
+            profile?.baseFont ?? "",
+          ],
+        })
+      : Promise.resolve<PdfFontProgramInspection>({
+          kind: "unavailable",
+          reason: "This PDF font does not contain an embedded font program.",
+        });
+
+    this.intelligenceCache.set(fontResource.dict, promise);
+    return promise;
   }
 
   private embeddedProgramFor(fontDict: PDFDict): EmbeddedFontProgram | null {
