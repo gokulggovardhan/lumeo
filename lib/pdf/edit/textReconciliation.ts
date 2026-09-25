@@ -100,6 +100,15 @@ export function reconcileTextSignals({
     );
     const direct = directKey ? nativeByKey.get(directKey) ?? null : null;
 
+    let rejectedDirect:
+      | {
+          span: NativeContentStreamSpan;
+          agreement: TextSignalAgreement;
+          baselineDistancePt: number | null;
+          angleDeltaDeg: number | null;
+        }
+      | null = null;
+
     if (direct) {
       const agreement = agreementFor(run, direct);
       const measured = metrics(run, direct, viewportTransform);
@@ -114,23 +123,31 @@ export function reconcileTextSignals({
           : agreement === "different"
             ? "low"
             : "medium";
-      claimed.add(direct.key);
-      results.push({
-        pdfJsRunIndex: index,
-        nativeSpanKey: direct.key,
-        confidence,
+
+      if (confidence === "high" || run.nativeSourceKey) {
+        claimed.add(direct.key);
+        results.push({
+          pdfJsRunIndex: index,
+          nativeSpanKey: direct.key,
+          confidence,
+          agreement,
+          baselineDistancePt: measured.baselineDistancePt,
+          angleDeltaDeg: measured.angleDeltaDeg,
+          source: run.nativeSourceKey ? "evidence-match" : "legacy-source-match",
+          reason:
+            confidence === "high"
+              ? "Native content-stream text and PDF.js extraction agree on text and geometry."
+              : "The native-synthesized run retains its exact source operator even though independent PDF.js evidence is unavailable.",
+        });
+        continue;
+      }
+
+      rejectedDirect = {
+        span: direct,
         agreement,
         baselineDistancePt: measured.baselineDistancePt,
         angleDeltaDeg: measured.angleDeltaDeg,
-        source: run.nativeSourceKey ? "evidence-match" : "legacy-source-match",
-        reason:
-          confidence === "high"
-            ? "Native content-stream text and PDF.js extraction agree on text and geometry."
-            : agreement === "different"
-              ? "PDF.js text and the matched native operator disagree on decoded text."
-              : "The signals match partially, but geometry or decoding evidence is incomplete.",
-      });
-      continue;
+      };
     }
 
     let best:
@@ -165,6 +182,17 @@ export function reconcileTextSignals({
         angleDeltaDeg: best.angle,
         source: "evidence-match",
         reason: "Exact decoded text plus baseline and writing-angle agreement identified the native source operator.",
+      });
+    } else if (rejectedDirect) {
+      results.push({
+        pdfJsRunIndex: index,
+        nativeSpanKey: rejectedDirect.span.key,
+        confidence: "low",
+        agreement: rejectedDirect.agreement,
+        baselineDistancePt: rejectedDirect.baselineDistancePt,
+        angleDeltaDeg: rejectedDirect.angleDeltaDeg,
+        source: "legacy-source-match",
+        reason: "The legacy position match disagrees with PDF.js text, and no better text-and-geometry match was found.",
       });
     } else {
       results.push({
