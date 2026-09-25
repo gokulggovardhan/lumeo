@@ -4,7 +4,7 @@ test.describe("PDF Tools discovery", () => {
   test("supports direct discovery, combined filters, and keyboard shortcuts", async ({ page }) => {
     await page.goto("/pdf-tools");
 
-    await expect(page.getByRole("heading", { name: "What do you need to do?" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Find the right tool" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Open Merge PDF/ })).toHaveAttribute("href", "/pdf/merge");
 
     const search = page.getByRole("searchbox", { name: "Search tools and actions" });
@@ -14,7 +14,7 @@ test.describe("PDF Tools discovery", () => {
     await expect(page.getByRole("link", { name: /Open Organize PDF/ })).toBeVisible();
     await expect(page.getByText("1 tool", { exact: true })).toBeVisible();
 
-    await page.getByRole("button", { name: "Edit & sign" }).click();
+    await page.getByRole("button", { name: "Edit" }).click();
     await expect(page.getByText("No tools match that search")).toBeVisible();
 
     await search.press("Escape");
