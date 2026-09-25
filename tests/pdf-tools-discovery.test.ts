@@ -41,6 +41,20 @@ test("discovery search exposes signature, image, and text vocabulary", () => {
   assert.equal(toolMatchesQuery(tile({ label: "Extract Text", aliases: ["copy text"] }), "text"), true);
 });
 
+test("public category mapping keeps specialist tools in clear homes", () => {
+  const catalog = readFileSync("lib/tools/catalog.ts", "utf8");
+  const tiles = readFileSync("lib/tools/tiles.ts", "utf8");
+
+  assert.match(catalog, /edit: "Edit"/);
+  assert.match(catalog, /"sign-fill": "Sign & Fill"/);
+  assert.match(catalog, /recognize: "Recognize"/);
+  assert.match(catalog, /"image-tools": "Image Tools"/);
+
+  assert.match(tiles, /seal: "sign-fill"/);
+  assert.match(tiles, /"extract-text": "recognize"/);
+  assert.match(tiles, /"heic-to-jpeg": "image-tools"/);
+});
+
 test("directory uses direct links, combined filters, live counts, and truthful availability", () => {
   const source = readFileSync("components/tools/ToolsExplorer.tsx", "utf8");
   for (const label of [
