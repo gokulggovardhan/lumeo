@@ -208,6 +208,12 @@ function capabilityFor(
       reason: "The visible text could not be reconciled safely to a native PDF text-show operator.",
     };
   }
+  if (match.operator.renderMode >= 4) {
+    return {
+      capability: "unsupported",
+      reason: "This text participates in a clipping text-rendering mode and is not safe to rewrite in place.",
+    };
+  }
   if (!fontProfile) {
     return {
       capability: "view-only",
@@ -218,12 +224,6 @@ function capabilityFor(
     return {
       capability: "view-only",
       reason: "The source text position depends on an earlier glyph advance that could not be measured safely.",
-    };
-  }
-  if (match.operator.renderMode >= 4) {
-    return {
-      capability: "unsupported",
-      reason: "This text participates in a clipping text-rendering mode and is not safe to rewrite in place.",
     };
   }
   if (fontProfile.kind === "Type3") {
