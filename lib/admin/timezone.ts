@@ -5,13 +5,15 @@
 // visitor's browser locale, so the same event shows two different times
 // depending on which component rendered it.
 export const ADMIN_TIMEZONE = "Asia/Kolkata";
+export const ADMIN_TIMEZONE_LABEL = "IST";
 
 export function formatAdminDateTime(value: string | number | Date, timeStyle: "short" | "medium" = "short") {
-  return new Date(value).toLocaleString("en-IN", {
+  const formatted = new Date(value).toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle,
     timeZone: ADMIN_TIMEZONE,
   });
+  return `${formatted} ${ADMIN_TIMEZONE_LABEL}`;
 }
 
 export function formatAdminDate(value: string | number | Date) {
@@ -25,6 +27,25 @@ export function formatAdminDate(value: string | number | Date) {
 // a <input type="datetime-local"> can be converted to a UTC instant just by
 // appending the offset -- no need for a full tz database lookup.
 const IST_OFFSET = "+05:30";
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseIstCalendarDate(value: string) {
+  if (!ISO_DATE.test(value)) return null;
+  const parsed = new Date(`${value}T00:00:00${IST_OFFSET}`);
+  if (Number.isNaN(parsed.getTime()) || istIsoDate(parsed) !== value) return null;
+  return parsed;
+}
+
+export function istDateStartUtcIso(value: string) {
+  return parseIstCalendarDate(value)?.toISOString() ?? null;
+}
+
+export function istDateEndExclusiveUtcIso(value: string) {
+  const parsed = parseIstCalendarDate(value);
+  if (!parsed) return null;
+  parsed.setUTCDate(parsed.getUTCDate() + 1);
+  return parsed.toISOString();
+}
 
 // "YYYY-MM-DDTHH:mm" (IST wall clock, from a datetime-local input) -> UTC
 // ISO string for storage. Without this, the raw string was being stored
