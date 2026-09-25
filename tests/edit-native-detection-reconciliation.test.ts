@@ -24,15 +24,19 @@ function located({
   bytes = new Uint8Array([72, 105]),
   renderMode = 0,
   locator = { kind: "page", contentStreamIndex: 0 } as const,
+  operatorIndex = 2,
+  textRenderingMatrix = [12, 0, 0, 12, 72, 700] as [number, number, number, number, number, number],
 }: {
   kind?: "Tj" | "TJ";
   bytes?: Uint8Array;
   renderMode?: number;
   locator?: LocatedTextOperator["locator"];
+  operatorIndex?: number;
+  textRenderingMatrix?: [number, number, number, number, number, number];
 } = {}): LocatedTextOperator {
   return {
     locator,
-    operatorIndex: 2,
+    operatorIndex,
     operator: {
       kind,
       start: 10,
@@ -40,7 +44,7 @@ function located({
       strings: [bytes],
       fontResourceName: "F1",
       fontSizePt: 12,
-      textRenderingMatrix: [12, 0, 0, 12, 72, 700],
+      textRenderingMatrix,
       textObjectIndex: 0,
       textMatrix: [1, 0, 0, 1, 72, 700],
       textLineMatrix: [1, 0, 0, 1, 72, 700],
@@ -188,6 +192,49 @@ test("reconciliation can recover a high-confidence source match from Unicode plu
   assert.equal(reconciliations[0].agreement, "exact");
   assert.equal(reconciliations[0].source, "evidence-match");
   assert.equal(reconciliationMatchMap(reconciliations, [span]).get(0)?.key, span.key);
+});
+
+test("reconciliation overrides a wrong positional legacy match when stronger native evidence exists", () => {
+  const wrong = located({
+    bytes: new Uint8Array([72]),
+    operatorIndex: 1,
+    textRenderingMatrix: [12, 0, 0, 12, 72, 700],
+  });
+  const correct = located({
+    operatorIndex: 2,
+    textRenderingMatrix: [12, 0, 0, 12, 72, 700],
+  });
+  const spans = buildNativeContentStreamSpans({
+    operators: [wrong, correct],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  });
+  const run = {
+    str: "Hi",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 2,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    pdfJsTransform: [12, 0, 0, 12, 72, 700],
+    detectionSource: "pdfjs" as const,
+  };
+
+  const reconciliations = reconcileTextSignals({
+    runs: [run],
+    legacyMatches: [{ locatedOperator: wrong, operator: wrong.operator }],
+    nativeSpans: spans,
+    viewportTransform: viewport,
+  });
+  const evidence = reconciliationMatchMap(reconciliations, spans).get(0);
+
+  assert.equal(reconciliations[0].confidence, "high");
+  assert.equal(reconciliations[0].source, "evidence-match");
+  assert.equal(evidence?.key, locatedTextOperatorKey(correct));
 });
 
 test("classifier identifies Form XObject text without flattening away its resource scope", () => {
