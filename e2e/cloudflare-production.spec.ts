@@ -67,6 +67,7 @@ test("production Edit PDF loads the deployed pdf.js worker and detects text", as
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });
   await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
 
   const editableRuns = page.locator(EDITABLE_RUN);
@@ -94,6 +95,7 @@ test("production Edit PDF applies native formatting and exports a valid PDF", as
   });
 
   await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });
   await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
 
   const employeeRun = page
