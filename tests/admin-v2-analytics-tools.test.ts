@@ -45,6 +45,24 @@ const tools: ToolWithCategory[] = [
     created_at: "2026-01-01",
     updated_at: "2026-01-02",
   },
+  {
+    id: "3",
+    slug: "edit",
+    category_id: "edit",
+    category_name: "Edit",
+    category_slug: "edit",
+    name: "Edit PDF",
+    short_description: "Edit PDF content",
+    route: "/pdf/edit",
+    icon_key: "edit",
+    status: "active",
+    maintenance_message: "Saved for the next maintenance window",
+    is_enabled: true,
+    is_homepage_eligible: true,
+    sort_order: 3,
+    created_at: "2026-01-01",
+    updated_at: "2026-01-03",
+  },
 ];
 
 test("Admin tool filters normalize URL input and compose without mutating records", () => {
@@ -58,7 +76,15 @@ test("Admin tool filters normalize URL input and compose without mutating record
 
   assert.equal(hasActiveToolFilters(filters), true);
   assert.deepEqual(filterAdminTools(tools, filters).map((tool) => tool.slug), ["compress"]);
-  assert.equal(tools.length, 2);
+  assert.equal(tools.length, 3);
+});
+
+test("Admin maintenance filter follows the effective maintenance state, not a stored future message", () => {
+  const maintenance = resolveToolFilters({ maintenance: "maintenance" });
+  const clear = resolveToolFilters({ maintenance: "clear" });
+
+  assert.deepEqual(filterAdminTools(tools, maintenance).map((tool) => tool.slug), ["compress"]);
+  assert.deepEqual(filterAdminTools(tools, clear).map((tool) => tool.slug), ["merge", "edit"]);
 });
 
 test("Admin tool filters reject unknown enum values and match case-insensitively", () => {
