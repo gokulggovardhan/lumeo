@@ -817,6 +817,50 @@ export default function EditPdfTool() {
     [pageIndex, pagePointSize, detectedTextRuns, runMatches, pageFontProfiles, fragmentedRunReconstructions],
   );
 
+  // Development-only fidelity diagnostics. This deliberately never renders
+  // debug noise in the normal product and is compiled behind NODE_ENV.
+  // In a local development build, the current page report can be inspected
+  // or downloaded from DevTools via window.__LUMEO_EDIT_PDF_DIAGNOSTICS__.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" || !pageTextModel) return;
+
+    const host = window as typeof window & {
+      __LUMEO_EDIT_PDF_DIAGNOSTICS__?: {
+        currentPage: () => Promise<unknown>;
+        downloadCurrentPage: () => Promise<void>;
+      };
+    };
+    let active = true;
+
+    const currentPage = async () => {
+      const diagnostics = await import("@/lib/pdf/edit/diagnostics");
+      if (!active) throw new Error("Edit PDF diagnostics are no longer active for this page.");
+      return diagnostics.buildEditPdfPageDiagnosticReport({
+        pageModel: pageTextModel,
+        runs: detectedTextRuns,
+        matches: runMatches,
+        fontProfiles: pageFontProfiles,
+        generatedAtIso: new Date().toISOString(),
+      });
+    };
+
+    host.__LUMEO_EDIT_PDF_DIAGNOSTICS__ = {
+      currentPage,
+      downloadCurrentPage: async () => {
+        const diagnostics = await import("@/lib/pdf/edit/diagnostics");
+        const report = await currentPage();
+        diagnostics.downloadEditPdfDiagnosticReport(
+          report as import("@/lib/pdf/edit/diagnostics").EditPdfPageDiagnosticReport,
+        );
+      },
+    };
+
+    return () => {
+      active = false;
+      delete host.__LUMEO_EDIT_PDF_DIAGNOSTICS__;
+    };
+  }, [pageTextModel, detectedTextRuns, runMatches, pageFontProfiles]);
+
   const textRunSpatialIndex = useMemo(() => {
     if (!pageTextModel) return null;
     return new PercentSpatialIndex(
