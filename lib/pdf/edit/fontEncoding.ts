@@ -407,6 +407,15 @@ export function resolveFont(fontDict: PDFDict, context: PDFContext): ResolvedFon
 
 export type ReplacementClassification = "editable" | "requires-fallback" | "impossible";
 
+export type EmbeddedGlyphEvidence = {
+  /**
+   * True only when the embedded Unicode cmap can be used as safe evidence
+   * for this PDF simple font (currently nonsymbolic embedded TrueType).
+   */
+  safeForSimplePdfEncoding: boolean;
+  hasUnicodeCodePoint: (codePoint: number) => boolean;
+};
+
 // Classifies whether a single Unicode character can be safely written back
 // into `font` in place, based only on what resolveFont could actually
 // verify:
@@ -429,14 +438,36 @@ export type ReplacementClassification = "editable" | "requires-fallback" | "impo
 //   module doesn't parse font binaries to check. Both cases mean: this
 //   exact font probably can't be trusted for that character without a
 //   fallback font, but the situation isn't as hopeless as "impossible."
-export function classifyReplacementChar(font: ResolvedFont, char: string): ReplacementClassification {
+export function classifyReplacementChar(
+  font: ResolvedFont,
+  char: string,
+  embeddedGlyphEvidence: EmbeddedGlyphEvidence | null = null,
+): ReplacementClassification {
   if (font.encodingSource === "Unknown") return "impossible";
 
   const hasVerifiedCode = font.unicodeToGlyphCode.has(char);
   if (!hasVerifiedCode) return "requires-fallback";
 
   if (font.kind !== "Type0" && font.isEmbedded && font.isSubset) {
-    return "requires-fallback";
+    // A subset's nominal PDF Encoding can name characters whose glyphs were
+    // actually removed from the embedded program. Upgrade this from
+    // requires-fallback only when the exact embedded TrueType Unicode cmap
+    // independently proves the glyph exists and the registry has declared
+    // that cmap safe for this nonsymbolic PDF simple-font encoding.
+    if (
+      font.kind !== "TrueType" ||
+      !embeddedGlyphEvidence?.safeForSimplePdfEncoding
+    ) {
+      return "requires-fallback";
+    }
+    const codePoint = char.codePointAt(0);
+    if (
+      codePoint === undefined ||
+      String.fromCodePoint(codePoint) !== char ||
+      !embeddedGlyphEvidence.hasUnicodeCodePoint(codePoint)
+    ) {
+      return "requires-fallback";
+    }
   }
 
   return "editable";
