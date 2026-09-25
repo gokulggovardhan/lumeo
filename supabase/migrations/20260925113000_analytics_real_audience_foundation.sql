@@ -159,10 +159,9 @@ security definer
 set search_path = ''
 as $$
 begin
-  if current_user <> 'service_role' and session_user <> 'service_role' then
-    raise exception 'Service role required.';
-  end if;
-
+  -- EXECUTE is granted only to service_role below. Avoid checking
+  -- current_user/session_user here because SECURITY DEFINER changes
+  -- current_user to the function owner under PostgREST.
   if p_secret is null or length(p_secret) < 32 or length(p_secret) > 256 then
     raise exception 'Analytics ingest secret must be between 32 and 256 characters.';
   end if;
