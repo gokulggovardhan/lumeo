@@ -109,8 +109,8 @@ export default function SecurityPage() {
         <InfoPageSection title="What current tools do not do">
           <InfoList
             items={[
-              "No required server upload for current Compose, Distill, Capture, or Render workflows.",
-              "No remote PDF processing for current Compose, Distill, Capture, or Render workflows.",
+              "No required server upload for current supported browser-first public tools.",
+              "No remote document processing for current supported browser-first public tools.",
               "No cloud document storage for current supported workflows.",
               "No forced account.",
               "No document-content analytics.",
