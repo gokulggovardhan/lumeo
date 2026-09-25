@@ -1,4 +1,9 @@
-import type { PdfFontProfile } from "./fontRegistry.ts";
+import type {
+  PdfCidSystemInfo,
+  PdfCidToGidMapIdentity,
+  PdfFontProfile,
+  PdfFontWritingMode,
+} from "./fontRegistry.ts";
 import { stringAdvancePt } from "./fontMetrics.ts";
 import type { PdfPageTextModel, PdfTextSourceMatch } from "./documentModel.ts";
 import type { DetectedTextRun } from "./textRuns.ts";
@@ -6,7 +11,7 @@ import type { NativeContentStreamSpan } from "./nativeTextDetection.ts";
 import type { TextSignalReconciliation } from "./textReconciliation.ts";
 import type { PageTextCapabilityClassification } from "./textCapabilityClassifier.ts";
 
-export const EDIT_PDF_DIAGNOSTIC_SCHEMA_VERSION = 1 as const;
+export const EDIT_PDF_DIAGNOSTIC_SCHEMA_VERSION = 2 as const;
 
 export type EditPdfDiagnosticReason =
   | "bt-et-scope-not-tracked"
@@ -61,14 +66,23 @@ export type EditPdfSpanDiagnostic = {
     subtype: string | null;
     objectRef: string | null;
     descriptorRef: string | null;
+    descendantRef: string | null;
     fontProgramRef: string | null;
+    toUnicodeRef: string | null;
+    encodingRef: string | null;
+    descriptorFontName: string | null;
+    descendantSubtype: string | null;
+    descendantBaseFont: string | null;
     embedded: boolean | null;
+    embeddedProgramByteLength: number | null;
+    embeddedProgramSha256: string | null;
     encodingType: string | null;
     encodingDifferences: readonly unknown[] | null;
     toUnicodeAvailable: boolean | null;
     cmap: string | null;
-    cidSystemInfo: string | null;
-    cidToGidMap: string | null;
+    writingMode: PdfFontWritingMode | null;
+    cidSystemInfo: PdfCidSystemInfo | null;
+    cidToGidMap: PdfCidToGidMapIdentity | null;
     glyphIds: readonly number[] | null;
     browserPreviewCapability: boolean | null;
     nativeRewriteCapability: "proven" | "limited" | "blocked";
@@ -210,14 +224,20 @@ export function buildEditPdfPageDiagnosticReport({
     if (!match) unresolved.add("native-operator-unmatched");
     if (match?.operator.textObjectIndex === undefined) unresolved.add("bt-et-scope-not-tracked");
     unresolved.add("stream-object-ref-not-exposed");
-    unresolved.add("font-object-ref-not-exposed");
-    unresolved.add("font-descriptor-ref-not-exposed");
-    unresolved.add("font-program-ref-not-exposed");
     unresolved.add("encoding-differences-not-exposed");
-    unresolved.add("cmap-details-not-exposed");
-    unresolved.add("cid-system-info-not-exposed");
-    unresolved.add("cid-to-gid-map-not-exposed");
     unresolved.add("glyph-ids-not-resolved");
+    if (!profile) {
+      unresolved.add("font-object-ref-not-exposed");
+      unresolved.add("font-descriptor-ref-not-exposed");
+      unresolved.add("font-program-ref-not-exposed");
+      unresolved.add("cmap-details-not-exposed");
+      unresolved.add("cid-system-info-not-exposed");
+      unresolved.add("cid-to-gid-map-not-exposed");
+    } else if (profile.kind === "Type0") {
+      if (!profile.resourceIdentity.type0Encoding) unresolved.add("cmap-details-not-exposed");
+      if (!profile.resourceIdentity.cidSystemInfo) unresolved.add("cid-system-info-not-exposed");
+      if (!profile.resourceIdentity.cidToGidMap) unresolved.add("cid-to-gid-map-not-exposed");
+    }
     if (!run?.pdfJsTransform) unresolved.add("pdfjs-raw-transform-not-retained");
     const reconciliation = reconciliations[index] ?? null;
     if (reconciliation?.confidence !== "high") {
@@ -277,16 +297,25 @@ export function buildEditPdfPageDiagnosticReport({
         normalizedFamily: profile?.familyName ?? span.style.fontFamily ?? null,
         subsetPrefix: subsetPrefix(profile?.baseFont ?? span.style.baseFont ?? null),
         subtype: profile?.kind ?? span.style.fontSubtype ?? null,
-        objectRef: null,
-        descriptorRef: null,
-        fontProgramRef: null,
+        objectRef: profile?.resourceIdentity.fontObjectRef ?? null,
+        descriptorRef: profile?.resourceIdentity.descriptorObjectRef ?? null,
+        descendantRef: profile?.resourceIdentity.descendantObjectRef ?? null,
+        fontProgramRef: profile?.resourceIdentity.fontProgramObjectRef ?? null,
+        toUnicodeRef: profile?.resourceIdentity.toUnicodeObjectRef ?? null,
+        encodingRef: profile?.resourceIdentity.encodingObjectRef ?? null,
+        descriptorFontName: profile?.resourceIdentity.descriptorFontName ?? null,
+        descendantSubtype: profile?.resourceIdentity.descendantSubtype ?? null,
+        descendantBaseFont: profile?.resourceIdentity.descendantBaseFont ?? null,
         embedded: profile?.isEmbedded ?? null,
+        embeddedProgramByteLength: profile?.embeddedProgramByteLength ?? null,
+        embeddedProgramSha256: profile?.embeddedProgramSha256 ?? null,
         encodingType: profile?.encodingSource ?? null,
         encodingDifferences: null,
         toUnicodeAvailable: profile ? profile.encodingSource === "ToUnicode" : null,
-        cmap: null,
-        cidSystemInfo: null,
-        cidToGidMap: null,
+        cmap: profile?.resourceIdentity.type0Encoding ?? null,
+        writingMode: profile?.resourceIdentity.writingMode ?? null,
+        cidSystemInfo: profile?.resourceIdentity.cidSystemInfo ?? null,
+        cidToGidMap: profile?.resourceIdentity.cidToGidMap ?? null,
         glyphIds: null,
         browserPreviewCapability: profile?.browserPreviewPossible ?? null,
         nativeRewriteCapability: rewriteCapability(span.capability),
