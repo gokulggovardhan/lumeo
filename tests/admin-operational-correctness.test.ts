@@ -175,6 +175,7 @@ test("Admin runtime metadata is Cloudflare-native", () => {
   }
   assert.match(health, /LUMEO_BUILD_SHA/);
   assert.match(health, /LUMEO_DEPLOYMENT_ENV/);
+  assert.match(health, /istIsoDate\(\)/);
   assert.match(overview, /LUMEO_DEPLOYMENT_ENV/);
   assert.match(errors, /LUMEO_BUILD_SHA/);
   assert.match(vite, /WORKERS_CI_COMMIT_SHA/);
@@ -279,4 +280,17 @@ test("Dashboard tool activity follows the same usable-state policy as public dis
     dashboard,
     /tool\.status !== "active" && tool\.status !== "beta"/,
   );
+});
+
+
+test("Cloudflare Worker configuration pins and verifies the paid CPU budget", () => {
+  const wrangler = read("wrangler.jsonc");
+  const verifier = read("scripts/verify-cloudflare-worker-config.mjs");
+  const workflow = read(".github/workflows/lumeo-ci.yml");
+
+  assert.match(wrangler, /"cpu_ms": 30000/);
+  assert.match(verifier, /EXPECTED_CPU_MS = 30_000/);
+  assert.match(verifier, /dist\/server\/wrangler\.json|generatedPath/);
+  assert.match(workflow, /Verify Cloudflare Worker CPU budget/);
+  assert.match(workflow, /verify-cloudflare-worker-config\.mjs dist\/server\/wrangler\.json/);
 });
