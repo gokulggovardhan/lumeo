@@ -6,6 +6,9 @@
 		"nodejs_compat"
 	],
 	"main": "./worker/index.ts",
+	"limits": {
+		"cpu_ms": 30000
+	},
 	"assets": {
 		"directory": "dist/client",
 		"not_found_handling": "none",
