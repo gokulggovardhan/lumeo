@@ -295,6 +295,8 @@ export type TextShowOperator = {
   end: number;
   /** Raw (still glyph-encoded, not decoded to readable text) string operands, in order shown. */
   strings: Uint8Array[];
+  /** Numeric TJ adjustments in source order. Empty for Tj/'/" operators. */
+  tjAdjustments?: number[];
   fontResourceName: string | null;
   fontSizePt: number;
   /** Text rendering matrix at the moment this operator runs: scale(Tfs*Th, Tfs) . translate(0, Trise) . Tm . CTM. */
@@ -304,6 +306,10 @@ export type TextShowOperator = {
   textMatrix?: Matrix2x3;
   textLineMatrix?: Matrix2x3;
   ctm?: Matrix2x3;
+  /** Whether this operator's implicit text position is proven from all prior text-show advances. */
+  positionReliability?: "proven" | "degraded";
+  /** Proven horizontal text advance in text-matrix units when font metrics are available. */
+  textAdvancePt?: number | null;
   charSpacing: number;
   wordSpacing: number;
   horizontalScalingPct: number;
@@ -483,6 +489,12 @@ export function walkTextShowOperators(
   options: {
     initialPaintState?: PdfGraphicsPaintState;
     resolveExtGState?: PdfExtGStateResolver;
+    /**
+     * Optional resource-aware advance measurement. contentStream.ts cannot
+     * resolve font widths by itself; callers with the active /Resources
+     * dictionary can provide this without coupling the tokenizer to pdf-lib.
+     */
+    measureTextAdvance?: (operator: TextShowOperator) => number | null;
   } = {},
 ): TextShowOperator[] {
   const tokens = tokenizeContentStream(bytes);
@@ -498,6 +510,7 @@ export function walkTextShowOperators(
   let inTextObject = false;
   let currentTextObjectIndex: number | null = null;
   let nextTextObjectIndex = 0;
+  let textPositionReliable = true;
 
   let operandStart = 0;
   let operands: ContentStreamToken[] = [];
@@ -519,12 +532,18 @@ export function walkTextShowOperators(
     return multiplyMatrix(ctm, multiplyMatrix(textMatrix, fontScale));
   }
 
-  function recordTextShow(kind: TextShowOperatorKind, strings: Uint8Array[], end: number) {
-    results.push({
+  function recordTextShow(
+    kind: TextShowOperatorKind,
+    strings: Uint8Array[],
+    end: number,
+    tjAdjustments: number[] = [],
+  ) {
+    const operator: TextShowOperator = {
       kind,
       start: operandStart,
       end,
       strings,
+      tjAdjustments,
       fontResourceName: textState.fontResourceName,
       fontSizePt: textState.fontSizePt,
       textRenderingMatrix: computeTrm(),
@@ -546,7 +565,28 @@ export function walkTextShowOperators(
         : null,
       fillOpacity: paintState.fillOpacity,
       strokeOpacity: paintState.strokeOpacity,
-    });
+      positionReliability: textPositionReliable ? "proven" : "degraded",
+      textAdvancePt: null,
+    };
+    results.push(operator);
+
+    const measuredAdvance = options.measureTextAdvance?.(operator) ?? null;
+    operator.textAdvancePt =
+      measuredAdvance !== null && Number.isFinite(measuredAdvance)
+        ? measuredAdvance
+        : null;
+
+    if (operator.textAdvancePt !== null) {
+      textMatrix = multiplyMatrix(
+        textMatrix,
+        [1, 0, 0, 1, operator.textAdvancePt, 0],
+      );
+    } else {
+      // A text-show operation always advances the current text matrix. If
+      // its advance cannot be measured from the active font resource, the
+      // next implicit text position is unknown until Tm/Td/TD/T* resets it.
+      textPositionReliable = false;
+    }
   }
 
   for (const token of tokens) {
@@ -600,6 +640,7 @@ export function walkTextShowOperators(
         nextTextObjectIndex += 1;
         textMatrix = IDENTITY_MATRIX;
         textLineMatrix = IDENTITY_MATRIX;
+        textPositionReliable = true;
         break;
       case "ET":
         inTextObject = false;
@@ -632,6 +673,7 @@ export function walkTextShowOperators(
         const ty = asNumber(operands[1]);
         textLineMatrix = multiplyMatrix(textLineMatrix, [1, 0, 0, 1, tx, ty]);
         textMatrix = textLineMatrix;
+        textPositionReliable = true;
         break;
       }
       case "TD": {
@@ -640,6 +682,7 @@ export function walkTextShowOperators(
         textState.leading = -ty;
         textLineMatrix = multiplyMatrix(textLineMatrix, [1, 0, 0, 1, tx, ty]);
         textMatrix = textLineMatrix;
+        textPositionReliable = true;
         break;
       }
       case "Tm": {
@@ -653,11 +696,13 @@ export function walkTextShowOperators(
         ];
         textMatrix = m;
         textLineMatrix = m;
+        textPositionReliable = true;
         break;
       }
       case "T*":
         textLineMatrix = multiplyMatrix(textLineMatrix, [1, 0, 0, 1, 0, -textState.leading]);
         textMatrix = textLineMatrix;
+        textPositionReliable = true;
         break;
       case "Tj":
         if (inTextObject && operands[0]?.type === "literalString") {
@@ -696,6 +741,12 @@ export function walkTextShowOperators(
             "TJ",
             arrayTokens.map((item) => item.value),
             token.end,
+            operands
+              .filter(
+                (item): item is Extract<ContentStreamToken, { type: "number" }> =>
+                  item.type === "number",
+              )
+              .map((item) => item.value),
           );
         }
         break;
