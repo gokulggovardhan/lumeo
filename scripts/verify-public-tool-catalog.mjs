@@ -92,6 +92,12 @@ try {
     assert(launcher.includes(`"${slug}"`), `Homepage primary tool missing: ${slug}`);
   }
   assert(launcher.includes("available ? (") && launcher.includes("<article"), "Unavailable curated tools must be visible but non-actionable.");
+  assert(
+    launcher.includes("additionalComingSoon") &&
+      launcher.includes('tile.availability === "coming_soon"') &&
+      launcher.includes("!CURATED_TOOL_SLUGS.has(tile.slug)"),
+    "Every enabled coming-soon tool must be publishable on the homepage even outside the curated launcher set.",
+  );
   const footer = read("components/PublicFooter.tsx");
   assert(footer.includes("All PDF Tools"), "Public footer must include a permanent All PDF Tools link.");
   assert(footer.includes("/pdf-tools"), "All PDF Tools link must point to /pdf-tools.");
@@ -153,7 +159,7 @@ try {
   console.log("PASS public RPC functions and grants exist");
   console.log("PASS no direct anon table grants or public writes");
   console.log("PASS public catalog types, data layer, and fallback exist");
-  console.log("PASS homepage launcher renders a curated primary/secondary hierarchy");
+  console.log("PASS homepage launcher renders curated live tools plus every enabled coming-soon tool");
   console.log("PASS /pdf-tools route exists");
   console.log("PASS PDF Tools menu accessibility markers exist");
   console.log("PASS no PDF processing engines, analytics tracking, or service-role usage changed");

@@ -215,7 +215,7 @@ export default async function ErrorsPage({
 
       <AdminSectionCard title="Error log" description={`Showing ${pageStart}–${pageEnd} of ${logs.data.total} matching records.`}>
         <AdminDataTable
-          columns={["Severity", "Message", "Route", "Occurrences", "First seen", "Last seen", "Status", canManage ? "Actions" : "" ].filter(Boolean)}
+          columns={["Severity", "Message", "Route", "Occurrences", "First seen (IST)", "Last seen (IST)", "Status", canManage ? "Actions" : "" ].filter(Boolean)}
           rows={logs.data.rows.map((log) => {
             const safeMessage = sanitizeErrorDiagnostic(log.message, 2000) ?? "Unknown error";
             const safeStack = sanitizeErrorDiagnostic(log.stack, 4000);

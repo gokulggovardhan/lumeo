@@ -1,3 +1,4 @@
+import { istCalendarDateStartToUtcIso } from "./timezone.ts";
 import type { AdminMemberView } from "@/lib/admin/data";
 import type { AdminRole } from "@/lib/admin/types";
 
@@ -113,14 +114,13 @@ export function resolveAuditFilters(
     return { action, entityType, startDate, endDate, dateError };
   }
 
-  if (end) end.setUTCDate(end.getUTCDate() + 1);
   return {
     action,
     entityType,
     startDate,
     endDate,
-    startIso: start?.toISOString(),
-    endExclusiveIso: end?.toISOString(),
+    startIso: start ? istCalendarDateStartToUtcIso(startDate) ?? undefined : undefined,
+    endExclusiveIso: end ? istCalendarDateStartToUtcIso(endDate, 1) ?? undefined : undefined,
     dateError: null,
   };
 }

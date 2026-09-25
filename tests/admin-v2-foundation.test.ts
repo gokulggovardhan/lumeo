@@ -72,6 +72,7 @@ test("Admin Console V2 mobile navigation remains keyboard and pointer dismissibl
   assert.match(mobile, /aria-expanded=\{open\}/);
   assert.match(mobile, /aria-controls="admin-mobile-menu"/);
   assert.match(mobile, /<Link href="\/"/);
+  assert.match(mobile, /Cloudflare · IST/);
   assert.doesNotMatch(mobile, /useEffect\(\(\) => \{\s*setOpen\(false\)/);
 });
 
@@ -81,6 +82,6 @@ test("Admin Console V2 runtime identity stays Cloudflare-native", () => {
 
   assert.match(layout, /LUMEO_DEPLOYMENT_ENV/);
   assert.match(layout, /LUMEO_BUILD_SHA/);
-  assert.match(topbar, /Cloudflare/);
+  assert.match(topbar, /Cloudflare · IST/);
   assert.doesNotMatch(`${layout}\n${topbar}`, /VERCEL_/);
 });

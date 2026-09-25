@@ -65,7 +65,7 @@ export function ControlCenterMobileNav({
 
         <div className="min-w-0 flex-1 text-center">
           <p className="truncate text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-muted)]">
-            {environment === "production" ? "Production" : environment} · Cloudflare
+            {environment === "production" ? "Production" : environment} · Cloudflare · IST
           </p>
           <p className="mt-0.5 truncate font-mono text-[10px] text-[var(--text-subtle)]">
             {revision ? revision.slice(0, 10) : "revision unavailable"}

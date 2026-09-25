@@ -57,7 +57,7 @@ export function filterAdminTools(tools: ToolWithCategory[], filters: ToolFilters
     if (filters.enabled === "enabled" && !tool.is_enabled) return false;
     if (filters.enabled === "disabled" && tool.is_enabled) return false;
 
-    const inMaintenance = tool.status === "maintenance" || Boolean(tool.maintenance_message);
+    const inMaintenance = tool.status === "maintenance";
     if (filters.maintenance === "maintenance" && !inMaintenance) return false;
     if (filters.maintenance === "clear" && inMaintenance) return false;
     return true;

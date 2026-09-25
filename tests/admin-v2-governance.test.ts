@@ -54,8 +54,8 @@ test("Audit filters include every current audited entity and validate calendar r
     end: "2026-09-21",
   });
   assert.equal(valid.dateError, null);
-  assert.equal(valid.startIso, "2026-09-01T00:00:00.000Z");
-  assert.equal(valid.endExclusiveIso, "2026-09-22T00:00:00.000Z");
+  assert.equal(valid.startIso, "2026-08-31T18:30:00.000Z");
+  assert.equal(valid.endExclusiveIso, "2026-09-21T18:30:00.000Z");
 
   assert.match(resolveAuditFilters({ start: "2026-02-31" }).dateError ?? "", /valid calendar/);
   assert.match(

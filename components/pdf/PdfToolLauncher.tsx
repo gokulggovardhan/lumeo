@@ -27,6 +27,11 @@ const SECONDARY_TOOL_SLUGS = [
   "pdf-to-jpg",
 ] as const;
 
+const CURATED_TOOL_SLUGS = new Set<string>([
+  ...PRIMARY_TOOL_SLUGS,
+  ...SECONDARY_TOOL_SLUGS,
+]);
+
 function statusLabel(tile: Tile) {
   if (tile.availability === "beta") return "Beta";
   if (tile.availability === "coming_soon") return "Coming soon";
@@ -121,6 +126,16 @@ export async function PdfToolLauncher() {
   const tiles = buildDiscoveryTiles(resolved);
   const primary = selectTiles(tiles, PRIMARY_TOOL_SLUGS);
   const secondary = selectTiles(tiles, SECONDARY_TOOL_SLUGS);
+  // The main homepage remains intentionally curated, but an Admin-controlled
+  // coming-soon state is also a publishing decision: every enabled tool in
+  // that state must be visible to visitors even when it is not one of the
+  // ten curated launch tiles. These cards remain non-actionable because
+  // CuratedToolCard only links active/beta tools.
+  const additionalComingSoon = tiles.filter(
+    (tile) =>
+      tile.availability === "coming_soon" &&
+      !CURATED_TOOL_SLUGS.has(tile.slug),
+  );
 
   return (
     <div>
@@ -167,6 +182,28 @@ export async function PdfToolLauncher() {
           ))}
         </ul>
       </section>
+
+      {additionalComingSoon.length > 0 ? (
+        <section aria-labelledby="coming-soon-tools-heading" className="mt-14 sm:mt-16">
+          <div className="mb-5 max-w-2xl">
+            <p className="aura-text-label text-[var(--text-muted)]">Coming soon</p>
+            <h2
+              id="coming-soon-tools-heading"
+              className="mt-2 font-serif text-[1.45rem] font-semibold text-[var(--text-primary)] sm:text-[1.6rem]"
+            >
+              More tools on the way
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+              These tools are published for preview but stay unavailable until they are ready.
+            </p>
+          </div>
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {additionalComingSoon.map((tile, index) => (
+              <CuratedToolCard key={tile.route} tile={tile} index={index} />
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

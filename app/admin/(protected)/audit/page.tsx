@@ -93,10 +93,10 @@ export default async function AuditPage({
       <AdminPageHeader
         eyebrow="Record of change"
         title="Audit Log"
-        description="Read-only administrative history. Sensitive raw payloads are not displayed by default."
+        description="Read-only administrative history. All date filters and timestamps use IST (Asia/Kolkata). Sensitive raw payloads are not displayed by default."
       />
 
-      <AdminSectionCard title="Filters" description="Narrow by action text, entity type, or date range.">
+      <AdminSectionCard title="Filters" description="Narrow by action text, entity type, or IST calendar-date range.">
         <form method="get" className="grid gap-4 md:grid-cols-4">
           <label className="block text-sm font-semibold text-[#F0EAD6]">
             Action contains
@@ -122,7 +122,7 @@ export default async function AuditPage({
             </select>
           </label>
           <label className="block text-sm font-semibold text-[#F0EAD6]">
-            From
+            From (IST)
             <input
               type="date"
               name="start"
@@ -131,7 +131,7 @@ export default async function AuditPage({
             />
           </label>
           <label className="block text-sm font-semibold text-[#F0EAD6]">
-            To
+            To (IST)
             <input
               type="date"
               name="end"
@@ -159,7 +159,7 @@ export default async function AuditPage({
 
       <AdminSectionCard title="Recent administrative actions" description="Showing 50 records per page. Actor identifiers are resolved to email when the actor is a known administrator.">
         <AdminDataTable
-          columns={["Time", "Actor", "Role", "Action", "Entity", "Summary"]}
+          columns={["Time (IST)", "Actor", "Role", "Action", "Entity", "Summary"]}
           rows={visibleLogs.map((log) => [
             formatAdminDateTime(log.created_at),
             log.actor_user_id ? (actorEmails[log.actor_user_id] ?? log.actor_user_id) : "Unknown",

@@ -55,7 +55,7 @@ export default async function ToolsPage({
   const activeFilters = hasActiveToolFilters(filters);
   const enabledCount = tools.data.filter((tool) => tool.is_enabled).length;
   const maintenanceCount = tools.data.filter(
-    (tool) => tool.status === "maintenance" || Boolean(tool.maintenance_message),
+    (tool) => tool.status === "maintenance",
   ).length;
   const usageAvailable = analytics.data.dataStatus === "available";
   const opensBySlug = new Map(
@@ -78,9 +78,32 @@ export default async function ToolsPage({
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminMetricCard label="Catalog tools" value={tools.data.length} detail="Database-backed tool records." />
         <AdminMetricCard label="Enabled" value={enabledCount} detail="Available to public catalog resolution." tone="success" />
-        <AdminMetricCard label="Maintenance" value={maintenanceCount} detail="Tools with a maintenance state or message." tone={maintenanceCount ? "warning" : "neutral"} />
+        <AdminMetricCard label="Maintenance" value={maintenanceCount} detail="Tools currently blocked for maintenance." tone={maintenanceCount ? "warning" : "neutral"} />
         <AdminMetricCard label="Filtered results" value={filteredTools.length} detail={activeFilters ? "Matches the current URL-backed filters." : "Showing the complete catalog."} tone="gold" />
       </section>
+
+      <AdminSectionCard
+        title="Public state policy"
+        description="The selected state and Enabled publicly flag resolve to one effective public behavior. Disabled always wins and fails closed."
+      >
+        <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            ["Active", "Listed and usable."],
+            ["Beta", "Listed and usable, with a Beta label."],
+            ["Coming soon", "Listed but blocked, with Coming Soon shown publicly."],
+            ["Maintenance", "Listed but blocked, with the maintenance notice shown."],
+            ["Hidden", "Not listed and blocked on its direct route."],
+          ].map(([label, detail]) => (
+            <div key={label} className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-base)] p-3">
+              <p className="font-semibold text-[var(--text-primary)]">{label}</p>
+              <p className="mt-1 leading-5 text-[var(--text-muted)]">{detail}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-[var(--text-subtle)]">
+          Turning off Enabled publicly overrides every state: the tool is removed from public discovery and its direct workspace is blocked.
+        </p>
+      </AdminSectionCard>
 
       <AdminSectionCard title="Find tools" description="Filters are server-rendered and encoded in the URL, so operational views can be bookmarked or shared.">
         <form action="/admin/tools" method="get" className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(13rem,1.5fr)_repeat(4,minmax(9rem,1fr))_auto]">
@@ -126,10 +149,10 @@ export default async function ToolsPage({
         description={canEdit ? "Owner and admin roles can update each row as one audited change. Usage shows verified tool-open events for today when analytics is available." : "Analyst access is read-only. Usage shows verified tool-open events for today when analytics is available."}
       >
         <AdminDataTable
-          columns={["Tool", "Category", "Public route", "State", "Maintenance", "Today opens", "Updated", "Action"]}
+          columns={["Tool", "Category", "Public route", "State", "Maintenance", "Today opens (IST)", "Updated (IST)", "Action"]}
           rows={filteredTools.map((tool) => {
             const formId = `tool-form-${tool.id}`;
-            const maintenance = tool.status === "maintenance" || Boolean(tool.maintenance_message);
+            const maintenance = tool.status === "maintenance";
 
             if (!canEdit) {
               return [
@@ -164,7 +187,7 @@ export default async function ToolsPage({
               </div>,
               <div key="maintenance" className="min-w-52">
                 <input type="text" form={formId} name="maintenance_message" defaultValue={tool.maintenance_message ?? ""} placeholder="Message shown while unavailable" aria-label={`${tool.name} maintenance message`} maxLength={300} className="min-h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base sm:text-xs" />
-                <p className="mt-2 text-xs text-[var(--text-subtle)]">{maintenance ? "Maintenance configured" : "No maintenance message"}</p>
+                <p className="mt-2 text-xs text-[var(--text-subtle)]">{maintenance ? "Maintenance active; this message is shown publicly while the tool is blocked." : tool.maintenance_message ? "Saved message; shown only when Maintenance is selected." : "Optional message for the Maintenance state."}</p>
               </div>,
               usageAvailable ? opensBySlug.get(tool.slug) ?? 0 : <span className="text-[var(--text-subtle)]">Unavailable</span>,
               formatAdminDate(tool.updated_at),

@@ -22,7 +22,7 @@ function formatEventTime(value: string) {
 export function RecentActivityTable({ rows }: { rows: RecentActivityRow[] }) {
   return (
     <AdminDataTable
-      columns={["Time", "Event", "Tool", "Location", "Device"]}
+      columns={["Time (IST)", "Event", "Tool", "Location", "Device"]}
       rows={rows.map((row) => {
         if (row.kind === "unknown_location_burst") {
           return [

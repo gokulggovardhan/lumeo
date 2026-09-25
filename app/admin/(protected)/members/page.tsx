@@ -148,7 +148,7 @@ export default async function MembersPage({
             description="Owners can promote, demote, or deactivate any administrator except themselves. At least one active owner must always remain."
           >
             <AdminDataTable
-              columns={["Email", "Role", "Status", "Last sign-in", "Added", "Action"]}
+              columns={["Email", "Role", "Status", "Last sign-in (IST)", "Added (IST)", "Action"]}
               rows={filteredMembers.map((member) => {
                 const isSelf = member.userId === admin.userId;
                 return [

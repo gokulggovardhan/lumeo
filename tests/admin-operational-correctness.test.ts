@@ -233,3 +233,50 @@ test("Inbox delete authorization is enforced in both UI action and database RLS"
     /for delete[\s\S]*?using \(public\.is_active_admin\(\)\)/,
   );
 });
+
+
+test("Admin Console uses IST consistently for display, scheduling, and audit date bounds", () => {
+  const timezone = read("lib/admin/timezone.ts");
+  const auditFilters = read("lib/admin/governance-filters.ts");
+  const announcements = read("app/admin/(protected)/announcements/actions.ts");
+  const dashboard = read("app/admin/(protected)/page.tsx");
+  const audit = read("app/admin/(protected)/audit/page.tsx");
+  const errors = read("app/admin/(protected)/errors/page.tsx");
+  const members = read("app/admin/(protected)/members/page.tsx");
+  const tools = read("app/admin/(protected)/tools/page.tsx");
+  const seo = read("app/admin/(protected)/seo/page.tsx");
+  const settings = read("app/admin/(protected)/settings/page.tsx");
+  const activity = read("components/admin/analytics/RecentActivityTable.tsx");
+  const topbar = read("components/admin/AdminTopbar.tsx");
+  const mobile = read("components/admin/ControlCenterMobileNav.tsx");
+
+  assert.match(timezone, /ADMIN_TIMEZONE = "Asia\/Kolkata"/);
+  assert.match(timezone, /return `\$\{formatted\} IST`/);
+  assert.match(timezone, /istCalendarDateStartToUtcIso/);
+  assert.match(auditFilters, /istCalendarDateStartToUtcIso\(startDate\)/);
+  assert.match(auditFilters, /istCalendarDateStartToUtcIso\(endDate, 1\)/);
+  assert.match(announcements, /istInputValueToUtcIso/);
+
+  for (const [source, marker] of [
+    [dashboard, "Last seen (IST)"],
+    [audit, "Time (IST)"],
+    [errors, "First seen (IST)"],
+    [members, "Last sign-in (IST)"],
+    [tools, "Updated (IST)"],
+    [seo, "Updated (IST)"],
+    [settings, "Updated (IST)"],
+    [activity, "Time (IST)"],
+    [topbar, "Cloudflare · IST"],
+    [mobile, "Cloudflare · IST"],
+  ] as const) {
+    assert.ok(source.includes(marker), `missing IST marker: ${marker}`);
+  }
+});
+
+test("Dashboard tool activity follows the same usable-state policy as public discovery", () => {
+  const dashboard = read("app/admin/(protected)/page.tsx");
+  assert.match(
+    dashboard,
+    /tool\.status !== "active" && tool\.status !== "beta"/,
+  );
+});

@@ -243,7 +243,7 @@ export default async function AdminPage() {
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-[var(--text-primary)]">Important metrics</p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">Today · verified analytics only.</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Today (IST) · verified analytics only.</p>
           </div>
           <Link href="/admin/analytics" className="text-xs font-semibold text-[var(--text-accent)] hover:underline">
             Analytics →
@@ -295,7 +295,7 @@ export default async function AdminPage() {
       <section className="grid gap-4 xl:grid-cols-2">
         <AdminSectionCard
           title="Tool activity"
-          description="Most-opened tools today, mapped to the current catalog state."
+          description="Most-opened tools today (IST), mapped to the current catalog state."
           action={<Link href="/admin/tools" className="text-xs font-semibold text-[var(--text-accent)] hover:underline">Manage tools →</Link>}
         >
           {topTools.length === 0 ? (
@@ -304,7 +304,7 @@ export default async function AdminPage() {
             <div className="space-y-1">
               {topTools.map((item, index) => {
                 const tool = toolBySlug.get(item.toolSlug);
-                const unavailable = !tool || !tool.is_enabled || tool.status === "maintenance";
+                const unavailable = !tool || !tool.is_enabled || (tool.status !== "active" && tool.status !== "beta");
                 return (
                   <div key={item.toolSlug} className="flex items-center gap-3 border-b border-[var(--border-hairline)] py-3 last:border-0">
                     <span className="w-5 font-mono text-xs text-[var(--text-subtle)]">{String(index + 1).padStart(2, "0")}</span>
@@ -370,7 +370,7 @@ export default async function AdminPage() {
             <AdminEmptyState title="Error preview unavailable" description="Error monitoring could not be verified for this preview." />
           ) : (
             <AdminDataTable
-              columns={["Severity", "Message", "Occurrences", "Last seen"]}
+              columns={["Severity", "Message", "Occurrences", "Last seen (IST)"]}
               rows={recentErrors.data.map((error) => [
                 <AdminStatusBadge key="severity" tone={error.severity === "critical" || error.severity === "high" ? "danger" : error.severity === "medium" ? "warning" : "neutral"}>{error.severity}</AdminStatusBadge>,
                 <span key="message" className="block max-w-[24rem] truncate font-medium text-[var(--text-primary)]">{error.message}</span>,
@@ -391,7 +391,7 @@ export default async function AdminPage() {
             <AdminEmptyState title="Audit preview unavailable" description="Audit history could not be verified for this preview." />
           ) : (
             <AdminDataTable
-              columns={["Time", "Action", "Summary"]}
+              columns={["Time (IST)", "Action", "Summary"]}
               rows={audit.data.map((log) => [formatDate(log.created_at), log.action, log.summary])}
               empty={<AdminEmptyState title="No recent Admin changes" description="Audited changes will appear here after Admin actions are performed." />}
             />

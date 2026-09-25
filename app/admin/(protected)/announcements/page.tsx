@@ -100,7 +100,7 @@ export default async function AnnouncementsPage({
       )}
       <AdminSectionCard title="Announcement records" description={canEdit ? "Owner and admin roles can edit or activate messages." : "Analyst access is read-only."}>
         <AdminDataTable
-          columns={["Title", "Tone", "State", "Schedule", "Link", "Action"]}
+          columns={["Title", "Tone", "State", "Schedule (IST)", "Link", "Action"]}
           rows={announcements.data.map((announcement) => {
             const status = resolveAnnouncementStatus({
               isActive: announcement.is_active,
