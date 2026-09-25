@@ -42,7 +42,7 @@ export function measureNativeTextShowAdvance(
   operator: TextShowOperator,
   profile: PdfFontProfile | null,
 ): NativeTextAdvanceMeasurement {
-  if (!profile) {
+  if (!profile || profile.metricsSource === "Unknown") {
     return { advancePt: null, glyphCodes: null, reason: "font-unresolved" };
   }
 
