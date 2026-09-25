@@ -29,7 +29,7 @@ export function AdminTopbar({
         />
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">
-            {environmentLabel(environment)} · Cloudflare
+            {environmentLabel(environment)} · Cloudflare · IST
           </p>
           <p className="mt-0.5 truncate font-mono text-[11px] text-[var(--text-subtle)]">
             {revision ? `rev ${revision.slice(0, 12)}` : "revision unavailable"}
