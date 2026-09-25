@@ -78,7 +78,7 @@ export default async function ToolsPage({
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <AdminMetricCard label="Catalog tools" value={tools.data.length} detail="Database-backed tool records." />
         <AdminMetricCard label="Enabled" value={enabledCount} detail="Available to public catalog resolution." tone="success" />
-        <AdminMetricCard label="Maintenance" value={maintenanceCount} detail="Tools with a maintenance state or message." tone={maintenanceCount ? "warning" : "neutral"} />
+        <AdminMetricCard label="Maintenance" value={maintenanceCount} detail="Tools currently blocked for maintenance." tone={maintenanceCount ? "warning" : "neutral"} />
         <AdminMetricCard label="Filtered results" value={filteredTools.length} detail={activeFilters ? "Matches the current URL-backed filters." : "Showing the complete catalog."} tone="gold" />
       </section>
 
@@ -152,7 +152,7 @@ export default async function ToolsPage({
           columns={["Tool", "Category", "Public route", "State", "Maintenance", "Today opens", "Updated", "Action"]}
           rows={filteredTools.map((tool) => {
             const formId = `tool-form-${tool.id}`;
-            const maintenance = tool.status === "maintenance" || Boolean(tool.maintenance_message);
+            const maintenance = tool.status === "maintenance";
 
             if (!canEdit) {
               return [
@@ -187,7 +187,7 @@ export default async function ToolsPage({
               </div>,
               <div key="maintenance" className="min-w-52">
                 <input type="text" form={formId} name="maintenance_message" defaultValue={tool.maintenance_message ?? ""} placeholder="Message shown while unavailable" aria-label={`${tool.name} maintenance message`} maxLength={300} className="min-h-10 w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--surface-input)] px-2 text-base sm:text-xs" />
-                <p className="mt-2 text-xs text-[var(--text-subtle)]">{maintenance ? "Maintenance configured" : "No maintenance message"}</p>
+                <p className="mt-2 text-xs text-[var(--text-subtle)]">{maintenance ? "Maintenance active; this message is shown publicly while the tool is blocked." : tool.maintenance_message ? "Saved message; shown only when Maintenance is selected." : "Optional message for the Maintenance state."}</p>
               </div>,
               usageAvailable ? opensBySlug.get(tool.slug) ?? 0 : <span className="text-[var(--text-subtle)]">Unavailable</span>,
               formatAdminDate(tool.updated_at),
