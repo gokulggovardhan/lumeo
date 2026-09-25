@@ -119,6 +119,29 @@ test("homepage exposes truthful beta and unavailable states without actionable l
   assert.match(source, /<article/);
 });
 
+test("every enabled coming-soon tool can surface on the homepage even outside the curated set", () => {
+  const source = readFileSync("components/pdf/PdfToolLauncher.tsx", "utf8");
+  assert.match(source, /const additionalComingSoon = tiles\.filter/);
+  assert.match(source, /tile\.availability === "coming_soon"/);
+  assert.match(source, /!CURATED_TOOL_SLUGS\.has\(tile\.slug\)/);
+  assert.match(source, /additionalComingSoon\.map/);
+  assert.match(source, /id="coming-soon-tools-heading"/);
+});
+
+test("Admin Tools explains the effective public state and counts maintenance by state", () => {
+  const source = readFileSync("app/admin/(protected)/tools/page.tsx", "utf8");
+  assert.match(source, /Public state policy/);
+  assert.match(source, /Disabled always wins and fails closed/);
+  assert.match(source, /Listed and usable, with a Beta label/);
+  assert.match(source, /Listed but blocked, with Coming Soon shown publicly/);
+  assert.match(source, /Not listed and blocked on its direct route/);
+  assert.match(source, /tool\.status === "maintenance"/);
+  assert.doesNotMatch(
+    source,
+    /tool\.status === "maintenance" \|\| Boolean\(tool\.maintenance_message\)/,
+  );
+});
+
 test("Admin saves verify an updated row, audit maintenance copy, and invalidate the shared cache", () => {
   const source = readFileSync("app/admin/(protected)/tools/actions.ts", "utf8");
   assert.match(source, /\.select\("id"\)[\s\S]*\.maybeSingle\(\)/);
