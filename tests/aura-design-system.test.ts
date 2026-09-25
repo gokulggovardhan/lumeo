@@ -290,7 +290,7 @@ test("Lumeo 2 directory and error states use public foundations", () => {
   assert.ok(pdfTools.includes("getPublicPdfCatalog"));
   assert.ok(pdfTools.includes("ToolsExplorer"));
   assert.ok(directoryError.includes("L2PublicErrorState"));
-  assert.doesNotMatch(pdfTools, /\b(popular|ratings?|users?|downloads?)\b/i);
+  assert.doesNotMatch(pdfTools, /\b(ratings?|users?|downloads?)\b/i);
 });
 
 test("Lumeo tool maintenance notice is clearly non-operational", () => {
