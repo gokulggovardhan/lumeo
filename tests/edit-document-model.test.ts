@@ -7,6 +7,7 @@ import {
   type PdfTextSourceMatch,
 } from "../lib/pdf/edit/documentModel.ts";
 import type { DetectedTextRun } from "../lib/pdf/edit/textRuns.ts";
+import type { PdfFontProfile } from "../lib/pdf/edit/fontRegistry.ts";
 
 function run(
   str: string,
@@ -25,6 +26,17 @@ function run(
     fontSizePt: 12,
     rotated: false,
   };
+}
+
+function safeFontProfile(): PdfFontProfile {
+  return {
+    kind: "Type1",
+    encodingSource: "WinAnsi",
+    metricsSource: "Widths",
+    resolvedFont: {
+      writingMode: "horizontal",
+    },
+  } as PdfFontProfile;
 }
 
 function match(
@@ -72,6 +84,7 @@ test("document model keeps distant same-baseline columns as separate lines and b
     heightPt: 800,
     runs,
     matches: runs.map((_, index) => match(index)),
+    fontProfiles: runs.map(() => safeFontProfile()),
   });
 
   assert.equal(model.spans.length, 4);
@@ -97,6 +110,7 @@ test("document model merges nearby fragmented spans into a meaningful line", () 
     heightPt: 800,
     runs,
     matches: runs.map((_, index) => match(index)),
+    fontProfiles: runs.map(() => safeFontProfile()),
     fragmentedRunIndices: new Set([1]),
   });
 
@@ -184,4 +198,21 @@ test("document model preserves proven fill/stroke paint and alpha from the match
   });
   assert.equal(model.spans[0].style.fillOpacity, 0.5);
   assert.equal(model.spans[0].style.strokeOpacity, 0.75);
+});
+
+
+test("document model never claims native editability when the source font profile is unresolved", () => {
+  const model = buildPdfPageTextModel({
+    pageIndex: 0,
+    widthPt: 600,
+    heightPt: 800,
+    runs: [run("Unknown font", 10, 20)],
+    matches: [match(0)],
+    fontProfiles: [null],
+  });
+
+  assert.equal(model.spans[0].capability, "view-only");
+  assert.match(model.spans[0].capabilityReason ?? "", /font resource/i);
+  assert.equal(model.capability, "view-only");
+  assert.equal(model.editableSpanCount, 0);
 });
