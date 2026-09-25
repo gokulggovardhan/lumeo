@@ -64,10 +64,10 @@ export default async function AnalyticsPage({
               <option value="today">Today</option><option value="yesterday">Yesterday</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="this-month">This month</option><option value="previous-month">Previous month</option><option value="custom">Custom</option>
             </select>
           </label>
-          <label className="text-xs font-semibold text-[var(--text-secondary)]">Custom start
+          <label className="text-xs font-semibold text-[var(--text-secondary)]">Custom start (IST)
             <input type="date" name="start" defaultValue={params.start ?? range.startDate} max={maxDate} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--text-primary)] sm:text-sm" />
           </label>
-          <label className="text-xs font-semibold text-[var(--text-secondary)]">Custom end
+          <label className="text-xs font-semibold text-[var(--text-secondary)]">Custom end (IST)
             <input type="date" name="end" defaultValue={params.end ?? range.endDate} max={maxDate} className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--text-primary)] sm:text-sm" />
           </label>
           <div className="flex items-end"><button type="submit" className="min-h-11 w-full rounded-xl bg-[var(--action-primary)] px-5 text-sm font-bold text-[var(--text-on-accent)] transition hover:bg-[var(--action-primary-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--lumeo-aura-rgb),0.2)] lg:w-auto">Apply</button></div>
