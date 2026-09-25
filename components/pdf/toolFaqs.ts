@@ -118,7 +118,7 @@ export const organizeFaqs: FaqItem[] = [
 
 export const extractTextFaqs: FaqItem[] = [
   {
-    question: "Does Text Extract work on scanned PDFs?",
+    question: "Does Extract Text work on scanned PDFs?",
     answer:
       "Only if the PDF already has selectable text. Scanned pages without an OCR layer have no extractable text -- a searchable-scan tool is planned separately.",
   },
