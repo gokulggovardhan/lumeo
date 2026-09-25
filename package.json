@@ -16,7 +16,6 @@
     "verify:lumeo2-public-experience": "node scripts/verify-lumeo-2-public-experience.mjs",
     "verify:lumeo2-workspaces": "node scripts/verify-lumeo-2-workspaces.mjs",
     "verify:release": "node scripts/verify-release.mjs",
-    "verify:worker-config": "node scripts/verify-cloudflare-worker-config.mjs",
     "test": "node --no-warnings --test --experimental-strip-types",
     "test:compression-target": "node --no-warnings --test --experimental-strip-types tests/compression-target.test.ts",
     "db:migrate": "node scripts/db-migrate.mjs",
