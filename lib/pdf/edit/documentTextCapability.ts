@@ -45,10 +45,11 @@ export function classifySpanTextCapability(
 ): SpanTextCapabilityClassification {
   const reasons: string[] = [];
   const native = item.nativeSpan;
-  const operator = item.locatedOperator?.operator ?? null;
+  const locatedOperator = item.locatedOperator;
+  const operator = locatedOperator?.operator ?? null;
   const profile = native?.fontProfile ?? null;
 
-  if (!native || !operator) {
+  if (!native || !locatedOperator || !operator) {
     return {
       category: "UNKNOWN_OR_UNSAFE",
       safelyRewritable: false,
@@ -133,7 +134,7 @@ export function classifySpanTextCapability(
     };
   }
 
-  if (item.locatedOperator.locator.kind === "xobject") {
+  if (locatedOperator.locator.kind === "xobject") {
     return {
       category: "FORM_XOBJECT_TEXT",
       safelyRewritable: true,
