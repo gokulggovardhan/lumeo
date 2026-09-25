@@ -4,7 +4,9 @@ import { PDFDocument, StandardFonts, degrees } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
-import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed } from "../lib/pdf/edit/matchTextRun.ts";
+import { detectNativeTextSpans } from "../lib/pdf/edit/nativeTextDetection.ts";
+import { reconcileTextDetections } from "../lib/pdf/edit/textReconciliation.ts";
+import { classifySpanTextCapability } from "../lib/pdf/edit/documentTextCapability.ts";
 import { textRunsFromContent } from "../lib/pdf/edit/textRuns.ts";
 import { buildEditPdfFidelityCorpusReport, type EditPdfFidelityFixtureMeasurement } from "../lib/pdf/edit/fidelityMetrics.ts";
 
@@ -37,32 +39,36 @@ async function measure(fixture: Fixture): Promise<EditPdfFidelityFixtureMeasurem
   const runs = textRunsFromContent(content.items as never, viewport.transform, viewport.width, viewport.height);
 
   const pdfLibDoc = await PDFDocument.load(fixture.bytes.slice());
-  const located = collectPageTextOperators(pdfLibDoc, 0);
-  const flat = located.map((item) => item.operator);
-  const index = buildOperatorSpatialIndex(flat, viewport.transform);
-  const byOperator = new Map(located.map((item) => [item.operator, item] as const));
   const registry = new PdfFontRegistry(pdfLibDoc);
+  const located = collectPageTextOperators(pdfLibDoc, 0, { fontRegistry: registry });
+  const nativeSpans = detectNativeTextSpans({
+    locatedOperators: located,
+    fontRegistry: registry,
+    viewportTransform: viewport.transform,
+    pageWidthPt: viewport.width,
+    pageHeightPt: viewport.height,
+  });
+  const reconciled = reconcileTextDetections({
+    pdfJsRuns: runs,
+    nativeSpans,
+    pageWidthPt: viewport.width,
+    pageHeightPt: viewport.height,
+  });
 
-  let matchedSpans = 0;
-  let correctFontResolutions = 0;
-  let unresolvedFonts = 0;
+  const matchedSpans = reconciled.filter((item) => item.locatedOperator !== null).length;
+  const correctFontResolutions = reconciled.filter(
+    (item) =>
+      item.nativeSpan?.fontProfile &&
+      item.nativeSpan.fontProfile.encodingSource !== "Unknown",
+  ).length;
+  const unresolvedFonts = reconciled.filter(
+    (item) => item.locatedOperator !== null && !item.nativeSpan?.fontProfile,
+  ).length;
+  const unsupportedRuns = reconciled.filter(
+    (item) => !classifySpanTextCapability(item).safelyRewritable,
+  ).length;
 
-  for (const run of runs) {
-    const operator = matchDetectedRunToOperatorIndexed(run, viewport.width, viewport.height, index);
-    if (!operator) continue;
-    const source = byOperator.get(operator);
-    if (!source) continue;
-    matchedSpans += 1;
-    if (!operator.fontResourceName) {
-      unresolvedFonts += 1;
-      continue;
-    }
-    const profile = registry.resolve(source.resources, operator.fontResourceName);
-    if (profile && profile.encodingSource !== "Unknown") correctFontResolutions += 1;
-    else unresolvedFonts += 1;
-  }
-
-  const detectedText = runs.map((run) => run.str).join("");
+  const detectedText = reconciled.map((item) => item.run.str).join("");
   // pdfjs-dist's Node legacy proxy shape differs slightly across builds;
   // this short-lived CI process does not need an unconditional destroy().
   const destroy = (pdfJsDoc as { destroy?: () => Promise<void> | void }).destroy;
@@ -75,11 +81,11 @@ async function measure(fixture: Fixture): Promise<EditPdfFidelityFixtureMeasurem
     detectedTextCharacters: detectedText.length,
     expectedSpans: 1,
     matchedSpans,
-    unmatchedSpans: Math.max(0, runs.length - matchedSpans),
+    unmatchedSpans: Math.max(0, reconciled.length - matchedSpans),
     correctFontResolutions,
     unresolvedFonts,
     baselineErrorsPt: [],
-    unsupportedRuns: Math.max(0, runs.length - matchedSpans),
+    unsupportedRuns,
     nativeEditSuccess: null,
     exportSuccess: null,
     reopenSuccess: null,
