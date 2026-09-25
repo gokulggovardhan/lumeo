@@ -51,7 +51,7 @@ test("diagnostics retain raw source bytes, native decoding, font identity and ex
     fontProfiles: [profile],
   });
 
-  assert.equal(report.schemaVersion, 1);
+  assert.equal(report.schemaVersion, 2);
   assert.equal(report.pageNumber, 1);
   assert.equal(report.spans.length, 1);
   const span = report.spans[0];
@@ -60,12 +60,17 @@ test("diagnostics retain raw source bytes, native decoding, font identity and ex
   assert.equal(span.source.operator.decodedUnicodeComplete, true);
   assert.ok(span.source.operator.rawEncodedHex[0]?.length > 0);
   assert.equal(span.font.baseFont, "Helvetica");
+  assert.match(span.font.objectRef ?? "", /^\d+ \d+ R$/);
+  assert.equal(span.font.writingMode, "unknown");
+  assert.equal(span.font.embeddedProgramSha256, null);
   assert.equal(span.font.nativeRewriteCapability, "proven");
   assert.equal(span.geometry.fontSizePt, 12);
   assert.equal(span.geometry.fontSizeDeltaPt, 0);
   assert.equal(span.geometry.baselineDeltaPt, null);
   assert.ok(span.unresolvedEvidence.includes("native-pdfjs-baseline-not-reconciled"));
-  assert.ok(span.unresolvedEvidence.includes("font-object-ref-not-exposed"));
+  assert.ok(!span.unresolvedEvidence.includes("font-object-ref-not-exposed"));
+  assert.ok(!span.unresolvedEvidence.includes("font-descriptor-ref-not-exposed"));
+  assert.ok(!span.unresolvedEvidence.includes("font-program-ref-not-exposed"));
   assert.ok(!span.unresolvedEvidence.includes("font-profile-unresolved"));
 });
 

@@ -86,6 +86,23 @@ function profile(overrides: Partial<PdfFontProfile> = {}): PdfFontProfile {
     cssFallbackFamily: "Arial, Helvetica, sans-serif",
     browserFamilyName: "LumeoPdf_F1_DemoSans",
     browserPreviewPossible: true,
+    resourceIdentity: {
+      fontObjectRef: null,
+      descriptorObjectRef: null,
+      descendantObjectRef: null,
+      fontProgramObjectRef: null,
+      toUnicodeObjectRef: null,
+      encodingObjectRef: null,
+      descriptorFontName: null,
+      descendantSubtype: null,
+      descendantBaseFont: null,
+      type0Encoding: null,
+      writingMode: "unknown",
+      cidSystemInfo: null,
+      cidToGidMap: null,
+    },
+    embeddedProgramByteLength: null,
+    embeddedProgramSha256: null,
     resolvedFont: {
       kind: "TrueType",
       baseFont: "ABCDEF+DemoSans",
@@ -253,6 +270,30 @@ test("classifier identifies Form XObject text without flattening away its resour
   const classification = classifyNativeTextSpan(span);
   assert.equal(classification.category, "FORM_XOBJECT_TEXT");
   assert.equal(classification.safelyRewritable, true);
+});
+
+test("classifier detects vertical Type0 text from retained font CMap evidence", () => {
+  const [span] = buildNativeContentStreamSpans({
+    operators: [located()],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () =>
+      profile({
+        kind: "Type0",
+        bytesPerCode: 2,
+        resourceIdentity: {
+          ...profile().resourceIdentity,
+          type0Encoding: "Identity-V",
+          writingMode: "vertical",
+          descendantSubtype: "CIDFontType2",
+        },
+      }),
+  });
+
+  const classification = classifyNativeTextSpan(span);
+  assert.equal(classification.category, "VERTICAL_TEXT");
+  assert.equal(classification.safelyRewritable, false);
 });
 
 test("classifier refuses unknown encoding and clipping instead of claiming safe editability", () => {

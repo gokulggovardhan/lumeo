@@ -62,6 +62,14 @@ export function classifyNativeTextSpan(
       reason: "Type3 glyph programs are not yet proven safe for native rewrite.",
     };
   }
+  if (profile?.resourceIdentity.writingMode === "vertical") {
+    return {
+      nativeSpanKey: span.key,
+      category: "VERTICAL_TEXT",
+      safelyRewritable: false,
+      reason: "The Type0 font uses a vertical CMap; vertical native rewrite is not yet proven safe.",
+    };
+  }
   if (span.locatedOperator.locator.kind === "xobject") {
     return {
       nativeSpanKey: span.key,

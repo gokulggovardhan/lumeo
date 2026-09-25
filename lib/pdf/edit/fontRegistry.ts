@@ -1,10 +1,12 @@
 import {
   PDFArray,
   PDFDict,
+  PDFHexString,
   PDFName,
   PDFNumber,
   PDFRawStream,
   PDFRef,
+  PDFString,
   decodePDFRawStream,
   type PDFContext,
   type PDFDocument,
@@ -17,6 +19,7 @@ import {
   type FallbackFontFamily,
   type FallbackStyleHints,
 } from "./fallbackFont.ts";
+import { sha256Hex } from "./sha256.ts";
 
 const SUBSET_PREFIX = /^[A-Z]{6}\+/;
 const BOLD_NAME = /bold|black|heavy|semib|demib?|ultra/i;
@@ -29,10 +32,42 @@ export type BrowserFontProgramFormat =
   | "cff"
   | "unknown";
 
+export type PdfFontWritingMode = "horizontal" | "vertical" | "unknown";
+
+export type PdfCidSystemInfo = {
+  registry: string | null;
+  ordering: string | null;
+  supplement: number | null;
+};
+
+export type PdfCidToGidMapIdentity = {
+  kind: "name" | "stream" | "unknown";
+  name: string | null;
+  objectRef: string | null;
+};
+
+export type PdfFontResourceIdentity = {
+  fontObjectRef: string | null;
+  descriptorObjectRef: string | null;
+  descendantObjectRef: string | null;
+  fontProgramObjectRef: string | null;
+  toUnicodeObjectRef: string | null;
+  encodingObjectRef: string | null;
+  descriptorFontName: string | null;
+  descendantSubtype: string | null;
+  descendantBaseFont: string | null;
+  type0Encoding: string | null;
+  writingMode: PdfFontWritingMode;
+  cidSystemInfo: PdfCidSystemInfo | null;
+  cidToGidMap: PdfCidToGidMapIdentity | null;
+};
+
 export type EmbeddedFontProgram = {
   bytes: Uint8Array;
   format: BrowserFontProgramFormat;
   browserLoadable: boolean;
+  objectRef: string | null;
+  sha256: string;
 };
 
 export type PdfFontProfile = {
@@ -65,6 +100,9 @@ export type PdfFontProfile = {
   cssFallbackFamily: string;
   browserFamilyName: string;
   browserPreviewPossible: boolean;
+  resourceIdentity: PdfFontResourceIdentity;
+  embeddedProgramByteLength: number | null;
+  embeddedProgramSha256: string | null;
   resolvedFont: ResolvedFont;
   metrics: FontMetrics;
   styleHints: FallbackStyleHints;
@@ -76,6 +114,24 @@ function nameString(value: unknown): string | null {
 
 function numberValue(value: unknown): number | null {
   return value instanceof PDFNumber ? value.asNumber() : null;
+}
+
+function textStringValue(value: unknown): string | null {
+  if (value instanceof PDFString || value instanceof PDFHexString) {
+    try {
+      return value.decodeText();
+    } catch {
+      return null;
+    }
+  }
+  // CIDSystemInfo is specified as PDF strings, but accepting a name here
+  // makes diagnostics robust to real-world producers that serialize these
+  // identifiers non-canonically.
+  return nameString(value);
+}
+
+function refString(value: unknown): string | null {
+  return value instanceof PDFRef ? value.toString() : null;
 }
 
 function normalizedDescriptorMetric(
@@ -106,21 +162,38 @@ function resolveArray(value: unknown, context: PDFContext): PDFArray | null {
   return resolved instanceof PDFArray ? resolved : null;
 }
 
-function descriptorForFont(fontDict: PDFDict, context: PDFContext): PDFDict | null {
+type FontStructure = {
+  descriptor: PDFDict | null;
+  descriptorRef: string | null;
+  descendant: PDFDict | null;
+  descendantRef: string | null;
+};
+
+function structureForFont(fontDict: PDFDict, context: PDFContext): FontStructure {
   const subtype = nameString(fontDict.get(PDFName.of("Subtype")));
   let descriptorHost: PDFDict | null = fontDict;
+  let descendant: PDFDict | null = null;
+  let descendantRef: string | null = null;
 
   if (subtype === "Type0") {
     const descendants = resolveArray(fontDict.get(PDFName.of("DescendantFonts")), context);
-    descriptorHost =
-      descendants && descendants.size() > 0
-        ? resolveDict(descendants.get(0), context)
-        : null;
+    const descendantEntry = descendants && descendants.size() > 0 ? descendants.get(0) : null;
+    descendantRef = refString(descendantEntry);
+    descendant = descendantEntry ? resolveDict(descendantEntry, context) : null;
+    descriptorHost = descendant;
   }
 
-  return descriptorHost
-    ? resolveDict(descriptorHost.get(PDFName.of("FontDescriptor")), context)
-    : null;
+  const descriptorEntry = descriptorHost?.get(PDFName.of("FontDescriptor")) ?? null;
+  return {
+    descriptor: descriptorEntry ? resolveDict(descriptorEntry, context) : null,
+    descriptorRef: refString(descriptorEntry),
+    descendant,
+    descendantRef,
+  };
+}
+
+function descriptorForFont(fontDict: PDFDict, context: PDFContext): PDFDict | null {
+  return structureForFont(fontDict, context).descriptor;
 }
 
 function familyNameFromBaseFont(baseFont: string): string {
@@ -151,7 +224,11 @@ function fallbackCssStack(fallback: FallbackFontFamily): string {
 function programFormatFor(
   descriptor: PDFDict,
   context: PDFContext,
-): { entry: unknown; format: BrowserFontProgramFormat; browserLoadable: boolean } | null {
+): {
+  entry: unknown;
+  format: BrowserFontProgramFormat;
+  browserLoadable: boolean;
+} | null {
   const trueType = descriptor.get(PDFName.of("FontFile2"));
   if (trueType) return { entry: trueType, format: "truetype", browserLoadable: true };
 
@@ -190,10 +267,29 @@ function readEmbeddedProgram(fontDict: PDFDict, context: PDFContext): EmbeddedFo
       bytes,
       format: candidate.format,
       browserLoadable: candidate.browserLoadable && bytes.byteLength > 0,
+      objectRef: refString(candidate.entry),
+      sha256: sha256Hex(bytes),
     };
   } catch {
     return null;
   }
+}
+
+type ResolvedFontResource = {
+  dict: PDFDict;
+  objectRef: string | null;
+};
+
+function resolveFontResource(
+  resources: PDFDict,
+  resourceName: string,
+  context: PDFContext,
+): ResolvedFontResource | null {
+  const fonts = resolveDict(resources.get(PDFName.of("Font")), context);
+  if (!fonts) return null;
+  const entry = fonts.get(PDFName.of(resourceName));
+  const dict = resolveDict(entry, context);
+  return dict ? { dict, objectRef: refString(entry) } : null;
 }
 
 function resolveFontDict(
@@ -201,9 +297,79 @@ function resolveFontDict(
   resourceName: string,
   context: PDFContext,
 ): PDFDict | null {
-  const fonts = resolveDict(resources.get(PDFName.of("Font")), context);
-  if (!fonts) return null;
-  return resolveDict(fonts.get(PDFName.of(resourceName)), context);
+  return resolveFontResource(resources, resourceName, context)?.dict ?? null;
+}
+
+function writingModeForEncoding(name: string | null): PdfFontWritingMode {
+  if (!name) return "unknown";
+  if (/(?:^|-)V$/i.test(name)) return "vertical";
+  if (/(?:^|-)H$/i.test(name) || /^Identity-H$/i.test(name)) return "horizontal";
+  return "unknown";
+}
+
+function cidSystemInfoFor(descendant: PDFDict | null, context: PDFContext): PdfCidSystemInfo | null {
+  if (!descendant) return null;
+  const value = descendant.get(PDFName.of("CIDSystemInfo"));
+  const info = resolveDict(value, context);
+  if (!info) return null;
+  return {
+    registry: textStringValue(resolveObject(info.get(PDFName.of("Registry")), context)),
+    ordering: textStringValue(resolveObject(info.get(PDFName.of("Ordering")), context)),
+    supplement: numberValue(resolveObject(info.get(PDFName.of("Supplement")), context)),
+  };
+}
+
+function cidToGidMapFor(
+  descendant: PDFDict | null,
+  context: PDFContext,
+): PdfCidToGidMapIdentity | null {
+  if (!descendant) return null;
+  const entry = descendant.get(PDFName.of("CIDToGIDMap"));
+  if (!entry) return null;
+  const resolved = resolveObject(entry, context);
+  const name = nameString(resolved);
+  if (name) return { kind: "name", name, objectRef: refString(entry) };
+  if (resolved instanceof PDFRawStream) {
+    return { kind: "stream", name: null, objectRef: refString(entry) };
+  }
+  return { kind: "unknown", name: null, objectRef: refString(entry) };
+}
+
+function resourceIdentityFor(
+  fontResource: ResolvedFontResource,
+  context: PDFContext,
+  embeddedProgram: EmbeddedFontProgram | null,
+): PdfFontResourceIdentity {
+  const fontDict = fontResource.dict;
+  const structure = structureForFont(fontDict, context);
+  const encodingEntry = fontDict.get(PDFName.of("Encoding"));
+  const type0Encoding = nameString(resolveObject(encodingEntry, context));
+  const toUnicodeEntry = fontDict.get(PDFName.of("ToUnicode"));
+  const descriptorFontName = structure.descriptor
+    ? nameString(structure.descriptor.get(PDFName.of("FontName")))
+    : null;
+  const descendantSubtype = structure.descendant
+    ? nameString(structure.descendant.get(PDFName.of("Subtype")))
+    : null;
+  const descendantBaseFont = structure.descendant
+    ? nameString(structure.descendant.get(PDFName.of("BaseFont")))
+    : null;
+
+  return {
+    fontObjectRef: fontResource.objectRef,
+    descriptorObjectRef: structure.descriptorRef,
+    descendantObjectRef: structure.descendantRef,
+    fontProgramObjectRef: embeddedProgram?.objectRef ?? null,
+    toUnicodeObjectRef: refString(toUnicodeEntry),
+    encodingObjectRef: refString(encodingEntry),
+    descriptorFontName,
+    descendantSubtype,
+    descendantBaseFont,
+    type0Encoding,
+    writingMode: writingModeForEncoding(type0Encoding),
+    cidSystemInfo: cidSystemInfoFor(structure.descendant, context),
+    cidToGidMap: cidToGidMapFor(structure.descendant, context),
+  };
 }
 
 /**
@@ -225,8 +391,9 @@ export class PdfFontRegistry {
   }
 
   resolve(resources: PDFDict, resourceName: string): PdfFontProfile | null {
-    const fontDict = resolveFontDict(resources, resourceName, this.context);
-    if (!fontDict) return null;
+    const fontResource = resolveFontResource(resources, resourceName, this.context);
+    if (!fontResource) return null;
+    const fontDict = fontResource.dict;
 
     const cached = this.profileCache.get(fontDict);
     if (cached) return cached;
@@ -275,6 +442,9 @@ export class PdfFontRegistry {
       cssFallbackFamily: fallbackCssStack(fallbackPdfFont),
       browserFamilyName: `LumeoPdf_${safeFamilyToken(resourceName)}_${safeFamilyToken(resolvedFont.baseFont)}`,
       browserPreviewPossible: Boolean(embeddedProgram?.browserLoadable),
+      resourceIdentity: resourceIdentityFor(fontResource, this.context, embeddedProgram),
+      embeddedProgramByteLength: embeddedProgram?.bytes.byteLength ?? null,
+      embeddedProgramSha256: embeddedProgram?.sha256 ?? null,
       resolvedFont,
       metrics,
       styleHints,
