@@ -120,6 +120,9 @@ export type DetectedTextRun = {
   pdfJsHeight?: number | null;
   pdfJsDirection?: string | null;
   pdfJsHasEOL?: boolean | null;
+  /** Detection provenance after native/PDF.js reconciliation. */
+  detectionSource?: "pdfjs" | "reconciled" | "native";
+  detectionConfidence?: "high" | "medium" | "low" | "unreconciled";
 };
 
 function isTextItem(item: PdfTextItem | PdfTextMarkedContent): item is PdfTextItem {
@@ -176,6 +179,8 @@ export function textRunsFromContent(
       pdfJsHeight: item.height ?? null,
       pdfJsDirection: item.dir ?? null,
       pdfJsHasEOL: item.hasEOL ?? null,
+      detectionSource: "pdfjs",
+      detectionConfidence: "unreconciled",
     });
   }
 
