@@ -714,6 +714,7 @@ export function walkTextShowOperators(
       case "'": {
         textLineMatrix = multiplyMatrix(textLineMatrix, [1, 0, 0, 1, 0, -textState.leading]);
         textMatrix = textLineMatrix;
+        textPositionReliable = true;
         const stringToken = operands[0];
         if (inTextObject && (stringToken?.type === "literalString" || stringToken?.type === "hexString")) {
           recordTextShow("'", [stringToken.value], token.end);
@@ -725,6 +726,7 @@ export function walkTextShowOperators(
         textState.charSpacing = asNumber(operands[1]);
         textLineMatrix = multiplyMatrix(textLineMatrix, [1, 0, 0, 1, 0, -textState.leading]);
         textMatrix = textLineMatrix;
+        textPositionReliable = true;
         const stringToken = operands[2];
         if (inTextObject && (stringToken?.type === "literalString" || stringToken?.type === "hexString")) {
           recordTextShow('"', [stringToken.value], token.end);
