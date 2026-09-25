@@ -1,11 +1,11 @@
 // Aura OS v2 Command Palette -- canonical search index.
 //
-// Deliberately does NOT redefine the tool list. It takes the same Tile[]
-// that already powers the "PDF Tools" nav dropdown (lib/tools/tiles.ts's
-// buildTiles(), computed once server-side in PublicNav) and layers two
-// it with a short static list of non-tool pages (Guides, Privacy, About,
-// Contact). Tool aliases and bundled capabilities come from the canonical
-// catalog-derived Tile[] so the command palette and /pdf-tools never drift.
+// Deliberately does NOT redefine the tool list. It takes the complete Tile[]
+// from lib/tools/tiles.ts (computed server-side in PublicNav) and layers in a
+// short static list of non-tool pages. The header dropdown may show a curated
+// subset, but command search and /pdf-tools keep the complete catalog index.
+// Tool aliases and bundled capabilities remain catalog-derived so search does
+// not drift from the actual public tool set.
 import type { Tile } from "@/lib/tools/tiles";
 
 export type CommandPaletteItem = {
