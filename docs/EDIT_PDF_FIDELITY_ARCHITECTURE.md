@@ -1,8 +1,15 @@
 # Premium Edit PDF fidelity architecture
 
-Status: Phase 0 audit + PR A diagnostics/measurement foundation  
-Phase 0 audit base: `9a52ce040b5dc5a9b2d6f8d34b49039963209935`  
-PR A refreshed integration base: `f8a14ea6c190c3939a805549cab160e7c874352c`
+Status: fidelity program active through native detection, font identity and embedded subset glyph proof  
+Historical Phase 0 audit base: `9a52ce040b5dc5a9b2d6f8d34b49039963209935`  
+Current production-certified base before shaping: `3a5bcab29e4b73cf77262e5a7c4cd40d55ddeb7d`
+
+Completed milestones:
+- PR A / #402 — diagnostics + quantitative seed corpus infrastructure
+- PR B / #416 — independent native detection + PDF.js reconciliation + evidence classifier
+- PR C / #417 — exact PDF font resource identity + embedded-program fingerprints
+- PR D / #418 — embedded TrueType subset cmap/maxp glyph proof
+- Current branch — lazy HarfBuzz canonical shaping foundation
 
 ## Product invariant
 
@@ -70,23 +77,28 @@ PDF bytes
                 +--> exported PDF bytes
 ```
 
-## Important audit finding: detection is currently PDF.js-first
+## Detection architecture after PR B
 
-The custom content-stream walker already understands native PDF text operators and Form XObjects, but the Edit PDF UI does not currently use it as an independent source of visible text.
+The Phase 0 PDF.js-first limitation is no longer current.
 
-The current page path is:
+Native content-stream extraction and PDF.js are now independent signals:
 
 ```text
-pdf.js getTextContent()
-  -> DetectedTextRun[]
-  -> native operator matching
-  -> font resolution
-  -> page text model
+PDF bytes
+  +--> native content-stream parser --> NativeContentStreamSpan[]
+  |
+  +--> PDF.js getTextContent() ------> DetectedTextRun[]
+                         \             /
+                          reconciliation
+                               |
+                     evidence-backed source mapping
+                               |
+                    Page -> Block -> Line -> Span
 ```
 
-If PDF.js yields no usable text items, the UI currently has no run to match, even when native text-show operators may exist in the content stream. The native parser therefore acts primarily as a validation/rewrite locator after PDF.js discovery rather than as a first-class detector.
+If PDF.js exposes no text, the native parser still records source text. It synthesizes a clickable run only for simple cases whose decoding, font metrics, descriptor ascent/descent and geometry are all proven. TJ-heavy, Type3, clipping, vertical, skewed, unknown-encoding and unknown-metric cases remain diagnostic/read-only instead of being guessed.
 
-This is a major target for PR B: native extraction and PDF.js must become independent signals that are reconciled, not a single PDF.js-led chain.
+When both signals exist, exact source identity plus Unicode, baseline and writing-angle evidence can supersede a bad positional match. Existing fragmented-run provenance remains available to the stricter fragmented reconstruction guard.
 
 ## Fidelity-loss inventory from Phase 0
 
@@ -102,15 +114,17 @@ The diagnostics schema records this as unresolved rather than calling it accurat
 
 ### Native/PDF.js reconciliation
 
-`matchTextRun.ts` currently matches principally by position using a fixed tolerance. It does not yet combine Unicode, baseline, direction, font identity, source order and geometry into a confidence model.
+PR B added an independent reconciliation layer that combines exact source identity where available with Unicode, baseline and writing-angle evidence. The older positional matcher remains as conservative provenance/fallback input, especially for fragmented-run reconstruction, but it is no longer the only signal.
 
 ### Font identity
 
-`PdfFontRegistry` currently derives its display family primarily from `/BaseFont`, stripping a subset prefix and common style suffixes. It does not yet parse the embedded font program's name table/PostScript identity.
+PR C now retains exact PDF font-resource identity: font/descriptor/descendant/program/ToUnicode/Encoding references, Type0 CMap and writing mode, CIDSystemInfo, CIDToGIDMap identity, descriptor/descendant names, embedded-byte length and SHA-256 fingerprint. User-facing family display still falls back primarily to PDF naming evidence until deeper internal-name parsing is justified.
 
 ### Glyph coverage and shaping
 
-The current encoding layer is intentionally conservative and does not parse TrueType/OpenType/CFF glyph programs or perform OpenType shaping. Complex-script shaping, ligatures, GPOS/GSUB and exact glyph-cluster mapping are not yet canonical export inputs.
+PR D added bounded, read-only SFNT cmap format 4/12 plus maxp proof for embedded nonsymbolic TrueType subsets, allowing same-font edits only when the exact embedded program proves the glyph exists and PDF width evidence remains valid.
+
+The current shaping branch introduces pinned `harfbuzzjs@1.6.2` / HarfBuzz 14.5.0 as a lazy canonical OpenType shaper for exact embedded font bytes. HarfBuzz output is not yet export geometry authority; it must first pass shaping-vs-PDF metric golden/corpus tests.
 
 ### TJ-heavy replacement
 
@@ -165,8 +179,8 @@ Candidate font/OCR dependencies will be evaluated in a later dependency-gate PR 
 1. **PR A** — diagnostics + corpus/measurement infrastructure.
 2. **PR B** — independent native detection + PDF.js reconciliation + evidence-based classifier.
 3. **PR C** — structured font resource resolver + embedded-font registry/fingerprints.
-4. **PR D** — professional font parsing/metrics foundation after dependency decision.
-5. **PR E** — canonical shaping integration where justified.
+4. **PR D** — embedded SFNT glyph-coverage proof (completed as #418).
+5. **PR E** — canonical HarfBuzz shaping foundation (current).
 6. **PR F** — caret style preservation + delete/retype font regression.
 7. **PR G** — PDF-space geometry/baseline fidelity and zoom-invariant round trips.
 8. **PR H** — safe glyph insertion / explicit fallback architecture.
