@@ -8,7 +8,7 @@ import { withSeoOverride } from "@/lib/public-site/seo";
 import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
 
 const softwareSchema = buildSoftwareApplicationSchema({
-  name: "Lumeo Text Extract",
+  name: "Lumeo Extract Text",
   description: "Pull selectable text out of a PDF and export it as TXT, JSON, or CSV, privately in your browser.",
   path: "/pdf/extract-text",
   featureList: ["Per-page text panels", "Search across all pages", "Page-range extraction", "Export as TXT, JSON, or CSV"],
@@ -16,7 +16,7 @@ const softwareSchema = buildSoftwareApplicationSchema({
 const breadcrumbSchema = buildBreadcrumbSchema([
   { name: "Home", path: "/" },
   { name: "PDF Tools", path: "/pdf-tools" },
-  { name: "Text Extract", path: "/pdf/extract-text" },
+  { name: "Extract Text", path: "/pdf/extract-text" },
 ]);
 
 const ExtractTextTool = dynamic(() => import("@/components/pdf/ExtractTextTool"), {
@@ -25,11 +25,11 @@ const ExtractTextTool = dynamic(() => import("@/components/pdf/ExtractTextTool")
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf/extract-text", {
-    title: { absolute: "Text Extract Online Privately - Lumeo PDF" },
+    title: { absolute: "Extract Text from PDF Privately - Lumeo PDF" },
     description: "Pull selectable text out of a PDF privately in your browser. Search it, extract a page range, and export as TXT, JSON, or CSV.",
     alternates: { canonical: "/pdf/extract-text" },
     openGraph: {
-      title: "Text Extract Online Privately - Lumeo PDF",
+      title: "Extract Text from PDF Privately - Lumeo PDF",
       description: "Read, search, and export PDF text in a calm browser-first workspace.",
       url: "https://lumeo.in/pdf/extract-text",
       siteName: "Lumeo PDF",
@@ -38,7 +38,7 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: "Text Extract Online Privately - Lumeo PDF",
+      title: "Extract Text from PDF Privately - Lumeo PDF",
       description: "Extract PDF text directly on your device using Lumeo PDF Workspace.",
       images: ["https://lumeo.in/twitter-image"],
     },
@@ -55,7 +55,7 @@ export default async function ExtractTextPage() {
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
       <L2ToolPageHeader
-        title="Text Extract"
+        title="Extract Text"
         description="Pull selectable text out of a PDF, narrow to a page range, and export as TXT, JSON, or CSV."
       />
 
