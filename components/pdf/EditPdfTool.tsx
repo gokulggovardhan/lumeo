@@ -61,7 +61,6 @@ import {
 import { overlayFontSizePx, textRunsFromContent, type DetectedTextRun } from "@/lib/pdf/edit/textRuns";
 import {
   buildNativeContentStreamSpans,
-  locatedTextOperatorKey,
   nativeDetectedRuns,
   type NativeContentStreamSpan,
 } from "@/lib/pdf/edit/nativeTextDetection";
