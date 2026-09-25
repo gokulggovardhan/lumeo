@@ -40,6 +40,11 @@ export type EditPdfSpanDiagnostic = {
       decodedUnicodeComplete: boolean;
     };
   };
+  detection: {
+    source: string;
+    confidence: string;
+    reconciliation: unknown;
+  };
   pdfJs: {
     unicode: string;
     fontName: string;
@@ -85,6 +90,8 @@ export type EditPdfSpanDiagnostic = {
     textRisePt: number;
     renderMode: number;
     nativeGlyphAdvanceExcludingTjAdjustmentsPt: number | null;
+    nativeTextAdvanceWithTjPt: number | null;
+    positionReliability: string | null;
     pdfJsWidthPt: number;
     widthDeltaPt: number | null;
     fontSizeDeltaPt: number | null;
@@ -115,6 +122,7 @@ export type EditPdfPageDiagnosticReport = {
     editableSpanCount: number;
     viewOnlySpanCount: number;
     unsupportedSpanCount: number;
+    classification: unknown;
   };
   spans: readonly EditPdfSpanDiagnostic[];
 };
@@ -241,6 +249,11 @@ export function buildEditPdfPageDiagnosticReport({
           decodedUnicodeComplete: decoded.complete,
         },
       },
+      detection: {
+        source: run?.detectionSource ?? "unknown",
+        confidence: run?.detectionConfidence ?? "unreconciled",
+        reconciliation: span.reconciliationEvidence,
+      },
       pdfJs: {
         unicode: run?.str ?? span.text,
         fontName: run?.fontName ?? span.style.fontFamily,
@@ -286,6 +299,8 @@ export function buildEditPdfPageDiagnosticReport({
         textRisePt: span.style.textRisePt,
         renderMode: span.style.renderingMode,
         nativeGlyphAdvanceExcludingTjAdjustmentsPt: nativeAdvance,
+        nativeTextAdvanceWithTjPt: match?.operator.textAdvancePt ?? null,
+        positionReliability: match?.operator.positionReliability ?? null,
         pdfJsWidthPt,
         widthDeltaPt: nativeAdvance === null ? null : pdfJsWidthPt - nativeAdvance,
         fontSizeDeltaPt:
@@ -318,6 +333,7 @@ export function buildEditPdfPageDiagnosticReport({
       editableSpanCount: pageModel.editableSpanCount,
       viewOnlySpanCount: pageModel.viewOnlySpanCount,
       unsupportedSpanCount: pageModel.unsupportedSpanCount,
+      classification: pageModel.classification,
     },
     spans,
   };
