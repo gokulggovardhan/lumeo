@@ -38,7 +38,7 @@ test("discovery search exposes signature, image, and text vocabulary", () => {
   assert.equal(toolMatchesQuery(tile({ label: "Sign PDF", aliases: ["signature", "initials"] }), "signature"), true);
   assert.equal(toolMatchesQuery(tile({ label: "JPG to PDF", aliases: ["image", "photo"] }), "image"), true);
   assert.equal(toolMatchesQuery(tile({ label: "Edit PDF", aliases: ["text", "whiteout"] }), "text"), true);
-  assert.equal(toolMatchesQuery(tile({ label: "Text Extract", aliases: ["copy text"] }), "text"), true);
+  assert.equal(toolMatchesQuery(tile({ label: "Extract Text", aliases: ["copy text"] }), "text"), true);
 });
 
 test("directory uses direct links, combined filters, live counts, and truthful availability", () => {
