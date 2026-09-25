@@ -143,3 +143,15 @@ test("Admin layout and pages share request-scoped authorization reads", () => {
   const auth = readFileSync("lib/admin/auth.ts", "utf8");
   assert.match(auth, /const getRequestAdminContext = cache\(/);
 });
+
+
+test("Admin maintenance semantics are driven by status, not stale message text", () => {
+  const filters = readFileSync("lib/admin/tool-filters.ts", "utf8");
+  const page = readFileSync("app/admin/(protected)/tools/page.tsx", "utf8");
+  assert.match(filters, /const inMaintenance = tool\.status === "maintenance"/);
+  assert.doesNotMatch(filters, /tool\.status === "maintenance" \|\| Boolean\(tool\.maintenance_message\)/);
+  assert.match(page, /Tools currently in the maintenance state/);
+  assert.match(page, /Message saved; inactive until maintenance/);
+  assert.match(page, /Hidden = removed from discovery and blocked/);
+  assert.match(page, /Enabled publicly off always removes and blocks the tool/);
+});
