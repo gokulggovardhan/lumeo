@@ -60,7 +60,7 @@ export default async function MergePdfPage() {
     >
       {toolState.blocked ? (
         <>
-          <L2ToolPageHeader
+          <L2ToolPageHeader categoryLabel="ORGANIZE"
             title="Merge PDF"
             description="Combine PDFs into one clean document."
           />
