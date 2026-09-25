@@ -54,7 +54,7 @@ export default async function WatermarkPdfPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader title="Watermark PDF" description="Add a text or image watermark to a PDF." />
+      <L2ToolPageHeader categoryLabel="EDIT" title="Watermark PDF" description="Add a text or image watermark to a PDF." />
 
       {toolState.blocked ? (
         <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
