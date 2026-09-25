@@ -82,17 +82,16 @@ try {
     assert(fallback.includes(`slug: "${slug}"`), `Fallback catalog must include the live ${slug} route.`);
   }
 
-  // The 5-slot admin-configured homepage (getPublicHomepageTools /
-  // homepage_tool_slots) was deliberately retired in favor of a fixed,
-  // flat catalog grid driven by lib/tools/catalog.ts -- see the header
-  // comment in components/pdf/PdfToolLauncher.tsx for the rationale.
+  // Homepage discovery is curated while the complete catalog remains available
+  // through /pdf-tools and command search.
   const launcher = read("components/pdf/PdfToolLauncher.tsx");
   assert(launcher.includes("getPublicPdfCatalog") && launcher.includes("resolveLumeoTools"), "Homepage launcher must use the public PDF catalog and resolved Lumeo tools.");
-  assert(launcher.includes("buildDiscoveryTiles(resolved)"), "Homepage launcher must include truthful enabled coming-soon and maintenance states.");
-  assert(launcher.includes("available ? (") && launcher.includes("<article"), "Unavailable homepage tools must be visible but non-actionable.");
-  // The permanent "All PDF Tools" card no longer lives in the launcher itself
-  // -- the homepage now shows every live tool directly, so the "see all"
-  // link moved to the public footer instead.
+  assert(launcher.includes("buildDiscoveryTiles(resolved)"), "Homepage launcher must use truthful resolved discovery state.");
+  assert(launcher.includes("PRIMARY_TOOL_SLUGS") && launcher.includes("SECONDARY_TOOL_SLUGS"), "Homepage must keep an explicit primary/secondary hierarchy.");
+  for (const slug of ["merge", "compress", "edit", "pdf-to-word", "word-to-pdf", "sign"]) {
+    assert(launcher.includes(`"${slug}"`), `Homepage primary tool missing: ${slug}`);
+  }
+  assert(launcher.includes("available ? (") && launcher.includes("<article"), "Unavailable curated tools must be visible but non-actionable.");
   const footer = read("components/PublicFooter.tsx");
   assert(footer.includes("All PDF Tools"), "Public footer must include a permanent All PDF Tools link.");
   assert(footer.includes("/pdf-tools"), "All PDF Tools link must point to /pdf-tools.");
@@ -111,9 +110,9 @@ try {
   const tiles = read("lib/tools/tiles.ts");
   const commandIndex = read("lib/command-palette/index.ts");
   assert(directory.includes("buildDiscoveryTiles") && directory.includes("ToolsExplorer"), "Directory must render resolved direct-action tools.");
-  assert(directory.includes("What do you need to do?"), "Directory must use an action-focused introduction.");
+  assert(directory.includes("Find the right tool"), "Directory must use a clear complete-directory introduction.");
   assert(explorer.includes('type="search"') && explorer.includes('aria-live="polite"'), "Directory search and live result count are missing.");
-  for (const filter of ["All tools", "Organize", "Edit & sign", "Optimize", "Convert"]) {
+  for (const filter of ["All tools", "Organize", "Edit", "Convert", "Sign & Fill", "Optimize", "Recognize", "Image Tools"]) {
     assert(explorer.includes(filter), `Directory filter missing: ${filter}`);
   }
   assert(explorer.includes("aria-pressed={category === filter.id}"), "Directory filters must expose pressed state.");
@@ -154,7 +153,7 @@ try {
   console.log("PASS public RPC functions and grants exist");
   console.log("PASS no direct anon table grants or public writes");
   console.log("PASS public catalog types, data layer, and fallback exist");
-  console.log("PASS homepage launcher renders the resolved catalog as a flat tile grid");
+  console.log("PASS homepage launcher renders a curated primary/secondary hierarchy");
   console.log("PASS /pdf-tools route exists");
   console.log("PASS PDF Tools menu accessibility markers exist");
   console.log("PASS no PDF processing engines, analytics tracking, or service-role usage changed");
