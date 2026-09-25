@@ -18,7 +18,7 @@
 // applied here one level up, across operators instead of within one.
 
 import type { TextShowOperator } from "./contentStream.ts";
-import type { ResolvedFont } from "./fontEncoding.ts";
+import type { EmbeddedGlyphEvidence, ResolvedFont } from "./fontEncoding.ts";
 import type { FontMetrics, TextShowState } from "./fontMetrics.ts";
 import { compareAdvance } from "./fontMetrics.ts";
 import { buildEditPlan, type EditPlan } from "./editPlan.ts";
@@ -88,6 +88,7 @@ export function buildMultiRunEditPlan({
   replacementText,
   resolvedFont,
   fontMetrics,
+  embeddedGlyphEvidence = null,
 }: {
   pageIndex: number;
   contentStreamIndex: number;
@@ -96,6 +97,7 @@ export function buildMultiRunEditPlan({
   replacementText: string;
   resolvedFont: ResolvedFont;
   fontMetrics: FontMetrics;
+  embeddedGlyphEvidence?: EmbeddedGlyphEvidence | null;
 }): MultiRunEditPlan {
   const sortedIndices = [...operatorIndices].sort((a, b) => a - b);
 
@@ -151,6 +153,7 @@ export function buildMultiRunEditPlan({
       replacementText: position === 0 ? replacementText : "",
       resolvedFont,
       fontMetrics,
+      embeddedGlyphEvidence,
     }),
   );
 
