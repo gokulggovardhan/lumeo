@@ -131,7 +131,7 @@ test("document model exposes view-only and clipping limitations instead of fakin
 
   assert.equal(model.capability, "view-only");
   assert.equal(model.spans[0].capability, "view-only");
-  assert.match(model.spans[0].capabilityReason ?? "", /could not be matched/i);
+  assert.match(model.spans[0].capabilityReason ?? "", /could not be (matched|reconciled)/i);
   assert.equal(model.spans[1].capability, "unsupported");
   assert.match(model.spans[1].capabilityReason ?? "", /clipping/i);
   assert.equal(model.lines[0].region, "body");
