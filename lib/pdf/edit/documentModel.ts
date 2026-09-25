@@ -3,6 +3,8 @@ import { PdfCoordinateMapper, type PercentBox, type VisualBox } from "./coordina
 import type { LocatedTextOperator, StreamLocator } from "./formXObjects.ts";
 import type { PdfFontProfile } from "./fontRegistry.ts";
 import type { DetectedTextRun } from "./textRuns.ts";
+import type { TextReconciliationEvidence } from "./textReconciliation.ts";
+import type { PageTextCapabilityClassification } from "./documentTextCapability.ts";
 
 export type PdfTextCapability =
   | "native-editable"
@@ -57,6 +59,7 @@ export type PdfTextSpan = {
   sourceOperatorKind: TextShowOperator["kind"] | null;
   style: PdfTextStyle;
   fontProfile: PdfFontProfile | null;
+  reconciliationEvidence: TextReconciliationEvidence | null;
   capability: PdfTextCapability;
   capabilityReason: string | null;
 };
@@ -102,6 +105,7 @@ export type PdfPageTextModel = {
   editableSpanCount: number;
   viewOnlySpanCount: number;
   unsupportedSpanCount: number;
+  classification: PageTextCapabilityClassification | null;
 };
 
 export type PdfTextSourceMatch = {
@@ -117,6 +121,8 @@ export type BuildPdfPageTextModelInput = {
   matches: readonly PdfTextSourceMatch[];
   fontProfiles?: readonly (PdfFontProfile | null)[];
   fragmentedRunIndices?: ReadonlySet<number>;
+  reconciliationEvidence?: readonly (TextReconciliationEvidence | null)[];
+  classification?: PageTextCapabilityClassification | null;
 };
 
 const DEFAULT_ASCENT_RATIO = 0.85;
@@ -194,11 +200,24 @@ function capabilityFor(
   match: PdfTextSourceMatch,
   fontProfile: PdfFontProfile | null,
   fragmented: boolean,
+  reconciliation: TextReconciliationEvidence | null,
 ): { capability: PdfTextCapability; reason: string | null } {
   if (!match) {
     return {
       capability: "view-only",
-      reason: "The visible text could not be matched safely to a text-show operator.",
+      reason: "The visible text could not be reconciled safely to a native PDF text-show operator.",
+    };
+  }
+  if (!fontProfile) {
+    return {
+      capability: "view-only",
+      reason: "The source font resource could not be resolved safely enough for native editing.",
+    };
+  }
+  if (match.operator.positionReliability === "degraded") {
+    return {
+      capability: "view-only",
+      reason: "The source text position depends on an earlier glyph advance that could not be measured safely.",
     };
   }
   if (match.operator.renderMode >= 4) {
@@ -207,10 +226,47 @@ function capabilityFor(
       reason: "This text participates in a clipping text-rendering mode and is not safe to rewrite in place.",
     };
   }
-  if (fontProfile?.encodingSource === "Unknown") {
+  if (fontProfile.kind === "Type3") {
+    return {
+      capability: "unsupported",
+      reason: "Type3 text uses custom glyph programs and is currently read-only.",
+    };
+  }
+  if (fontProfile.resolvedFont.writingMode === "vertical") {
+    return {
+      capability: "unsupported",
+      reason: "Vertical PDF text is currently read-only until vertical metrics and caret geometry are fully supported.",
+    };
+  }
+  if (fontProfile.encodingSource === "Unknown") {
     return {
       capability: "view-only",
       reason: "The font encoding cannot be decoded reliably enough for safe text replacement.",
+    };
+  }
+  if (fontProfile.metricsSource === "Unknown") {
+    return {
+      capability: "view-only",
+      reason: "The font's glyph advance metrics are not proven well enough for safe replacement geometry.",
+    };
+  }
+  if (
+    reconciliation?.unicodeAgreement === "conflict" ||
+    reconciliation?.directionAgreement === "conflict"
+  ) {
+    return {
+      capability: "view-only",
+      reason: "Independent native and PDF.js text evidence materially disagrees.",
+    };
+  }
+  if (
+    reconciliation?.source === "reconciled" &&
+    reconciliation.confidence !== "high" &&
+    reconciliation.confidence !== "medium"
+  ) {
+    return {
+      capability: "view-only",
+      reason: "Native and PDF.js text evidence does not reconcile with sufficient confidence.",
     };
   }
   return {
@@ -398,6 +454,8 @@ export function buildPdfPageTextModel({
   matches,
   fontProfiles = [],
   fragmentedRunIndices = new Set<number>(),
+  reconciliationEvidence = [],
+  classification = null,
 }: BuildPdfPageTextModelInput): PdfPageTextModel {
   const mapper = new PdfCoordinateMapper(widthPt, heightPt);
 
@@ -413,10 +471,12 @@ export function buildPdfPageTextModel({
     const boundsPt = mapper.percentBoxToVisualBox(boundsPct);
     const sourceMatrix = match?.operator.textRenderingMatrix ?? null;
     const rotationDeg = matrixRotationDeg(sourceMatrix, run.rotated);
+    const reconciliation = reconciliationEvidence[sourceRunIndex] ?? null;
     const capability = capabilityFor(
       match,
       fontProfile,
       fragmentedRunIndices.has(sourceRunIndex),
+      reconciliation,
     );
 
     return {
@@ -436,6 +496,7 @@ export function buildPdfPageTextModel({
       sourceOperatorKind: match?.operator.kind ?? null,
       style: styleFor(run, match, fontProfile),
       fontProfile,
+      reconciliationEvidence: reconciliation,
       capability: capability.capability,
       capabilityReason: capability.reason,
     };
@@ -466,5 +527,6 @@ export function buildPdfPageTextModel({
     editableSpanCount,
     viewOnlySpanCount,
     unsupportedSpanCount,
+    classification,
   };
 }
