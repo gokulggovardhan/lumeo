@@ -1739,11 +1739,16 @@ export default function EditPdfTool() {
   // user's next keystroke replaces the text with no extra click into a
   // sidebar field first.
   useEffect(() => {
-    if (activeTool === "select" && selectedRunIndices.length === 1 && runMatches[selectedRunIndices[0]]) {
+    const index = selectedRunIndices.length === 1 ? selectedRunIndices[0] : null;
+    const capability =
+      index === null ? null : pageTextModel?.spans[index]?.capability ?? null;
+    const editable =
+      capability === "native-editable" || capability === "fragmented-editable";
+    if (activeTool === "select" && index !== null && runMatches[index] && editable) {
       inlineEditInputRef.current?.focus();
       inlineEditInputRef.current?.select();
     }
-  }, [activeTool, selectedRunIndices, runMatches]);
+  }, [activeTool, selectedRunIndices, runMatches, pageTextModel]);
 
   // Phase 20 (D): scrollIntoView (Phase 15, above/selectTextRunAndFocus)
   // only runs ONCE, synchronously at the moment of tap -- it can't account
@@ -1759,7 +1764,14 @@ export default function EditPdfTool() {
   // simply don't get this extra correction and fall back to the Phase 15
   // scrollIntoView-at-focus-time behavior alone, unchanged.
   useEffect(() => {
-    const isEditorOpen = activeTool === "select" && selectedRunIndices.length === 1 && Boolean(runMatches[selectedRunIndices[0]]);
+    const index = selectedRunIndices.length === 1 ? selectedRunIndices[0] : null;
+    const capability =
+      index === null ? null : pageTextModel?.spans[index]?.capability ?? null;
+    const isEditorOpen =
+      activeTool === "select" &&
+      index !== null &&
+      Boolean(runMatches[index]) &&
+      (capability === "native-editable" || capability === "fragmented-editable");
     if (!isEditorOpen || typeof window === "undefined" || !window.visualViewport) return;
 
     const viewport = window.visualViewport;
@@ -1776,7 +1788,7 @@ export default function EditPdfTool() {
     }
     viewport.addEventListener("resize", handleViewportResize);
     return () => viewport.removeEventListener("resize", handleViewportResize);
-  }, [activeTool, selectedRunIndices, runMatches]);
+  }, [activeTool, selectedRunIndices, runMatches, pageTextModel]);
 
 
   async function addFile(files: FileList | File[]) {
@@ -2228,6 +2240,19 @@ export default function EditPdfTool() {
       };
 
   function validateMultiRunSelection(indices: number[]): MultiRunValidation {
+    const capabilities = indices.map((i) => pageTextModel?.spans[i]?.capability ?? null);
+    if (
+      capabilities.some(
+        (capability) =>
+          capability !== "native-editable" && capability !== "fragmented-editable",
+      )
+    ) {
+      return {
+        kind: "invalid",
+        reason:
+          "One or more selected text spans cannot be rewritten safely with their current font/geometry evidence.",
+      };
+    }
     const matches = indices.map((i) => runMatches[i]);
     if (matches.some((m) => !m)) {
       return { kind: "invalid", reason: "One or more selected lines couldn't be matched to editable text -- try selecting fewer lines." };
@@ -2278,10 +2303,12 @@ export default function EditPdfTool() {
       : null;
   const nativeFillCapability = useMemo(
     () =>
-      selectedNativeRunMatch
+      selectedNativeRunMatch &&
+      (selectedNativeSpan?.capability === "native-editable" ||
+        selectedNativeSpan?.capability === "fragmented-editable")
         ? describeNativeFillColorCapability(selectedNativeRunMatch.operator)
         : null,
-    [selectedNativeRunMatch],
+    [selectedNativeRunMatch, selectedNativeSpan],
   );
   const nativePaintPlan = useMemo<NativePaintPlan | null>(() => {
     if (
@@ -2346,7 +2373,22 @@ export default function EditPdfTool() {
 
     try {
       if (selectedRunIndices.length === 1) {
-        const match = runMatches[selectedRunIndices[0]];
+        const selectedIndex = selectedRunIndices[0];
+        const selectedSpan = pageTextModel?.spans[selectedIndex] ?? null;
+        const capability = selectedSpan?.capability ?? null;
+        if (
+          capability !== "native-editable" &&
+          capability !== "fragmented-editable"
+        ) {
+          return {
+            kind: "error",
+            reason:
+              selectedSpan?.capabilityReason ??
+              "This text cannot be rewritten safely with the available font and geometry evidence.",
+            multi: false,
+          };
+        }
+        const match = runMatches[selectedIndex];
         if (!match) return { kind: "empty" };
         const { locatedOperator, operator } = match;
         if (!operator.fontResourceName) throw new Error("This text's font couldn't be identified, so it can't be edited here.");
@@ -2382,7 +2424,16 @@ export default function EditPdfTool() {
       return { kind: "error", reason, multi: selectedRunIndices.length > 1 };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
-  }, [pdfLibDoc, editEngine, selectedRunIndices, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions]);
+  }, [
+    pdfLibDoc,
+    editEngine,
+    selectedRunIndices,
+    runMatches,
+    pageOperators,
+    pageIndex,
+    fragmentedRunReconstructions,
+    pageTextModel,
+  ]);
 
   // Phase 9.2: the live dry-run preview driving both the Apply button's
   // disabled state and the specific reason shown next to it -- see
@@ -3589,7 +3640,10 @@ export default function EditPdfTool() {
                           // page load or edit apply, so an index key is safe here.
                           key={index}
                           run={run}
-                          editable={Boolean(runMatches[index])}
+                          editable={
+                            pageTextModel?.spans[index]?.capability === "native-editable" ||
+                            pageTextModel?.spans[index]?.capability === "fragmented-editable"
+                          }
                           selected={selectedRunIndices.includes(index)}
                           hovered={hoveredRunIndex === index}
                           onSelect={(shiftKey) => selectTextRunAndFocus(index, shiftKey)}
@@ -3646,7 +3700,11 @@ export default function EditPdfTool() {
                     </>
                   ) : null}
 
-                  {activeTool === "select" && singleSelectedRun && singleSelectedRunMatch ? (
+                  {activeTool === "select" &&
+                  singleSelectedRun &&
+                  singleSelectedRunMatch &&
+                  (singleSelectedSpan?.capability === "native-editable" ||
+                    singleSelectedSpan?.capability === "fragmented-editable") ? (
                     // Phase 11: true inline editing -- a caret appears
                     // directly over the clicked text (positioned with the
                     // exact same percent box TextRunOverlay uses for this
