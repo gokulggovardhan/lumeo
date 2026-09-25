@@ -139,6 +139,46 @@ test("textRunsFromContent's widthPct matches the run's real advance width, not i
   }
 });
 
+test("retained baseline percentages are invariant across PDF.js viewport scales", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("Zoom invariant", { x: 137, y: 511, size: 17, font });
+  const bytes = await doc.save();
+
+  const scales = [0.5, 0.67, 0.8, 1, 1.25, 1.5, 2, 3] as const;
+  const baselines: Array<{ xPct: number; yPct: number }> = [];
+
+  for (const scale of scales) {
+    const pdfjsPage = await loadPdfjsPage(bytes.slice());
+    const viewport = pdfjsPage.getViewport({ scale });
+    const content = await pdfjsPage.getTextContent();
+    const [run] = textRunsFromContent(
+      content.items as never,
+      viewport.transform,
+      viewport.width,
+      viewport.height,
+      content.styles as never,
+    );
+    assert.ok(run);
+    assert.equal(typeof run.baselineXPct, "number");
+    assert.equal(typeof run.baselineYPct, "number");
+    baselines.push({ xPct: run.baselineXPct!, yPct: run.baselineYPct! });
+  }
+
+  const first = baselines[0];
+  for (const [index, baseline] of baselines.entries()) {
+    assert.ok(
+      Math.abs(baseline.xPct - first.xPct) < 1e-9,
+      `scale ${scales[index]} changed baseline x from ${first.xPct} to ${baseline.xPct}`,
+    );
+    assert.ok(
+      Math.abs(baseline.yPct - first.yPct) < 1e-9,
+      `scale ${scales[index]} changed baseline y from ${first.yPct} to ${baseline.yPct}`,
+    );
+  }
+});
+
 test("textRunsFromContent flags a rotated page's text as rotated", async () => {
   const doc = await PDFDocument.create();
   const page = doc.addPage([612, 792]);
