@@ -63,9 +63,7 @@ function ToolCard({ tool }: { tool: Tile }) {
           </span>
         ) : tool.availability === "beta" ? (
           <span className="text-xs font-bold text-[var(--text-premium)]">Beta</span>
-        ) : (
-          <span className="text-xs text-[var(--text-muted)]">{tool.categoryLabel}</span>
-        )}
+        ) : null}
         {available ? (
           <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-bold text-[var(--atelier-sage-300)]">
             Open
