@@ -15,9 +15,12 @@ type CategoryFilter = "all" | ToolDiscoveryCategory;
 const FILTERS: { id: CategoryFilter; label: string }[] = [
   { id: "all", label: "All tools" },
   { id: "organize", label: "Organize" },
-  { id: "edit-sign", label: "Edit & sign" },
-  { id: "optimize", label: "Optimize" },
+  { id: "edit", label: "Edit" },
   { id: "convert", label: "Convert" },
+  { id: "sign-fill", label: "Sign & Fill" },
+  { id: "optimize", label: "Optimize" },
+  { id: "recognize", label: "Recognize" },
+  { id: "image-tools", label: "Image Tools" },
 ];
 
 const PROCESSING_LABEL: Record<Tile["processing"], string> = {
@@ -57,11 +60,8 @@ function ToolCard({ tool }: { tool: Tile }) {
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)] shadow-[inset_0_1px_0_rgba(var(--paper-rgb),0.05)]">
           <ToolGlyph name={tool.glyph} className="h-5 w-5" />
         </span>
-        <span className="text-right">
-          <span className="block text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--text-muted)]">
-            {tool.categoryLabel}
-          </span>
-          <span className="mt-1 block text-[10px] text-[var(--text-subtle)]">{tool.brandedCategory}</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--text-muted)]">
+          {tool.categoryLabel}
         </span>
       </div>
 
@@ -94,7 +94,7 @@ function ToolCard({ tool }: { tool: Tile }) {
   );
 
   const shell =
-    "lumeo-tool-card group flex min-h-[15rem] flex-col gap-4 rounded-[16px] border p-5 shadow-[var(--shadow-sm)] " +
+    "lumeo-tool-card group flex min-h-[13.5rem] flex-col gap-4 rounded-[16px] border p-5 shadow-[var(--shadow-sm)] " +
     (available
       ? "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
       : "border-[var(--border-subtle)] bg-[var(--surface-raised)] opacity-80");
@@ -170,9 +170,14 @@ export function ToolsExplorer({ tools }: { tools: Tile[] }) {
   return (
     <div>
       <section aria-label="Find a PDF tool" className="rounded-[18px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-4 shadow-[var(--shadow-sm)] sm:p-5">
-        <label htmlFor="pdf-tool-search" className="mb-2 block text-sm font-bold text-[var(--text-primary)]">
-          Search tools and actions
-        </label>
+        <div className="mb-2">
+          <label htmlFor="pdf-tool-search" className="block text-sm font-bold text-[var(--text-primary)]">
+            Search tools and actions
+          </label>
+          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+            Search by task, file type, or capability.
+          </p>
+        </div>
         <div className="flex min-h-12 items-center gap-3 rounded-[12px] border border-[var(--border-default)] bg-[var(--surface-input)] px-4 transition focus-within:border-[var(--border-focus)] focus-within:shadow-[var(--shadow-focus)]">
           <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-[var(--text-muted)]">
             <circle cx="11" cy="11" r="7" />
@@ -212,7 +217,7 @@ export function ToolsExplorer({ tools }: { tools: Tile[] }) {
 
       {popular.length > 0 ? (
         <nav aria-label="Popular PDF tools" className="mt-5 flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Popular</span>
+          <span className="mr-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Popular tools</span>
           {popular.map((tool) => (
             <Link key={tool.route} href={tool.route} className="lumeo-focus-ring inline-flex min-h-11 items-center rounded-full border border-[var(--border-hairline)] bg-[var(--surface-base)] px-4 text-sm font-bold text-[var(--text-secondary)] transition hover:border-[var(--border-selected)] hover:text-[var(--text-primary)]">
               {tool.label}
