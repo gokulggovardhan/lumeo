@@ -31,6 +31,7 @@ export type PageTextCapabilityClassification = {
     pdfJsOnlyRuns: number;
     nativeOperators: number;
     imageXObjectInvocations: number;
+    inlineImageInvocations: number;
     formXObjectInvocations: number;
     vectorPaintOperatorCount: number;
   };
@@ -180,12 +181,16 @@ export class DocumentTextCapabilityClassifier {
     const hasText = reconciled.length > 0 || nativeSpans.length > 0;
     const imageOnlyCandidate =
       !hasText &&
-      contentEvidence.imageXObjectInvocations > 0 &&
-      contentEvidence.vectorPaintOperatorCount === 0;
+      contentEvidence.imageXObjectInvocations +
+        contentEvidence.inlineImageInvocations >
+        0;
     const hasNativeText = nativeSpans.some(
       (span) => span.decode.complete && span.decode.text?.trim(),
     );
-    const hasImages = contentEvidence.imageXObjectInvocations > 0;
+    const hasImages =
+      contentEvidence.imageXObjectInvocations +
+        contentEvidence.inlineImageInvocations >
+      0;
 
     let primary: DocumentTextCapabilityCategory;
 
@@ -193,7 +198,7 @@ export class DocumentTextCapabilityClassifier {
       primary = "SCANNED_IMAGE";
       signals.push("SCANNED_IMAGE");
       reasons.push(
-        "The page contains image XObject content but no native/PDF.js text or vector-paint evidence.",
+        "The page contains image content but no native/PDF.js text. It is an OCR candidate, not proof that the image contains text.",
       );
     } else if (!hasText) {
       primary =
@@ -239,6 +244,7 @@ export class DocumentTextCapabilityClassifier {
         pdfJsOnlyRuns,
         nativeOperators: nativeSpans.length,
         imageXObjectInvocations: contentEvidence.imageXObjectInvocations,
+        inlineImageInvocations: contentEvidence.inlineImageInvocations,
         formXObjectInvocations: contentEvidence.formXObjectInvocations,
         vectorPaintOperatorCount: contentEvidence.vectorPaintOperatorCount,
       },
