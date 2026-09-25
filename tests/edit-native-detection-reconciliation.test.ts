@@ -103,6 +103,8 @@ function profile(overrides: Partial<PdfFontProfile> = {}): PdfFontProfile {
     },
     embeddedProgramByteLength: null,
     embeddedProgramSha256: null,
+    embeddedGlyphCoverage: null,
+    embeddedGlyphEvidence: null,
     resolvedFont: {
       kind: "TrueType",
       baseFont: "ABCDEF+DemoSans",
