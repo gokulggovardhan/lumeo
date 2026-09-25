@@ -8,9 +8,8 @@ import type { RecentFileItem } from "@/lib/recent-files";
 import type { Tile } from "@/lib/tools/tiles";
 
 // The four fastest re-entry points, always available even for a first-time
-// visitor with no recent history -- kept deliberately short (not the full
-// 14-tile catalog already shown above this section) so "Quick actions"
-// stays a small strip, not a second copy of the homepage grid.
+// visitor with no recent history -- kept deliberately short so Quick actions
+// stays a small re-entry strip rather than becoming a second tool directory.
 const QUICK_ACTION_SLUGS = ["merge", "split", "compress", "sign"];
 
 function RecentFileLink({ item, tile }: { item: RecentFileItem; tile: Tile }) {

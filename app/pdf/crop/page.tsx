@@ -54,7 +54,7 @@ export default async function CropPdfPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader title="Crop PDF" description="Trim a PDF's pages to a custom rectangle." />
+      <L2ToolPageHeader categoryLabel="EDIT" title="Crop PDF" description="Trim a PDF's pages to a custom rectangle." />
 
       {toolState.blocked ? (
         <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />

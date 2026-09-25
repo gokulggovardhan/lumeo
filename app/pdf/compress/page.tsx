@@ -54,7 +54,7 @@ export default async function CompressPdfPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader
+      <L2ToolPageHeader categoryLabel="OPTIMIZE"
         title="Compress PDF"
         description="Reduce PDF file size privately in your browser."
       />

@@ -15,9 +15,12 @@ type CategoryFilter = "all" | ToolDiscoveryCategory;
 const FILTERS: { id: CategoryFilter; label: string }[] = [
   { id: "all", label: "All tools" },
   { id: "organize", label: "Organize" },
-  { id: "edit-sign", label: "Edit & sign" },
-  { id: "optimize", label: "Optimize" },
+  { id: "edit", label: "Edit" },
   { id: "convert", label: "Convert" },
+  { id: "sign-fill", label: "Sign & Fill" },
+  { id: "optimize", label: "Optimize" },
+  { id: "recognize", label: "Recognize" },
+  { id: "image-tools", label: "Image Tools" },
 ];
 
 const PROCESSING_LABEL: Record<Tile["processing"], string> = {
@@ -33,22 +36,6 @@ function availabilityLabel(tool: Tile) {
   return "Available";
 }
 
-function ProcessingBadge({ tool }: { tool: Tile }) {
-  const browser = tool.processing === "browser";
-  return (
-    <span
-      className={`inline-flex min-h-7 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
-        browser
-          ? "border-[rgba(var(--atelier-sage-rgb),0.32)] bg-[rgba(var(--atelier-sage-rgb),0.1)] text-[var(--atelier-sage-300)]"
-          : "border-[rgba(var(--champagne-rgb),0.3)] bg-[rgba(var(--champagne-rgb),0.09)] text-[var(--text-premium)]"
-      }`}
-    >
-      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current" />
-      {PROCESSING_LABEL[tool.processing]}
-    </span>
-  );
-}
-
 function ToolCard({ tool }: { tool: Tile }) {
   const available = tool.availability === "active" || tool.availability === "beta";
   const contents = (
@@ -57,11 +44,8 @@ function ToolCard({ tool }: { tool: Tile }) {
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)] shadow-[inset_0_1px_0_rgba(var(--paper-rgb),0.05)]">
           <ToolGlyph name={tool.glyph} className="h-5 w-5" />
         </span>
-        <span className="text-right">
-          <span className="block text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--text-muted)]">
-            {tool.categoryLabel}
-          </span>
-          <span className="mt-1 block text-[10px] text-[var(--text-subtle)]">{tool.brandedCategory}</span>
+        <span className="text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--text-muted)]">
+          {tool.categoryLabel}
         </span>
       </div>
 
@@ -72,20 +56,17 @@ function ToolCard({ tool }: { tool: Tile }) {
         <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">{tool.description}</p>
       </div>
 
-      <div className="mt-auto flex items-end justify-between gap-3 pt-3">
-        <div className="flex min-w-0 flex-col items-start gap-2">
-          <ProcessingBadge tool={tool} />
-          {!available ? (
-            <span className="text-xs font-bold text-[var(--atelier-warning)]">
-              {availabilityLabel(tool)}
-            </span>
-          ) : tool.availability === "beta" ? (
-            <span className="text-xs font-bold text-[var(--text-premium)]">Beta</span>
-          ) : null}
-        </div>
+      <div className="mt-auto flex min-h-11 items-center justify-between gap-3 pt-3">
+        {!available ? (
+          <span className="text-xs font-bold text-[var(--atelier-warning)]">
+            {availabilityLabel(tool)}
+          </span>
+        ) : tool.availability === "beta" ? (
+          <span className="text-xs font-bold text-[var(--text-premium)]">Beta</span>
+        ) : null}
         {available ? (
-          <span className="inline-flex min-h-11 shrink-0 items-center gap-1.5 self-end text-sm font-bold text-[var(--atelier-sage-300)]">
-            Open tool
+          <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-bold text-[var(--atelier-sage-300)]">
+            Open
             <span aria-hidden="true" className="transition-transform duration-200 group-hover:translate-x-1 motion-reduce:transform-none">→</span>
           </span>
         ) : null}
@@ -94,7 +75,7 @@ function ToolCard({ tool }: { tool: Tile }) {
   );
 
   const shell =
-    "lumeo-tool-card group flex min-h-[15rem] flex-col gap-4 rounded-[16px] border p-5 shadow-[var(--shadow-sm)] " +
+    "lumeo-tool-card group flex min-h-[13.5rem] flex-col gap-4 rounded-[16px] border p-5 shadow-[var(--shadow-sm)] " +
     (available
       ? "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
       : "border-[var(--border-subtle)] bg-[var(--surface-raised)] opacity-80");
@@ -170,9 +151,14 @@ export function ToolsExplorer({ tools }: { tools: Tile[] }) {
   return (
     <div>
       <section aria-label="Find a PDF tool" className="rounded-[18px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-4 shadow-[var(--shadow-sm)] sm:p-5">
-        <label htmlFor="pdf-tool-search" className="mb-2 block text-sm font-bold text-[var(--text-primary)]">
-          Search tools and actions
-        </label>
+        <div className="mb-2">
+          <label htmlFor="pdf-tool-search" className="block text-sm font-bold text-[var(--text-primary)]">
+            Search tools and actions
+          </label>
+          <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+            Search by task, file type, or capability.
+          </p>
+        </div>
         <div className="flex min-h-12 items-center gap-3 rounded-[12px] border border-[var(--border-default)] bg-[var(--surface-input)] px-4 transition focus-within:border-[var(--border-focus)] focus-within:shadow-[var(--shadow-focus)]">
           <svg aria-hidden="true" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-[var(--text-muted)]">
             <circle cx="11" cy="11" r="7" />
@@ -212,7 +198,7 @@ export function ToolsExplorer({ tools }: { tools: Tile[] }) {
 
       {popular.length > 0 ? (
         <nav aria-label="Popular PDF tools" className="mt-5 flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Popular</span>
+          <span className="mr-1 text-xs font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">Popular tools</span>
           {popular.map((tool) => (
             <Link key={tool.route} href={tool.route} className="lumeo-focus-ring inline-flex min-h-11 items-center rounded-full border border-[var(--border-hairline)] bg-[var(--surface-base)] px-4 text-sm font-bold text-[var(--text-secondary)] transition hover:border-[var(--border-selected)] hover:text-[var(--text-primary)]">
               {tool.label}
@@ -253,9 +239,15 @@ export function ToolsExplorer({ tools }: { tools: Tile[] }) {
         </>
       )}
 
-      <aside className="mt-9 grid gap-3 rounded-[16px] border border-[var(--border-hairline)] bg-[var(--surface-base)] p-4 text-sm text-[var(--text-secondary)] sm:grid-cols-2 sm:p-5" aria-label="Processing information">
-        <p><strong className="text-[var(--atelier-sage-300)]">On device</strong> means the file is processed in your browser.</p>
-        <p><strong className="text-[var(--text-premium)]">Server-assisted</strong> tools are explicitly identified before upload.</p>
+      <aside
+        className="mt-9 rounded-[16px] border border-[var(--border-hairline)] bg-[var(--surface-base)] p-4 text-sm leading-6 text-[var(--text-secondary)] sm:p-5"
+        aria-label="Processing information"
+      >
+        <p>
+          <strong className="text-[var(--atelier-sage-300)]">Current live tools are browser-based.</strong>{" "}
+          Your tool page explains file handling and any browser capability requirements before you begin.
+          If a future workflow uses a different processing model, Lumeo will identify it clearly before file selection.
+        </p>
       </aside>
     </div>
   );

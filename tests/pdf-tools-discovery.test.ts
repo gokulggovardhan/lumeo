@@ -38,12 +38,35 @@ test("discovery search exposes signature, image, and text vocabulary", () => {
   assert.equal(toolMatchesQuery(tile({ label: "Sign PDF", aliases: ["signature", "initials"] }), "signature"), true);
   assert.equal(toolMatchesQuery(tile({ label: "JPG to PDF", aliases: ["image", "photo"] }), "image"), true);
   assert.equal(toolMatchesQuery(tile({ label: "Edit PDF", aliases: ["text", "whiteout"] }), "text"), true);
-  assert.equal(toolMatchesQuery(tile({ label: "Text Extract", aliases: ["copy text"] }), "text"), true);
+  assert.equal(toolMatchesQuery(tile({ label: "Extract Text", aliases: ["copy text"] }), "text"), true);
+});
+
+test("public category mapping keeps specialist tools in clear homes", () => {
+  const catalog = readFileSync("lib/tools/catalog.ts", "utf8");
+  const tiles = readFileSync("lib/tools/tiles.ts", "utf8");
+
+  assert.match(catalog, /edit: "Edit"/);
+  assert.match(catalog, /"sign-fill": "Sign & Fill"/);
+  assert.match(catalog, /recognize: "Recognize"/);
+  assert.match(catalog, /"image-tools": "Image Tools"/);
+
+  assert.match(tiles, /seal: "sign-fill"/);
+  assert.match(tiles, /"extract-text": "recognize"/);
+  assert.match(tiles, /"heic-to-jpeg": "image-tools"/);
 });
 
 test("directory uses direct links, combined filters, live counts, and truthful availability", () => {
   const source = readFileSync("components/tools/ToolsExplorer.tsx", "utf8");
-  for (const label of ["All tools", "Organize", "Edit & sign", "Optimize", "Convert"]) {
+  for (const label of [
+    "All tools",
+    "Organize",
+    "Edit",
+    "Convert",
+    "Sign & Fill",
+    "Optimize",
+    "Recognize",
+    "Image Tools",
+  ]) {
     assert.match(source, new RegExp(label));
   }
   assert.match(source, /aria-pressed=\{category === filter\.id\}/);
@@ -52,7 +75,7 @@ test("directory uses direct links, combined filters, live counts, and truthful a
   assert.match(source, /Temporarily unavailable/);
   assert.doesNotMatch(source, /Notify me/);
   assert.match(source, /On device/);
-  assert.match(source, /Server-assisted/);
+  assert.match(source, /Current live tools are browser-based/);
 });
 
 test("slash and Escape keyboard contracts are explicit", () => {

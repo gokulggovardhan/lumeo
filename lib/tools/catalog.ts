@@ -16,7 +16,15 @@ import type { PublicToolStatus } from "@/lib/public-catalog/types";
 
 export type ToolProcessing = "browser" | "server" | "hybrid";
 export type ToolAvailability = "available" | "soon";
-export type ToolDiscoveryCategory = "organize" | "edit-sign" | "optimize" | "convert";
+export type ToolDiscoveryCategory =
+  | "organize"
+  | "edit"
+  | "convert"
+  | "sign-fill"
+  | "optimize"
+  | "secure"
+  | "recognize"
+  | "image-tools";
 export type ToolGlyphName =
   | "compose"
   | "distill"
@@ -60,9 +68,13 @@ export const PROCESSING_LABEL: Record<ToolProcessing, string> = {
 
 export const DISCOVERY_CATEGORY_LABEL: Record<ToolDiscoveryCategory, string> = {
   organize: "Organize",
-  "edit-sign": "Edit & sign",
-  optimize: "Optimize",
+  edit: "Edit",
   convert: "Convert",
+  "sign-fill": "Sign & Fill",
+  optimize: "Optimize",
+  secure: "Secure",
+  recognize: "Recognize",
+  "image-tools": "Image Tools",
 };
 
 export const lumeoTools: LumeoTool[] = [
@@ -136,7 +148,7 @@ export const lumeoTools: LumeoTool[] = [
       { label: "PDF to JPG", slug: "pdf-to-jpg", route: "/pdf/pdf-to-jpg", live: true, searchAliases: ["jpeg", "image", "export", "picture"] },
       { label: "PDF to PNG", slug: "pdf-to-png", route: "/pdf/pdf-to-jpg", live: true },
       { label: "PDF to WEBP", slug: "pdf-to-webp", route: "/pdf/pdf-to-jpg", live: true },
-      { label: "Text Extract", slug: "extract-text", route: "/pdf/extract-text", live: true, searchAliases: ["copy text", "read", "selectable text"] },
+      { label: "Extract Text", slug: "extract-text", route: "/pdf/extract-text", live: true, searchAliases: ["copy text", "read", "selectable text"] },
       { label: "PDF to HTML", slug: "pdf-to-html", live: false },
     ],
   },

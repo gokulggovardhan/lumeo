@@ -56,7 +56,7 @@ export default async function SplitPdfPage() {
     >
       {toolState.blocked ? (
         <>
-          <L2ToolPageHeader
+          <L2ToolPageHeader categoryLabel="ORGANIZE"
             title="Split PDF"
             description="Extract pages or separate one PDF into smaller files."
           />

@@ -176,6 +176,9 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit
 
+      - name: Run public discovery hierarchy regression
+        run: npx playwright test e2e/pdf-tools-discovery.spec.ts --project=chromium
+
       - name: Run Sign drag history regression
         run: npx playwright test e2e/sign-drag.spec.ts --project=chromium
 

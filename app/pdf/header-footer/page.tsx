@@ -54,7 +54,7 @@ export default async function HeaderFooterPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader title="Header & Footer" description="Add a header and footer to a PDF." />
+      <L2ToolPageHeader categoryLabel="EDIT" title="Header & Footer" description="Add a header and footer to a PDF." />
 
       {toolState.blocked ? (
         <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />

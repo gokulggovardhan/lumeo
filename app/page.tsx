@@ -6,7 +6,6 @@ import PublicFooter from "@/components/PublicFooter";
 import { PublicNav } from "@/components/PublicPdfChrome";
 import { PdfToolLauncher } from "@/components/pdf/PdfToolLauncher";
 import { ContinueWorking } from "@/components/ContinueWorking";
-import { ScrollReveal } from "@/components/ui/ScrollReveal";
 import { withSeoOverride } from "@/lib/public-site/seo";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
 import { resolveLumeoTools } from "@/lib/tools/resolve";
@@ -15,16 +14,15 @@ import { buildTiles } from "@/lib/tools/tiles";
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/", {
     title: {
-      absolute:
-        "Lumeo PDF - Merge, Split, Compress & Convert PDFs",
+      absolute: "Lumeo PDF - Private Browser-First PDF Tools",
     },
     description:
-      "Merge, split, compress, and convert PDFs, images, and Office files directly in your browser. No account required.",
+      "Merge, compress, edit, sign, and convert PDFs and documents in a focused browser-first workspace. No account or installation required for current public tools.",
     alternates: { canonical: "/" },
     openGraph: {
-      title: "Lumeo PDF - Browser-First PDF Tools",
+      title: "Lumeo PDF - Private Browser-First PDF Tools",
       description:
-        "A browser-first PDF workspace with local Word and PDF conversion.",
+        "A focused PDF and document workspace with clear browser-first processing.",
       url: "https://lumeo.in",
       siteName: "Lumeo PDF",
       type: "website",
@@ -32,7 +30,8 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "Lumeo PDF Workspace",
-      description: "Browser-first PDF tools with clear processing details.",
+      description:
+        "Private, browser-first PDF tools with clear processing details.",
     },
   });
 }
@@ -53,19 +52,25 @@ const structuredData = [
     applicationCategory: "BusinessApplication",
     operatingSystem: "Any modern browser",
     description:
-      "A browser-first PDF workspace for merging, splitting, compression, signing, and local document conversion.",
+      "A browser-first PDF workspace for organizing, optimizing, editing, signing, converting, and extracting document content.",
     featureList: [
       "Merge PDF",
       "Split PDF",
-      "Page Re-Order",
+      "Organize PDF",
       "Compress PDF",
-      "JPG to PDF",
-      "PDF to JPG",
+      "Edit PDF",
+      "Crop PDF",
+      "Watermark PDF",
+      "Page Numbers",
+      "Header & Footer",
       "Sign PDF",
       "Word to PDF",
       "PDF to Word",
-      "Text Extract",
+      "JPG to PDF",
+      "PDF to JPG",
       "HTML to PDF",
+      "Extract Text",
+      "HEIC to JPEG",
     ],
   },
   {
@@ -77,62 +82,117 @@ const structuredData = [
   },
 ];
 
-function TrustCheckIcon() {
+function CheckIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[15px] w-[15px] text-[var(--atelier-sage-300)]">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4 text-[var(--atelier-sage-300)]"
+    >
       <circle cx="12" cy="12" r="9" />
       <path d="M9 12l2 2 4-4" />
     </svg>
   );
 }
 
-function TrustShieldIcon() {
+function ShieldIcon() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[15px] w-[15px] text-[var(--atelier-sage-300)]">
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5 text-[var(--atelier-sage-300)]"
+    >
       <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z" />
+      <path d="m9.5 12 1.7 1.7 3.6-3.9" />
     </svg>
   );
 }
 
-function TrustUserIcon() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-[15px] w-[15px] text-[var(--atelier-sage-300)]">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M4 21c0-4 4-6 8-6s8 2 8 6" />
-    </svg>
-  );
-}
-
-const trustItems = [
-  { icon: TrustUserIcon, label: "No account needed" },
-  { icon: TrustCheckIcon, label: "Free, always" },
-  { icon: TrustShieldIcon, label: "No installs" },
+const trustRail = [
+  "Browser-first processing",
+  "No account required for public tools",
+  "No installation",
 ];
 
-const whyItems = [
+const privacyItems = [
   {
-    icon: TrustShieldIcon,
-    title: "Clear file handling",
-    description: "Document tools, including Word and PDF conversion, process files locally in your browser.",
+    title: "Files stay local where supported",
+    description:
+      "Current public document workflows are designed to process supported files in your browser instead of sending them away for conversion.",
   },
   {
-    icon: () => (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[22px] w-[22px] text-[var(--atelier-sage-300)]">
-        <path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z" />
-      </svg>
-    ),
-    title: "Open and go",
-    description: "Drop a file, get the result. No menus to learn, no setup.",
+    title: "Processing is explained up front",
+    description:
+      "Each workspace tells you how it handles files before you begin, including browser capability requirements where they matter.",
   },
   {
-    icon: () => (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[22px] w-[22px] text-[var(--atelier-sage-300)]">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 7v5l3 3" />
-      </svg>
-    ),
-    title: "Clear from the start",
-    description: "Each workspace explains how processing works before you begin.",
+    title: "No unnecessary document storage",
+    description:
+      "The current public tools do not require a Lumeo account or cloud document library to complete everyday tasks.",
+  },
+];
+
+const categoryItems = [
+  {
+    title: "Organize",
+    description: "Merge, split, reorder, rotate, duplicate, and remove pages.",
+  },
+  {
+    title: "Edit",
+    description: "Edit content, crop pages, add watermarks, numbers, headers, and footers.",
+  },
+  {
+    title: "Convert",
+    description: "Move between PDF, Word, images, and HTML.",
+  },
+  {
+    title: "Sign & Fill",
+    description: "Sign and initial documents now, with form workflows fitting here later.",
+  },
+  {
+    title: "Optimize",
+    description: "Reduce PDF size with clear quality controls.",
+  },
+  {
+    title: "Recognize",
+    description: "Extract selectable text now; OCR belongs here when it arrives.",
+  },
+  {
+    title: "Secure",
+    description: "A clear home for protection, unlocking, and permanent redaction as those tools ship.",
+  },
+  {
+    title: "Image Tools",
+    description: "HEIC to JPEG and other image utilities outside the core PDF workflow.",
+  },
+];
+
+const qualityItems = [
+  {
+    title: "Focused",
+    description: "Common actions are obvious without turning the homepage into a wall of utilities.",
+  },
+  {
+    title: "Cross-platform",
+    description: "Open Lumeo in a supported modern browser without installing a desktop application.",
+  },
+  {
+    title: "Clean exports",
+    description: "Each tool is built around a clear result, review step, and downloadable output.",
+  },
+  {
+    title: "Accessible by default",
+    description: "Keyboard, focus, responsive layout, and reduced-motion behavior stay part of the product contract.",
   },
 ];
 
@@ -141,78 +201,179 @@ export default async function Home() {
   const tiles = buildTiles(resolveLumeoTools(catalog.tools));
 
   return (
-    <main id="main-content" className="lumeo-page-enter aura-home relative flex min-h-dvh flex-col overflow-x-hidden text-[var(--lumeo-paper-100)]">
+    <main
+      id="main-content"
+      className="lumeo-page-enter aura-home relative flex min-h-dvh flex-col overflow-x-hidden text-[var(--lumeo-paper-100)]"
+    >
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
 
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="lumeo-ambient absolute -left-44 -top-52 h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.055)] blur-[60px] md:blur-[150px]" />
-        <div className="lumeo-ambient absolute -right-44 top-[-5rem] h-[28rem] w-[28rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.05)] blur-[60px] md:blur-[150px] [animation-delay:-4s]" />
-        <div className="absolute bottom-[-16rem] left-[42%] h-[26rem] w-[26rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.045)] blur-[60px] md:blur-[145px]" />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+        <div className="lumeo-ambient absolute -left-44 -top-52 h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.045)] blur-[60px] md:blur-[150px]" />
+        <div className="lumeo-ambient absolute -right-44 top-[-5rem] h-[28rem] w-[28rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.04)] blur-[60px] md:blur-[150px] [animation-delay:-4s]" />
       </div>
 
       <PublicNav />
 
       <section className="relative z-10 flex-1">
-        <div className="mx-auto w-full max-w-[1160px] px-5 pb-16 pt-4 sm:px-8 sm:pt-5 lg:pt-5">
-          <header className="lumeo-fade-up mx-auto max-w-[36rem] text-center">
+        <div className="mx-auto w-full max-w-[1160px] px-5 pb-16 pt-8 sm:px-8 sm:pt-12 lg:pt-14">
+          <header className="lumeo-fade-up mx-auto max-w-[46rem] text-center">
             <p className="aura-text-label inline-flex items-center gap-2 text-[var(--text-accent)]">
-              <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-[var(--text-accent)]" />
-              Browser-first document workspace
+              <span
+                aria-hidden="true"
+                className="h-1.5 w-1.5 rounded-full bg-[var(--text-accent)]"
+              />
+              Private, browser-first document workspace
             </p>
-            <h1
-              id="tool-heading"
-              className="mt-3 font-serif font-semibold text-[clamp(2rem,4.6vw,3.1rem)] leading-[1.06] tracking-[-0.02em] text-[var(--text-primary)]"
-            >
-              Pick a tool. <em className="not-italic text-[var(--atelier-sage-300)]">Get it done.</em>
+            <h1 className="mt-4 font-serif text-[clamp(2.45rem,6vw,4.6rem)] font-semibold leading-[0.98] tracking-[-0.035em] text-[var(--text-primary)]">
+              Your PDFs stay yours.
             </h1>
+            <p className="mx-auto mt-5 max-w-[41rem] text-[15px] leading-7 text-[var(--text-secondary)] sm:text-lg">
+              Merge, edit, sign, compress, and convert documents in a focused
+              workspace. Current supported workflows process files in your
+              browser, with handling explained before you begin.
+            </p>
+            <Link
+              href="/pdf-tools"
+              className="mt-7 inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--action-primary)] px-6 text-sm font-bold text-[var(--text-on-accent)] shadow-[0_12px_28px_rgba(var(--atelier-sage-rgb),0.16)] transition hover:-translate-y-0.5 hover:bg-[var(--action-primary-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
+            >
+              Explore PDF tools
+            </Link>
           </header>
 
-          <div className="mt-9 sm:mt-12">
-            <PdfToolLauncher showHeading={false} />
-          </div>
-
-          <div className="mt-9 flex flex-wrap justify-center gap-6 border-y border-[var(--border-hairline)] py-4 sm:mt-12 sm:gap-10">
-            {trustItems.map((item) => (
-              <div key={item.label} className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-                <item.icon />
-                {item.label}
+          <div className="mx-auto mt-9 flex max-w-[50rem] flex-wrap justify-center gap-x-6 gap-y-3 border-y border-[var(--border-hairline)] py-4 sm:mt-10 sm:gap-x-10">
+            {trustRail.map((item) => (
+              <div
+                key={item}
+                className="flex items-center gap-2 text-sm text-[var(--text-secondary)]"
+              >
+                <CheckIcon />
+                {item}
               </div>
             ))}
           </div>
 
+          <div className="mt-16 sm:mt-20">
+            <PdfToolLauncher />
+          </div>
+
           <ContinueWorking tiles={tiles} />
 
-          <section className="pt-16">
-            <div className="mx-auto mb-10 max-w-[35rem] text-center">
-              <p className="aura-text-label text-[var(--atelier-sage-300)]">Why Lumeo</p>
-              <h2 className="mt-3 font-serif font-semibold text-[1.9rem] text-[var(--text-primary)]">Built to be trusted, not just fast</h2>
-            </div>
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
-              {whyItems.map((item, index) => (
-                <ScrollReveal key={item.title} index={index} className="text-center">
-                  <div className="mx-auto flex h-[54px] w-[54px] items-center justify-center rounded-2xl border border-[rgba(132,175,154,0.2)] bg-[rgba(var(--atelier-sage-rgb),0.13)]">
-                    <item.icon />
+          <section className="mt-20 border-y border-[var(--border-hairline)] py-16 sm:mt-24 sm:py-20">
+            <div className="grid gap-10 lg:grid-cols-[0.85fr_1.4fr] lg:items-start">
+              <div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-[rgba(var(--atelier-sage-rgb),0.24)] bg-[rgba(var(--atelier-sage-rgb),0.1)]">
+                  <ShieldIcon />
+                </div>
+                <p className="aura-text-label mt-5 text-[var(--atelier-sage-300)]">
+                  Privacy & trust
+                </p>
+                <h2 className="mt-2 max-w-md font-serif text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]">
+                  Private by design, clear by default
+                </h2>
+                <p className="mt-3 max-w-md text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+                  Privacy is useful only when the product explains what is
+                  actually happening. Lumeo keeps those processing details
+                  visible instead of hiding them in marketing copy.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-3">
+                {privacyItems.map((item) => (
+                  <div
+                    key={item.title}
+                    className="rounded-[18px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-5"
+                  >
+                    <h3 className="font-serif text-[1.06rem] font-semibold text-[var(--text-primary)]">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">
+                      {item.description}
+                    </p>
                   </div>
-                  <h3 className="mt-5 font-serif text-base text-[var(--text-primary)]">{item.title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{item.description}</p>
-                </ScrollReveal>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="mt-16 sm:mt-20" aria-labelledby="categories-heading">
+            <div className="max-w-2xl">
+              <p className="aura-text-label text-[var(--atelier-sage-300)]">
+                Tool categories
+              </p>
+              <h2
+                id="categories-heading"
+                className="mt-2 font-serif text-[1.9rem] font-semibold tracking-[-0.02em] text-[var(--text-primary)]"
+              >
+                A structure that stays simple as Lumeo grows
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+                Plain-language groups make the current tools easy to scan and
+                leave clear homes for higher-value workflows later.
+              </p>
+            </div>
+            <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {categoryItems.map((item) => (
+                <div
+                  key={item.title}
+                  className="rounded-[16px] border border-[var(--border-hairline)] bg-[var(--surface-base)] p-5"
+                >
+                  <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
+                    {item.title}
+                  </h3>
+                  <p className="mt-2 text-[13px] leading-5 text-[var(--text-muted)]">
+                    {item.description}
+                  </p>
+                </div>
               ))}
             </div>
           </section>
 
-          <div className="my-16 rounded-[22px] border border-[var(--border-hairline)] bg-[linear-gradient(135deg,var(--surface-raised),var(--surface-base))] p-10 text-center sm:p-12">
-            <h2 className="font-serif font-semibold text-2xl text-[var(--text-primary)] sm:text-[1.7rem]">Your next PDF task, sorted in seconds.</h2>
-            <p className="mx-auto mt-3 max-w-md text-[var(--text-secondary)]">Choose a tool and follow its clear processing steps.</p>
+          <section className="mt-16 sm:mt-20" aria-labelledby="quality-heading">
+            <div className="text-center">
+              <p className="aura-text-label text-[var(--text-muted)]">
+                Product quality
+              </p>
+              <h2
+                id="quality-heading"
+                className="mt-2 font-serif text-[1.75rem] font-semibold text-[var(--text-primary)]"
+              >
+                Built to feel like one workspace
+              </h2>
+            </div>
+            <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {qualityItems.map((item) => (
+                <div key={item.title} className="text-center">
+                  <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
+                    {item.title}
+                  </h3>
+                  <p className="mx-auto mt-2 max-w-[17rem] text-[13px] leading-5 text-[var(--text-muted)]">
+                    {item.description}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="my-16 rounded-[22px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-6 py-10 text-center sm:my-20 sm:px-10 sm:py-12">
+            <h2 className="font-serif text-2xl font-semibold text-[var(--text-primary)] sm:text-[1.8rem]">
+              Need something more specific?
+            </h2>
+            <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+              The complete directory keeps specialist tools available without
+              crowding the homepage.
+            </p>
             <Link
               href="/pdf-tools"
-              className="mt-7 inline-flex items-center justify-center rounded-xl border border-[rgba(var(--atelier-sage-rgb),0.5)] bg-[linear-gradient(180deg,var(--action-primary-hover),var(--action-primary-active))] px-8 py-3.5 text-sm font-bold text-[var(--text-on-accent)] shadow-[0_12px_28px_rgba(var(--atelier-sage-rgb),0.18)] transition hover:-translate-y-0.5 hover:brightness-105 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]"
+              className="mt-6 inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-selected)] bg-[var(--surface-selected)] px-5 text-sm font-bold text-[var(--text-primary)] transition hover:border-[var(--atelier-sage-300)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]"
             >
-              Open Lumeo
+              View all tools
             </Link>
-          </div>
+          </section>
         </div>
       </section>
 

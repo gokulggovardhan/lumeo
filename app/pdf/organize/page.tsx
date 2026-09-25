@@ -58,7 +58,7 @@ export default async function OrganizePdfPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader
+      <L2ToolPageHeader categoryLabel="ORGANIZE"
         title="Organize PDF"
         description="Reorder, rotate, duplicate, or remove pages in one document."
       />

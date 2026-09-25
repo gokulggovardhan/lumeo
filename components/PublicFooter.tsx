@@ -6,12 +6,11 @@ import { L2PublicFooter } from "@/components/ui/Aura";
 
 const footerGroups = [
   {
-    title: "Tools",
+    title: "PDF Tools",
     links: [
-      { label: "Compose", href: "/pdf/merge" },
-      { label: "Distill", href: "/pdf/compress" },
-      { label: "Capture", href: "/pdf/jpg-to-pdf" },
-      { label: "Render", href: "/pdf/pdf-to-jpg" },
+      { label: "Merge PDF", href: "/pdf/merge" },
+      { label: "Compress PDF", href: "/pdf/compress" },
+      { label: "Edit PDF", href: "/pdf/edit" },
       { label: "All PDF Tools", href: "/pdf-tools" },
     ],
   },
@@ -43,18 +42,25 @@ export default function PublicFooter() {
         <div>
           <BrandLockup markSize="h-10 w-10" />
           <p className="mt-4 max-w-sm text-sm leading-6 text-[var(--text-secondary)]">
-            Private, browser-first PDF tools.
+            A focused, browser-first workspace for private PDF and document work.
           </p>
-          <p className="mt-3 text-xs font-bold text-[var(--text-accent)]">Private by design · Clear handling</p>
+          <p className="mt-3 text-xs font-bold text-[var(--text-accent)]">
+            Private by design · Clear file handling
+          </p>
         </div>
         <nav aria-label="Footer navigation" className="grid gap-6 sm:grid-cols-3">
           {footerGroups.map((group) => (
             <div key={group.title}>
-              <p className="text-sm font-black text-[var(--text-primary)]">{group.title}</p>
+              <p className="text-sm font-black text-[var(--text-primary)]">
+                {group.title}
+              </p>
               <ul className="mt-3 grid gap-2">
                 {group.links.map((link) => (
                   <li key={link.href}>
-                    <Link href={link.href} className="rounded-[var(--radius-sm)] text-sm font-bold text-[var(--text-muted)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]">
+                    <Link
+                      href={link.href}
+                      className="rounded-[var(--radius-sm)] text-sm font-bold text-[var(--text-muted)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
+                    >
                       {link.label}
                     </Link>
                   </li>
@@ -63,7 +69,9 @@ export default function PublicFooter() {
             </div>
           ))}
         </nav>
-        <p className="border-t border-[var(--border-hairline)] pt-5 text-xs text-[var(--text-muted)] md:col-span-2">&copy; {year} Lumeo PDF Workspace</p>
+        <p className="border-t border-[var(--border-hairline)] pt-5 text-xs text-[var(--text-muted)] md:col-span-2">
+          &copy; {year} Lumeo PDF Workspace
+        </p>
       </div>
     </L2PublicFooter>
   );

@@ -60,7 +60,7 @@ export default async function SignPdfPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader
+      <L2ToolPageHeader categoryLabel="SIGN & FILL"
         title="Sign PDF"
         description="Draw or type your signature, then place it on any page."
       />

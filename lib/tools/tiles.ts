@@ -21,11 +21,16 @@ const CATEGORY_BY_TOOL: Record<ResolvedTool["key"], ToolDiscoveryCategory> = {
   distill: "optimize",
   capture: "convert",
   render: "convert",
-  inscribe: "edit-sign",
-  seal: "edit-sign",
-  secure: "edit-sign",
+  inscribe: "edit",
+  seal: "sign-fill",
+  secure: "secure",
   convert: "convert",
-  recognize: "convert",
+  recognize: "recognize",
+};
+
+const CATEGORY_BY_ACTION_SLUG: Partial<Record<string, ToolDiscoveryCategory>> = {
+  "extract-text": "recognize",
+  "heic-to-jpeg": "image-tools",
 };
 
 const TILE_LABEL: Record<string, string> = {
@@ -37,6 +42,7 @@ const TILE_LABEL: Record<string, string> = {
   "page-numbers": "Page Numbers",
   "header-footer": "Header & Footer",
   crop: "Crop PDF",
+  "extract-text": "Extract Text",
 };
 
 const TILE_DESCRIPTION: Record<string, string> = {
@@ -71,7 +77,14 @@ const TOOL_ACCENT: Record<ResolvedTool["key"], TileAccent> = {
   recognize: "sage",
 };
 
-const POPULAR_TOOL_SLUGS = new Set(["merge", "compress", "edit", "sign"]);
+const POPULAR_TOOL_SLUGS = new Set([
+  "merge",
+  "compress",
+  "edit",
+  "pdf-to-word",
+  "word-to-pdf",
+  "sign",
+]);
 
 export type Tile = {
   slug: string;
@@ -106,8 +119,9 @@ function buildAllTiles(tools: ResolvedTool[]): Tile[] {
   const byRoute = new Map<string, Tile>();
 
   for (const tool of tools) {
-    const category = CATEGORY_BY_TOOL[tool.key];
     for (const action of tool.actions) {
+      const category =
+        CATEGORY_BY_ACTION_SLUG[action.slug] ?? CATEGORY_BY_TOOL[tool.key];
       if (!action.route) continue;
 
       const existing = byRoute.get(action.route);

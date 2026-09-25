@@ -1,51 +1,88 @@
 // components/pdf/PdfToolLauncher.tsx
 //
-// The homepage IS the catalog: one flat grid of the actual actions people
-// come here to do -- Merge, Split, Compress, Sign, Convert -- each a single
-// tap from landing straight into the workspace. No submenu, no deep-tool
-// grouping page to click through first. Deep-tool groupings (Compose,
-// Distill, ...) still exist as the data model and drive /pdf-tools, but the
-// homepage surfaces their live actions directly, deduplicated by
-// destination route so six related actions that all open the same
-// workspace (e.g. every Split family action) show once, not six times.
+// Homepage discovery is intentionally curated. The complete, searchable tool
+// directory lives at /pdf-tools; the homepage gives the strongest general-use
+// workflows the most visual weight and keeps secondary actions easy to find.
 
 import Link from "next/link";
 import { ToolGlyph } from "@/components/pdf/ToolGlyph";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
-import { resolveLumeoTools, type ResolvedTool } from "@/lib/tools/resolve";
+import { resolveLumeoTools } from "@/lib/tools/resolve";
 import { buildDiscoveryTiles, type Tile } from "@/lib/tools/tiles";
 import { ScrollReveal } from "@/components/ui/ScrollReveal";
 
-function availabilityLabel(tile: Tile) {
+const PRIMARY_TOOL_SLUGS = [
+  "merge",
+  "compress",
+  "edit",
+  "pdf-to-word",
+  "word-to-pdf",
+  "sign",
+] as const;
+
+const SECONDARY_TOOL_SLUGS = [
+  "split",
+  "reorder",
+  "jpg-to-pdf",
+  "pdf-to-jpg",
+] as const;
+
+function statusLabel(tile: Tile) {
   if (tile.availability === "beta") return "Beta";
   if (tile.availability === "coming_soon") return "Coming soon";
   if (tile.availability === "maintenance") return "Maintenance";
   return null;
 }
 
-function ToolTile({ tile, index }: { tile: Tile; index: number }) {
-  const available = tile.availability === "active" || tile.availability === "beta";
-  const status = availabilityLabel(tile);
+function CuratedToolCard({
+  tile,
+  index,
+  featured = false,
+}: {
+  tile: Tile;
+  index: number;
+  featured?: boolean;
+}) {
+  const available =
+    tile.availability === "active" || tile.availability === "beta";
+  const status = statusLabel(tile);
   const contents = (
     <>
-      <div className="lumeo-tile-icon">
-        <ToolGlyph name={tile.glyph} className="h-[22px] w-[22px]" />
+      <div className="flex items-start justify-between gap-4">
+        <span
+          className={`grid shrink-0 place-items-center rounded-[14px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)] shadow-[inset_0_1px_0_rgba(var(--paper-rgb),0.05)] ${
+            featured ? "h-12 w-12" : "h-11 w-11"
+          }`}
+        >
+          <ToolGlyph
+            name={tile.glyph}
+            className={featured ? "h-[22px] w-[22px]" : "h-5 w-5"}
+          />
+        </span>
+        {status ? (
+          <span className="rounded-full border border-[var(--border-subtle)] px-2 py-1 text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--text-premium)]">
+            {status}
+          </span>
+        ) : null}
       </div>
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-serif font-semibold text-[1.05rem] leading-tight text-[var(--text-primary)]">
-            {tile.label}
-          </h3>
-          {status ? (
-            <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] text-[var(--text-premium)]">
-              {status}
-            </span>
-          ) : null}
-        </div>
-        <p className="mt-1.5 text-[13px] leading-[1.45] text-[var(--text-secondary)]">{tile.description}</p>
+      <div className="mt-auto">
+        <h3
+          className={`font-serif font-semibold leading-tight text-[var(--text-primary)] ${
+            featured ? "text-[1.22rem]" : "text-[1.05rem]"
+          }`}
+        >
+          {tile.label}
+        </h3>
+        <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">
+          {tile.description}
+        </p>
       </div>
     </>
   );
+
+  const classes = `group flex h-full flex-col rounded-[18px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] ${
+    featured ? "min-h-[12rem] p-5 sm:min-h-[13rem] sm:p-6" : "min-h-[10.5rem] p-5"
+  } shadow-[var(--shadow-sm)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none`;
 
   return (
     <li className="min-w-0">
@@ -53,16 +90,15 @@ function ToolTile({ tile, index }: { tile: Tile; index: number }) {
         {available ? (
           <Link
             href={tile.route}
-            data-accent={tile.accent === "brass" ? "brass" : undefined}
-            aria-label={`${tile.label}${status ? `, ${status}` : ""}`}
-            className="lumeo-tile group backdrop-blur-[18px]"
+            className={classes}
+            aria-label={`Open ${tile.label}${status ? `, ${status}` : ""}`}
           >
             {contents}
           </Link>
         ) : (
           <article
+            className={`${classes} cursor-default opacity-75 hover:translate-y-0 hover:shadow-[var(--shadow-sm)]`}
             aria-label={`${tile.label}, ${status ?? "Unavailable"}`}
-            className="lumeo-tile cursor-default opacity-80 backdrop-blur-[18px]"
           >
             {contents}
           </article>
@@ -72,50 +108,65 @@ function ToolTile({ tile, index }: { tile: Tile; index: number }) {
   );
 }
 
-function ComingSoonLine({ tools }: { tools: ResolvedTool[] }) {
-  if (tools.length === 0) return null;
-
-  return (
-    <ScrollReveal index={2}>
-      <p className="mt-10 text-center text-[13px] text-[var(--text-muted)]">
-        <span className="text-[var(--atelier-brass-300)]">More on the way — </span>
-        {tools.map((tool, i) => (
-          <span key={tool.key}>
-            {tool.name}
-            {i < tools.length - 1 ? ", " : ""}
-          </span>
-        ))}
-      </p>
-    </ScrollReveal>
-  );
+function selectTiles(tiles: Tile[], slugs: readonly string[]) {
+  const bySlug = new Map(tiles.map((tile) => [tile.slug, tile]));
+  return slugs
+    .map((slug) => bySlug.get(slug))
+    .filter((tile): tile is Tile => Boolean(tile));
 }
 
-export async function PdfToolLauncher({ showHeading = true }: { showHeading?: boolean }) {
+export async function PdfToolLauncher() {
   const catalog = await getPublicPdfCatalog();
   const resolved = resolveLumeoTools(catalog.tools);
   const tiles = buildDiscoveryTiles(resolved);
-  const comingSoon = resolved.filter((tool) => tool.availability === "soon");
+  const primary = selectTiles(tiles, PRIMARY_TOOL_SLUGS);
+  const secondary = selectTiles(tiles, SECONDARY_TOOL_SLUGS);
 
   return (
-    <section aria-label="PDF tools">
-      {showHeading ? (
-        <header className="mb-7 text-center">
-          <p className="aura-text-label text-[var(--lumeo-gold-300)]">Lumeo PDF Workspace</p>
-          <h1 className="mt-3 font-serif text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] text-[color:var(--lumeo-paper-50)]">
-            Choose a tool. Get it done.
-          </h1>
-        </header>
-      ) : null}
-
-      <nav aria-label="Available PDF tools">
-        <ul className="grid grid-cols-2 gap-3.5 sm:gap-4 md:grid-cols-4 xl:grid-cols-5">
-          {tiles.map((tile, index) => (
-            <ToolTile key={tile.route} tile={tile} index={index} />
+    <div>
+      <section aria-labelledby="popular-tools-heading">
+        <div className="mb-6 max-w-2xl">
+          <p className="aura-text-label text-[var(--atelier-sage-300)]">
+            Popular tools
+          </p>
+          <h2
+            id="popular-tools-heading"
+            className="mt-2 font-serif text-[1.8rem] font-semibold tracking-[-0.015em] text-[var(--text-primary)] sm:text-[2rem]"
+          >
+            Start with the essentials
+          </h2>
+          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+            Six focused workspaces for the most common PDF and document tasks.
+          </p>
+        </div>
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {primary.map((tile, index) => (
+            <CuratedToolCard
+              key={tile.route}
+              tile={tile}
+              index={index}
+              featured
+            />
           ))}
         </ul>
-      </nav>
+      </section>
 
-      <ComingSoonLine tools={comingSoon} />
-    </section>
+      <section aria-labelledby="more-tools-heading" className="mt-14 sm:mt-16">
+        <div className="mb-5 max-w-2xl">
+          <p className="aura-text-label text-[var(--text-muted)]">More tools</p>
+          <h2
+            id="more-tools-heading"
+            className="mt-2 font-serif text-[1.45rem] font-semibold text-[var(--text-primary)] sm:text-[1.6rem]"
+          >
+            Useful next steps, without the clutter
+          </h2>
+        </div>
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {secondary.map((tile, index) => (
+            <CuratedToolCard key={tile.route} tile={tile} index={index} />
+          ))}
+        </ul>
+      </section>
+    </div>
   );
 }

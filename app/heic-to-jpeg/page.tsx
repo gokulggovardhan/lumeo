@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function HeicToJpegPage() {
   const state = await getToolBlockedState("heic-to-jpeg");
   return <PublicCatalogPageShell maxWidth="max-w-[1240px]">
-    <L2ToolPageHeader categoryLabel="SMART IPHONE PHOTO CONVERSION" title="HEIC to JPEG" description="Convert iPhone HEIC photos to high-quality JPEG directly in your browser." />
+    <L2ToolPageHeader categoryLabel="IMAGE TOOLS" title="HEIC to JPEG" description="Convert iPhone HEIC photos to high-quality JPEG directly in your browser." />
     {state.blocked ? <ToolMaintenanceNotice status={state.status} message={state.message} /> : <HeicToJpegTool />}
   </PublicCatalogPageShell>;
 }
