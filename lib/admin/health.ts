@@ -1,6 +1,7 @@
 import "server-only";
 
 import { summarizeHealthStatus, type HealthCheckStatus } from "@/lib/admin/health-status";
+import { istIsoDate } from "@/lib/admin/timezone";
 import { createClient } from "@/lib/supabase/server";
 
 export type { HealthCheckStatus } from "@/lib/admin/health-status";
@@ -95,7 +96,7 @@ async function checkProtectedStore(
 }
 
 async function checkAnalytics(supabase: ServerSupabaseClient): Promise<HealthCheck> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = istIsoDate();
   const { result, error, latencyMs } = await timed(async () =>
     await supabase.rpc("get_admin_analytics_summary", {
       p_start_date: today,
