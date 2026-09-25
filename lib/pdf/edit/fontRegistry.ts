@@ -101,6 +101,7 @@ export type PdfFontProfile = {
   browserFamilyName: string;
   browserPreviewPossible: boolean;
   resourceIdentity: PdfFontResourceIdentity;
+  embeddedProgramByteLength: number | null;
   embeddedProgramSha256: string | null;
   resolvedFont: ResolvedFont;
   metrics: FontMetrics;
@@ -439,6 +440,7 @@ export class PdfFontRegistry {
       browserFamilyName: `LumeoPdf_${safeFamilyToken(resourceName)}_${safeFamilyToken(resolvedFont.baseFont)}`,
       browserPreviewPossible: Boolean(embeddedProgram?.browserLoadable),
       resourceIdentity: resourceIdentityFor(fontResource, this.context, embeddedProgram),
+      embeddedProgramByteLength: embeddedProgram?.bytes.byteLength ?? null,
       embeddedProgramSha256: embeddedProgram?.sha256 ?? null,
       resolvedFont,
       metrics,
