@@ -117,9 +117,6 @@ jobs:
       - name: Build Cloudflare Worker
         run: npm run build:vinext
 
-      - name: Verify Cloudflare Worker CPU budget
-        run: node scripts/verify-cloudflare-worker-config.mjs dist/server/wrangler.json
-
       - name: Validate Cloudflare Worker bundle
         run: npx vinext-cloudflare deploy --dry-run --config dist/server/wrangler.json
 

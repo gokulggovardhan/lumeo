@@ -280,3 +280,16 @@ test("Dashboard tool activity follows the same usable-state policy as public dis
     /tool\.status !== "active" && tool\.status !== "beta"/,
   );
 });
+
+
+test("Admin Health scopes analytics checks to the IST calendar day", () => {
+  const health = read("lib/admin/health.ts");
+  assert.match(health, /import \{ istIsoDate \} from "@\/lib\/admin\/timezone"/);
+  assert.match(health, /const today = istIsoDate\(\);/);
+  assert.doesNotMatch(health, /new Date\(\)\.toISOString\(\)\.slice\(0, 10\)/);
+});
+
+test("Cloudflare Worker config stays deployable on the current Free plan", () => {
+  const wrangler = read("wrangler.jsonc");
+  assert.doesNotMatch(wrangler, /"cpu_ms"\s*:/);
+});
