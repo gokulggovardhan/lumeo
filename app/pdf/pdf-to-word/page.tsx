@@ -54,7 +54,7 @@ export default async function PdfToWordPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader
+      <L2ToolPageHeader categoryLabel="CONVERT"
         title="PDF to Word"
         description="Convert PDF documents to editable Word files locally in your browser. Your PDF stays on your device."
       />
