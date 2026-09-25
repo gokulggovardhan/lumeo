@@ -123,7 +123,7 @@ test("Lumeo Atelier retheme keeps soft semantic tokens and interaction contracts
   // Hero heading size was reduced after this test was written (verified
   // current value below), part of the same redesign that replaced the
   // 5-slot homepage with the flat tile grid.
-  assert.ok(homepage.includes("text-[clamp(2rem,4.6vw,3.1rem)]"));
+  assert.ok(homepage.includes("text-[clamp(2.45rem,6vw,4.6rem)]"));
   assert.doesNotMatch(homepage, /#0D2C6D|sky-rgb|bg-\[var\(--surface-canvas\)\]/);
 });
 
@@ -206,26 +206,17 @@ test("Lumeo 2 documentation and verifier cover the flagship foundation", () => {
   assert.ok(lumeo2Verifier.includes("components/analytics/AnalyticsProvider.tsx"));
 });
 
-test("Lumeo 2 public homepage shows the enabled catalog as a truthful flat tile grid", () => {
-  // The 5-slot admin-configured homepage (getPublicHomepageTools,
-  // configuredTools.slice(0, 5), a hardcoded 6th "All PDF Tools" card) was
-  // deliberately retired in favor of a fixed grid showing every enabled tool
-  // with unavailable states rendered non-actionably -- see the header comment in components/pdf/PdfToolLauncher.tsx
-  // for the rationale, and the matching fix already applied to
-  // scripts/verify-public-tool-catalog.mjs. The "All PDF Tools" link now
-  // lives in the public footer instead of a homepage card.
-  assert.ok(homepage.includes("Pick a tool."));
+test("Lumeo 2 public homepage uses a curated, truthful tool hierarchy", () => {
+  assert.ok(homepage.includes("Your PDFs stay yours."));
   assert.ok(launcher.includes("getPublicPdfCatalog"));
   assert.ok(launcher.includes("resolveLumeoTools"));
   assert.ok(launcher.includes("buildDiscoveryTiles(resolved)"));
+  assert.ok(launcher.includes("PRIMARY_TOOL_SLUGS"));
+  assert.ok(launcher.includes("SECONDARY_TOOL_SLUGS"));
   assert.ok(launcher.includes("available ? ("));
   assert.ok(launcher.includes("<article"));
   assert.ok(publicFooter.includes("All PDF Tools"));
-  assert.doesNotMatch(homepage, /Start with Merge PDF/);
-  // "processed" was dropped from this forbidden-word check: it's
-  // legitimate, load-bearing privacy copy ("Each file is processed for the
-  // task at hand, then cleared"), not a marketing social-proof number like
-  // the other three terms this check actually guards against.
+  assert.ok(homepage.includes("View all tools"));
   assert.doesNotMatch(homepage, /\b(ratings?|users?|downloads?)\b/i);
 });
 
@@ -312,7 +303,7 @@ test("Lumeo 2 footer has grouped navigation and public verifier exists", () => {
   assert.ok(publicFooter.includes("Tools"));
   assert.ok(publicFooter.includes("Company"));
   assert.ok(publicFooter.includes("Legal"));
-  assert.ok(publicFooter.includes("Private, browser-first PDF tools."));
+  assert.ok(publicFooter.includes("browser-first workspace"));
   assert.ok(publicExperienceVerifier.includes("verify:lumeo2-public-experience"));
   assert.ok(lumeo2Doc.includes("Homepage Hierarchy"));
   assert.ok(lumeo2Doc.includes("What Remains For Run 3") || lumeo2Doc.includes("What remains for Run 3"));
@@ -325,13 +316,8 @@ test("new Aura code avoids prohibited debug and secret patterns", () => {
 });
 
 test("Run 2 public rollout uses Aura surfaces and keeps tools visible", () => {
-  // Homepage copy was revised after this test was written (verified
-  // current headline: "Pick a tool. Get it done."). The inline
-  // "aura-directory-section" class was removed along with the old
-  // directory markup when /pdf-tools moved to the ToolsExplorer
-  // component (same finding as the directory-states test above).
   assert.ok(homepage.includes("aura-home"));
-  assert.ok(homepage.includes("Pick a tool."));
+  assert.ok(homepage.includes("Your PDFs stay yours."));
   assert.ok(homepage.includes("text-[var(--text-primary)]"));
   assert.ok(pdfTools.includes("ToolsExplorer"));
   assert.ok(publicChrome.includes("aura-public-nav"));
