@@ -49,8 +49,8 @@ export type ResolvedFont = {
   bytesPerCode: 1 | 2;
   encodingSource: EncodingSource;
   /** Exact Type0 /Encoding name when directly named; null for simple/unknown encodings. */
-  compositeEncodingName: string | null;
-  writingMode: "horizontal" | "vertical" | "unknown";
+  compositeEncodingName?: string | null;
+  writingMode?: "horizontal" | "vertical" | "unknown";
   glyphCodeToUnicode: Map<number, string>;
   /**
    * Only populated with codes this module can vouch for -- see
