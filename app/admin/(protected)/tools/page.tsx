@@ -55,7 +55,7 @@ export default async function ToolsPage({
   const activeFilters = hasActiveToolFilters(filters);
   const enabledCount = tools.data.filter((tool) => tool.is_enabled).length;
   const maintenanceCount = tools.data.filter(
-    (tool) => tool.status === "maintenance" || Boolean(tool.maintenance_message),
+    (tool) => tool.status === "maintenance",
   ).length;
   const usageAvailable = analytics.data.dataStatus === "available";
   const opensBySlug = new Map(
@@ -81,6 +81,29 @@ export default async function ToolsPage({
         <AdminMetricCard label="Maintenance" value={maintenanceCount} detail="Tools with a maintenance state or message." tone={maintenanceCount ? "warning" : "neutral"} />
         <AdminMetricCard label="Filtered results" value={filteredTools.length} detail={activeFilters ? "Matches the current URL-backed filters." : "Showing the complete catalog."} tone="gold" />
       </section>
+
+      <AdminSectionCard
+        title="Public state policy"
+        description="The selected state and Enabled publicly flag resolve to one effective public behavior. Disabled always wins and fails closed."
+      >
+        <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-5">
+          {[
+            ["Active", "Listed and usable."],
+            ["Beta", "Listed and usable, with a Beta label."],
+            ["Coming soon", "Listed but blocked, with Coming Soon shown publicly."],
+            ["Maintenance", "Listed but blocked, with the maintenance notice shown."],
+            ["Hidden", "Not listed and blocked on its direct route."],
+          ].map(([label, detail]) => (
+            <div key={label} className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-base)] p-3">
+              <p className="font-semibold text-[var(--text-primary)]">{label}</p>
+              <p className="mt-1 leading-5 text-[var(--text-muted)]">{detail}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs leading-5 text-[var(--text-subtle)]">
+          Turning off Enabled publicly overrides every state: the tool is removed from public discovery and its direct workspace is blocked.
+        </p>
+      </AdminSectionCard>
 
       <AdminSectionCard title="Find tools" description="Filters are server-rendered and encoded in the URL, so operational views can be bookmarked or shared.">
         <form action="/admin/tools" method="get" className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(13rem,1.5fr)_repeat(4,minmax(9rem,1fr))_auto]">
