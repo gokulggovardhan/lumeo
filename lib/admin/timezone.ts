@@ -7,11 +7,12 @@
 export const ADMIN_TIMEZONE = "Asia/Kolkata";
 
 export function formatAdminDateTime(value: string | number | Date, timeStyle: "short" | "medium" = "short") {
-  return new Date(value).toLocaleString("en-IN", {
+  const formatted = new Date(value).toLocaleString("en-IN", {
     dateStyle: "medium",
     timeStyle,
     timeZone: ADMIN_TIMEZONE,
   });
+  return `${formatted} IST`;
 }
 
 export function formatAdminDate(value: string | number | Date) {
@@ -25,6 +26,28 @@ export function formatAdminDate(value: string | number | Date) {
 // a <input type="datetime-local"> can be converted to a UTC instant just by
 // appending the offset -- no need for a full tz database lookup.
 const IST_OFFSET = "+05:30";
+const ISO_CALENDAR_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function parseIsoCalendarDate(value: string) {
+  if (!ISO_CALENDAR_DATE.test(value)) return null;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    return null;
+  }
+  return date;
+}
+
+// Treat an Admin date filter as midnight in India, then convert that instant
+// to UTC for database comparison. dayOffset=1 is useful for an exclusive end
+// boundary, e.g. 21 Sep IST -> 22 Sep 00:00 IST -> 21 Sep 18:30 UTC.
+export function istCalendarDateStartToUtcIso(value: string, dayOffset = 0): string | null {
+  const calendarDate = parseIsoCalendarDate(value);
+  if (!calendarDate) return null;
+  calendarDate.setUTCDate(calendarDate.getUTCDate() + dayOffset);
+  const shifted = calendarDate.toISOString().slice(0, 10);
+  const instant = new Date(`${shifted}T00:00:00${IST_OFFSET}`);
+  return Number.isNaN(instant.getTime()) ? null : instant.toISOString();
+}
 
 // "YYYY-MM-DDTHH:mm" (IST wall clock, from a datetime-local input) -> UTC
 // ISO string for storage. Without this, the raw string was being stored
