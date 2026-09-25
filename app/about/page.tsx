@@ -119,11 +119,10 @@ export default function AboutPage() {
 
         <InfoPageSection title="Current tools">
           <p>
-            Lumeo currently includes 17 live public tools across organizing,
+            Lumeo currently includes live public tools across organizing,
             editing, conversion, signing, optimization, text extraction, and
             image utilities. That includes Edit PDF, Sign PDF, Word to PDF,
-            PDF to Word, and the specialist tools available in the full
-            directory.
+            PDF to Word, and specialist tools available in the full directory.
           </p>
           <InfoInlineLinks
             links={[
