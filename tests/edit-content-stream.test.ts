@@ -256,3 +256,29 @@ test("walkTextShowOperators preserves DeviceCMYK components without inventing an
     cssHex: null,
   });
 });
+
+
+test("quote text-show operators re-establish a proven line position after an unmeasurable prior advance", () => {
+  const singleQuote = walkTextShowOperators(
+    new TextEncoder().encode(
+      "BT /F1 12 Tf 14 TL 1 0 0 1 10 700 Tm (A) Tj (B) ' ET",
+    ),
+    undefined,
+    { measureTextAdvance: () => null },
+  );
+  assert.equal(singleQuote.length, 2);
+  assert.equal(singleQuote[0].positionReliability, "proven");
+  assert.equal(singleQuote[1].positionReliability, "proven");
+  assert.equal(singleQuote[1].textRenderingMatrix[5], 686);
+
+  const doubleQuote = walkTextShowOperators(
+    new TextEncoder().encode(
+      'BT /F1 12 Tf 14 TL 1 0 0 1 10 700 Tm (A) Tj 1 0 (B) " ET',
+    ),
+    undefined,
+    { measureTextAdvance: () => null },
+  );
+  assert.equal(doubleQuote.length, 2);
+  assert.equal(doubleQuote[1].positionReliability, "proven");
+  assert.equal(doubleQuote[1].textRenderingMatrix[5], 686);
+});
