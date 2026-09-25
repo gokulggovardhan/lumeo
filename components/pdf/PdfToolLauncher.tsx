@@ -133,7 +133,7 @@ export async function PdfToolLauncher() {
             id="popular-tools-heading"
             className="mt-2 font-serif text-[1.8rem] font-semibold tracking-[-0.015em] text-[var(--text-primary)] sm:text-[2rem]"
           >
-            Start with the tools people reach for most
+            Start with the essentials
           </h2>
           <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
             Six focused workspaces for the most common PDF and document tasks.
