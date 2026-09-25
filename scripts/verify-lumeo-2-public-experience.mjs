@@ -54,7 +54,7 @@ try {
     assert(ui.includes(`export function ${component}`) || ui.includes(`export const ${component}`), `Missing Lumeo 2 public primitive: ${component}`);
   }
 
-  assert(homepage.includes("Pick a tool."), "Current homepage headline is missing.");
+  assert(homepage.includes("Your PDFs stay yours."), "Current homepage headline is missing.");
   assert(!homepage.includes("Start with Merge PDF"), "Homepage must not restore the retired CTA.");
   assert(!/badge/i.test(homepage), "Homepage must not introduce badges.");
   assert(!/\b(ratings?|customers?|users?|downloads?)\b/i.test(homepage), "Homepage must not introduce fake counts or social proof.");
@@ -62,7 +62,8 @@ try {
   assert(launcher.includes("getPublicPdfCatalog"), "Homepage tools must remain catalog driven.");
   assert(launcher.includes("resolveLumeoTools"), "Homepage tools must resolve current availability.");
   assert(launcher.includes("buildDiscoveryTiles(resolved)"), "Homepage must render the current resolved discovery-state model.");
-  assert(launcher.includes("available ? (") && launcher.includes("<article"), "Unavailable homepage tools must remain visible but non-actionable.");
+  assert(launcher.includes("PRIMARY_TOOL_SLUGS") && launcher.includes("SECONDARY_TOOL_SLUGS"), "Homepage must keep its curated primary and secondary tool hierarchy.");
+  assert(launcher.includes("available ? (") && launcher.includes("<article"), "Unavailable curated homepage tools must remain visible but non-actionable.");
   assert(footer.includes("All PDF Tools"), "All PDF Tools navigation must remain available.");
 
   assert(chrome.includes("L2PublicHeader"), "Public navigation must use the Lumeo 2 header surface.");
@@ -100,7 +101,7 @@ try {
   assert(!/AuraUploadSurface|Select files|Start conversion|Convert now/.test(maintenanceNotice), "Unavailable tools must not expose fake operational controls.");
 
   assert(footer.includes("Tools") && footer.includes("Company") && footer.includes("Legal"), "Footer grouped navigation is missing.");
-  assert(footer.includes("Private, browser-first PDF tools."), "Footer product description is missing.");
+  assert(footer.includes("browser-first workspace"), "Footer product description is missing.");
   assert(css.includes("@media (prefers-reduced-motion: reduce)"), "Reduced-motion support is missing.");
   assert(docs.includes("Homepage Hierarchy") && (docs.includes("What remains for Run 3") || docs.includes("What Remains For Run 3")), "Lumeo 2 public-experience documentation is incomplete.");
 
