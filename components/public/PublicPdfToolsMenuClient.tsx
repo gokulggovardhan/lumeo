@@ -90,7 +90,7 @@ export function PublicPdfToolsMenuClient({
             <div className="flex items-start justify-between gap-4 px-1 pb-2">
               <div>
                 <p className="text-sm font-black text-[var(--text-primary)]">PDF Tools</p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">Jump straight to any tool.</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Jump straight to popular tools.</p>
               </div>
               <button
                 type="button"
@@ -140,6 +140,25 @@ export function PublicPdfToolsMenuClient({
               <span>View all PDF tools</span>
               <span aria-hidden="true" className="text-[var(--text-premium)]">→</span>
             </Link>
+
+            <div className="mt-2 grid grid-cols-2 gap-2 md:hidden">
+              <Link
+                href="/guides"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex min-h-11 items-center justify-center rounded-[var(--radius-lg)] px-3 text-sm font-bold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.06)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
+              >
+                Guides
+              </Link>
+              <Link
+                href="/about"
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                className="flex min-h-11 items-center justify-center rounded-[var(--radius-lg)] px-3 text-sm font-bold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.06)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
+              >
+                About
+              </Link>
+            </div>
           </L2MenuSurface>
         </>
       ) : null}
