@@ -200,13 +200,15 @@ test("Admin database-backed pages distinguish unavailable data from valid empty 
   }
 });
 
-test("Audit filters reject malformed date input without throwing", () => {
+test("Audit filters reject malformed input and use IST calendar-day boundaries", () => {
   const audit = read("app/admin/(protected)/audit/page.tsx");
   const filters = read("lib/admin/governance-filters.ts");
+  const timezone = read("lib/admin/timezone.ts");
   assert.match(audit, /resolveAuditFilters/);
-  assert.match(filters, /function parseIsoDate/);
-  assert.match(filters, /Number\.isNaN\(date\.getTime\(\)\)/);
-  assert.match(filters, /date\.toISOString\(\)\.slice\(0, 10\) !== value/);
+  assert.match(filters, /istDateStartUtcIso/);
+  assert.match(filters, /istDateEndExclusiveUtcIso/);
+  assert.match(timezone, /function parseIstCalendarDate/);
+  assert.match(timezone, /istIsoDate\(parsed\) !== value/);
   assert.doesNotMatch(audit, /new Date\(params\.start\)\.toISOString/);
   assert.match(audit, /if \(!canView\)/);
 });
