@@ -259,8 +259,8 @@ export async function inspectPdfFontProgram(
   }
 
   try {
-    const module = await moduleLoader();
-    const fontkit = module.default ?? module;
+    const fontkitModule = await moduleLoader();
+    const fontkit = fontkitModule.default ?? fontkitModule;
     const opened = fontkit.create(bytes);
     const font = pickFont(opened, preferredPostScriptNames);
     if (!font) {
