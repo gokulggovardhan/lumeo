@@ -10,7 +10,7 @@ import {
 } from "@/components/InfoPage";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
-const lastUpdated = "July 11, 2026";
+const lastUpdated = "September 25, 2026";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/privacy", {
@@ -94,7 +94,7 @@ export default function PrivacyPage() {
               {
                 term: "May be stored",
                 description:
-                  "Non-document UI preferences such as layout choices within Compose.",
+                  "Non-document UI preferences such as layout choices within supported workspaces.",
               },
               {
                 term: "Not stored",
@@ -130,9 +130,9 @@ export default function PrivacyPage() {
           <p>
             Lumeo uses web hosting and deployment infrastructure to serve the
             public site. Fonts are loaded through the framework&apos;s font system.
-            Current Compose, Distill, Capture, and Render workflows run
-            entirely in the browser and do not require remote PDF processing
-            services.
+            Current live public PDF, document-conversion, and image-conversion
+            workflows are designed to run in the browser and do not require a
+            remote document-processing service.
           </p>
         </InfoPageSection>
 
