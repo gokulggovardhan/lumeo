@@ -1657,14 +1657,19 @@ export default function EditPdfTool() {
 
             const legacy = legacyMatches[index];
             const reconciliation = reconciliations[index];
-            if (legacy && reconciliation?.confidence === "high") return legacy;
-
             const evidence = evidenceMatches.get(index);
-            return evidence
-              ? { locatedOperator: evidence.locatedOperator, operator: evidence.locatedOperator.operator }
-              : legacy && reconciliation?.confidence !== "low"
-                ? legacy
-                : null;
+
+            // A high-confidence evidence match may replace a bad positional
+            // legacy match. Otherwise retain the legacy provenance so the
+            // existing fragmented-run reconstruction and edit-plan guards can
+            // prove or reject multi-operator text exactly as before.
+            if (evidence && reconciliation?.source === "evidence-match") {
+              return {
+                locatedOperator: evidence.locatedOperator,
+                operator: evidence.locatedOperator.operator,
+              };
+            }
+            return legacy;
           }),
         );
       } catch (matchError) {
