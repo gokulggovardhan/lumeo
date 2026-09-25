@@ -76,7 +76,9 @@ import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/pr
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
-import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
+import { runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
+import type { TextReconciliationEvidence } from "@/lib/pdf/edit/textReconciliation";
+import type { PageTextCapabilityClassification } from "@/lib/pdf/edit/documentTextCapability";
 import type { ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
@@ -263,6 +265,10 @@ type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 let editEngineModulePromise: Promise<{
   exportEditedPdf: (typeof import("@/lib/pdf/edit/export"))["exportEditedPdf"];
   collectPageTextOperators: (typeof import("@/lib/pdf/edit/formXObjects"))["collectPageTextOperators"];
+  inspectPageContentEvidence: (typeof import("@/lib/pdf/edit/formXObjects"))["inspectPageContentEvidence"];
+  detectNativeTextSpans: (typeof import("@/lib/pdf/edit/nativeTextDetection"))["detectNativeTextSpans"];
+  reconcileTextDetections: (typeof import("@/lib/pdf/edit/textReconciliation"))["reconcileTextDetections"];
+  DocumentTextCapabilityClassifier: (typeof import("@/lib/pdf/edit/documentTextCapability"))["DocumentTextCapabilityClassifier"];
   resolveFont: (typeof import("@/lib/pdf/edit/fontEncoding"))["resolveFont"];
   resolveFontMetrics: (typeof import("@/lib/pdf/edit/fontMetrics"))["resolveFontMetrics"];
   readFallbackStyleHints: (typeof import("@/lib/pdf/edit/fallbackFont"))["readFallbackStyleHints"];
@@ -285,9 +291,29 @@ function loadEditEngine() {
       import("pdf-lib"),
       import("@/lib/pdf/edit/fallbackFont"),
       import("@/lib/pdf/edit/fontRegistry"),
-    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod]) => ({
+      import("@/lib/pdf/edit/nativeTextDetection"),
+      import("@/lib/pdf/edit/textReconciliation"),
+      import("@/lib/pdf/edit/documentTextCapability"),
+    ]).then(([
+      exportMod,
+      formXObjectsMod,
+      fontEncodingMod,
+      fontMetricsMod,
+      applyEditPlanMod,
+      pdfLibMod,
+      fallbackFontMod,
+      fontRegistryMod,
+      nativeTextDetectionMod,
+      textReconciliationMod,
+      documentTextCapabilityMod,
+    ]) => ({
       exportEditedPdf: exportMod.exportEditedPdf,
       collectPageTextOperators: formXObjectsMod.collectPageTextOperators,
+      inspectPageContentEvidence: formXObjectsMod.inspectPageContentEvidence,
+      detectNativeTextSpans: nativeTextDetectionMod.detectNativeTextSpans,
+      reconcileTextDetections: textReconciliationMod.reconcileTextDetections,
+      DocumentTextCapabilityClassifier:
+        documentTextCapabilityMod.DocumentTextCapabilityClassifier,
       resolveFont: fontEncodingMod.resolveFont,
       resolveFontMetrics: fontMetricsMod.resolveFontMetrics,
       readFallbackStyleHints: fallbackFontMod.readFallbackStyleHints,
