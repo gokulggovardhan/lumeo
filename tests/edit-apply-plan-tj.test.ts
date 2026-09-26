@@ -343,11 +343,20 @@ test("text-only Tj replacement preserves the following run origin across repeate
     current = await editedDoc.save();
 
     const after = await positions(current);
-    assert.equal(after.length, 2);
-    assert.equal(after.map((item) => item.text).join(""), `${replacement}Second`);
+    const secondMatches = after.filter((item) => item.text === "Second");
+    assert.equal(secondMatches.length, 1, `expected exactly one following "Second" item: ${JSON.stringify(after)}`);
+    const secondIndex = after.findIndex((item) => item.text === "Second");
+    assert.ok(secondIndex > 0, `expected replacement content before "Second": ${JSON.stringify(after)}`);
+
+    const beforeSecondText = after.slice(0, secondIndex).map((item) => item.text).join("");
+    assert.equal(
+      beforeSecondText.replace(/\\s+/gu, ""),
+      replacement.replace(/\\s+/gu, ""),
+      `only PDF.js whitespace segmentation may appear in the compensated gap: ${JSON.stringify(after)}`,
+    );
     assert.ok(
-      Math.abs(after[1].x - anchoredSecondX) < 0.05,
-      `following run moved after edit ${iteration + 1}: ${anchoredSecondX} -> ${after[1].x}`,
+      Math.abs(secondMatches[0].x - anchoredSecondX) < 0.05,
+      `following run moved after edit ${iteration + 1}: ${anchoredSecondX} -> ${secondMatches[0].x}`,
     );
 
     const stream = await decodedContentStreamBytes(current.slice());
