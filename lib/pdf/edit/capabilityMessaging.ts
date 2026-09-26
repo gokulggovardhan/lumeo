@@ -15,9 +15,9 @@ const CATEGORY_MESSAGES: Record<
   TextCapabilityUserMessage
 > = {
   NATIVE_TEXT: {
-    title: "Text source match is not fully proven",
+    title: "Native PDF text is ready for direct editing",
     detail:
-      "Lumeo can see native PDF text here, but direct editing stays read-only unless the visible text and its original PDF source agree strongly enough.",
+      "Lumeo has enough source, font and geometry evidence to edit this native PDF text in place. Each replacement still passes its own glyph and layout checks before Apply.",
   },
   SCANNED_IMAGE: {
     title: "This page appears to be a scan",
