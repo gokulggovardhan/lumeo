@@ -3976,6 +3976,7 @@ export default function EditPdfTool() {
                           }
                         }}
                         aria-label="Edit text"
+                        data-caret-style-snapshot={activeCaretTextStyleSnapshot ? "true" : "false"}
                         data-native-fill-color={activeNativeStyleDraft?.fillColorHex ?? singleSelectedSpan?.style.fillColor?.cssHex ?? undefined}
                         data-native-fill-opacity={singleSelectedSpan?.style.fillOpacity ?? undefined}
                         // lumeo-page-overlay-input opts out of the app-chrome
