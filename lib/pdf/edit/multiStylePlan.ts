@@ -58,6 +58,10 @@ class ValidatedNativeTextStyleBatchProof {
       configurable: false,
     });
   }
+
+  isPlannerIssued(): boolean {
+    return this.validationProof === true;
+  }
 }
 
 export type ValidatedNativeTextStyleBatchPlan =
@@ -124,6 +128,7 @@ export function isValidatedNativeTextStyleBatchPlan(
 ): plan is ValidatedNativeTextStyleBatchPlan {
   return (
     plan instanceof ValidatedNativeTextStyleBatchProof &&
+    plan.isPlannerIssued() &&
     plan.editable === true &&
     plan.reason === null &&
     Object.isFrozen(plan) &&
