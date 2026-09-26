@@ -38,6 +38,7 @@ type TextRunOverlayProps = {
   editable: boolean;
   selected: boolean;
   hovered: boolean;
+  limitationMessage?: string | null;
   onSelect: (shiftKey: boolean) => void;
   onHoverStart: () => void;
   onHoverEnd: () => void;
@@ -59,6 +60,7 @@ function TextRunOverlayImpl({
   editable,
   selected,
   hovered,
+  limitationMessage,
   onSelect,
   onHoverStart,
   onHoverEnd,
@@ -100,6 +102,8 @@ function TextRunOverlayImpl({
       tabIndex={0}
       aria-label={`${editable ? "Editable" : "Not yet editable"} text: ${run.str}`}
       aria-pressed={selected}
+      title={!editable && limitationMessage ? limitationMessage : undefined}
+      data-edit-limitation={limitationMessage ? "true" : undefined}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onMouseEnter={onHoverStart}
