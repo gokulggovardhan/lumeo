@@ -109,6 +109,10 @@ import {
   captureCaretTextStyleSnapshot,
 } from "@/lib/pdf/edit/caretTextStyleSnapshot";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
+import {
+  buildNativeTextStyleBatchPlan,
+  type NativeTextStyleBatchPatch,
+} from "@/lib/pdf/edit/multiStylePlan";
 import { reconstructFragmentedRun, type FragmentedRunReconstruction } from "@/lib/pdf/edit/fragmentedRun";
 import {
   buildNativePaintPlan,
@@ -287,6 +291,7 @@ let editEngineModulePromise: Promise<{
   readFallbackStyleHints: (typeof import("@/lib/pdf/edit/fallbackFont"))["readFallbackStyleHints"];
   applyEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyEditPlanToDocument"];
   applyMultiRunEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyMultiRunEditPlanToDocument"];
+  applyNativeTextStyleBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyNativeTextStyleBatchToDocument"];
   PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
   PDFName: (typeof import("pdf-lib"))["PDFName"];
   PDFDict: (typeof import("pdf-lib"))["PDFDict"];
@@ -312,6 +317,7 @@ function loadEditEngine() {
       readFallbackStyleHints: fallbackFontMod.readFallbackStyleHints,
       applyEditPlanToDocument: applyEditPlanMod.applyEditPlanToDocument,
       applyMultiRunEditPlanToDocument: applyEditPlanMod.applyMultiRunEditPlanToDocument,
+      applyNativeTextStyleBatchToDocument: applyEditPlanMod.applyNativeTextStyleBatchToDocument,
       PDFDocument: pdfLibMod.PDFDocument,
       PDFName: pdfLibMod.PDFName,
       PDFDict: pdfLibMod.PDFDict,
@@ -2912,6 +2918,140 @@ export default function EditPdfTool() {
     }
   }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan, nativePaintPlan]);
 
+  // Phase 2.4B: formatting a logical multi-span selection is a DIFFERENT
+  // transaction from multi-run text replacement. Each selected span keeps its
+  // own font resource/encoding/metrics and is independently preflighted by
+  // multiStylePlan.ts. Only after EVERY changed span proves safe does the
+  // batch writer rewrite the shared page stream back-to-front and save one
+  // history snapshot, so one Undo/Redo covers the complete formatting action.
+  const applyMixedNativeFormatting = useCallback(async (patch: NativeTextStyleBatchPatch) => {
+    const doc = pdfLibDocRef.current;
+    const engine = editEngineRef.current;
+    if (!doc || !engine || !fontRegistry || !pageTextModel || selectedRunIndices.length < 2) {
+      setEditApplyError("Select at least two editable native text spans before applying uniform formatting.");
+      return;
+    }
+    if (!logicalRangeCoversWholeSpans(logicalSelection, pageTextModel)) {
+      setEditApplyError("Uniform formatting currently requires whole PDF text spans.");
+      return;
+    }
+
+    setIsApplyingEdit(true);
+    setEditApplyError("");
+    try {
+      const inputs = selectedRunIndices.map((index) => {
+        const span = pageTextModel.spans[index];
+        const match = editableRunMatches[index];
+        const profile = pageFontProfiles[index];
+        if (!span || !match || !profile) {
+          throw new Error(
+            "One selected span no longer has complete native PDF font/write evidence. Reselect the text and try again.",
+          );
+        }
+        return {
+          spanId: span.id,
+          locatedOperator: match.locatedOperator,
+          resolvedFont: profile.resolvedFont,
+          fontMetrics: profile.metrics,
+          embeddedGlyphEvidence: profile.embeddedGlyphEvidence,
+          fragmented: fragmentedRunReconstructions.has(index),
+        };
+      });
+
+      const batch = buildNativeTextStyleBatchPlan({
+        pageIndex,
+        inputs,
+        patch,
+      });
+      if (!batch.editable) {
+        throw new Error(batch.reason);
+      }
+
+      await engine.applyNativeTextStyleBatchToDocument(doc, batch);
+
+      const newBytes = await doc.save();
+      const buffer = newBytes.buffer.slice(
+        newBytes.byteOffset,
+        newBytes.byteOffset + newBytes.byteLength,
+      ) as ArrayBuffer;
+      const spanById = new Map(
+        selectedNativeSpans.map((span) => [span.id, span] as const),
+      );
+
+      const semanticOperations: PdfEditOperationDraft[] = batch.entries.map((entry) => {
+        const plan = entry.plan;
+        const span = spanById.get(entry.spanId);
+        const target: NativeTextTarget = {
+          kind: "native-text",
+          pageIndex,
+          spanIds: [entry.spanId],
+          contentStreamIndex: plan.contentStreamIndex,
+          formPath: null,
+          operatorIndices: [plan.operatorIndex],
+          fontResourceName: plan.fontResourceName,
+        };
+        const beforeStyle: PdfEditTextStyle = {
+          fontFamily: span?.style.fontFamily,
+          fontSizePt: plan.fontSizePt,
+          bold: (span?.style.weight ?? 400) >= 600,
+          italic: span?.style.italic ?? false,
+          charSpacingPt: plan.charSpacing,
+          wordSpacingPt: plan.wordSpacing,
+          horizontalScalingPct: plan.horizontalScalingPct,
+          color: span?.style.fillColor?.cssHex ?? undefined,
+        };
+        const afterStyle: PdfEditTextStyle = {
+          ...beforeStyle,
+          fontSizePt:
+            plan.replacementTextState?.fontSizePt ?? beforeStyle.fontSizePt,
+          charSpacingPt:
+            plan.replacementTextState?.charSpacing ?? beforeStyle.charSpacingPt,
+          wordSpacingPt:
+            plan.replacementTextState?.wordSpacing ?? beforeStyle.wordSpacingPt,
+          horizontalScalingPct:
+            plan.replacementTextState?.horizontalScalingPct ??
+            beforeStyle.horizontalScalingPct,
+          color:
+            entry.nativePaintPlan?.override.fillColor?.cssHex ??
+            beforeStyle.color,
+        };
+        return nativeTextStyleOperation({
+          target,
+          before: beforeStyle,
+          after: afterStyle,
+        });
+      });
+
+      setHistoryState((current) => ({
+        ...current,
+        pdfBytes: buffer,
+        session: appendPdfEditOperations(
+          current.session,
+          semanticOperations,
+        ),
+      }));
+    } catch (applyError) {
+      setEditApplyError(
+        applyError instanceof Error
+          ? applyError.message
+          : "Could not apply uniform native formatting.",
+      );
+    } finally {
+      setIsApplyingEdit(false);
+    }
+  }, [
+    fontRegistry,
+    pageTextModel,
+    selectedRunIndices,
+    logicalSelection,
+    editableRunMatches,
+    pageFontProfiles,
+    fragmentedRunReconstructions,
+    pageIndex,
+    selectedNativeSpans,
+    setHistoryState,
+  ]);
+
   // Restyle covers a run with a whiteout and drops an editable text box in
   // its place. The whiteout hides the original glyphs, but hiding is not
   // removing: the original text stays in the content stream, so the exported
@@ -4347,7 +4487,10 @@ export default function EditPdfTool() {
                           </button>
                           <button
                             type="button"
-                            onClick={() => setNativeFormatOpen((current) => !current)}
+                            onClick={() => {
+                              setEditApplyError("");
+                              setNativeFormatOpen((current) => !current);
+                            }}
                             aria-expanded={nativeFormatOpen}
                             aria-controls="native-text-mixed-format-panel"
                             className={`min-h-11 rounded-lg border px-2.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${
@@ -4368,13 +4511,18 @@ export default function EditPdfTool() {
                         </div>
                         {nativeFormatOpen && mixedNativeStyleSummary ? (
                           <div id="native-text-mixed-format-panel">
-                            <NativeTextMixedFormatPanel summary={mixedNativeStyleSummary} />
+                            <NativeTextMixedFormatPanel
+                              key={selectedNativeSpans.map((span) => span.id).join("|")}
+                              summary={mixedNativeStyleSummary}
+                              applying={isApplyingEdit}
+                              onApply={applyMixedNativeFormatting}
+                            />
                           </div>
                         ) : null}
-                        {!editPreview.editable && editPreview.reason ? (
-                          <span role="alert" className="mt-1.5 block text-[10px] text-[var(--text-danger)]">{editPreview.reason}</span>
-                        ) : editApplyError ? (
+                        {editApplyError ? (
                           <span role="alert" className="mt-1.5 block text-[10px] text-[var(--text-danger)]">{editApplyError}</span>
+                        ) : !editPreview.editable && editPreview.reason ? (
+                          <span role="alert" className="mt-1.5 block text-[10px] text-[var(--text-danger)]">{editPreview.reason}</span>
                         ) : null}
                       </div>
                     </div>
