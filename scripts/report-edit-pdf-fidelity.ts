@@ -396,12 +396,23 @@ async function measure(
   );
   const registry = new PdfFontRegistry(pdfLibDoc);
 
+  // PDF.js may emit separator-only text items between otherwise substantive
+  // runs (especially Courier/table-like layouts). They carry no visible glyph
+  // characters and are not editable user text, so counting them as
+  // "unsupported spans" depresses the corpus match ratio even when every
+  // expected visible span is detected and mapped correctly. Keep them in the
+  // raw render/run list for visual masking, but exclude them from capability
+  // coverage metrics exactly as character recall already excludes whitespace.
+  const substantiveRuns = runs.filter(
+    (run) => measurableTextCharacters(run.str) > 0,
+  );
+
   let matchedSpans = 0;
   let correctFontResolutions = 0;
   let unresolvedFonts = 0;
   const baselineErrorsPt: number[] = [];
 
-  for (const run of runs) {
+  for (const run of substantiveRuns) {
     const operator = matchDetectedRunToOperatorIndexed(
       run,
       viewport.width,
@@ -613,11 +624,11 @@ async function measure(
     detectedTextCharacters: measurableTextCharacters(detectedText),
     expectedSpans: fixture.expectedRuns.length,
     matchedSpans,
-    unmatchedSpans: Math.max(0, runs.length - matchedSpans),
+    unmatchedSpans: Math.max(0, substantiveRuns.length - matchedSpans),
     correctFontResolutions,
     unresolvedFonts,
     baselineErrorsPt,
-    unsupportedRuns: Math.max(0, runs.length - matchedSpans),
+    unsupportedRuns: Math.max(0, substantiveRuns.length - matchedSpans),
     nativeEditSuccess,
     exportSuccess,
     reopenSuccess,
