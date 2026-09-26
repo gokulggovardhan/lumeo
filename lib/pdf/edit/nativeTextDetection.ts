@@ -141,7 +141,10 @@ function synthesizeRun({
   // TJ includes explicit numeric positioning adjustments which are not yet
   // retained on TextShowOperator. Do not fabricate native geometry for it.
   if (operator.kind === "TJ") return null;
-  if (operator.renderMode >= 4) return null;
+  // Text clipping changes EDIT safety, not the geometry of the glyph run.
+  // Keep the proven box/baseline so the product can expose this text as a
+  // read-only native run and explain WHY it cannot be rewritten. The
+  // limitationReason/classifier below still fail closed for edit authority.
   if (profile.kind === "Type3") return null;
   if (profile.encodingSource === "Unknown" || profile.metricsSource === "Unknown") {
     return null;
@@ -245,6 +248,9 @@ export function buildNativeContentStreamSpans({
       limitationReason = "The PDF font resource could not be resolved.";
     } else if (!decoded.complete) {
       limitationReason = "The PDF character encoding could not be decoded completely.";
+    } else if (located.operator.renderMode >= 4) {
+      limitationReason =
+        "The native text geometry is measurable, but the text participates in a clipping rendering mode and must remain read-only.";
     }
 
     const detectedRun =
