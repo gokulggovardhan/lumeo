@@ -55,6 +55,7 @@ test.describe("PDF Tools discovery", () => {
     await expect(page.getByRole("link", { name: /Open Merge PDF/ })).toHaveAttribute("href", "/pdf/merge");
 
     const search = page.getByRole("searchbox", { name: "Search tools and actions" });
+    await expect(search).toHaveAttribute("data-search-shortcut-ready", "true", { timeout: 30_000 });
     await page.keyboard.press("/");
     await expect(search).toBeFocused();
     await search.fill("rotate");
