@@ -120,7 +120,8 @@ function issueValidatedNativeTextStyleBatchPlan({
     reason: null,
   }) as ValidatedNativeTextStyleBatchPlan;
   Object.freeze(batch.entries);
-  return Object.freeze(batch);
+  Object.freeze(batch);
+  return batch;
 }
 
 export function isValidatedNativeTextStyleBatchPlan(
