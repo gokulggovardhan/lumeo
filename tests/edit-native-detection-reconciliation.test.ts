@@ -10,6 +10,7 @@ import {
 } from "../lib/pdf/edit/nativeTextDetection.ts";
 import {
   buildTextEditArbitrations,
+  finalizeTextEditArbitration,
   reconcileTextSignals,
   reconciliationMatchMap,
 } from "../lib/pdf/edit/textReconciliation.ts";
@@ -252,6 +253,25 @@ test("edit arbitration fails closed when PDF.js and native text disagree", () =>
   assert.equal(arbitration.decision, "view-only");
   assert.equal(arbitration.source, "conflict");
   assert.match(arbitration.reason, /conflict|not strong enough/i);
+});
+
+test("exact fragmented reconstruction may authorize a run that single-span arbitration keeps view-only", () => {
+  const base = {
+    pdfJsRunIndex: 0,
+    decision: "view-only" as const,
+    nativeSpanKey: "page:0:operator:1",
+    source: "conflict" as const,
+    reason: "The visible PDF.js run spans more than one native operator.",
+  };
+
+  const unchanged = finalizeTextEditArbitration(base, false);
+  assert.equal(unchanged.decision, "view-only");
+  assert.equal(unchanged.source, "conflict");
+
+  const promoted = finalizeTextEditArbitration(base, true);
+  assert.equal(promoted.decision, "editable");
+  assert.equal(promoted.source, "fragmented-reconstruction");
+  assert.match(promoted.reason, /exact consecutive fragmented-run reconstruction/i);
 });
 
 test("edit arbitration requires measured geometry even when text identity matches", () => {
