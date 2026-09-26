@@ -60,4 +60,34 @@ type _EditableFlagAloneCannotWrite = AssertFalse<
   IsAssignable<UnbrandedEditableLookingPlan, SingleWriterPlan>
 >;
 
+// Copying/spreading a genuine proof must also lose authority. This guards the
+// subtle case where a caller starts from a valid plan, changes one public
+// field, and otherwise keeps all visible data.
+declare const genuineSingle: ValidatedEditPlan;
+const spreadSingle = {
+  ...genuineSingle,
+  replacementText: "tampered after validation",
+};
+type _SpreadSingleCannotWrite = AssertFalse<
+  IsAssignable<typeof spreadSingle, SingleWriterPlan>
+>;
+
+declare const genuineMulti: ValidatedMultiRunEditPlan;
+const spreadMulti = {
+  ...genuineMulti,
+  replacementText: "tampered after validation",
+};
+type _SpreadMultiCannotWrite = AssertFalse<
+  IsAssignable<typeof spreadMulti, MultiWriterPlan>
+>;
+
+declare const genuineBatch: ValidatedNativeTextStyleBatchPlan;
+const spreadBatch = {
+  ...genuineBatch,
+  contentStreamIndex: genuineBatch.contentStreamIndex + 1,
+};
+type _SpreadBatchCannotWrite = AssertFalse<
+  IsAssignable<typeof spreadBatch, BatchWriterPlan>
+>;
+
 export {};
