@@ -1,5 +1,8 @@
 import type { NativeContentStreamSpan } from "./nativeTextDetection.ts";
-import type { TextSignalReconciliation } from "./textReconciliation.ts";
+import type {
+  TextEditArbitration,
+  TextSignalReconciliation,
+} from "./textReconciliation.ts";
 
 export type DocumentTextCapabilityCategory =
   | "NATIVE_TEXT"
@@ -108,6 +111,42 @@ export function classifyNativeTextSpan(
     category: "NATIVE_TEXT",
     safelyRewritable: true,
     reason: "Native text has decodable source bytes, a resolved font and deterministic metrics.",
+  };
+}
+
+/**
+ * Final fail-closed bridge between signal reconciliation and native PDF
+ * capability evidence.
+ *
+ * Signal arbitration answers "did the visible run and native source agree?"
+ * It does not, by itself, know whether the agreed source uses a clipping
+ * render mode, Type3 glyph program, vertical writing, missing metrics, etc.
+ * This function prevents those structurally unsafe classes from being
+ * advertised as editable merely because identity/geometry reconciliation was
+ * strong. Writers still retain their own validation; this closes the UI/edit
+ * authorization layer earlier.
+ */
+export function enforceSpanCapabilityOnArbitration({
+  arbitration,
+  spanClassification,
+}: {
+  arbitration: TextEditArbitration;
+  spanClassification: SpanTextCapabilityClassification | null;
+}): TextEditArbitration {
+  if (
+    arbitration.decision !== "editable" ||
+    !spanClassification ||
+    spanClassification.safelyRewritable
+  ) {
+    return arbitration;
+  }
+
+  return {
+    ...arbitration,
+    decision: "view-only",
+    source: "conflict",
+    reason:
+      `Native capability classification blocks direct rewrite: ${spanClassification.reason}`,
   };
 }
 
