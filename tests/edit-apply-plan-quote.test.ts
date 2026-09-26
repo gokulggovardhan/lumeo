@@ -128,6 +128,53 @@ async function extractPageStrings(pdfBytes: Uint8Array, pageNumber = 1): Promise
   return content.items.map((item) => ("str" in item ? item.str : ""));
 }
 
+async function buildQuoteContinuationFixture(
+  kind: "'" | '"',
+  text: string,
+  wordSpacing = 0,
+  charSpacing = 0,
+): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.setFont(font);
+  const fontKey = page.node.newFontDictionary(font.name, font.ref);
+
+  const showOperator =
+    kind === "'"
+      ? PDFOperator.of(PDFOperatorNames.ShowTextLine, [PDFHexString.of(hexOf(text))])
+      : PDFOperator.of(PDFOperatorNames.ShowTextLineAndSpace, [
+          PDFNumber.of(wordSpacing),
+          PDFNumber.of(charSpacing),
+          PDFHexString.of(hexOf(text)),
+        ]);
+
+  page.pushOperators(
+    beginText(),
+    setFontAndSize(fontKey, 12),
+    setLineHeight(18),
+    moveText(50, 700),
+    showOperator,
+    // A distinct font size keeps PDF.js from coalescing this show with the
+    // quote text while preserving the current text position. Its x-origin
+    // therefore measures the quote operator's effective endpoint.
+    setFontAndSize(fontKey, 10),
+    showText(PDFHexString.of(hexOf("Tail"))),
+    endText(),
+  );
+
+  return doc.save();
+}
+
+async function extractedItems(pdfBytes: Uint8Array) {
+  const doc = await pdfjsLib.getDocument({ data: pdfBytes.slice() }).promise;
+  const page = await doc.getPage(1);
+  const content = await page.getTextContent();
+  return content.items
+    .filter((item): item is Extract<(typeof content.items)[number], { str: string }> => "str" in item)
+    .map((item) => ({ text: item.str, x: item.transform[4], y: item.transform[5] }));
+}
+
 test("' rewrite: equal-length replacement, neighboring Tj operators untouched", async () => {
   const original = await buildQuoteFixture("'", "Middle");
   assert.deepEqual(await extractPageStrings(original), ["First", "Middle", "Last"]);
@@ -144,7 +191,7 @@ test("' rewrite: equal-length replacement, neighboring Tj operators untouched", 
 
   const reloaded = await PDFDocument.load(editedBytes.slice());
   assert.equal(reloaded.getPageCount(), 1);
-  assert.deepEqual(await extractPageStrings(editedBytes), ["First", "Center", "Last"]);
+  assert.deepEqual(await extractPageStrings(editedBytes), ["First", "BA", "Last"]);
 });
 
 test("' rewrite: shorter and longer replacements both produce valid, correctly-extractable text", async () => {
@@ -163,15 +210,12 @@ test("' rewrite: shorter and longer replacements both produce valid, correctly-e
   assert.deepEqual(await extractPageStrings(await longDoc.save()), ["First", "A much longer middle line", "Last"]);
 });
 
-test('" rewrite: preserves its own word/char spacing operands verbatim', async () => {
-  // Small, realistic spacing values -- a large character spacing (tried
-  // first at 5/2) makes pdfjs's own text-extraction heuristic reinterpret
-  // the wide inter-glyph gaps as word boundaries and split "Center" into
-  // individual space-separated letters in its extracted str, which is a
-  // property of THAT heuristic, not of what bytes were actually written
-  // (independently confirmed correct below via the raw operator bytes).
-  const original = await buildQuoteFixture('"', "Middle", 1, 0.3);
-  const { plan, resolvedFont, operators } = await buildPlanForOperatorIndex(original, 1, "Center");
+test('" rewrite: preserves its own word/char spacing operands verbatim when endpoint compensation is unnecessary', async () => {
+  // Same glyph multiset means exactly the same natural width and character
+  // count, so no endpoint compensation is needed. This locks the clean
+  // shorthand path while the width-changing case below exercises expansion.
+  const original = await buildQuoteFixture('"', "AB", 1, 0.3);
+  const { plan, resolvedFont, operators } = await buildPlanForOperatorIndex(original, 1, "BA");
   assert.equal(plan.operatorType, '"');
   assert.equal(plan.wordSpacing, 1);
   assert.equal(plan.charSpacing, 0.3);
@@ -192,6 +236,60 @@ test('" rewrite: preserves its own word/char spacing operands verbatim', async (
   // The rewritten " invocation must still carry the SAME aw/ac numbers
   // (1 and 0.3) verbatim, per spec order: aw ac string ".
   assert.match(slice, /^1 0\.3 <[0-9a-f]+> "$/);
+});
+
+test("' rewrite: width-changing replacement preserves an immediately following text origin", async () => {
+  const original = await buildQuoteContinuationFixture("'", "Middle line");
+  const before = await extractedItems(original);
+  assert.deepEqual(before.map((item) => item.text), ["Middle line", "Tail"]);
+  const tailX = before[1].x;
+
+  const { plan, resolvedFont } = await buildPlanForOperatorIndex(original, 0, "Mid");
+  assert.equal(plan.operatorType, "'");
+  assert.equal(plan.editable, true);
+  assert.ok(Math.abs(plan.tjSpacingDelta) > 1e-6);
+
+  const editedDoc = await PDFDocument.load(original.slice());
+  await applyEditPlanToDocument(editedDoc, plan, resolvedFont.bytesPerCode);
+  const editedBytes = await editedDoc.save();
+  const after = await extractedItems(editedBytes);
+
+  assert.deepEqual(after.map((item) => item.text), ["Mid", "Tail"]);
+  assert.ok(
+    Math.abs(after[1].x - tailX) < 0.05,
+    `following run moved after ' rewrite: ${tailX} -> ${after[1].x}`,
+  );
+
+  const stream = await decodedContentStreamBytes(editedBytes.slice());
+  const text = Buffer.from(stream).toString("latin1");
+  assert.match(text, /T\* \[<[0-9a-f]+> -?[\d.]+\] TJ/);
+});
+
+test('" rewrite: width-changing replacement preserves spacing state, line move and following text origin', async () => {
+  const original = await buildQuoteContinuationFixture('"', "Middle line", 1, 0.3);
+  const before = await extractedItems(original);
+  assert.deepEqual(before.map((item) => item.text), ["Middle line", "Tail"]);
+  const tailX = before[1].x;
+
+  const { plan, resolvedFont } = await buildPlanForOperatorIndex(original, 0, "Mid");
+  assert.equal(plan.operatorType, '"');
+  assert.equal(plan.editable, true);
+  assert.ok(Math.abs(plan.tjSpacingDelta) > 1e-6);
+
+  const editedDoc = await PDFDocument.load(original.slice());
+  await applyEditPlanToDocument(editedDoc, plan, resolvedFont.bytesPerCode);
+  const editedBytes = await editedDoc.save();
+  const after = await extractedItems(editedBytes);
+
+  assert.deepEqual(after.map((item) => item.text), ["Mid", "Tail"]);
+  assert.ok(
+    Math.abs(after[1].x - tailX) < 0.05,
+    `following run moved after " rewrite: ${tailX} -> ${after[1].x}`,
+  );
+
+  const stream = await decodedContentStreamBytes(editedBytes.slice());
+  const text = Buffer.from(stream).toString("latin1");
+  assert.match(text, /1 Tw 0\.3 Tc T\* \[<[0-9a-f]+> -?[\d.]+\] TJ/);
 });
 
 test('" rewrite: shorter and longer replacements both produce valid, correctly-extractable text', async () => {
