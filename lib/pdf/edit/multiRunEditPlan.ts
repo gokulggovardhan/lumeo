@@ -94,7 +94,8 @@ function issueValidatedMultiRunEditPlan({
   }) as ValidatedMultiRunEditPlan;
   Object.freeze(plan.operatorIndices);
   Object.freeze(plan.subPlans);
-  return Object.freeze(plan);
+  Object.freeze(plan);
+  return plan;
 }
 
 export function isValidatedMultiRunEditPlan(
