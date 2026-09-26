@@ -94,66 +94,64 @@ export type FallbackFontUse = {
   bytesPerCode: 1;
 };
 
-export type EditPlan = {
+const validatedEditPlanBrand = Symbol("lumeo.edit.validated-plan");
+
+export type EditPlanFields = {
   pageIndex: number;
   contentStreamIndex: number;
-  /**
-   * Non-null when this operator lives inside a Form XObject rather than
-   * directly in one of the page's own content streams -- a chain of
-   * resource names from the page's own /Resources /XObject down to the
-   * target Form (see lib/pdf/edit/formXObjects.ts's StreamLocator). When
-   * set, contentStreamIndex is unused; applyEditPlan.ts resolves the
-   * target stream via this path instead.
-   */
   formPath: string[] | null;
   operatorIndex: number;
   operatorType: TextShowOperatorKind;
   fontResourceName: string | null;
   fontSizePt: number;
-  /**
-   * The word/char spacing this operator's show applied. For a " operator
-   * these ARE its own aw/ac operands (non-text, must be preserved
-   * verbatim on rewrite -- see lib/pdf/edit/applyEditPlan.ts). For every
-   * other operator kind these just reflect the graphics state already in
-   * effect, informational only (already folded into originalWidthPt/
-   * replacementWidthPt via fontMetrics.ts's stringAdvancePt).
-   */
   wordSpacing: number;
   charSpacing: number;
   horizontalScalingPct: number;
-  /**
-   * Null for the established text-only rewrite path. When set, the replacement
-   * is rendered under this exact PDF text state and the writer restores the
-   * original state immediately afterwards.
-   */
   replacementTextState: TextShowState | null;
   originalText: string;
   replacementText: string;
   originalGlyphCodes: number[];
   replacementGlyphCodes: number[];
-  /**
-   * Effective original text advance in PDF points. For an original TJ this
-   * includes its numeric spacing operands, not just the natural glyph widths.
-   */
   originalWidthPt: number;
   replacementWidthPt: number;
-  /**
-   * Sum of numeric TJ operands found on the original operator. Zero for Tj,
-   * quote operators, and TJ arrays without numeric spacing.
-   */
   originalTjAdjustmentTotal?: number;
-  /**
-   * Trailing TJ number that makes the replacement end at the same effective
-   * text position as the original operator.
-   */
   tjSpacingDelta: number;
   byteOffset: number;
   byteLength: number;
-  /** See FallbackFontUse -- null on every same-font plan. */
   fallbackFont: FallbackFontUse | null;
-  editable: boolean;
-  reason: string | null;
 };
+
+/**
+ * Planner-issued proof that every single-run rewrite invariant passed.
+ *
+ * The symbol is private to this module, so ordinary callers cannot
+ * structurally manufacture a writable plan. The native writer also checks
+ * the brand at runtime to fail closed against casts/plain JavaScript.
+ */
+export type ValidatedEditPlan = EditPlanFields & {
+  editable: true;
+  reason: null;
+  readonly [validatedEditPlanBrand]: true;
+};
+
+export type RejectedEditPlan = EditPlanFields & {
+  editable: false;
+  reason: string;
+  readonly [validatedEditPlanBrand]?: never;
+};
+
+export type EditPlan = ValidatedEditPlan | RejectedEditPlan;
+
+export function isValidatedEditPlan(
+  plan: EditPlan,
+): plan is ValidatedEditPlan {
+  return (
+    plan.editable === true &&
+    plan.reason === null &&
+    validatedEditPlanBrand in plan &&
+    plan[validatedEditPlanBrand] === true
+  );
+}
 
 // The message a rejected character produces when no fallback was offered
 // (or when the fallback couldn't help either) -- kept in one place so the
@@ -315,7 +313,7 @@ export function buildEditPlan({
   const effectiveReplacementState = sameTextShowState(state, targetState) ? null : targetState;
   const originalTjTotal = originalTjAdjustmentTotal(operator);
 
-  const base: Omit<EditPlan, "replacementGlyphCodes" | "replacementWidthPt" | "tjSpacingDelta" | "editable" | "reason"> = {
+  const base: Omit<EditPlanFields, "replacementGlyphCodes" | "replacementWidthPt" | "tjSpacingDelta"> = {
     pageIndex,
     contentStreamIndex,
     formPath,
@@ -535,6 +533,7 @@ export function buildEditPlan({
       replacementWidthPt: preserved.replacementAdvancePt,
       tjSpacingDelta: preserved.trailingTjAdjustment,
       editable: true,
+      [validatedEditPlanBrand]: true,
       reason: null,
     };
   }
@@ -549,7 +548,14 @@ export function buildEditPlan({
   // original face and half in a substitute would look worse than one
   // rendered consistently in a well-matched substitute.
 
-  const rejection = { ...base, originalWidthPt: 0, replacementGlyphCodes: [], replacementWidthPt: 0, tjSpacingDelta: 0, editable: false };
+  const rejection: Omit<RejectedEditPlan, "reason"> = {
+    ...base,
+    originalWidthPt: 0,
+    replacementGlyphCodes: [],
+    replacementWidthPt: 0,
+    tjSpacingDelta: 0,
+    editable: false,
+  };
 
   if (!fallbackStyleHints) {
     return { ...rejection, reason: rejectionReasonFor(blocked.char, blocked.classification) };
@@ -605,6 +611,7 @@ export function buildEditPlan({
     tjSpacingDelta: preserved.trailingTjAdjustment,
     fallbackFont: { family, originalFontResourceName: operator.fontResourceName, bytesPerCode: 1 },
     editable: true,
+    [validatedEditPlanBrand]: true,
     reason: null,
   };
 }
