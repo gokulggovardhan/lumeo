@@ -255,7 +255,7 @@ test("edit arbitration fails closed when PDF.js and native text disagree", () =>
   assert.match(arbitration.reason, /conflict|not strong enough/i);
 });
 
-test("exact fragmented reconstruction may authorize a run that single-span arbitration keeps view-only", () => {
+test("exact fragmented reconstruction may authorize only when measured geometry also agrees", () => {
   const base = {
     pdfJsRunIndex: 0,
     decision: "view-only" as const,
@@ -263,15 +263,61 @@ test("exact fragmented reconstruction may authorize a run that single-span arbit
     source: "conflict" as const,
     reason: "The visible PDF.js run spans more than one native operator.",
   };
+  const run = {
+    str: "SSN 123-45-6789",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 20,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    baselineXPct: 10,
+    baselineYPct: 11.5,
+    detectionSource: "pdfjs" as const,
+  };
+  const reconciliation = {
+    pdfJsRunIndex: 0,
+    nativeSpanKey: base.nativeSpanKey,
+    confidence: "low" as const,
+    agreement: "different" as const,
+    baselineDistancePt: 0.25,
+    angleDeltaDeg: 0,
+    source: "legacy-source-match" as const,
+    reason: "The first native operator contains only the first fragment.",
+  };
 
-  const unchanged = finalizeTextEditArbitration(base, false);
+  const unchanged = finalizeTextEditArbitration({
+    arbitration: base,
+    run,
+    reconciliation,
+    fragmentedReconstructionProven: false,
+  });
   assert.equal(unchanged.decision, "view-only");
   assert.equal(unchanged.source, "conflict");
 
-  const promoted = finalizeTextEditArbitration(base, true);
+  const promoted = finalizeTextEditArbitration({
+    arbitration: base,
+    run,
+    reconciliation,
+    fragmentedReconstructionProven: true,
+  });
   assert.equal(promoted.decision, "editable");
   assert.equal(promoted.source, "fragmented-reconstruction");
-  assert.match(promoted.reason, /exact consecutive fragmented-run reconstruction/i);
+  assert.match(promoted.reason, /fragmented-run reconstruction.*measured PDF\.js\/native geometry/i);
+
+  const missingGeometry = finalizeTextEditArbitration({
+    arbitration: base,
+    run,
+    reconciliation: {
+      ...reconciliation,
+      baselineDistancePt: null,
+      angleDeltaDeg: null,
+    },
+    fragmentedReconstructionProven: true,
+  });
+  assert.equal(missingGeometry.decision, "view-only");
+  assert.equal(missingGeometry.source, "conflict");
 });
 
 test("edit arbitration requires measured geometry even when text identity matches", () => {
