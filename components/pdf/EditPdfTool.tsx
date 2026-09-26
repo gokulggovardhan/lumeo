@@ -1378,7 +1378,7 @@ export default function EditPdfTool() {
     // PRE-edit image on screen -- strictly worse than an error, because it
     // looks like the edit didn't apply.
     renderedPageRef.current = null;
-  }, [pdf, pageIndex]);
+  }, [pdf, pageIndex, resetNativeTextInteraction]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // EFFECT B -- rasterize. The only expensive step, and the only one keyed
