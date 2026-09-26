@@ -36,6 +36,7 @@ import type { PDFContext, PDFDict, PDFPage } from "pdf-lib";
 import type { EditPlan } from "./editPlan.ts";
 import { ensureFallbackFontResource, resolveFallbackFontsDict } from "./fallbackFont.ts";
 import type { MultiRunEditPlan } from "./multiRunEditPlan.ts";
+import type { NativeTextStyleBatchPlan } from "./multiStylePlan.ts";
 import type { NativePaintPlan } from "./nativePaint.ts";
 import { resolveStreamTarget, resolveIsolatedStreamTarget } from "./formXObjects.ts";
 
@@ -574,4 +575,106 @@ export async function applyMultiRunEditPlanToDocument(
   }
 
   replaceContentStream(page, located, plan.contentStreamIndex, bytes);
+}
+
+
+/**
+ * Applies one fully preflighted mixed-span native-formatting transaction.
+ *
+ * Every entry was planned against the SAME original decoded page stream, so
+ * byte offsets are valid only as a set. Rewriting right-to-left is therefore
+ * mandatory: an edit may change the length of its own operator, but can never
+ * invalidate an offset that still remains to its left.
+ *
+ * The batch planner deliberately excludes Forms, fragmented spans, quote/TJ
+ * operators and substitute fonts in this first slice. This applier repeats
+ * those structural checks before touching the object graph, then swaps the
+ * content stream exactly once so a caller gets an all-or-nothing mutation.
+ */
+export async function applyNativeTextStyleBatchToDocument(
+  doc: PDFDocument,
+  batch: NativeTextStyleBatchPlan,
+): Promise<void> {
+  if (!batch.editable) {
+    throw new EditPlanRejectedError(
+      batch.reason ?? "This multi-span native formatting plan is not editable.",
+    );
+  }
+  if (batch.entries.length === 0) {
+    throw new EditPlanRejectedError(
+      "This multi-span native formatting plan contains no changed operators.",
+    );
+  }
+
+  const seenOffsets = new Set<number>();
+  for (const entry of batch.entries) {
+    const plan = entry.plan;
+    assertApplicable(plan);
+
+    if (plan.pageIndex !== batch.pageIndex) {
+      throw new EditPlanRejectedError(
+        "A batch formatting entry targets a different page than the batch.",
+      );
+    }
+    if (plan.formPath) {
+      throw new EditPlanRejectedError(
+        "Multi-span native formatting inside Form XObjects is not supported yet.",
+      );
+    }
+    if (plan.contentStreamIndex !== batch.contentStreamIndex) {
+      throw new EditPlanRejectedError(
+        "A batch formatting entry targets a different PDF content stream.",
+      );
+    }
+    if (plan.operatorType !== "Tj") {
+      throw new EditPlanRejectedError(
+        "Multi-span native formatting is currently limited to simple Tj text runs.",
+      );
+    }
+    if (plan.fallbackFont) {
+      throw new EditPlanRejectedError(
+        "Multi-span native formatting cannot use a substitute font.",
+      );
+    }
+    if (seenOffsets.has(plan.byteOffset)) {
+      throw new EditPlanRejectedError(
+        "Two batch formatting entries target the same PDF byte offset.",
+      );
+    }
+    seenOffsets.add(plan.byteOffset);
+  }
+
+  const page = doc.getPages()[batch.pageIndex];
+  if (!page) {
+    throw new EditPlanRejectedError(
+      `Page ${batch.pageIndex} does not exist in this document.`,
+    );
+  }
+  const located = locateContentStream(
+    doc,
+    batch.pageIndex,
+    batch.contentStreamIndex,
+  );
+
+  const ordered = [...batch.entries].sort(
+    (a, b) => b.plan.byteOffset - a.plan.byteOffset,
+  );
+  let bytes = located.decodedBytes;
+
+  for (const entry of ordered) {
+    bytes = await applyPlanToTargetBytes(
+      bytes,
+      entry.plan,
+      entry.bytesPerCode,
+      undefined,
+      entry.nativePaintPlan ?? undefined,
+    );
+  }
+
+  replaceContentStream(
+    page,
+    located,
+    batch.contentStreamIndex,
+    bytes,
+  );
 }
