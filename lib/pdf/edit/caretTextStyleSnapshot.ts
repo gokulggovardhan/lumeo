@@ -246,6 +246,7 @@ export function buildCaretRetypePlan({
   fontMetrics,
   embeddedGlyphEvidence = null,
   fallbackStyleHints = null,
+  replacementTextState = null,
 }: {
   snapshot: CaretTextStyleSnapshot;
   locatedOperator: LocatedTextOperator;
@@ -254,6 +255,12 @@ export function buildCaretRetypePlan({
   fontMetrics: FontMetrics;
   embeddedGlyphEvidence?: EmbeddedGlyphEvidence | null;
   fallbackStyleHints?: FallbackStyleHints | null;
+  replacementTextState?: {
+    fontSizePt?: number;
+    charSpacing?: number;
+    wordSpacing?: number;
+    horizontalScalingPct?: number;
+  } | null;
 }): CaretRetypePlanResult {
   const validation = validateCaretTextStyleSnapshot(snapshot, locatedOperator);
   if (!validation.valid) return { kind: "blocked", reason: validation.reason };
@@ -272,7 +279,8 @@ export function buildCaretRetypePlan({
       fontMetrics,
       embeddedGlyphEvidence,
       fallbackStyleHints,
-      replacementTextState: replacementTextStateFromCaretSnapshot(snapshot),
+      replacementTextState:
+        replacementTextState ?? replacementTextStateFromCaretSnapshot(snapshot),
     }),
   };
 }
