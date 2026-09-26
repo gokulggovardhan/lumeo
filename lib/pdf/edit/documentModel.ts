@@ -18,6 +18,7 @@ export type PdfPageTextCapability =
 
 export type PdfTextRegion = "header" | "body" | "footer";
 export type PdfWritingDirection = "ltr" | "rtl" | "vertical";
+export type PdfTextGeometryConfidence = "exact" | "descriptor" | "fallback";
 
 export type PdfTextStyle = {
   fontResourceName: string | null;
@@ -49,6 +50,12 @@ export type PdfTextSpan = {
   boundsPct: PercentBox;
   boundsPt: VisualBox;
   baselinePt: number;
+  /**
+   * exact: retained detector/native baseline evidence.
+   * descriptor: baseline reconstructed from font metric evidence.
+   * fallback: historical 0.85 ascent approximation; never edit authority.
+   */
+  geometryConfidence: PdfTextGeometryConfidence;
   sourceMatrix: Matrix2x3 | null;
   rotationDeg: number;
   writingDirection: PdfWritingDirection;
@@ -160,37 +167,42 @@ function metricRatio(value: number | null | undefined): number | null {
     : null;
 }
 
-function ascentRatioForRun(
-  run: DetectedTextRun,
-  fontProfile: PdfFontProfile | null,
-): number {
-  return (
-    metricRatio(fontProfile?.ascentRatio) ??
-    metricRatio(run.ascentRatio) ??
-    DEFAULT_ASCENT_RATIO
-  );
-}
-
-function baselineForRun(
+function baselineGeometryForRun(
   run: DetectedTextRun,
   boundsPct: PercentBox,
   mapper: PdfCoordinateMapper,
   fontProfile: PdfFontProfile | null,
-): number {
+): { baselinePt: number; confidence: PdfTextGeometryConfidence } {
   if (
     typeof run.baselineYPct === "number" &&
     Number.isFinite(run.baselineYPct)
   ) {
-    return mapper.percentPointToVisualPoint({
-      xPct:
-        typeof run.baselineXPct === "number" && Number.isFinite(run.baselineXPct)
-          ? run.baselineXPct
-          : boundsPct.xPct,
-      yPct: run.baselineYPct,
-    }).yPt;
+    return {
+      baselinePt: mapper.percentPointToVisualPoint({
+        xPct:
+          typeof run.baselineXPct === "number" && Number.isFinite(run.baselineXPct)
+            ? run.baselineXPct
+            : boundsPct.xPct,
+        yPct: run.baselineYPct,
+      }).yPt,
+      confidence: "exact",
+    };
   }
 
-  return mapper.baselineForBox(boundsPct, ascentRatioForRun(run, fontProfile));
+  const metricBackedAscent =
+    metricRatio(fontProfile?.ascentRatio) ??
+    metricRatio(run.ascentRatio);
+  if (metricBackedAscent !== null) {
+    return {
+      baselinePt: mapper.baselineForBox(boundsPct, metricBackedAscent),
+      confidence: "descriptor",
+    };
+  }
+
+  return {
+    baselinePt: mapper.baselineForBox(boundsPct, DEFAULT_ASCENT_RATIO),
+    confidence: "fallback",
+  };
 }
 
 function unionPercentBoxes(boxes: readonly PercentBox[]): PercentBox {
@@ -233,6 +245,7 @@ function capabilityFor(
   match: PdfTextSourceMatch,
   fontProfile: PdfFontProfile | null,
   fragmented: boolean,
+  geometryConfidence: PdfTextGeometryConfidence,
 ): { capability: PdfTextCapability; reason: string | null } {
   if (!match) {
     return {
@@ -250,6 +263,13 @@ function capabilityFor(
     return {
       capability: "view-only",
       reason: "The font encoding cannot be decoded reliably enough for safe text replacement.",
+    };
+  }
+  if (geometryConfidence === "fallback") {
+    return {
+      capability: "view-only",
+      reason:
+        "The text baseline is available only through the historical approximate ascent fallback, so export placement is not proven safely enough for direct editing.",
     };
   }
   return {
@@ -452,10 +472,12 @@ export function buildPdfPageTextModel({
     const boundsPt = mapper.percentBoxToVisualBox(boundsPct);
     const sourceMatrix = match?.operator.textRenderingMatrix ?? null;
     const rotationDeg = matrixRotationDeg(sourceMatrix, run.rotated);
+    const geometry = baselineGeometryForRun(run, boundsPct, mapper, fontProfile);
     const capability = capabilityFor(
       match,
       fontProfile,
       fragmentedRunIndices.has(sourceRunIndex),
+      geometry.confidence,
     );
 
     return {
@@ -466,7 +488,8 @@ export function buildPdfPageTextModel({
       text: run.str,
       boundsPct,
       boundsPt,
-      baselinePt: baselineForRun(run, boundsPct, mapper, fontProfile),
+      baselinePt: geometry.baselinePt,
+      geometryConfidence: geometry.confidence,
       sourceMatrix,
       rotationDeg,
       writingDirection: inferDirection(run.str, rotationDeg),
