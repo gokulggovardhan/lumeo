@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   AuraButton,
   AuraCard,
@@ -452,6 +452,17 @@ export function L2UploadStage({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dragDepthRef = useRef(0);
   const [internalDragActive, setInternalDragActive] = useState(false);
+
+  useEffect(() => {
+    // The hidden input is part of the server-rendered upload shell, but its
+    // React onChange handler does not exist until hydration completes.
+    // Automated clients that inject files directly into the input must wait
+    // for this marker or they can set the native input value before React is
+    // listening, leaving the UI on the upload screen. This DOM-only marker
+    // mirrors Edit PDF's existing client-ready contract without changing
+    // visible product behaviour.
+    inputRef.current?.setAttribute("data-upload-client-ready", "true");
+  }, []);
   const canSelect = Boolean(onFilesSelected) && !disabled && !loading;
   const isDragActive = dragActive || internalDragActive;
 
