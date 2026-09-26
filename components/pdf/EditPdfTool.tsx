@@ -955,6 +955,50 @@ export default function EditPdfTool() {
     });
   }, [nativeTextSpans, pdfJsDetectedRunCount, textReconciliations]);
 
+
+  const runLimitationMessages = useMemo(
+    () => {
+      const byNativeKey = new Map(
+        pageTextCapability.spanClassifications.map((item) => [
+          item.nativeSpanKey,
+          item,
+        ] as const),
+      );
+
+      return detectedTextRuns.map((run, index): string | null => {
+        if (editableRunMatches[index]) return null;
+
+        const nativeKey =
+          effectiveTextArbitrations[index]?.nativeSpanKey ??
+          textReconciliations[index]?.nativeSpanKey ??
+          run.nativeSourceKey ??
+          null;
+        const classification = nativeKey ? byNativeKey.get(nativeKey) : null;
+        if (classification) return classification.userMessage;
+
+        const modelSpan = pageTextModel?.spans[index];
+        if (modelSpan?.geometryConfidence === "fallback") {
+          return "Lumeo found native text here, but its baseline can only be estimated. Editing is disabled to avoid shifting the text vertically.";
+        }
+
+        const arbitration = effectiveTextArbitrations[index];
+        if (arbitration?.source === "pdfjs-only" || !nativeKey) {
+          return "Lumeo can see this text, but it cannot map the visible run back to one safe native PDF text target yet.";
+        }
+
+        return pageTextCapability.userMessage;
+      });
+    },
+    [
+      detectedTextRuns,
+      editableRunMatches,
+      effectiveTextArbitrations,
+      textReconciliations,
+      pageTextCapability,
+      pageTextModel,
+    ],
+  );
+
   // Development-only fidelity diagnostics. This deliberately never renders
   // debug noise in the normal product and is compiled behind NODE_ENV.
   // In a local development build, the current page report can be inspected
@@ -3569,6 +3613,20 @@ export default function EditPdfTool() {
           : "Text detected · direct editing limited"
     : "";
 
+  const selectedLimitedRunIndex =
+    selectedRunIndices.find((index) => !editableRunMatches[index]) ?? null;
+  const activeLimitedRunIndex =
+    selectedLimitedRunIndex ??
+    (hoveredRunIndex >= 0 && !editableRunMatches[hoveredRunIndex]
+      ? hoveredRunIndex
+      : focusedRunIndex !== null && !editableRunMatches[focusedRunIndex]
+        ? focusedRunIndex
+        : null);
+  const activeLimitedRunMessage =
+    activeLimitedRunIndex !== null
+      ? runLimitationMessages[activeLimitedRunIndex] ?? null
+      : null;
+
   // Best-effort embedded-font preview. A failed FontFace registration is
   // expected for many PDF subsets (especially ones without browser cmap
   // metadata), so the deterministic metric-compatible CSS fallback remains
@@ -4165,6 +4223,7 @@ export default function EditPdfTool() {
                           )}
                           selected={selectedRunIndices.includes(index)}
                           hovered={hoveredRunIndex === index}
+                          limitationMessage={runLimitationMessages[index]}
                           onSelect={(shiftKey) => selectTextRunAndFocus(index, shiftKey)}
                           onHoverStart={() => setHoveredRunIndex((current) => (current === index ? current : index))}
                           onHoverEnd={() => setHoveredRunIndex((current) => (current === -1 ? current : -1))}
@@ -4175,6 +4234,21 @@ export default function EditPdfTool() {
                           }}
                         />
                       ))}
+                    </div>
+                  ) : null}
+
+                  {activeTool === "select" && textDetectionCurrent && activeLimitedRunMessage ? (
+                    <div
+                      data-edit-limitation-notice
+                      role="status"
+                      className="pointer-events-none absolute left-3 top-12 z-30 max-w-[min(22rem,calc(100%-1.5rem))] rounded-lg border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 px-3 py-2 shadow-lg"
+                    >
+                      <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-[var(--text-primary)]/45">
+                        Editing limited
+                      </span>
+                      <p className="mt-1 text-[11px] leading-4 text-[var(--text-primary)]/75">
+                        {activeLimitedRunMessage}
+                      </p>
                     </div>
                   ) : null}
 
@@ -4618,9 +4692,7 @@ export default function EditPdfTool() {
                         {pageTextCapability.nativeSpanCount > 0 ? "Text detected — editing limited" : "No editable text found"}
                       </span>
                       <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
-                        {pageTextCapability.nativeSpanCount > 0
-                          ? "This page contains native PDF text, but Lumeo cannot safely reconstruct its editable geometry or encoding yet."
-                          : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
+                        {pageTextCapability.userMessage}
                       </p>
                     </div>
                   ) : null}
