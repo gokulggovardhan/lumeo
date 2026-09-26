@@ -2,6 +2,35 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
+const lookupMaybeRestriction = {
+  selector: "CallExpression[callee.property.name='lookupMaybe'][arguments.length=2]",
+  message:
+    "pdf-lib's lookupMaybe(key, Type) THROWS on a wrong-type entry and returns undefined only for a missing one. Use the untyped lookup(key) and check the result with instanceof instead, so a malformed PDF degrades gracefully rather than throwing.",
+};
+
+const exportDomMeasurementRestrictions = [
+  {
+    selector:
+      "CallExpression[callee.property.name=/^(getBoundingClientRect|getClientRects|getComputedStyle)$/]",
+    message:
+      "DOM/CSS measurements are presentation-only and must never become authoritative inside the native PDF export path. Derive export geometry from PDF/native model evidence instead.",
+  },
+  {
+    selector:
+      "MemberExpression[property.name=/^(offsetWidth|offsetHeight|clientWidth|clientHeight|scrollWidth|scrollHeight)$/]",
+    message:
+      "DOM layout dimensions are presentation-only and must never become authoritative inside the native PDF export path. Use PDF/native geometry instead.",
+  },
+];
+
+const exportAuthorityFiles = [
+  "lib/pdf/edit/applyEditPlan.ts",
+  "lib/pdf/edit/editPlan.ts",
+  "lib/pdf/edit/multiRunEditPlan.ts",
+  "lib/pdf/edit/coordinateMapper.ts",
+  "lib/pdf/edit/export.ts",
+];
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -43,13 +72,21 @@ const eslintConfig = defineConfig([
   // fix sat unmerged for ten days while the same bug was written twice more.
   {
     rules: {
+      "no-restricted-syntax": ["error", lookupMaybeRestriction],
+    },
+  },
+  // Export-authority guard: UI code may measure the DOM for hit testing,
+  // scrolling and preview layout, but the native PDF writer/planner must
+  // never consume browser layout as canonical geometry. Keep the existing
+  // lookupMaybe restriction in this scoped override as well so the narrower
+  // config cannot accidentally weaken the repo-wide malformed-PDF guard.
+  {
+    files: exportAuthorityFiles,
+    rules: {
       "no-restricted-syntax": [
         "error",
-        {
-          selector: "CallExpression[callee.property.name='lookupMaybe'][arguments.length=2]",
-          message:
-            "pdf-lib's lookupMaybe(key, Type) THROWS on a wrong-type entry and returns undefined only for a missing one. Use the untyped lookup(key) and check the result with instanceof instead, so a malformed PDF degrades gracefully rather than throwing.",
-        },
+        lookupMaybeRestriction,
+        ...exportDomMeasurementRestrictions,
       ],
     },
   },
