@@ -2,6 +2,13 @@
 
 import { useCallback, useState } from "react";
 import type { CaretTextStyleSnapshot } from "@/lib/pdf/edit/caretTextStyleSnapshot";
+import type { PdfPageTextModel, PdfTextSpan } from "@/lib/pdf/edit/documentModel";
+import {
+  logicalRangeForFullRunSelection,
+  logicalRangeForSingleSpan,
+  type LogicalTextDirection,
+  type LogicalTextRange,
+} from "@/lib/pdf/edit/logicalTextRange";
 
 type TextRunLike = Readonly<{ str: string }>;
 
@@ -37,6 +44,7 @@ export function useNativeTextSelectionState() {
   const [useSubstituteFont, setUseSubstituteFont] = useState(false);
   const [editApplyError, setEditApplyError] = useState("");
   const [nativeFormatOpen, setNativeFormatOpen] = useState(false);
+  const [logicalSelection, setLogicalSelection] = useState<LogicalTextRange | null>(null);
 
   const clearSelection = useCallback((closeFormatPanel = true) => {
     setSelectionAnchorIndex(null);
@@ -45,6 +53,7 @@ export function useNativeTextSelectionState() {
     setCaretTextStyleSnapshot(null);
     setEditApplyError("");
     setUseSubstituteFont(false);
+    setLogicalSelection(null);
     if (closeFormatPanel) setNativeFormatOpen(false);
   }, []);
 
@@ -57,6 +66,7 @@ export function useNativeTextSelectionState() {
     setCaretTextStyleSnapshot(null);
     setEditApplyError("");
     setUseSubstituteFont(false);
+    setLogicalSelection(null);
   }, []);
 
   const selectDetectedRun = useCallback(
@@ -64,11 +74,19 @@ export function useNativeTextSelectionState() {
       index: number,
       extend: boolean,
       runs: readonly TextRunLike[],
+      pageTextModel: PdfPageTextModel | null,
     ) => {
       const range = contiguousRunRange(selectionAnchorIndex, index, extend);
+      const anchorIndex =
+        extend && selectionAnchorIndex !== null ? selectionAnchorIndex : index;
       if (!extend) setSelectionAnchorIndex(index);
       setSelectedRunIndices(range);
       setEditDraftText(range.map((runIndex) => runs[runIndex]?.str ?? "").join(""));
+      setLogicalSelection(
+        pageTextModel
+          ? logicalRangeForFullRunSelection(pageTextModel, anchorIndex, index)
+          : null,
+      );
       setCaretTextStyleSnapshot(null);
       setEditApplyError("");
       setUseSubstituteFont(false);
@@ -76,6 +94,70 @@ export function useNativeTextSelectionState() {
       return range;
     },
     [selectionAnchorIndex],
+  );
+
+  const selectRunIndices = useCallback(
+    ({
+      indices,
+      runs,
+      pageTextModel,
+      draftText,
+    }: {
+      indices: readonly number[];
+      runs: readonly TextRunLike[];
+      pageTextModel: PdfPageTextModel | null;
+      draftText?: string;
+    }) => {
+      if (indices.length === 0) {
+        clearSelection();
+        return;
+      }
+      const ordered = [...new Set(indices)].sort((a, b) => a - b);
+      const first = ordered[0];
+      const last = ordered[ordered.length - 1];
+      setSelectionAnchorIndex(first);
+      setSelectedRunIndices(ordered);
+      setEditDraftText(
+        draftText ?? ordered.map((runIndex) => runs[runIndex]?.str ?? "").join(""),
+      );
+      setLogicalSelection(
+        pageTextModel
+          ? logicalRangeForFullRunSelection(pageTextModel, first, last)
+          : null,
+      );
+      setCaretTextStyleSnapshot(null);
+      setEditApplyError("");
+      setUseSubstituteFont(false);
+      setNativeFormatOpen(false);
+    },
+    [clearSelection],
+  );
+
+  const updateSingleSpanLogicalSelection = useCallback(
+    ({
+      span,
+      text,
+      selectionStart,
+      selectionEnd,
+      direction,
+    }: {
+      span: Pick<PdfTextSpan, "id" | "sourceRunIndex">;
+      text: string;
+      selectionStart: number;
+      selectionEnd: number;
+      direction?: LogicalTextDirection;
+    }) => {
+      const next = logicalRangeForSingleSpan({
+        span,
+        text,
+        selectionStart,
+        selectionEnd,
+        direction,
+      });
+      setLogicalSelection(next);
+      return next;
+    },
+    [],
   );
 
   return {
@@ -97,8 +179,12 @@ export function useNativeTextSelectionState() {
     setEditApplyError,
     nativeFormatOpen,
     setNativeFormatOpen,
+    logicalSelection,
+    setLogicalSelection,
     clearSelection,
     resetInteraction,
     selectDetectedRun,
+    selectRunIndices,
+    updateSingleSpanLogicalSelection,
   };
 }
