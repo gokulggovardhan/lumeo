@@ -117,13 +117,24 @@ export function useNativeTextSelectionState() {
       const last = ordered[ordered.length - 1];
       setSelectionAnchorIndex(first);
       setSelectedRunIndices(ordered);
-      setEditDraftText(
-        draftText ?? ordered.map((runIndex) => runs[runIndex]?.str ?? "").join(""),
-      );
+      const nextDraft =
+        draftText ?? ordered.map((runIndex) => runs[runIndex]?.str ?? "").join("");
+      setEditDraftText(nextDraft);
+      const singleSpan =
+        ordered.length === 1
+          ? pageTextModel?.spans.find((span) => span.sourceRunIndex === first) ?? null
+          : null;
       setLogicalSelection(
-        pageTextModel
-          ? logicalRangeForFullRunSelection(pageTextModel, first, last)
-          : null,
+        singleSpan
+          ? logicalRangeForSingleSpan({
+              span: singleSpan,
+              text: nextDraft,
+              selectionStart: 0,
+              selectionEnd: nextDraft.length,
+            })
+          : pageTextModel
+            ? logicalRangeForFullRunSelection(pageTextModel, first, last)
+            : null,
       );
       setCaretTextStyleSnapshot(null);
       setEditApplyError("");
