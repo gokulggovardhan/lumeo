@@ -20,7 +20,7 @@ import type { TextShowOperator, TextShowOperatorKind } from "./contentStream.ts"
 import type { FallbackFontFamily, FallbackStyleHints } from "./fallbackFont.ts";
 import { encodeWithFallbackFont, fallbackFontMetrics, firstUnencodableChar, pickFallbackFont } from "./fallbackFont.ts";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "./fontEncoding.ts";
-import { classifyReplacementChar } from "./fontEncoding.ts";
+import { resolveGlyphAuthority } from "./glyphAuthority.ts";
 import type { FontMetrics } from "./fontMetrics.ts";
 import { compareAdvance, compareAdvanceAcrossFonts, compareAdvanceAcrossStates, type TextShowState } from "./fontMetrics.ts";
 
@@ -410,13 +410,13 @@ export function buildEditPlan({
   const replacementGlyphCodes: number[] = [];
   let blocked: { char: string; classification: "requires-fallback" | "impossible" } | null = null;
   for (const char of replacementText) {
-    const classification = classifyReplacementChar(
-      resolvedFont,
+    const authority = resolveGlyphAuthority({
+      font: resolvedFont,
       char,
       embeddedGlyphEvidence,
-    );
-    if (classification !== "editable") {
-      blocked = { char, classification };
+    });
+    if (authority.classification !== "editable") {
+      blocked = { char, classification: authority.classification };
       break;
     }
     const code = resolvedFont.unicodeToGlyphCode.get(char);
