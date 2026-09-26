@@ -350,8 +350,8 @@ test("text-only Tj replacement preserves the following run origin across repeate
 
     const beforeSecondText = after.slice(0, secondIndex).map((item) => item.text).join("");
     assert.equal(
-      beforeSecondText.replace(/\\s+/gu, ""),
-      replacement.replace(/\\s+/gu, ""),
+      beforeSecondText.replace(/\s+/gu, ""),
+      replacement.replace(/\s+/gu, ""),
       `only PDF.js whitespace segmentation may appear in the compensated gap: ${JSON.stringify(after)}`,
     );
     assert.ok(
