@@ -14,7 +14,11 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { walkTextShowOperators } from "../lib/pdf/edit/contentStream.ts";
 import { resolveFont } from "../lib/pdf/edit/fontEncoding.ts";
 import { resolveFontMetrics } from "../lib/pdf/edit/fontMetrics.ts";
-import { buildEditPlan, type EditPlan } from "../lib/pdf/edit/editPlan.ts";
+import {
+  buildEditPlan,
+  isValidatedEditPlan,
+  type EditPlan,
+} from "../lib/pdf/edit/editPlan.ts";
 import { applyEditPlanToBytes, applyEditPlanToDocument, EditPlanRejectedError } from "../lib/pdf/edit/applyEditPlan.ts";
 
 async function decodedContentStreamBytes(pdfBytes: Uint8Array): Promise<Uint8Array> {
@@ -186,7 +190,7 @@ test("applyEditPlanToDocument: original layout is unchanged except the edited ru
   assert.equal(editedViewport.height, originalViewport.height);
 });
 
-test("applyEditPlanToBytes rejects a plan whose editable flag is false (invalid-glyph rejection is enforced, not silently attempted)", () => {
+test("applyEditPlanToBytes rejects a cast rejected plan that never passed the validated dry-run boundary", () => {
   const notEditablePlan: EditPlan = {
     pageIndex: 0,
     contentStreamIndex: 0,
@@ -214,12 +218,19 @@ test("applyEditPlanToBytes rejects a plan whose editable flag is false (invalid-
   };
 
   assert.throws(
-    () => applyEditPlanToBytes(new Uint8Array(20), notEditablePlan, 1),
-    (error: unknown) => error instanceof EditPlanRejectedError && /cannot be encoded/.test((error as Error).message),
+    () =>
+      applyEditPlanToBytes(
+        new Uint8Array(20),
+        notEditablePlan as unknown as Parameters<typeof applyEditPlanToBytes>[1],
+        1,
+      ),
+    (error: unknown) =>
+      error instanceof EditPlanRejectedError &&
+      /validated EditPlan dry-run|not issued/i.test((error as Error).message),
   );
 });
 
-test("applyEditPlanToBytes rejects a subset-font requires-fallback plan the same way", () => {
+test("applyEditPlanToBytes rejects a second cast rejected plan regardless of its former rejection reason", () => {
   const subsetRejectedPlan: EditPlan = {
     pageIndex: 0,
     contentStreamIndex: 0,
@@ -247,8 +258,15 @@ test("applyEditPlanToBytes rejects a subset-font requires-fallback plan the same
   };
 
   assert.throws(
-    () => applyEditPlanToBytes(new Uint8Array(20), subsetRejectedPlan, 1),
-    (error: unknown) => error instanceof EditPlanRejectedError && /fallback font/.test((error as Error).message),
+    () =>
+      applyEditPlanToBytes(
+        new Uint8Array(20),
+        subsetRejectedPlan as unknown as Parameters<typeof applyEditPlanToBytes>[1],
+        1,
+      ),
+    (error: unknown) =>
+      error instanceof EditPlanRejectedError &&
+      /validated EditPlan dry-run|not issued/i.test((error as Error).message),
   );
 });
 
@@ -263,31 +281,46 @@ test("applyEditPlanToBytes replaces exactly the operator's byte range and nothin
   const start = streamText.indexOf("<41> Tj");
   const end = start + "<41> Tj".length;
 
-  const plan: EditPlan = {
+  const [operator] = walkTextShowOperators(bytes);
+  assert.ok(operator);
+  assert.equal(operator.start, start);
+  assert.equal(operator.end, end);
+
+  const resolvedFont = {
+    kind: "Type1" as const,
+    baseFont: "Helvetica",
+    isEmbedded: false,
+    isSubset: false,
+    bytesPerCode: 1 as const,
+    encodingSource: "WinAnsi" as const,
+    glyphCodeToUnicode: new Map([
+      [0x41, "A"],
+      [0x42, "B"],
+    ]),
+    unicodeToGlyphCode: new Map([
+      ["A", 0x41],
+      ["B", 0x42],
+    ]),
+  };
+  const fontMetrics = {
+    bytesPerCode: 1 as const,
+    defaultWidth: 600,
+    glyphWidths: new Map([
+      [0x41, 600],
+      [0x42, 600],
+    ]),
+    source: "Widths" as const,
+  };
+  const plan = buildEditPlan({
     pageIndex: 0,
     contentStreamIndex: 0,
     operatorIndex: 0,
-    operatorType: "Tj",
-    formPath: null,
-    fontResourceName: "F1",
-    fontSizePt: 12,
-    wordSpacing: 0,
-    charSpacing: 0,
-    horizontalScalingPct: 100,
-    replacementTextState: null,
-    originalText: "A",
+    operator,
     replacementText: "B",
-    originalGlyphCodes: [0x41],
-    replacementGlyphCodes: [0x42],
-    originalWidthPt: 0,
-    replacementWidthPt: 0,
-    tjSpacingDelta: 0,
-    byteOffset: start,
-    byteLength: end - start,
-    fallbackFont: null,
-    editable: true,
-    reason: null,
-  };
+    resolvedFont,
+    fontMetrics,
+  });
+  assert.ok(isValidatedEditPlan(plan));
 
   const result = applyEditPlanToBytes(bytes, plan, 1);
   const resultText = new TextDecoder().decode(result);
