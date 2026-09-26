@@ -117,10 +117,12 @@ function encodePdfName(name: string): string {
 // applicable Tf had set (contentStream.ts tracks it into the operator), and
 // the substitution changes only the typeface, never the size.
 //
-// A Tj is deliberately promoted to a single-element TJ here, unlike the
-// same-font path which leaves Tj alone. `<hex> Tj` and `[<hex>] TJ` are
-// exactly equivalent per spec 9.4.3, but only the TJ form has anywhere to
-// put the spacing adjustment -- and a substitute font is precisely the case
+// A substitute-font Tj is deliberately emitted as a single-element TJ.
+// `<hex> Tj` and `[<hex>] TJ` are exactly equivalent per spec 9.4.3, but
+// the TJ form has somewhere to put the spacing adjustment. The same-font
+// writer now makes the same promotion whenever a width-changing edit needs
+// endpoint compensation; fallback uses TJ unconditionally because a
+// substitute font is precisely the case
 // where the replacement's natural width is most likely to differ from the
 // original's (measured across the standard families: -7.1% to +22.0%), so
 // having somewhere to absorb that difference matters most here. ' and " are
