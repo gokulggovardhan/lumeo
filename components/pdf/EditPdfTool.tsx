@@ -525,14 +525,6 @@ export default function EditPdfTool() {
     setHistoryStateRaw(updater);
     setDownloadUrl("");
   }, [setHistoryStateRaw]);
-  const undo = useCallback(() => {
-    undoRaw();
-    setDownloadUrl("");
-  }, [undoRaw]);
-  const redo = useCallback(() => {
-    redoRaw();
-    setDownloadUrl("");
-  }, [redoRaw]);
   const elements = historyState.elements;
   // Adapter preserving setElements' EXACT prior call signature (a bare
   // EditElement[] array or updater over one) -- every existing overlay-
@@ -673,6 +665,28 @@ export default function EditPdfTool() {
     selectRunIndices,
     updateSingleSpanLogicalSelection,
   } = useNativeTextSelectionState();
+
+  // History navigation swaps the live PDF byte identity synchronously. Clear
+  // native-text interaction in that SAME event before the new document can
+  // begin detection/matching. Leaving this solely to the later [pdf] effect
+  // creates a race: after Undo/Redo a browser can expose freshly-detected
+  // overlays, accept a new selection, then have the pending identity-reset
+  // effect erase that selection. Firefox reproduced this in the mixed-style
+  // formatting regression; WebKit exposed the same class earlier.
+  //
+  // The [pdf] identity effect remains as defense-in-depth for every other
+  // document-byte transition (apply/edit/page ops/new file).
+  const undo = useCallback(() => {
+    resetNativeTextInteraction();
+    undoRaw();
+    setDownloadUrl("");
+  }, [resetNativeTextInteraction, undoRaw]);
+  const redo = useCallback(() => {
+    resetNativeTextInteraction();
+    redoRaw();
+    setDownloadUrl("");
+  }, [resetNativeTextInteraction, redoRaw]);
+
   // Browser FontFace previews are keyed to a model span id so an async font
   // load can never leak the previous selection's face into a newly-selected
   // run. Export safety remains governed by fontEncoding/editPlan, not by
