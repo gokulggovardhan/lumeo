@@ -4295,29 +4295,30 @@ export default function EditPdfTool() {
                         </button>
                         <button
                           type="button"
+                          disabled={!singleSelectedSpan}
                           onClick={(event) => {
                             event.stopPropagation();
                             if (nativeFormatOpen) {
                               setNativeFormatOpen(false);
                               return;
                             }
-                            if (singleSelectedSpan) {
-                              setNativeStyleDraft({
-                                spanId: singleSelectedSpan.id,
-                                fontSizePt: singleSelectedSpan.style.fontSizePt,
-                                charSpacing: singleSelectedSpan.style.charSpacingPt,
-                                wordSpacing: singleSelectedSpan.style.wordSpacingPt,
-                                horizontalScalingPct: singleSelectedSpan.style.horizontalScalingPct,
-                                fillColorHex: nativeFillCapability?.editable
-                                  ? nativeFillCapability.sourceColor?.cssHex ?? null
-                                  : null,
-                              });
-                              setNativeFormatOpen(true);
-                            }
+                            if (!singleSelectedSpan) return;
+                            setNativeStyleDraft({
+                              spanId: singleSelectedSpan.id,
+                              fontSizePt: singleSelectedSpan.style.fontSizePt,
+                              charSpacing: singleSelectedSpan.style.charSpacingPt,
+                              wordSpacing: singleSelectedSpan.style.wordSpacingPt,
+                              horizontalScalingPct: singleSelectedSpan.style.horizontalScalingPct,
+                              fillColorHex: nativeFillCapability?.editable
+                                ? nativeFillCapability.sourceColor?.cssHex ?? null
+                                : null,
+                            });
+                            setNativeFormatOpen(true);
                           }}
                           aria-expanded={nativeFormatOpen}
                           aria-controls="native-text-format-panel"
-                          className={`grid h-9 shrink-0 place-items-center rounded-full border px-3 text-[10px] font-bold uppercase tracking-[0.1em] shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${
+                          title={!singleSelectedSpan ? "Preparing native text formatting…" : undefined}
+                          className={`grid h-9 shrink-0 place-items-center rounded-full border px-3 text-[10px] font-bold uppercase tracking-[0.1em] shadow-lg transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:cursor-wait disabled:opacity-45 ${
                             nativeFormatOpen
                               ? "border-[var(--lumeo-gold)]/60 bg-[var(--lumeo-gold)]/15 text-[var(--text-primary)]"
                               : "border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/95 text-[var(--text-primary)]/70 hover:border-[var(--text-primary)]/24"
