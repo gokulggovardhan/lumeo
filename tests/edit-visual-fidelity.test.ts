@@ -69,7 +69,6 @@ async function renderFirstPage(bytes: Uint8Array): Promise<RenderedPage> {
   const doc = await pdfjsLib.getDocument({
     data: bytes.slice(),
     useWorkerFetch: false,
-    isEvalSupported: false,
   }).promise;
   try {
     const page = await doc.getPage(1);
