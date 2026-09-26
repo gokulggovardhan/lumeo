@@ -6,7 +6,11 @@ import { walkTextShowOperators } from "../lib/pdf/edit/contentStream.ts";
 import { readFallbackStyleHints } from "../lib/pdf/edit/fallbackFont.ts";
 import { resolveFont } from "../lib/pdf/edit/fontEncoding.ts";
 import { resolveFontMetrics } from "../lib/pdf/edit/fontMetrics.ts";
-import { buildEditPlan } from "../lib/pdf/edit/editPlan.ts";
+import {
+  buildEditPlan,
+  isValidatedEditPlan,
+  type ValidatedEditPlan,
+} from "../lib/pdf/edit/editPlan.ts";
 import { applyEditPlanToDocument } from "../lib/pdf/edit/applyEditPlan.ts";
 
 // --- Fixtures ----------------------------------------------------------
@@ -54,7 +58,9 @@ function toUnicodeCMapFor(entries: Array<[number, string]>): string {
 }
 
 /** A page showing "Hello" in a Type0 subset font, plus a control line in a plain standard font. */
-async function makeType0SubsetPdf(): Promise<Uint8Array> {
+async function makeType0SubsetPdf(
+  options: { secondSubsetRun?: boolean } = {},
+): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([612, 792]);
   const context = doc.context;
@@ -123,6 +129,15 @@ async function makeType0SubsetPdf(): Promise<Uint8Array> {
     "1 0 0 1 50 690 Tm",
     "<00010002000300030004> Tj",
     "ET",
+    ...(options.secondSubsetRun
+      ? [
+          "BT",
+          "/FSub 14 Tf",
+          "1 0 0 1 50 650 Tm",
+          "<00010002000300030004> Tj",
+          "ET",
+        ]
+      : []),
   ].join("\n");
   page.node.set(PDFName.of("Contents"), context.register(context.flateStream(new TextEncoder().encode(content))));
 
@@ -198,19 +213,34 @@ async function extractedStrings(pdfBytes: Uint8Array): Promise<string[]> {
   return content.items.map((item) => ("str" in item ? item.str : "")).filter((str) => str !== "");
 }
 
-type PreparedEdit = Awaited<ReturnType<typeof prepareEdit>>;
+type PreparedEdit = ReturnType<typeof prepareEditFromDocument>;
 
-async function prepareEdit(pdfBytes: Uint8Array, resourceName: string) {
-  const doc = await PDFDocument.load(pdfBytes);
+function prepareEditFromDocument(
+  doc: PDFDocument,
+  resourceName: string,
+  occurrence = 0,
+) {
   const page = doc.getPages()[0];
   const contents = page.node.Contents();
-  const stream = contents instanceof PDFArray ? doc.context.lookup(contents.get(0), PDFStream) : (contents as PDFStream);
-  if (!(stream instanceof PDFRawStream)) throw new Error("Expected a raw content stream.");
+  const stream =
+    contents instanceof PDFArray
+      ? doc.context.lookup(contents.get(0), PDFStream)
+      : (contents as PDFStream);
+  if (!(stream instanceof PDFRawStream)) {
+    throw new Error("Expected a raw content stream.");
+  }
   const bytes = decodePDFRawStream(stream).decode();
 
   const operators = walkTextShowOperators(bytes);
-  const operatorIndex = operators.findIndex((op) => op.fontResourceName === resourceName);
-  if (operatorIndex < 0) throw new Error(`No text-show operator found using /${resourceName}.`);
+  const matches = operators
+    .map((operator, operatorIndex) => ({ operator, operatorIndex }))
+    .filter(({ operator }) => operator.fontResourceName === resourceName);
+  const selected = matches[occurrence];
+  if (!selected) {
+    throw new Error(
+      `No text-show operator #${occurrence + 1} found using /${resourceName}.`,
+    );
+  }
 
   const fontDict = page.node
     .Resources()!
@@ -220,7 +250,26 @@ async function prepareEdit(pdfBytes: Uint8Array, resourceName: string) {
   const fontMetrics = resolveFontMetrics(fontDict, doc.context, resolvedFont);
   const styleHints = readFallbackStyleHints(fontDict, doc.context);
 
-  return { doc, operator: operators[operatorIndex], operatorIndex, resolvedFont, fontMetrics, styleHints };
+  return {
+    doc,
+    operator: selected.operator,
+    operatorIndex: selected.operatorIndex,
+    resolvedFont,
+    fontMetrics,
+    styleHints,
+  };
+}
+
+async function prepareEdit(
+  pdfBytes: Uint8Array,
+  resourceName: string,
+  occurrence = 0,
+): Promise<PreparedEdit> {
+  return prepareEditFromDocument(
+    await PDFDocument.load(pdfBytes),
+    resourceName,
+    occurrence,
+  );
 }
 
 function planFor(prepared: PreparedEdit, replacementText: string, withFallback: boolean) {
@@ -234,6 +283,16 @@ function planFor(prepared: PreparedEdit, replacementText: string, withFallback: 
     fontMetrics: prepared.fontMetrics,
     fallbackStyleHints: withFallback ? prepared.styleHints : null,
   });
+}
+
+function validatedPlanFor(
+  prepared: PreparedEdit,
+  replacementText: string,
+  withFallback: boolean,
+): ValidatedEditPlan {
+  const plan = planFor(prepared, replacementText, withFallback);
+  if (!isValidatedEditPlan(plan)) assert.fail(plan.reason);
+  return plan;
 }
 
 // --- The fixtures really do reject, before any fallback is offered -----
