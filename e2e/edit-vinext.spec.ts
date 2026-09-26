@@ -157,7 +157,13 @@ test("vinext Edit PDF applies native formatting and colour with one native histo
       .first();
     await expect(run).toBeVisible({ timeout: 90_000 });
     await run.click();
-    await page.getByRole("button", { name: "Format" }).click();
+    const formatButton = page.getByRole("button", { name: "Format" });
+    // The inline editor can appear one React turn before the richer
+    // Page→Block→Line→Span model has materialized its selected span. Format
+    // must stay non-actionable through that gap rather than accepting a
+    // click that silently does nothing (a WebKit race caught in PR #438).
+    await expect(formatButton).toBeEnabled({ timeout: 90_000 });
+    await formatButton.click();
     const panel = page.locator("[data-native-text-formatting]");
     await expect(panel).toBeVisible();
     return {
