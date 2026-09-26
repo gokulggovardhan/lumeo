@@ -40,6 +40,10 @@ class ValidatedMultiRunEditPlanProof {
       configurable: false,
     });
   }
+
+  isPlannerIssued(): boolean {
+    return this.validationProof === true;
+  }
 }
 
 type MultiRunEditPlanFields = {
@@ -98,6 +102,7 @@ export function isValidatedMultiRunEditPlan(
 ): plan is ValidatedMultiRunEditPlan {
   return (
     plan instanceof ValidatedMultiRunEditPlanProof &&
+    plan.isPlannerIssued() &&
     plan.editable === true &&
     plan.reason === null &&
     Object.isFrozen(plan) &&
