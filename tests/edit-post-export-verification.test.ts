@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDocument, StandardFonts } from "pdf-lib";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { applyEditPlanToDocument } from "../lib/pdf/edit/applyEditPlan.ts";
 import { buildEditPlan, decodeTextShowOperator } from "../lib/pdf/edit/editPlan.ts";
 import {
@@ -13,7 +14,10 @@ import { createTextElement } from "../lib/pdf/edit/elements.ts";
 import { exportEditedPdf } from "../lib/pdf/edit/export.ts";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
-import { verifyPostExportNativeEdits } from "../lib/pdf/edit/postExportVerification.ts";
+import {
+  verifyPostExportNativeEdits,
+  type PostExportPdfJsOpener,
+} from "../lib/pdf/edit/postExportVerification.ts";
 
 async function buildNativeEditedFixture(): Promise<{
   bytes: Uint8Array;
@@ -104,6 +108,15 @@ function asArrayBuffer(bytes: Uint8Array): ArrayBuffer {
     bytes.byteOffset + bytes.byteLength,
   ) as ArrayBuffer;
 }
+
+const openLegacyPdfJs: PostExportPdfJsOpener = async (data) =>
+  (await pdfjsLib.getDocument({
+    data:
+      data instanceof Uint8Array
+        ? data.slice()
+        : new Uint8Array(data.slice(0)),
+    useWorkerFetch: false,
+  }).promise) as unknown as Awaited<ReturnType<PostExportPdfJsOpener>>;
 
 test("post-export verification proves a native edit survives an overlay export", async () => {
   const source = await buildNativeEditedFixture();
@@ -211,14 +224,15 @@ test("post-export verification blocks PDF-space geometry drift", async () => {
     sourceBytes: source.bytes,
     exportedBytes: corruptedBytes,
     session: source.session,
-    verifyPdfJs: false,
+    verifyPdfJs: true,
+    openPdfJs: openLegacyPdfJs,
   });
 
   assert.equal(verification.ok, false);
   if (verification.ok) return;
   assert.match(
     verification.reason,
-    /geometry|could not be located|native text/i,
+    /position\/transform|geometry|could not be located|native text/i,
   );
 });
 
