@@ -3268,6 +3268,60 @@ export default function EditPdfTool() {
   const singleSelectedRun = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
   const singleSelectedRunMatch = selectedRunIndices.length === 1 ? editableRunMatches[selectedRunIndices[0]] : null;
   const singleSelectedSpan = selectedNativeSpan;
+  const singleSpanLogicalOffsets = singleSelectedSpan
+    ? orderedSingleSpanOffsets(logicalSelection, singleSelectedSpan.id)
+    : null;
+  const logicalSelectionStart = singleSpanLogicalOffsets?.start ?? null;
+  const logicalSelectionEnd = singleSpanLogicalOffsets?.end ?? null;
+  const logicalSelectionDirection = singleSpanLogicalOffsets?.direction ?? "forward";
+
+  const syncSingleSpanLogicalSelection = useCallback(
+    (input: HTMLInputElement) => {
+      if (!singleSelectedSpan) return;
+      const fallbackOffset = input.value.length;
+      updateSingleSpanLogicalSelection({
+        span: singleSelectedSpan,
+        text: input.value,
+        selectionStart: input.selectionStart ?? fallbackOffset,
+        selectionEnd: input.selectionEnd ?? fallbackOffset,
+        direction: input.selectionDirection === "backward" ? "backward" : "forward",
+      });
+    },
+    [singleSelectedSpan, updateSingleSpanLogicalSelection],
+  );
+
+  // The browser input is a presentation/control surface only. Selection
+  // changes are normalized into Lumeo's own grapheme-aware logical range,
+  // then mirrored back here. DOM selection never participates in PDF export
+  // geometry or writer authorization.
+  useEffect(() => {
+    const input = inlineEditInputRef.current;
+    if (
+      !input ||
+      logicalSelectionStart === null ||
+      logicalSelectionEnd === null
+    ) {
+      return;
+    }
+    if (
+      input.selectionStart === logicalSelectionStart &&
+      input.selectionEnd === logicalSelectionEnd &&
+      input.selectionDirection === logicalSelectionDirection
+    ) {
+      return;
+    }
+    input.setSelectionRange(
+      logicalSelectionStart,
+      logicalSelectionEnd,
+      logicalSelectionDirection,
+    );
+  }, [
+    logicalSelectionStart,
+    logicalSelectionEnd,
+    logicalSelectionDirection,
+    editDraftText,
+  ]);
+
   const activeNativeStyleDraft =
     nativeStyleDraft?.spanId === singleSelectedSpan?.id ? nativeStyleDraft : null;
   const inlineEditorFontFamily =
@@ -3943,7 +3997,12 @@ export default function EditPdfTool() {
                         ref={inlineEditInputRef}
                         value={editDraftText}
                         onChange={(event) => {
-                          handleEditDraftTextChange(event.target.value);
+                          handleEditDraftTextChange(event.currentTarget.value);
+                          syncSingleSpanLogicalSelection(event.currentTarget);
+                        }}
+                        onSelect={(event) => {
+                          event.stopPropagation();
+                          syncSingleSpanLogicalSelection(event.currentTarget);
                         }}
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => {
@@ -3957,6 +4016,10 @@ export default function EditPdfTool() {
                           }
                         }}
                         aria-label="Edit text"
+                        data-logical-selection-start={logicalSelectionStart ?? undefined}
+                        data-logical-selection-end={logicalSelectionEnd ?? undefined}
+                        data-logical-selection-direction={logicalSelectionDirection}
+                        data-logical-selection-collapsed={logicalSelection?.collapsed ? "true" : "false"}
                         data-caret-style-snapshot={activeCaretTextStyleSnapshot ? "true" : "false"}
                         data-native-fill-color={activeNativeStyleDraft?.fillColorHex ?? singleSelectedSpan?.style.fillColor?.cssHex ?? undefined}
                         data-native-fill-opacity={singleSelectedSpan?.style.fillOpacity ?? undefined}
