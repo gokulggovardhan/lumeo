@@ -6,7 +6,6 @@ import type {
 } from "./contentStream.ts";
 import type {
   NativeTextTarget,
-  PdfEditOperation,
   PdfEditSessionState,
 } from "./editSession.ts";
 import {
@@ -158,7 +157,7 @@ function snapshotOperator(located: LocatedTextOperator): OperatorSnapshot {
       : null,
     fontResourceName: operator.fontResourceName,
     fontSizePt: operator.fontSizePt,
-    textRenderingMatrix: [...operator.textRenderingMatrix],
+    textRenderingMatrix: [...operator.textRenderingMatrix] as Matrix2x3,
     textMatrix: cloneMatrix(operator.textMatrix),
     textLineMatrix: cloneMatrix(operator.textLineMatrix),
     ctm: cloneMatrix(operator.ctm),
@@ -307,7 +306,7 @@ function fallbackIdentityMatches(
     candidate.operator.fontResourceName === expected.fontResourceName &&
     matricesEqual(
       expected.textRenderingMatrix,
-      [...candidate.operator.textRenderingMatrix],
+      cloneMatrix(candidate.operator.textRenderingMatrix),
     )
   );
 }
@@ -363,7 +362,7 @@ async function buildSnapshots(
   bytes: ArrayBuffer | Uint8Array,
   targets: readonly NativeTextTarget[],
 ): Promise<
-  | { ok: true; snapshots: NativeTargetSnapshot[] }
+  | { ok: true; snapshots: NativeTargetSnapshot[]; pageCount: number }
   | { ok: false; reason: string }
 > {
   const doc = await PDFDocument.load(
@@ -420,7 +419,7 @@ async function buildSnapshots(
     });
   }
 
-  return { ok: true, snapshots };
+  return { ok: true, snapshots, pageCount: doc.getPageCount() };
 }
 
 async function verifyWithPdfJs({
@@ -560,17 +559,12 @@ export async function verifyPostExportNativeEdits({
     if (!source.ok) return failed({ reason: source.reason });
 
     const exportedDoc = await PDFDocument.load(exportedBytes.slice());
-    if (
-      exportedDoc.getPageCount() !==
-      new Set(source.snapshots.map((snapshot) => snapshot.target.pageIndex))
-        .size +
-        (exportedDoc.getPageCount() -
-          new Set(
-            source.snapshots.map((snapshot) => snapshot.target.pageIndex),
-          ).size)
-    ) {
-      // Kept intentionally simple: parsing succeeded; the explicit PDF.js
-      // page-count cross-check below is authoritative for source vs export.
+    if (exportedDoc.getPageCount() !== source.pageCount) {
+      return failed({
+        reason:
+          `The exported PDF reopened with ${exportedDoc.getPageCount()} pages, ` +
+          `but the committed source has ${source.pageCount}.`,
+      });
     }
 
     let checkedOperators = 0;
