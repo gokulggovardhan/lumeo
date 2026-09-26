@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
-import { SPLIT_RUN_PDF, TEXT_ONLY_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
+import { MIXED_STYLE_PDF, SPLIT_RUN_PDF, TEXT_ONLY_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
 import { waitForStageReady } from "./helpers.ts";
 
 test.beforeAll(async () => {
@@ -252,6 +252,43 @@ test("vinext Edit PDF applies native formatting and colour with one native histo
   expect(pageErrors).toEqual([]);
 });
 
+
+test("vinext Edit PDF shows honest mixed formatting for a multi-span logical selection", async ({ page }) => {
+  await uploadEditFixture(page, MIXED_STYLE_PDF);
+  await waitForStageReady(page);
+
+  const editableRuns = page.locator('div[role="button"][aria-label^="Editable text: "]');
+  await expect(editableRuns).toHaveCount(2, { timeout: 90_000 });
+
+  const labels = await editableRuns.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("aria-label") ?? ""),
+  );
+  const firstIndex = labels.findIndex((label) => label.includes("Mixed alpha"));
+  const secondIndex = labels.findIndex((label) => label.includes("Mixed beta"));
+  expect(firstIndex).toBeGreaterThanOrEqual(0);
+  expect(secondIndex).toBeGreaterThanOrEqual(0);
+
+  await editableRuns.nth(firstIndex).click();
+  await editableRuns.nth(secondIndex).click({ modifiers: ["Shift"] });
+
+  const multiPanel = page.locator("[data-edit-multi-run-panel]");
+  await expect(multiPanel).toBeVisible();
+  await expect(multiPanel).toHaveAttribute("data-logical-selection-span-count", "2");
+
+  await multiPanel.getByRole("button", { name: "Format" }).click();
+  const formatting = page.locator("[data-native-mixed-formatting]");
+  await expect(formatting).toBeVisible();
+
+  await expect(formatting.locator("[data-native-mixed-font]")).toHaveText("Mixed");
+  await expect(formatting.locator("[data-native-mixed-font-size]")).toHaveText("Mixed");
+  await expect(formatting.locator("[data-native-mixed-fill]")).toHaveText("Mixed");
+
+  // Weight/italic are deliberately independent style dimensions: the
+  // fixture only changes family/size/fill, so these must not be falsely
+  // reported mixed.
+  await expect(formatting.locator("[data-native-mixed-weight]")).toHaveText("Regular");
+  await expect(formatting.locator("[data-native-mixed-italic]")).toHaveText("Not italic");
+});
 
 test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecutive Tj operators", async ({ page }) => {
   const pageErrors: string[] = [];
