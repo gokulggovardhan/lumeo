@@ -64,7 +64,8 @@ export function arbitrateTextEditability({
   if (run.detectionSource === "native") {
     const safeNativeSynthesis =
       Boolean(run.nativeSourceKey) &&
-      nativeSpan?.key === run.nativeSourceKey &&
+      nativeSpan !== null &&
+      nativeSpan.key === run.nativeSourceKey &&
       nativeSpan.decodeComplete &&
       nativeSpan.geometryConfidence === "exact-simple-run" &&
       nativeSpan.detectedRun !== null &&
