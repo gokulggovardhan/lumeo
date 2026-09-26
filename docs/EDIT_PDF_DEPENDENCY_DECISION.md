@@ -1,7 +1,7 @@
 # Premium Edit PDF — font, shaping and OCR dependency decision
 
 Status: approved architecture decision for the Edit PDF fidelity program  
-Audit baseline: protected main `3a5bcab29e4b73cf77262e5a7c4cd40d55ddeb7d`
+Audit baseline: protected main `e75e0736066839644ee2ece84de50a8996ccfda8`
 
 ## Decision summary
 
@@ -11,7 +11,7 @@ Lumeo will keep one clear responsibility per font/text engine.
 | --- | --- | --- |
 | `pdfjs-dist` | Keep | Independent browser renderer / extraction oracle. Not the canonical write engine. |
 | Existing Lumeo PDF parser/writer | Keep | PDF objects/resources, text operators, provenance, capability guards and exact native content-stream rewrite. |
-| `fontkit@2.0.4` | Approved for a later measured integration PR | Font-program inspection, names, metrics, coverage and deterministic subsetting where required. |
+| `@cantoo/fontkit@2.0.12` | Approved for a later measured integration PR | Font-program inspection, names, metrics, coverage and deterministic subsetting where required. |
 | `harfbuzzjs@1.6.2` | Approved for the shaping PR, not the fontkit PR | Canonical OpenType shaping: glyph IDs, clusters, advances and offsets for complex scripts / GPOS / GSUB. |
 | `opentype.js@2.0.0` | Do not add | Substantial overlap with fontkit; a second parser/layout stack would increase bundle size and disagreement risk. |
 | `tesseract.js@7.0.0` | Approved in principle for the later OCR PR only | Browser-local OCR for pages/regions proven to be scanned/image-only after native extraction is exhausted. |
@@ -34,7 +34,7 @@ The current custom font stack now safely provides:
 
 What remains missing is a broad font-program parser for professional metadata and future subsetting across TTF/OTF/CFF without growing a second large custom binary parser.
 
-`fontkit` is selected for that role because it:
+`@cantoo/fontkit` is selected for that role because it is the actively maintained fork of the original fontkit package and:
 - is MIT licensed;
 - supports Node and browser builds;
 - supports TrueType, OpenType, WOFF/WOFF2 and CFF outlines;
@@ -43,11 +43,11 @@ What remains missing is a broad font-program parser for professional metadata an
 
 ### Important constraint
 
-fontkit will **not** become Lumeo's PDF write authority and will not silently replace PDF resource/encoding evidence. It inspects exact font bytes already available locally in the browser.
+`@cantoo/fontkit` will **not** become Lumeo's PDF write authority and will not silently replace PDF resource/encoding evidence. It inspects exact font bytes already available locally in the browser.
 
 ### Integration gate
 
-Do not add fontkit until the integration PR can measure:
+Do not add `@cantoo/fontkit` until the integration PR can measure:
 - package-lock delta;
 - production bundle delta;
 - lazy chunk size;
@@ -57,7 +57,7 @@ Do not add fontkit until the integration PR can measure:
 - no loading on non-Edit-PDF routes;
 - no loading until exact embedded/local font inspection is needed.
 
-The current execution environment cannot safely regenerate npm's dependency graph, so this decision PR intentionally does not hand-edit `package-lock.json`.
+This decision PR does not change dependencies or hand-edit `package-lock.json`; the implementation PR must regenerate the lockfile through npm and measure the resulting bundle/security impact.
 
 ## Why HarfBuzzJS
 
@@ -82,10 +82,10 @@ It will not perform:
 
 ### Avoid two shaping authorities
 
-Although fontkit can perform layout, production export must not independently shape the same run through both fontkit and HarfBuzz. Planned split:
+Although @cantoo/fontkit can perform layout, production export must not independently shape the same run through both fontkit and HarfBuzz. Planned split:
 
 ```
-fontkit
+@cantoo/fontkit
   -> font inspection / metadata / metrics / subsetting
 
 HarfBuzz
@@ -96,7 +96,7 @@ Where a simple PDF run does not require shaping beyond existing proven code, Lum
 
 ## Why not opentype.js
 
-opentype.js is MIT licensed and browser capable, but its font parsing, glyph/metric, kerning/ligature and outline responsibilities substantially overlap fontkit.
+opentype.js is MIT licensed and browser capable, but its font parsing, glyph/metric, kerning/ligature and outline responsibilities substantially overlap @cantoo/fontkit.
 
 Adding both would create:
 - duplicate binary parsers;
@@ -104,7 +104,7 @@ Adding both would create:
 - additional bundle cost;
 - more opportunities for disagreement over font identity/metrics.
 
-It is therefore not selected unless a future measured gap exists that fontkit cannot satisfy.
+It is therefore not selected unless a future measured gap exists that @cantoo/fontkit cannot satisfy.
 
 ## OCR decision
 
@@ -142,7 +142,7 @@ Treat font binaries as hostile input:
 ## License gate
 
 Approved licenses in this decision:
-- fontkit — MIT
+- @cantoo/fontkit — MIT
 - harfbuzzjs — MIT
 - opentype.js — MIT (not selected)
 - Tesseract.js — Apache-2.0
@@ -156,13 +156,13 @@ Normal Lumeo pages must not load the professional Edit PDF engines.
 Target loading:
 ```
 normal site
-  -> no fontkit / HarfBuzz / OCR
+  -> no @cantoo/fontkit / HarfBuzz / OCR
 
 Edit PDF initial page
   -> existing PDF.js + native parser
 
 exact font inspection needed
-  -> lazy fontkit chunk
+  -> lazy @cantoo/fontkit chunk
 
 complex shaping needed
   -> lazy HarfBuzz/WASM chunk
