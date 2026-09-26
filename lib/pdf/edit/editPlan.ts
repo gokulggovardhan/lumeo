@@ -137,6 +137,10 @@ class ValidatedEditPlanProof {
       configurable: false,
     });
   }
+
+  isPlannerIssued(): boolean {
+    return this.validationProof === true;
+  }
 }
 
 export type ValidatedEditPlan = Readonly<EditPlanFields> &
@@ -176,6 +180,7 @@ export function isValidatedEditPlan(
 ): plan is ValidatedEditPlan {
   return (
     plan instanceof ValidatedEditPlanProof &&
+    plan.isPlannerIssued() &&
     plan.editable === true &&
     plan.reason === null &&
     Object.isFrozen(plan)
