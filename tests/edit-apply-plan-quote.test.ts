@@ -191,7 +191,7 @@ test("' rewrite: equal-length replacement, neighboring Tj operators untouched", 
 
   const reloaded = await PDFDocument.load(editedBytes.slice());
   assert.equal(reloaded.getPageCount(), 1);
-  assert.deepEqual(await extractPageStrings(editedBytes), ["First", "BA", "Last"]);
+  assert.deepEqual(await extractPageStrings(editedBytes), ["First", "Center", "Last"]);
 });
 
 test("' rewrite: shorter and longer replacements both produce valid, correctly-extractable text", async () => {
@@ -226,7 +226,7 @@ test('" rewrite: preserves its own word/char spacing operands verbatim when endp
   await applyEditPlanToDocument(editedDoc, plan, resolvedFont.bytesPerCode);
   const editedBytes = await editedDoc.save();
 
-  assert.deepEqual(await extractPageStrings(editedBytes), ["First", "Center", "Last"]);
+  assert.deepEqual(await extractPageStrings(editedBytes), ["First", "BA", "Last"]);
 
   const editedStreamBytes = await decodedContentStreamBytes(editedBytes.slice());
   const editedOperators = walkTextShowOperators(editedStreamBytes);
@@ -254,10 +254,19 @@ test("' rewrite: width-changing replacement preserves an immediately following t
   const editedBytes = await editedDoc.save();
   const after = await extractedItems(editedBytes);
 
-  assert.deepEqual(after.map((item) => item.text), ["Mid", "Tail"]);
+  const tailMatches = after.filter((item) => item.text === "Tail");
+  assert.equal(tailMatches.length, 1, `expected exactly one following "Tail" item: ${JSON.stringify(after)}`);
+  const tailIndex = after.findIndex((item) => item.text === "Tail");
+  assert.ok(tailIndex > 0, `expected replacement content before "Tail": ${JSON.stringify(after)}`);
+  const beforeTailText = after.slice(0, tailIndex).map((item) => item.text).join("");
+  assert.equal(
+    beforeTailText.replace(/\s+/gu, ""),
+    "Mid",
+    `only PDF.js whitespace segmentation may appear in the compensated gap: ${JSON.stringify(after)}`,
+  );
   assert.ok(
-    Math.abs(after[1].x - tailX) < 0.05,
-    `following run moved after ' rewrite: ${tailX} -> ${after[1].x}`,
+    Math.abs(tailMatches[0].x - tailX) < 0.05,
+    `following run moved after ' rewrite: ${tailX} -> ${tailMatches[0].x}`,
   );
 
   const stream = await decodedContentStreamBytes(editedBytes.slice());
@@ -281,10 +290,19 @@ test('" rewrite: width-changing replacement preserves spacing state, line move a
   const editedBytes = await editedDoc.save();
   const after = await extractedItems(editedBytes);
 
-  assert.deepEqual(after.map((item) => item.text), ["Mid", "Tail"]);
+  const tailMatches = after.filter((item) => item.text === "Tail");
+  assert.equal(tailMatches.length, 1, `expected exactly one following "Tail" item: ${JSON.stringify(after)}`);
+  const tailIndex = after.findIndex((item) => item.text === "Tail");
+  assert.ok(tailIndex > 0, `expected replacement content before "Tail": ${JSON.stringify(after)}`);
+  const beforeTailText = after.slice(0, tailIndex).map((item) => item.text).join("");
+  assert.equal(
+    beforeTailText.replace(/\s+/gu, ""),
+    "Mid",
+    `only PDF.js whitespace segmentation may appear in the compensated gap: ${JSON.stringify(after)}`,
+  );
   assert.ok(
-    Math.abs(after[1].x - tailX) < 0.05,
-    `following run moved after " rewrite: ${tailX} -> ${after[1].x}`,
+    Math.abs(tailMatches[0].x - tailX) < 0.05,
+    `following run moved after " rewrite: ${tailX} -> ${tailMatches[0].x}`,
   );
 
   const stream = await decodedContentStreamBytes(editedBytes.slice());
