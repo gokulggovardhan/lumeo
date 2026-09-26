@@ -2,7 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
-import { MIXED_STYLE_PDF, SPLIT_RUN_PDF, TEXT_ONLY_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
+import { LIMITED_TEXT_PDF, MIXED_STYLE_PDF, SPLIT_RUN_PDF, TEXT_ONLY_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
 import { waitForStageReady } from "./helpers.ts";
 
 test.beforeAll(async () => {
@@ -137,6 +137,43 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
   expect(failedRequests).toEqual([]);
 });
 
+
+test("vinext Edit PDF explains why visible clipped text stays read-only", async ({ page }) => {
+  await uploadEditFixture(page, LIMITED_TEXT_PDF);
+  await waitForStageReady(page);
+
+  const clipped = page
+    .locator('div[role="button"][aria-label^="Not yet editable text: "][aria-label*="Clipped label"]')
+    .first();
+  const normal = page
+    .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Normal label"]')
+    .first();
+
+  await expect(clipped).toBeVisible({ timeout: 90_000 });
+  await expect(normal).toBeVisible({ timeout: 90_000 });
+  await expect(clipped).toHaveAttribute("data-edit-limitation", "true");
+  await expect(clipped).toHaveAttribute("title", /clipping mask/i);
+
+  const notice = page.locator("[data-edit-limitation-notice]");
+
+  await clipped.hover();
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText(/clipping mask/i);
+  await expect(notice).toContainText(/read-only/i);
+
+  await clipped.focus();
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText(/clipping mask/i);
+
+  await clipped.click();
+  await expect(notice).toBeVisible();
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+
+  // The limitation is local to the unsafe native span; a normal neighboring
+  // run on the same page still opens the real inline native editor.
+  await normal.click();
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toBeVisible();
+});
 
 test("vinext Edit PDF applies native formatting and colour with one native history transaction", async ({ page }) => {
   const pageErrors: string[] = [];
