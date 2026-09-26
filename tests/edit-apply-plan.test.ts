@@ -398,6 +398,7 @@ test("applyEditPlanToDocument degrades gracefully instead of throwing when /Cont
     resolvedFont,
     fontMetrics,
   });
+  if (!isValidatedEditPlan(plan)) assert.fail(plan.reason);
 
   await applyEditPlanToDocument(loaded, plan, 1);
 
