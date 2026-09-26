@@ -313,6 +313,62 @@ function unionRects(a: PixelRect, b: PixelRect): PixelRect {
   };
 }
 
+function normalizedVisibleText(value: string): string {
+  return value.replace(/\s+/gu, "");
+}
+
+function uniqueRunSequenceRect({
+  runs,
+  expectedText,
+  width,
+  height,
+  viewportTransform,
+}: {
+  runs: ReturnType<typeof textRunsFromContent>;
+  expectedText: string;
+  width: number;
+  height: number;
+  viewportTransform: readonly number[];
+}): PixelRect | null {
+  const expected = normalizedVisibleText(expectedText);
+  if (!expected) return null;
+
+  const matches: PixelRect[] = [];
+  for (let start = 0; start < runs.length; start += 1) {
+    let combined = "";
+    let rect: PixelRect | null = null;
+
+    for (let end = start; end < runs.length; end += 1) {
+      combined += normalizedVisibleText(runs[end].str);
+      if (!combined) continue;
+
+      const current = runPixelRect(
+        runs[end],
+        width,
+        height,
+        viewportTransform,
+      );
+      rect = rect ? unionRects(rect, current) : current;
+
+      if (combined === expected) {
+        if (rect) matches.push(rect);
+        break;
+      }
+      if (
+        combined.length > expected.length ||
+        !expected.startsWith(combined)
+      ) {
+        break;
+      }
+    }
+  }
+
+  // Duplicate visible strings are deliberately not guessed. A corpus target
+  // must resolve to one unique PDF.js sequence before its raster mask can
+  // authorize changed pixels.
+  return matches.length === 1 ? matches[0] : null;
+}
+
 async function measure(
   fixture: Fixture,
 ): Promise<EditPdfFidelityFixtureMeasurement> {
@@ -512,33 +568,28 @@ async function measure(
 
         const before = await renderFirstPage(fixture.bytes);
         const after = await renderFirstPage(exported.bytes);
-        const beforeRun = before.runs.find((run) =>
-          run.str.includes(fixture.editTarget),
-        );
-        const afterRun = after.runs.find((run) =>
-          run.str.includes(fixture.replacementText),
-        );
+        const beforeRect = uniqueRunSequenceRect({
+          runs: before.runs,
+          expectedText: fixture.editTarget,
+          width: before.width,
+          height: before.height,
+          viewportTransform: before.viewportTransform,
+        });
+        const afterRect = uniqueRunSequenceRect({
+          runs: after.runs,
+          expectedText: fixture.replacementText,
+          width: after.width,
+          height: after.height,
+          viewportTransform: after.viewportTransform,
+        });
 
         if (
-          beforeRun &&
-          afterRun &&
+          beforeRect &&
+          afterRect &&
           before.width === after.width &&
           before.height === after.height
         ) {
-          const mask = unionRects(
-            runPixelRect(
-              beforeRun,
-              before.width,
-              before.height,
-              before.viewportTransform,
-            ),
-            runPixelRect(
-              afterRun,
-              after.width,
-              after.height,
-              after.viewportTransform,
-            ),
-          );
+          const mask = unionRects(beforeRect, afterRect);
           const diff = compareRgbaImages({
             before: before.rgba,
             after: after.rgba,
