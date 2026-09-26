@@ -254,6 +254,47 @@ test("edit arbitration fails closed when PDF.js and native text disagree", () =>
   assert.match(arbitration.reason, /conflict|not strong enough/i);
 });
 
+test("edit arbitration requires measured geometry even when text identity matches", () => {
+  const source = located();
+  const [span] = buildNativeContentStreamSpans({
+    operators: [source],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  });
+
+  const run = {
+    str: "Hi",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 2,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    detectionSource: "pdfjs" as const,
+  };
+
+  const reconciliations = reconcileTextSignals({
+    runs: [run],
+    legacyMatches: [{ locatedOperator: source, operator: source.operator }],
+    nativeSpans: [span],
+    viewportTransform: viewport,
+  });
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [run],
+    reconciliations,
+    nativeSpans: [span],
+  });
+
+  assert.equal(reconciliations[0].confidence, "high");
+  assert.equal(reconciliations[0].baselineDistancePt, null);
+  assert.equal(reconciliations[0].angleDeltaDeg, null);
+  assert.equal(arbitration.decision, "view-only");
+  assert.match(arbitration.reason, /measured PDF\.js\/native geometry/i);
+});
+
 test("edit arbitration never promotes PDF.js-only text to a native edit target", () => {
   const run = {
     str: "Visible only",
