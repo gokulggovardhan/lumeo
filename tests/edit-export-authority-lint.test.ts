@@ -29,6 +29,27 @@ test("export-path lint guard rejects DOM geometry authority", async () => {
   );
 });
 
+test("export-path lint guard rejects global getComputedStyle", async () => {
+  const eslint = new ESLint({ cwd: process.cwd() });
+  const [result] = await eslint.lintText(
+    [
+      "export function forbidden(node: Element) {",
+      "  return getComputedStyle(node).fontSize;",
+      "}",
+    ].join("\n"),
+    { filePath: "lib/pdf/edit/editPlan.ts" },
+  );
+
+  assert.ok(
+    result.messages.some(
+      (message) =>
+        message.ruleId === "no-restricted-syntax" &&
+        /DOM\/CSS measurements/i.test(message.message),
+    ),
+    JSON.stringify(result.messages, null, 2),
+  );
+});
+
 test("export-path lint guard does not ban pure PDF geometry", async () => {
   const eslint = new ESLint({ cwd: process.cwd() });
   const [result] = await eslint.lintText(
