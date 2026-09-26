@@ -167,11 +167,39 @@ export function arbitrateTextEditability({
  * consecutive page-stream operators, identical text state/resource scope,
  * ignorable gaps only, complete decoding, and exact concatenated Unicode.
  */
-export function finalizeTextEditArbitration(
-  arbitration: TextEditArbitration,
-  fragmentedReconstructionProven: boolean,
-): TextEditArbitration {
+export function finalizeTextEditArbitration({
+  arbitration,
+  run,
+  reconciliation,
+  fragmentedReconstructionProven,
+}: {
+  arbitration: TextEditArbitration;
+  run: DetectedTextRun;
+  reconciliation: TextSignalReconciliation | null;
+  fragmentedReconstructionProven: boolean;
+}): TextEditArbitration {
   if (!fragmentedReconstructionProven || arbitration.decision === "editable") {
+    return arbitration;
+  }
+
+  const baselineDistance = reconciliation?.baselineDistancePt ?? null;
+  const angleDelta = reconciliation?.angleDeltaDeg ?? null;
+  const measuredGeometry =
+    baselineDistance !== null &&
+    Number.isFinite(baselineDistance) &&
+    baselineDistance <= thresholdFor(run) &&
+    angleDelta !== null &&
+    Number.isFinite(angleDelta) &&
+    angleDelta <= 3;
+  const hasExportBaselineEvidence =
+    (typeof run.baselineYPct === "number" && Number.isFinite(run.baselineYPct)) ||
+    (typeof run.ascentRatio === "number" && Number.isFinite(run.ascentRatio));
+
+  if (
+    !reconciliation?.nativeSpanKey ||
+    !measuredGeometry ||
+    !hasExportBaselineEvidence
+  ) {
     return arbitration;
   }
 
@@ -180,19 +208,11 @@ export function finalizeTextEditArbitration(
     decision: "editable",
     source: "fragmented-reconstruction",
     reason:
-      "Single-operator reconciliation is insufficient, but exact consecutive fragmented-run reconstruction proved the full visible text and writer scope.",
+      "The apparent single-operator text disagreement was resolved by exact consecutive fragmented-run reconstruction plus measured PDF.js/native geometry.",
   };
 }
 
 export function buildTextEditArbitrations({
-  runs,
-  reconciliations,
-  nativeSpans,
-}: {
-  runs: readonly DetectedTextRun[];
-  reconciliations: readonly TextSignalReconciliation[];
-  nativeSpans: readonly NativeContentStreamSpan[];
-}): TextEditArbitration[] {export function buildTextEditArbitrations({
   runs,
   reconciliations,
   nativeSpans,
