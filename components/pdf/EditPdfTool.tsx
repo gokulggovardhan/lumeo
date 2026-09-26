@@ -103,7 +103,6 @@ import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import {
   buildCaretRetypePlan,
   captureCaretTextStyleSnapshot,
-  type CaretTextStyleSnapshot,
 } from "@/lib/pdf/edit/caretTextStyleSnapshot";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import { reconstructFragmentedRun, type FragmentedRunReconstruction } from "@/lib/pdf/edit/fragmentedRun";
