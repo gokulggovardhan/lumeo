@@ -12,6 +12,8 @@ on:
       - "components/pdf/HtmlToPdfTool.tsx"
       - "components/pdf/EditPdfTool.tsx"
       - "lib/pdf/edit/**"
+      - "scripts/report-edit-pdf-fidelity.ts"
+      - "tests/fixtures/pdfFixtures.ts"
       - "e2e/edit-vinext.spec.ts"
       - "e2e/fixtures.ts"
       - "lib/conversion/**"
