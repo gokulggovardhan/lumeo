@@ -161,7 +161,7 @@ test("mixed-span style writer rejects a rejected plan before mutating the docume
           typeof applyNativeTextStyleBatchToDocument
         >[1],
       ),
-    /Blocked by preflight/,
+    /validated dry-run planner|not issued/i,
   );
 
   const after = await loaded.save();
