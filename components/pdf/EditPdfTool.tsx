@@ -65,8 +65,10 @@ import {
   type NativeContentStreamSpan,
 } from "@/lib/pdf/edit/nativeTextDetection";
 import {
+  buildTextEditArbitrations,
+  finalizeTextEditArbitration,
   reconcileTextSignals,
-  reconciliationMatchMap,
+  type TextEditArbitration,
   type TextSignalReconciliation,
 } from "@/lib/pdf/edit/textReconciliation";
 import {
@@ -577,9 +579,15 @@ export default function EditPdfTool() {
   // detectedTextRuns, so a run's editability, selection, hover, and focus
   // state are all looked up by one shared index rather than juggling
   // separate DetectedTextRun object identities.
+  // runMatches is WRITE AUTHORITY only. Lower-confidence positional/source
+  // provenance is retained separately so fragmented-run reconstruction and
+  // diagnostics can still prove/reject a source without accidentally making
+  // that same provenance editable.
   const [runMatches, setRunMatches] = useState<RunMatch[]>([]);
+  const [runProvenanceMatches, setRunProvenanceMatches] = useState<RunMatch[]>([]);
   const [nativeTextSpans, setNativeTextSpans] = useState<NativeContentStreamSpan[]>([]);
   const [textReconciliations, setTextReconciliations] = useState<TextSignalReconciliation[]>([]);
+  const [textArbitrations, setTextArbitrations] = useState<TextEditArbitration[]>([]);
   const [pdfJsDetectedRunCount, setPdfJsDetectedRunCount] = useState(0);
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
   // runMatches was derived from), kept around so a multi-run selection can
@@ -783,7 +791,7 @@ export default function EditPdfTool() {
   const pageFontProfiles = useMemo(
     () =>
       detectedTextRuns.map((_run, index) => {
-        const match = runMatches[index];
+        const match = runProvenanceMatches[index];
         const resourceName = match?.operator.fontResourceName;
         if (!fontRegistry || !match || !resourceName) return null;
         try {
@@ -792,14 +800,14 @@ export default function EditPdfTool() {
           return null;
         }
       }),
-    [detectedTextRuns, runMatches, fontRegistry],
+    [detectedTextRuns, runProvenanceMatches, fontRegistry],
   );
 
   const fragmentedRunReconstructions = useMemo(() => {
     const reconstructed = new Map<number, FragmentedRunReconstruction>();
     for (let index = 0; index < detectedTextRuns.length; index += 1) {
       const run = detectedTextRuns[index];
-      const match = runMatches[index];
+      const match = runProvenanceMatches[index];
       const profile = pageFontProfiles[index];
       if (!match || !profile) continue;
       const fragment = reconstructFragmentedRun({
@@ -811,7 +819,53 @@ export default function EditPdfTool() {
       if (fragment) reconstructed.set(index, fragment);
     }
     return reconstructed;
-  }, [detectedTextRuns, runMatches, pageFontProfiles, pageOperators]);
+  }, [detectedTextRuns, runProvenanceMatches, pageFontProfiles, pageOperators]);
+
+
+  // Final write authority is the single-signal arbitration plus one narrowly
+  // defined second proof: exact fragmented-run reconstruction. The latter is
+  // what preserves the established consecutive Tj/TJ editing path without
+  // turning a generic PDF.js/native conflict into an editable run.
+  const effectiveTextArbitrations = useMemo(
+    () =>
+      detectedTextRuns.map((_run, index) => {
+        const arbitration =
+          textArbitrations[index] ??
+          ({
+            pdfJsRunIndex: index,
+            decision: "view-only",
+            nativeSpanKey: null,
+            source: "unmatched",
+            reason: "Edit authorization evidence has not been established for this run.",
+          } satisfies TextEditArbitration);
+        return finalizeTextEditArbitration({
+          arbitration,
+          run: detectedTextRuns[index],
+          reconciliation: textReconciliations[index] ?? null,
+          fragmentedReconstructionProven: fragmentedRunReconstructions.has(index),
+        });
+      }),
+    [
+      detectedTextRuns,
+      textArbitrations,
+      textReconciliations,
+      fragmentedRunReconstructions,
+    ],
+  );
+
+  const editableRunMatches = useMemo(
+    () =>
+      detectedTextRuns.map((_run, index): RunMatch => {
+        if (effectiveTextArbitrations[index]?.decision !== "editable") return null;
+        return runMatches[index] ?? runProvenanceMatches[index] ?? null;
+      }),
+    [
+      detectedTextRuns,
+      effectiveTextArbitrations,
+      runMatches,
+      runProvenanceMatches,
+    ],
+  );
 
 
   // Document → Page → Block → Line → Span model. This is a read-only view
@@ -826,12 +880,12 @@ export default function EditPdfTool() {
             widthPt: pagePointSize.width,
             heightPt: pagePointSize.height,
             runs: detectedTextRuns,
-            matches: runMatches,
+            matches: editableRunMatches,
             fontProfiles: pageFontProfiles,
             fragmentedRunIndices: new Set(fragmentedRunReconstructions.keys()),
           })
         : null,
-    [pageIndex, pagePointSize, detectedTextRuns, runMatches, pageFontProfiles, fragmentedRunReconstructions],
+    [pageIndex, pagePointSize, detectedTextRuns, editableRunMatches, pageFontProfiles, fragmentedRunReconstructions],
   );
 
   const pageTextCapability = useMemo<PageTextCapabilityClassification>(() => {
@@ -864,10 +918,11 @@ export default function EditPdfTool() {
       return diagnostics.buildEditPdfPageDiagnosticReport({
         pageModel: pageTextModel,
         runs: detectedTextRuns,
-        matches: runMatches,
+        matches: runProvenanceMatches,
         fontProfiles: pageFontProfiles,
         nativeSpans: nativeTextSpans,
         reconciliations: textReconciliations,
+        arbitrations: effectiveTextArbitrations,
         pageClassification: pageTextCapability,
         pdfJsRunCount: pdfJsDetectedRunCount,
         generatedAtIso: new Date().toISOString(),
@@ -892,10 +947,11 @@ export default function EditPdfTool() {
   }, [
     pageTextModel,
     detectedTextRuns,
-    runMatches,
+    runProvenanceMatches,
     pageFontProfiles,
     nativeTextSpans,
     textReconciliations,
+    effectiveTextArbitrations,
     pageTextCapability,
     pdfJsDetectedRunCount,
   ]);
@@ -1115,8 +1171,10 @@ export default function EditPdfTool() {
     setSelectedId(null);
     setDetectedTextRuns([]);
     setRunMatches([]);
+    setRunProvenanceMatches([]);
     setNativeTextSpans([]);
     setTextReconciliations([]);
+    setTextArbitrations([]);
     setPdfJsDetectedRunCount(0);
     setPageOperators([]);
     setSelectionAnchorIndex(null);
@@ -1305,6 +1363,8 @@ export default function EditPdfTool() {
     // effect never briefly pairs a new page's detected runs with the
     // previous page's matches while it's catching up.
     setRunMatches([]);
+    setRunProvenanceMatches([]);
+    setTextArbitrations([]);
     setPageOperators([]);
     setPrivacyShieldMatches([]);
     setTextDetectionReady(false);
@@ -1616,7 +1676,9 @@ export default function EditPdfTool() {
         if (runs.length === 0) {
           const nativeRuns = nativeDetectedRuns(nativeSpans);
           setTextReconciliations([]);
+          setTextArbitrations([]);
           setRunMatches([]);
+          setRunProvenanceMatches([]);
           if (nativeRuns.length > 0) setDetectedTextRuns(nativeRuns);
           return;
         }
@@ -1652,33 +1714,54 @@ export default function EditPdfTool() {
         });
         setTextReconciliations(reconciliations);
 
-        const evidenceMatches = reconciliationMatchMap(reconciliations, nativeSpans);
-        setRunMatches(
-          runs.map((run, index): RunMatch => {
-            if (run.nativeSourceKey) {
-              const native = nativeByKey.get(run.nativeSourceKey);
-              return native
-                ? { locatedOperator: native.locatedOperator, operator: native.locatedOperator.operator }
-                : null;
-            }
+        // Keep source provenance and write authority as two separate layers.
+        // A stronger evidence match may replace a bad positional legacy match
+        // for provenance. Otherwise the legacy source remains available for
+        // fragmented-run reconstruction/diagnostics only.
+        const provenanceMatches = runs.map((run, index): RunMatch => {
+          if (run.nativeSourceKey) {
+            const native = nativeByKey.get(run.nativeSourceKey);
+            return native
+              ? { locatedOperator: native.locatedOperator, operator: native.locatedOperator.operator }
+              : null;
+          }
 
-            const legacy = legacyMatches[index];
-            const reconciliation = reconciliations[index];
-            const evidence = evidenceMatches.get(index);
-
-            // A high-confidence evidence match may replace a bad positional
-            // legacy match. Otherwise retain the legacy provenance so the
-            // existing fragmented-run reconstruction and edit-plan guards can
-            // prove or reject multi-operator text exactly as before.
-            if (evidence && reconciliation?.source === "evidence-match") {
+          const legacy = legacyMatches[index];
+          const reconciliation = reconciliations[index];
+          if (
+            reconciliation?.confidence === "high" &&
+            reconciliation.nativeSpanKey &&
+            reconciliation.source === "evidence-match"
+          ) {
+            const evidence = nativeByKey.get(reconciliation.nativeSpanKey);
+            if (evidence) {
               return {
                 locatedOperator: evidence.locatedOperator,
                 operator: evidence.locatedOperator.operator,
               };
             }
-            return legacy;
-          }),
-        );
+          }
+          return legacy;
+        });
+
+        const arbitrations = buildTextEditArbitrations({
+          runs,
+          reconciliations,
+          nativeSpans,
+        });
+        const authorizedMatches = arbitrations.map((arbitration): RunMatch => {
+          if (arbitration.decision !== "editable" || !arbitration.nativeSpanKey) {
+            return null;
+          }
+          const native = nativeByKey.get(arbitration.nativeSpanKey);
+          return native
+            ? { locatedOperator: native.locatedOperator, operator: native.locatedOperator.operator }
+            : null;
+        });
+
+        setRunProvenanceMatches(provenanceMatches);
+        setTextArbitrations(arbitrations);
+        setRunMatches(authorizedMatches);
       } catch (matchError) {
         if (!cancelled) {
           console.error(
@@ -1688,8 +1771,10 @@ export default function EditPdfTool() {
               : { message: String(matchError) },
           );
           setRunMatches([]);
+          setRunProvenanceMatches([]);
           setNativeTextSpans([]);
           setTextReconciliations([]);
+          setTextArbitrations([]);
           setPageOperators([]);
         }
       }
@@ -1771,11 +1856,11 @@ export default function EditPdfTool() {
   // user's next keystroke replaces the text with no extra click into a
   // sidebar field first.
   useEffect(() => {
-    if (activeTool === "select" && selectedRunIndices.length === 1 && runMatches[selectedRunIndices[0]]) {
+    if (activeTool === "select" && selectedRunIndices.length === 1 && editableRunMatches[selectedRunIndices[0]]) {
       inlineEditInputRef.current?.focus();
       inlineEditInputRef.current?.select();
     }
-  }, [activeTool, selectedRunIndices, runMatches]);
+  }, [activeTool, selectedRunIndices, editableRunMatches]);
 
   // Phase 20 (D): scrollIntoView (Phase 15, above/selectTextRunAndFocus)
   // only runs ONCE, synchronously at the moment of tap -- it can't account
@@ -1791,7 +1876,7 @@ export default function EditPdfTool() {
   // simply don't get this extra correction and fall back to the Phase 15
   // scrollIntoView-at-focus-time behavior alone, unchanged.
   useEffect(() => {
-    const isEditorOpen = activeTool === "select" && selectedRunIndices.length === 1 && Boolean(runMatches[selectedRunIndices[0]]);
+    const isEditorOpen = activeTool === "select" && selectedRunIndices.length === 1 && Boolean(editableRunMatches[selectedRunIndices[0]]);
     if (!isEditorOpen || typeof window === "undefined" || !window.visualViewport) return;
 
     const viewport = window.visualViewport;
@@ -1808,7 +1893,7 @@ export default function EditPdfTool() {
     }
     viewport.addEventListener("resize", handleViewportResize);
     return () => viewport.removeEventListener("resize", handleViewportResize);
-  }, [activeTool, selectedRunIndices, runMatches]);
+  }, [activeTool, selectedRunIndices, editableRunMatches]);
 
 
   async function addFile(files: FileList | File[]) {
@@ -2306,7 +2391,7 @@ export default function EditPdfTool() {
       : null;
   const selectedNativeRunMatch =
     selectedRunIndices.length === 1
-      ? runMatches[selectedRunIndices[0]] ?? null
+      ? editableRunMatches[selectedRunIndices[0]] ?? null
       : null;
   const nativeFillCapability = useMemo(
     () =>
@@ -2384,7 +2469,7 @@ export default function EditPdfTool() {
 
     try {
       if (selectedRunIndices.length === 1) {
-        const match = runMatches[selectedRunIndices[0]];
+        const match = editableRunMatches[selectedRunIndices[0]];
         if (!match) return { kind: "empty" };
         const { locatedOperator, operator } = match;
         if (!operator.fontResourceName) throw new Error("This text's font couldn't be identified, so it can't be edited here.");
@@ -2445,7 +2530,7 @@ export default function EditPdfTool() {
       return { kind: "error", reason, multi: selectedRunIndices.length > 1 };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
-  }, [fontRegistry, selectedRunIndices, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions]);
+  }, [fontRegistry, selectedRunIndices, editableRunMatches, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions]);
 
   // Phase 9.2: the live dry-run preview driving both the Apply button's
   // disabled state and the specific reason shown next to it -- see
@@ -3087,7 +3172,7 @@ export default function EditPdfTool() {
   // JSX below, instead of repeatedly indexing detectedTextRuns/runMatches by
   // selectedRunIndices[0] at each use site.
   const singleSelectedRun = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
-  const singleSelectedRunMatch = selectedRunIndices.length === 1 ? runMatches[selectedRunIndices[0]] : null;
+  const singleSelectedRunMatch = selectedRunIndices.length === 1 ? editableRunMatches[selectedRunIndices[0]] : null;
   const singleSelectedSpan = selectedNativeSpan;
   const activeNativeStyleDraft =
     nativeStyleDraft?.spanId === singleSelectedSpan?.id ? nativeStyleDraft : null;
@@ -3673,7 +3758,7 @@ export default function EditPdfTool() {
                           // page load or edit apply, so an index key is safe here.
                           key={index}
                           run={run}
-                          editable={Boolean(runMatches[index])}
+                          editable={Boolean(editableRunMatches[index])}
                           selected={selectedRunIndices.includes(index)}
                           hovered={hoveredRunIndex === index}
                           onSelect={(shiftKey) => selectTextRunAndFocus(index, shiftKey)}

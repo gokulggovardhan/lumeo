@@ -24,6 +24,8 @@ function run(
     heightPct,
     fontSizePt: 12,
     rotated: false,
+    baselineXPct: xPct,
+    baselineYPct: yPct + heightPct * 0.8,
   };
 }
 
@@ -78,6 +80,38 @@ test("document model stores the detector baseline directly instead of rebuilding
   // A legacy 0.85 * box-height reconstruction would have produced 200.8pt,
   // proving this expectation is tied to the explicit baseline, not the box.
   assert.notEqual(model.spans[0].baselinePt, 200.8);
+});
+
+test("document model exposes geometry confidence and fails closed on the 0.85 ascent fallback", () => {
+  const exact = run("Exact", 10, 20, 18, 4);
+  const metricBacked = run("Metric", 10, 30, 18, 4);
+  delete metricBacked.baselineXPct;
+  delete metricBacked.baselineYPct;
+  metricBacked.ascentRatio = 0.72;
+
+  const fallback = run("Fallback", 10, 40, 18, 4);
+  delete fallback.baselineXPct;
+  delete fallback.baselineYPct;
+  delete fallback.ascentRatio;
+  delete fallback.descentRatio;
+
+  const model = buildPdfPageTextModel({
+    pageIndex: 0,
+    widthPt: 600,
+    heightPt: 800,
+    runs: [exact, metricBacked, fallback],
+    matches: [match(0), match(1), match(2)],
+  });
+
+  assert.equal(model.spans[0].geometryConfidence, "exact");
+  assert.equal(model.spans[0].capability, "native-editable");
+
+  assert.equal(model.spans[1].geometryConfidence, "descriptor");
+  assert.equal(model.spans[1].capability, "native-editable");
+
+  assert.equal(model.spans[2].geometryConfidence, "fallback");
+  assert.equal(model.spans[2].capability, "view-only");
+  assert.match(model.spans[2].capabilityReason ?? "", /approximate ascent fallback/i);
 });
 
 test("document model keeps distant same-baseline columns as separate lines and blocks", () => {

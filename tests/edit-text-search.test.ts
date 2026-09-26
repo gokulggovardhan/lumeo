@@ -31,6 +31,8 @@ function run(
     heightPct: 2,
     fontSizePt: 12,
     rotated: false,
+    baselineXPct: xPct,
+    baselineYPct: yPct + 1.6,
   };
 }
 

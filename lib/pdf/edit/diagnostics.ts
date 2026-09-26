@@ -8,10 +8,13 @@ import { stringAdvancePt } from "./fontMetrics.ts";
 import type { PdfPageTextModel, PdfTextSourceMatch } from "./documentModel.ts";
 import type { DetectedTextRun } from "./textRuns.ts";
 import type { NativeContentStreamSpan } from "./nativeTextDetection.ts";
-import type { TextSignalReconciliation } from "./textReconciliation.ts";
+import type {
+  TextEditArbitration,
+  TextSignalReconciliation,
+} from "./textReconciliation.ts";
 import type { PageTextCapabilityClassification } from "./textCapabilityClassifier.ts";
 
-export const EDIT_PDF_DIAGNOSTIC_SCHEMA_VERSION = 3 as const;
+export const EDIT_PDF_DIAGNOSTIC_SCHEMA_VERSION = 4 as const;
 
 export type EditPdfDiagnosticReason =
   | "bt-et-scope-not-tracked"
@@ -98,6 +101,7 @@ export type EditPdfSpanDiagnostic = {
     textLineMatrix: readonly number[] | null;
     ctm: readonly number[] | null;
     baselinePt: number;
+    geometryConfidence: "exact" | "descriptor" | "fallback";
     rotationDeg: number;
     skewDeg: number | null;
     horizontalScalingPct: number;
@@ -142,6 +146,7 @@ export type EditPdfPageDiagnosticReport = {
     pdfJsRunCount: number;
     classification: PageTextCapabilityClassification | null;
     reconciliations: readonly TextSignalReconciliation[];
+    arbitrations: readonly TextEditArbitration[];
   };
   spans: readonly EditPdfSpanDiagnostic[];
 };
@@ -204,6 +209,7 @@ export function buildEditPdfPageDiagnosticReport({
   fontProfiles,
   nativeSpans = [],
   reconciliations = [],
+  arbitrations = [],
   pageClassification = null,
   pdfJsRunCount = runs.filter((run) => run.detectionSource !== "native").length,
   generatedAtIso = null,
@@ -214,6 +220,7 @@ export function buildEditPdfPageDiagnosticReport({
   fontProfiles: readonly (PdfFontProfile | null)[];
   nativeSpans?: readonly NativeContentStreamSpan[];
   reconciliations?: readonly TextSignalReconciliation[];
+  arbitrations?: readonly TextEditArbitration[];
   pageClassification?: PageTextCapabilityClassification | null;
   pdfJsRunCount?: number;
   generatedAtIso?: string | null;
@@ -355,6 +362,7 @@ export function buildEditPdfPageDiagnosticReport({
         textLineMatrix: match?.operator.textLineMatrix ? [...match.operator.textLineMatrix] : null,
         ctm: match?.operator.ctm ? [...match.operator.ctm] : null,
         baselinePt: span.baselinePt,
+        geometryConfidence: span.geometryConfidence,
         rotationDeg: span.rotationDeg,
         skewDeg: skewDeg(span.sourceMatrix),
         horizontalScalingPct: span.style.horizontalScalingPct,
@@ -401,6 +409,7 @@ export function buildEditPdfPageDiagnosticReport({
       pdfJsRunCount,
       classification: pageClassification,
       reconciliations,
+      arbitrations,
     },
     spans,
   };

@@ -17,6 +17,223 @@ export type TextSignalReconciliation = {
   reason: string;
 };
 
+export type TextEditArbitrationDecision = "editable" | "view-only";
+export type TextEditArbitrationSource =
+  | "reconciled"
+  | "native-only-safe-synthesis"
+  | "fragmented-reconstruction"
+  | "conflict"
+  | "pdfjs-only"
+  | "unmatched";
+
+export type TextEditArbitration = {
+  pdfJsRunIndex: number;
+  decision: TextEditArbitrationDecision;
+  nativeSpanKey: string | null;
+  source: TextEditArbitrationSource;
+  reason: string;
+};
+
+/**
+ * One choke point decides whether a detected run is allowed to become a
+ * native edit target. Reconciliation/provenance and edit authorization are
+ * deliberately separate concepts:
+ *
+ * - PDF.js-only, unmatched, low/medium-confidence or conflicting evidence is
+ *   view-only.
+ * - Native-only text is editable only when the independent native detector
+ *   already produced its exact-simple-run synthesis (complete decoding,
+ *   resolved font metrics/ascent/descent and safe simple geometry).
+ * - A normal PDF.js run needs a high-confidence Unicode + geometry
+ *   reconciliation to one native source operator.
+ *
+ * This function never guesses past missing evidence. Callers may retain
+ * lower-confidence provenance for diagnostics/fragment reconstruction, but
+ * must not use that provenance as write authorization.
+ */
+export function arbitrateTextEditability({
+  run,
+  reconciliation,
+  nativeSpan,
+  runIndex,
+}: {
+  run: DetectedTextRun;
+  reconciliation: TextSignalReconciliation | null;
+  nativeSpan: NativeContentStreamSpan | null;
+  runIndex: number;
+}): TextEditArbitration {
+  if (run.detectionSource === "native") {
+    const safeNativeSynthesis =
+      Boolean(run.nativeSourceKey) &&
+      nativeSpan !== null &&
+      nativeSpan.key === run.nativeSourceKey &&
+      nativeSpan.decodeComplete &&
+      nativeSpan.geometryConfidence === "exact-simple-run" &&
+      nativeSpan.detectedRun !== null &&
+      nativeSpan.detectedRun.nativeSourceKey === run.nativeSourceKey &&
+      nativeSpan.fontProfile !== null &&
+      nativeSpan.limitationReason === null;
+
+    return safeNativeSynthesis
+      ? {
+          pdfJsRunIndex: runIndex,
+          decision: "editable",
+          nativeSpanKey: nativeSpan!.key,
+          source: "native-only-safe-synthesis",
+          reason:
+            "Native-only text cleared the existing safe-synthesis proof: complete decoding, resolved font metrics and exact simple geometry.",
+        }
+      : {
+          pdfJsRunIndex: runIndex,
+          decision: "view-only",
+          nativeSpanKey: nativeSpan?.key ?? run.nativeSourceKey ?? null,
+          source: nativeSpan ? "conflict" : "unmatched",
+          reason:
+            "Native-only text did not clear every safe-synthesis proof required for direct editing.",
+        };
+  }
+
+  if (!reconciliation) {
+    return {
+      pdfJsRunIndex: runIndex,
+      decision: "view-only",
+      nativeSpanKey: null,
+      source: "pdfjs-only",
+      reason: "PDF.js detected visible text, but no independent native reconciliation result exists.",
+    };
+  }
+
+  const textAgrees =
+    reconciliation.agreement === "exact" ||
+    reconciliation.agreement === "unicode-normalized";
+  const measuredGeometry =
+    reconciliation.baselineDistancePt !== null &&
+    reconciliation.angleDeltaDeg !== null;
+  const hasExportBaselineEvidence =
+    (typeof run.baselineYPct === "number" && Number.isFinite(run.baselineYPct)) ||
+    (typeof nativeSpan?.fontProfile?.ascentRatio === "number" &&
+      Number.isFinite(nativeSpan.fontProfile.ascentRatio)) ||
+    (typeof run.ascentRatio === "number" && Number.isFinite(run.ascentRatio));
+  const sourceAgrees =
+    reconciliation.confidence === "high" &&
+    measuredGeometry &&
+    hasExportBaselineEvidence &&
+    Boolean(reconciliation.nativeSpanKey) &&
+    nativeSpan?.key === reconciliation.nativeSpanKey &&
+    nativeSpan.decodeComplete;
+
+  if (textAgrees && sourceAgrees) {
+    return {
+      pdfJsRunIndex: runIndex,
+      decision: "editable",
+      nativeSpanKey: reconciliation.nativeSpanKey,
+      source: "reconciled",
+      reason:
+        "PDF.js and native content-stream evidence agree at high confidence on Unicode and geometry.",
+    };
+  }
+
+  const missingGeometryEvidence =
+    reconciliation.confidence === "high" &&
+    (!measuredGeometry || !hasExportBaselineEvidence);
+  const conflict =
+    reconciliation.agreement === "different" ||
+    reconciliation.confidence === "low" ||
+    reconciliation.confidence === "medium" ||
+    missingGeometryEvidence;
+
+  return {
+    pdfJsRunIndex: runIndex,
+    decision: "view-only",
+    nativeSpanKey: reconciliation.nativeSpanKey,
+    source: conflict ? "conflict" : reconciliation.nativeSpanKey ? "conflict" : "unmatched",
+    reason: missingGeometryEvidence
+      ? "Text identity agrees, but measured PDF.js/native geometry and a safe export baseline are not both available."
+      : conflict
+        ? "PDF.js and native evidence conflict or are not strong enough to authorize a native rewrite."
+        : "No native source operator satisfied the edit-authorization evidence threshold.",
+  };
+}
+
+/**
+ * Applies the separate, stronger fragmented-run proof after the initial
+ * one-run signal arbitration. A PDF.js visual run may legitimately span
+ * several byte-adjacent Tj/TJ operators, so no single native span can agree
+ * with the whole visible string. That single-span conflict remains visible,
+ * but an exact fragmented reconstruction may independently authorize the
+ * established multi-run writer.
+ *
+ * The caller may pass true only after reconstructFragmentedRun() has proven:
+ * consecutive page-stream operators, identical text state/resource scope,
+ * ignorable gaps only, complete decoding, and exact concatenated Unicode.
+ */
+export function finalizeTextEditArbitration({
+  arbitration,
+  run,
+  reconciliation,
+  fragmentedReconstructionProven,
+}: {
+  arbitration: TextEditArbitration;
+  run: DetectedTextRun;
+  reconciliation: TextSignalReconciliation | null;
+  fragmentedReconstructionProven: boolean;
+}): TextEditArbitration {
+  if (!fragmentedReconstructionProven || arbitration.decision === "editable") {
+    return arbitration;
+  }
+
+  const baselineDistance = reconciliation?.baselineDistancePt ?? null;
+  const angleDelta = reconciliation?.angleDeltaDeg ?? null;
+  const measuredGeometry =
+    baselineDistance !== null &&
+    Number.isFinite(baselineDistance) &&
+    baselineDistance <= thresholdFor(run) &&
+    angleDelta !== null &&
+    Number.isFinite(angleDelta) &&
+    angleDelta <= 3;
+  const hasExportBaselineEvidence =
+    (typeof run.baselineYPct === "number" && Number.isFinite(run.baselineYPct)) ||
+    (typeof run.ascentRatio === "number" && Number.isFinite(run.ascentRatio));
+
+  if (
+    !reconciliation?.nativeSpanKey ||
+    !measuredGeometry ||
+    !hasExportBaselineEvidence
+  ) {
+    return arbitration;
+  }
+
+  return {
+    ...arbitration,
+    decision: "editable",
+    source: "fragmented-reconstruction",
+    reason:
+      "The apparent single-operator text disagreement was resolved by exact consecutive fragmented-run reconstruction plus measured PDF.js/native geometry.",
+  };
+}
+
+export function buildTextEditArbitrations({
+  runs,
+  reconciliations,
+  nativeSpans,
+}: {
+  runs: readonly DetectedTextRun[];
+  reconciliations: readonly TextSignalReconciliation[];
+  nativeSpans: readonly NativeContentStreamSpan[];
+}): TextEditArbitration[] {
+  const nativeByKey = new Map(nativeSpans.map((span) => [span.key, span] as const));
+  return runs.map((run, index) => {
+    const reconciliation = reconciliations[index] ?? null;
+    const nativeKey = run.nativeSourceKey ?? reconciliation?.nativeSpanKey ?? null;
+    return arbitrateTextEditability({
+      run,
+      reconciliation,
+      nativeSpan: nativeKey ? nativeByKey.get(nativeKey) ?? null : null,
+      runIndex: index,
+    });
+  });
+}
+
 function normalizeText(value: string): string {
   return value.normalize("NFC");
 }

@@ -33,6 +33,8 @@ test("diagnostics retain raw source bytes, native decoding, font identity and ex
     heightPct: 2,
     fontSizePt: 12,
     rotated: false,
+    baselineXPct: 10,
+    baselineYPct: 11.6,
   };
   const match = { locatedOperator: located, operator: located.operator };
   const model = buildPdfPageTextModel({
@@ -51,7 +53,7 @@ test("diagnostics retain raw source bytes, native decoding, font identity and ex
     fontProfiles: [profile],
   });
 
-  assert.equal(report.schemaVersion, 3);
+  assert.equal(report.schemaVersion, 4);
   assert.equal(report.pageNumber, 1);
   assert.equal(report.spans.length, 1);
   const span = report.spans[0];
@@ -69,6 +71,7 @@ test("diagnostics retain raw source bytes, native decoding, font identity and ex
   assert.equal(span.font.embeddedGlyphEvidenceSafeForSimplePdfEncoding, false);
   assert.equal(span.font.nativeRewriteCapability, "proven");
   assert.equal(span.geometry.fontSizePt, 12);
+  assert.equal(span.geometry.geometryConfidence, "exact");
   assert.equal(span.geometry.fontSizeDeltaPt, 0);
   assert.equal(span.geometry.baselineDeltaPt, null);
   assert.ok(span.unresolvedEvidence.includes("native-pdfjs-baseline-not-reconciled"));

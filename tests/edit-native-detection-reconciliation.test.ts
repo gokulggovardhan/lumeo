@@ -9,6 +9,8 @@ import {
   nativeDetectedRuns,
 } from "../lib/pdf/edit/nativeTextDetection.ts";
 import {
+  buildTextEditArbitrations,
+  finalizeTextEditArbitration,
   reconcileTextSignals,
   reconciliationMatchMap,
 } from "../lib/pdf/edit/textReconciliation.ts";
@@ -211,6 +213,206 @@ test("reconciliation can recover a high-confidence source match from Unicode plu
   assert.equal(reconciliations[0].agreement, "exact");
   assert.equal(reconciliations[0].source, "evidence-match");
   assert.equal(reconciliationMatchMap(reconciliations, [span]).get(0)?.key, span.key);
+});
+
+test("edit arbitration fails closed when PDF.js and native text disagree", () => {
+  const source = located();
+  const [span] = buildNativeContentStreamSpans({
+    operators: [source],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  });
+  const run = {
+    str: "No",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 2,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    pdfJsTransform: [12, 0, 0, 12, 72, 700],
+    detectionSource: "pdfjs" as const,
+  };
+
+  const reconciliations = reconcileTextSignals({
+    runs: [run],
+    legacyMatches: [{ locatedOperator: source, operator: source.operator }],
+    nativeSpans: [span],
+    viewportTransform: viewport,
+  });
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [run],
+    reconciliations,
+    nativeSpans: [span],
+  });
+
+  assert.equal(reconciliations[0].agreement, "different");
+  assert.equal(arbitration.decision, "view-only");
+  assert.equal(arbitration.source, "conflict");
+  assert.match(arbitration.reason, /conflict|not strong enough/i);
+});
+
+test("exact fragmented reconstruction may authorize only when measured geometry also agrees", () => {
+  const base = {
+    pdfJsRunIndex: 0,
+    decision: "view-only" as const,
+    nativeSpanKey: "page:0:operator:1",
+    source: "conflict" as const,
+    reason: "The visible PDF.js run spans more than one native operator.",
+  };
+  const run = {
+    str: "SSN 123-45-6789",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 20,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    baselineXPct: 10,
+    baselineYPct: 11.5,
+    detectionSource: "pdfjs" as const,
+  };
+  const reconciliation = {
+    pdfJsRunIndex: 0,
+    nativeSpanKey: base.nativeSpanKey,
+    confidence: "low" as const,
+    agreement: "different" as const,
+    baselineDistancePt: 0.25,
+    angleDeltaDeg: 0,
+    source: "legacy-source-match" as const,
+    reason: "The first native operator contains only the first fragment.",
+  };
+
+  const unchanged = finalizeTextEditArbitration({
+    arbitration: base,
+    run,
+    reconciliation,
+    fragmentedReconstructionProven: false,
+  });
+  assert.equal(unchanged.decision, "view-only");
+  assert.equal(unchanged.source, "conflict");
+
+  const promoted = finalizeTextEditArbitration({
+    arbitration: base,
+    run,
+    reconciliation,
+    fragmentedReconstructionProven: true,
+  });
+  assert.equal(promoted.decision, "editable");
+  assert.equal(promoted.source, "fragmented-reconstruction");
+  assert.match(promoted.reason, /fragmented-run reconstruction.*measured PDF\.js\/native geometry/i);
+
+  const missingGeometry = finalizeTextEditArbitration({
+    arbitration: base,
+    run,
+    reconciliation: {
+      ...reconciliation,
+      baselineDistancePt: null,
+      angleDeltaDeg: null,
+    },
+    fragmentedReconstructionProven: true,
+  });
+  assert.equal(missingGeometry.decision, "view-only");
+  assert.equal(missingGeometry.source, "conflict");
+});
+
+test("edit arbitration requires measured geometry even when text identity matches", () => {
+  const source = located();
+  const [span] = buildNativeContentStreamSpans({
+    operators: [source],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  });
+
+  const run = {
+    str: "Hi",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 2,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    detectionSource: "pdfjs" as const,
+  };
+
+  const reconciliations = reconcileTextSignals({
+    runs: [run],
+    legacyMatches: [{ locatedOperator: source, operator: source.operator }],
+    nativeSpans: [span],
+    viewportTransform: viewport,
+  });
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [run],
+    reconciliations,
+    nativeSpans: [span],
+  });
+
+  assert.equal(reconciliations[0].confidence, "high");
+  assert.equal(reconciliations[0].baselineDistancePt, null);
+  assert.equal(reconciliations[0].angleDeltaDeg, null);
+  assert.equal(arbitration.decision, "view-only");
+  assert.match(arbitration.reason, /measured PDF\.js\/native geometry/i);
+});
+
+test("edit arbitration never promotes PDF.js-only text to a native edit target", () => {
+  const run = {
+    str: "Visible only",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 10,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    pdfJsTransform: [12, 0, 0, 12, 72, 700],
+    detectionSource: "pdfjs" as const,
+  };
+
+  const reconciliations = reconcileTextSignals({
+    runs: [run],
+    legacyMatches: [null],
+    nativeSpans: [],
+    viewportTransform: viewport,
+  });
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [run],
+    reconciliations,
+    nativeSpans: [],
+  });
+
+  assert.equal(reconciliations[0].confidence, "unmatched");
+  assert.equal(arbitration.decision, "view-only");
+  assert.equal(arbitration.nativeSpanKey, null);
+});
+
+test("edit arbitration preserves proven native-only safe synthesis", () => {
+  const source = located();
+  const spans = buildNativeContentStreamSpans({
+    operators: [source],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  });
+  const [nativeRun] = nativeDetectedRuns(spans);
+  assert.ok(nativeRun);
+
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [nativeRun],
+    reconciliations: [],
+    nativeSpans: spans,
+  });
+
+  assert.equal(arbitration.decision, "editable");
+  assert.equal(arbitration.source, "native-only-safe-synthesis");
+  assert.equal(arbitration.nativeSpanKey, spans[0].key);
 });
 
 test("reconciliation overrides a wrong positional legacy match when stronger native evidence exists", () => {
