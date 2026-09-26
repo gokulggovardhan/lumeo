@@ -108,7 +108,13 @@ test("native paint composes with existing Tc/Tw/Tz/Tf text-state formatting insi
 
   const edited = applyEditPlanWithNativePaintToBytes(bytes, plan, 1, paint);
   const text = new TextDecoder().decode(edited);
-  assert.match(text, /0 0\.5 0 rg[\s\S]*14 Tf[\s\S]*0\.5 Tc[\s\S]*1 Tw[\s\S]*96 Tz[\s\S]*<43> Tj/);
+  // The real dry-run preserves the source endpoint under the changed size/
+  // scale, so this case must promote Tj to a compensated TJ rather than
+  // pretending the replacement has the same effective advance.
+  assert.match(
+    text,
+    /0 0\.5 0 rg[\s\S]*14 Tf[\s\S]*0\.5 Tc[\s\S]*1 Tw[\s\S]*96 Tz[\s\S]*\[<43> -?[\d.]+\] TJ/,
+  );
   // The established writer restores text state in reverse dependency order,
   // then native paint restores colour. Assert that exact sequence rather
   // than imposing an alternative ordering that the proven writer never used.
