@@ -94,8 +94,6 @@ export type FallbackFontUse = {
   bytesPerCode: 1;
 };
 
-const validatedEditPlanBrand = Symbol("lumeo.edit.validated-plan");
-
 export type EditPlanFields = {
   pageIndex: number;
   contentStreamIndex: number;
@@ -122,35 +120,117 @@ export type EditPlanFields = {
 };
 
 /**
- * Planner-issued proof that every single-run rewrite invariant passed.
- *
- * The symbol is private to this module, so ordinary callers cannot
- * structurally manufacture a writable plan. The native writer also checks
- * the brand at runtime to fail closed against casts/plain JavaScript.
+ * Runtime + compile-time proof object. The class itself is intentionally NOT
+ * exported; only the alias below is. Its private member gives TypeScript
+ * nominal identity, so spreading a validated plan produces a plain object
+ * that is no longer assignable to the writer type. instanceof provides the
+ * matching runtime proof.
  */
-export type ValidatedEditPlan = EditPlanFields & {
-  editable: true;
-  reason: null;
-  readonly [validatedEditPlanBrand]: true;
-};
+class ValidatedEditPlanProof {
+  private readonly validationProof!: true;
+
+  constructor() {
+    Object.defineProperty(this, "validationProof", {
+      value: true,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+  }
+}
+
+export type ValidatedEditPlan = Readonly<EditPlanFields> &
+  ValidatedEditPlanProof & {
+    readonly editable: true;
+    readonly reason: null;
+  };
 
 export type RejectedEditPlan = EditPlanFields & {
   editable: false;
   reason: string;
-  readonly [validatedEditPlanBrand]?: never;
 };
 
 export type EditPlan = ValidatedEditPlan | RejectedEditPlan;
+
+function issueValidatedEditPlan(
+  fields: EditPlanFields,
+): ValidatedEditPlan {
+  const plan = Object.assign(new ValidatedEditPlanProof(), fields, {
+    editable: true as const,
+    reason: null,
+  }) as ValidatedEditPlan;
+
+  // A validated plan is an immutable proof. Freeze its nested mutable payloads
+  // as well so cast/plain-JS callers cannot keep the same instance identity
+  // and alter glyphs, target path or text-state values after validation.
+  Object.freeze(plan.originalGlyphCodes);
+  Object.freeze(plan.replacementGlyphCodes);
+  if (plan.formPath) Object.freeze(plan.formPath);
+  if (plan.replacementTextState) Object.freeze(plan.replacementTextState);
+  if (plan.fallbackFont) Object.freeze(plan.fallbackFont);
+  return Object.freeze(plan);
+}
 
 export function isValidatedEditPlan(
   plan: EditPlan,
 ): plan is ValidatedEditPlan {
   return (
+    plan instanceof ValidatedEditPlanProof &&
     plan.editable === true &&
     plan.reason === null &&
-    validatedEditPlanBrand in plan &&
-    plan[validatedEditPlanBrand] === true
+    Object.isFrozen(plan)
   );
+}
+
+/**
+ * Narrow planner-owned derivation used only after the multi-run planner has
+ * proven a combined logical span. It may update ADVANCE bookkeeping, never
+ * target identity, text, glyph codes, font authority or byte range.
+ */
+export function deriveValidatedEditPlanAdvance(
+  plan: ValidatedEditPlan,
+  override: {
+    originalWidthPt: number;
+    replacementWidthPt: number;
+    tjSpacingDelta: number;
+  },
+): ValidatedEditPlan {
+  if (!isValidatedEditPlan(plan)) {
+    throw new Error("Cannot derive advance data from an unvalidated edit plan.");
+  }
+  if (
+    !Number.isFinite(override.originalWidthPt) ||
+    !Number.isFinite(override.replacementWidthPt) ||
+    !Number.isFinite(override.tjSpacingDelta)
+  ) {
+    throw new Error("Derived edit-plan advance values must be finite.");
+  }
+  return issueValidatedEditPlan({
+    pageIndex: plan.pageIndex,
+    contentStreamIndex: plan.contentStreamIndex,
+    formPath: plan.formPath ? [...plan.formPath] : null,
+    operatorIndex: plan.operatorIndex,
+    operatorType: plan.operatorType,
+    fontResourceName: plan.fontResourceName,
+    fontSizePt: plan.fontSizePt,
+    wordSpacing: plan.wordSpacing,
+    charSpacing: plan.charSpacing,
+    horizontalScalingPct: plan.horizontalScalingPct,
+    replacementTextState: plan.replacementTextState
+      ? { ...plan.replacementTextState }
+      : null,
+    originalText: plan.originalText,
+    replacementText: plan.replacementText,
+    originalGlyphCodes: [...plan.originalGlyphCodes],
+    replacementGlyphCodes: [...plan.replacementGlyphCodes],
+    originalWidthPt: override.originalWidthPt,
+    replacementWidthPt: override.replacementWidthPt,
+    originalTjAdjustmentTotal: plan.originalTjAdjustmentTotal,
+    tjSpacingDelta: override.tjSpacingDelta,
+    byteOffset: plan.byteOffset,
+    byteLength: plan.byteLength,
+    fallbackFont: plan.fallbackFont ? { ...plan.fallbackFont } : null,
+  });
 }
 
 // The message a rejected character produces when no fallback was offered
@@ -526,16 +606,13 @@ export function buildEditPlan({
       state,
       targetState,
     );
-    return {
+    return issueValidatedEditPlan({
       ...base,
       originalWidthPt: preserved.originalEffectiveAdvancePt,
       replacementGlyphCodes,
       replacementWidthPt: preserved.replacementAdvancePt,
       tjSpacingDelta: preserved.trailingTjAdjustment,
-      editable: true,
-      [validatedEditPlanBrand]: true,
-      reason: null,
-    };
+    });
   }
 
   // --- Substitute-font path (lib/pdf/edit/fallbackFont.ts) -------------
@@ -603,15 +680,16 @@ export function buildEditPlan({
     state,
   );
 
-  return {
+  return issueValidatedEditPlan({
     ...base,
     originalWidthPt: preserved.originalEffectiveAdvancePt,
     replacementGlyphCodes: fallbackCodes,
     replacementWidthPt: preserved.replacementAdvancePt,
     tjSpacingDelta: preserved.trailingTjAdjustment,
-    fallbackFont: { family, originalFontResourceName: operator.fontResourceName, bytesPerCode: 1 },
-    editable: true,
-    [validatedEditPlanBrand]: true,
-    reason: null,
-  };
+    fallbackFont: {
+      family,
+      originalFontResourceName: operator.fontResourceName,
+      bytesPerCode: 1,
+    },
+  });
 }
