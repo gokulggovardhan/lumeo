@@ -333,3 +333,66 @@ test("PdfFontRegistry never treats symbolic embedded TrueType cmap as safe PDF s
   assert.ok(profile.embeddedGlyphCoverage);
   assert.equal(profile.embeddedGlyphEvidence?.safeForSimplePdfEncoding, false);
 });
+
+
+test("PdfFontRegistry keeps professional inspection opt-in and fail-closed", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("Local font intelligence", { x: 72, y: 700, size: 12, font });
+
+  const saved = await doc.save();
+  const loaded = await PDFDocument.load(saved);
+  const { resources, resourceName } = firstFontResource(loaded.getPage(0));
+  const registry = new PdfFontRegistry(loaded);
+
+  // Standard 14 fonts have no embedded program. The normal synchronous
+  // profile remains usable and the opt-in inspector reports the limitation.
+  const profile = registry.resolve(resources, resourceName);
+  assert.ok(profile);
+  const inspection = await registry.inspectEmbeddedFontProgram(resources, resourceName);
+  assert.equal(inspection.kind, "unavailable");
+  assert.match(inspection.reason, /does not contain an embedded font program/i);
+});
+
+test("PdfFontRegistry caches professional inspection for the same embedded PDF font", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const malformedButEmbedded = Uint8Array.from([0, 1, 2, 3, 4, 5, 6, 7]);
+  const fontFileRef = context.register(context.flateStream(malformedButEmbedded));
+  const descriptorRef = context.register(
+    context.obj({
+      Type: "FontDescriptor",
+      FontName: "ABCDEF+BrokenDemo-Regular",
+      Flags: 32,
+      ItalicAngle: 0,
+      FontWeight: 400,
+      FontFile2: fontFileRef,
+    }),
+  );
+  const fontRef = context.register(
+    context.obj({
+      Type: "Font",
+      Subtype: "TrueType",
+      BaseFont: "ABCDEF+BrokenDemo-Regular",
+      FirstChar: 65,
+      LastChar: 65,
+      Widths: [600],
+      Encoding: "WinAnsiEncoding",
+      FontDescriptor: descriptorRef,
+    }),
+  );
+  const resources = context.obj({
+    Font: context.obj({ FBroken: fontRef }),
+  });
+
+  const registry = new PdfFontRegistry(doc);
+  assert.ok(registry.resolve(resources, "FBroken"));
+
+  const first = registry.inspectEmbeddedFontProgram(resources, "FBroken");
+  const second = registry.inspectEmbeddedFontProgram(resources, "FBroken");
+  assert.equal(first, second, "inspection promise should be cached by exact font dictionary");
+
+  const result = await first;
+  assert.equal(result.kind, "parse-error");
+});

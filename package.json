@@ -33,6 +33,7 @@
     "report:edit-fidelity": "node --no-warnings --experimental-strip-types scripts/report-edit-pdf-fidelity.ts"
   },
   "dependencies": {
+    "@cantoo/fontkit": "2.0.12",
     "@pdf-lib/standard-fonts": "^1.0.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.112.2",
