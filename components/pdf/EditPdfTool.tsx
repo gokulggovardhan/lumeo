@@ -79,6 +79,10 @@ import {
 } from "@/lib/pdf/edit/textCapabilityClassifier";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
 import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
+import {
+  logicalRangeCoversWholeSpans,
+  orderedSingleSpanOffsets,
+} from "@/lib/pdf/edit/logicalTextRange";
 import { PercentSpatialIndex } from "@/lib/pdf/edit/spatialIndex";
 import {
   buildPdfTextSearchPageIndex,
@@ -600,9 +604,7 @@ export default function EditPdfTool() {
   // behind one boundary instead of another monolithic component rewrite.
   const {
     selectionAnchorIndex,
-    setSelectionAnchorIndex,
     selectedRunIndices,
-    setSelectedRunIndices,
     hoveredRunIndex,
     setHoveredRunIndex,
     focusedRunIndex,
@@ -617,9 +619,12 @@ export default function EditPdfTool() {
     setEditApplyError,
     nativeFormatOpen,
     setNativeFormatOpen,
+    logicalSelection,
     clearSelection: clearNativeTextSelection,
     resetInteraction: resetNativeTextInteraction,
     selectDetectedRun,
+    selectRunIndices,
+    updateSingleSpanLogicalSelection,
   } = useNativeTextSelectionState();
   // Browser FontFace previews are keyed to a model span id so an async font
   // load can never leak the previous selection's face into a newly-selected
@@ -2157,7 +2162,7 @@ export default function EditPdfTool() {
       clearNativeTextSelection();
       return;
     }
-    selectDetectedRun(index, extend, detectedTextRuns);
+    selectDetectedRun(index, extend, detectedTextRuns, pageTextModel);
   }
 
   // Bug fix (reported from iPhone 15 Plus / Safari): tapping editable text
@@ -2240,12 +2245,12 @@ export default function EditPdfTool() {
 
     setActiveTool("select");
     setSelectedId(null);
-    setSelectionAnchorIndex(indices[0]);
-    setSelectedRunIndices(indices);
-    setEditDraftText(plan.replacementText);
-    setEditApplyError("");
-    setUseSubstituteFont(false);
-    setNativeFormatOpen(false);
+    selectRunIndices({
+      indices,
+      runs: detectedTextRuns,
+      pageTextModel,
+      draftText: plan.replacementText,
+    });
 
     if (indices.length === 1) {
       requestAnimationFrame(() => {
@@ -2322,6 +2327,19 @@ export default function EditPdfTool() {
       };
 
   function validateMultiRunSelection(indices: number[]): MultiRunValidation {
+    if (
+      !pageTextModel ||
+      !logicalRangeCoversWholeSpans(logicalSelection, pageTextModel) ||
+      logicalSelection?.sourceRunIndices.length !== indices.length ||
+      logicalSelection.sourceRunIndices.some((value, position) => value !== indices[position])
+    ) {
+      return {
+        kind: "invalid",
+        reason:
+          "Cross-span edits must select whole compatible PDF text spans. Partial cross-span editing is not supported yet.",
+      };
+    }
+
     const matches = indices.map((i) => runMatches[i]);
     if (matches.some((m) => !m)) {
       return { kind: "invalid", reason: "One or more selected lines couldn't be matched to editable text -- try selecting fewer lines." };
@@ -2554,8 +2572,8 @@ export default function EditPdfTool() {
       const reason = resolveError instanceof Error ? resolveError.message : "Could not validate this edit.";
       return { kind: "error", reason, multi: selectedRunIndices.length > 1 };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
-  }, [fontRegistry, selectedRunIndices, editableRunMatches, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over the explicitly listed page/write evidence below.
+  }, [fontRegistry, selectedRunIndices, editableRunMatches, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions, pageTextModel, logicalSelection]);
 
   // Phase 9.2: the live dry-run preview driving both the Apply button's
   // disabled state and the specific reason shown next to it -- see
@@ -3250,6 +3268,60 @@ export default function EditPdfTool() {
   const singleSelectedRun = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
   const singleSelectedRunMatch = selectedRunIndices.length === 1 ? editableRunMatches[selectedRunIndices[0]] : null;
   const singleSelectedSpan = selectedNativeSpan;
+  const singleSpanLogicalOffsets = singleSelectedSpan
+    ? orderedSingleSpanOffsets(logicalSelection, singleSelectedSpan.id)
+    : null;
+  const logicalSelectionStart = singleSpanLogicalOffsets?.start ?? null;
+  const logicalSelectionEnd = singleSpanLogicalOffsets?.end ?? null;
+  const logicalSelectionDirection = singleSpanLogicalOffsets?.direction ?? "forward";
+
+  const syncSingleSpanLogicalSelection = useCallback(
+    (input: HTMLInputElement) => {
+      if (!singleSelectedSpan) return;
+      const fallbackOffset = input.value.length;
+      updateSingleSpanLogicalSelection({
+        span: singleSelectedSpan,
+        text: input.value,
+        selectionStart: input.selectionStart ?? fallbackOffset,
+        selectionEnd: input.selectionEnd ?? fallbackOffset,
+        direction: input.selectionDirection === "backward" ? "backward" : "forward",
+      });
+    },
+    [singleSelectedSpan, updateSingleSpanLogicalSelection],
+  );
+
+  // The browser input is a presentation/control surface only. Selection
+  // changes are normalized into Lumeo's own grapheme-aware logical range,
+  // then mirrored back here. DOM selection never participates in PDF export
+  // geometry or writer authorization.
+  useEffect(() => {
+    const input = inlineEditInputRef.current;
+    if (
+      !input ||
+      logicalSelectionStart === null ||
+      logicalSelectionEnd === null
+    ) {
+      return;
+    }
+    if (
+      input.selectionStart === logicalSelectionStart &&
+      input.selectionEnd === logicalSelectionEnd &&
+      input.selectionDirection === logicalSelectionDirection
+    ) {
+      return;
+    }
+    input.setSelectionRange(
+      logicalSelectionStart,
+      logicalSelectionEnd,
+      logicalSelectionDirection,
+    );
+  }, [
+    logicalSelectionStart,
+    logicalSelectionEnd,
+    logicalSelectionDirection,
+    editDraftText,
+  ]);
+
   const activeNativeStyleDraft =
     nativeStyleDraft?.spanId === singleSelectedSpan?.id ? nativeStyleDraft : null;
   const inlineEditorFontFamily =
@@ -3925,7 +3997,12 @@ export default function EditPdfTool() {
                         ref={inlineEditInputRef}
                         value={editDraftText}
                         onChange={(event) => {
-                          handleEditDraftTextChange(event.target.value);
+                          handleEditDraftTextChange(event.currentTarget.value);
+                          syncSingleSpanLogicalSelection(event.currentTarget);
+                        }}
+                        onSelect={(event) => {
+                          event.stopPropagation();
+                          syncSingleSpanLogicalSelection(event.currentTarget);
                         }}
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => {
@@ -3939,6 +4016,10 @@ export default function EditPdfTool() {
                           }
                         }}
                         aria-label="Edit text"
+                        data-logical-selection-start={logicalSelectionStart ?? undefined}
+                        data-logical-selection-end={logicalSelectionEnd ?? undefined}
+                        data-logical-selection-direction={logicalSelectionDirection}
+                        data-logical-selection-collapsed={logicalSelection?.collapsed ? "true" : "false"}
                         data-caret-style-snapshot={activeCaretTextStyleSnapshot ? "true" : "false"}
                         data-native-fill-color={activeNativeStyleDraft?.fillColorHex ?? singleSelectedSpan?.style.fillColor?.cssHex ?? undefined}
                         data-native-fill-opacity={singleSelectedSpan?.style.fillOpacity ?? undefined}
@@ -4196,6 +4277,12 @@ export default function EditPdfTool() {
                         left: `${detectedTextRuns[selectedRunIndices[0]].xPct}%`,
                         top: `${detectedTextRuns[selectedRunIndices[0]].yPct}%`,
                       }}
+                      data-logical-selection-span-count={logicalSelection?.spanIds.length ?? 0}
+                      data-logical-selection-whole-spans={
+                        pageTextModel && logicalRangeCoversWholeSpans(logicalSelection, pageTextModel)
+                          ? "true"
+                          : "false"
+                      }
                     >
                       <div className="w-64 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 p-3 shadow-lg">
                         <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with ({selectedRunIndices.length} runs selected)</span>
