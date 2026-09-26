@@ -38,6 +38,7 @@ import { InkCanvas } from "@/components/pdf/edit/InkCanvas";
 import { MicroDock } from "@/components/pdf/edit/MicroDock";
 import { TextRunOverlay } from "@/components/pdf/edit/TextRunOverlay";
 import { NativeTextFormatPanel, type NativeTextStyleDraft } from "@/components/pdf/edit/NativeTextFormatPanel";
+import { NativeTextMixedFormatPanel } from "@/components/pdf/edit/NativeTextMixedFormatPanel";
 import { useNativeTextSelectionState } from "@/components/pdf/edit/useNativeTextSelectionState";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
@@ -79,6 +80,7 @@ import {
 } from "@/lib/pdf/edit/textCapabilityClassifier";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
 import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
+import { summarizeNativeTextSelectionStyles } from "@/lib/pdf/edit/mixedStyleSelection";
 import {
   logicalRangeCoversWholeSpans,
   orderedSingleSpanOffsets,
@@ -2380,9 +2382,25 @@ export default function EditPdfTool() {
     return { kind: "valid", contentStreamIndex: firstLocator.contentStreamIndex, operatorIndices, allOperators, resources: nonNull[0].locatedOperator.resources, fontResourceName };
   }
 
+  const selectedNativeSpans = useMemo(
+    () =>
+      pageTextModel
+        ? selectedRunIndices
+            .map((index) => pageTextModel.spans[index] ?? null)
+            .filter((span): span is NonNullable<typeof span> => span !== null)
+        : [],
+    [pageTextModel, selectedRunIndices],
+  );
+  const mixedNativeStyleSummary = useMemo(
+    () =>
+      selectedNativeSpans.length > 1
+        ? summarizeNativeTextSelectionStyles(selectedNativeSpans)
+        : null,
+    [selectedNativeSpans],
+  );
   const selectedNativeSpan =
-    selectedRunIndices.length === 1
-      ? pageTextModel?.spans[selectedRunIndices[0]] ?? null
+    selectedNativeSpans.length === 1
+      ? selectedNativeSpans[0]
       : null;
   const selectedNativeRunMatch =
     selectedRunIndices.length === 1
@@ -4284,7 +4302,7 @@ export default function EditPdfTool() {
                           : "false"
                       }
                     >
-                      <div className="w-64 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 p-3 shadow-lg">
+                      <div className="w-72 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 p-3 shadow-lg">
                         <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with ({selectedRunIndices.length} runs selected)</span>
                         <input
                           data-edit-multi-run-input
@@ -4307,12 +4325,30 @@ export default function EditPdfTool() {
                           </button>
                           <button
                             type="button"
+                            onClick={() => setNativeFormatOpen((current) => !current)}
+                            aria-expanded={nativeFormatOpen}
+                            aria-controls="native-text-mixed-format-panel"
+                            className={`min-h-11 rounded-lg border px-2.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${
+                              nativeFormatOpen
+                                ? "border-[var(--lumeo-gold)]/55 bg-[var(--lumeo-gold)]/12 text-[var(--text-primary)]"
+                                : "border-[var(--text-primary)]/14 text-[var(--text-primary)]/70 hover:border-[var(--text-primary)]/24"
+                            }`}
+                          >
+                            Format
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => selectTextRun(null)}
                             className="min-h-11 rounded-lg border border-[var(--text-primary)]/14 px-2.5 text-xs font-bold text-[var(--text-primary)]/70 transition hover:border-[var(--text-primary)]/24 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)]"
                           >
                             Cancel
                           </button>
                         </div>
+                        {nativeFormatOpen && mixedNativeStyleSummary ? (
+                          <div id="native-text-mixed-format-panel">
+                            <NativeTextMixedFormatPanel summary={mixedNativeStyleSummary} />
+                          </div>
+                        ) : null}
                         {!editPreview.editable && editPreview.reason ? (
                           <span role="alert" className="mt-1.5 block text-[10px] text-[var(--text-danger)]">{editPreview.reason}</span>
                         ) : editApplyError ? (
