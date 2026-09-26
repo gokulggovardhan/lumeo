@@ -36,6 +36,7 @@ import type { DetectedTextRun } from "@/lib/pdf/edit/textRuns.ts";
 type TextRunOverlayProps = {
   run: DetectedTextRun;
   editable: boolean;
+  limitationReason?: string | null;
   selected: boolean;
   hovered: boolean;
   onSelect: (shiftKey: boolean) => void;
@@ -57,6 +58,7 @@ type TextRunOverlayProps = {
 function TextRunOverlayImpl({
   run,
   editable,
+  limitationReason = null,
   selected,
   hovered,
   onSelect,
@@ -100,6 +102,7 @@ function TextRunOverlayImpl({
       tabIndex={0}
       aria-label={`${editable ? "Editable" : "Not yet editable"} text: ${run.str}`}
       aria-pressed={selected}
+      title={!editable ? limitationReason ?? "This text can’t yet be edited safely." : undefined}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onMouseEnter={onHoverStart}
