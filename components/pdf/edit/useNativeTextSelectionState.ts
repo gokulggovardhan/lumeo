@@ -173,9 +173,7 @@ export function useNativeTextSelectionState() {
 
   return {
     selectionAnchorIndex,
-    setSelectionAnchorIndex,
     selectedRunIndices,
-    setSelectedRunIndices,
     hoveredRunIndex,
     setHoveredRunIndex,
     focusedRunIndex,
@@ -191,7 +189,6 @@ export function useNativeTextSelectionState() {
     nativeFormatOpen,
     setNativeFormatOpen,
     logicalSelection,
-    setLogicalSelection,
     clearSelection,
     resetInteraction,
     selectDetectedRun,
