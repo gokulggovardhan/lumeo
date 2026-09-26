@@ -37,6 +37,7 @@ import { FloatingIsland } from "@/components/pdf/edit/FloatingIsland";
 import { InkCanvas } from "@/components/pdf/edit/InkCanvas";
 import { MicroDock } from "@/components/pdf/edit/MicroDock";
 import { TextRunOverlay } from "@/components/pdf/edit/TextRunOverlay";
+import { useNativeTextSelectionState } from "@/components/pdf/edit/useNativeTextSelectionState";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
   createInkElement,
@@ -99,7 +100,6 @@ import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
 import {
   buildCaretRetypePlan,
   captureCaretTextStyleSnapshot,
-  type CaretTextStyleSnapshot,
 } from "@/lib/pdf/edit/caretTextStyleSnapshot";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import { reconstructFragmentedRun, type FragmentedRunReconstruction } from "@/lib/pdf/edit/fragmentedRun";
@@ -601,36 +601,40 @@ export default function EditPdfTool() {
   // (its `allOperators` param) without re-walking the page from scratch on
   // every keystroke.
   const [pageOperators, setPageOperators] = useState<LocatedTextOperator[]>([]);
-  // A contiguous RANGE of detectedTextRuns indices -- selectionAnchorIndex
-  // is where the selection started (a plain click, or the first click of a
-  // Shift+click range); selectedRunIndices is the full (possibly
-  // single-element) range currently selected. Multi-run editing only ever
-  // operates on a CONTIGUOUS run of detected boxes, matching
-  // buildMultiRunEditPlan's own "operators must be consecutive" invariant --
-  // see validateMultiRunSelection below for what else must line up.
-  const [selectionAnchorIndex, setSelectionAnchorIndex] = useState<number | null>(null);
-  const [selectedRunIndices, setSelectedRunIndices] = useState<number[]>([]);
-  const [hoveredRunIndex, setHoveredRunIndex] = useState<number>(-1);
-  const [focusedRunIndex, setFocusedRunIndex] = useState<number | null>(null);
-  const [editDraftText, setEditDraftText] = useState("");
-  // Captured only when a single native span transitions through an empty
-  // draft. It preserves exact font/text-state/paint/geometry intent while
-  // the user retypes, but never bypasses EditPlan or glyph authority.
-  const [caretTextStyleSnapshot, setCaretTextStyleSnapshot] =
-    useState<CaretTextStyleSnapshot | null>(null);
-  // Whether the user has accepted the substitute-font offer for the CURRENT
-  // selection (see EditPreview's substituteFont field). Reset by every
-  // selection change, never by typing -- re-offering mid-word would make
-  // the control flicker while someone is still deciding what to type.
-  const [useSubstituteFont, setUseSubstituteFont] = useState(false);
-  const [editApplyError, setEditApplyError] = useState("");
+  // Phase 2.2 decomposition seam: native text selection/caret/draft state is
+  // owned by a focused controller rather than this 4k+ line workspace
+  // component. PDF evidence, planning and writing authority remain here and
+  // in lib/pdf/edit; Phase 2.3 can now replace the run-index selection model
+  // behind one boundary instead of another monolithic component rewrite.
+  const {
+    selectionAnchorIndex,
+    setSelectionAnchorIndex,
+    selectedRunIndices,
+    setSelectedRunIndices,
+    hoveredRunIndex,
+    setHoveredRunIndex,
+    focusedRunIndex,
+    setFocusedRunIndex,
+    editDraftText,
+    setEditDraftText,
+    caretTextStyleSnapshot,
+    setCaretTextStyleSnapshot,
+    useSubstituteFont,
+    setUseSubstituteFont,
+    editApplyError,
+    setEditApplyError,
+    nativeFormatOpen,
+    setNativeFormatOpen,
+    clearSelection: clearNativeTextSelection,
+    resetInteraction: resetNativeTextInteraction,
+    selectDetectedRun,
+  } = useNativeTextSelectionState();
   // Browser FontFace previews are keyed to a model span id so an async font
   // load can never leak the previous selection's face into a newly-selected
   // run. Export safety remains governed by fontEncoding/editPlan, not by
   // whether a browser happens to accept the embedded font bytes.
   const [browserFontPreview, setBrowserFontPreview] = useState<{ spanId: string; family: string } | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
-  const [nativeFormatOpen, setNativeFormatOpen] = useState(false);
   const [textSearchOpen, setTextSearchOpen] = useState(false);
   const [textSearchQuery, setTextSearchQuery] = useState("");
   const [textSearchReplacement, setTextSearchReplacement] = useState("");
@@ -1187,16 +1191,9 @@ export default function EditPdfTool() {
     setTextArbitrations([]);
     setPdfJsDetectedRunCount(0);
     setPageOperators([]);
-    setSelectionAnchorIndex(null);
-    setSelectedRunIndices([]);
+    resetNativeTextInteraction();
     setPrivacyShieldMatches([]);
     setTextDetectionReady(false);
-    setHoveredRunIndex(-1);
-    setFocusedRunIndex(null);
-    setEditDraftText("");
-    setCaretTextStyleSnapshot(null);
-    setEditApplyError("");
-    setUseSubstituteFont(false);
     setRestyleKeptOriginalText(false);
     setTextSearchOpen(false);
     setTextSearchQuery("");
@@ -1358,14 +1355,7 @@ export default function EditPdfTool() {
     // after a failed page 1 showed page 1's error immediately, before
     // page 2's own render had even had a chance to succeed or fail.
     setError("");
-    setSelectionAnchorIndex(null);
-    setSelectedRunIndices([]);
-    setHoveredRunIndex(-1);
-    setFocusedRunIndex(null);
-    setEditDraftText("");
-    setCaretTextStyleSnapshot(null);
-    setEditApplyError("");
-    setUseSubstituteFont(false);
+    resetNativeTextInteraction();
     // Deliberately NOT cleared by selectTextRun: restyleSelectedRun sets this
     // and then immediately deselects, so clearing on deselect would hide the
     // notice the instant it appeared. Page identity is the right lifetime.
@@ -1388,7 +1378,7 @@ export default function EditPdfTool() {
     // PRE-edit image on screen -- strictly worse than an error, because it
     // looks like the edit didn't apply.
     renderedPageRef.current = null;
-  }, [pdf, pageIndex]);
+  }, [pdf, pageIndex, resetNativeTextInteraction]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   // EFFECT B -- rasterize. The only expensive step, and the only one keyed
@@ -2172,29 +2162,10 @@ export default function EditPdfTool() {
     // "selected" in this editor.
     setSelectedId(null);
     if (index === null) {
-      setSelectionAnchorIndex(null);
-      setSelectedRunIndices([]);
-      setEditDraftText("");
-      setCaretTextStyleSnapshot(null);
-      setEditApplyError("");
-      setUseSubstituteFont(false);
-      setNativeFormatOpen(false);
+      clearNativeTextSelection();
       return;
     }
-    const range =
-      extend && selectionAnchorIndex !== null
-        ? Array.from(
-            { length: Math.abs(index - selectionAnchorIndex) + 1 },
-            (_, i) => Math.min(selectionAnchorIndex, index) + i,
-          )
-        : [index];
-    if (!extend) setSelectionAnchorIndex(index);
-    setSelectedRunIndices(range);
-    setEditDraftText(range.map((i) => detectedTextRuns[i]?.str ?? "").join(""));
-    setCaretTextStyleSnapshot(null);
-    setEditApplyError("");
-    setUseSubstituteFont(false);
-    if (!extend) setNativeFormatOpen(false);
+    selectDetectedRun(index, extend, detectedTextRuns);
   }
 
   // Bug fix (reported from iPhone 15 Plus / Safari): tapping editable text
