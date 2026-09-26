@@ -47,18 +47,27 @@ export type NativeTextStyleBatchEntry = {
   nativePaintPlan: Extract<NativePaintPlan, { editable: true }> | null;
 };
 
-const validatedNativeTextStyleBatchBrand = Symbol(
-  "lumeo.edit.validated-native-style-batch",
-);
+class ValidatedNativeTextStyleBatchProof {
+  private readonly validationProof!: true;
 
-export type ValidatedNativeTextStyleBatchPlan = {
-  editable: true;
-  pageIndex: number;
-  contentStreamIndex: number;
-  entries: NativeTextStyleBatchEntry[];
-  reason: null;
-  readonly [validatedNativeTextStyleBatchBrand]: true;
-};
+  constructor() {
+    Object.defineProperty(this, "validationProof", {
+      value: true,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+  }
+}
+
+export type ValidatedNativeTextStyleBatchPlan =
+  ValidatedNativeTextStyleBatchProof & {
+    readonly editable: true;
+    readonly pageIndex: number;
+    readonly contentStreamIndex: number;
+    readonly entries: readonly Readonly<NativeTextStyleBatchEntry>[];
+    readonly reason: null;
+  };
 
 export type RejectedNativeTextStyleBatchPlan = {
   editable: false;
@@ -66,21 +75,58 @@ export type RejectedNativeTextStyleBatchPlan = {
   contentStreamIndex: number | null;
   entries: NativeTextStyleBatchEntry[];
   reason: string;
-  readonly [validatedNativeTextStyleBatchBrand]?: never;
 };
 
 export type NativeTextStyleBatchPlan =
   | ValidatedNativeTextStyleBatchPlan
   | RejectedNativeTextStyleBatchPlan;
 
+function deepFreezeProofValue<T>(value: T): T {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) {
+    return value;
+  }
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    deepFreezeProofValue(child);
+  }
+  return Object.freeze(value);
+}
+
+function issueValidatedNativeTextStyleBatchPlan({
+  pageIndex,
+  contentStreamIndex,
+  entries,
+}: {
+  pageIndex: number;
+  contentStreamIndex: number;
+  entries: NativeTextStyleBatchEntry[];
+}): ValidatedNativeTextStyleBatchPlan {
+  const stableEntries = entries.map((entry) =>
+    Object.freeze({
+      ...entry,
+      nativePaintPlan: entry.nativePaintPlan
+        ? deepFreezeProofValue(entry.nativePaintPlan)
+        : null,
+    }),
+  );
+  const batch = Object.assign(new ValidatedNativeTextStyleBatchProof(), {
+    editable: true as const,
+    pageIndex,
+    contentStreamIndex,
+    entries: stableEntries,
+    reason: null,
+  }) as ValidatedNativeTextStyleBatchPlan;
+  Object.freeze(batch.entries);
+  return Object.freeze(batch);
+}
+
 export function isValidatedNativeTextStyleBatchPlan(
   plan: NativeTextStyleBatchPlan,
 ): plan is ValidatedNativeTextStyleBatchPlan {
   return (
+    plan instanceof ValidatedNativeTextStyleBatchProof &&
     plan.editable === true &&
     plan.reason === null &&
-    validatedNativeTextStyleBatchBrand in plan &&
-    plan[validatedNativeTextStyleBatchBrand] === true &&
+    Object.isFrozen(plan) &&
     plan.entries.every((entry) => isValidatedEditPlan(entry.plan))
   );
 }
@@ -313,12 +359,9 @@ export function buildNativeTextStyleBatchPlan({
     );
   }
 
-  return {
-    editable: true,
+  return issueValidatedNativeTextStyleBatchPlan({
     pageIndex,
     contentStreamIndex: streamIndex,
     entries,
-    reason: null,
-    [validatedNativeTextStyleBatchBrand]: true,
-  };
+  });
 }
