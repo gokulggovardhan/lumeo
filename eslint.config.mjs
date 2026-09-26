@@ -16,6 +16,11 @@ const exportDomMeasurementRestrictions = [
       "DOM/CSS measurements are presentation-only and must never become authoritative inside the native PDF export path. Derive export geometry from PDF/native model evidence instead.",
   },
   {
+    selector: "CallExpression[callee.name='getComputedStyle']",
+    message:
+      "DOM/CSS measurements are presentation-only and must never become authoritative inside the native PDF export path. Derive export geometry from PDF/native model evidence instead.",
+  },
+  {
     selector:
       "MemberExpression[property.name=/^(offsetWidth|offsetHeight|clientWidth|clientHeight|scrollWidth|scrollHeight)$/]",
     message:
