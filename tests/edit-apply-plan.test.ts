@@ -71,6 +71,13 @@ async function buildPlanForSoleTjOperator(pdfBytes: Uint8Array, replacementText:
   return { plan, resolvedFont };
 }
 
+function awaitableBytesPlaceholder(): Uint8Array {
+  // Large enough that the writer would reach the planned range if brand
+  // validation were ever accidentally removed. Today it must fail before
+  // touching these bytes.
+  return new Uint8Array(4096);
+}
+
 async function extractPageText(pdfBytes: Uint8Array, pageNumber = 1): Promise<string> {
   const doc = await pdfjsLib.getDocument({ data: pdfBytes.slice() }).promise;
   const page = await doc.getPage(pageNumber);
@@ -99,6 +106,37 @@ test("applyEditPlanToDocument: equal-length replacement produces a real, reopena
   // Re-opens and re-extracts cleanly via real pdfjs too, with the new text.
   const text = await extractPageText(editedBytes);
   assert.equal(text, "World");
+});
+
+test("writer rejects an editable-looking plan after its private validation brand is stripped", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("Hello", { x: 50, y: 700, size: 18, font });
+  const original = await doc.save();
+
+  const { plan, resolvedFont } = await buildPlanForSoleTjOperator(
+    original,
+    "World",
+  );
+  assert.ok(isValidatedEditPlan(plan));
+
+  // Object.entries intentionally copies only string-keyed public fields.
+  // The planner's private symbol proof is therefore absent even though the
+  // copied object still says editable:true/reason:null.
+  const unbranded = Object.fromEntries(Object.entries(plan));
+
+  assert.throws(
+    () =>
+      applyEditPlanToBytes(
+        awaitableBytesPlaceholder(),
+        unbranded as unknown as Parameters<typeof applyEditPlanToBytes>[1],
+        resolvedFont.bytesPerCode,
+      ),
+    (error: unknown) =>
+      error instanceof EditPlanRejectedError &&
+      /validated EditPlan dry-run|not issued/i.test((error as Error).message),
+  );
 });
 
 test("applyEditPlanToDocument: shorter replacement still produces valid, correctly-extractable text", async () => {
