@@ -166,6 +166,55 @@ test("buildEditPlan: longer replacement (more glyphs)", () => {
   assert.ok(plan.tjSpacingDelta > 0);
 });
 
+test("buildEditPlan: original TJ spacing contributes to the effective preserved advance", () => {
+  const { resolvedFont, fontMetrics } = fixedWidthsFont();
+  const operator = fixedOperator({
+    kind: "TJ",
+    strings: [Uint8Array.from([65])], // A = 7pt natural at 10pt
+    tjAdjustments: [100], // move back 1pt => effective 6pt
+  });
+
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator,
+    replacementText: "C", // C = 6pt natural
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, true);
+  assert.equal(plan.originalTjAdjustmentTotal, 100);
+  assert.ok(Math.abs(plan.originalWidthPt - 6) < 1e-9);
+  assert.ok(Math.abs(plan.replacementWidthPt - 6) < 1e-9);
+  assert.ok(Math.abs(plan.tjSpacingDelta) < 1e-9);
+});
+
+test("buildEditPlan: repeated compensated TJ remains anchored instead of forgetting its prior adjustment", () => {
+  const { resolvedFont, fontMetrics } = fixedWidthsFont();
+  const operator = fixedOperator({
+    kind: "TJ",
+    strings: [Uint8Array.from([67])], // C = 6pt natural
+    tjAdjustments: [-100], // move forward 1pt => effective 7pt
+  });
+
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator,
+    replacementText: "B", // B = 7.2pt natural
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, true);
+  assert.equal(plan.originalTjAdjustmentTotal, -100);
+  assert.ok(Math.abs(plan.originalWidthPt - 7) < 1e-9);
+  assert.ok(Math.abs(plan.tjSpacingDelta - 20) < 1e-9);
+});
+
 test("buildEditPlan: TJ operator is supported the same as Tj", () => {
   const { resolvedFont, fontMetrics } = fixedWidthsFont();
   const operator = fixedOperator({ kind: "TJ", strings: [Uint8Array.from([65]), Uint8Array.from([66])] }); // "A","B"
