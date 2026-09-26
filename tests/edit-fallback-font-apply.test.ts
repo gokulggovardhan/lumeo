@@ -382,7 +382,7 @@ test("a run whose own font resource can't be named is rejected rather than left 
 test("applying a substitute-font edit rewrites one operator into a Tf-wrapped run and nothing else", async () => {
   const original = await makeType0SubsetPdf();
   const prepared = await prepareEdit(original, "FSub");
-  const plan = planFor(prepared, "Héllo", true);
+  const plan = validatedPlanFor(prepared, "Héllo", true);
 
   await applyEditPlanToDocument(prepared.doc, plan, prepared.resolvedFont.bytesPerCode);
   const edited = await prepared.doc.save();
@@ -403,7 +403,7 @@ test("the rewritten page really renders the new text, read back by pdfjs", async
   assert.deepEqual(await extractedStrings(original), ["Control line", "Hello"]);
 
   const prepared = await prepareEdit(original, "FSub");
-  const plan = planFor(prepared, "Héllo", true);
+  const plan = validatedPlanFor(prepared, "Héllo", true);
   await applyEditPlanToDocument(prepared.doc, plan, prepared.resolvedFont.bytesPerCode);
   const edited = await prepared.doc.save();
 
@@ -417,7 +417,7 @@ test("the rewritten page really renders the new text, read back by pdfjs", async
 
 test("the substitute font is written into the page's /Resources /Font, leaving the original entry untouched", async () => {
   const prepared = await prepareEdit(await makeType0SubsetPdf(), "FSub");
-  const plan = planFor(prepared, "Héllo", true);
+  const plan = validatedPlanFor(prepared, "Héllo", true);
   await applyEditPlanToDocument(prepared.doc, plan, prepared.resolvedFont.bytesPerCode);
   const edited = await prepared.doc.save();
 
@@ -436,7 +436,7 @@ test("the substitute font is written into the page's /Resources /Font, leaving t
 
 test("an embedded-subset simple font takes the same path, one byte per code throughout", async () => {
   const prepared = await prepareEdit(await makeSimpleSubsetPdf(), "FSub");
-  const plan = planFor(prepared, "World", true);
+  const plan = validatedPlanFor(prepared, "World", true);
   assert.equal(plan.editable, true);
   assert.equal(plan.fallbackFont?.family, "Helvetica-Bold");
 
@@ -448,22 +448,46 @@ test("an embedded-subset simple font takes the same path, one byte per code thro
   assert.deepEqual(await extractedStrings(edited), ["World"]);
 });
 
-test("two substitute edits on one page share a single embedded font object", async () => {
-  const original = await makeType0SubsetPdf();
-  const prepared = await prepareEdit(original, "FSub");
-  const plan = planFor(prepared, "Héllo", true);
+test("two independently planned substitute edits on one page share a single embedded font object", async () => {
+  const original = await makeType0SubsetPdf({ secondSubsetRun: true });
+  const doc = await PDFDocument.load(original.slice());
 
-  await applyEditPlanToDocument(prepared.doc, plan, prepared.resolvedFont.bytesPerCode);
-  // A second edit against the same in-memory document, before any save --
-  // the case where pdf-lib has reserved the font's ref but not yet written
-  // its dictionary, so a naive reuse check would embed a duplicate.
-  await applyEditPlanToDocument(prepared.doc, { ...plan, replacementText: "Hé" }, prepared.resolvedFont.bytesPerCode);
-  const edited = await prepared.doc.save();
+  // Plan both targets against the same original stream. Apply the later
+  // byte range first so its rewrite cannot invalidate the earlier plan's
+  // offset. Both registrations happen before any save of this document.
+  const first = prepareEditFromDocument(doc, "FSub", 0);
+  const second = prepareEditFromDocument(doc, "FSub", 1);
+  const firstPlan = validatedPlanFor(first, "Héllo", true);
+  const secondPlan = validatedPlanFor(second, "Héllo", true);
+  assert.ok(secondPlan.byteOffset > firstPlan.byteOffset);
+
+  await applyEditPlanToDocument(
+    doc,
+    secondPlan,
+    second.resolvedFont.bytesPerCode,
+  );
+  await applyEditPlanToDocument(
+    doc,
+    firstPlan,
+    first.resolvedFont.bytesPerCode,
+  );
+  const edited = await doc.save();
 
   const reloaded = await PDFDocument.load(edited);
-  const fonts = reloaded.getPages()[0].node.Resources()!.lookup(PDFName.of("Font"), PDFDict);
+  const fonts = reloaded
+    .getPages()[0]
+    .node.Resources()!
+    .lookup(PDFName.of("Font"), PDFDict);
   const names = fonts.keys().map((key) => key.asString());
-  assert.deepEqual(names.filter((name) => name.startsWith("/LumeoFallback")), ["/LumeoFallback0"]);
+  assert.deepEqual(
+    names.filter((name) => name.startsWith("/LumeoFallback")),
+    ["/LumeoFallback0"],
+  );
+  assert.deepEqual(await extractedStrings(edited), [
+    "Control line",
+    "Héllo",
+    "Héllo",
+  ]);
 });
 
 test("a font resource whose name needs #-escaping is restored as the same name, not a different one", async () => {
@@ -508,7 +532,7 @@ test("a font resource whose name needs #-escaping is restored as the same name, 
   );
 
   const prepared = await prepareEdit(await doc.save(), "F#1");
-  const plan = planFor(prepared, "Hé", true);
+  const plan = validatedPlanFor(prepared, "Hé", true);
   assert.equal(plan.fallbackFont?.originalFontResourceName, "F#1");
 
   await applyEditPlanToDocument(prepared.doc, plan, prepared.resolvedFont.bytesPerCode);
