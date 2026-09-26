@@ -59,6 +59,28 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
 
   const editor = page.getByRole("textbox", { name: "Edit text" });
   await expect(editor).toBeVisible();
+
+  const initialText = await editor.inputValue();
+  await expect(editor).toHaveAttribute("data-logical-selection-start", "0");
+  await expect(editor).toHaveAttribute(
+    "data-logical-selection-end",
+    String(initialText.length),
+  );
+  await expect(editor).toHaveAttribute("data-logical-selection-collapsed", "false");
+
+  // Browser selection is only an input signal. Arrow movement updates
+  // Lumeo's own logical range and the model is mirrored back to the input.
+  await editor.press("ArrowLeft");
+  await expect(editor).toHaveAttribute("data-logical-selection-start", "0");
+  await expect(editor).toHaveAttribute("data-logical-selection-end", "0");
+  await expect(editor).toHaveAttribute("data-logical-selection-collapsed", "true");
+
+  await editor.press("Shift+ArrowRight");
+  await expect(editor).toHaveAttribute("data-logical-selection-start", "0");
+  await expect(editor).toHaveAttribute("data-logical-selection-end", "1");
+  await expect(editor).toHaveAttribute("data-logical-selection-direction", "forward");
+  await expect(editor).toHaveAttribute("data-logical-selection-collapsed", "false");
+
   const inheritedStyle = await editor.evaluate((node) => {
     const style = getComputedStyle(node);
     return { fontFamily: style.fontFamily, fontStyle: style.fontStyle, fontWeight: style.fontWeight };
@@ -278,6 +300,8 @@ test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecuti
 
     const panel = page.locator("[data-edit-multi-run-panel]");
     await expect(panel).toBeVisible();
+    await expect(panel).toHaveAttribute("data-logical-selection-span-count", "2");
+    await expect(panel).toHaveAttribute("data-logical-selection-whole-spans", "true");
     const editor = page.locator("[data-edit-multi-run-input]");
     await expect(editor).toHaveValue(/SSN 123-45-6789/);
     await editor.fill("SSN 000-00-0000");
