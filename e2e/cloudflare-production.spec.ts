@@ -323,7 +323,9 @@ test("production Merge PDF processes and downloads a real two-page result", asyn
 
   const fixture = await readFile(TEXT_ONLY_PDF);
   await page.goto("/pdf/merge", { waitUntil: "domcontentloaded" });
-  await page.locator('input[type="file"]').first().setInputFiles([
+  const mergeUpload = page.locator("#merge-pdf-upload");
+  await expect(mergeUpload).toHaveAttribute("data-upload-client-ready", "true", { timeout: 30_000 });
+  await mergeUpload.setInputFiles([
     { name: "merge-a.pdf", mimeType: "application/pdf", buffer: fixture },
     { name: "merge-b.pdf", mimeType: "application/pdf", buffer: fixture },
   ]);
@@ -351,7 +353,9 @@ test("production Crop PDF exports a valid PDF", async ({ page }, testInfo) => {
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   await page.goto("/pdf/crop", { waitUntil: "domcontentloaded" });
-  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
+  const cropUpload = page.locator("#crop-pdf-upload");
+  await expect(cropUpload).toHaveAttribute("data-upload-client-ready", "true", { timeout: 30_000 });
+  await cropUpload.setInputFiles(TEXT_ONLY_PDF);
 
   const apply = page.getByRole("button", { name: "Apply Crop" });
   await expect(apply).toBeEnabled({ timeout: 60_000 });
@@ -378,7 +382,9 @@ test("production Watermark PDF exports a valid text-watermarked PDF", async ({
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   await page.goto("/pdf/watermark", { waitUntil: "domcontentloaded" });
-  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
+  const watermarkUpload = page.locator("#watermark-pdf-upload");
+  await expect(watermarkUpload).toHaveAttribute("data-upload-client-ready", "true", { timeout: 30_000 });
+  await watermarkUpload.setInputFiles(TEXT_ONLY_PDF);
 
   const watermarkText = page.getByLabel("Text", { exact: true });
   await expect(watermarkText).toBeVisible({ timeout: 60_000 });
