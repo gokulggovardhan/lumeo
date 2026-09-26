@@ -3609,12 +3609,28 @@ export default function EditPdfTool() {
     singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
       ? browserFontPreview.family
       : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
+  const pageHasLimitedText =
+    Boolean(
+      pageTextModel &&
+        (pageTextModel.viewOnlySpanCount > 0 ||
+          pageTextModel.unsupportedSpanCount > 0),
+    ) ||
+    effectiveTextArbitrations.some(
+      (arbitration) => arbitration.decision !== "editable",
+    ) ||
+    pageTextCapability.spanClassifications.some(
+      (classification) => !classification.safelyRewritable,
+    );
+  const presentedPageCapability =
+    pageTextModel?.capability === "native-editable" && pageHasLimitedText
+      ? "mixed"
+      : pageTextModel?.capability ?? null;
   const pageCapabilityLabel = pageTextModel
-    ? pageTextModel.capability === "native-editable"
+    ? presentedPageCapability === "native-editable"
       ? `${pageTextModel.editableSpanCount} text span${pageTextModel.editableSpanCount === 1 ? "" : "s"} editable`
-      : pageTextModel.capability === "mixed"
-        ? `${pageTextModel.editableSpanCount} editable · ${pageTextModel.viewOnlySpanCount + pageTextModel.unsupportedSpanCount} limited`
-        : pageTextModel.capability === "no-detected-text"
+      : pageTextModel.editableSpanCount > 0 && pageHasLimitedText
+        ? `${pageTextModel.editableSpanCount} editable · some text limited`
+        : presentedPageCapability === "no-detected-text"
           ? "No native text detected"
           : "Text detected · direct editing limited"
     : "";
@@ -4092,10 +4108,10 @@ export default function EditPdfTool() {
                 >
                   {textDetectionCurrent && pageTextModel ? (
                     <div
-                      data-edit-page-capability={pageTextModel.capability}
+                      data-edit-page-capability={presentedPageCapability ?? pageTextModel.capability}
                       role="status"
                       aria-label={`${pageCapabilityLabel}. ${pageCapabilityMessage.detail}`}
-                      title={pageTextModel.capability === "native-editable" ? undefined : pageCapabilityMessage.detail}
+                      title={presentedPageCapability === "native-editable" ? undefined : pageCapabilityMessage.detail}
                       className="pointer-events-none absolute right-2 top-2 z-20 rounded-full border border-black/10 bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-[#343842] shadow-sm backdrop-blur-sm"
                     >
                       {pageCapabilityLabel}
