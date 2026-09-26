@@ -529,15 +529,21 @@ test("classifier refuses unknown encoding and clipping instead of claiming safe 
     viewportTransform: viewport,
     pageWidthPt: 612,
     pageHeightPt: 792,
-    resolveFontProfile: () => profile(),
+    // Model the real standard-font fixture: deterministic widths exist, but
+    // the PDF does not expose descriptor ascent/descent.
+    resolveFontProfile: () =>
+      profile({
+        ascentRatio: null,
+        descentRatio: null,
+      }),
   })[0];
   assert.equal(classifyNativeTextSpan(clipped).category, "CLIPPED_TEXT");
   assert.equal(classifyNativeTextSpan(clipped).safelyRewritable, false);
 
   // Clipping changes rewrite safety, not the ability to locate the native
-  // glyph box. Keep a read-only overlay so the product can explain this
-  // limitation even when PDF.js does not expose the clipped text at all.
-  assert.equal(clipped.geometryConfidence, "exact-simple-run");
+  // glyph box. Missing vertical font metrics may use the explicit approximate
+  // display box, but that confidence can never authorize an edit.
+  assert.equal(clipped.geometryConfidence, "fallback-box");
   assert.ok(clipped.detectedRun);
   assert.match(clipped.limitationReason ?? "", /clipping rendering mode/i);
   const [clippedRun] = nativeDetectedRuns([clipped]);
@@ -550,6 +556,39 @@ test("classifier refuses unknown encoding and clipping instead of claiming safe 
   });
   assert.equal(arbitration.decision, "view-only");
   assert.equal(arbitration.nativeSpanKey, clipped.key);
+});
+
+test("missing ascent/descent exposes approximate native geometry but remains font-limited and read-only", () => {
+  const [span] = buildNativeContentStreamSpans({
+    operators: [located()],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () =>
+      profile({
+        ascentRatio: null,
+        descentRatio: null,
+      }),
+  });
+
+  assert.equal(span.geometryConfidence, "fallback-box");
+  assert.ok(span.detectedRun);
+  assert.equal(span.detectedRun.ascentRatio, 0.85);
+  assert.equal(span.detectedRun.descentRatio, -0.15);
+  assert.match(span.limitationReason ?? "", /approximate fallback/i);
+
+  const classification = classifyNativeTextSpan(span);
+  assert.equal(classification.category, "NATIVE_TEXT_WITH_FONT_LIMITATIONS");
+  assert.equal(classification.safelyRewritable, false);
+
+  const [run] = nativeDetectedRuns([span]);
+  assert.ok(run);
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [run],
+    reconciliations: [],
+    nativeSpans: [span],
+  });
+  assert.equal(arbitration.decision, "view-only");
 });
 
 test("capability guard keeps reconciled clipping text read-only and preserves safe native text", () => {
