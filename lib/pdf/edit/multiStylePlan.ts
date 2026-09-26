@@ -7,7 +7,8 @@ import type { FontMetrics, TextShowState } from "./fontMetrics.ts";
 import {
   buildEditPlan,
   decodeTextShowOperator,
-  type EditPlan,
+  isValidatedEditPlan,
+  type ValidatedEditPlan,
 } from "./editPlan.ts";
 import {
   buildNativePaintPlan,
@@ -41,33 +42,55 @@ export type NativeTextStyleBatchInput = {
 
 export type NativeTextStyleBatchEntry = {
   spanId: string;
-  plan: EditPlan;
+  plan: ValidatedEditPlan;
   bytesPerCode: 1 | 2;
   nativePaintPlan: Extract<NativePaintPlan, { editable: true }> | null;
 };
 
+const validatedNativeTextStyleBatchBrand = Symbol(
+  "lumeo.edit.validated-native-style-batch",
+);
+
+export type ValidatedNativeTextStyleBatchPlan = {
+  editable: true;
+  pageIndex: number;
+  contentStreamIndex: number;
+  entries: NativeTextStyleBatchEntry[];
+  reason: null;
+  readonly [validatedNativeTextStyleBatchBrand]: true;
+};
+
+export type RejectedNativeTextStyleBatchPlan = {
+  editable: false;
+  pageIndex: number;
+  contentStreamIndex: number | null;
+  entries: NativeTextStyleBatchEntry[];
+  reason: string;
+  readonly [validatedNativeTextStyleBatchBrand]?: never;
+};
+
 export type NativeTextStyleBatchPlan =
-  | {
-      editable: true;
-      pageIndex: number;
-      contentStreamIndex: number;
-      entries: NativeTextStyleBatchEntry[];
-      reason: null;
-    }
-  | {
-      editable: false;
-      pageIndex: number;
-      contentStreamIndex: number | null;
-      entries: NativeTextStyleBatchEntry[];
-      reason: string;
-    };
+  | ValidatedNativeTextStyleBatchPlan
+  | RejectedNativeTextStyleBatchPlan;
+
+export function isValidatedNativeTextStyleBatchPlan(
+  plan: NativeTextStyleBatchPlan,
+): plan is ValidatedNativeTextStyleBatchPlan {
+  return (
+    plan.editable === true &&
+    plan.reason === null &&
+    validatedNativeTextStyleBatchBrand in plan &&
+    plan[validatedNativeTextStyleBatchBrand] === true &&
+    plan.entries.every((entry) => isValidatedEditPlan(entry.plan))
+  );
+}
 
 function rejected(
   pageIndex: number,
   contentStreamIndex: number | null,
   reason: string,
   entries: NativeTextStyleBatchEntry[] = [],
-): NativeTextStyleBatchPlan {
+): RejectedNativeTextStyleBatchPlan {
   return {
     editable: false,
     pageIndex,
@@ -210,11 +233,11 @@ export function buildNativeTextStyleBatchPlan({
       replacementTextState: textState,
     });
 
-    if (!plan.editable) {
+    if (!isValidatedEditPlan(plan)) {
       return rejected(
         pageIndex,
         streamIndex,
-        plan.reason ?? "One selected span failed native formatting validation.",
+        plan.reason,
         entries,
       );
     }
@@ -296,5 +319,6 @@ export function buildNativeTextStyleBatchPlan({
     contentStreamIndex: streamIndex,
     entries,
     reason: null,
+    [validatedNativeTextStyleBatchBrand]: true,
   };
 }
