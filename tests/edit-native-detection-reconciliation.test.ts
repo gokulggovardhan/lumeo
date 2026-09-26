@@ -17,6 +17,7 @@ import {
 import {
   DocumentTextCapabilityClassifier,
   classifyNativeTextSpan,
+  enforceSpanCapabilityOnArbitration,
 } from "../lib/pdf/edit/textCapabilityClassifier.ts";
 
 const viewport = [1, 0, 0, -1, 0, 792];
@@ -532,6 +533,50 @@ test("classifier refuses unknown encoding and clipping instead of claiming safe 
   })[0];
   assert.equal(classifyNativeTextSpan(clipped).category, "CLIPPED_TEXT");
   assert.equal(classifyNativeTextSpan(clipped).safelyRewritable, false);
+});
+
+test("capability guard keeps reconciled clipping text read-only and preserves safe native text", () => {
+  const clipped = buildNativeContentStreamSpans({
+    operators: [located({ renderMode: 4 })],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  })[0];
+  const safe = buildNativeContentStreamSpans({
+    operators: [located({ renderMode: 0 })],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  })[0];
+
+  const reconciled = {
+    pdfJsRunIndex: 0,
+    decision: "editable" as const,
+    nativeSpanKey: clipped.key,
+    source: "reconciled" as const,
+    reason: "Strong Unicode and geometry agreement.",
+  };
+
+  const clippedGuard = enforceSpanCapabilityOnArbitration({
+    arbitration: reconciled,
+    spanClassification: classifyNativeTextSpan(clipped),
+  });
+  assert.equal(clippedGuard.decision, "view-only");
+  assert.equal(clippedGuard.source, "conflict");
+  assert.match(clippedGuard.reason, /capability classification/i);
+  assert.match(clippedGuard.reason, /clipping/i);
+
+  const safeGuard = enforceSpanCapabilityOnArbitration({
+    arbitration: {
+      ...reconciled,
+      nativeSpanKey: safe.key,
+    },
+    spanClassification: classifyNativeTextSpan(safe),
+  });
+  assert.equal(safeGuard.decision, "editable");
+  assert.equal(safeGuard.source, "reconciled");
 });
 
 test("page classifier distinguishes native-only evidence from an unsupported empty page", () => {
