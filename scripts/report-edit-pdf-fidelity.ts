@@ -53,6 +53,7 @@ type RenderedPage = {
   height: number;
   rgba: Uint8ClampedArray;
   runs: ReturnType<typeof textRunsFromContent>;
+  viewportTransform: readonly number[];
 };
 
 type FixtureFonts = {
@@ -180,6 +181,15 @@ async function makeSimpleFixture(
   };
 }
 
+function measurableTextCharacters(value: string): number {
+  // textRunsFromContent intentionally discards whitespace-only PDF.js items:
+  // they are not useful interactive/editable runs. Counting those separator
+  // items in the denominator made monospaced documents look like detection
+  // failures even though every visible glyph was detected and matched.
+  // Span matching below still proves the document structure independently.
+  return [...value].filter((character) => !/\s/u.test(character)).length;
+}
+
 function expectedText(fixture: Fixture): string {
   return fixture.expectedRuns.join("");
 }
@@ -227,6 +237,7 @@ async function renderFirstPage(bytes: Uint8Array): Promise<RenderedPage> {
       height,
       rgba: new Uint8ClampedArray(image.data),
       runs,
+      viewportTransform: [...viewport.transform],
     };
   } finally {
     const destroy = (doc as { destroy?: () => Promise<void> | void }).destroy;
@@ -238,16 +249,54 @@ function runPixelRect(
   run: ReturnType<typeof textRunsFromContent>[number],
   width: number,
   height: number,
+  viewportTransform: readonly number[],
 ): PixelRect {
   const x = (run.xPct / 100) * width;
   const y = (run.yPct / 100) * height;
   const runWidth = (run.widthPct / 100) * width;
   const runHeight = (run.heightPct / 100) * height;
+
+  if (!run.rotated || !run.pdfJsTransform) {
+    return {
+      x: x - EDIT_MASK_MARGIN_PX,
+      y: y - EDIT_MASK_MARGIN_PX,
+      width: runWidth + EDIT_MASK_MARGIN_PX * 2,
+      height: runHeight + EDIT_MASK_MARGIN_PX * 2,
+    };
+  }
+
+  // x/y is the same top-left text-layer origin produced by
+  // boxOriginFromTransform(). For rotated text, the local width/height axes
+  // are rotated by the combined PDF.js viewport/text transform. Build the
+  // four local rectangle corners in raster space and take their AABB; this
+  // keeps the mask tied to PDF.js/PDF geometry rather than DOM measurement.
+  const combined = transformPoint2x3(
+    [...viewportTransform],
+    [...run.pdfJsTransform],
+  );
+  const angle = Math.atan2(combined[1], combined[0]);
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const corners = [
+    [0, 0],
+    [runWidth, 0],
+    [0, runHeight],
+    [runWidth, runHeight],
+  ].map(([localX, localY]) => ({
+    x: x + localX * cos - localY * sin,
+    y: y + localX * sin + localY * cos,
+  }));
+
+  const minX = Math.min(...corners.map((point) => point.x));
+  const minY = Math.min(...corners.map((point) => point.y));
+  const maxX = Math.max(...corners.map((point) => point.x));
+  const maxY = Math.max(...corners.map((point) => point.y));
+
   return {
-    x: x - EDIT_MASK_MARGIN_PX,
-    y: y - EDIT_MASK_MARGIN_PX,
-    width: runWidth + EDIT_MASK_MARGIN_PX * 2,
-    height: runHeight + EDIT_MASK_MARGIN_PX * 2,
+    x: minX - EDIT_MASK_MARGIN_PX,
+    y: minY - EDIT_MASK_MARGIN_PX,
+    width: maxX - minX + EDIT_MASK_MARGIN_PX * 2,
+    height: maxY - minY + EDIT_MASK_MARGIN_PX * 2,
   };
 }
 
@@ -481,11 +530,13 @@ async function measure(
               beforeRun,
               before.width,
               before.height,
+              before.viewportTransform,
             ),
             runPixelRect(
               afterRun,
               after.width,
               after.height,
+              after.viewportTransform,
             ),
           );
           const diff = compareRgbaImages({
@@ -507,8 +558,8 @@ async function measure(
   return {
     id: fixture.id,
     category: fixture.category,
-    expectedTextCharacters: expected.length,
-    detectedTextCharacters: detectedText.length,
+    expectedTextCharacters: measurableTextCharacters(expected),
+    detectedTextCharacters: measurableTextCharacters(detectedText),
     expectedSpans: fixture.expectedRuns.length,
     matchedSpans,
     unmatchedSpans: Math.max(0, runs.length - matchedSpans),
