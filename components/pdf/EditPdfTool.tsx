@@ -96,6 +96,11 @@ import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansM
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
+import {
+  buildCaretRetypePlan,
+  captureCaretTextStyleSnapshot,
+  type CaretTextStyleSnapshot,
+} from "@/lib/pdf/edit/caretTextStyleSnapshot";
 import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
 import { reconstructFragmentedRun, type FragmentedRunReconstruction } from "@/lib/pdf/edit/fragmentedRun";
 import {
@@ -608,6 +613,11 @@ export default function EditPdfTool() {
   const [hoveredRunIndex, setHoveredRunIndex] = useState<number>(-1);
   const [focusedRunIndex, setFocusedRunIndex] = useState<number | null>(null);
   const [editDraftText, setEditDraftText] = useState("");
+  // Captured only when a single native span transitions through an empty
+  // draft. It preserves exact font/text-state/paint/geometry intent while
+  // the user retypes, but never bypasses EditPlan or glyph authority.
+  const [caretTextStyleSnapshot, setCaretTextStyleSnapshot] =
+    useState<CaretTextStyleSnapshot | null>(null);
   // Whether the user has accepted the substitute-font offer for the CURRENT
   // selection (see EditPreview's substituteFont field). Reset by every
   // selection change, never by typing -- re-offering mid-word would make
@@ -1184,6 +1194,7 @@ export default function EditPdfTool() {
     setHoveredRunIndex(-1);
     setFocusedRunIndex(null);
     setEditDraftText("");
+    setCaretTextStyleSnapshot(null);
     setEditApplyError("");
     setUseSubstituteFont(false);
     setRestyleKeptOriginalText(false);
@@ -1352,6 +1363,7 @@ export default function EditPdfTool() {
     setHoveredRunIndex(-1);
     setFocusedRunIndex(null);
     setEditDraftText("");
+    setCaretTextStyleSnapshot(null);
     setEditApplyError("");
     setUseSubstituteFont(false);
     // Deliberately NOT cleared by selectTextRun: restyleSelectedRun sets this
@@ -2163,6 +2175,7 @@ export default function EditPdfTool() {
       setSelectionAnchorIndex(null);
       setSelectedRunIndices([]);
       setEditDraftText("");
+      setCaretTextStyleSnapshot(null);
       setEditApplyError("");
       setUseSubstituteFont(false);
       setNativeFormatOpen(false);
@@ -2178,6 +2191,7 @@ export default function EditPdfTool() {
     if (!extend) setSelectionAnchorIndex(index);
     setSelectedRunIndices(range);
     setEditDraftText(range.map((i) => detectedTextRuns[i]?.str ?? "").join(""));
+    setCaretTextStyleSnapshot(null);
     setEditApplyError("");
     setUseSubstituteFont(false);
     if (!extend) setNativeFormatOpen(false);
