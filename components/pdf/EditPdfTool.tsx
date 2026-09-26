@@ -573,6 +573,20 @@ export default function EditPdfTool() {
   // only about whether that result is final yet, so Select can tell "still
   // detecting" apart from "genuinely has no text."
   const [textDetectionReady, setTextDetectionReady] = useState(false);
+  // Detection results are valid only for the exact PDF-byte snapshot and page
+  // that produced them. History Undo/Redo and native edits swap pdf.bytes
+  // synchronously, while the next pdf.js detection pass is asynchronous.
+  // Keeping this provenance prevents a one-render stale overlay window where
+  // old text can still accept a click and then have that selection erased by
+  // the incoming refresh (observed reliably in WebKit after Undo).
+  const [textDetectionRevision, setTextDetectionRevision] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+  } | null>(null);
+  const textDetectionCurrent =
+    textDetectionReady &&
+    textDetectionRevision?.bytes === pdf?.bytes &&
+    textDetectionRevision.pageIndex === pageIndex;
   // Phase 9.1: the index-parallel matched-operator for each entry in
   // detectedTextRuns (lib/pdf/edit/matchTextRun.ts), computed once per page
   // load alongside detection itself -- cheap position-only matching, no
@@ -1193,6 +1207,7 @@ export default function EditPdfTool() {
     resetNativeTextInteraction();
     setPrivacyShieldMatches([]);
     setTextDetectionReady(false);
+    setTextDetectionRevision(null);
     setRestyleKeptOriginalText(false);
     setTextSearchOpen(false);
     setTextSearchQuery("");
@@ -1369,6 +1384,7 @@ export default function EditPdfTool() {
     setPageOperators([]);
     setPrivacyShieldMatches([]);
     setTextDetectionReady(false);
+    setTextDetectionRevision(null);
     // Cleared so the raster effect's "is this just a re-sharpen?" check is
     // exact. This effect runs whenever the PAGE or the DOCUMENT BYTES
     // change, so afterwards any render failure is a genuine failure to draw
@@ -1537,8 +1553,13 @@ export default function EditPdfTool() {
           setDetectedTextRuns([]);
         }
       } finally {
-        // true means detection finished, successfully or not
-        if (!cancelled) setTextDetectionReady(true);
+        // "Ready" is meaningful only together with the exact document/page
+        // revision that produced the result. This stamp makes stale results
+        // fail closed during history/document transitions.
+        if (!cancelled) {
+          setTextDetectionRevision({ bytes: pdf.bytes, pageIndex });
+          setTextDetectionReady(true);
+        }
       }
     })();
 
@@ -3805,7 +3826,7 @@ export default function EditPdfTool() {
                   className={`relative mx-auto w-full overflow-hidden rounded-lg border border-[var(--text-primary)]/12 bg-white ${activeTool !== "select" && activeTool !== "draw" ? "cursor-crosshair" : ""} ${activeTool === "whiteout" ? "touch-none" : ""}`}
                   style={{ aspectRatio: `${pageDisplaySize.width} / ${pageDisplaySize.height}` }}
                 >
-                  {textDetectionReady && pageTextModel ? (
+                  {textDetectionCurrent && pageTextModel ? (
                     <div
                       data-edit-page-capability={pageTextModel.capability}
                       role="status"
@@ -3905,7 +3926,7 @@ export default function EditPdfTool() {
                     </div>
                   ) : null}
 
-                  {detectedTextRuns.length > 0 ? (
+                  {textDetectionCurrent && detectedTextRuns.length > 0 ? (
                     // Phase 10.2: kept mounted regardless of activeTool (a CSS
                     // display toggle, not a conditional unmount) -- measured
                     // root cause of "tool switching feels slow on a text-heavy
@@ -3981,7 +4002,7 @@ export default function EditPdfTool() {
                     </>
                   ) : null}
 
-                  {activeTool === "select" && singleSelectedRun && singleSelectedRunMatch ? (
+                  {activeTool === "select" && textDetectionCurrent && singleSelectedRun && singleSelectedRunMatch ? (
                     // Phase 11: true inline editing -- a caret appears
                     // directly over the clicked text (positioned with the
                     // exact same percent box TextRunOverlay uses for this
@@ -4282,7 +4303,7 @@ export default function EditPdfTool() {
                     </div>
                   ) : null}
 
-                  {activeTool === "select" && selectedRunIndices.length > 1 && editPreview.kind === "multi" ? (
+                  {activeTool === "select" && textDetectionCurrent && selectedRunIndices.length > 1 && editPreview.kind === "multi" ? (
                     // Multi-run selection has no per-run inline editor (that's
                     // scoped to a single run) -- this compact floating panel,
                     // anchored to the first selected run, is the only UI path
@@ -4359,13 +4380,13 @@ export default function EditPdfTool() {
                     </div>
                   ) : null}
 
-                  {activeTool === "select" && !textDetectionReady && selectedRunIndices.length === 0 && pageImageUrl ? (
+                  {activeTool === "select" && !textDetectionCurrent && selectedRunIndices.length === 0 && pageImageUrl ? (
                     <p role="status" className="absolute left-3 top-3 z-20 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 px-3 py-1.5 text-[11px] leading-5 text-[var(--text-primary)]/50 shadow-lg">
                       Preparing editable text…
                     </p>
                   ) : null}
 
-                  {activeTool === "select" && textDetectionReady && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
+                  {activeTool === "select" && textDetectionCurrent && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
                     <div className="absolute left-3 top-3 z-20 max-w-[260px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
                         {pageTextCapability.nativeSpanCount > 0 ? "Text detected — editing limited" : "No editable text found"}
@@ -4486,7 +4507,7 @@ export default function EditPdfTool() {
                     <button
                       type="button"
                       onClick={handleDetectSensitive}
-                      disabled={redactionBusy || !textDetectionReady}
+                      disabled={redactionBusy || !textDetectionCurrent}
                       className="rounded-full border border-[var(--text-primary)]/14 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-secondary)] transition hover:text-[var(--text-primary)] disabled:opacity-40"
                     >
                       Find sensitive data
