@@ -295,6 +295,15 @@ export type TextShowOperator = {
   end: number;
   /** Raw (still glyph-encoded, not decoded to readable text) string operands, in order shown. */
   strings: Uint8Array[];
+  /**
+   * Numeric spacing operands from an original TJ array, in source order.
+   * Positive values move the text position backward; negative values move it
+   * forward. Undefined for Tj/'/" and for legacy synthetic fixtures.
+   *
+   * Retaining these values is required to preserve the original EFFECTIVE
+   * end position when a TJ is flattened/replaced and then edited again.
+   */
+  tjAdjustments?: number[];
   fontResourceName: string | null;
   fontSizePt: number;
   /** Text rendering matrix at the moment this operator runs: scale(Tfs*Th, Tfs) . translate(0, Trise) . Tm . CTM. */
@@ -519,12 +528,18 @@ export function walkTextShowOperators(
     return multiplyMatrix(ctm, multiplyMatrix(textMatrix, fontScale));
   }
 
-  function recordTextShow(kind: TextShowOperatorKind, strings: Uint8Array[], end: number) {
+  function recordTextShow(
+    kind: TextShowOperatorKind,
+    strings: Uint8Array[],
+    end: number,
+    tjAdjustments?: number[],
+  ) {
     results.push({
       kind,
       start: operandStart,
       end,
       strings,
+      ...(tjAdjustments ? { tjAdjustments: [...tjAdjustments] } : {}),
       fontResourceName: textState.fontResourceName,
       fontSizePt: textState.fontSizePt,
       textRenderingMatrix: computeTrm(),
@@ -687,15 +702,34 @@ export function walkTextShowOperators(
         break;
       }
       case "TJ": {
-        const arrayTokens = operands.filter(
+        const arrayStart = operands.findIndex((item) => item.type === "arrayStart");
+        let arrayEnd = -1;
+        for (let index = operands.length - 1; index > arrayStart; index -= 1) {
+          if (operands[index].type === "arrayEnd") {
+            arrayEnd = index;
+            break;
+          }
+        }
+        const arrayEntries =
+          arrayStart >= 0 && arrayEnd > arrayStart
+            ? operands.slice(arrayStart + 1, arrayEnd)
+            : [];
+        const arrayTokens = arrayEntries.filter(
           (item): item is Extract<ContentStreamToken, { type: "literalString" | "hexString" }> =>
             item.type === "literalString" || item.type === "hexString",
         );
+        const adjustments = arrayEntries
+          .filter(
+            (item): item is Extract<ContentStreamToken, { type: "number" }> =>
+              item.type === "number",
+          )
+          .map((item) => item.value);
         if (inTextObject && arrayTokens.length > 0) {
           recordTextShow(
             "TJ",
             arrayTokens.map((item) => item.value),
             token.end,
+            adjustments,
           );
         }
         break;
