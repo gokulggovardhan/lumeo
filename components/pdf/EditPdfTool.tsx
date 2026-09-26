@@ -946,6 +946,19 @@ export default function EditPdfTool() {
     [pageIndex, pagePointSize, detectedTextRuns, editableRunMatches, pageFontProfiles, fragmentedRunReconstructions],
   );
 
+  const interactionEditableRunMatches = useMemo(
+    () =>
+      editableRunMatches.map((match, index): RunMatch => {
+        const capability = pageTextModel?.spans[index]?.capability;
+        return match &&
+          (capability === "native-editable" ||
+            capability === "fragmented-editable")
+          ? match
+          : null;
+      }),
+    [editableRunMatches, pageTextModel],
+  );
+
   const pageTextCapability = useMemo<PageTextCapabilityClassification>(() => {
     const classifier = new DocumentTextCapabilityClassifier();
     return classifier.classifyPage({
@@ -966,7 +979,7 @@ export default function EditPdfTool() {
       );
 
       return detectedTextRuns.map((run, index): string | null => {
-        if (editableRunMatches[index]) return null;
+        if (interactionEditableRunMatches[index]) return null;
 
         const nativeKey =
           effectiveTextArbitrations[index]?.nativeSpanKey ??
@@ -991,7 +1004,7 @@ export default function EditPdfTool() {
     },
     [
       detectedTextRuns,
-      editableRunMatches,
+      interactionEditableRunMatches,
       effectiveTextArbitrations,
       textReconciliations,
       pageTextCapability,
@@ -1957,11 +1970,11 @@ export default function EditPdfTool() {
   // user's next keystroke replaces the text with no extra click into a
   // sidebar field first.
   useEffect(() => {
-    if (activeTool === "select" && selectedRunIndices.length === 1 && editableRunMatches[selectedRunIndices[0]]) {
+    if (activeTool === "select" && selectedRunIndices.length === 1 && interactionEditableRunMatches[selectedRunIndices[0]]) {
       inlineEditInputRef.current?.focus();
       inlineEditInputRef.current?.select();
     }
-  }, [activeTool, selectedRunIndices, editableRunMatches]);
+  }, [activeTool, selectedRunIndices, interactionEditableRunMatches]);
 
   // Phase 20 (D): scrollIntoView (Phase 15, above/selectTextRunAndFocus)
   // only runs ONCE, synchronously at the moment of tap -- it can't account
@@ -1977,7 +1990,7 @@ export default function EditPdfTool() {
   // simply don't get this extra correction and fall back to the Phase 15
   // scrollIntoView-at-focus-time behavior alone, unchanged.
   useEffect(() => {
-    const isEditorOpen = activeTool === "select" && selectedRunIndices.length === 1 && Boolean(editableRunMatches[selectedRunIndices[0]]);
+    const isEditorOpen = activeTool === "select" && selectedRunIndices.length === 1 && Boolean(interactionEditableRunMatches[selectedRunIndices[0]]);
     if (!isEditorOpen || typeof window === "undefined" || !window.visualViewport) return;
 
     const viewport = window.visualViewport;
@@ -1994,7 +2007,7 @@ export default function EditPdfTool() {
     }
     viewport.addEventListener("resize", handleViewportResize);
     return () => viewport.removeEventListener("resize", handleViewportResize);
-  }, [activeTool, selectedRunIndices, editableRunMatches]);
+  }, [activeTool, selectedRunIndices, interactionEditableRunMatches]);
 
 
   async function addFile(files: FileList | File[]) {
@@ -2504,7 +2517,7 @@ export default function EditPdfTool() {
       : null;
   const selectedNativeRunMatch =
     selectedRunIndices.length === 1
-      ? editableRunMatches[selectedRunIndices[0]] ?? null
+      ? interactionEditableRunMatches[selectedRunIndices[0]] ?? null
       : null;
   const nativeFillCapability = useMemo(
     () =>
@@ -3541,7 +3554,7 @@ export default function EditPdfTool() {
   // JSX below, instead of repeatedly indexing detectedTextRuns/runMatches by
   // selectedRunIndices[0] at each use site.
   const singleSelectedRun = selectedRunIndices.length === 1 ? detectedTextRuns[selectedRunIndices[0]] : null;
-  const singleSelectedRunMatch = selectedRunIndices.length === 1 ? editableRunMatches[selectedRunIndices[0]] : null;
+  const singleSelectedRunMatch = selectedRunIndices.length === 1 ? interactionEditableRunMatches[selectedRunIndices[0]] : null;
   const singleSelectedSpan = selectedNativeSpan;
   const singleSpanLogicalOffsets = singleSelectedSpan
     ? orderedSingleSpanOffsets(logicalSelection, singleSelectedSpan.id)
@@ -3614,12 +3627,12 @@ export default function EditPdfTool() {
     : "";
 
   const selectedLimitedRunIndex =
-    selectedRunIndices.find((index) => !editableRunMatches[index]) ?? null;
+    selectedRunIndices.find((index) => !interactionEditableRunMatches[index]) ?? null;
   const activeLimitedRunIndex =
     selectedLimitedRunIndex ??
-    (hoveredRunIndex >= 0 && !editableRunMatches[hoveredRunIndex]
+    (hoveredRunIndex >= 0 && !interactionEditableRunMatches[hoveredRunIndex]
       ? hoveredRunIndex
-      : focusedRunIndex !== null && !editableRunMatches[focusedRunIndex]
+      : focusedRunIndex !== null && !interactionEditableRunMatches[focusedRunIndex]
         ? focusedRunIndex
         : null);
   const activeLimitedRunMessage =
@@ -4219,7 +4232,7 @@ export default function EditPdfTool() {
                           run={run}
                           editable={Boolean(
                             nativeTextInteractionCurrent &&
-                              editableRunMatches[index],
+                              interactionEditableRunMatches[index],
                           )}
                           selected={selectedRunIndices.includes(index)}
                           hovered={hoveredRunIndex === index}
