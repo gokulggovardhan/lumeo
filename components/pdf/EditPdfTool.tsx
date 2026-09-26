@@ -604,6 +604,20 @@ export default function EditPdfTool() {
     textDetectionReady &&
     textDetectionRevision?.bytes === pdf?.bytes &&
     textDetectionRevision?.pageIndex === pageIndex;
+  // PDF.js detection and native content-stream matching finish in separate
+  // effects. A current detected run is therefore not yet a safe interactive
+  // target until the matching/font/arbitration effect has also finished for
+  // the SAME byte snapshot and page. This second provenance stamp closes the
+  // WebKit history-reload race where a freshly detected overlay could accept
+  // a click during the small gap before runMatches/pageTextModel caught up.
+  const [textMatchRevision, setTextMatchRevision] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+  } | null>(null);
+  const nativeTextInteractionCurrent =
+    textDetectionCurrent &&
+    textMatchRevision?.bytes === pdf?.bytes &&
+    textMatchRevision?.pageIndex === pageIndex;
   // Phase 9.1: the index-parallel matched-operator for each entry in
   // detectedTextRuns (lib/pdf/edit/matchTextRun.ts), computed once per page
   // load alongside detection itself -- cheap position-only matching, no
@@ -1225,6 +1239,7 @@ export default function EditPdfTool() {
     setPrivacyShieldMatches([]);
     setTextDetectionReady(false);
     setTextDetectionRevision(null);
+    setTextMatchRevision(null);
     setRestyleKeptOriginalText(false);
     setTextSearchOpen(false);
     setTextSearchQuery("");
@@ -1402,6 +1417,7 @@ export default function EditPdfTool() {
     setPrivacyShieldMatches([]);
     setTextDetectionReady(false);
     setTextDetectionRevision(null);
+    setTextMatchRevision(null);
     // Cleared so the raster effect's "is this just a re-sharpen?" check is
     // exact. This effect runs whenever the PAGE or the DOCUMENT BYTES
     // change, so afterwards any render failure is a genuine failure to draw
@@ -1801,6 +1817,7 @@ export default function EditPdfTool() {
         setRunProvenanceMatches(provenanceMatches);
         setTextArbitrations(arbitrations);
         setRunMatches(authorizedMatches);
+        setTextMatchRevision({ bytes: pdf.bytes, pageIndex });
       } catch (matchError) {
         if (!cancelled) {
           console.error(
@@ -1815,6 +1832,7 @@ export default function EditPdfTool() {
           setTextReconciliations([]);
           setTextArbitrations([]);
           setPageOperators([]);
+          setTextMatchRevision(null);
         }
       }
     })();
@@ -4141,7 +4159,10 @@ export default function EditPdfTool() {
                           // page load or edit apply, so an index key is safe here.
                           key={index}
                           run={run}
-                          editable={Boolean(editableRunMatches[index])}
+                          editable={Boolean(
+                            nativeTextInteractionCurrent &&
+                              editableRunMatches[index],
+                          )}
                           selected={selectedRunIndices.includes(index)}
                           hovered={hoveredRunIndex === index}
                           onSelect={(shiftKey) => selectTextRunAndFocus(index, shiftKey)}
