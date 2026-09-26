@@ -105,8 +105,18 @@ export function arbitrateTextEditability({
   const textAgrees =
     reconciliation.agreement === "exact" ||
     reconciliation.agreement === "unicode-normalized";
+  const measuredGeometry =
+    reconciliation.baselineDistancePt !== null &&
+    reconciliation.angleDeltaDeg !== null;
+  const hasExportBaselineEvidence =
+    (typeof run.baselineYPct === "number" && Number.isFinite(run.baselineYPct)) ||
+    (typeof nativeSpan?.fontProfile?.ascentRatio === "number" &&
+      Number.isFinite(nativeSpan.fontProfile.ascentRatio)) ||
+    (typeof run.ascentRatio === "number" && Number.isFinite(run.ascentRatio));
   const sourceAgrees =
     reconciliation.confidence === "high" &&
+    measuredGeometry &&
+    hasExportBaselineEvidence &&
     Boolean(reconciliation.nativeSpanKey) &&
     nativeSpan?.key === reconciliation.nativeSpanKey &&
     nativeSpan.decodeComplete;
@@ -122,19 +132,25 @@ export function arbitrateTextEditability({
     };
   }
 
+  const missingGeometryEvidence =
+    reconciliation.confidence === "high" &&
+    (!measuredGeometry || !hasExportBaselineEvidence);
   const conflict =
     reconciliation.agreement === "different" ||
     reconciliation.confidence === "low" ||
-    reconciliation.confidence === "medium";
+    reconciliation.confidence === "medium" ||
+    missingGeometryEvidence;
 
   return {
     pdfJsRunIndex: runIndex,
     decision: "view-only",
     nativeSpanKey: reconciliation.nativeSpanKey,
     source: conflict ? "conflict" : reconciliation.nativeSpanKey ? "conflict" : "unmatched",
-    reason: conflict
-      ? "PDF.js and native evidence conflict or are not strong enough to authorize a native rewrite."
-      : "No native source operator satisfied the edit-authorization evidence threshold.",
+    reason: missingGeometryEvidence
+      ? "Text identity agrees, but measured PDF.js/native geometry and a safe export baseline are not both available."
+      : conflict
+        ? "PDF.js and native evidence conflict or are not strong enough to authorize a native rewrite."
+        : "No native source operator satisfied the edit-authorization evidence threshold.",
   };
 }
 
