@@ -18,7 +18,10 @@ export type SpanTextCapabilityClassification = {
   nativeSpanKey: string;
   category: DocumentTextCapabilityCategory;
   safelyRewritable: boolean;
+  /** Internal engineering/diagnostic evidence. */
   reason: string;
+  /** Plain-language product explanation. Never used as write authority. */
+  userMessage: string;
 };
 
 export type PageTextCapabilityClassification = {
@@ -30,8 +33,59 @@ export type PageTextCapabilityClassification = {
   nativeOnlySpanCount: number;
   pdfJsOnlyRunCount: number;
   rasterImageEvidence: boolean;
+  /** Internal engineering/diagnostic evidence. */
   reasons: readonly string[];
+  /** Plain-language page explanation. Never used as write authority. */
+  userMessage: string;
 };
+
+export function userMessageForTextCapability(
+  category: DocumentTextCapabilityCategory,
+  safelyRewritable = false,
+): string {
+  switch (category) {
+    case "NATIVE_TEXT":
+      return "This is native PDF text with enough font and geometry information for safe in-place editing.";
+    case "SCANNED_IMAGE":
+      return "This page appears to be an image scan. There is no native PDF text to edit here yet.";
+    case "HYBRID_TEXT_AND_IMAGE":
+      return "This page mixes native PDF text with image content. Native text may be editable, but text inside images stays read-only.";
+    case "NATIVE_TEXT_WITH_ENCODING_LIMITATIONS":
+      return "Lumeo found native PDF text here, but its character mapping is incomplete or ambiguous. Editing is disabled to avoid changing the wrong characters.";
+    case "NATIVE_TEXT_WITH_FONT_LIMITATIONS":
+      return "Lumeo found native PDF text here, but the font does not provide reliable character-width information. Editing is disabled to avoid shifting the layout.";
+    case "COMPLEX_VECTOR_TEXT":
+      return "This text uses a skewed or complex transform that Lumeo cannot reproduce safely yet, so it stays read-only.";
+    case "TYPE3_TEXT":
+      return "This text uses a custom-drawn PDF font. Lumeo can display it, but exact in-place editing is not yet proven safe.";
+    case "FORM_XOBJECT_TEXT":
+      return safelyRewritable
+        ? "This text is stored inside a reusable PDF form object. Lumeo can edit it only when the selected instance can be isolated safely."
+        : "This text is stored inside a reusable PDF form object whose local resources cannot be isolated safely yet, so it stays read-only.";
+    case "CLIPPED_TEXT":
+      return "This text also participates in a clipping mask. Editing it could change other page graphics, so Lumeo keeps it read-only.";
+    case "VERTICAL_TEXT":
+      return "This text uses vertical writing. Lumeo can read it, but vertical in-place editing is not yet proven safe.";
+    case "UNKNOWN_OR_UNSAFE":
+    default:
+      return "Lumeo can see content here, but it cannot prove a safe native text-edit path from the PDF evidence yet.";
+  }
+}
+
+function pageUserMessage({
+  category,
+  nativeOnlySpanCount,
+  pdfJsOnlyRunCount,
+}: {
+  category: DocumentTextCapabilityCategory;
+  nativeOnlySpanCount: number;
+  pdfJsOnlyRunCount: number;
+}): string {
+  if (category === "NATIVE_TEXT" && (nativeOnlySpanCount > 0 || pdfJsOnlyRunCount > 0)) {
+    return "Most native text on this page is editable, but some visible text could not be mapped back to a safe native PDF edit target.";
+  }
+  return userMessageForTextCapability(category, category === "FORM_XOBJECT_TEXT");
+}
 
 function matrixSkewMagnitudeDeg(matrix: readonly number[]): number {
   const x = (Math.atan2(matrix[1], matrix[0]) * 180) / Math.PI;
@@ -52,6 +106,7 @@ export function classifyNativeTextSpan(
       category: "CLIPPED_TEXT",
       safelyRewritable: false,
       reason: "The text participates in a clipping rendering mode.",
+      userMessage: userMessageForTextCapability("CLIPPED_TEXT"),
     };
   }
   if (profile?.kind === "Type3") {
@@ -60,6 +115,7 @@ export function classifyNativeTextSpan(
       category: "TYPE3_TEXT",
       safelyRewritable: false,
       reason: "Type3 glyph programs are not yet proven safe for native rewrite.",
+      userMessage: userMessageForTextCapability("TYPE3_TEXT"),
     };
   }
   if (profile?.resourceIdentity.writingMode === "vertical") {
@@ -68,6 +124,7 @@ export function classifyNativeTextSpan(
       category: "VERTICAL_TEXT",
       safelyRewritable: false,
       reason: "The Type0 font uses a vertical CMap; vertical native rewrite is not yet proven safe.",
+      userMessage: userMessageForTextCapability("VERTICAL_TEXT"),
     };
   }
   if (span.locatedOperator.locator.kind === "xobject") {
@@ -76,6 +133,10 @@ export function classifyNativeTextSpan(
       category: "FORM_XOBJECT_TEXT",
       safelyRewritable: span.decodeComplete && profile?.encodingSource !== "Unknown",
       reason: "The text is inside a Form XObject and retains form-local resource scope.",
+      userMessage: userMessageForTextCapability(
+        "FORM_XOBJECT_TEXT",
+        span.decodeComplete && profile?.encodingSource !== "Unknown",
+      ),
     };
   }
   if (!profile || profile.encodingSource === "Unknown" || !span.decodeComplete) {
@@ -84,6 +145,7 @@ export function classifyNativeTextSpan(
       category: "NATIVE_TEXT_WITH_ENCODING_LIMITATIONS",
       safelyRewritable: false,
       reason: "The source character encoding cannot be proven completely.",
+      userMessage: userMessageForTextCapability("NATIVE_TEXT_WITH_ENCODING_LIMITATIONS"),
     };
   }
   if (profile.metricsSource === "Unknown") {
@@ -92,6 +154,7 @@ export function classifyNativeTextSpan(
       category: "NATIVE_TEXT_WITH_FONT_LIMITATIONS",
       safelyRewritable: false,
       reason: "The source font exists, but deterministic glyph metrics are unavailable.",
+      userMessage: userMessageForTextCapability("NATIVE_TEXT_WITH_FONT_LIMITATIONS"),
     };
   }
   if (matrixSkewMagnitudeDeg(operator.textRenderingMatrix) > 4) {
@@ -100,6 +163,7 @@ export function classifyNativeTextSpan(
       category: "COMPLEX_VECTOR_TEXT",
       safelyRewritable: false,
       reason: "The text transform is materially skewed and is kept read-only.",
+      userMessage: userMessageForTextCapability("COMPLEX_VECTOR_TEXT"),
     };
   }
 
@@ -108,6 +172,7 @@ export function classifyNativeTextSpan(
     category: "NATIVE_TEXT",
     safelyRewritable: true,
     reason: "Native text has decodable source bytes, a resolved font and deterministic metrics.",
+    userMessage: userMessageForTextCapability("NATIVE_TEXT", true),
   };
 }
 
@@ -184,6 +249,11 @@ export class DocumentTextCapabilityClassifier {
       pdfJsOnlyRunCount,
       rasterImageEvidence,
       reasons,
+      userMessage: pageUserMessage({
+        category,
+        nativeOnlySpanCount,
+        pdfJsOnlyRunCount,
+      }),
     };
   }
 }
