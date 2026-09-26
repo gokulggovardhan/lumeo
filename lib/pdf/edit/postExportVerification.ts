@@ -18,6 +18,34 @@ import { decodeTextShowOperator } from "./editPlan.ts";
 import { openPdfJsDocument } from "../pdfjs.ts";
 
 const NUMBER_EPSILON = 1e-6;
+// PDF.js source/export transforms are produced by the same pinned renderer.
+// 0.05pt is < 1/1400 inch: large enough for harmless parser float
+// normalization, far smaller than a visible baseline/position shift.
+const PDFJS_TRANSFORM_TOLERANCE_PT = 0.05;
+const PDFJS_NATIVE_MATCH_MAX_DISTANCE_PT = 2;
+
+type PdfJsTextItemLike = {
+  str: string;
+  transform: readonly number[];
+};
+type PdfJsTextContentLike = {
+  items: readonly (PdfJsTextItemLike | { type: string })[];
+};
+type PdfJsPageLike = {
+  getTextContent: () => Promise<PdfJsTextContentLike>;
+};
+type PdfJsDocumentLike = {
+  numPages: number;
+  getPage: (pageNumber: number) => Promise<PdfJsPageLike>;
+  destroy?: () => Promise<void> | void;
+};
+
+export type PostExportPdfJsOpener = (
+  data: ArrayBuffer | Uint8Array,
+) => Promise<PdfJsDocumentLike>;
+
+const defaultPdfJsOpener: PostExportPdfJsOpener = async (data) =>
+  (await openPdfJsDocument(data)) as unknown as PdfJsDocumentLike;
 
 export type PostExportNativeVerificationResult =
   | {
@@ -74,6 +102,7 @@ type OperatorSnapshot = {
   strokeColor: PdfPaintColor | null;
   fillOpacity: number | null;
   strokeOpacity: number | null;
+  decodedText: string | null;
 };
 
 function failed({
@@ -145,7 +174,10 @@ function clonePaint(value: PdfPaintColor | null | undefined): PdfPaintColor | nu
     : null;
 }
 
-function snapshotOperator(located: LocatedTextOperator): OperatorSnapshot {
+function snapshotOperator(
+  located: LocatedTextOperator,
+  decodedText: string | null,
+): OperatorSnapshot {
   const operator = located.operator;
   return {
     operatorIndex: located.operatorIndex,
@@ -171,6 +203,7 @@ function snapshotOperator(located: LocatedTextOperator): OperatorSnapshot {
     strokeColor: clonePaint(operator.strokeColor),
     fillOpacity: operator.fillOpacity ?? null,
     strokeOpacity: operator.strokeOpacity ?? null,
+    decodedText,
   };
 }
 
@@ -338,22 +371,30 @@ function operationPageIndices(targets: readonly NativeTextTarget[]): number[] {
   );
 }
 
+function decodeLocatedOperator(
+  registry: PdfFontRegistry,
+  entry: LocatedTextOperator,
+): string | null {
+  const resourceName = entry.operator.fontResourceName;
+  if (!resourceName) return null;
+  const profile = registry.resolve(entry.resources, resourceName);
+  if (!profile) return null;
+  const decoded = decodeTextShowOperator(
+    entry.operator,
+    profile.resolvedFont,
+  );
+  return decoded.allDecoded ? decoded.text : null;
+}
+
 function decodeTarget(
   registry: PdfFontRegistry,
   located: readonly LocatedTextOperator[],
 ): string | null {
   let text = "";
   for (const entry of located) {
-    const resourceName = entry.operator.fontResourceName;
-    if (!resourceName) return null;
-    const profile = registry.resolve(entry.resources, resourceName);
-    if (!profile) return null;
-    const decoded = decodeTextShowOperator(
-      entry.operator,
-      profile.resolvedFont,
-    );
-    if (!decoded.allDecoded) return null;
-    text += decoded.text;
+    const decoded = decodeLocatedOperator(registry, entry);
+    if (decoded === null) return null;
+    text += decoded;
   }
   return text;
 }
@@ -414,7 +455,12 @@ async function buildSnapshots(
     snapshots.push({
       key: targetKey(target),
       target,
-      operators: located.map(snapshotOperator),
+      operators: located.map((entry) =>
+        snapshotOperator(
+          entry,
+          decodeLocatedOperator(registry, entry),
+        ),
+      ),
       decodedText: decodeTarget(registry, located),
     });
   }
@@ -422,29 +468,94 @@ async function buildSnapshots(
   return { ok: true, snapshots, pageCount: doc.getPageCount() };
 }
 
+function isPdfJsTextItem(
+  item: PdfJsTextItemLike | { type: string },
+): item is PdfJsTextItemLike {
+  return "str" in item && Array.isArray(item.transform);
+}
+
+function textSequenceTransforms(
+  content: PdfJsTextContentLike,
+  expectedText: string,
+): Matrix2x3[] {
+  const expected = normalizeVisibleText(expectedText);
+  if (!expected) return [];
+
+  const items = content.items.filter(isPdfJsTextItem);
+  const matches: Matrix2x3[] = [];
+  for (let start = 0; start < items.length; start += 1) {
+    let combined = "";
+    for (let end = start; end < items.length; end += 1) {
+      combined += normalizeVisibleText(items[end].str);
+      if (!combined) continue;
+      if (combined === expected) {
+        const transform = cloneMatrix(items[start].transform);
+        if (transform) matches.push(transform);
+        break;
+      }
+      if (combined.length > expected.length) break;
+    }
+  }
+  return matches;
+}
+
+function translationDistance(
+  left: Matrix2x3,
+  right: Matrix2x3,
+): number {
+  return Math.hypot(left[4] - right[4], left[5] - right[5]);
+}
+
+function nearestTransform(
+  candidates: readonly Matrix2x3[],
+  reference: Matrix2x3,
+): Matrix2x3 | null {
+  let best: Matrix2x3 | null = null;
+  let bestDistance = Number.POSITIVE_INFINITY;
+  for (const candidate of candidates) {
+    const distance = translationDistance(candidate, reference);
+    if (distance < bestDistance) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+  return best;
+}
+
+function pdfJsTransformsEqual(
+  left: Matrix2x3,
+  right: Matrix2x3,
+): boolean {
+  return left.every(
+    (value, index) =>
+      Math.abs(value - right[index]) <= PDFJS_TRANSFORM_TOLERANCE_PT,
+  );
+}
+
 async function verifyWithPdfJs({
   sourceBytes,
   exportedBytes,
   snapshots,
+  openPdfJs,
 }: {
   sourceBytes: ArrayBuffer | Uint8Array;
   exportedBytes: Uint8Array;
   snapshots: readonly NativeTargetSnapshot[];
+  openPdfJs: PostExportPdfJsOpener;
 }): Promise<
   | { ok: true; pagesChecked: number }
   | { ok: false; pagesChecked: number; reason: string }
 > {
-  const sourceDoc = await openPdfJsDocument(
+  const sourceDoc = await openPdfJs(
     sourceBytes instanceof Uint8Array
       ? sourceBytes.slice()
       : sourceBytes.slice(0),
   );
-  let exportedDoc: Awaited<ReturnType<typeof openPdfJsDocument>> | null =
-    null;
+  let exportedDoc: PdfJsDocumentLike | null = null;
   let pagesChecked = 0;
 
   try {
-    exportedDoc = await openPdfJsDocument(exportedBytes.slice());
+    exportedDoc = await openPdfJs(exportedBytes.slice());
 
     if (sourceDoc.numPages !== exportedDoc.numPages) {
       return {
@@ -484,12 +595,7 @@ async function verifyWithPdfJs({
         const expected = snapshot.decodedText
           ? normalizeVisibleText(snapshot.decodedText)
           : "";
-        if (!expected || !sourceText.includes(expected)) {
-          // Native-only or deleted/empty text cannot be usefully proven by
-          // PDF.js. The native structural proof still covers it exactly.
-          continue;
-        }
-        if (!exportedText.includes(expected)) {
+        if (expected && sourceText.includes(expected) && !exportedText.includes(expected)) {
           return {
             ok: false,
             pagesChecked,
@@ -498,25 +604,70 @@ async function verifyWithPdfJs({
               "after reopening the export.",
           };
         }
+
+        // For each operator PDF.js can represent as the same exact logical
+        // text sequence, compare its reopened transform too. Matching the
+        // SOURCE sequence to the native matrix first prevents duplicate page
+        // strings from authorizing the wrong occurrence. If PDF.js merged the
+        // native run with unrelated adjacent text, the structural native proof
+        // remains authoritative and this cross-engine geometry check is simply
+        // unavailable rather than guessed.
+        for (const operator of snapshot.operators) {
+          const operatorText = operator.decodedText ?? "";
+          const sourceCandidates = textSequenceTransforms(
+            sourceContent,
+            operatorText,
+          );
+          const sourceTransform = nearestTransform(
+            sourceCandidates,
+            operator.textRenderingMatrix,
+          );
+          if (
+            !sourceTransform ||
+            translationDistance(
+              sourceTransform,
+              operator.textRenderingMatrix,
+            ) > PDFJS_NATIVE_MATCH_MAX_DISTANCE_PT
+          ) {
+            continue;
+          }
+
+          const exportedCandidates = textSequenceTransforms(
+            exportedContent,
+            operatorText,
+          );
+          const exportedTransform = nearestTransform(
+            exportedCandidates,
+            sourceTransform,
+          );
+          if (!exportedTransform) {
+            return {
+              ok: false,
+              pagesChecked,
+              reason:
+                `PDF.js could not rematch committed native text geometry on page ${pageIndex + 1} after export.`,
+            };
+          }
+          if (!pdfJsTransformsEqual(sourceTransform, exportedTransform)) {
+            return {
+              ok: false,
+              pagesChecked,
+              reason:
+                `PDF.js detected a native text position/transform change on page ${pageIndex + 1} after export.`,
+            };
+          }
+        }
       }
 
       pagesChecked += 1;
     }
     return { ok: true, pagesChecked };
   } finally {
-    const sourceDestroy = (
-      sourceDoc as { destroy?: () => Promise<void> | void }
-    ).destroy;
-    if (typeof sourceDestroy === "function") {
-      await sourceDestroy.call(sourceDoc);
+    if (typeof sourceDoc.destroy === "function") {
+      await sourceDoc.destroy();
     }
-    if (exportedDoc) {
-      const exportedDestroy = (
-        exportedDoc as { destroy?: () => Promise<void> | void }
-      ).destroy;
-      if (typeof exportedDestroy === "function") {
-        await exportedDestroy.call(exportedDoc);
-      }
+    if (exportedDoc && typeof exportedDoc.destroy === "function") {
+      await exportedDoc.destroy();
     }
   }
 }
@@ -536,11 +687,13 @@ export async function verifyPostExportNativeEdits({
   exportedBytes,
   session,
   verifyPdfJs = true,
+  openPdfJs = defaultPdfJsOpener,
 }: {
   sourceBytes: ArrayBuffer | Uint8Array;
   exportedBytes: Uint8Array;
   session: PdfEditSessionState;
   verifyPdfJs?: boolean;
+  openPdfJs?: PostExportPdfJsOpener;
 }): Promise<PostExportNativeVerificationResult> {
   const targets = nativeTargets(session);
   if (targets.length === 0) {
@@ -605,7 +758,7 @@ export async function verifyPostExportNativeEdits({
             checkedOperators,
           });
         }
-        const actual = snapshotOperator(candidate);
+        const actual = snapshotOperator(candidate, expected.decodedText);
         if (!operatorStateEquals(expected, actual)) {
           return failed({
             reason:
@@ -625,6 +778,7 @@ export async function verifyPostExportNativeEdits({
         sourceBytes,
         exportedBytes,
         snapshots: source.snapshots,
+        openPdfJs,
       });
       pdfJsPagesChecked = pdfJs.pagesChecked;
       if (!pdfJs.ok) {
