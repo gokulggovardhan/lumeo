@@ -75,7 +75,9 @@ import {
   type TextSignalReconciliation,
 } from "@/lib/pdf/edit/textReconciliation";
 import {
+  classifyNativeTextSpan,
   DocumentTextCapabilityClassifier,
+  enforceSpanCapabilityOnArbitration,
   type PageTextCapabilityClassification,
 } from "@/lib/pdf/edit/textCapabilityClassifier";
 import {
@@ -884,36 +886,50 @@ export default function EditPdfTool() {
   }, [detectedTextRuns, runProvenanceMatches, pageFontProfiles, pageOperators]);
 
 
-  // Final write authority is the single-signal arbitration plus one narrowly
-  // defined second proof: exact fragmented-run reconstruction. The latter is
-  // what preserves the established consecutive Tj/TJ editing path without
-  // turning a generic PDF.js/native conflict into an editable run.
-  const effectiveTextArbitrations = useMemo(
-    () =>
-      detectedTextRuns.map((_run, index) => {
-        const arbitration =
-          textArbitrations[index] ??
-          ({
-            pdfJsRunIndex: index,
-            decision: "view-only",
-            nativeSpanKey: null,
-            source: "unmatched",
-            reason: "Edit authorization evidence has not been established for this run.",
-          } satisfies TextEditArbitration);
-        return finalizeTextEditArbitration({
-          arbitration,
-          run: detectedTextRuns[index],
-          reconciliation: textReconciliations[index] ?? null,
-          fragmentedReconstructionProven: fragmentedRunReconstructions.has(index),
-        });
-      }),
-    [
-      detectedTextRuns,
-      textArbitrations,
-      textReconciliations,
-      fragmentedRunReconstructions,
-    ],
-  );
+  // Final write authority requires BOTH signal agreement and structural PDF
+  // capability safety. Exact fragmented-run reconstruction can resolve the
+  // established multi-operator provenance case, but a matched run still stays
+  // read-only when its native source is clipping text, Type3, vertical,
+  // metric/encoding-limited or otherwise classified unsafe.
+  const effectiveTextArbitrations = useMemo(() => {
+    const nativeCapabilityByKey = new Map(
+      nativeTextSpans.map((span) => [
+        span.key,
+        classifyNativeTextSpan(span),
+      ] as const),
+    );
+
+    return detectedTextRuns.map((_run, index) => {
+      const arbitration =
+        textArbitrations[index] ??
+        ({
+          pdfJsRunIndex: index,
+          decision: "view-only",
+          nativeSpanKey: null,
+          source: "unmatched",
+          reason: "Edit authorization evidence has not been established for this run.",
+        } satisfies TextEditArbitration);
+      const finalized = finalizeTextEditArbitration({
+        arbitration,
+        run: detectedTextRuns[index],
+        reconciliation: textReconciliations[index] ?? null,
+        fragmentedReconstructionProven: fragmentedRunReconstructions.has(index),
+      });
+      const spanClassification = finalized.nativeSpanKey
+        ? nativeCapabilityByKey.get(finalized.nativeSpanKey) ?? null
+        : null;
+      return enforceSpanCapabilityOnArbitration({
+        arbitration: finalized,
+        spanClassification,
+      });
+    });
+  }, [
+    detectedTextRuns,
+    textArbitrations,
+    textReconciliations,
+    fragmentedRunReconstructions,
+    nativeTextSpans,
+  ]);
 
   const editableRunMatches = useMemo(
     () =>
