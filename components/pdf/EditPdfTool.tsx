@@ -2449,6 +2449,54 @@ export default function EditPdfTool() {
     };
   }, [selectedNativeSpan, nativeStyleDraft]);
 
+  const activeCaretTextStyleSnapshot =
+    selectedNativeSpan &&
+    caretTextStyleSnapshot?.spanId === selectedNativeSpan.id
+      ? caretTextStyleSnapshot
+      : null;
+
+  const handleEditDraftTextChange = useCallback(
+    (nextText: string) => {
+      const selectedIndex =
+        selectedRunIndices.length === 1 ? selectedRunIndices[0] : null;
+      const canCaptureSingleNativeSpan =
+        selectedIndex !== null &&
+        selectedNativeSpan !== null &&
+        selectedNativeRunMatch !== null &&
+        !fragmentedRunReconstructions.has(selectedIndex);
+
+      if (
+        nextText.length === 0 &&
+        editDraftText.length > 0 &&
+        canCaptureSingleNativeSpan
+      ) {
+        setCaretTextStyleSnapshot(
+          captureCaretTextStyleSnapshot({
+            span: selectedNativeSpan,
+            locatedOperator: selectedNativeRunMatch.locatedOperator,
+          }),
+        );
+      } else if (
+        nextText.length > 0 &&
+        caretTextStyleSnapshot &&
+        caretTextStyleSnapshot.spanId !== selectedNativeSpan?.id
+      ) {
+        setCaretTextStyleSnapshot(null);
+      }
+
+      setEditDraftText(nextText);
+      setEditApplyError("");
+    },
+    [
+      selectedRunIndices,
+      selectedNativeSpan,
+      selectedNativeRunMatch,
+      fragmentedRunReconstructions,
+      editDraftText,
+      caretTextStyleSnapshot,
+    ],
+  );
+
   // Phase 10: font resolution (resolveFont/resolveFontMetrics -- both parse
   // the font dictionary, the expensive part of building editPreview below)
   // depends only on WHICH run(s) are selected, never on the draft replacement
@@ -2584,15 +2632,66 @@ export default function EditPdfTool() {
         embeddedGlyphEvidence,
         replacementTextState: nativeStyleOverride,
       };
+
+      // Once a single native span has transitioned through an empty draft,
+      // retyping is validated against its persistent style/resource snapshot
+      // before returning to the normal EditPlan glyph/width authority. The
+      // snapshot never authorizes a character or writer path on its own.
+      let strictPlan: EditPlan;
+      if (activeCaretTextStyleSnapshot && editDraftText.length > 0) {
+        const snapshotPlan = buildCaretRetypePlan({
+          snapshot: activeCaretTextStyleSnapshot,
+          locatedOperator,
+          replacementText: editDraftText,
+          resolvedFont,
+          fontMetrics,
+          embeddedGlyphEvidence,
+          replacementTextState: nativeStyleOverride,
+        });
+        if (snapshotPlan.kind === "blocked") {
+          const diagnosticPlan = buildEditPlan(planInputs);
+          return {
+            kind: "single",
+            editable: false,
+            reason: snapshotPlan.reason,
+            plan: diagnosticPlan,
+            resolvedFont,
+            locatedOperator,
+            substituteFont: null,
+          };
+        }
+        strictPlan = snapshotPlan.plan;
+      } else {
+        strictPlan = buildEditPlan(planInputs);
+      }
+
       // Always planned strictly first, in the run's OWN font. A substitute
       // is only ever considered when the real font genuinely can't do the
       // job -- so text that fits the original font keeps it, every time,
       // and the substitution path can never quietly pre-empt a perfect
       // same-font edit.
-      const strictPlan = buildEditPlan(planInputs);
-      const substitutePlan = strictPlan.editable || nativeStyleOverride
-        ? null
-        : buildEditPlan({ ...planInputs, fallbackStyleHints, replacementTextState: null });
+      let substitutePlan: EditPlan | null = null;
+      if (!strictPlan.editable && !nativeStyleOverride) {
+        if (activeCaretTextStyleSnapshot && editDraftText.length > 0) {
+          const snapshotFallback = buildCaretRetypePlan({
+            snapshot: activeCaretTextStyleSnapshot,
+            locatedOperator,
+            replacementText: editDraftText,
+            resolvedFont,
+            fontMetrics,
+            embeddedGlyphEvidence,
+            fallbackStyleHints,
+          });
+          substitutePlan =
+            snapshotFallback.kind === "planned" ? snapshotFallback.plan : null;
+        } else {
+          substitutePlan = buildEditPlan({
+            ...planInputs,
+            fallbackStyleHints,
+            replacementTextState: null,
+          });
+        }
+      }
       const substituteAvailable = substitutePlan?.editable ? substitutePlan : null;
       const plan = useSubstituteFont && substituteAvailable ? substituteAvailable : strictPlan;
 
@@ -2647,7 +2746,7 @@ export default function EditPdfTool() {
       const reason = previewError instanceof Error ? previewError.message : "Could not validate this edit.";
       return { kind: "multi", editable: false, reason, plan: null as never, resolvedFont: null as never };
     }
-  }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont, nativeStyleOverride]);
+  }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont, nativeStyleOverride, activeCaretTextStyleSnapshot]);
 
   const replacementLayoutDecision = useMemo(() => {
     if (editPreview.kind === "empty" || !editPreview.editable) return null;
@@ -3863,8 +3962,7 @@ export default function EditPdfTool() {
                         ref={inlineEditInputRef}
                         value={editDraftText}
                         onChange={(event) => {
-                          setEditDraftText(event.target.value);
-                          setEditApplyError("");
+                          handleEditDraftTextChange(event.target.value);
                         }}
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => {
@@ -4278,8 +4376,7 @@ export default function EditPdfTool() {
                           aria-label="Edit selected text runs"
                           value={editDraftText}
                           onChange={(event) => {
-                            setEditDraftText(event.target.value);
-                            setEditApplyError("");
+                            handleEditDraftTextChange(event.target.value);
                           }}
                           className="mt-1 w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
                         />
