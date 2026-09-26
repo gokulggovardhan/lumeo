@@ -8,7 +8,7 @@ import {
   logicalRangeForSingleSpan,
   type LogicalTextDirection,
   type LogicalTextRange,
-} from "@/lib/pdf/edit/logicalTextRange";
+} from "../../../lib/pdf/edit/logicalTextRange.ts";
 
 type TextRunLike = Readonly<{ str: string }>;
 
