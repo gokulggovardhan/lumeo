@@ -103,12 +103,20 @@ import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
-import { buildEditPlan, type EditPlan } from "@/lib/pdf/edit/editPlan";
+import {
+  buildEditPlan,
+  isValidatedEditPlan,
+  type EditPlan,
+} from "@/lib/pdf/edit/editPlan";
 import {
   buildCaretRetypePlan,
   captureCaretTextStyleSnapshot,
 } from "@/lib/pdf/edit/caretTextStyleSnapshot";
-import { buildMultiRunEditPlan, type MultiRunEditPlan } from "@/lib/pdf/edit/multiRunEditPlan";
+import {
+  buildMultiRunEditPlan,
+  isValidatedMultiRunEditPlan,
+  type MultiRunEditPlan,
+} from "@/lib/pdf/edit/multiRunEditPlan";
 import {
   buildNativeTextStyleBatchPlan,
   type NativeTextStyleBatchPatch,
@@ -2827,13 +2835,27 @@ export default function EditPdfTool() {
     try {
       if (editPreview.kind === "single") {
         const { plan, resolvedFont, locatedOperator } = editPreview;
+        if (!isValidatedEditPlan(plan)) {
+          throw new Error(
+            "The native edit dry-run is no longer valid. Reselect the text and try again.",
+          );
+        }
         await engine.applyEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode, {
           isolate: locatedOperator.locator.kind === "xobject",
           nativePaintPlan: nativePaintPlan?.editable ? nativePaintPlan : undefined,
         });
       } else {
         const { plan, resolvedFont } = editPreview;
-        await engine.applyMultiRunEditPlanToDocument(doc, plan, resolvedFont.bytesPerCode);
+        if (!isValidatedMultiRunEditPlan(plan)) {
+          throw new Error(
+            "The multi-run edit dry-run is no longer valid. Reselect the text and try again.",
+          );
+        }
+        await engine.applyMultiRunEditPlanToDocument(
+          doc,
+          plan,
+          resolvedFont.bytesPerCode,
+        );
       }
 
       const newBytes = await doc.save();
