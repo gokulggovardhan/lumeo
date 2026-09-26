@@ -838,12 +838,19 @@ export default function EditPdfTool() {
             source: "unmatched",
             reason: "Edit authorization evidence has not been established for this run.",
           } satisfies TextEditArbitration);
-        return finalizeTextEditArbitration(
+        return finalizeTextEditArbitration({
           arbitration,
-          fragmentedRunReconstructions.has(index),
-        );
+          run: detectedTextRuns[index],
+          reconciliation: textReconciliations[index] ?? null,
+          fragmentedReconstructionProven: fragmentedRunReconstructions.has(index),
+        });
       }),
-    [detectedTextRuns, textArbitrations, fragmentedRunReconstructions],
+    [
+      detectedTextRuns,
+      textArbitrations,
+      textReconciliations,
+      fragmentedRunReconstructions,
+    ],
   );
 
   const editableRunMatches = useMemo(
