@@ -17,6 +17,7 @@ export const WITH_IMAGE_PDF = path.join(TMP_DIR, "with-image.pdf");
 export const SPLIT_RUN_PDF = path.join(TMP_DIR, "split-run.pdf");
 export const TWO_PAGE_PDF = path.join(TMP_DIR, "two-page.pdf");
 export const MIXED_STYLE_PDF = path.join(TMP_DIR, "mixed-style.pdf");
+export const LIMITED_TEXT_PDF = path.join(TMP_DIR, "limited-text.pdf");
 
 /** Widely spaced so each line is its own detected run and boxes cannot straddle two. */
 function drawSensitiveText(page: import("pdf-lib").PDFPage, font: import("pdf-lib").PDFFont) {
@@ -167,6 +168,38 @@ async function mixedStyle(): Promise<Uint8Array> {
   return doc.save();
 }
 
+/**
+ * One visible text run uses PDF text rendering mode 4 (fill + clipping).
+ * It must stay read-only because changing it would also change the clipping
+ * path, while the ordinary run below remains independently editable.
+ */
+async function limitedText(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const context = doc.context;
+  const fonts = context.obj({});
+  fonts.set(PDFName.of("F1"), font.ref);
+  page.node.Resources()!.set(PDFName.of("Font"), fonts);
+
+  const body = [
+    "BT",
+    "/F1 18 Tf",
+    "1 0 0 1 60 740 Tm",
+    "4 Tr",
+    "(Clipped label) Tj",
+    "0 Tr",
+    "1 0 0 1 60 680 Tm",
+    "(Normal label) Tj",
+    "ET",
+  ].join("\n");
+  page.node.set(
+    PDFName.of("Contents"),
+    context.register(context.flateStream(new TextEncoder().encode(body))),
+  );
+  return doc.save();
+}
+
 /** Two pages, so the PAGES rail renders -- it is hidden for a single page. */
 async function twoPage(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -188,4 +221,5 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(SPLIT_RUN_PDF, split);
   await writeFile(TWO_PAGE_PDF, await twoPage());
   await writeFile(MIXED_STYLE_PDF, await mixedStyle());
+  await writeFile(LIMITED_TEXT_PDF, await limitedText());
 }
