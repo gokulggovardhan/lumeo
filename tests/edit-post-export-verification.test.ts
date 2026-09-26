@@ -71,8 +71,8 @@ async function buildNativeEditedFixture(): Promise<{
     fontMetrics: profile.metrics,
     embeddedGlyphEvidence: profile.embeddedGlyphEvidence,
   });
-  assert.equal(plan.editable, true, plan.reason ?? undefined);
   if (!plan.editable) throw new Error(plan.reason);
+  assert.equal(plan.editable, true);
 
   await applyEditPlanToDocument(
     doc,
@@ -189,8 +189,8 @@ test("post-export verification blocks a text-corrupted native target", async () 
     fontMetrics: profile.metrics,
     embeddedGlyphEvidence: profile.embeddedGlyphEvidence,
   });
-  assert.equal(corruptPlan.editable, true, corruptPlan.reason ?? undefined);
   if (!corruptPlan.editable) throw new Error(corruptPlan.reason);
+  assert.equal(corruptPlan.editable, true);
 
   await applyEditPlanToDocument(
     corrupted,
