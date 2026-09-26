@@ -4002,7 +4002,7 @@ export default function EditPdfTool() {
                     // comment for why they're derived up there and not
                     // inline here.
                     <div
-                      data-edit-multi-run-panel
+                      data-edit-inline-panel
                       className="absolute z-30"
                       style={{
                         left: `${singleSelectedRun.xPct}%`,
