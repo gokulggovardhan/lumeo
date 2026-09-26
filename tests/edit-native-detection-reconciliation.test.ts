@@ -9,6 +9,7 @@ import {
   nativeDetectedRuns,
 } from "../lib/pdf/edit/nativeTextDetection.ts";
 import {
+  buildTextEditArbitrations,
   reconcileTextSignals,
   reconciliationMatchMap,
 } from "../lib/pdf/edit/textReconciliation.ts";
@@ -211,6 +212,100 @@ test("reconciliation can recover a high-confidence source match from Unicode plu
   assert.equal(reconciliations[0].agreement, "exact");
   assert.equal(reconciliations[0].source, "evidence-match");
   assert.equal(reconciliationMatchMap(reconciliations, [span]).get(0)?.key, span.key);
+});
+
+test("edit arbitration fails closed when PDF.js and native text disagree", () => {
+  const source = located();
+  const [span] = buildNativeContentStreamSpans({
+    operators: [source],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  });
+  const run = {
+    str: "No",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 2,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    pdfJsTransform: [12, 0, 0, 12, 72, 700],
+    detectionSource: "pdfjs" as const,
+  };
+
+  const reconciliations = reconcileTextSignals({
+    runs: [run],
+    legacyMatches: [{ locatedOperator: source, operator: source.operator }],
+    nativeSpans: [span],
+    viewportTransform: viewport,
+  });
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [run],
+    reconciliations,
+    nativeSpans: [span],
+  });
+
+  assert.equal(reconciliations[0].agreement, "different");
+  assert.equal(arbitration.decision, "view-only");
+  assert.equal(arbitration.source, "conflict");
+  assert.match(arbitration.reason, /conflict|not strong enough/i);
+});
+
+test("edit arbitration never promotes PDF.js-only text to a native edit target", () => {
+  const run = {
+    str: "Visible only",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 10,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    pdfJsTransform: [12, 0, 0, 12, 72, 700],
+    detectionSource: "pdfjs" as const,
+  };
+
+  const reconciliations = reconcileTextSignals({
+    runs: [run],
+    legacyMatches: [null],
+    nativeSpans: [],
+    viewportTransform: viewport,
+  });
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [run],
+    reconciliations,
+    nativeSpans: [],
+  });
+
+  assert.equal(reconciliations[0].confidence, "unmatched");
+  assert.equal(arbitration.decision, "view-only");
+  assert.equal(arbitration.nativeSpanKey, null);
+});
+
+test("edit arbitration preserves proven native-only safe synthesis", () => {
+  const source = located();
+  const spans = buildNativeContentStreamSpans({
+    operators: [source],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  });
+  const [nativeRun] = nativeDetectedRuns(spans);
+  assert.ok(nativeRun);
+
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [nativeRun],
+    reconciliations: [],
+    nativeSpans: spans,
+  });
+
+  assert.equal(arbitration.decision, "editable");
+  assert.equal(arbitration.source, "native-only-safe-synthesis");
+  assert.equal(arbitration.nativeSpanKey, spans[0].key);
 });
 
 test("reconciliation overrides a wrong positional legacy match when stronger native evidence exists", () => {
