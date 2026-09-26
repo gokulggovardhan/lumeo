@@ -21,6 +21,7 @@ export type TextEditArbitrationDecision = "editable" | "view-only";
 export type TextEditArbitrationSource =
   | "reconciled"
   | "native-only-safe-synthesis"
+  | "fragmented-reconstruction"
   | "conflict"
   | "pdfjs-only"
   | "unmatched";
@@ -154,7 +155,44 @@ export function arbitrateTextEditability({
   };
 }
 
+/**
+ * Applies the separate, stronger fragmented-run proof after the initial
+ * one-run signal arbitration. A PDF.js visual run may legitimately span
+ * several byte-adjacent Tj/TJ operators, so no single native span can agree
+ * with the whole visible string. That single-span conflict remains visible,
+ * but an exact fragmented reconstruction may independently authorize the
+ * established multi-run writer.
+ *
+ * The caller may pass true only after reconstructFragmentedRun() has proven:
+ * consecutive page-stream operators, identical text state/resource scope,
+ * ignorable gaps only, complete decoding, and exact concatenated Unicode.
+ */
+export function finalizeTextEditArbitration(
+  arbitration: TextEditArbitration,
+  fragmentedReconstructionProven: boolean,
+): TextEditArbitration {
+  if (!fragmentedReconstructionProven || arbitration.decision === "editable") {
+    return arbitration;
+  }
+
+  return {
+    ...arbitration,
+    decision: "editable",
+    source: "fragmented-reconstruction",
+    reason:
+      "Single-operator reconciliation is insufficient, but exact consecutive fragmented-run reconstruction proved the full visible text and writer scope.",
+  };
+}
+
 export function buildTextEditArbitrations({
+  runs,
+  reconciliations,
+  nativeSpans,
+}: {
+  runs: readonly DetectedTextRun[];
+  reconciliations: readonly TextSignalReconciliation[];
+  nativeSpans: readonly NativeContentStreamSpan[];
+}): TextEditArbitration[] {export function buildTextEditArbitrations({
   runs,
   reconciliations,
   nativeSpans,
