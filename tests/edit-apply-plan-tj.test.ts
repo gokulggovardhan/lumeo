@@ -280,6 +280,83 @@ test("TJ rewrite: editing one of several TJ operators leaves the others complete
   assert.deepEqual(strs, ["First line", "Middle line", "Third line"]);
 });
 
+test("text-only Tj replacement preserves the following run origin across repeated edits", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.setFont(font);
+  const fontKey = page.node.newFontDictionary(font.name, font.ref);
+
+  page.pushOperators(
+    beginText(),
+    setFontAndSize(fontKey, 12),
+    moveText(50, 700),
+    PDFOperator.of(PDFOperatorNames.ShowText, [PDFHexString.of(hexOf("First"))]),
+    // Distinct font size keeps PDF.js from coalescing the adjacent shows,
+    // while Tf itself leaves the current text position untouched.
+    setFontAndSize(fontKey, 10),
+    PDFOperator.of(PDFOperatorNames.ShowText, [PDFHexString.of(hexOf("Second"))]),
+    endText(),
+  );
+  let current = await doc.save();
+
+  async function positions(bytes: Uint8Array) {
+    const pdf = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+    const pdfPage = await pdf.getPage(1);
+    const content = await pdfPage.getTextContent();
+    return content.items
+      .filter((item): item is Extract<(typeof content.items)[number], { str: string }> => "str" in item)
+      .map((item) => ({ text: item.str, x: item.transform[4] }));
+  }
+
+  const before = await positions(current);
+  assert.equal(before.length, 2);
+  assert.equal(before.map((item) => item.text).join(""), "FirstSecond");
+  const anchoredSecondX = before[1].x;
+
+  for (const [iteration, replacement] of ["Hi", "Longer first"].entries()) {
+    const { plan, resolvedFont, operators } = await buildPlanForOperatorIndex(
+      current,
+      0,
+      replacement,
+    );
+    assert.equal(plan.editable, true);
+    assert.ok(
+      Math.abs(plan.tjSpacingDelta) > 1e-6,
+      "width-changing text replacement must produce endpoint compensation",
+    );
+    if (iteration === 0) {
+      assert.equal(operators[0].kind, "Tj");
+      assert.deepEqual(operators[0].tjAdjustments, undefined);
+    } else {
+      assert.equal(
+        operators[0].kind,
+        "TJ",
+        "the second edit must parse the compensated TJ produced by the first edit",
+      );
+      assert.equal(operators[0].tjAdjustments?.length, 1);
+      assert.equal(plan.originalTjAdjustmentTotal, operators[0].tjAdjustments?.[0]);
+    }
+
+    const editedDoc = await PDFDocument.load(current.slice());
+    await applyEditPlanToDocument(editedDoc, plan, resolvedFont.bytesPerCode);
+    current = await editedDoc.save();
+
+    const after = await positions(current);
+    assert.equal(after.length, 2);
+    assert.equal(after.map((item) => item.text).join(""), `${replacement}Second`);
+    assert.ok(
+      Math.abs(after[1].x - anchoredSecondX) < 0.05,
+      `following run moved after edit ${iteration + 1}: ${anchoredSecondX} -> ${after[1].x}`,
+    );
+
+    const stream = await decodedContentStreamBytes(current.slice());
+    const rewritten = walkTextShowOperators(stream)[0];
+    assert.equal(rewritten.kind, "TJ");
+    assert.equal(rewritten.tjAdjustments?.length, 1);
+  }
+});
+
 // Replacing a TJ run with empty text used to be rejected outright ("no
 // real reproduced example to validate against"); it's since become a real,
 // tested need -- lib/pdf/edit/multiRunEditPlan.ts intentionally empties
