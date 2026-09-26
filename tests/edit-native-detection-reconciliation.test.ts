@@ -533,6 +533,23 @@ test("classifier refuses unknown encoding and clipping instead of claiming safe 
   })[0];
   assert.equal(classifyNativeTextSpan(clipped).category, "CLIPPED_TEXT");
   assert.equal(classifyNativeTextSpan(clipped).safelyRewritable, false);
+
+  // Clipping changes rewrite safety, not the ability to locate the native
+  // glyph box. Keep a read-only overlay so the product can explain this
+  // limitation even when PDF.js does not expose the clipped text at all.
+  assert.equal(clipped.geometryConfidence, "exact-simple-run");
+  assert.ok(clipped.detectedRun);
+  assert.match(clipped.limitationReason ?? "", /clipping rendering mode/i);
+  const [clippedRun] = nativeDetectedRuns([clipped]);
+  assert.ok(clippedRun);
+
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [clippedRun],
+    reconciliations: [],
+    nativeSpans: [clipped],
+  });
+  assert.equal(arbitration.decision, "view-only");
+  assert.equal(arbitration.nativeSpanKey, clipped.key);
 });
 
 test("capability guard keeps reconciled clipping text read-only and preserves safe native text", () => {
