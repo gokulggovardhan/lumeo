@@ -253,41 +253,97 @@ test("vinext Edit PDF applies native formatting and colour with one native histo
 });
 
 
-test("vinext Edit PDF shows honest mixed formatting for a multi-span logical selection", async ({ page }) => {
+test("vinext Edit PDF applies one safe formatting transaction across mixed native spans", async ({ page }) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
   await uploadEditFixture(page, MIXED_STYLE_PDF);
-  await waitForStageReady(page);
+  const workspace = page.locator("[data-edit-operation-count]");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
 
-  const editableRuns = page.locator('div[role="button"][aria-label^="Editable text: "]');
-  await expect(editableRuns).toHaveCount(2, { timeout: 90_000 });
+  const selectMixedAndOpenFormat = async () => {
+    await waitForStageReady(page);
+    const editableRuns = page.locator('div[role="button"][aria-label^="Editable text: "]');
+    await expect(editableRuns).toHaveCount(2, { timeout: 90_000 });
 
-  const labels = await editableRuns.evaluateAll((nodes) =>
-    nodes.map((node) => node.getAttribute("aria-label") ?? ""),
-  );
-  const firstIndex = labels.findIndex((label) => label.includes("Mixed alpha"));
-  const secondIndex = labels.findIndex((label) => label.includes("Mixed beta"));
-  expect(firstIndex).toBeGreaterThanOrEqual(0);
-  expect(secondIndex).toBeGreaterThanOrEqual(0);
+    const labels = await editableRuns.evaluateAll((nodes) =>
+      nodes.map((node) => node.getAttribute("aria-label") ?? ""),
+    );
+    const firstIndex = labels.findIndex((label) => label.includes("Mixed alpha"));
+    const secondIndex = labels.findIndex((label) => label.includes("Mixed beta"));
+    expect(firstIndex).toBeGreaterThanOrEqual(0);
+    expect(secondIndex).toBeGreaterThanOrEqual(0);
 
-  await editableRuns.nth(firstIndex).click();
-  await editableRuns.nth(secondIndex).click({ modifiers: ["Shift"] });
+    await editableRuns.nth(firstIndex).click();
+    await editableRuns.nth(secondIndex).click({ modifiers: ["Shift"] });
 
-  const multiPanel = page.locator("[data-edit-multi-run-panel]");
-  await expect(multiPanel).toBeVisible();
-  await expect(multiPanel).toHaveAttribute("data-logical-selection-span-count", "2");
+    const multiPanel = page.locator("[data-edit-multi-run-panel]");
+    await expect(multiPanel).toBeVisible();
+    await expect(multiPanel).toHaveAttribute("data-logical-selection-span-count", "2");
+    await expect(multiPanel).toHaveAttribute("data-logical-selection-whole-spans", "true");
 
-  await multiPanel.getByRole("button", { name: "Format" }).click();
-  const formatting = page.locator("[data-native-mixed-formatting]");
-  await expect(formatting).toBeVisible();
+    await multiPanel.getByRole("button", { name: "Format" }).click();
+    const formatting = page.locator("[data-native-mixed-formatting]");
+    await expect(formatting).toBeVisible();
+    return formatting;
+  };
 
-  await expect(formatting.locator("[data-native-mixed-font]")).toHaveText("Mixed");
-  await expect(formatting.locator("[data-native-mixed-font-size]")).toHaveText("Mixed");
-  await expect(formatting.locator("[data-native-mixed-fill]")).toHaveText("Mixed");
+  const initial = await selectMixedAndOpenFormat();
+  await expect(initial.locator("[data-native-mixed-font]")).toHaveText("Mixed");
+  await expect(initial.locator("[data-native-mixed-font-size]")).toHaveValue("");
+  await expect(initial.locator("[data-native-mixed-font-size]")).toHaveAttribute("placeholder", /Mixed/);
+  await expect(initial.locator("[data-native-mixed-horizontal-scale]")).toHaveValue("100");
+  await expect(initial.locator("[data-native-mixed-fill]")).toHaveValue("");
+  await expect(initial.locator("[data-native-mixed-fill]")).toHaveAttribute("placeholder", /Mixed/);
 
   // Weight/italic are deliberately independent style dimensions: the
   // fixture only changes family/size/fill, so these must not be falsely
   // reported mixed.
-  await expect(formatting.locator("[data-native-mixed-weight]")).toHaveText("Regular");
-  await expect(formatting.locator("[data-native-mixed-italic]")).toHaveText("Not italic");
+  await expect(initial.locator("[data-native-mixed-weight]")).toHaveText("Regular");
+  await expect(initial.locator("[data-native-mixed-italic]")).toHaveText("Not italic");
+
+  await initial.locator("[data-native-mixed-font-size]").fill("16");
+  await initial.locator("[data-native-mixed-horizontal-scale]").fill("90");
+  await initial.locator("[data-native-mixed-fill]").fill("#008800");
+  const applyFormatting = initial.locator("[data-native-mixed-apply]");
+  await expect(applyFormatting).toBeEnabled();
+  await applyFormatting.click();
+
+  // One UI action may append one semantic changeStyle record per native span,
+  // but it is committed through ONE history snapshot. Undo below must revert
+  // the complete batch rather than exposing a half-formatted intermediate.
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "2");
+
+  const applied = await selectMixedAndOpenFormat();
+  await expect(applied.locator("[data-native-mixed-font]")).toHaveText("Mixed");
+  await expect(applied.locator("[data-native-mixed-font-size]")).toHaveValue("16");
+  await expect(applied.locator("[data-native-mixed-horizontal-scale]")).toHaveValue("90");
+  await expect(applied.locator("[data-native-mixed-fill]")).toHaveValue("#008800");
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+
+  const undone = await selectMixedAndOpenFormat();
+  await expect(undone.locator("[data-native-mixed-font]")).toHaveText("Mixed");
+  await expect(undone.locator("[data-native-mixed-font-size]")).toHaveValue("");
+  await expect(undone.locator("[data-native-mixed-horizontal-scale]")).toHaveValue("100");
+  await expect(undone.locator("[data-native-mixed-fill]")).toHaveValue("");
+
+  await page.getByRole("button", { name: "Redo" }).click();
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "2");
+
+  const redone = await selectMixedAndOpenFormat();
+  await expect(redone.locator("[data-native-mixed-font]")).toHaveText("Mixed");
+  await expect(redone.locator("[data-native-mixed-font-size]")).toHaveValue("16");
+  await expect(redone.locator("[data-native-mixed-horizontal-scale]")).toHaveValue("90");
+  await expect(redone.locator("[data-native-mixed-fill]")).toHaveValue("#008800");
+
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
 });
 
 test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecutive Tj operators", async ({ page }) => {
