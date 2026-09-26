@@ -30,6 +30,8 @@
 // both used exactly as pdfjs itself documents them).
 type PdfTextItem = { str: string; transform: number[]; width: number; height?: number; fontName: string; dir?: string; hasEOL?: boolean };
 type PdfTextMarkedContent = { type: string };
+type PdfTextStyle = { ascent?: number; descent?: number; vertical?: boolean; fontFamily?: string };
+type PdfTextStyles = Record<string, PdfTextStyle | undefined>;
 type PdfViewportTransform = number[];
 
 // Matches pdfjs-dist's Util.transform(m1, m2) exactly: a 2x3 affine matrix
@@ -72,11 +74,21 @@ export type TransformBoxOrigin = {
 // operators) so both sides of a match are computed identically -- neither
 // duplicates the ascent-ratio constant or the rotated-vs-axis-aligned
 // branch on its own.
-export function boxOriginFromTransform(tx: number[]): TransformBoxOrigin {
+function safeMetricRatio(value: number | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 2
+    ? value
+    : null;
+}
+
+export function boxOriginFromTransform(
+  tx: number[],
+  ascentRatio = DEFAULT_ASCENT_RATIO,
+): TransformBoxOrigin {
   const angle = Math.atan2(tx[1], tx[0]);
   const rotated = Math.abs(angle) > ROTATION_EPSILON;
   const fontHeight = Math.hypot(tx[2], tx[3]);
-  const fontAscent = fontHeight * DEFAULT_ASCENT_RATIO;
+  const safeAscent = safeMetricRatio(ascentRatio) ?? DEFAULT_ASCENT_RATIO;
+  const fontAscent = fontHeight * safeAscent;
 
   const left = rotated ? tx[4] + fontAscent * Math.sin(angle) : tx[4];
   const top = rotated ? tx[5] - fontAscent * Math.cos(angle) : tx[5] - fontAscent;
@@ -114,6 +126,13 @@ export type DetectedTextRun = {
    * work a rotated bounding box needs to stay pixel-accurate.
    */
   rotated: boolean;
+  /** Exact visual baseline origin retained independently from ascent-based bounds. */
+  baselineXPct?: number;
+  baselineYPct?: number;
+  /** Normalized ascent/descent evidence from the detector's font source. */
+  ascentRatio?: number | null;
+  descentRatio?: number | null;
+  verticalWriting?: boolean | null;
   /** Raw pdf.js extraction evidence retained only for diagnostics/reconciliation. */
   pdfJsTransform?: readonly number[];
   pdfJsWidth?: number;
@@ -135,6 +154,7 @@ export function textRunsFromContent(
   viewportTransform: PdfViewportTransform,
   pageWidthPx: number,
   pageHeightPx: number,
+  styles: PdfTextStyles = {},
 ): DetectedTextRun[] {
   if (pageWidthPx <= 0 || pageHeightPx <= 0) return [];
 
@@ -159,7 +179,13 @@ export function textRunsFromContent(
     if (!isTextItem(item) || !item.str.trim()) continue;
 
     const tx = transformPoint2x3(viewportTransform, item.transform);
-    const { left, top, fontHeight, rotated } = boxOriginFromTransform(tx);
+    const style = styles[item.fontName];
+    const ascentRatio = safeMetricRatio(style?.ascent);
+    const descentRatio = safeMetricRatio(style?.descent);
+    const { left, top, fontHeight, rotated } = boxOriginFromTransform(
+      tx,
+      ascentRatio ?? DEFAULT_ASCENT_RATIO,
+    );
 
     const widthPx = item.width * viewportScaleX;
     const heightPx = fontHeight;
@@ -175,6 +201,11 @@ export function textRunsFromContent(
       // scale-1 (point-space) viewport so this is PDF points.
       fontSizePt: fontHeight,
       rotated,
+      baselineXPct: (tx[4] / pageWidthPx) * 100,
+      baselineYPct: (tx[5] / pageHeightPx) * 100,
+      ascentRatio,
+      descentRatio,
+      verticalWriting: style?.vertical ?? null,
       pdfJsTransform: [...item.transform],
       pdfJsWidth: item.width,
       pdfJsHeight: item.height ?? null,

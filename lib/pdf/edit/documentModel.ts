@@ -154,6 +154,45 @@ function regionForBox(box: PercentBox): PdfTextRegion {
   return "body";
 }
 
+function metricRatio(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= 2
+    ? value
+    : null;
+}
+
+function ascentRatioForRun(
+  run: DetectedTextRun,
+  fontProfile: PdfFontProfile | null,
+): number {
+  return (
+    metricRatio(fontProfile?.ascentRatio) ??
+    metricRatio(run.ascentRatio) ??
+    DEFAULT_ASCENT_RATIO
+  );
+}
+
+function baselineForRun(
+  run: DetectedTextRun,
+  boundsPct: PercentBox,
+  mapper: PdfCoordinateMapper,
+  fontProfile: PdfFontProfile | null,
+): number {
+  if (
+    typeof run.baselineYPct === "number" &&
+    Number.isFinite(run.baselineYPct)
+  ) {
+    return mapper.percentPointToVisualPoint({
+      xPct:
+        typeof run.baselineXPct === "number" && Number.isFinite(run.baselineXPct)
+          ? run.baselineXPct
+          : boundsPct.xPct,
+      yPct: run.baselineYPct,
+    }).yPt;
+  }
+
+  return mapper.baselineForBox(boundsPct, ascentRatioForRun(run, fontProfile));
+}
+
 function unionPercentBoxes(boxes: readonly PercentBox[]): PercentBox {
   const left = Math.min(...boxes.map((box) => box.xPct));
   const top = Math.min(...boxes.map((box) => box.yPct));
@@ -427,7 +466,7 @@ export function buildPdfPageTextModel({
       text: run.str,
       boundsPct,
       boundsPt,
-      baselinePt: mapper.baselineForBox(boundsPct, DEFAULT_ASCENT_RATIO),
+      baselinePt: baselineForRun(run, boundsPct, mapper, fontProfile),
       sourceMatrix,
       rotationDeg,
       writingDirection: inferDirection(run.str, rotationDeg),

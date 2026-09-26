@@ -59,6 +59,27 @@ function match(
   };
 }
 
+test("document model stores the detector baseline directly instead of rebuilding it from box height", () => {
+  const detected = run("Baseline", 10, 20, 18, 6);
+  detected.baselineXPct = 11;
+  detected.baselineYPct = 27.5;
+  detected.ascentRatio = 0.61;
+
+  const model = buildPdfPageTextModel({
+    pageIndex: 0,
+    widthPt: 600,
+    heightPt: 800,
+    runs: [detected],
+    matches: [match(0)],
+  });
+
+  assert.equal(model.spans.length, 1);
+  assert.ok(Math.abs(model.spans[0].baselinePt - 220) < 1e-9);
+  // A legacy 0.85 * box-height reconstruction would have produced 200.8pt,
+  // proving this expectation is tied to the explicit baseline, not the box.
+  assert.notEqual(model.spans[0].baselinePt, 200.8);
+});
+
 test("document model keeps distant same-baseline columns as separate lines and blocks", () => {
   const runs = [
     run("Left heading", 10, 20),
