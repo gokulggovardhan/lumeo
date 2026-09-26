@@ -25,7 +25,7 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { walkTextShowOperators } from "../lib/pdf/edit/contentStream.ts";
 import { resolveFont } from "../lib/pdf/edit/fontEncoding.ts";
 import { resolveFontMetrics } from "../lib/pdf/edit/fontMetrics.ts";
-import { buildEditPlan } from "../lib/pdf/edit/editPlan.ts";
+import { buildEditPlan, isValidatedEditPlan } from "../lib/pdf/edit/editPlan.ts";
 import { applyEditPlanToDocument } from "../lib/pdf/edit/applyEditPlan.ts";
 
 async function decodedContentStreamBytes(pdfBytes: Uint8Array): Promise<Uint8Array> {
@@ -221,6 +221,7 @@ test('" rewrite: preserves its own word/char spacing operands verbatim when endp
   assert.equal(plan.charSpacing, 0.3);
   assert.equal(operators[1].wordSpacing, 1);
   assert.equal(operators[1].charSpacing, 0.3);
+  if (!isValidatedEditPlan(plan)) assert.fail(plan.reason);
 
   const editedDoc = await PDFDocument.load(original.slice());
   await applyEditPlanToDocument(editedDoc, plan, resolvedFont.bytesPerCode);

@@ -1,5 +1,5 @@
 import { applyEditPlanToBytes } from "./applyEditPlan.ts";
-import type { EditPlan } from "./editPlan.ts";
+import type { ValidatedEditPlan } from "./editPlan.ts";
 import type { NativePaintPlan } from "./nativePaint.ts";
 
 export class NativePaintPlanRejectedError extends Error {
@@ -35,7 +35,7 @@ function concatBytes(parts: readonly Uint8Array[]): Uint8Array {
  */
 export function applyEditPlanWithNativePaintToBytes(
   contentStreamBytes: Uint8Array,
-  plan: EditPlan,
+  plan: ValidatedEditPlan,
   bytesPerCode: 1 | 2,
   paintPlan: NativePaintPlan,
   options: { fallbackResourceName?: string } = {},

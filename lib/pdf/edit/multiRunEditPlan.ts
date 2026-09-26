@@ -21,27 +21,95 @@ import type { TextShowOperator } from "./contentStream.ts";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "./fontEncoding.ts";
 import type { FontMetrics, TextShowState } from "./fontMetrics.ts";
 import { compareAdvance } from "./fontMetrics.ts";
-import { buildEditPlan, type EditPlan } from "./editPlan.ts";
+import {
+  buildEditPlan,
+  deriveValidatedEditPlanAdvance,
+  isValidatedEditPlan,
+  type EditPlan,
+  type ValidatedEditPlan,
+} from "./editPlan.ts";
 
-export type MultiRunEditPlan = {
+class ValidatedMultiRunEditPlanProof {
+  private readonly validationProof!: true;
+
+  constructor() {
+    Object.defineProperty(this, "validationProof", {
+      value: true,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+  }
+
+  isPlannerIssued(): boolean {
+    return this.validationProof === true;
+  }
+}
+
+type MultiRunEditPlanFields = {
   pageIndex: number;
   contentStreamIndex: number;
-  /** Ascending, consecutive operator indices this plan spans (length >= 2). */
   operatorIndices: number[];
   originalText: string;
   replacementText: string;
-  editable: boolean;
-  reason: string | null;
-  /**
-   * One EditPlan per spanned operator, in the same order as
-   * operatorIndices. Only the first carries the actual replacement text;
-   * the rest are emptied. Apply with
-   * lib/pdf/edit/applyEditPlan.ts's applyMultiRunEditPlanToDocument,
-   * never by applying these individually (their byte offsets are only
-   * mutually consistent when applied together, back-to-front).
-   */
+};
+
+export type ValidatedMultiRunEditPlan =
+  Readonly<MultiRunEditPlanFields> &
+  ValidatedMultiRunEditPlanProof & {
+    readonly editable: true;
+    readonly reason: null;
+    readonly subPlans: readonly ValidatedEditPlan[];
+  };
+
+export type RejectedMultiRunEditPlan = MultiRunEditPlanFields & {
+  editable: false;
+  reason: string;
   subPlans: EditPlan[];
 };
+
+export type MultiRunEditPlan =
+  | ValidatedMultiRunEditPlan
+  | RejectedMultiRunEditPlan;
+
+function issueValidatedMultiRunEditPlan({
+  pageIndex,
+  contentStreamIndex,
+  operatorIndices,
+  originalText,
+  replacementText,
+  subPlans,
+}: MultiRunEditPlanFields & {
+  subPlans: readonly ValidatedEditPlan[];
+}): ValidatedMultiRunEditPlan {
+  const plan = Object.assign(new ValidatedMultiRunEditPlanProof(), {
+    pageIndex,
+    contentStreamIndex,
+    operatorIndices: [...operatorIndices],
+    originalText,
+    replacementText,
+    editable: true as const,
+    reason: null,
+    subPlans: [...subPlans],
+  }) as ValidatedMultiRunEditPlan;
+  Object.freeze(plan.operatorIndices);
+  Object.freeze(plan.subPlans);
+  Object.freeze(plan);
+  return plan;
+}
+
+export function isValidatedMultiRunEditPlan(
+  plan: MultiRunEditPlan,
+): plan is ValidatedMultiRunEditPlan {
+  return (
+    plan instanceof ValidatedMultiRunEditPlanProof &&
+    plan.isPlannerIssued() &&
+    plan.editable === true &&
+    plan.reason === null &&
+    Object.isFrozen(plan) &&
+    plan.subPlans.every(isValidatedEditPlan)
+  );
+}
 
 function rejected(
   pageIndex: number,
@@ -49,7 +117,7 @@ function rejected(
   operatorIndices: number[],
   replacementText: string,
   reason: string,
-): MultiRunEditPlan {
+): RejectedMultiRunEditPlan {
   return {
     pageIndex,
     contentStreamIndex,
@@ -159,18 +227,21 @@ export function buildMultiRunEditPlan({
 
   const originalText = subPlans.map((plan) => plan.originalText).join("");
 
-  const firstRejected = subPlans.find((plan) => !plan.editable);
-  if (firstRejected) {
-    return {
-      pageIndex,
-      contentStreamIndex,
-      operatorIndices: sortedIndices,
-      originalText,
-      replacementText,
-      editable: false,
-      reason: firstRejected.reason,
-      subPlans,
-    };
+  const validatedSubPlans: ValidatedEditPlan[] = [];
+  for (const subPlan of subPlans) {
+    if (!isValidatedEditPlan(subPlan)) {
+      return {
+        pageIndex,
+        contentStreamIndex,
+        operatorIndices: sortedIndices,
+        originalText,
+        replacementText,
+        editable: false,
+        reason: subPlan.reason,
+        subPlans,
+      };
+    }
+    validatedSubPlans.push(subPlan);
   }
 
   // Recompute the first sub-plan's width/delta against the SPAN's true
@@ -178,7 +249,9 @@ export function buildMultiRunEditPlan({
   // glyphs), not just the first operator's own -- otherwise the emptied
   // operators' widths would be uncounted. Reuses fontMetrics.ts's own
   // compareAdvance (the existing spacing engine), not a new calculation.
-  const combinedOriginalCodes = subPlans.flatMap((plan) => plan.originalGlyphCodes);
+  const combinedOriginalCodes = validatedSubPlans.flatMap(
+    (plan) => plan.originalGlyphCodes,
+  );
   const firstOperator = spanOperators[0];
   const state: TextShowState = {
     fontSizePt: firstOperator.fontSizePt,
@@ -186,29 +259,40 @@ export function buildMultiRunEditPlan({
     wordSpacing: firstOperator.wordSpacing,
     horizontalScalingPct: firstOperator.horizontalScalingPct,
   };
-  const comparison = compareAdvance(combinedOriginalCodes, subPlans[0].replacementGlyphCodes, fontMetrics, state);
+  const comparison = compareAdvance(
+    combinedOriginalCodes,
+    validatedSubPlans[0].replacementGlyphCodes,
+    fontMetrics,
+    state,
+  );
 
-  const mergedFirstPlan: EditPlan = {
-    ...subPlans[0],
-    originalWidthPt: comparison.originalAdvancePt,
-    replacementWidthPt: comparison.replacementAdvancePt,
-    tjSpacingDelta: comparison.tjAdjustment,
-  };
+  const mergedFirstPlan = deriveValidatedEditPlanAdvance(
+    validatedSubPlans[0],
+    {
+      originalWidthPt: comparison.originalAdvancePt,
+      replacementWidthPt: comparison.replacementAdvancePt,
+      tjSpacingDelta: comparison.tjAdjustment,
+    },
+  );
 
   // Every OTHER spanned operator is emptied with NO compensating
   // adjustment of its own -- mergedFirstPlan above already accounts for
   // the whole span's width difference in one place; a second, separate
   // adjustment on an emptied operator would double-compensate.
-  const mergedRestPlans: EditPlan[] = subPlans.slice(1).map((plan) => ({ ...plan, tjSpacingDelta: 0 }));
+  const mergedRestPlans = validatedSubPlans.slice(1).map((plan) =>
+    deriveValidatedEditPlanAdvance(plan, {
+      originalWidthPt: plan.originalWidthPt,
+      replacementWidthPt: plan.replacementWidthPt,
+      tjSpacingDelta: 0,
+    }),
+  );
 
-  return {
+  return issueValidatedMultiRunEditPlan({
     pageIndex,
     contentStreamIndex,
     operatorIndices: sortedIndices,
     originalText,
     replacementText,
-    editable: true,
-    reason: null,
     subPlans: [mergedFirstPlan, ...mergedRestPlans],
-  };
+  });
 }

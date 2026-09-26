@@ -149,14 +149,19 @@ test("mixed-span style writer rejects a rejected plan before mutating the docume
 
   await assert.rejects(
     () =>
-      applyNativeTextStyleBatchToDocument(loaded, {
-        editable: false,
-        pageIndex: 0,
-        contentStreamIndex: 0,
-        entries: [],
-        reason: "Blocked by preflight.",
-      }),
-    /Blocked by preflight/,
+      applyNativeTextStyleBatchToDocument(
+        loaded,
+        {
+          editable: false,
+          pageIndex: 0,
+          contentStreamIndex: 0,
+          entries: [],
+          reason: "Blocked by preflight.",
+        } as unknown as Parameters<
+          typeof applyNativeTextStyleBatchToDocument
+        >[1],
+      ),
+    /validated dry-run planner|not issued/i,
   );
 
   const after = await loaded.save();

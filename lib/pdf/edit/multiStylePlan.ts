@@ -7,7 +7,8 @@ import type { FontMetrics, TextShowState } from "./fontMetrics.ts";
 import {
   buildEditPlan,
   decodeTextShowOperator,
-  type EditPlan,
+  isValidatedEditPlan,
+  type ValidatedEditPlan,
 } from "./editPlan.ts";
 import {
   buildNativePaintPlan,
@@ -41,33 +42,107 @@ export type NativeTextStyleBatchInput = {
 
 export type NativeTextStyleBatchEntry = {
   spanId: string;
-  plan: EditPlan;
+  plan: ValidatedEditPlan;
   bytesPerCode: 1 | 2;
   nativePaintPlan: Extract<NativePaintPlan, { editable: true }> | null;
 };
 
+class ValidatedNativeTextStyleBatchProof {
+  private readonly validationProof!: true;
+
+  constructor() {
+    Object.defineProperty(this, "validationProof", {
+      value: true,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+  }
+
+  isPlannerIssued(): boolean {
+    return this.validationProof === true;
+  }
+}
+
+export type ValidatedNativeTextStyleBatchPlan =
+  ValidatedNativeTextStyleBatchProof & {
+    readonly editable: true;
+    readonly pageIndex: number;
+    readonly contentStreamIndex: number;
+    readonly entries: readonly Readonly<NativeTextStyleBatchEntry>[];
+    readonly reason: null;
+  };
+
+export type RejectedNativeTextStyleBatchPlan = {
+  editable: false;
+  pageIndex: number;
+  contentStreamIndex: number | null;
+  entries: NativeTextStyleBatchEntry[];
+  reason: string;
+};
+
 export type NativeTextStyleBatchPlan =
-  | {
-      editable: true;
-      pageIndex: number;
-      contentStreamIndex: number;
-      entries: NativeTextStyleBatchEntry[];
-      reason: null;
-    }
-  | {
-      editable: false;
-      pageIndex: number;
-      contentStreamIndex: number | null;
-      entries: NativeTextStyleBatchEntry[];
-      reason: string;
-    };
+  | ValidatedNativeTextStyleBatchPlan
+  | RejectedNativeTextStyleBatchPlan;
+
+function deepFreezeProofValue<T>(value: T): T {
+  if (!value || typeof value !== "object" || Object.isFrozen(value)) {
+    return value;
+  }
+  for (const child of Object.values(value as Record<string, unknown>)) {
+    deepFreezeProofValue(child);
+  }
+  return Object.freeze(value);
+}
+
+function issueValidatedNativeTextStyleBatchPlan({
+  pageIndex,
+  contentStreamIndex,
+  entries,
+}: {
+  pageIndex: number;
+  contentStreamIndex: number;
+  entries: NativeTextStyleBatchEntry[];
+}): ValidatedNativeTextStyleBatchPlan {
+  const stableEntries = entries.map((entry) =>
+    Object.freeze({
+      ...entry,
+      nativePaintPlan: entry.nativePaintPlan
+        ? deepFreezeProofValue(entry.nativePaintPlan)
+        : null,
+    }),
+  );
+  const batch = Object.assign(new ValidatedNativeTextStyleBatchProof(), {
+    editable: true as const,
+    pageIndex,
+    contentStreamIndex,
+    entries: stableEntries,
+    reason: null,
+  }) as ValidatedNativeTextStyleBatchPlan;
+  Object.freeze(batch.entries);
+  Object.freeze(batch);
+  return batch;
+}
+
+export function isValidatedNativeTextStyleBatchPlan(
+  plan: NativeTextStyleBatchPlan,
+): plan is ValidatedNativeTextStyleBatchPlan {
+  return (
+    plan instanceof ValidatedNativeTextStyleBatchProof &&
+    plan.isPlannerIssued() &&
+    plan.editable === true &&
+    plan.reason === null &&
+    Object.isFrozen(plan) &&
+    plan.entries.every((entry) => isValidatedEditPlan(entry.plan))
+  );
+}
 
 function rejected(
   pageIndex: number,
   contentStreamIndex: number | null,
   reason: string,
   entries: NativeTextStyleBatchEntry[] = [],
-): NativeTextStyleBatchPlan {
+): RejectedNativeTextStyleBatchPlan {
   return {
     editable: false,
     pageIndex,
@@ -210,11 +285,11 @@ export function buildNativeTextStyleBatchPlan({
       replacementTextState: textState,
     });
 
-    if (!plan.editable) {
+    if (!isValidatedEditPlan(plan)) {
       return rejected(
         pageIndex,
         streamIndex,
-        plan.reason ?? "One selected span failed native formatting validation.",
+        plan.reason,
         entries,
       );
     }
@@ -290,11 +365,9 @@ export function buildNativeTextStyleBatchPlan({
     );
   }
 
-  return {
-    editable: true,
+  return issueValidatedNativeTextStyleBatchPlan({
     pageIndex,
     contentStreamIndex: streamIndex,
     entries,
-    reason: null,
-  };
+  });
 }

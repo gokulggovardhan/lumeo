@@ -33,10 +33,19 @@
 
 import { PDFArray, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFStream, decodePDFRawStream } from "pdf-lib";
 import type { PDFContext, PDFDict, PDFPage } from "pdf-lib";
-import type { EditPlan } from "./editPlan.ts";
+import {
+  isValidatedEditPlan,
+  type ValidatedEditPlan,
+} from "./editPlan.ts";
 import { ensureFallbackFontResource, resolveFallbackFontsDict } from "./fallbackFont.ts";
-import type { MultiRunEditPlan } from "./multiRunEditPlan.ts";
-import type { NativeTextStyleBatchPlan } from "./multiStylePlan.ts";
+import {
+  isValidatedMultiRunEditPlan,
+  type ValidatedMultiRunEditPlan,
+} from "./multiRunEditPlan.ts";
+import {
+  isValidatedNativeTextStyleBatchPlan,
+  type ValidatedNativeTextStyleBatchPlan,
+} from "./multiStylePlan.ts";
 import type { NativePaintPlan } from "./nativePaint.ts";
 import { resolveStreamTarget, resolveIsolatedStreamTarget } from "./formXObjects.ts";
 
@@ -54,11 +63,13 @@ function encodeGlyphCodesToHex(codes: number[], bytesPerCode: 1 | 2): string {
   return bytes.map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-const SUPPORTED_OPERATOR_TYPES: ReadonlySet<EditPlan["operatorType"]> = new Set(["Tj", "TJ", "'", '"']);
+const SUPPORTED_OPERATOR_TYPES: ReadonlySet<ValidatedEditPlan["operatorType"]> = new Set(["Tj", "TJ", "'", '"']);
 
-function assertApplicable(plan: EditPlan): void {
-  if (!plan.editable) {
-    throw new EditPlanRejectedError(plan.reason ?? "This edit plan is not editable.");
+function assertApplicable(plan: ValidatedEditPlan): void {
+  if (!isValidatedEditPlan(plan)) {
+    throw new EditPlanRejectedError(
+      "This edit plan was not issued by the validated EditPlan dry-run.",
+    );
   }
   if (!SUPPORTED_OPERATOR_TYPES.has(plan.operatorType)) {
     throw new EditPlanRejectedError(`This rewrite engine does not support the "${plan.operatorType}" operator.`);
@@ -135,7 +146,7 @@ function encodePdfName(name: string): string {
 // with a compensated TJ. This preserves the line move and (for ") the
 // persistent word/character-spacing side effects while keeping any following
 // text show anchored to the original endpoint.
-function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string): string {
+function buildFallbackOperatorText(plan: ValidatedEditPlan, fallbackResourceName: string): string {
   const fallback = plan.fallbackFont;
   if (!fallback) throw new EditPlanRejectedError("This plan does not use a substitute font.");
 
@@ -189,7 +200,7 @@ function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string)
 //   `aw Tw ac Tc T* [<hex> delta] TJ`. This preserves the operator's
 //   persistent word/character-spacing side effects as well as the line move
 //   and the following text position.
-function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): string {
+function buildReplacementOperatorText(plan: ValidatedEditPlan, bytesPerCode: 1 | 2): string {
   const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, bytesPerCode);
   if (plan.operatorType === "Tj") {
     // Text-only replacement can change natural advance just as formatting
@@ -219,7 +230,7 @@ function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): stri
   return adjustedShow;
 }
 
-function buildTextStateOverrideWrapper(plan: EditPlan): { prefix: string; suffix: string } {
+function buildTextStateOverrideWrapper(plan: ValidatedEditPlan): { prefix: string; suffix: string } {
   const target = plan.replacementTextState;
   if (!target) return { prefix: "", suffix: "" };
 
@@ -277,7 +288,7 @@ function buildTextStateOverrideWrapper(plan: EditPlan): { prefix: string; suffix
 // the stream's balanced-parens structure).
 export function applyEditPlanToBytes(
   contentStreamBytes: Uint8Array,
-  plan: EditPlan,
+  plan: ValidatedEditPlan,
   bytesPerCode: 1 | 2,
   options: { fallbackResourceName?: string } = {},
 ): Uint8Array {
@@ -468,7 +479,7 @@ function replaceContentStream(
 // clone at all, identically to isolate: false.
 async function applyPlanToTargetBytes(
   bytes: Uint8Array,
-  plan: EditPlan,
+  plan: ValidatedEditPlan,
   bytesPerCode: 1 | 2,
   fallbackResourceName: string | undefined,
   nativePaintPlan: NativePaintPlan | undefined,
@@ -488,7 +499,7 @@ async function applyPlanToTargetBytes(
 
 export async function applyEditPlanToDocument(
   doc: PDFDocument,
-  plan: EditPlan,
+  plan: ValidatedEditPlan,
   bytesPerCode: 1 | 2,
   options: { isolate?: boolean; nativePaintPlan?: NativePaintPlan } = {},
 ): Promise<void> {
@@ -528,7 +539,7 @@ export async function applyEditPlanToDocument(
 // the same rule (lib/pdf/edit/fallbackFont.ts's resolveFallbackFontsDict).
 async function registerFallbackFont(
   doc: PDFDocument,
-  plan: EditPlan,
+  plan: ValidatedEditPlan,
   formStreamDict: PDFDict | null,
 ): Promise<string | undefined> {
   if (!plan.fallbackFont) return undefined;
@@ -549,11 +560,13 @@ async function registerFallbackFont(
 // each remaining offset stays valid until its own turn.
 export async function applyMultiRunEditPlanToDocument(
   doc: PDFDocument,
-  plan: MultiRunEditPlan,
+  plan: ValidatedMultiRunEditPlan,
   bytesPerCode: 1 | 2,
 ): Promise<void> {
-  if (!plan.editable) {
-    throw new EditPlanRejectedError(plan.reason ?? "This multi-run edit plan is not editable.");
+  if (!isValidatedMultiRunEditPlan(plan)) {
+    throw new EditPlanRejectedError(
+      "This multi-run edit plan was not issued by the validated dry-run planner.",
+    );
   }
   for (const subPlan of plan.subPlans) assertApplicable(subPlan);
   // buildMultiRunEditPlan never opts into the substitute-font path (it
@@ -593,11 +606,11 @@ export async function applyMultiRunEditPlanToDocument(
  */
 export async function applyNativeTextStyleBatchToDocument(
   doc: PDFDocument,
-  batch: NativeTextStyleBatchPlan,
+  batch: ValidatedNativeTextStyleBatchPlan,
 ): Promise<void> {
-  if (!batch.editable) {
+  if (!isValidatedNativeTextStyleBatchPlan(batch)) {
     throw new EditPlanRejectedError(
-      batch.reason ?? "This multi-span native formatting plan is not editable.",
+      "This multi-span native formatting plan was not issued by the validated dry-run planner.",
     );
   }
   if (batch.entries.length === 0) {
