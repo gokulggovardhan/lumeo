@@ -4290,6 +4290,7 @@ export default function EditPdfTool() {
                     // FloatingIsland/MicroDock: the spec requires FloatingIsland
                     // to never activate for existing-PDF-text-run selections.
                     <div
+                      data-edit-multi-run-panel
                       className="absolute z-30"
                       style={{
                         left: `${detectedTextRuns[selectedRunIndices[0]].xPct}%`,
