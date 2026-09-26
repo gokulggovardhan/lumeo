@@ -624,7 +624,12 @@ async function measure(
     detectedTextCharacters: measurableTextCharacters(detectedText),
     expectedSpans: fixture.expectedRuns.length,
     matchedSpans,
-    unmatchedSpans: Math.max(0, substantiveRuns.length - matchedSpans),
+    // "unmatchedSpans" measures expected native source-span coverage, not
+    // every low-level PDF.js fragment. One source Tj may legitimately surface
+    // as several visible PDF.js runs (Courier/table layouts are common) while
+    // all expected text and the native source operator are still proven.
+    // Keep those extra visible fragments in unsupportedRuns as diagnostics.
+    unmatchedSpans: Math.max(0, fixture.expectedRuns.length - matchedSpans),
     correctFontResolutions,
     unresolvedFonts,
     baselineErrorsPt,
@@ -1171,7 +1176,8 @@ async function main() {
     [
       `Edit PDF fidelity corpus report: ${report.fixtureCount} fixtures`,
       `text recall: ${report.aggregate.textRecall === null ? "n/a" : (report.aggregate.textRecall * 100).toFixed(2) + "%"}`,
-      `matched spans: ${report.totals.matchedSpans}/${report.totals.matchedSpans + report.totals.unmatchedSpans}`,
+      `source span coverage: ${report.totals.matchedSpans}/${report.totals.matchedSpans + report.totals.unmatchedSpans}`,
+      `extra PDF.js fragments (diagnostic): ${report.totals.unsupportedRuns}`,
       `native edits: ${report.totals.nativeEditSuccesses}/${report.totals.nativeEditMeasured}`,
       `exports: ${report.totals.exportSuccesses}/${report.totals.exportMeasured}`,
       `reopens: ${report.totals.reopenSuccesses}/${report.totals.reopenMeasured}`,
