@@ -78,6 +78,10 @@ import {
   DocumentTextCapabilityClassifier,
   type PageTextCapabilityClassification,
 } from "@/lib/pdf/edit/textCapabilityClassifier";
+import {
+  userMessageForPageCapability,
+  userMessageForTextRun,
+} from "@/lib/pdf/edit/capabilityMessaging";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
 import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
 import { summarizeNativeTextSelectionStyles } from "@/lib/pdf/edit/mixedStyleSelection";
@@ -954,6 +958,36 @@ export default function EditPdfTool() {
       reconciliations: textReconciliations,
     });
   }, [nativeTextSpans, pdfJsDetectedRunCount, textReconciliations]);
+
+  // Product-facing explanations are derived from structured capability
+  // evidence. Internal classifier/arbitration reason strings stay diagnostic
+  // only and never become the normal UI contract.
+  const pageCapabilityMessage = useMemo(
+    () => userMessageForPageCapability(pageTextCapability),
+    [pageTextCapability],
+  );
+  const runCapabilityMessages = useMemo(() => {
+    const nativeByKey = new Map(
+      pageTextCapability.spanClassifications.map((classification) => [
+        classification.nativeSpanKey,
+        classification,
+      ] as const),
+    );
+    return detectedTextRuns.map((_run, index) => {
+      const arbitration = effectiveTextArbitrations[index] ?? null;
+      const nativeClassification = arbitration?.nativeSpanKey
+        ? nativeByKey.get(arbitration.nativeSpanKey) ?? null
+        : null;
+      return userMessageForTextRun({
+        arbitration,
+        nativeClassification,
+      });
+    });
+  }, [
+    detectedTextRuns,
+    effectiveTextArbitrations,
+    pageTextCapability.spanClassifications,
+  ]);
 
   // Development-only fidelity diagnostics. This deliberately never renders
   // debug noise in the normal product and is compiled behind NODE_ENV.
@@ -4044,6 +4078,8 @@ export default function EditPdfTool() {
                     <div
                       data-edit-page-capability={pageTextModel.capability}
                       role="status"
+                      aria-label={`${pageCapabilityLabel}. ${pageCapabilityMessage.detail}`}
+                      title={pageTextModel.capability === "native-editable" ? undefined : pageCapabilityMessage.detail}
                       className="pointer-events-none absolute right-2 top-2 z-20 rounded-full border border-black/10 bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-[#343842] shadow-sm backdrop-blur-sm"
                     >
                       {pageCapabilityLabel}
@@ -4165,6 +4201,8 @@ export default function EditPdfTool() {
                           )}
                           selected={selectedRunIndices.includes(index)}
                           hovered={hoveredRunIndex === index}
+                          focused={focusedRunIndex === index}
+                          limitationMessage={runCapabilityMessages[index] ?? null}
                           onSelect={(shiftKey) => selectTextRunAndFocus(index, shiftKey)}
                           onHoverStart={() => setHoveredRunIndex((current) => (current === index ? current : index))}
                           onHoverEnd={() => setHoveredRunIndex((current) => (current === -1 ? current : -1))}
@@ -4615,12 +4653,19 @@ export default function EditPdfTool() {
                   {activeTool === "select" && textDetectionCurrent && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
                     <div className="absolute left-3 top-3 z-20 max-w-[260px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
-                        {pageTextCapability.nativeSpanCount > 0 ? "Text detected — editing limited" : "No editable text found"}
-                      </span>
-                      <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
                         {pageTextCapability.nativeSpanCount > 0
-                          ? "This page contains native PDF text, but Lumeo cannot safely reconstruct its editable geometry or encoding yet."
-                          : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
+                          ? pageCapabilityMessage.title
+                          : "No editable text found"}
+                      </span>
+                      <p
+                        data-edit-page-capability-explanation
+                        className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60"
+                      >
+                        {pageTextCapability.nativeSpanCount > 0
+                          ? pageCapabilityMessage.detail
+                          : pageTextCapability.rasterImageEvidence
+                            ? pageCapabilityMessage.detail
+                            : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
                       </p>
                     </div>
                   ) : null}
