@@ -39,7 +39,7 @@ import {
 } from "../lib/pdf/edit/formXObjects.ts";
 import { resolveFont } from "../lib/pdf/edit/fontEncoding.ts";
 import { resolveFontMetrics } from "../lib/pdf/edit/fontMetrics.ts";
-import { buildEditPlan } from "../lib/pdf/edit/editPlan.ts";
+import { buildEditPlan, isValidatedEditPlan } from "../lib/pdf/edit/editPlan.ts";
 import { applyEditPlanToDocument } from "../lib/pdf/edit/applyEditPlan.ts";
 
 function hexOf(text: string): string {
@@ -286,6 +286,7 @@ test("same resource name invoked twice within one parent stream is rejected hone
     resolvedFont,
     fontMetrics,
   });
+  if (!isValidatedEditPlan(plan)) assert.fail(plan.reason);
   await assert.rejects(
     () => applyEditPlanToDocument(editedDoc, plan, resolvedFont.bytesPerCode, { isolate: true }),
     AmbiguousSharedFormError,
@@ -326,6 +327,7 @@ test("a shared immediate-parent Form (cascading reuse) is rejected honestly rath
     resolvedFont,
     fontMetrics,
   });
+  if (!isValidatedEditPlan(plan)) assert.fail(plan.reason);
   await assert.rejects(
     () => applyEditPlanToDocument(editedDoc, plan, resolvedFont.bytesPerCode, { isolate: true }),
     AmbiguousSharedFormError,
