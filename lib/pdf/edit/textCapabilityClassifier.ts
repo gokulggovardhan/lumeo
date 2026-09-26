@@ -73,6 +73,15 @@ export function classifyNativeTextSpan(
       reason: "The Type0 font uses a vertical CMap; vertical native rewrite is not yet proven safe.",
     };
   }
+  if (span.geometryConfidence === "fallback-box") {
+    return {
+      nativeSpanKey: span.key,
+      category: "NATIVE_TEXT_WITH_FONT_LIMITATIONS",
+      safelyRewritable: false,
+      reason:
+        "The source baseline is known, but font ascent/descent metrics are unavailable and the visible text box uses an approximate fallback.",
+    };
+  }
   if (span.locatedOperator.locator.kind === "xobject") {
     return {
       nativeSpanKey: span.key,
