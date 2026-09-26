@@ -4277,6 +4277,12 @@ export default function EditPdfTool() {
                         left: `${detectedTextRuns[selectedRunIndices[0]].xPct}%`,
                         top: `${detectedTextRuns[selectedRunIndices[0]].yPct}%`,
                       }}
+                      data-logical-selection-span-count={logicalSelection?.spanIds.length ?? 0}
+                      data-logical-selection-whole-spans={
+                        pageTextModel && logicalRangeCoversWholeSpans(logicalSelection, pageTextModel)
+                          ? "true"
+                          : "false"
+                      }
                     >
                       <div className="w-64 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 p-3 shadow-lg">
                         <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with ({selectedRunIndices.length} runs selected)</span>
