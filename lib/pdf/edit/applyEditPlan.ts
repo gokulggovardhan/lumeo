@@ -117,16 +117,23 @@ function encodePdfName(name: string): string {
 // applicable Tf had set (contentStream.ts tracks it into the operator), and
 // the substitution changes only the typeface, never the size.
 //
-// A Tj is deliberately promoted to a single-element TJ here, unlike the
-// same-font path which leaves Tj alone. `<hex> Tj` and `[<hex>] TJ` are
-// exactly equivalent per spec 9.4.3, but only the TJ form has anywhere to
-// put the spacing adjustment -- and a substitute font is precisely the case
+// A substitute-font Tj is deliberately emitted as a single-element TJ.
+// `<hex> Tj` and `[<hex>] TJ` are exactly equivalent per spec 9.4.3, but
+// the TJ form has somewhere to put the spacing adjustment. The same-font
+// writer now makes the same promotion whenever a width-changing edit needs
+// endpoint compensation; fallback uses TJ unconditionally because a
+// substitute font is precisely the case
 // where the replacement's natural width is most likely to differ from the
 // original's (measured across the standard families: -7.1% to +22.0%), so
-// having somewhere to absorb that difference matters most here. ' and " are
-// left in their own form for the reason the same-font path already gives:
-// each performs its own text-line move before showing, so what follows
-// starts a fresh line and has no horizontal position to preserve.
+// having somewhere to absorb that difference matters most here.
+//
+// Quote operators need the same endpoint guarantee. Per PDF 32000-1,
+//   '  == T* + Tj
+//   "  == aw Tw + ac Tc + '
+// so a width-changing quote rewrite is expanded to that equivalent sequence
+// with a compensated TJ. This preserves the line move and (for ") the
+// persistent word/character-spacing side effects while keeping any following
+// text show anchored to the original endpoint.
 function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string): string {
   const fallback = plan.fallbackFont;
   if (!fallback) throw new EditPlanRejectedError("This plan does not use a substitute font.");
@@ -136,21 +143,32 @@ function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string)
   const selectSubstitute = `${encodePdfName(fallbackResourceName)} ${size} Tf`;
   const restoreOriginal = `${encodePdfName(fallback.originalFontResourceName)} ${size} Tf`;
 
+  const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
+  const adjustedShow = needsAdjustment
+    ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ`
+    : `[<${hex}>] TJ`;
+
   let show: string;
   if (plan.operatorType === "'") {
-    show = `<${hex}> '`;
+    show = needsAdjustment ? `T* ${adjustedShow}` : `<${hex}> '`;
   } else if (plan.operatorType === '"') {
-    show = `${formatPdfNumber(plan.wordSpacing)} ${formatPdfNumber(plan.charSpacing)} <${hex}> "`;
+    const wordSpacing = formatPdfNumber(plan.wordSpacing);
+    const charSpacing = formatPdfNumber(plan.charSpacing);
+    show = needsAdjustment
+      ? `${wordSpacing} Tw ${charSpacing} Tc T* ${adjustedShow}`
+      : `${wordSpacing} ${charSpacing} <${hex}> "`;
   } else {
-    const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
-    show = needsAdjustment ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ` : `[<${hex}>] TJ`;
+    show = adjustedShow;
   }
 
   return `${selectSubstitute} ${show} ${restoreOriginal}`;
 }
 
 // Builds the exact replacement operator invocation text for `plan`:
-// - Tj: `<hex> Tj`.
+// - Tj: `<hex> Tj` when the effective advance is unchanged, otherwise
+//   `[<hex> delta] TJ`. Promoting Tj to TJ is spec-equivalent for showing
+//   the string and gives the writer an explicit trailing adjustment that
+//   keeps following text anchored.
 // - TJ: `[<hex>] TJ` or `[<hex> delta] TJ`. A TJ replacement always
 //   collapses to a single combined string operand (task 3: rewrite only
 //   text operands) -- the original's own inter-string kerning numbers are
@@ -162,41 +180,42 @@ function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string)
 //   plan.tjSpacingDelta (fontMetrics.ts's compareAdvance, task 5: use the
 //   existing spacing engine) keeps whatever text follows this operator
 //   from shifting position -- omitted entirely when negligible.
-// - ' (quote): `<hex> '`. No spacing operands to preserve -- ' takes only
-//   a string.
-// - " (double-quote): `aw ac <hex> "`, where aw/ac are plan.wordSpacing/
-//   plan.charSpacing -- these ARE this operator's own two leading numeric
-//   operands (word spacing, char spacing), carried through EditPlan
-//   unchanged from the original operator (task 5: preserve all non-text
-//   operands verbatim; these are never recomputed).
-// No compensating spacing delta is added for ' or ", unlike TJ: each
-// already performs its own text-line move (equivalent to T*) before
-// showing text, so whatever normally follows starts a fresh line rather
-// than continuing this one -- there is no established "keep the next
-// glyph in place" need the way there is mid-line in a TJ/Tj run.
+// - ' (quote): `<hex> '` when advance is unchanged. A width-changing
+//   replacement expands the spec-equivalent shorthand to
+//   `T* [<hex> delta] TJ`, preserving both its line move and endpoint.
+// - " (double-quote): `aw ac <hex> "` when advance is unchanged. A
+//   width-changing replacement expands to
+//   `aw Tw ac Tc T* [<hex> delta] TJ`. This preserves the operator's
+//   persistent word/character-spacing side effects as well as the line move
+//   and the following text position.
 function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): string {
   const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, bytesPerCode);
   if (plan.operatorType === "Tj") {
-    // A direct text-state change can alter this run's natural advance even
-    // when the text itself is unchanged. Promote only that formatting case
-    // to TJ so the already-computed spacing compensation keeps downstream
-    // text anchored. Ordinary text-only Tj edits retain their established
-    // byte shape.
-    const needsAdjustment =
-      Boolean(plan.replacementTextState) &&
-      Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
+    // Text-only replacement can change natural advance just as formatting
+    // can. Promote whenever compensation is materially non-zero; otherwise
+    // a shorter/longer replacement would move every following show that
+    // continues from this text position.
+    const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
     return needsAdjustment
       ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ`
       : `<${hex}> Tj`;
   }
+  const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
+  const adjustedShow = needsAdjustment
+    ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ`
+    : `[<${hex}>] TJ`;
+
   if (plan.operatorType === "'") {
-    return `<${hex}> '`;
+    return needsAdjustment ? `T* ${adjustedShow}` : `<${hex}> '`;
   }
   if (plan.operatorType === '"') {
-    return `${formatPdfNumber(plan.wordSpacing)} ${formatPdfNumber(plan.charSpacing)} <${hex}> "`;
+    const wordSpacing = formatPdfNumber(plan.wordSpacing);
+    const charSpacing = formatPdfNumber(plan.charSpacing);
+    return needsAdjustment
+      ? `${wordSpacing} Tw ${charSpacing} Tc T* ${adjustedShow}`
+      : `${wordSpacing} ${charSpacing} <${hex}> "`;
   }
-  const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
-  return needsAdjustment ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ` : `[<${hex}>] TJ`;
+  return adjustedShow;
 }
 
 function buildTextStateOverrideWrapper(plan: EditPlan): { prefix: string; suffix: string } {

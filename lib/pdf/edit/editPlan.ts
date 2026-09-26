@@ -131,8 +131,21 @@ export type EditPlan = {
   replacementText: string;
   originalGlyphCodes: number[];
   replacementGlyphCodes: number[];
+  /**
+   * Effective original text advance in PDF points. For an original TJ this
+   * includes its numeric spacing operands, not just the natural glyph widths.
+   */
   originalWidthPt: number;
   replacementWidthPt: number;
+  /**
+   * Sum of numeric TJ operands found on the original operator. Zero for Tj,
+   * quote operators, and TJ arrays without numeric spacing.
+   */
+  originalTjAdjustmentTotal?: number;
+  /**
+   * Trailing TJ number that makes the replacement end at the same effective
+   * text position as the original operator.
+   */
   tjSpacingDelta: number;
   byteOffset: number;
   byteLength: number;
@@ -189,6 +202,55 @@ function sameTextShowState(a: TextShowState, b: TextShowState): boolean {
     a.wordSpacing === b.wordSpacing &&
     a.horizontalScalingPct === b.horizontalScalingPct
   );
+}
+
+function originalTjAdjustmentTotal(operator: TextShowOperator): number | null {
+  if (operator.kind !== "TJ" || !operator.tjAdjustments?.length) return 0;
+  let total = 0;
+  for (const adjustment of operator.tjAdjustments) {
+    if (!Number.isFinite(adjustment)) return null;
+    total += adjustment;
+    if (!Number.isFinite(total)) return null;
+  }
+  return total;
+}
+
+function textHorizontalScalePt(state: TextShowState): number {
+  return state.fontSizePt * (state.horizontalScalingPct / 100);
+}
+
+function preserveOriginalEffectiveAdvance(
+  comparison: {
+    originalAdvancePt: number;
+    replacementAdvancePt: number;
+    tjAdjustment: number;
+  },
+  originalAdjustmentTotal: number,
+  originalState: TextShowState,
+  replacementState: TextShowState,
+): {
+  originalEffectiveAdvancePt: number;
+  replacementAdvancePt: number;
+  trailingTjAdjustment: number;
+} {
+  const originalScalePt = textHorizontalScalePt(originalState);
+  const replacementScalePt = textHorizontalScalePt(replacementState);
+  const originalEffectiveAdvancePt =
+    comparison.originalAdvancePt -
+    (originalAdjustmentTotal / 1000) * originalScalePt;
+
+  const trailingTjAdjustment =
+    replacementScalePt === 0
+      ? 0
+      : ((comparison.replacementAdvancePt - originalEffectiveAdvancePt) /
+          replacementScalePt) *
+        1000;
+
+  return {
+    originalEffectiveAdvancePt,
+    replacementAdvancePt: comparison.replacementAdvancePt,
+    trailingTjAdjustment,
+  };
 }
 
 // Builds a dry-run EditPlan for replacing one matched text-show operator's
@@ -251,6 +313,7 @@ export function buildEditPlan({
   const normalizedReplacementState = normalizeReplacementTextState(state, replacementTextState);
   const targetState = normalizedReplacementState.state;
   const effectiveReplacementState = sameTextShowState(state, targetState) ? null : targetState;
+  const originalTjTotal = originalTjAdjustmentTotal(operator);
 
   const base: Omit<EditPlan, "replacementGlyphCodes" | "replacementWidthPt" | "tjSpacingDelta" | "editable" | "reason"> = {
     pageIndex,
@@ -268,6 +331,7 @@ export function buildEditPlan({
     replacementText,
     originalGlyphCodes: originalCodes,
     originalWidthPt: 0, // filled in below, after we know originalCodes is safe to measure
+    originalTjAdjustmentTotal: originalTjTotal ?? 0,
     byteOffset: operator.start,
     byteLength: operator.end - operator.start,
     // Overridden only by the substitute-font branch at the very bottom;
@@ -279,6 +343,19 @@ export function buildEditPlan({
   // --- Safety invariant checks, in a fixed, deterministic order --------
   // Each one that fails immediately produces a non-editable plan with a
   // specific reason; none of them are skipped or guessed past.
+
+  if (originalTjTotal === null) {
+    return {
+      ...base,
+      originalWidthPt: 0,
+      replacementGlyphCodes: [],
+      replacementWidthPt: 0,
+      tjSpacingDelta: 0,
+      editable: false,
+      reason:
+        "This TJ operator contains a non-finite spacing adjustment, so its original text advance cannot be preserved safely.",
+    };
+  }
 
   if (normalizedReplacementState.error) {
     return {
@@ -445,12 +522,18 @@ export function buildEditPlan({
     const comparison = effectiveReplacementState
       ? compareAdvanceAcrossStates(originalCodes, replacementGlyphCodes, fontMetrics, state, targetState)
       : compareAdvance(originalCodes, replacementGlyphCodes, fontMetrics, state);
+    const preserved = preserveOriginalEffectiveAdvance(
+      comparison,
+      originalTjTotal,
+      state,
+      targetState,
+    );
     return {
       ...base,
-      originalWidthPt: comparison.originalAdvancePt,
+      originalWidthPt: preserved.originalEffectiveAdvancePt,
       replacementGlyphCodes,
-      replacementWidthPt: comparison.replacementAdvancePt,
-      tjSpacingDelta: comparison.tjAdjustment,
+      replacementWidthPt: preserved.replacementAdvancePt,
+      tjSpacingDelta: preserved.trailingTjAdjustment,
       editable: true,
       reason: null,
     };
@@ -507,13 +590,19 @@ export function buildEditPlan({
     fallbackFontMetrics(family),
     state,
   );
+  const preserved = preserveOriginalEffectiveAdvance(
+    comparison,
+    originalTjTotal,
+    state,
+    state,
+  );
 
   return {
     ...base,
-    originalWidthPt: comparison.originalAdvancePt,
+    originalWidthPt: preserved.originalEffectiveAdvancePt,
     replacementGlyphCodes: fallbackCodes,
-    replacementWidthPt: comparison.replacementAdvancePt,
-    tjSpacingDelta: comparison.tjAdjustment,
+    replacementWidthPt: preserved.replacementAdvancePt,
+    tjSpacingDelta: preserved.trailingTjAdjustment,
     fallbackFont: { family, originalFontResourceName: operator.fontResourceName, bytesPerCode: 1 },
     editable: true,
     reason: null,

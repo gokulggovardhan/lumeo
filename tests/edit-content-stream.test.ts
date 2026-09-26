@@ -188,6 +188,7 @@ test("walkTextShowOperators handles TJ arrays (multiple string runs in one opera
   assert.equal(operators[0].strings.length, 2);
   assert.equal(Buffer.from(operators[0].strings[0]).toString("latin1"), "AB");
   assert.equal(Buffer.from(operators[0].strings[1]).toString("latin1"), "CD");
+  assert.deepEqual(operators[0].tjAdjustments, [-100]);
 });
 
 
