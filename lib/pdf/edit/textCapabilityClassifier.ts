@@ -84,7 +84,10 @@ function pageUserMessage({
   if (category === "NATIVE_TEXT" && (nativeOnlySpanCount > 0 || pdfJsOnlyRunCount > 0)) {
     return "Most native text on this page is editable, but some visible text could not be mapped back to a safe native PDF edit target.";
   }
-  return userMessageForTextCapability(category, category === "FORM_XOBJECT_TEXT");
+  if (category === "FORM_XOBJECT_TEXT") {
+    return "This page contains text stored inside reusable PDF form objects. Lumeo edits those runs only when each selected instance and its local resources can be isolated safely.";
+  }
+  return userMessageForTextCapability(category);
 }
 
 function matrixSkewMagnitudeDeg(matrix: readonly number[]): number {
