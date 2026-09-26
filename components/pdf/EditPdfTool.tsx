@@ -585,9 +585,8 @@ export default function EditPdfTool() {
   } | null>(null);
   const textDetectionCurrent =
     textDetectionReady &&
-    textDetectionRevision !== null &&
-    textDetectionRevision.bytes === pdf?.bytes &&
-    textDetectionRevision.pageIndex === pageIndex;
+    textDetectionRevision?.bytes === pdf?.bytes &&
+    textDetectionRevision?.pageIndex === pageIndex;
   // Phase 9.1: the index-parallel matched-operator for each entry in
   // detectedTextRuns (lib/pdf/edit/matchTextRun.ts), computed once per page
   // load alongside detection itself -- cheap position-only matching, no
