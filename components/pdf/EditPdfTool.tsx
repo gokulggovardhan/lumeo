@@ -79,6 +79,10 @@ import {
 } from "@/lib/pdf/edit/textCapabilityClassifier";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
 import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
+import {
+  logicalRangeCoversWholeSpans,
+  orderedSingleSpanOffsets,
+} from "@/lib/pdf/edit/logicalTextRange";
 import { PercentSpatialIndex } from "@/lib/pdf/edit/spatialIndex";
 import {
   buildPdfTextSearchPageIndex,
@@ -600,9 +604,7 @@ export default function EditPdfTool() {
   // behind one boundary instead of another monolithic component rewrite.
   const {
     selectionAnchorIndex,
-    setSelectionAnchorIndex,
     selectedRunIndices,
-    setSelectedRunIndices,
     hoveredRunIndex,
     setHoveredRunIndex,
     focusedRunIndex,
@@ -617,9 +619,12 @@ export default function EditPdfTool() {
     setEditApplyError,
     nativeFormatOpen,
     setNativeFormatOpen,
+    logicalSelection,
     clearSelection: clearNativeTextSelection,
     resetInteraction: resetNativeTextInteraction,
     selectDetectedRun,
+    selectRunIndices,
+    updateSingleSpanLogicalSelection,
   } = useNativeTextSelectionState();
   // Browser FontFace previews are keyed to a model span id so an async font
   // load can never leak the previous selection's face into a newly-selected
@@ -2157,7 +2162,7 @@ export default function EditPdfTool() {
       clearNativeTextSelection();
       return;
     }
-    selectDetectedRun(index, extend, detectedTextRuns);
+    selectDetectedRun(index, extend, detectedTextRuns, pageTextModel);
   }
 
   // Bug fix (reported from iPhone 15 Plus / Safari): tapping editable text
@@ -2240,12 +2245,12 @@ export default function EditPdfTool() {
 
     setActiveTool("select");
     setSelectedId(null);
-    setSelectionAnchorIndex(indices[0]);
-    setSelectedRunIndices(indices);
-    setEditDraftText(plan.replacementText);
-    setEditApplyError("");
-    setUseSubstituteFont(false);
-    setNativeFormatOpen(false);
+    selectRunIndices({
+      indices,
+      runs: detectedTextRuns,
+      pageTextModel,
+      draftText: plan.replacementText,
+    });
 
     if (indices.length === 1) {
       requestAnimationFrame(() => {
@@ -2322,6 +2327,19 @@ export default function EditPdfTool() {
       };
 
   function validateMultiRunSelection(indices: number[]): MultiRunValidation {
+    if (
+      !pageTextModel ||
+      !logicalRangeCoversWholeSpans(logicalSelection, pageTextModel) ||
+      logicalSelection?.sourceRunIndices.length !== indices.length ||
+      logicalSelection.sourceRunIndices.some((value, position) => value !== indices[position])
+    ) {
+      return {
+        kind: "invalid",
+        reason:
+          "Cross-span edits must select whole compatible PDF text spans. Partial cross-span editing is not supported yet.",
+      };
+    }
+
     const matches = indices.map((i) => runMatches[i]);
     if (matches.some((m) => !m)) {
       return { kind: "invalid", reason: "One or more selected lines couldn't be matched to editable text -- try selecting fewer lines." };
@@ -2554,8 +2572,8 @@ export default function EditPdfTool() {
       const reason = resolveError instanceof Error ? resolveError.message : "Could not validate this edit.";
       return { kind: "error", reason, multi: selectedRunIndices.length > 1 };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over runMatches/pageOperators, already listed below.
-  }, [fontRegistry, selectedRunIndices, editableRunMatches, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over the explicitly listed page/write evidence below.
+  }, [fontRegistry, selectedRunIndices, editableRunMatches, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions, pageTextModel, logicalSelection]);
 
   // Phase 9.2: the live dry-run preview driving both the Apply button's
   // disabled state and the specific reason shown next to it -- see
