@@ -2,7 +2,14 @@ import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
-import { MIXED_STYLE_PDF, SPLIT_RUN_PDF, TEXT_ONLY_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
+import {
+  CLIPPED_TEXT_PDF,
+  MIXED_STYLE_PDF,
+  SPLIT_RUN_PDF,
+  TEXT_ONLY_PDF,
+  TWO_PAGE_PDF,
+  writeFixtures,
+} from "./fixtures.ts";
 import { waitForStageReady } from "./helpers.ts";
 
 test.beforeAll(async () => {
@@ -14,6 +21,41 @@ async function uploadEditFixture(page: Page, fixturePath: string) {
   await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });
   await page.locator('input[type="file"]').first().setInputFiles(fixturePath);
 }
+
+test("vinext Edit PDF explains read-only clipped text before an edit is attempted", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, CLIPPED_TEXT_PDF);
+
+  const limitedRun = page
+    .locator(
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="Clipped sample"]',
+    )
+    .first();
+  await expect(limitedRun).toBeVisible({ timeout: 90_000 });
+  await waitForStageReady(page);
+
+  const pageCapability = page.locator("[data-edit-page-capability]");
+  await expect(pageCapability).toHaveAttribute(
+    "data-edit-page-capability",
+    "view-only",
+  );
+  await expect(pageCapability).toHaveAttribute("title", /clipping shape/i);
+
+  await limitedRun.hover();
+  const explanation = page.locator("[data-edit-capability-explanation]");
+  await expect(explanation).toBeVisible();
+  await expect(explanation).toContainText(/clipping shape/i);
+  await expect(explanation).toContainText(/read-only/i);
+
+  // Keyboard users get the same proactive explanation. Selecting a limited
+  // run must not produce the normal inline edit textbox.
+  await limitedRun.focus();
+  await expect(explanation).toBeVisible();
+  await limitedRun.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+  await expect(explanation).toBeVisible();
+});
 
 test("vinext Edit PDF supports text matching, editing, and export", async ({
   page,
