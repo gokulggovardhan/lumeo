@@ -45,6 +45,7 @@ type TextRunOverlayProps = {
   onHoverStart: () => void;
   onHoverEnd: () => void;
   onFocusRun: () => void;
+  onBlurRun: () => void;
   registerNode: (node: HTMLDivElement | null) => void;
 };
 
@@ -68,6 +69,7 @@ function TextRunOverlayImpl({
   onHoverStart,
   onHoverEnd,
   onFocusRun,
+  onBlurRun,
   registerNode,
 }: TextRunOverlayProps) {
   const limitationId = useId();
@@ -121,6 +123,7 @@ function TextRunOverlayImpl({
       onMouseEnter={onHoverStart}
       onMouseLeave={onHoverEnd}
       onFocus={onFocusRun}
+      onBlur={onBlurRun}
       className={`absolute z-10 rounded-[2px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${borderClass} ${editable ? "cursor-text" : "cursor-not-allowed"}`}
       style={{
         left: `${run.xPct}%`,
