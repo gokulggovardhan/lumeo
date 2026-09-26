@@ -4399,7 +4399,7 @@ export default function EditPdfTool() {
                           )}
                         </div>
                       ) : replacementLayoutDecision && !replacementLayoutDecision.safeToApplyWithCurrentWriter && replacementLayoutDecision.reason ? (
-                        <div role="alert" data-edit-layout-strategy={replacementLayoutDecision.strategy} className={`absolute z-30 max-w-[260px] rounded-md border border-[var(--lumeo-gold)]/30 bg-[var(--atelier-surface-1)]/95 px-2 py-1.5 text-[10px] font-semibold leading-4 text-[var(--text-primary)] shadow-lg ${inlineEditorTooltipPositionClass} ${inlineEditorHorizontalClass}`}>
+                        <div role="alert" data-edit-layout-strategy={replacementLayoutDecision.strategy} className={`pointer-events-none absolute z-30 max-w-[260px] rounded-md border border-[var(--lumeo-gold)]/30 bg-[var(--atelier-surface-1)]/95 px-2 py-1.5 text-[10px] font-semibold leading-4 text-[var(--text-primary)] shadow-lg ${inlineEditorTooltipPositionClass} ${inlineEditorHorizontalClass}`}>
                           {replacementLayoutDecision.reason}
                         </div>
                       ) : editPreview.kind !== "empty" && !editPreview.editable && editPreview.reason ? (
