@@ -75,9 +75,15 @@ import {
   type TextSignalReconciliation,
 } from "@/lib/pdf/edit/textReconciliation";
 import {
+  classifyNativeTextSpan,
   DocumentTextCapabilityClassifier,
+  enforceSpanCapabilityOnArbitration,
   type PageTextCapabilityClassification,
 } from "@/lib/pdf/edit/textCapabilityClassifier";
+import {
+  userMessageForPageCapability,
+  userMessageForTextRun,
+} from "@/lib/pdf/edit/capabilityMessaging";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
 import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
 import { summarizeNativeTextSelectionStyles } from "@/lib/pdf/edit/mixedStyleSelection";
@@ -880,36 +886,50 @@ export default function EditPdfTool() {
   }, [detectedTextRuns, runProvenanceMatches, pageFontProfiles, pageOperators]);
 
 
-  // Final write authority is the single-signal arbitration plus one narrowly
-  // defined second proof: exact fragmented-run reconstruction. The latter is
-  // what preserves the established consecutive Tj/TJ editing path without
-  // turning a generic PDF.js/native conflict into an editable run.
-  const effectiveTextArbitrations = useMemo(
-    () =>
-      detectedTextRuns.map((_run, index) => {
-        const arbitration =
-          textArbitrations[index] ??
-          ({
-            pdfJsRunIndex: index,
-            decision: "view-only",
-            nativeSpanKey: null,
-            source: "unmatched",
-            reason: "Edit authorization evidence has not been established for this run.",
-          } satisfies TextEditArbitration);
-        return finalizeTextEditArbitration({
-          arbitration,
-          run: detectedTextRuns[index],
-          reconciliation: textReconciliations[index] ?? null,
-          fragmentedReconstructionProven: fragmentedRunReconstructions.has(index),
-        });
-      }),
-    [
-      detectedTextRuns,
-      textArbitrations,
-      textReconciliations,
-      fragmentedRunReconstructions,
-    ],
-  );
+  // Final write authority requires BOTH signal agreement and structural PDF
+  // capability safety. Exact fragmented-run reconstruction can resolve the
+  // established multi-operator provenance case, but a matched run still stays
+  // read-only when its native source is clipping text, Type3, vertical,
+  // metric/encoding-limited or otherwise classified unsafe.
+  const effectiveTextArbitrations = useMemo(() => {
+    const nativeCapabilityByKey = new Map(
+      nativeTextSpans.map((span) => [
+        span.key,
+        classifyNativeTextSpan(span),
+      ] as const),
+    );
+
+    return detectedTextRuns.map((_run, index) => {
+      const arbitration =
+        textArbitrations[index] ??
+        ({
+          pdfJsRunIndex: index,
+          decision: "view-only",
+          nativeSpanKey: null,
+          source: "unmatched",
+          reason: "Edit authorization evidence has not been established for this run.",
+        } satisfies TextEditArbitration);
+      const finalized = finalizeTextEditArbitration({
+        arbitration,
+        run: detectedTextRuns[index],
+        reconciliation: textReconciliations[index] ?? null,
+        fragmentedReconstructionProven: fragmentedRunReconstructions.has(index),
+      });
+      const spanClassification = finalized.nativeSpanKey
+        ? nativeCapabilityByKey.get(finalized.nativeSpanKey) ?? null
+        : null;
+      return enforceSpanCapabilityOnArbitration({
+        arbitration: finalized,
+        spanClassification,
+      });
+    });
+  }, [
+    detectedTextRuns,
+    textArbitrations,
+    textReconciliations,
+    fragmentedRunReconstructions,
+    nativeTextSpans,
+  ]);
 
   const editableRunMatches = useMemo(
     () =>
@@ -954,6 +974,36 @@ export default function EditPdfTool() {
       reconciliations: textReconciliations,
     });
   }, [nativeTextSpans, pdfJsDetectedRunCount, textReconciliations]);
+
+  // Product-facing explanations are derived from structured capability
+  // evidence. Internal classifier/arbitration reason strings stay diagnostic
+  // only and never become the normal UI contract.
+  const pageCapabilityMessage = useMemo(
+    () => userMessageForPageCapability(pageTextCapability),
+    [pageTextCapability],
+  );
+  const runCapabilityMessages = useMemo(() => {
+    const nativeByKey = new Map(
+      pageTextCapability.spanClassifications.map((classification) => [
+        classification.nativeSpanKey,
+        classification,
+      ] as const),
+    );
+    return detectedTextRuns.map((_run, index) => {
+      const arbitration = effectiveTextArbitrations[index] ?? null;
+      const nativeClassification = arbitration?.nativeSpanKey
+        ? nativeByKey.get(arbitration.nativeSpanKey) ?? null
+        : null;
+      return userMessageForTextRun({
+        arbitration,
+        nativeClassification,
+      });
+    });
+  }, [
+    detectedTextRuns,
+    effectiveTextArbitrations,
+    pageTextCapability.spanClassifications,
+  ]);
 
   // Development-only fidelity diagnostics. This deliberately never renders
   // debug noise in the normal product and is compiled behind NODE_ENV.
@@ -3559,12 +3609,28 @@ export default function EditPdfTool() {
     singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
       ? browserFontPreview.family
       : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
+  const pageHasLimitedText =
+    Boolean(
+      pageTextModel &&
+        (pageTextModel.viewOnlySpanCount > 0 ||
+          pageTextModel.unsupportedSpanCount > 0),
+    ) ||
+    effectiveTextArbitrations.some(
+      (arbitration) => arbitration.decision !== "editable",
+    ) ||
+    pageTextCapability.spanClassifications.some(
+      (classification) => !classification.safelyRewritable,
+    );
+  const presentedPageCapability =
+    pageTextModel?.capability === "native-editable" && pageHasLimitedText
+      ? "mixed"
+      : pageTextModel?.capability ?? null;
   const pageCapabilityLabel = pageTextModel
-    ? pageTextModel.capability === "native-editable"
+    ? presentedPageCapability === "native-editable"
       ? `${pageTextModel.editableSpanCount} text span${pageTextModel.editableSpanCount === 1 ? "" : "s"} editable`
-      : pageTextModel.capability === "mixed"
-        ? `${pageTextModel.editableSpanCount} editable · ${pageTextModel.viewOnlySpanCount + pageTextModel.unsupportedSpanCount} limited`
-        : pageTextModel.capability === "no-detected-text"
+      : pageTextModel.editableSpanCount > 0 && pageHasLimitedText
+        ? `${pageTextModel.editableSpanCount} editable · some text limited`
+        : presentedPageCapability === "no-detected-text"
           ? "No native text detected"
           : "Text detected · direct editing limited"
     : "";
@@ -4042,8 +4108,10 @@ export default function EditPdfTool() {
                 >
                   {textDetectionCurrent && pageTextModel ? (
                     <div
-                      data-edit-page-capability={pageTextModel.capability}
+                      data-edit-page-capability={presentedPageCapability ?? pageTextModel.capability}
                       role="status"
+                      aria-label={`${pageCapabilityLabel}. ${pageCapabilityMessage.detail}`}
+                      title={presentedPageCapability === "native-editable" ? undefined : pageCapabilityMessage.detail}
                       className="pointer-events-none absolute right-2 top-2 z-20 rounded-full border border-black/10 bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-[#343842] shadow-sm backdrop-blur-sm"
                     >
                       {pageCapabilityLabel}
@@ -4165,10 +4233,17 @@ export default function EditPdfTool() {
                           )}
                           selected={selectedRunIndices.includes(index)}
                           hovered={hoveredRunIndex === index}
+                          focused={focusedRunIndex === index}
+                          limitationMessage={runCapabilityMessages[index] ?? null}
                           onSelect={(shiftKey) => selectTextRunAndFocus(index, shiftKey)}
                           onHoverStart={() => setHoveredRunIndex((current) => (current === index ? current : index))}
                           onHoverEnd={() => setHoveredRunIndex((current) => (current === -1 ? current : -1))}
                           onFocusRun={() => setFocusedRunIndex(index)}
+                          onBlurRun={() =>
+                            setFocusedRunIndex((current) =>
+                              current === index ? null : current,
+                            )
+                          }
                           registerNode={(node) => {
                             if (node) runOverlayNodesRef.current.set(index, node);
                             else runOverlayNodesRef.current.delete(index);
@@ -4615,12 +4690,19 @@ export default function EditPdfTool() {
                   {activeTool === "select" && textDetectionCurrent && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
                     <div className="absolute left-3 top-3 z-20 max-w-[260px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
-                        {pageTextCapability.nativeSpanCount > 0 ? "Text detected — editing limited" : "No editable text found"}
-                      </span>
-                      <p className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60">
                         {pageTextCapability.nativeSpanCount > 0
-                          ? "This page contains native PDF text, but Lumeo cannot safely reconstruct its editable geometry or encoding yet."
-                          : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
+                          ? pageCapabilityMessage.title
+                          : "No editable text found"}
+                      </span>
+                      <p
+                        data-edit-page-capability-explanation
+                        className="mt-1.5 text-[11px] leading-5 text-[var(--text-primary)]/60"
+                      >
+                        {pageTextCapability.nativeSpanCount > 0
+                          ? pageCapabilityMessage.detail
+                          : pageTextCapability.rasterImageEvidence
+                            ? pageCapabilityMessage.detail
+                            : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
                       </p>
                     </div>
                   ) : null}

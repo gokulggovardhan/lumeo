@@ -17,6 +17,7 @@ export const WITH_IMAGE_PDF = path.join(TMP_DIR, "with-image.pdf");
 export const SPLIT_RUN_PDF = path.join(TMP_DIR, "split-run.pdf");
 export const TWO_PAGE_PDF = path.join(TMP_DIR, "two-page.pdf");
 export const MIXED_STYLE_PDF = path.join(TMP_DIR, "mixed-style.pdf");
+export const CLIPPED_TEXT_PDF = path.join(TMP_DIR, "clipped-text.pdf");
 
 /** Widely spaced so each line is its own detected run and boxes cannot straddle two. */
 function drawSensitiveText(page: import("pdf-lib").PDFPage, font: import("pdf-lib").PDFFont) {
@@ -167,6 +168,40 @@ async function mixedStyle(): Promise<Uint8Array> {
   return doc.save();
 }
 
+/**
+ * Visible native text using PDF text rendering mode 4 (fill + clipping).
+ * The glyphs are readable, but rewriting them could alter the page clipping
+ * path. Phase 4A uses this to prove Lumeo explains the limitation BEFORE an
+ * edit is attempted instead of silently exposing a normal editable caret.
+ */
+async function clippedText(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+
+  const context = doc.context;
+  const fonts = context.obj({});
+  fonts.set(PDFName.of("FClip"), font.ref);
+  page.node.Resources()!.set(PDFName.of("Font"), fonts);
+
+  const body = [
+    "BT",
+    "/FClip 18 Tf",
+    "4 Tr",
+    "1 0 0 1 60 740 Tm",
+    "(Clipped sample) Tj",
+    "ET",
+  ].join("\n");
+  page.node.set(
+    PDFName.of("Contents"),
+    context.register(
+      context.flateStream(new TextEncoder().encode(body)),
+    ),
+  );
+
+  return doc.save();
+}
+
 /** Two pages, so the PAGES rail renders -- it is hidden for a single page. */
 async function twoPage(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -188,4 +223,5 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(SPLIT_RUN_PDF, split);
   await writeFile(TWO_PAGE_PDF, await twoPage());
   await writeFile(MIXED_STYLE_PDF, await mixedStyle());
+  await writeFile(CLIPPED_TEXT_PDF, await clippedText());
 }
