@@ -4207,6 +4207,11 @@ export default function EditPdfTool() {
                           onHoverStart={() => setHoveredRunIndex((current) => (current === index ? current : index))}
                           onHoverEnd={() => setHoveredRunIndex((current) => (current === -1 ? current : -1))}
                           onFocusRun={() => setFocusedRunIndex(index)}
+                          onBlurRun={() =>
+                            setFocusedRunIndex((current) =>
+                              current === index ? null : current,
+                            )
+                          }
                           registerNode={(node) => {
                             if (node) runOverlayNodesRef.current.set(index, node);
                             else runOverlayNodesRef.current.delete(index);
