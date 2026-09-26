@@ -131,7 +131,11 @@ export function ToolsExplorer({ tools }: { tools: Tile[] }) {
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    inputRef.current?.setAttribute("data-search-shortcut-ready", "true");
+    return () => {
+      inputRef.current?.removeAttribute("data-search-shortcut-ready");
+      window.removeEventListener("keydown", handleKeyDown);
+    };
   }, [query]);
 
   const shown = useMemo(
