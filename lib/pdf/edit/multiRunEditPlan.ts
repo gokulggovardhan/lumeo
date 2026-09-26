@@ -23,14 +23,24 @@ import type { FontMetrics, TextShowState } from "./fontMetrics.ts";
 import { compareAdvance } from "./fontMetrics.ts";
 import {
   buildEditPlan,
+  deriveValidatedEditPlanAdvance,
   isValidatedEditPlan,
   type EditPlan,
   type ValidatedEditPlan,
 } from "./editPlan.ts";
 
-const validatedMultiRunEditPlanBrand = Symbol(
-  "lumeo.edit.validated-multi-run-plan",
-);
+class ValidatedMultiRunEditPlanProof {
+  private readonly validationProof!: true;
+
+  constructor() {
+    Object.defineProperty(this, "validationProof", {
+      value: true,
+      enumerable: false,
+      writable: false,
+      configurable: false,
+    });
+  }
+}
 
 type MultiRunEditPlanFields = {
   pageIndex: number;
@@ -40,32 +50,57 @@ type MultiRunEditPlanFields = {
   replacementText: string;
 };
 
-export type ValidatedMultiRunEditPlan = MultiRunEditPlanFields & {
-  editable: true;
-  reason: null;
-  subPlans: ValidatedEditPlan[];
-  readonly [validatedMultiRunEditPlanBrand]: true;
-};
+export type ValidatedMultiRunEditPlan =
+  Readonly<MultiRunEditPlanFields> &
+  ValidatedMultiRunEditPlanProof & {
+    readonly editable: true;
+    readonly reason: null;
+    readonly subPlans: readonly ValidatedEditPlan[];
+  };
 
 export type RejectedMultiRunEditPlan = MultiRunEditPlanFields & {
   editable: false;
   reason: string;
   subPlans: EditPlan[];
-  readonly [validatedMultiRunEditPlanBrand]?: never;
 };
 
 export type MultiRunEditPlan =
   | ValidatedMultiRunEditPlan
   | RejectedMultiRunEditPlan;
 
+function issueValidatedMultiRunEditPlan({
+  pageIndex,
+  contentStreamIndex,
+  operatorIndices,
+  originalText,
+  replacementText,
+  subPlans,
+}: MultiRunEditPlanFields & {
+  subPlans: readonly ValidatedEditPlan[];
+}): ValidatedMultiRunEditPlan {
+  const plan = Object.assign(new ValidatedMultiRunEditPlanProof(), {
+    pageIndex,
+    contentStreamIndex,
+    operatorIndices: [...operatorIndices],
+    originalText,
+    replacementText,
+    editable: true as const,
+    reason: null,
+    subPlans: [...subPlans],
+  }) as ValidatedMultiRunEditPlan;
+  Object.freeze(plan.operatorIndices);
+  Object.freeze(plan.subPlans);
+  return Object.freeze(plan);
+}
+
 export function isValidatedMultiRunEditPlan(
   plan: MultiRunEditPlan,
 ): plan is ValidatedMultiRunEditPlan {
   return (
+    plan instanceof ValidatedMultiRunEditPlanProof &&
     plan.editable === true &&
     plan.reason === null &&
-    validatedMultiRunEditPlanBrand in plan &&
-    plan[validatedMultiRunEditPlanBrand] === true &&
+    Object.isFrozen(plan) &&
     plan.subPlans.every(isValidatedEditPlan)
   );
 }
@@ -225,30 +260,33 @@ export function buildMultiRunEditPlan({
     state,
   );
 
-  const mergedFirstPlan: ValidatedEditPlan = {
-    ...validatedSubPlans[0],
-    originalWidthPt: comparison.originalAdvancePt,
-    replacementWidthPt: comparison.replacementAdvancePt,
-    tjSpacingDelta: comparison.tjAdjustment,
-  };
+  const mergedFirstPlan = deriveValidatedEditPlanAdvance(
+    validatedSubPlans[0],
+    {
+      originalWidthPt: comparison.originalAdvancePt,
+      replacementWidthPt: comparison.replacementAdvancePt,
+      tjSpacingDelta: comparison.tjAdjustment,
+    },
+  );
 
   // Every OTHER spanned operator is emptied with NO compensating
   // adjustment of its own -- mergedFirstPlan above already accounts for
   // the whole span's width difference in one place; a second, separate
   // adjustment on an emptied operator would double-compensate.
-  const mergedRestPlans: ValidatedEditPlan[] = validatedSubPlans
-    .slice(1)
-    .map((plan) => ({ ...plan, tjSpacingDelta: 0 }));
+  const mergedRestPlans = validatedSubPlans.slice(1).map((plan) =>
+    deriveValidatedEditPlanAdvance(plan, {
+      originalWidthPt: plan.originalWidthPt,
+      replacementWidthPt: plan.replacementWidthPt,
+      tjSpacingDelta: 0,
+    }),
+  );
 
-  return {
+  return issueValidatedMultiRunEditPlan({
     pageIndex,
     contentStreamIndex,
     operatorIndices: sortedIndices,
     originalText,
     replacementText,
-    editable: true,
-    reason: null,
     subPlans: [mergedFirstPlan, ...mergedRestPlans],
-    [validatedMultiRunEditPlanBrand]: true,
-  };
+  });
 }
