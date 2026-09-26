@@ -37,6 +37,10 @@ import { FloatingIsland } from "@/components/pdf/edit/FloatingIsland";
 import { InkCanvas } from "@/components/pdf/edit/InkCanvas";
 import { MicroDock } from "@/components/pdf/edit/MicroDock";
 import { TextRunOverlay } from "@/components/pdf/edit/TextRunOverlay";
+import {
+  contiguousNativeTextSelectionRange,
+  useNativeTextSelectionState,
+} from "@/components/pdf/edit/useNativeTextSelectionState";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
   createInkElement,
@@ -608,29 +612,37 @@ export default function EditPdfTool() {
   // operates on a CONTIGUOUS run of detected boxes, matching
   // buildMultiRunEditPlan's own "operators must be consecutive" invariant --
   // see validateMultiRunSelection below for what else must line up.
-  const [selectionAnchorIndex, setSelectionAnchorIndex] = useState<number | null>(null);
-  const [selectedRunIndices, setSelectedRunIndices] = useState<number[]>([]);
-  const [hoveredRunIndex, setHoveredRunIndex] = useState<number>(-1);
-  const [focusedRunIndex, setFocusedRunIndex] = useState<number | null>(null);
-  const [editDraftText, setEditDraftText] = useState("");
-  // Captured only when a single native span transitions through an empty
-  // draft. It preserves exact font/text-state/paint/geometry intent while
-  // the user retypes, but never bypasses EditPlan or glyph authority.
-  const [caretTextStyleSnapshot, setCaretTextStyleSnapshot] =
-    useState<CaretTextStyleSnapshot | null>(null);
-  // Whether the user has accepted the substitute-font offer for the CURRENT
-  // selection (see EditPreview's substituteFont field). Reset by every
-  // selection change, never by typing -- re-offering mid-word would make
-  // the control flicker while someone is still deciding what to type.
-  const [useSubstituteFont, setUseSubstituteFont] = useState(false);
-  const [editApplyError, setEditApplyError] = useState("");
+  // Phase 2.2-A: native-text selection/caret presentation state now has one
+  // owner instead of adding more independent useState declarations to this
+  // already-large orchestration component. The hook exposes the same setters
+  // during this behavior-preserving extraction; PDF authority and writing
+  // remain in this component/lib/pdf/edit.
+  const {
+    selectionAnchorIndex,
+    setSelectionAnchorIndex,
+    selectedRunIndices,
+    setSelectedRunIndices,
+    hoveredRunIndex,
+    setHoveredRunIndex,
+    focusedRunIndex,
+    setFocusedRunIndex,
+    editDraftText,
+    setEditDraftText,
+    caretTextStyleSnapshot,
+    setCaretTextStyleSnapshot,
+    useSubstituteFont,
+    setUseSubstituteFont,
+    editApplyError,
+    setEditApplyError,
+    nativeFormatOpen,
+    setNativeFormatOpen,
+  } = useNativeTextSelectionState();
   // Browser FontFace previews are keyed to a model span id so an async font
   // load can never leak the previous selection's face into a newly-selected
   // run. Export safety remains governed by fontEncoding/editPlan, not by
   // whether a browser happens to accept the embedded font bytes.
   const [browserFontPreview, setBrowserFontPreview] = useState<{ spanId: string; family: string } | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
-  const [nativeFormatOpen, setNativeFormatOpen] = useState(false);
   const [textSearchOpen, setTextSearchOpen] = useState(false);
   const [textSearchQuery, setTextSearchQuery] = useState("");
   const [textSearchReplacement, setTextSearchReplacement] = useState("");
@@ -2181,13 +2193,11 @@ export default function EditPdfTool() {
       setNativeFormatOpen(false);
       return;
     }
-    const range =
-      extend && selectionAnchorIndex !== null
-        ? Array.from(
-            { length: Math.abs(index - selectionAnchorIndex) + 1 },
-            (_, i) => Math.min(selectionAnchorIndex, index) + i,
-          )
-        : [index];
+    const range = contiguousNativeTextSelectionRange(
+      selectionAnchorIndex,
+      index,
+      extend,
+    );
     if (!extend) setSelectionAnchorIndex(index);
     setSelectedRunIndices(range);
     setEditDraftText(range.map((i) => detectedTextRuns[i]?.str ?? "").join(""));
