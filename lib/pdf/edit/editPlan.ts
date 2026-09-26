@@ -172,7 +172,8 @@ function issueValidatedEditPlan(
   if (plan.formPath) Object.freeze(plan.formPath);
   if (plan.replacementTextState) Object.freeze(plan.replacementTextState);
   if (plan.fallbackFont) Object.freeze(plan.fallbackFont);
-  return Object.freeze(plan);
+  Object.freeze(plan);
+  return plan;
 }
 
 export function isValidatedEditPlan(
