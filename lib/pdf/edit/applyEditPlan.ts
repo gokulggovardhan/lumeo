@@ -150,7 +150,10 @@ function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string)
 }
 
 // Builds the exact replacement operator invocation text for `plan`:
-// - Tj: `<hex> Tj`.
+// - Tj: `<hex> Tj` when the effective advance is unchanged, otherwise
+//   `[<hex> delta] TJ`. Promoting Tj to TJ is spec-equivalent for showing
+//   the string and gives the writer an explicit trailing adjustment that
+//   keeps following text anchored.
 // - TJ: `[<hex>] TJ` or `[<hex> delta] TJ`. A TJ replacement always
 //   collapses to a single combined string operand (task 3: rewrite only
 //   text operands) -- the original's own inter-string kerning numbers are
@@ -177,14 +180,11 @@ function buildFallbackOperatorText(plan: EditPlan, fallbackResourceName: string)
 function buildReplacementOperatorText(plan: EditPlan, bytesPerCode: 1 | 2): string {
   const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, bytesPerCode);
   if (plan.operatorType === "Tj") {
-    // A direct text-state change can alter this run's natural advance even
-    // when the text itself is unchanged. Promote only that formatting case
-    // to TJ so the already-computed spacing compensation keeps downstream
-    // text anchored. Ordinary text-only Tj edits retain their established
-    // byte shape.
-    const needsAdjustment =
-      Boolean(plan.replacementTextState) &&
-      Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
+    // Text-only replacement can change natural advance just as formatting
+    // can. Promote whenever compensation is materially non-zero; otherwise
+    // a shorter/longer replacement would move every following show that
+    // continues from this text position.
+    const needsAdjustment = Math.abs(plan.tjSpacingDelta) >= TJ_DELTA_EPSILON;
     return needsAdjustment
       ? `[<${hex}> ${formatPdfNumber(plan.tjSpacingDelta)}] TJ`
       : `<${hex}> Tj`;
