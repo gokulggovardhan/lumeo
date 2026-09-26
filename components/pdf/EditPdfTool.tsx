@@ -2780,7 +2780,16 @@ export default function EditPdfTool() {
       editPreview.kind === "single"
         ? editPreview.plan
         : editPreview.plan.subPlans[0];
-    return plan ? decideReplacementLayout(plan) : null;
+    if (!plan) return null;
+
+    // Layout warnings are about a requested change in text advance. Merely
+    // selecting/inspecting a run (or changing paint only) must not surface a
+    // "replacement is wider" warning from font-metric round-tripping when no
+    // layout-affecting edit has actually been requested.
+    const layoutAffectingChange =
+      plan.originalText !== plan.replacementText ||
+      plan.replacementTextState !== null;
+    return layoutAffectingChange ? decideReplacementLayout(plan) : null;
   }, [editPreview]);
 
   // Phase 9.2: the actual write-back for whatever editPreview currently
