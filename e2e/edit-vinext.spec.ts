@@ -176,9 +176,50 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   expect(wordCount).toBeGreaterThan(0);
   expect(externalOcrRequests).toEqual([]);
 
-  // Recognition is an aid for scanned pixels, never a shortcut into the
-  // native content-stream writer.
+  // Recognition alone is an aid for scanned pixels, never a shortcut into
+  // the native content-stream writer.
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+
+  await page
+    .getByRole("button", { name: "Make scanned page searchable" })
+    .click();
+  const searchableStatus = page.locator("[data-edit-ocr-searchable-status]");
+  await expect(searchableStatus).toHaveAttribute(
+    "data-edit-ocr-searchable-status-kind",
+    "success",
+    { timeout: 90_000 },
+  );
+  await expect(searchableStatus).toContainText(/is now searchable/i);
+
+  // The rebuilt PDF must expose recognized text through PDF.js, but because
+  // the layer is intentionally Tr=3 invisible text it remains read-only for
+  // native Edit. Searchability and write authority are separate.
+  const searchableRun = page
+    .locator(
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="SCANNED PAGE SAMPLE"]',
+    )
+    .first();
+  await expect(searchableRun).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+
+  // Searchable OCR is one real history transaction. Undo must restore the
+  // exact scanned revision and its still-local OCR result; Redo must restore
+  // the invisible searchable layer without rerunning OCR or making network
+  // requests for document content.
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByRole("textbox", { name: "Recognized text (OCR)" })).toHaveValue(
+    /SCANNED PAGE SAMPLE/i,
+    { timeout: 90_000 },
+  );
+  await expect(
+    page.getByRole("button", { name: "Make scanned page searchable" }),
+  ).toBeEnabled();
+
+  await page.getByRole("button", { name: "Redo" }).click();
+  await expect(searchableRun).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+  expect(externalOcrRequests).toEqual([]);
+
   page.off("request", recordOcrRequest);
 });
 
