@@ -1835,7 +1835,8 @@ export default function EditPdfTool() {
     ocrEngineRef.current = null;
     setOcrResultsRevision(null);
     setOcrActivity(null);
-    
+    setOcrSearchLayerActivity(null);
+    setOcrSearchLayerNoticeRevision(null);
     setOcrErrorRevision(null);
     setOcrCopiedRevision(null);
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
@@ -6150,6 +6151,16 @@ export default function EditPdfTool() {
                             : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
                       </p>
 
+                      {ocrSearchLayerNotice ? (
+                        <p
+                          role="status"
+                          data-edit-ocr-searchable-status
+                          className="mt-2 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/25 bg-[var(--lumeo-gold)]/[0.07] px-2.5 py-2 text-[10px] leading-4 text-[var(--text-primary)]/65"
+                        >
+                          {ocrSearchLayerNotice}
+                        </p>
+                      ) : null}
+
                       {pageTextCapability.category === "SCANNED_IMAGE" ? (
                         <div data-edit-ocr-panel data-edit-ocr-source="ocr" onClick={(event) => event.stopPropagation()} className="mt-2.5 grid gap-2">
                           {ocrPageResultCurrent ? (
@@ -6184,8 +6195,16 @@ export default function EditPdfTool() {
                                 </button>
                                 <button
                                   type="button"
+                                  onClick={() => void handleAddSearchableOcrLayer()}
+                                  disabled={ocrBusy || ocrSearchLayerBusy}
+                                  className="rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {ocrSearchLayerBusy ? "Adding searchable text…" : "Make page searchable"}
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => void handleRecognizeScannedPage()}
-                                  disabled={ocrBusy}
+                                  disabled={ocrBusy || ocrSearchLayerBusy}
                                   className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   Recognize again
@@ -6196,7 +6215,7 @@ export default function EditPdfTool() {
                             <button
                               type="button"
                               onClick={() => void handleRecognizeScannedPage()}
-                              disabled={ocrBusy}
+                              disabled={ocrBusy || ocrSearchLayerBusy}
                               className="w-fit rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-55"
                             >
                               {ocrBusy ? "Recognizing locally…" : "Recognize text locally"}
@@ -6237,7 +6256,7 @@ export default function EditPdfTool() {
                           ) : null}
 
                           <p className="text-[9px] leading-4 text-[var(--text-primary)]/45">
-                            Recognized text is an OCR aid, not original PDF text. Native rewrite remains disabled for this scan.
+                            Recognized text is an OCR aid, not original PDF text. “Make page searchable” adds a separate invisible read-only text layer; native rewrite remains disabled and the scan pixels stay unchanged.
                           </p>
                         </div>
                       ) : null}
