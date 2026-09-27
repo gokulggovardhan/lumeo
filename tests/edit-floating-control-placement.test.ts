@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { pickHorizontalAlign, pickVerticalPlacement } from "../lib/pdf/edit/floatingControlPlacement.ts";
+import {
+  pickHorizontalAlign,
+  pickInlineTextToolbarPlacement,
+  pickVerticalPlacement,
+} from "../lib/pdf/edit/floatingControlPlacement.ts";
 
 // Regression for Phase 29's edge-clipping fix: EditElementView.tsx's delete
 // pill and EditPdfTool.tsx's inline text-editor Apply/Cancel toolbar both
@@ -93,4 +97,77 @@ test("pickHorizontalAlign prefers 'start' when neither side has room (checked be
   // existing left-anchored default the inline editor's toolbar already used
   // before this fix.
   assert.equal(pickHorizontalAlign(5, 95), "start");
+});
+
+
+test("inline text toolbar flips above when a nearby editable run occupies the below band", () => {
+  assert.equal(
+    pickInlineTextToolbarPlacement({
+      anchor: {
+        leftPct: 12,
+        rightPct: 42,
+        topPct: 18,
+        bottomPct: 21,
+      },
+      editableObstacles: [
+        {
+          leftPct: 12,
+          rightPct: 44,
+          topPct: 23,
+          bottomPct: 26,
+        },
+      ],
+      edgeMarginPct: 24,
+      toolbarClearancePct: 6,
+    }),
+    "above",
+  );
+});
+
+test("inline text toolbar keeps the normal below placement when the nearby run is horizontally separate", () => {
+  assert.equal(
+    pickInlineTextToolbarPlacement({
+      anchor: {
+        leftPct: 12,
+        rightPct: 32,
+        topPct: 18,
+        bottomPct: 21,
+      },
+      editableObstacles: [
+        {
+          leftPct: 60,
+          rightPct: 80,
+          topPct: 23,
+          bottomPct: 26,
+        },
+      ],
+      edgeMarginPct: 24,
+      toolbarClearancePct: 6,
+    }),
+    "below",
+  );
+});
+
+test("inline text toolbar does not flip above when the selected run is too close to the top edge", () => {
+  assert.equal(
+    pickInlineTextToolbarPlacement({
+      anchor: {
+        leftPct: 12,
+        rightPct: 42,
+        topPct: 3,
+        bottomPct: 6,
+      },
+      editableObstacles: [
+        {
+          leftPct: 12,
+          rightPct: 44,
+          topPct: 8,
+          bottomPct: 11,
+        },
+      ],
+      edgeMarginPct: 24,
+      toolbarClearancePct: 6,
+    }),
+    "below",
+  );
 });
