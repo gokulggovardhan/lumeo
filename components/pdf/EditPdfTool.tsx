@@ -725,7 +725,12 @@ export default function EditPdfTool() {
   // extracted text, font programs or measurements are transmitted anywhere.
   // The collector exists only to measure before Phase 5 optimizes.
   useEffect(() => {
-    if (process.env.NODE_ENV === "production") return;
+    if (
+      process.env.NODE_ENV === "production" &&
+      process.env.NEXT_PUBLIC_EDIT_PERFORMANCE_DIAGNOSTICS !== "1"
+    ) {
+      return;
+    }
 
     let active = true;
     let memoryTimer: number | null = null;
@@ -760,9 +765,12 @@ export default function EditPdfTool() {
       captureMemory();
       memoryTimer = window.setInterval(captureMemory, 2_000);
 
-      const handleScroll = () => {
+      const handleScroll = (event: Event) => {
         if (scrollRaf !== null) return;
         const startedAt = window.performance.now();
+        const target = event.target;
+        const scrollPosition =
+          target instanceof HTMLElement ? target.scrollTop : window.scrollY;
         scrollRaf = window.requestAnimationFrame(() => {
           scrollRaf = null;
           collector.recordDuration(
@@ -770,16 +778,21 @@ export default function EditPdfTool() {
             window.performance.now() - startedAt,
             {
               detail: {
-                scrollY: window.scrollY,
+                scrollPosition,
                 viewportHeight: window.innerHeight,
               },
             },
           );
         });
       };
-      window.addEventListener("scroll", handleScroll, { passive: true });
+      document.addEventListener("scroll", handleScroll, {
+        passive: true,
+        capture: true,
+      });
       removeScrollListener = () =>
-        window.removeEventListener("scroll", handleScroll);
+        document.removeEventListener("scroll", handleScroll, {
+          capture: true,
+        });
     });
 
     return () => {
