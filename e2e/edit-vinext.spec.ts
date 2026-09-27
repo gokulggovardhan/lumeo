@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
@@ -28,6 +28,25 @@ async function uploadEditFixture(page: Page, fixturePath: string) {
   await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
   await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });
   await page.locator('input[type="file"]').first().setInputFiles(fixturePath);
+}
+
+async function replaceCharacterRange(
+  page: Page,
+  input: Locator,
+  start: number,
+  end: number,
+  replacement: string,
+) {
+  await input.focus();
+  await input.evaluate(
+    (element, range) => {
+      const field = element as HTMLInputElement;
+      field.setSelectionRange(range.start, range.end);
+      field.dispatchEvent(new Event("select", { bubbles: true }));
+    },
+    { start, end },
+  );
+  await page.keyboard.insertText(replacement);
 }
 
 test("vinext Edit PDF explains read-only clipped text before an edit is attempted", async ({
@@ -235,7 +254,34 @@ test("vinext Edit PDF keeps IME composition isolated until the candidate is comm
   // Synthetic composition events are enough to exercise Lumeo's browser
   // event boundary in Chromium/WebKit/Firefox. The PDF writer still sees
   // nothing until compositionend releases the candidate.
-  await editor.dispatchEvent("compositionstart", { data: "file" });
+  // Fire compositionstart and keyboard actions in the SAME browser task.
+  // React has not had a render turn to expose textCompositionActive yet, so
+  // this specifically proves the immediate selection-scoped owner ref guards
+  // the tiny pre-render race for both Enter and Escape.
+  await editor.evaluate((node) => {
+    node.dispatchEvent(
+      new CompositionEvent("compositionstart", {
+        bubbles: true,
+        data: "file",
+      }),
+    );
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "Enter",
+      }),
+    );
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "Escape",
+      }),
+    );
+  });
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+  await expect(editor).toBeVisible();
   await expect(editor).toHaveAttribute("data-ime-composing", "true");
 
   // Playwright fill() may implicitly terminate composition in Firefox, so
@@ -704,7 +750,13 @@ test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecuti
     await editableRuns.nth(mergedIndex).click();
     const editor = page.getByRole("textbox", { name: "Edit text" });
     await expect(editor).toHaveValue(/SSN 123-45-6789/);
-    await editor.fill("SSN 000-00-0000");
+    // Replace only the SSN characters, leaving the "SSN " prefix untouched.
+    // In browsers that coalesce the operators this is a single-span
+    // character edit; in the split-run path below the same character range
+    // crosses the native Tj boundary while the validated writer still owns
+    // the complete proven operator set.
+    await replaceCharacterRange(page, editor, 4, 15, "000-00-0000");
+    await expect(editor).toHaveValue("SSN 000-00-0000");
 
     const apply = page.locator("[data-edit-inline-apply]");
     await expect(apply).toHaveCount(1);
@@ -729,12 +781,16 @@ test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecuti
     await expect(panel).toHaveAttribute("data-logical-selection-whole-spans", "true");
     const editor = page.locator("[data-edit-multi-run-input]");
     await expect(editor).toHaveValue(/SSN 123-45-6789/);
-    await editor.fill("SSN 000-00-0000");
+    // This selected character range begins in the first native span and ends
+    // in the second. The UX is character-level, but write authority remains
+    // the existing whole-span validated multi-run plan.
+    await replaceCharacterRange(page, editor, 4, 15, "000-00-0000");
+    await expect(editor).toHaveValue("SSN 000-00-0000");
 
     const apply = page.locator("[data-edit-multi-run-apply]");
     await expect(apply).toHaveCount(1);
     await expect(apply).toBeEnabled();
-    await apply.click();
+    await editor.press("Enter");
   }
 
   const workspace = page.locator("[data-edit-operation-count]");
