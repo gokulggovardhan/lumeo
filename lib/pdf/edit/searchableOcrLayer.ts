@@ -36,6 +36,38 @@ type PreparedWord = Readonly<{
   boundsPct: OcrWord["boundsPct"];
 }>;
 
+function normalizeVerifiedOcrText(value: string): string {
+  return value.replace(/\s+/g, " ").trim().normalize("NFKC").toLocaleLowerCase();
+}
+
+/**
+ * Verifies OCR publication against independently extracted PDF.js text items.
+ * Each claimed written word consumes one exact normalized item occurrence, so
+ * duplicates need duplicate evidence and a substring inside another word can
+ * never satisfy the proof accidentally.
+ */
+export function firstMissingSearchableOcrWord(
+  writtenWords: readonly string[],
+  extractedItems: readonly string[],
+): string | null {
+  const available = new Map<string, number>();
+  for (const item of extractedItems) {
+    const normalized = normalizeVerifiedOcrText(item);
+    if (!normalized) continue;
+    available.set(normalized, (available.get(normalized) ?? 0) + 1);
+  }
+
+  for (const word of writtenWords) {
+    const normalized = normalizeVerifiedOcrText(word);
+    if (!normalized) return word;
+    const count = available.get(normalized) ?? 0;
+    if (count <= 0) return word;
+    if (count === 1) available.delete(normalized);
+    else available.set(normalized, count - 1);
+  }
+  return null;
+}
+
 function normalizePageRotation(angle: number): PageRotation {
   const normalized = ((Math.round(angle / 90) * 90) % 360 + 360) % 360;
   return normalized === 90 || normalized === 180 || normalized === 270
