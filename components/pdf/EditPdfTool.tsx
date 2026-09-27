@@ -4238,6 +4238,36 @@ export default function EditPdfTool() {
       validation,
     } = resolvedEditContext;
     try {
+      if (paragraphSelectionTemplate && editEngine) {
+        const paragraphPlan = editEngine.buildParagraphEditPlan({
+          pageIndex,
+          contentStreamIndex: validation.contentStreamIndex,
+          allOperators: validation.allOperators,
+          operatorIndices: validation.operatorIndices,
+          replacementText: editDraftText,
+          resolvedFont,
+          fontMetrics,
+          embeddedGlyphEvidence,
+        });
+        if (shapingRequirement.required) {
+          return {
+            kind: "paragraph",
+            editable: false,
+            reason:
+              "Complex shaping across several native PDF lines is not yet proven safe. Edit each shaped line separately.",
+            plan: paragraphPlan,
+            resolvedFont,
+          };
+        }
+        return {
+          kind: "paragraph",
+          editable: paragraphPlan.editable,
+          reason: paragraphPlan.reason,
+          plan: paragraphPlan,
+          resolvedFont,
+        };
+      }
+
       const plan = buildMultiRunEditPlan({
         pageIndex,
         contentStreamIndex: validation.contentStreamIndex,
@@ -4288,25 +4318,29 @@ export default function EditPdfTool() {
     currentShapedGlyphPlan,
     currentShapingBlockReason,
     nativePaintPlan,
+    paragraphSelectionTemplate,
+    editEngine,
   ]);
 
   const replacementLayoutDecision = useMemo(() => {
     if (editPreview.kind === "empty" || !editPreview.editable) return null;
     if (editPreview.kind === "single" && editPreview.shapedGlyphPlan) return null;
-    const plan =
+    const plans =
       editPreview.kind === "single"
-        ? editPreview.plan
-        : editPreview.plan.subPlans[0];
-    if (!plan) return null;
-
-    // Layout warnings are about a requested change in text advance. Merely
-    // selecting/inspecting a run (or changing paint only) must not surface a
-    // "replacement is wider" warning from font-metric round-tripping when no
-    // layout-affecting edit has actually been requested.
-    const layoutAffectingChange =
-      plan.originalText !== plan.replacementText ||
-      plan.replacementTextState !== null;
-    return layoutAffectingChange ? decideReplacementLayout(plan) : null;
+        ? [editPreview.plan]
+        : [...editPreview.plan.subPlans];
+    const decisions = plans
+      .filter(
+        (plan) =>
+          plan.originalText !== plan.replacementText ||
+          plan.replacementTextState !== null,
+      )
+      .map(decideReplacementLayout);
+    return (
+      decisions.find((decision) => !decision.safeToApplyWithCurrentWriter) ??
+      decisions[0] ??
+      null
+    );
   }, [editPreview]);
 
   // Phase 9.2: the actual write-back for whatever editPreview currently
