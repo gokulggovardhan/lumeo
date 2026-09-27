@@ -63,6 +63,17 @@ type Fixture = {
   resourceName: string;
 };
 
+function assertNear(
+  actual: number,
+  expected: number,
+  tolerance = 1e-9,
+): void {
+  assert.ok(
+    Math.abs(actual - expected) <= tolerance,
+    `expected ${actual} to be within ${tolerance} of ${expected}`,
+  );
+}
+
 async function fixture({
   show = "<00010002> Tj",
   renderMode = 0,
@@ -275,14 +286,14 @@ test("shaped-glyph planner issues a nominal ligature plan with native TJ endpoin
 
   assert.equal(plan.originalText, "AB");
   assert.equal(plan.replacementText, "fi");
-  assert.equal(plan.originalEffectiveAdvancePt, 14.4);
-  assert.equal(plan.shapedAdvancePt, 7.8);
-  assert.equal(plan.endpointTjAdjustment, -550);
+  assertNear(plan.originalEffectiveAdvancePt, 14.4);
+  assertNear(plan.shapedAdvancePt, 7.8);
+  assertNear(plan.endpointTjAdjustment, -550);
   assert.equal(plan.glyphs.length, 1);
   assert.equal(plan.glyphs[0]?.pdfCode, 3);
   // Natural PDF width 700 -> HarfBuzz 650 = +50 TJ, then -550 TJ
   // endpoint compensation => final -500.
-  assert.equal(plan.glyphs[0]?.tjAdjustment, -500);
+  assertNear(plan.glyphs[0]!.tjAdjustment, -500);
 });
 
 test("shaped-glyph byte writer emits addressed CIDs and per-glyph/end-point TJ positioning only inside the target range", async () => {
@@ -343,10 +354,10 @@ test("shaped-glyph planner preserves an original TJ operator's effective endpoin
   if (!isValidatedShapedGlyphEditPlan(plan)) assert.fail(plan.reason);
 
   assert.equal(plan.originalTjAdjustmentTotal, -100);
-  assert.equal(plan.originalEffectiveAdvancePt, 15.6);
-  assert.equal(plan.shapedAdvancePt, 7.8);
-  assert.equal(plan.endpointTjAdjustment, -650);
-  assert.equal(plan.glyphs[0]?.tjAdjustment, -600);
+  assertNear(plan.originalEffectiveAdvancePt, 15.6);
+  assertNear(plan.shapedAdvancePt, 7.8);
+  assertNear(plan.endpointTjAdjustment, -650);
+  assertNear(plan.glyphs[0]!.tjAdjustment, -600);
 });
 
 test("document writer rejects a stale shaped plan when the native operator changes during asynchronous shaping", async () => {
