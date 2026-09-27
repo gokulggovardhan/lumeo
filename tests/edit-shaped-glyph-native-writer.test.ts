@@ -15,7 +15,7 @@ import {
 } from "../lib/pdf/edit/formXObjects.ts";
 import {
   decodeTextShowOperator,
-} from "../lib/pdf/edit/fontEncoding.ts";
+} from "../lib/pdf/edit/editPlan.ts";
 import {
   PdfFontRegistry,
   type PdfFontShapingInspection,
