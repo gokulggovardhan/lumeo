@@ -194,6 +194,8 @@ export function useNativeTextSelectionState() {
     nativeFormatOpen,
     setNativeFormatOpen,
     logicalSelection,
+    textCompositionActive,
+    setTextCompositionActive,
     clearSelection,
     resetInteraction,
     selectDetectedRun,
