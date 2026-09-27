@@ -62,7 +62,8 @@ async function extractedText(bytes: Uint8Array): Promise<string> {
       .replace(/\s+/g, " ")
       .trim();
   } finally {
-    await doc.destroy();
+    const destroy = (doc as { destroy?: () => Promise<void> | void }).destroy;
+    if (destroy) await destroy.call(doc);
   }
 }
 
