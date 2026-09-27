@@ -3,7 +3,7 @@
 // Shared driving for the redaction e2e tests. Kept separate so the specs
 // read as assertions rather than as plumbing.
 
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export const RUN_SELECTOR = 'div[role="button"][aria-label^="Editable text"]';
 
@@ -30,6 +30,41 @@ export const LAYER_SELECTOR = '[aria-label="Draw a box over text to redact it"]'
  */
 export function outcomePanel(page: Page) {
   return page.getByTestId("redaction-outcome");
+}
+
+async function waitForStableRunGeometry(
+  run: Locator,
+  label: string,
+): Promise<void> {
+  let previous = await run.boundingBox();
+  if (!previous) throw new Error(`${label} has no bounding box`);
+
+  let stableSamples = 0;
+  await expect
+    .poll(
+      async () => {
+        const next = await run.boundingBox();
+        if (!next) {
+          stableSamples = 0;
+          previous = next;
+          return stableSamples;
+        }
+        const stable =
+          previous !== null &&
+          Math.abs(next.x - previous.x) <= 0.5 &&
+          Math.abs(next.y - previous.y) <= 0.5 &&
+          Math.abs(next.width - previous.width) <= 0.5 &&
+          Math.abs(next.height - previous.height) <= 0.5;
+        stableSamples = stable ? stableSamples + 1 : 0;
+        previous = next;
+        return stableSamples;
+      },
+      {
+        timeout: 10_000,
+        message: `${label} should stop moving before interaction`,
+      },
+    )
+    .toBeGreaterThanOrEqual(2);
 }
 
 /** Individually-named runs that were masked but NOT removed. */
@@ -60,6 +95,10 @@ export async function waitForStageReady(page: Page): Promise<void> {
       message: "stage should have rendered detected text runs",
     })
     .toBeGreaterThan(0);
+  await waitForStableRunGeometry(
+    page.locator(RUN_SELECTOR).first(),
+    "first detected text run",
+  );
 }
 
 export async function openWithPdf(page: Page, pdfPath: string): Promise<void> {
@@ -84,41 +123,10 @@ export async function enterRedactMode(page: Page): Promise<void> {
 export async function dragBoxOverRun(page: Page, needle: string): Promise<void> {
   const run = page.locator(runSelectorFor(needle)).first();
 
-  // Firefox can still be finishing a smooth scroll started by the editor's
-  // focus/selection choreography after a native edit. Starting a viewport-
-  // coordinate mouse drag while the page is moving makes the page-relative
-  // redaction box drift away from the run even though the initial
-  // boundingBox() was correct. Require several consecutive stable geometry
-  // samples before pressing the pointer; this waits on observable layout
-  // state rather than hiding the race behind a fixed sleep.
-  let previous = await run.boundingBox();
-  if (!previous) throw new Error(`run containing "${needle}" has no box`);
-  let stableSamples = 0;
-  await expect
-    .poll(
-      async () => {
-        const next = await run.boundingBox();
-        if (!next) {
-          stableSamples = 0;
-          previous = next;
-          return stableSamples;
-        }
-        const stable =
-          previous !== null &&
-          Math.abs(next.x - previous.x) <= 0.5 &&
-          Math.abs(next.y - previous.y) <= 0.5 &&
-          Math.abs(next.width - previous.width) <= 0.5 &&
-          Math.abs(next.height - previous.height) <= 0.5;
-        stableSamples = stable ? stableSamples + 1 : 0;
-        previous = next;
-        return stableSamples;
-      },
-      {
-        timeout: 10_000,
-        message: `run containing "${needle}" should stop moving before a redaction drag starts`,
-      },
-    )
-    .toBeGreaterThanOrEqual(2);
+  // A stage can still be settling after upload/reraster or a smooth focus
+  // scroll. Start the viewport-coordinate drag only after the target run's
+  // geometry is observably stable.
+  await waitForStableRunGeometry(run, `run containing "${needle}"`);
 
   const box = await run.boundingBox();
   if (!box) throw new Error(`run containing "${needle}" disappeared before the drag`);
