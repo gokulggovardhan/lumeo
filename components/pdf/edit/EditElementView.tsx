@@ -48,6 +48,8 @@ function EditElementViewImpl({
   onDelete,
   onTextChange,
   pixelsPerPoint,
+  fontFamilyCss,
+  customFontIssue,
 }: {
   element: EditElement;
   selected: boolean;
@@ -62,6 +64,8 @@ function EditElementViewImpl({
   // the exported PDF. Computed once in EditPdfTool.tsx from the rendered
   // page's pixel dimensions vs. its real point dimensions.
   pixelsPerPoint: number;
+  fontFamilyCss?: string;
+  customFontIssue?: string | null;
 }) {
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const liveRef = useRef<LiveGeometry | null>(null);
@@ -277,6 +281,10 @@ function EditElementViewImpl({
           onPointerDown={(event) => event.stopPropagation()}
           onKeyDown={(event) => event.stopPropagation()}
           placeholder="Type here"
+          aria-invalid={customFontIssue ? true : undefined}
+          title={customFontIssue ?? undefined}
+          data-edit-local-font-active={element.fontAssetId ? "true" : "false"}
+          data-edit-local-font-id={element.fontAssetId ?? undefined}
           // lumeo-page-overlay-input opts this out of the app-chrome input
           // styling in globals.css. Without it, that rule's themed
           // --surface-input beat this bg-transparent on specificity and
@@ -285,6 +293,7 @@ function EditElementViewImpl({
           className={`lumeo-page-overlay-input h-full w-full resize-none rounded-sm bg-transparent px-1 outline-none ${selected ? "ring-2 ring-[var(--lumeo-gold)]" : "hover:ring-1 hover:ring-[var(--text-primary)]/20"}`}
           style={{
             fontSize: `${element.fontSizePt * pixelsPerPoint}px`,
+            fontFamily: fontFamilyCss ? `"${fontFamilyCss}"` : undefined,
             lineHeight: 1.15,
             color: element.color,
             fontWeight: element.bold ? 700 : 400,
