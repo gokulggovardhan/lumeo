@@ -199,3 +199,33 @@ test("native text formatting is journaled as a real changeStyle operation", () =
   assert.equal(operation.after.fontSizePt, 14);
   assert.equal(operation.after.horizontalScalingPct, 96);
 });
+
+
+test("same-family local font swaps remain distinct semantic style operations without font bytes", () => {
+  const base = {
+    ...createTextElement("t-local", 0, 12, 18),
+    text: "AB",
+    fontFamily: "Demo Sans",
+    fontAssetId: "local-font-aaaaaaaa",
+  };
+  const changed = {
+    ...base,
+    fontAssetId: "local-font-bbbbbbbb",
+  };
+
+  const operations = deriveElementOperations([base], [changed]);
+  assert.equal(operations.length, 1);
+  assert.equal(operations[0].kind, "changeStyle");
+  if (operations[0].kind !== "changeStyle") return;
+  assert.equal(operations[0].before.fontFamily, "Demo Sans");
+  assert.equal(operations[0].after.fontFamily, "Demo Sans");
+  assert.equal(operations[0].before.fontIdentity, "local-font-aaaaaaaa");
+  assert.equal(operations[0].after.fontIdentity, "local-font-bbbbbbbb");
+
+  const session = appendPdfEditOperations(createPdfEditSession(100), operations);
+  const semantic = session.semanticHistory.entries[0];
+  assert.equal(semantic.type, "change-style");
+  assert.equal(semantic.before?.style?.fontIdentity, "local-font-aaaaaaaa");
+  assert.equal(semantic.after?.style?.fontIdentity, "local-font-bbbbbbbb");
+  assert.equal(JSON.stringify(semantic).includes("bytes"), false);
+});
