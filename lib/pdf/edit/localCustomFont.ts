@@ -51,6 +51,14 @@ export async function createLocalCustomFontAsset(
       inspectPdfFontProgram(input, { maxBytes: MAX_LOCAL_CUSTOM_FONT_BYTES }),
   }: { inspectFont?: LocalFontInspector } = {},
 ): Promise<LocalCustomFontAssetResult> {
+  const normalizedFileName = fileName.trim();
+  if (!/\.(?:ttf|otf)$/i.test(normalizedFileName)) {
+    return {
+      kind: "blocked",
+      reason: "Choose a .ttf or .otf font file.",
+    };
+  }
+
   if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0) {
     return { kind: "blocked", reason: "Choose a non-empty TrueType or OpenType font file." };
   }
