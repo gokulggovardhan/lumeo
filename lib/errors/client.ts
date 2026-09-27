@@ -39,6 +39,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
  * caps how many reports a single page load can send.
  */
 export async function captureClientError(input: ErrorCaptureInput): Promise<void> {
+  if (process.env.NODE_ENV !== "production") return;
   if (typeof window === "undefined") return;
   if (capturing) return; // re-entrancy guard: a failure inside this function must never re-trigger itself
   if (captureCount >= MAX_CAPTURES_PER_LOAD) return;
