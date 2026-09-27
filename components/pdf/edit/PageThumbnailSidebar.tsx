@@ -91,7 +91,8 @@ const Thumb = memo(function Thumb({
       // The drop indicator is a border on the neighbour rather than a
       // separate inserted node, so the list never reflows mid-drag -- a
       // shifting list makes the drop target move out from under the cursor.
-      className={`relative ${virtualized ? "h-[148px]" : ""} ${dropTarget ? "before:absolute before:-top-1 before:left-2 before:right-2 before:h-0.5 before:rounded before:bg-[var(--lumeo-gold)]" : ""}`}
+      className={`relative ${dropTarget ? "before:absolute before:-top-1 before:left-2 before:right-2 before:h-0.5 before:rounded before:bg-[var(--lumeo-gold)]" : ""}`}
+      style={virtualized ? { height: THUMBNAIL_ROW_HEIGHT_PX } : undefined}
     >
       <div
         draggable={!disabled}
