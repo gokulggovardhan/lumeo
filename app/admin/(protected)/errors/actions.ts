@@ -75,6 +75,8 @@ export async function markErrorFixDeployed(formData: FormData) {
       last_fix_sha: deployedSha.slice(0, 40),
       fix_deployed_at: now,
       recurrence_after_fix: false,
+      resolution_provenance: null,
+      verified_at: null,
       resolved_at: null,
       resolved_by: null,
     })
@@ -126,6 +128,8 @@ export async function resolveErrorLog(formData: FormData) {
       status: "resolved",
       resolved_at: new Date().toISOString(),
       resolved_by: target.admin.userId,
+      resolution_provenance: "verified_fix",
+      verified_at: new Date().toISOString(),
     })
     .eq("id", target.id)
     .eq("status", "fixed_pending_verification")
@@ -175,6 +179,8 @@ export async function reopenErrorLog(formData: FormData) {
       status: "open",
       resolved_at: null,
       resolved_by: null,
+      resolution_provenance: null,
+      verified_at: null,
     })
     .eq("id", target.id)
     .select("id")
