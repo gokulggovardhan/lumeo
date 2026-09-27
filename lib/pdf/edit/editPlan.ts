@@ -609,7 +609,10 @@ export function buildEditPlan({
   }
 
   const shapingRequirement = detectComplexShapingRequirement(replacementText);
-  if (shapingRequirement.required) {
+  if (
+    shapingRequirement.required ||
+    shapingWriteEvidence?.writerMode === "shaped-glyphs"
+  ) {
     const shapingRejection = {
       ...base,
       originalWidthPt: 0,
