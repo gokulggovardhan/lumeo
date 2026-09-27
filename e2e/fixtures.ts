@@ -14,6 +14,7 @@ import { createCanvas } from "@napi-rs/canvas";
 export const TMP_DIR = path.join(process.cwd(), "e2e", ".tmp");
 export const TEXT_ONLY_PDF = path.join(TMP_DIR, "text-only.pdf");
 export const WITH_IMAGE_PDF = path.join(TMP_DIR, "with-image.pdf");
+export const IMAGE_ONLY_PDF = path.join(TMP_DIR, "image-only.pdf");
 export const SPLIT_RUN_PDF = path.join(TMP_DIR, "split-run.pdf");
 export const TWO_PAGE_PDF = path.join(TMP_DIR, "two-page.pdf");
 export const MIXED_STYLE_PDF = path.join(TMP_DIR, "mixed-style.pdf");
@@ -32,6 +33,25 @@ async function textOnly(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   drawSensitiveText(doc.addPage([595, 842]), font);
+  return doc.save();
+}
+
+async function imageOnly(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+
+  const canvas = createCanvas(595, 842);
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#f3f4f6";
+  context.fillRect(0, 0, 595, 842);
+  context.fillStyle = "#111111";
+  context.font = "30px sans-serif";
+  context.fillText("SCANNED PAGE SAMPLE", 80, 160);
+  context.font = "22px sans-serif";
+  context.fillText("This text exists only in image pixels.", 80, 220);
+  const png = await doc.embedPng(canvas.toBuffer("image/png"));
+  page.drawImage(png, { x: 0, y: 0, width: 595, height: 842 });
+
   return doc.save();
 }
 
@@ -236,6 +256,7 @@ export async function writeFixtures(): Promise<void> {
   await mkdir(TMP_DIR, { recursive: true });
   await writeFile(TEXT_ONLY_PDF, await textOnly());
   await writeFile(WITH_IMAGE_PDF, await withImage());
+  await writeFile(IMAGE_ONLY_PDF, await imageOnly());
   const split = await splitRun();
   await assertGenuinelySplit(split);
   await writeFile(SPLIT_RUN_PDF, split);

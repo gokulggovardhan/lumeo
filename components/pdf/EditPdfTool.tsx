@@ -105,6 +105,7 @@ import {
   type PdfTextSearchScope,
 } from "@/lib/pdf/edit/textSearch";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
+import { detectRasterImageEvidence } from "@/lib/pdf/edit/rasterImageEvidence";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
@@ -658,6 +659,19 @@ export default function EditPdfTool() {
   const [textReconciliations, setTextReconciliations] = useState<TextSignalReconciliation[]>([]);
   const [textArbitrations, setTextArbitrations] = useState<TextEditArbitration[]>([]);
   const [pdfJsDetectedRunCount, setPdfJsDetectedRunCount] = useState(0);
+  // Image evidence is valid only for the exact bytes/page that produced the
+  // PDF.js operator list. Unknown/failed inspection stays false rather than
+  // promoting a textless page to "scanned" without proof.
+  const [rasterImageEvidenceRevision, setRasterImageEvidenceRevision] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+    evidence: boolean;
+  } | null>(null);
+  const rasterImageEvidenceCurrent =
+    rasterImageEvidenceRevision?.bytes === pdf?.bytes &&
+    rasterImageEvidenceRevision?.pageIndex === pageIndex
+      ? rasterImageEvidenceRevision.evidence
+      : false;
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
   // runMatches was derived from), kept around so a multi-run selection can
   // reconstruct the FULL, in-order operator list one specific content
@@ -1122,8 +1136,14 @@ export default function EditPdfTool() {
       nativeSpans: nativeTextSpans,
       pdfJsRunCount: pdfJsDetectedRunCount,
       reconciliations: textReconciliations,
+      rasterImageEvidence: rasterImageEvidenceCurrent,
     });
-  }, [nativeTextSpans, pdfJsDetectedRunCount, textReconciliations]);
+  }, [
+    nativeTextSpans,
+    pdfJsDetectedRunCount,
+    textReconciliations,
+    rasterImageEvidenceCurrent,
+  ]);
 
   // Product-facing explanations are derived from structured capability
   // evidence. Internal classifier/arbitration reason strings stay diagnostic
@@ -1831,6 +1851,14 @@ export default function EditPdfTool() {
     void (async () => {
       try {
         const page = await doc.getPage(pageIndex + 1);
+        void detectRasterImageEvidence(page, pageIndex + 1).then((evidence) => {
+          if (cancelled) return;
+          setRasterImageEvidenceRevision({
+            bytes: pdf.bytes,
+            pageIndex,
+            evidence,
+          });
+        });
         const pointViewport = page.getViewport({ scale: 1 });
         const content = await withPageTimeout(page.getTextContent(), pageIndex + 1, PAGE_RENDER_TIMEOUT_MS, "extract text from");
         if (cancelled) return;

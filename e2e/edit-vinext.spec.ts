@@ -4,6 +4,7 @@ import { PDFDocument } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import {
   CLIPPED_TEXT_PDF,
+  IMAGE_ONLY_PDF,
   LARGE_DOCUMENT_PDF,
   MIXED_STYLE_PDF,
   SPLIT_RUN_PDF,
@@ -89,6 +90,31 @@ test("vinext Edit PDF explains read-only clipped text before an edit is attempte
   await limitedRun.press("Enter");
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
   await expect(explanation).toBeVisible();
+});
+
+test("vinext Edit PDF classifies a proven image-only page as a scan", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, IMAGE_ONLY_PDF);
+
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
+  const pageCapability = page.locator("[data-edit-page-capability]");
+  await expect(pageCapability).toHaveAttribute("data-edit-page-capability", "no-detected-text", {
+    timeout: 90_000,
+  });
+  await expect(pageCapability).toHaveAttribute("title", /appears to be a scan/i, {
+    timeout: 30_000,
+  });
+
+  const explanation = page.locator("[data-edit-page-capability-explanation]");
+  await expect(explanation).toContainText(
+    /image content without a proven native text layer/i,
+    { timeout: 30_000 },
+  );
+  await expect(explanation).toContainText(/OCR support/i);
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
 });
 
 test("vinext Edit PDF keeps a 120-page thumbnail rail bounded and scrollable", async ({
