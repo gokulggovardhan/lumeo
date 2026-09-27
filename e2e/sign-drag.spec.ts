@@ -32,6 +32,12 @@ async function openSignWithPlacedText(page: Page) {
   await expect(addText).toBeVisible({ timeout: 90_000 });
   await addText.click();
   await expect(page.locator(PLACED)).toHaveCount(1, { timeout: 30_000 });
+  await expect
+    .poll(() => semanticHistoryCount(page), {
+      timeout: 30_000,
+      message: "placement should append one semantic history entry",
+    })
+    .toBe(1);
 }
 
 /** Percent-space position, which is what the element actually stores. */
@@ -44,6 +50,13 @@ async function positionOf(page: Page) {
 
 async function undoDisabled(page: Page) {
   return page.getByRole("button", { name: "Undo", exact: true }).isDisabled();
+}
+
+async function semanticHistoryCount(page: Page) {
+  const value = await page
+    .locator("[data-sign-semantic-history-count]")
+    .getAttribute("data-sign-semantic-history-count");
+  return Number(value ?? "0");
 }
 
 /** A real drag: press, several moves, one release. */
@@ -69,6 +82,12 @@ test("one drag is ONE undo entry -- a single undo returns the element and exhaus
 
   const afterDrag = await positionOf(page);
   expect(afterDrag, "the drag must actually move the element").not.toEqual(before);
+  await expect
+    .poll(() => semanticHistoryCount(page), {
+      timeout: 30_000,
+      message: "drag should append exactly one semantic history entry",
+    })
+    .toBe(2);
 
   await page.getByRole("button", { name: "Undo", exact: true }).click();
 
@@ -78,6 +97,12 @@ test("one drag is ONE undo entry -- a single undo returns the element and exhaus
       message: "one undo must restore the pre-drag position in a single step",
     })
     .toEqual(before);
+  await expect
+    .poll(() => semanticHistoryCount(page), {
+      timeout: 30_000,
+      message: "semantic journal should rewind with the same undo snapshot",
+    })
+    .toBe(1);
 
   // The entry count, not just the outcome. Undo stays ENABLED here because
   // the placement is still on the stack -- so the proof that the drag was
@@ -88,6 +113,12 @@ test("one drag is ONE undo entry -- a single undo returns the element and exhaus
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(page.locator(PLACED), "the second undo must remove the placement, not rewind more drag")
     .toHaveCount(0, { timeout: 30_000 });
+  await expect
+    .poll(() => semanticHistoryCount(page), {
+      timeout: 30_000,
+      message: "semantic journal should be empty after undoing placement",
+    })
+    .toBe(0);
   expect(await undoDisabled(page), "nothing should remain to undo").toBe(true);
 });
 
