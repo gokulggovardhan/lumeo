@@ -3790,9 +3790,24 @@ export default function EditPdfTool() {
     [editDraftText],
   );
 
+  const optionalShapedGlyphInspection =
+    resolvedEditContext.kind === "single" &&
+    editDraftText.length > 1 &&
+    resolvedEditContext.resolvedFont.kind === "Type0" &&
+    resolvedEditContext.resolvedFont.bytesPerCode === 2 &&
+    resolvedEditContext.resourceIdentity.descendantSubtype ===
+      "CIDFontType2" &&
+    resolvedEditContext.resourceIdentity.type0Encoding === "Identity-H" &&
+    resolvedEditContext.resourceIdentity.writingMode === "horizontal" &&
+    resolvedEditContext.resourceIdentity.cidSystemInfo?.ordering ===
+      "Identity" &&
+    resolvedEditContext.resourceIdentity.cidToGidMap?.kind === "name" &&
+    resolvedEditContext.resourceIdentity.cidToGidMap.name === "Identity" &&
+    Boolean(resolvedEditContext.embeddedProgramSha256);
+
   const shapingEvidenceRequest = useMemo(() => {
     if (
-      !shapingRequirement.required ||
+      (!shapingRequirement.required && !optionalShapedGlyphInspection) ||
       (resolvedEditContext.kind !== "single" &&
         resolvedEditContext.kind !== "multi")
     ) {
@@ -3823,9 +3838,12 @@ export default function EditPdfTool() {
           : null,
       resources: resolvedEditContext.resources,
       resourceName: resolvedEditContext.fontResourceName,
+      forceInspection:
+        !shapingRequirement.required && optionalShapedGlyphInspection,
     };
   }, [
     shapingRequirement.required,
+    optionalShapedGlyphInspection,
     resolvedEditContext,
     pageIndex,
     nativeTextSelectionKey,
@@ -3862,6 +3880,7 @@ export default function EditPdfTool() {
           resourceIdentity: request.resourceIdentity,
           resolvedFont: request.resolvedFont,
           fontMetrics: request.fontMetrics,
+          forceInspection: request.forceInspection,
         });
 
         if (cancelled) return;
@@ -4028,7 +4047,7 @@ export default function EditPdfTool() {
       const substituteAvailable = substitutePlan?.editable ? substitutePlan : null;
       const plan = useSubstituteFont && substituteAvailable ? substituteAvailable : strictPlan;
 
-      if (shapingRequirement.required && shapingEvidencePending) {
+      if (shapingEvidenceRequest && shapingEvidencePending) {
         return {
           kind: "single",
           editable: false,
@@ -4039,7 +4058,7 @@ export default function EditPdfTool() {
           substituteFont: null,
         };
       }
-      if (shapingRequirement.required && currentShapingBlockReason) {
+      if (shapingEvidenceRequest && currentShapingBlockReason) {
         return {
           kind: "single",
           editable: false,
@@ -4100,7 +4119,7 @@ export default function EditPdfTool() {
         embeddedProgramSha256,
         shapingWriteEvidence: currentShapingEvidence,
       });
-      if (shapingRequirement.required && shapingEvidencePending) {
+      if (shapingEvidenceRequest && shapingEvidencePending) {
         return {
           kind: "multi",
           editable: false,
@@ -4109,7 +4128,7 @@ export default function EditPdfTool() {
           resolvedFont,
         };
       }
-      if (shapingRequirement.required && currentShapingBlockReason) {
+      if (shapingEvidenceRequest && currentShapingBlockReason) {
         return {
           kind: "multi",
           editable: false,
