@@ -20,7 +20,6 @@ import {
   computeThumbnailWindow,
   scrollTopForThumbnail,
 } from "@/lib/pdf/edit/thumbnailVirtualization";
-
 const THUMBNAIL_SCALE = 0.28;
 const THUMBNAIL_CONCURRENCY = 3;
 
@@ -42,7 +41,7 @@ export type PageThumbnailSidebarProps = {
     pageCount: number;
     renderedCount: number;
     failedCount: number;
-    mountedRowCount: number;
+    mountedCount: number;
     virtualized: boolean;
   }) => void;
 };
@@ -229,6 +228,7 @@ export default function PageThumbnailSidebar({
   // pages are reused and URLs outside the window are revoked immediately.
   useEffect(() => {
     let cancelled = false;
+
     const thumbnailBatchStartedAt = window.performance.now();
     let renderedCount = 0;
     let failedCount = 0;
@@ -306,7 +306,7 @@ export default function PageThumbnailSidebar({
             urls: Object.fromEntries(urlsRef.current),
           });
         } catch {
-          if (!cancelled) failedCount += 1;
+          failedCount += 1;
           // Best-effort: a page without a thumbnail is still selectable and
           // still reorderable, so one failed raster never takes down the rail.
         }
@@ -329,7 +329,7 @@ export default function PageThumbnailSidebar({
           pageCount,
           renderedCount,
           failedCount,
-          mountedRowCount: thumbnailWindow.indices.length,
+          mountedCount: thumbnailWindow.indices.length,
           virtualized: thumbnailWindow.virtualized,
         });
       }
