@@ -32,6 +32,16 @@ import {
   inspectPdfFontProgram,
   type PdfFontProgramInspection,
 } from "./fontProgramIntelligence.ts";
+import {
+  shapeEmbeddedFontText,
+  type ShapeEmbeddedFontOptions,
+  type ShapedRun,
+  type TextShapingDirection,
+} from "./harfbuzzShaping.ts";
+import {
+  reconcileShapingWithPdfCharacterCodes,
+  type ShapingReconciliation,
+} from "./shapingReconciliation.ts";
 import type { EditPdfFontRegistryPerformanceSnapshot } from "./performanceDiagnostics.ts";
 import { BoundedLruCache } from "./boundedLruCache.ts";
 
@@ -50,6 +60,22 @@ export type BrowserFontProgramFormat =
   | "unknown";
 
 export type PdfFontWritingMode = "horizontal" | "vertical" | "unknown";
+
+export type PdfFontShapingInspection =
+  | Readonly<{
+      kind: "reconciled";
+      shaped: ShapedRun;
+      reconciliation: ShapingReconciliation;
+    }>
+  | Readonly<{
+      kind: "unavailable";
+      reason: string;
+    }>;
+
+type ExplicitShapingOptions = Omit<ShapeEmbeddedFontOptions, "direction"> & {
+  direction: Exclude<TextShapingDirection, "auto">;
+};
+
 
 export type PdfCidSystemInfo = {
   registry: string | null;
@@ -561,6 +587,71 @@ export class PdfFontRegistry {
 
     this.intelligenceCache.set(fontResource.dict, promise);
     return promise;
+  }
+
+  /**
+   * Shapes text with the exact embedded PDF font program and reconciles that
+   * evidence against the PDF character-code/width model.
+   *
+   * This is inspection only. A "reconciled" result is never write authority:
+   * PDF encoding/ToUnicode, glyph proof, EditPlan validation and the native
+   * content-stream writer remain independently mandatory.
+   */
+  async inspectShapingCompatibility(
+    resources: PDFDict,
+    resourceName: string,
+    text: string,
+    options: ExplicitShapingOptions,
+  ): Promise<PdfFontShapingInspection> {
+    const profile = this.resolve(resources, resourceName);
+    if (!profile) {
+      return {
+        kind: "unavailable",
+        reason: "The PDF font resource could not be resolved.",
+      };
+    }
+
+    const program = this.embeddedProgram(resources, resourceName);
+    if (!program) {
+      return {
+        kind: "unavailable",
+        reason: "This PDF font does not contain an embedded font program.",
+      };
+    }
+
+    const inspection = await this.inspectEmbeddedFontProgram(
+      resources,
+      resourceName,
+    );
+    if (inspection.kind !== "ok") {
+      return {
+        kind: "unavailable",
+        reason: inspection.reason,
+      };
+    }
+
+    try {
+      const shaped = await shapeEmbeddedFontText(program.bytes, text, options);
+      return {
+        kind: "reconciled",
+        shaped,
+        reconciliation: reconcileShapingWithPdfCharacterCodes({
+          text,
+          shaped,
+          resolvedFont: profile.resolvedFont,
+          fontMetrics: profile.metrics,
+          intelligence: inspection.intelligence,
+        }),
+      };
+    } catch (error) {
+      return {
+        kind: "unavailable",
+        reason:
+          error instanceof Error
+            ? error.message
+            : "The embedded font could not be shaped safely.",
+      };
+    }
   }
 
   /** Advisory fontkit cache size only; structural PDF font caches remain complete. */
