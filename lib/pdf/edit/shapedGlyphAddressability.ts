@@ -12,7 +12,10 @@ export type ShapedGlyphResourceBinding = Readonly<{
   fontObjectRef: string | null;
   descendantObjectRef: string | null;
   fontProgramObjectRef: string | null;
+  toUnicodeObjectRef: string | null;
+  encodingObjectRef: string | null;
   cidToGidMapObjectRef: string | null;
+  cidToGidMapKind: "identity" | "stream";
 }>;
 
 export type ShapedGlyphPdfAddress = Readonly<{
@@ -235,7 +238,11 @@ export function proveShapedGlyphAddressability({
     kind: "addressable",
     advisoryOnly: true,
     embeddedProgramSha256: embeddedProgramSha256.toLowerCase(),
-    binding: Object.freeze({ ...binding }),
+    binding: Object.freeze({
+      ...binding,
+      cidToGidMapKind:
+        cidToGidMap.kind === "identity" ? "identity" : "stream",
+    }),
     addresses: Object.freeze(addresses),
   });
 }
