@@ -3739,6 +3739,7 @@ export default function EditPdfTool() {
             fontMetrics,
             embeddedGlyphEvidence,
             embeddedProgramSha256: profile.embeddedProgramSha256,
+            resourceIdentity: profile.resourceIdentity,
             resources: validation.resources,
             fontResourceName: validation.fontResourceName,
             validation,
@@ -3753,6 +3754,7 @@ export default function EditPdfTool() {
           fallbackStyleHints,
           embeddedGlyphEvidence,
           embeddedProgramSha256: profile.embeddedProgramSha256,
+          resourceIdentity: profile.resourceIdentity,
           resources: locatedOperator.resources,
           fontResourceName: operator.fontResourceName,
         };
@@ -3771,6 +3773,7 @@ export default function EditPdfTool() {
         fontMetrics: profile.metrics,
         embeddedGlyphEvidence: profile.embeddedGlyphEvidence,
         embeddedProgramSha256: profile.embeddedProgramSha256,
+        resourceIdentity: profile.resourceIdentity,
         resources: validation.resources,
         fontResourceName: validation.fontResourceName,
         validation,
@@ -3806,6 +3809,18 @@ export default function EditPdfTool() {
       }),
       replacementText: editDraftText,
       embeddedProgramSha256: resolvedEditContext.embeddedProgramSha256,
+      resourceIdentity:
+        resolvedEditContext.kind === "single"
+          ? resolvedEditContext.resourceIdentity
+          : null,
+      resolvedFont:
+        resolvedEditContext.kind === "single"
+          ? resolvedEditContext.resolvedFont
+          : null,
+      fontMetrics:
+        resolvedEditContext.kind === "single"
+          ? resolvedEditContext.fontMetrics
+          : null,
       resources: resolvedEditContext.resources,
       resourceName: resolvedEditContext.fontResourceName,
     };
@@ -3843,6 +3858,10 @@ export default function EditPdfTool() {
               shapeText,
             ),
           shapeText: shapeEmbeddedFontText,
+          resourceName: request.resourceName,
+          resourceIdentity: request.resourceIdentity,
+          resolvedFont: request.resolvedFont,
+          fontMetrics: request.fontMetrics,
         });
 
         if (cancelled) return;
@@ -3935,6 +3954,7 @@ export default function EditPdfTool() {
         embeddedGlyphEvidence,
         embeddedProgramSha256,
         shapingWriteEvidence: currentShapingEvidence,
+        fontResourceIdentity: resolvedEditContext.resourceIdentity,
         replacementTextState: nativeStyleOverride,
       };
 
