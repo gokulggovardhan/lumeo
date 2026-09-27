@@ -105,6 +105,9 @@ import {
   type PdfTextSearchPageIndex,
   type PdfTextSearchScope,
 } from "@/lib/pdf/edit/textSearch";
+import { analyzeNativeReplacePage } from "@/lib/pdf/edit/nativeReplacePageAnalysis";
+import { planStructuredReplaceAllPage } from "@/lib/pdf/edit/structuredReplaceAll";
+import { preflightStructuredReplacePageWrites } from "@/lib/pdf/edit/structuredReplaceWritePlan";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { detectRasterImageEvidence } from "@/lib/pdf/edit/rasterImageEvidence";
 import {
@@ -329,6 +332,7 @@ let editEngineModulePromise: Promise<{
   applyEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyEditPlanToDocument"];
   applyMultiRunEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyMultiRunEditPlanToDocument"];
   applyNativeTextStyleBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyNativeTextStyleBatchToDocument"];
+  applyValidatedEditPlanBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyValidatedEditPlanBatchToDocument"];
   verifyPostExportNativeEdits: (typeof import("@/lib/pdf/edit/postExportVerification"))["verifyPostExportNativeEdits"];
   PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
   PDFName: (typeof import("pdf-lib"))["PDFName"];
@@ -357,6 +361,7 @@ function loadEditEngine() {
       applyEditPlanToDocument: applyEditPlanMod.applyEditPlanToDocument,
       applyMultiRunEditPlanToDocument: applyEditPlanMod.applyMultiRunEditPlanToDocument,
       applyNativeTextStyleBatchToDocument: applyEditPlanMod.applyNativeTextStyleBatchToDocument,
+      applyValidatedEditPlanBatchToDocument: applyEditPlanMod.applyValidatedEditPlanBatchToDocument,
       verifyPostExportNativeEdits: postExportVerificationMod.verifyPostExportNativeEdits,
       PDFDocument: pdfLibMod.PDFDocument,
       PDFName: pdfLibMod.PDFName,
@@ -804,6 +809,8 @@ export default function EditPdfTool() {
     () => new Map(),
   );
   const [textSearchIndexBusy, setTextSearchIndexBusy] = useState(false);
+  const [textSearchReplaceAllBusy, setTextSearchReplaceAllBusy] = useState(false);
+  const [textSearchReplaceAllStatus, setTextSearchReplaceAllStatus] = useState("");
   // True when the last Restyle could not blank the original glyphs from the
   // content stream, so the covered text is still in the exported file. Drives
   // the disclosure notice -- see restyleSelectedRun for when that happens.
