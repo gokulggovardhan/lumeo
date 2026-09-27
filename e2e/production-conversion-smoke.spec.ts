@@ -227,8 +227,10 @@ test("production Edit PDF certifies native colour, formatting, history and expor
       .first();
     await expect(run).toBeVisible({ timeout: 90_000 });
     await run.click();
-    await page.getByRole("button", { name: "Format" }).click();
     const panel = page.locator("[data-native-text-formatting]");
+    if (!(await panel.isVisible())) {
+      await page.getByRole("button", { name: "Format" }).click();
+    }
     await expect(panel).toBeVisible();
     return {
       colour: page.getByLabel("Native fill colour"),
