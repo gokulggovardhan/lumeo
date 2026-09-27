@@ -43,6 +43,11 @@ import {
 } from "./shapingReconciliation.ts";
 import type { EditPdfFontRegistryPerformanceSnapshot } from "./performanceDiagnostics.ts";
 import { BoundedLruCache } from "./boundedLruCache.ts";
+import {
+  proveShapedGlyphAddressability,
+  type CidToGidAddressingSource,
+  type ShapedGlyphAddressabilityResult,
+} from "./shapedGlyphAddressability.ts";
 
 const SUBSET_PREFIX = /^[A-Z]{6}\+/;
 const BOLD_NAME = /bold|black|heavy|semib|demib?|ultra/i;
@@ -385,6 +390,58 @@ function cidToGidMapFor(
   return { kind: "unknown", name: null, objectRef: refString(entry) };
 }
 
+function cidToGidAddressingSourceFor(
+  descendant: PDFDict | null,
+  context: PDFContext,
+): CidToGidAddressingSource {
+  if (!descendant) {
+    return {
+      kind: "blocked",
+      reason: "The Type0 font descendant resource could not be resolved.",
+    };
+  }
+
+  const entry = descendant.get(PDFName.of("CIDToGIDMap"));
+  if (!entry) {
+    return {
+      kind: "blocked",
+      reason:
+        "This CIDFontType2 resource does not expose an explicit CIDToGIDMap, so shaped glyph addressing remains read-only.",
+    };
+  }
+
+  const resolved = resolveObject(entry, context);
+  const name = nameString(resolved);
+  if (name) {
+    return name === "Identity"
+      ? { kind: "identity" }
+      : {
+          kind: "blocked",
+          reason:
+            `The CIDToGIDMap name “${name}” is not a proven Identity mapping.`,
+        };
+  }
+
+  if (resolved instanceof PDFRawStream) {
+    if (resolved.dict.has(PDFName.of("Filter"))) {
+      return {
+        kind: "blocked",
+        reason:
+          "Compressed CIDToGIDMap streams are not decoded by this first bounded proof slice.",
+      };
+    }
+    return {
+      kind: "stream",
+      bytes: resolved.getContents().slice(),
+    };
+  }
+
+  return {
+    kind: "blocked",
+    reason: "The CIDToGIDMap resource has an unsupported PDF object type.",
+  };
+}
+
 function resourceIdentityFor(
   fontResource: ResolvedFontResource,
   context: PDFContext,
@@ -667,6 +724,65 @@ export class PdfFontRegistry {
             : "The embedded font could not be shaped safely.",
       };
     }
+  }
+
+  /**
+   * Proves whether HarfBuzz glyph IDs can be addressed by the exact existing
+   * PDF Type0/CIDFontType2 resource. This is advisory evidence only: the
+   * returned object is intentionally not accepted by EditPlan or the native
+   * writer and therefore cannot authorize a mutation.
+   */
+  inspectShapedGlyphAddressability(
+    resources: PDFDict,
+    resourceName: string,
+    shaped: ShapedRun,
+  ): ShapedGlyphAddressabilityResult {
+    const fontResource = resolveFontResource(
+      resources,
+      resourceName,
+      this.context,
+    );
+    if (!fontResource) {
+      return {
+        kind: "blocked",
+        reason: "The PDF font resource could not be resolved.",
+      };
+    }
+
+    const profile = this.resolve(resources, resourceName);
+    if (!profile) {
+      return {
+        kind: "blocked",
+        reason: "The PDF font profile could not be resolved.",
+      };
+    }
+
+    const structure = structureForFont(fontResource.dict, this.context);
+    return proveShapedGlyphAddressability({
+      binding: {
+        resourceName,
+        fontObjectRef: profile.resourceIdentity.fontObjectRef,
+        descendantObjectRef: profile.resourceIdentity.descendantObjectRef,
+        fontProgramObjectRef: profile.resourceIdentity.fontProgramObjectRef,
+        toUnicodeObjectRef: profile.resourceIdentity.toUnicodeObjectRef,
+        encodingObjectRef: profile.resourceIdentity.encodingObjectRef,
+        cidToGidMapObjectRef:
+          profile.resourceIdentity.cidToGidMap?.objectRef ?? null,
+      },
+      fontKind: profile.kind,
+      descendantSubtype: profile.resourceIdentity.descendantSubtype,
+      type0Encoding: profile.resourceIdentity.type0Encoding,
+      writingMode: profile.resourceIdentity.writingMode,
+      embeddedProgramSha256: profile.embeddedProgramSha256,
+      cidToGidMap: cidToGidAddressingSourceFor(
+        structure.descendant,
+        this.context,
+      ),
+      glyphCodeToUnicode: profile.resolvedFont.glyphCodeToUnicode,
+      glyphWidths: profile.metrics.glyphWidths,
+      defaultWidth: profile.metrics.defaultWidth,
+      shaped,
+    });
   }
 
   /** Advisory fontkit cache size only; structural PDF font caches remain complete. */
