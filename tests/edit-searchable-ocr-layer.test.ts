@@ -87,7 +87,8 @@ test("searchable OCR writes extractable text with invisible native rendering mod
 
   const searchable = await addSearchableOcrTextLayer({ sourceBytes, result });
 
-  const pdfjs = await pdfjsLib.getDocument({ data: searchable.bytes }).promise;
+  const searchableLoadingTask = pdfjsLib.getDocument({ data: searchable.bytes });
+  const pdfjs = await searchableLoadingTask.promise;
   try {
     const page = await pdfjs.getPage(1);
     const content = await page.getTextContent();
@@ -97,7 +98,7 @@ test("searchable OCR writes extractable text with invisible native rendering mod
     assert.match(extracted, /SCANNED/);
     assert.match(extracted, /PAGE/);
   } finally {
-    await pdfjs.destroy();
+    await searchableLoadingTask.destroy();
   }
 
   const native = await PDFDocument.load(searchable.bytes);
@@ -131,12 +132,15 @@ test("searchable OCR rejects unsupported Unicode atomically for the Standard-14 
     /embedded Unicode font.*Nothing was changed/i,
   );
 
-  const original = await pdfjsLib.getDocument({ data: new Uint8Array(sourceBytes.slice(0)) }).promise;
+  const originalLoadingTask = pdfjsLib.getDocument({
+    data: new Uint8Array(sourceBytes.slice(0)),
+  });
+  const original = await originalLoadingTask.promise;
   try {
     const page = await original.getPage(1);
     const content = await page.getTextContent();
     assert.equal((content.items as Array<{ str?: string }>).map((item) => item.str ?? "").join("").trim(), "");
   } finally {
-    await original.destroy();
+    await originalLoadingTask.destroy();
   }
 });
