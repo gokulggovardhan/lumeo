@@ -4328,7 +4328,7 @@ export default function EditPdfTool() {
           pageIndex,
           spanIds,
           contentStreamIndex: textPlan.formPath ? null : textPlan.contentStreamIndex,
-          formPath: textPlan.formPath,
+          formPath: textPlan.formPath ? [...textPlan.formPath] : null,
           operatorIndices: [textPlan.operatorIndex],
           fontResourceName: textPlan.fontResourceName,
         };
