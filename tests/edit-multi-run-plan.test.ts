@@ -216,7 +216,7 @@ test("multi-run: rejects a quote operator that moves onto a new text line", asyn
   );
   assert.equal(allOperators.length, 4);
   assert.equal(plan.editable, false);
-  assert.match(plan.reason ?? "", /text-positioning boundary|line break/i);
+  assert.match(plan.reason ?? "", /positioned independently|line break/i);
 });
 
 test("multi-run: combined advance uses each selected operator's own text state", async () => {
@@ -362,7 +362,7 @@ test("multi-run: rejects otherwise-adjacent operators from different PDF text ob
   });
 
   assert.equal(plan.editable, false);
-  assert.match(plan.reason ?? "", /text-object boundaries/i);
+  assert.match(plan.reason ?? "", /separate native text groups/i);
 });
 
 test("multi-run: rejects otherwise-adjacent operators under different CTMs", async () => {
@@ -398,7 +398,7 @@ test("multi-run: rejects otherwise-adjacent operators under different CTMs", asy
   });
 
   assert.equal(plan.editable, false);
-  assert.match(plan.reason ?? "", /transform|positioning/i);
+  assert.match(plan.reason ?? "", /positioned independently|line break/i);
 });
 
 test("multi-run: rejects a discontinuous selection honestly, without guessing at a merge", async () => {
