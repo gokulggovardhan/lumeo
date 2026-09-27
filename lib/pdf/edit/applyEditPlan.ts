@@ -51,6 +51,7 @@ import {
   type ValidatedNativeTextStyleBatchPlan,
 } from "./multiStylePlan.ts";
 import type { NativePaintPlan } from "./nativePaint.ts";
+import { PdfFontRegistry } from "./fontRegistry.ts";
 import {
   collectPageTextOperators,
   resolveStreamTarget,
@@ -663,6 +664,51 @@ function originalTjTotalForCurrentOperator(
  * Shaping can be asynchronous, so a formerly-valid plan is never allowed to
  * write into a stream that changed underneath it.
  */
+function shapedResourceBindingMatchesCurrent(
+  doc: PDFDocument,
+  resources: PDFDict,
+  plan: ValidatedShapedGlyphEditPlan,
+): boolean {
+  const profile = new PdfFontRegistry(doc).resolve(
+    resources,
+    plan.fontResourceName,
+  );
+  if (!profile) return false;
+
+  const identity = profile.resourceIdentity;
+  const binding = plan.resourceBinding;
+  if (
+    profile.embeddedProgramSha256?.toLowerCase() !==
+      plan.embeddedProgramSha256.toLowerCase() ||
+    binding.resourceName !== plan.fontResourceName ||
+    binding.fontObjectRef !== identity.fontObjectRef ||
+    binding.descendantObjectRef !== identity.descendantObjectRef ||
+    binding.fontProgramObjectRef !== identity.fontProgramObjectRef ||
+    binding.toUnicodeObjectRef !== identity.toUnicodeObjectRef ||
+    binding.encodingObjectRef !== identity.encodingObjectRef
+  ) {
+    return false;
+  }
+
+  if (binding.cidToGidMapKind === "identity") {
+    return (
+      identity.cidToGidMap?.kind === "name" &&
+      identity.cidToGidMap.name === "Identity"
+    );
+  }
+
+  return (
+    identity.cidToGidMap?.kind === "stream" &&
+    identity.cidToGidMap.objectRef === binding.cidToGidMapObjectRef
+  );
+}
+
+/**
+ * Re-resolves both the exact operator and the exact font-resource identity
+ * immediately before mutation. Shaping is asynchronous, so neither a changed
+ * text operator nor a same-named font resource swapped underneath the plan is
+ * allowed to cross the writer boundary.
+ */
 function assertShapedTargetStillCurrent(
   doc: PDFDocument,
   plan: ValidatedShapedGlyphEditPlan,
@@ -685,6 +731,12 @@ function assertShapedTargetStillCurrent(
   if (!candidate) {
     throw new EditPlanRejectedError(
       "The shaped-glyph target no longer resolves to the planned PDF operator.",
+    );
+  }
+
+  if (!shapedResourceBindingMatchesCurrent(doc, candidate.resources, plan)) {
+    throw new EditPlanRejectedError(
+      "The PDF font resource changed after shaped-glyph validation; reselect the text and build a fresh plan.",
     );
   }
 
