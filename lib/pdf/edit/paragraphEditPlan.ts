@@ -9,6 +9,10 @@ import {
   type ValidatedEditPlan,
 } from "./editPlan.ts";
 import {
+  buildMultiRunEditPlan,
+  isValidatedMultiRunEditPlan,
+} from "./multiRunEditPlan.ts";
+import {
   applyValidatedEditPlanBatchToDocument,
   EditPlanRejectedError,
 } from "./applyEditPlan.ts";
@@ -189,19 +193,20 @@ export function isValidatedParagraphEditPlan(
  * Builds the first bounded cross-line native paragraph edit.
  *
  * This does NOT perform reflow. Each selected native PDF text-show operator
- * already owns one proven line/baseline. The replacement must contain exactly
- * the same number of explicit lines; every existing operator is rewritten with
- * exactly one corresponding replacement line, so its own line matrix, text
- * state and surrounding positioning operators remain untouched.
+ * already belongs to one proven line/baseline. A line may consist of one
+ * operator or several consecutive Tj/TJ operators that the established
+ * multi-run planner can already rewrite safely. The replacement must contain
+ * exactly the same number of explicit lines; every existing line keeps its
+ * own baseline, text state and surrounding positioning operators.
  *
  * Deliberately rejected:
  * - one-line selections (ordinary editPlan/multiRunEditPlan own those);
  * - discontinuous operator sets;
  * - separate BT/ET text objects;
  * - different CTMs or font resources;
- * - two selected operators on the same line (use multiRunEditPlan);
- * - horizontal-only repositioning that changes x but not the text-space baseline;
- * - changed line orientation or repeated/unknown line matrices;
+ * - same-line fragments the existing multi-run planner cannot prove;
+ * - horizontal-only independently positioned pieces on one baseline;
+ * - changed line orientation or unknown line matrices;
  * - replacement line-count changes;
  * - any per-line replacement buildEditPlan cannot independently validate.
  */
@@ -332,13 +337,27 @@ export function buildParagraphEditPlan({
     });
   }
 
-  for (let index = 1; index < lineMatrices.length; index += 1) {
-    const previous = lineMatrices[index - 1];
-    const current = lineMatrices[index];
-    if (
-      !sameLineOrientation(previous, current) ||
-      !hasDistinctTextSpaceBaseline(previous, current)
-    ) {
+  type LineGroup = {
+    operatorIndices: number[];
+    operators: TextShowOperator[];
+    lineMatrix: Matrix2x3;
+  };
+  const lineGroups: LineGroup[] = [];
+  for (let position = 0; position < selected.length; position += 1) {
+    const operator = selected[position];
+    const lineMatrix = operator.textLineMatrix!;
+    const previous = lineGroups[lineGroups.length - 1];
+
+    if (!previous) {
+      lineGroups.push({
+        operatorIndices: [sortedIndices[position]],
+        operators: [operator],
+        lineMatrix: [...lineMatrix] as Matrix2x3,
+      });
+      continue;
+    }
+
+    if (!sameLineOrientation(previous.lineMatrix, lineMatrix)) {
       return rejected({
         pageIndex,
         contentStreamIndex,
@@ -347,12 +366,29 @@ export function buildParagraphEditPlan({
         replacementLines,
         resolvedFont,
         reason:
-          "These operators are not proven as separate native text lines with one stable line orientation and distinct baselines. Edit them separately.",
+          "These lines change native text orientation, so one paragraph transaction is not proven safe.",
       });
     }
+
+    if (!hasDistinctTextSpaceBaseline(previous.lineMatrix, lineMatrix)) {
+      // Same text-space baseline: this is one logical line. Exact same-matrix
+      // fragments can be delegated to the already-certified multi-run writer.
+      // An x-shifted independently positioned operator is grouped here too so
+      // it cannot be miscounted as a second line; buildMultiRunEditPlan will
+      // then reject it honestly because its line matrix is not identical.
+      previous.operatorIndices.push(sortedIndices[position]);
+      previous.operators.push(operator);
+      continue;
+    }
+
+    lineGroups.push({
+      operatorIndices: [sortedIndices[position]],
+      operators: [operator],
+      lineMatrix: [...lineMatrix] as Matrix2x3,
+    });
   }
 
-  if (replacementLines.length !== selected.length) {
+  if (lineGroups.length < 2) {
     return rejected({
       pageIndex,
       contentStreamIndex,
@@ -361,27 +397,80 @@ export function buildParagraphEditPlan({
       replacementLines,
       resolvedFont,
       reason:
-        `This safe paragraph mode preserves the existing ${selected.length} native lines. Enter exactly ${selected.length} lines instead of changing the line count.`,
+        "This selection is one native PDF line. Use the existing same-line editor instead of paragraph mode.",
     });
   }
 
-  const subPlans = selected.map((operator, position) =>
-    buildEditPlan({
+  if (replacementLines.length !== lineGroups.length) {
+    return rejected({
       pageIndex,
       contentStreamIndex,
-      operatorIndex: sortedIndices[position],
-      operator,
-      replacementText: replacementLines[position],
+      operatorIndices: sortedIndices,
+      replacementText,
+      replacementLines,
+      resolvedFont,
+      reason:
+        `This safe paragraph mode preserves the existing ${lineGroups.length} native lines. Enter exactly ${lineGroups.length} lines instead of changing the line count.`,
+    });
+  }
+
+  const allSubPlans: EditPlan[] = [];
+  const validatedSubPlans: ValidatedEditPlan[] = [];
+  const originalLines: string[] = [];
+
+  for (let lineIndex = 0; lineIndex < lineGroups.length; lineIndex += 1) {
+    const group = lineGroups[lineIndex];
+    const lineReplacement = replacementLines[lineIndex] ?? "";
+
+    if (group.operatorIndices.length === 1) {
+      const operatorIndex = group.operatorIndices[0];
+      const operator = allOperators[operatorIndex];
+      const subPlan = buildEditPlan({
+        pageIndex,
+        contentStreamIndex,
+        operatorIndex,
+        operator,
+        replacementText: lineReplacement,
+        resolvedFont,
+        fontMetrics,
+        embeddedGlyphEvidence,
+      });
+      allSubPlans.push(subPlan);
+      originalLines.push(subPlan.originalText);
+
+      if (!isValidatedEditPlan(subPlan)) {
+        return rejected({
+          pageIndex,
+          contentStreamIndex,
+          operatorIndices: sortedIndices,
+          replacementText,
+          replacementLines,
+          resolvedFont,
+          originalLines,
+          subPlans: allSubPlans,
+          reason:
+            subPlan.reason ||
+            "At least one paragraph line could not be validated for native PDF rewriting.",
+        });
+      }
+      validatedSubPlans.push(subPlan);
+      continue;
+    }
+
+    const multiPlan = buildMultiRunEditPlan({
+      pageIndex,
+      contentStreamIndex,
+      allOperators,
+      operatorIndices: group.operatorIndices,
+      replacementText: lineReplacement,
       resolvedFont,
       fontMetrics,
       embeddedGlyphEvidence,
-    }),
-  );
-  const originalLines = subPlans.map((plan) => plan.originalText);
+    });
+    allSubPlans.push(...multiPlan.subPlans);
+    originalLines.push(multiPlan.originalText);
 
-  const validatedSubPlans: ValidatedEditPlan[] = [];
-  for (const subPlan of subPlans) {
-    if (!isValidatedEditPlan(subPlan)) {
+    if (!isValidatedMultiRunEditPlan(multiPlan)) {
       return rejected({
         pageIndex,
         contentStreamIndex,
@@ -390,13 +479,28 @@ export function buildParagraphEditPlan({
         replacementLines,
         resolvedFont,
         originalLines,
-        subPlans,
+        subPlans: allSubPlans,
         reason:
-          subPlan.reason ||
-          "At least one paragraph line could not be validated for native PDF rewriting.",
+          multiPlan.reason ||
+          "One fragmented paragraph line could not be validated by the same-line native writer.",
       });
     }
-    validatedSubPlans.push(subPlan);
+
+    if (multiPlan.subPlans.some((subPlan) => subPlan.fallbackFont)) {
+      return rejected({
+        pageIndex,
+        contentStreamIndex,
+        operatorIndices: sortedIndices,
+        replacementText,
+        replacementLines,
+        resolvedFont,
+        originalLines,
+        subPlans: allSubPlans,
+        reason:
+          "A fragmented paragraph line would require a substitute font. Edit that line separately instead.",
+      });
+    }
+    validatedSubPlans.push(...multiPlan.subPlans);
   }
 
   return issueValidatedParagraphEditPlan({
