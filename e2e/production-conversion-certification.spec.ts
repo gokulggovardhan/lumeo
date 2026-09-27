@@ -280,11 +280,19 @@ function semanticParagraphFor(xml: string, marker: string): string {
   return xml.slice(start, end + 6);
 }
 
+async function waitForL2UploadReady(page: Page) {
+  const input = page.locator('input[type="file"]').first();
+  await expect(input).toHaveAttribute("data-upload-client-ready", "true", {
+    timeout: 30_000,
+  });
+  return input;
+}
+
 async function convertPdfToWord(
   page: Page,
   input: { name: string; buffer: Buffer; expectedFileName: string },
 ): Promise<{ bytes: Buffer; xml: string }> {
-  const fileInput = page.locator('input[type="file"]');
+  const fileInput = await waitForL2UploadReady(page);
   const removeButton = page.getByRole("button", { name: `Remove ${input.name}` });
   const filePayload = {
     name: input.name,
@@ -318,7 +326,8 @@ async function convertWordToPdf(
   page: Page,
   input: { name: string; buffer: Buffer; expectedFileName: string },
 ): Promise<Buffer> {
-  await page.locator('input[type="file"]').setInputFiles({
+  const fileInput = await waitForL2UploadReady(page);
+  await fileInput.setInputFiles({
     name: input.name,
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -430,7 +439,7 @@ test("production Word to PDF reuses Office runtime, survives cancellation, and c
 
   await page.getByRole("button", { name: "Convert another" }).click();
   const cancellationDocx = await makeCancellationDocx();
-  await page.locator('input[type="file"]').setInputFiles({
+  await (await waitForL2UploadReady(page)).setInputFiles({
     name: "cancellation-regression.docx",
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -472,7 +481,7 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
   const runtime = watchConversionRuntime(page);
   await gotoProductionRoute(page, "/pdf/word-to-pdf");
   const source = await makeProfessionalDocx();
-  await page.locator('input[type="file"]').setInputFiles({
+  await (await waitForL2UploadReady(page)).setInputFiles({
     name: `capability-${browserName}.docx`,
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",

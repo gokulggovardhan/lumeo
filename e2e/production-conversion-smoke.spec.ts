@@ -239,6 +239,14 @@ async function waitForWordToPdfClientReady(page: Page): Promise<void> {
   ).toBeAttached({ timeout: 30_000 });
 }
 
+async function waitForL2UploadReady(page: Page) {
+  const input = page.locator('input[type="file"]').first();
+  await expect(input).toHaveAttribute("data-upload-client-ready", "true", {
+    timeout: 30_000,
+  });
+  return input;
+}
+
 test.beforeAll(async () => {
   await writeFixtures();
 });
@@ -380,7 +388,7 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
   const runtime = watchConversionRuntime(page);
 
   const docx = await makeDocx();
-  await page.locator('input[type="file"]').setInputFiles({
+  await (await waitForL2UploadReady(page)).setInputFiles({
     name: "production-smoke.docx",
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -423,7 +431,7 @@ test("production Word to PDF preserves professional formatting against native re
   await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
 
   const source = await makeProfessionalDocx();
-  await page.locator('input[type="file"]').setInputFiles({
+  await (await waitForL2UploadReady(page)).setInputFiles({
     name: "professional-production-fidelity.docx",
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -521,7 +529,7 @@ test("production PDF to Word reconstructs locally and downloaded DOCX opens", as
   await expect(page.getByText(/Processed locally in your browser/i).first()).toBeVisible();
 
   const pdf = await makePdf();
-  await page.locator('input[type="file"]').setInputFiles({
+  await (await waitForL2UploadReady(page)).setInputFiles({
     name: "production-smoke.pdf",
     mimeType: "application/pdf",
     buffer: pdf,
@@ -558,7 +566,7 @@ test("production PDF to Word preserves fixed-layout invoice and AMC fidelity", a
   ).toBeVisible();
 
   const source = await makeFixedLayoutInvoicePdf();
-  await page.locator('input[type="file"]').setInputFiles({
+  await (await waitForL2UploadReady(page)).setInputFiles({
     name: "fixed-layout-production-fidelity.pdf",
     mimeType: "application/pdf",
     buffer: source,
