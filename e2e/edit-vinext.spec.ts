@@ -130,6 +130,9 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
 }) => {
   await uploadEditFixture(page, IMAGE_ONLY_PDF);
 
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+
   await expect(page.getByText("Loading page preview")).toHaveCount(0, {
     timeout: 90_000,
   });
@@ -179,6 +182,58 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   // Recognition is an aid for scanned pixels, never a shortcut into the
   // native content-stream writer.
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Make page searchable" }).click();
+  const searchableStatus = page.locator("[data-edit-ocr-searchable-status]");
+  await expect(searchableStatus).toContainText(/Searchable text added locally/i, {
+    timeout: 90_000,
+  });
+  await expect(searchableStatus).toContainText(/scan pixels were not changed/i);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
+    timeout: 90_000,
+  });
+
+  // The new PDF revision contains extractable text, but that text is mode-3
+  // OCR/search metadata and must remain proactively read-only.
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
+  const searchableRun = page
+    .locator(
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="SCANNED"]',
+    )
+    .first();
+  await expect(searchableRun).toBeVisible({ timeout: 90_000 });
+  await searchableRun.focus();
+  await searchableRun.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("SCANNED");
+  await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
+    "data-edit-search-match-count",
+    "1",
+    { timeout: 90_000 },
+  );
+
+  // One Undo removes the generated text layer and returns to the original
+  // image-only PDF revision.
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0", {
+    timeout: 90_000,
+  });
+  await expect(searchableStatus).toHaveCount(0);
+  await expect(searchableRun).toHaveCount(0);
+  await expect(pageCapability).toHaveAttribute(
+    "data-edit-page-capability",
+    "no-detected-text",
+    { timeout: 90_000 },
+  );
+
   page.off("request", recordOcrRequest);
 });
 
