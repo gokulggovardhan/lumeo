@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
-import { PDFDocument } from "pdf-lib";
+import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import {
   CLIPPED_TEXT_PDF,
@@ -30,6 +30,25 @@ async function uploadEditFixture(page: Page, fixturePath: string) {
   await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
   await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });
   await page.locator('input[type="file"]').first().setInputFiles(fixturePath);
+}
+
+async function findCiTrueTypeFont(): Promise<string> {
+  const candidates = [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+  ];
+  for (const candidate of candidates) {
+    try {
+      const bytes = await readFile(candidate);
+      if (bytes.byteLength > 1_000) return candidate;
+    } catch {
+      // Try the next font installed by the Linux runner image.
+    }
+  }
+  throw new Error(
+    "No deterministic TrueType font was found on the Linux CI runner.",
+  );
 }
 
 async function replaceCharacterRange(
@@ -599,6 +618,58 @@ test("vinext Edit PDF clears an abandoned IME owner when native selection change
       'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee file"]',
     ),
   ).toBeVisible({ timeout: 90_000 });
+});
+
+test("vinext Edit PDF embeds a selected local font for added text", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await waitForStageReady(page);
+
+  await page.getByRole("button", { name: "Text", exact: true }).click();
+  const stage = page.getByAltText("Page 1 preview").locator("..");
+  await stage.click({ position: { x: 180, y: 180 } });
+
+  const placedText = page.locator('textarea[placeholder="Type here"]').last();
+  await expect(placedText).toBeVisible();
+  await placedText.fill("AB");
+
+  const fontPath = await findCiTrueTypeFont();
+  await page.getByLabel("Choose local font").setInputFiles(fontPath);
+  await expect(placedText).toHaveAttribute(
+    "data-edit-local-font-active",
+    "true",
+    { timeout: 30_000 },
+  );
+  const fontLabel = page.locator("[data-edit-local-font-label]");
+  await expect(fontLabel).not.toHaveText("Loading font…");
+  await expect(fontLabel).not.toHaveText("Helvetica");
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", {
+    name: "Download edited PDF",
+  });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  const outputPath = await download.path();
+  expect(outputPath).not.toBeNull();
+
+  const bytes = await readFile(outputPath!);
+  const exported = await PDFDocument.load(bytes);
+  expect(exported.getPageCount()).toBe(1);
+
+  const fontFile2 = PDFName.of("FontFile2");
+  const fontFile3 = PDFName.of("FontFile3");
+  const hasEmbeddedFontProgram = exported.context
+    .enumerateIndirectObjects()
+    .some(
+      ([, object]) =>
+        object instanceof PDFDict &&
+        (object.has(fontFile2) || object.has(fontFile3)),
+    );
+  expect(hasEmbeddedFontProgram).toBe(true);
 });
 
 test("vinext Edit PDF supports text matching, editing, and export", async ({
