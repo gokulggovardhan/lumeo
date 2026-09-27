@@ -1,7 +1,6 @@
 // app/page.tsx
 
 import type { Metadata } from "next";
-import Link from "next/link";
 import PublicFooter from "@/components/PublicFooter";
 import { PublicNav } from "@/components/PublicPdfChrome";
 import { PdfToolLauncher } from "@/components/pdf/PdfToolLauncher";
@@ -100,24 +99,6 @@ function CheckIcon() {
   );
 }
 
-function ShieldIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.9"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="h-5 w-5 text-[var(--atelier-sage-300)]"
-    >
-      <path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6l8-4z" />
-      <path d="m9.5 12 1.7 1.7 3.6-3.9" />
-    </svg>
-  );
-}
-
 const trustRail = [
   "Browser-first processing",
   "No account required for public tools",
@@ -126,73 +107,19 @@ const trustRail = [
 
 const privacyItems = [
   {
-    title: "Files stay local where supported",
+    title: "Open locally",
     description:
-      "Current public document workflows are designed to process supported files in your browser instead of sending them away for conversion.",
+      "Current supported document workflows open files in your browser and explain their handling before you begin.",
   },
   {
-    title: "Processing is explained up front",
+    title: "Work locally",
     description:
-      "Each workspace tells you how it handles files before you begin, including browser capability requirements where they matter.",
+      "Current public PDF tools are designed around browser-first processing rather than a required cloud document library.",
   },
   {
-    title: "No unnecessary document storage",
+    title: "Export locally",
     description:
-      "The current public tools do not require a Lumeo account or cloud document library to complete everyday tasks.",
-  },
-];
-
-const categoryItems = [
-  {
-    title: "Organize",
-    description: "Merge, split, reorder, rotate, duplicate, and remove pages.",
-  },
-  {
-    title: "Edit",
-    description: "Edit content, crop pages, add watermarks, numbers, headers, and footers.",
-  },
-  {
-    title: "Convert",
-    description: "Move between PDF, Word, images, and HTML.",
-  },
-  {
-    title: "Sign & Fill",
-    description: "Sign and initial documents now, with form workflows fitting here later.",
-  },
-  {
-    title: "Optimize",
-    description: "Reduce PDF size with clear quality controls.",
-  },
-  {
-    title: "Recognize",
-    description: "Extract selectable text now; OCR belongs here when it arrives.",
-  },
-  {
-    title: "Secure",
-    description: "A clear home for protection, unlocking, and permanent redaction as those tools ship.",
-  },
-  {
-    title: "Image Tools",
-    description: "HEIC to JPEG and other image utilities outside the core PDF workflow.",
-  },
-];
-
-const qualityItems = [
-  {
-    title: "Focused",
-    description: "Common actions are obvious without turning the homepage into a wall of utilities.",
-  },
-  {
-    title: "Cross-platform",
-    description: "Open Lumeo in a supported modern browser without installing a desktop application.",
-  },
-  {
-    title: "Clean exports",
-    description: "Each tool is built around a clear result, review step, and downloadable output.",
-  },
-  {
-    title: "Accessible by default",
-    description: "Keyboard, focus, responsive layout, and reduced-motion behavior stay part of the product contract.",
+      "Finish the task in the workspace and export the result without creating an account for current public tools.",
   },
 ];
 
@@ -221,158 +148,107 @@ export default async function Home() {
       <PublicNav />
 
       <section className="relative z-10 flex-1">
-        <div className="mx-auto w-full max-w-[1160px] px-5 pb-16 pt-8 sm:px-8 sm:pt-12 lg:pt-14">
-          <header className="lumeo-fade-up mx-auto max-w-[46rem] text-center">
-            <p className="aura-text-label inline-flex items-center gap-2 text-[var(--text-accent)]">
-              <span
-                aria-hidden="true"
-                className="h-1.5 w-1.5 rounded-full bg-[var(--text-accent)]"
-              />
-              Private, browser-first document workspace
+        <div className="mx-auto w-full max-w-[1160px] px-5 pb-14 pt-5 sm:px-8 sm:pt-7">
+          <header className="lumeo-fade-up max-w-[52rem]">
+            <p className="aura-text-label text-[var(--text-accent)]">
+              Lumeo PDF Workspace
             </p>
-            <h1 className="mt-4 font-serif text-[clamp(2.45rem,6vw,4.6rem)] font-semibold leading-[0.98] tracking-[-0.035em] text-[var(--text-primary)]">
-              Your PDFs stay yours.
+            <h1 className="mt-2 font-serif text-[clamp(2rem,4.4vw,3.25rem)] font-semibold leading-[1.02] tracking-[-0.03em] text-[var(--text-primary)]">
+              One PDF. One private workspace.
             </h1>
-            <p className="mx-auto mt-5 max-w-[41rem] text-[15px] leading-7 text-[var(--text-secondary)] sm:text-lg">
-              Merge, edit, sign, compress, and convert documents in a focused
-              workspace. Current supported workflows process files in your
-              browser, with handling explained before you begin.
+            <p className="mt-2.5 max-w-[46rem] text-[15px] leading-6 text-[var(--text-secondary)] sm:text-base">
+              Every change in one session. Open once · Work locally · Undo
+              anything · Finish once.
             </p>
-            <Link
-              href="/pdf-tools"
-              className="mt-7 inline-flex min-h-12 items-center justify-center rounded-[var(--radius-md)] bg-[var(--action-primary)] px-6 text-sm font-bold text-[var(--text-on-accent)] shadow-[0_12px_28px_rgba(var(--atelier-sage-rgb),0.16)] transition hover:-translate-y-0.5 hover:bg-[var(--action-primary-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
-            >
-              Explore PDF tools
-            </Link>
           </header>
 
-          <div className="mx-auto mt-9 flex max-w-[50rem] flex-wrap justify-center gap-x-6 gap-y-3 border-y border-[var(--border-hairline)] py-4 sm:mt-10 sm:gap-x-10">
-            {trustRail.map((item) => (
-              <div
-                key={item}
-                className="flex items-center gap-2 text-sm text-[var(--text-secondary)]"
-              >
-                <CheckIcon />
-                {item}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-16 sm:mt-20">
+          <div className="mt-7 sm:mt-8">
             <PdfToolLauncher />
           </div>
 
           <ContinueWorking tiles={tiles} />
 
-          <section className="mt-20 border-y border-[var(--border-hairline)] py-16 sm:mt-24 sm:py-20">
-            <div className="grid gap-10 lg:grid-cols-[0.85fr_1.4fr] lg:items-start">
+          <section
+            className="mt-12 border-y border-[var(--border-hairline)] py-10 sm:mt-14 sm:py-12"
+            aria-labelledby="workspace-heading"
+          >
+            <div className="grid gap-7 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
               <div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-[14px] border border-[rgba(var(--atelier-sage-rgb),0.24)] bg-[rgba(var(--atelier-sage-rgb),0.1)]">
-                  <ShieldIcon />
-                </div>
-                <p className="aura-text-label mt-5 text-[var(--atelier-sage-300)]">
-                  Privacy & trust
+                <p className="aura-text-label text-[var(--text-premium)]">
+                  PDF Workspace
                 </p>
-                <h2 className="mt-2 max-w-md font-serif text-[2rem] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]">
-                  Private by design, clear by default
+                <h2
+                  id="workspace-heading"
+                  className="mt-2 font-serif text-[1.85rem] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]"
+                >
+                  Open once. Keep working.
                 </h2>
-                <p className="mt-3 max-w-md text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-                  Privacy is useful only when the product explains what is
-                  actually happening. Lumeo keeps those processing details
-                  visible instead of hiding them in marketing copy.
+              </div>
+              <div className="space-y-3 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+                <p>
+                  The tool directory is the discovery layer. After a document is
+                  opened, Lumeo is evolving toward one persistent workspace where
+                  compatible edits, page organization, signing, watermarks,
+                  numbering, compression, and export can stay connected.
+                </p>
+                <p>
+                  Standalone tool pages remain available. The Workspace connects
+                  them so you do not have to repeatedly export, return to the
+                  directory, and reopen the same PDF for every compatible step.
                 </p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-3">
+            </div>
+          </section>
+
+          <section
+            className="mt-10 sm:mt-12"
+            aria-labelledby="privacy-heading"
+          >
+            <div className="grid gap-7 lg:grid-cols-[0.85fr_1.4fr] lg:items-start">
+              <div>
+                <p className="aura-text-label text-[var(--atelier-sage-300)]">
+                  Privacy & local-first
+                </p>
+                <h2
+                  id="privacy-heading"
+                  className="mt-2 font-serif text-[1.8rem] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]"
+                >
+                  Your PDFs stay yours.
+                </h2>
+                <p className="mt-3 max-w-md text-sm leading-6 text-[var(--text-secondary)]">
+                  Open locally · Work locally · Export locally, where the
+                  selected workflow supports browser-local processing.
+                </p>
+
+                <div className="mt-5 flex flex-wrap gap-x-5 gap-y-2">
+                  {trustRail.map((item) => (
+                    <div
+                      key={item}
+                      className="flex items-center gap-2 text-[13px] text-[var(--text-secondary)]"
+                    >
+                      <CheckIcon />
+                      {item}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3">
                 {privacyItems.map((item) => (
                   <div
                     key={item.title}
-                    className="rounded-[18px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-5"
+                    className="rounded-[15px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-4"
                   >
-                    <h3 className="font-serif text-[1.06rem] font-semibold text-[var(--text-primary)]">
+                    <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
                       {item.title}
                     </h3>
-                    <p className="mt-2 text-[13px] leading-5 text-[var(--text-secondary)]">
+                    <p className="mt-1.5 text-[12.5px] leading-5 text-[var(--text-secondary)]">
                       {item.description}
                     </p>
                   </div>
                 ))}
               </div>
             </div>
-          </section>
-
-          <section className="mt-16 sm:mt-20" aria-labelledby="categories-heading">
-            <div className="max-w-2xl">
-              <p className="aura-text-label text-[var(--atelier-sage-300)]">
-                Tool categories
-              </p>
-              <h2
-                id="categories-heading"
-                className="mt-2 font-serif text-[1.9rem] font-semibold tracking-[-0.02em] text-[var(--text-primary)]"
-              >
-                A structure that stays simple as Lumeo grows
-              </h2>
-              <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-                Plain-language groups make the current tools easy to scan and
-                leave clear homes for higher-value workflows later.
-              </p>
-            </div>
-            <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              {categoryItems.map((item) => (
-                <div
-                  key={item.title}
-                  className="rounded-[16px] border border-[var(--border-hairline)] bg-[var(--surface-base)] p-5"
-                >
-                  <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
-                    {item.title}
-                  </h3>
-                  <p className="mt-2 text-[13px] leading-5 text-[var(--text-muted)]">
-                    {item.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="mt-16 sm:mt-20" aria-labelledby="quality-heading">
-            <div className="text-center">
-              <p className="aura-text-label text-[var(--text-muted)]">
-                Product quality
-              </p>
-              <h2
-                id="quality-heading"
-                className="mt-2 font-serif text-[1.75rem] font-semibold text-[var(--text-primary)]"
-              >
-                Built to feel like one workspace
-              </h2>
-            </div>
-            <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {qualityItems.map((item) => (
-                <div key={item.title} className="text-center">
-                  <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
-                    {item.title}
-                  </h3>
-                  <p className="mx-auto mt-2 max-w-[17rem] text-[13px] leading-5 text-[var(--text-muted)]">
-                    {item.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          <section className="my-16 rounded-[22px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-6 py-10 text-center sm:my-20 sm:px-10 sm:py-12">
-            <h2 className="font-serif text-2xl font-semibold text-[var(--text-primary)] sm:text-[1.8rem]">
-              Need something more specific?
-            </h2>
-            <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-              The complete directory keeps specialist tools available without
-              crowding the homepage.
-            </p>
-            <Link
-              href="/pdf-tools"
-              className="mt-6 inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-selected)] bg-[var(--surface-selected)] px-5 text-sm font-bold text-[var(--text-primary)] transition hover:border-[var(--atelier-sage-300)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]"
-            >
-              View all tools
-            </Link>
           </section>
         </div>
       </section>

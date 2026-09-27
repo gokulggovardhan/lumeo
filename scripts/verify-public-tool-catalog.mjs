@@ -14,6 +14,7 @@ const newFiles = [
   // initial rollout -- page.tsx and error.tsx cover the route today).
   "components/public/PublicPdfToolsMenuClient.tsx",
   "components/tools/ToolsExplorer.tsx",
+  "components/tools/DiscoveryToolCard.tsx",
   "lib/tools/catalog.ts",
   "lib/tools/public-state.ts",
   "lib/tools/tool-status.ts",
@@ -87,11 +88,12 @@ try {
   const launcher = read("components/pdf/PdfToolLauncher.tsx");
   assert(launcher.includes("getPublicPdfCatalog") && launcher.includes("resolveLumeoTools"), "Homepage launcher must use the public PDF catalog and resolved Lumeo tools.");
   assert(launcher.includes("buildDiscoveryTiles(resolved)"), "Homepage launcher must use truthful resolved discovery state.");
-  assert(launcher.includes("PRIMARY_TOOL_SLUGS") && launcher.includes("SECONDARY_TOOL_SLUGS"), "Homepage must keep an explicit primary/secondary hierarchy.");
-  for (const slug of ["merge", "compress", "edit", "pdf-to-word", "word-to-pdf", "sign"]) {
-    assert(launcher.includes(`"${slug}"`), `Homepage primary tool missing: ${slug}`);
+  assert(launcher.includes("PRIMARY_TOOL_SLUGS") && launcher.includes("SECONDARY_TOOL_SLUGS") && launcher.includes("HOME_TOOL_SLUGS"), "Homepage must keep an explicit ten-tool hierarchy.");
+  for (const slug of ["edit", "reorder", "merge", "split", "compress", "sign", "word-to-pdf", "pdf-to-word", "jpg-to-pdf", "pdf-to-jpg"]) {
+    assert(launcher.includes(`"${slug}"`), `Homepage essential tool missing: ${slug}`);
   }
-  assert(launcher.includes("available ? (") && launcher.includes("<article"), "Unavailable curated tools must be visible but non-actionable.");
+  assert(launcher.includes("DiscoveryToolCard") && launcher.includes("lg:grid-cols-5"), "Homepage must use the shared dense tool-card grid.");
+  assert(launcher.includes("View all PDF tools"), "Homepage must link directly to the complete tool directory.");
   assert(
     launcher.includes("additionalComingSoon") &&
       launcher.includes('tile.availability === "coming_soon"') &&
@@ -111,19 +113,21 @@ try {
 
   const directory = read("app/pdf-tools/page.tsx");
   const explorer = read("components/tools/ToolsExplorer.tsx");
+  const sharedCard = read("components/tools/DiscoveryToolCard.tsx");
   const toolCatalog = read("lib/tools/catalog.ts");
   const resolver = read("lib/tools/resolve.ts");
   const tiles = read("lib/tools/tiles.ts");
   const commandIndex = read("lib/command-palette/index.ts");
   assert(directory.includes("buildDiscoveryTiles") && directory.includes("ToolsExplorer"), "Directory must render resolved direct-action tools.");
-  assert(directory.includes("Find the right tool"), "Directory must use a clear complete-directory introduction.");
+  assert(directory.includes("All PDF Tools") && directory.includes("Choose a tool or continue working in your PDF Workspace."), "Directory must use the compact tools-first introduction.");
   assert(explorer.includes('type="search"') && explorer.includes('aria-live="polite"'), "Directory search and live result count are missing.");
   for (const filter of ["All tools", "Organize", "Edit", "Convert", "Sign & Fill", "Optimize", "Recognize", "Image Tools"]) {
     assert(explorer.includes(filter), `Directory filter missing: ${filter}`);
   }
   assert(explorer.includes("aria-pressed={category === filter.id}"), "Directory filters must expose pressed state.");
-  assert(explorer.includes("href={tool.route}"), "Available directory cards must link directly to tool routes.");
-  assert(explorer.includes("Temporarily unavailable") && !explorer.includes("Notify me"), "Unavailable tools must be explicit and non-misleading.");
+  assert(explorer.includes("DiscoveryToolCard"), "Directory must use the shared compact tool card.");
+  assert(sharedCard.includes("href={tool.route}"), "Available directory cards must link directly to tool routes.");
+  assert(sharedCard.includes("Temporarily unavailable") && !sharedCard.includes("Notify me"), "Unavailable tools must be explicit and non-misleading.");
   assert(explorer.includes("Current live tools are browser-based"), "Directory browser-first processing guidance is missing.");
   assert(toolCatalog.includes("searchAliases") && toolCatalog.includes('processing: "browser"'), "Canonical tool actions must own aliases and action-level processing overrides.");
   assert(tiles.includes("action.dbStatus") && tiles.includes("buildDiscoveryTiles"), "Discovery availability must derive from resolved catalog status.");
@@ -135,7 +139,7 @@ try {
   assert(!routeGate.includes("if (!dbTool) return { blocked: false }"), "Missing Admin catalog rows must not fail open on direct routes.");
   assert(commandIndex.includes("...tile.aliases") && commandIndex.includes("...tile.capabilities"), "Command palette must reuse canonical discovery aliases.");
   assert(!commandIndex.includes("const TOOL_ALIASES"), "Command palette must not maintain a second tool alias index.");
-  assert(!/pdfjs-dist|pdf-lib|heic-decode|JSZip/.test([directory, explorer, tiles].join("\n")), "Directory must not import heavy processing engines.");
+  assert(!/pdfjs-dist|pdf-lib|heic-decode|JSZip/.test([directory, explorer, sharedCard, tiles].join("\n")), "Directory must not import heavy processing engines.");
 
   const combined = newFiles.map(read).join("\n");
   assert(!/getSession\(/.test(combined), "New public catalog files must not use getSession().");

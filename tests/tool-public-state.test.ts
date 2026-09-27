@@ -110,13 +110,14 @@ test("catalog fallback keeps every functional gated route available", () => {
 });
 
 test("homepage exposes truthful beta and unavailable states without actionable links", () => {
-  const source = readFileSync("components/pdf/PdfToolLauncher.tsx", "utf8");
-  assert.match(source, /buildDiscoveryTiles\(resolved\)/);
-  assert.match(source, /tile\.availability === "active" \|\| tile\.availability === "beta"/);
-  assert.match(source, /Coming soon/);
-  assert.match(source, /Maintenance/);
-  assert.match(source, /available \? \(/);
-  assert.match(source, /<article/);
+  const launcher = readFileSync("components/pdf/PdfToolLauncher.tsx", "utf8");
+  const card = readFileSync("components/tools/DiscoveryToolCard.tsx", "utf8");
+  assert.match(launcher, /buildDiscoveryTiles\(resolved\)/);
+  assert.match(card, /tool\.availability === "active" \|\| tool\.availability === "beta"/);
+  assert.match(card, /Coming soon/);
+  assert.match(card, /Temporarily unavailable/);
+  assert.match(card, /available \? \(/);
+  assert.match(card, /<article/);
 });
 
 test("every enabled coming-soon tool can surface on the homepage even outside the curated set", () => {

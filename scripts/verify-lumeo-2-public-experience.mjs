@@ -20,6 +20,7 @@ function changedFiles() {
 const packageJson = JSON.parse(read("package.json"));
 const homepage = read("app/page.tsx");
 const launcher = read("components/pdf/PdfToolLauncher.tsx");
+const discoveryCard = read("components/tools/DiscoveryToolCard.tsx");
 const ui = read("components/ui/Aura.tsx");
 const chrome = read("components/PublicPdfChrome.tsx");
 const menu = read("components/public/PublicPdfToolsMenuClient.tsx");
@@ -54,7 +55,8 @@ try {
     assert(ui.includes(`export function ${component}`) || ui.includes(`export const ${component}`), `Missing Lumeo 2 public primitive: ${component}`);
   }
 
-  assert(homepage.includes("Your PDFs stay yours."), "Current homepage headline is missing.");
+  assert(homepage.includes("One PDF. One private workspace."), "Compact PDF Workspace homepage headline is missing.");
+  assert(homepage.includes("Your PDFs stay yours."), "Supporting privacy message is missing.");
   assert(!homepage.includes("Start with Merge PDF"), "Homepage must not restore the retired CTA.");
   assert(!/badge/i.test(homepage), "Homepage must not introduce badges.");
   assert(!/\b(ratings?|customers?|users?|downloads?)\b/i.test(homepage), "Homepage must not introduce fake counts or social proof.");
@@ -62,8 +64,9 @@ try {
   assert(launcher.includes("getPublicPdfCatalog"), "Homepage tools must remain catalog driven.");
   assert(launcher.includes("resolveLumeoTools"), "Homepage tools must resolve current availability.");
   assert(launcher.includes("buildDiscoveryTiles(resolved)"), "Homepage must render the current resolved discovery-state model.");
-  assert(launcher.includes("PRIMARY_TOOL_SLUGS") && launcher.includes("SECONDARY_TOOL_SLUGS"), "Homepage must keep its curated primary and secondary tool hierarchy.");
-  assert(launcher.includes("available ? (") && launcher.includes("<article"), "Unavailable curated homepage tools must remain visible but non-actionable.");
+  assert(launcher.includes("PRIMARY_TOOL_SLUGS") && launcher.includes("SECONDARY_TOOL_SLUGS") && launcher.includes("HOME_TOOL_SLUGS"), "Homepage must keep its curated ten-tool hierarchy.");
+  assert(launcher.includes("DiscoveryToolCard") && launcher.includes("lg:grid-cols-5"), "Homepage must use the shared dense tool-card grid.");
+  assert(discoveryCard.includes("available") && discoveryCard.includes("<article"), "Unavailable curated homepage tools must remain visible but non-actionable.");
   assert(footer.includes("All PDF Tools"), "All PDF Tools navigation must remain available.");
 
   assert(chrome.includes("L2PublicHeader"), "Public navigation must use the Lumeo 2 header surface.");
@@ -115,7 +118,7 @@ try {
   assert(compressTool.includes("Target Size Studio") && compressTool.includes("Under 100 KB") && compressTool.includes("Under 200 KB") && compressTool.includes("Under 400 KB"), "Compress Target Size Studio markers changed unexpectedly.");
   assert(/processing_started|processing_succeeded|processing_failed|download_started/.test([mergeTool, splitTool, compressTool].join("\n")), "Approved analytics lifecycle events must remain present.");
 
-  const scannedSource = [homepage, launcher, ui, chrome, menu, directory, errorPage, maintenanceNotice, footer, docs].join("\n");
+  const scannedSource = [homepage, launcher, discoveryCard, ui, chrome, menu, directory, errorPage, maintenanceNotice, footer, docs].join("\n");
   assert(!/console\.(log|info|warn|error)/.test(scannedSource), "Production debug logging must not be added.");
   assert(!/service_role|secret[_-]?key|password\s*=/.test(scannedSource), "No hard-coded secrets may be introduced.");
 

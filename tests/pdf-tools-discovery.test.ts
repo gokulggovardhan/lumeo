@@ -55,8 +55,10 @@ test("public category mapping keeps specialist tools in clear homes", () => {
   assert.match(tiles, /"heic-to-jpeg": "image-tools"/);
 });
 
-test("directory uses direct links, combined filters, live counts, and truthful availability", () => {
-  const source = readFileSync("components/tools/ToolsExplorer.tsx", "utf8");
+test("directory uses compact combined filters, live counts, and shared truthful cards", () => {
+  const explorer = readFileSync("components/tools/ToolsExplorer.tsx", "utf8");
+  const card = readFileSync("components/tools/DiscoveryToolCard.tsx", "utf8");
+
   for (const label of [
     "All tools",
     "Organize",
@@ -67,40 +69,58 @@ test("directory uses direct links, combined filters, live counts, and truthful a
     "Recognize",
     "Image Tools",
   ]) {
-    assert.match(source, new RegExp(label));
+    assert.match(explorer, new RegExp(label));
   }
-  assert.match(source, /aria-pressed=\{category === filter\.id\}/);
-  assert.match(source, /aria-live="polite"/);
-  assert.match(source, /href=\{tool\.route\}/);
-  assert.match(source, /Temporarily unavailable/);
-  assert.doesNotMatch(source, /Notify me/);
-  assert.match(source, /On device/);
-  assert.match(source, /Current live tools are browser-based/);
+
+  assert.match(explorer, /aria-pressed={category === filter.id}/);
+  assert.match(explorer, /aria-live="polite"/);
+  assert.match(explorer, /DiscoveryToolCard/);
+  assert.match(card, /href={tool.route}/);
+  assert.match(card, /Temporarily unavailable/);
+  assert.doesNotMatch(card, /Notify me/);
+  assert.match(card, /On device/);
+  assert.match(explorer, /Current live tools are browser-based/);
+  assert.match(explorer, /xl:grid-cols-4/);
 });
 
-test("slash and Escape keyboard contracts are explicit", () => {
+test("slash and Escape keyboard contracts are hydration-safe", () => {
   const source = readFileSync("components/tools/ToolsExplorer.tsx", "utf8");
-  assert.match(source, /event\.key === "\/"/);
-  assert.match(source, /event\.key === "Escape"/);
-  assert.match(source, /inputRef\.current\?\.focus\(\)/);
-  assert.match(source, /setQuery\(""\)/);
+  assert.ok(source.includes('event.key === "/"'));
+  assert.ok(source.includes('event.key === "Escape"'));
+  assert.ok(source.includes("inputRef.current?.focus()"));
+  assert.ok(source.includes('setQuery("")'));
+  assert.ok(source.includes("data-search-shortcut-ready"));
+  assert.ok(source.includes('window.addEventListener("keydown", handleKeyDown)'));
+});
+
+test("homepage and directory share the same compact tool-card implementation", () => {
+  const launcher = readFileSync("components/pdf/PdfToolLauncher.tsx", "utf8");
+  const explorer = readFileSync("components/tools/ToolsExplorer.tsx", "utf8");
+  const card = readFileSync("components/tools/DiscoveryToolCard.tsx", "utf8");
+
+  assert.ok(launcher.includes("DiscoveryToolCard"));
+  assert.ok(explorer.includes("DiscoveryToolCard"));
+  assert.ok(card.includes("data-tool-card"));
+  assert.ok(card.includes("min-h-[9.5rem]"));
+  assert.ok(card.includes("min-h-[10.25rem]"));
 });
 
 test("command palette reuses catalog aliases and traps focus", () => {
   const index = readFileSync("lib/command-palette/index.ts", "utf8");
   const dialog = readFileSync("components/CommandPaletteDialog.tsx", "utf8");
-  assert.match(index, /\.\.\.tile\.aliases/);
-  assert.match(index, /\.\.\.tile\.capabilities/);
+  assert.ok(index.includes("...tile.aliases"));
+  assert.ok(index.includes("...tile.capabilities"));
   assert.doesNotMatch(index, /const TOOL_ALIASES/);
-  assert.match(dialog, /event\.key !== "Tab"/);
-  assert.match(dialog, /onKeyDown=\{handleDialogKeyDown\}/);
-  assert.match(dialog, /aria-modal="true"/);
+  assert.ok(dialog.includes('event.key !== "Tab"'));
+  assert.ok(dialog.includes("onKeyDown={handleDialogKeyDown}"));
+  assert.ok(dialog.includes('aria-modal="true"'));
 });
 
 test("directory keeps heavy PDF engines out of its component graph", () => {
   const sources = [
     readFileSync("app/pdf-tools/page.tsx", "utf8"),
     readFileSync("components/tools/ToolsExplorer.tsx", "utf8"),
+    readFileSync("components/tools/DiscoveryToolCard.tsx", "utf8"),
     readFileSync("lib/tools/tiles.ts", "utf8"),
   ].join("\n");
   assert.doesNotMatch(sources, /pdfjs-dist|pdf-lib|heic-decode|JSZip/);
@@ -109,9 +129,9 @@ test("directory keeps heavy PDF engines out of its component graph", () => {
 test("resolved discovery availability comes from the shared public catalog status", () => {
   const resolver = readFileSync("lib/tools/resolve.ts", "utf8");
   const tiles = readFileSync("lib/tools/tiles.ts", "utf8");
-  assert.match(resolver, /resolveEffectivePublicToolState\(dbTool\)/);
-  assert.match(resolver, /dbStatus: state\.status/);
-  assert.match(tiles, /action\.dbStatus === "maintenance"/);
-  assert.match(tiles, /action\.dbStatus === "coming_soon"/);
-  assert.match(tiles, /action\.dbStatus === "hidden"/);
+  assert.ok(resolver.includes("resolveEffectivePublicToolState(dbTool)"));
+  assert.ok(resolver.includes("dbStatus: state.status"));
+  assert.ok(tiles.includes('action.dbStatus === "maintenance"'));
+  assert.ok(tiles.includes('action.dbStatus === "coming_soon"'));
+  assert.ok(tiles.includes('action.dbStatus === "hidden"'));
 });

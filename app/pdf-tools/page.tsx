@@ -15,7 +15,8 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: { canonical: "/pdf-tools" },
     openGraph: {
       title: "All PDF Tools - Lumeo PDF Workspace",
-      description: "Browse Lumeo's complete browser-first PDF and document tool directory.",
+      description:
+        "Browse Lumeo's complete browser-first PDF and document tool directory.",
       url: "https://lumeo.in/pdf-tools",
       siteName: "Lumeo PDF",
       type: "website",
@@ -23,7 +24,8 @@ export async function generateMetadata(): Promise<Metadata> {
     twitter: {
       card: "summary_large_image",
       title: "All PDF Tools - Lumeo PDF Workspace",
-      description: "Search and filter Lumeo's complete PDF and document tool directory.",
+      description:
+        "Search and filter Lumeo's complete PDF and document tool directory.",
     },
   });
 }
@@ -44,26 +46,46 @@ export default async function PdfToolsPage() {
   return (
     <PublicCatalogPageShell
       maxWidth="max-w-[1160px]"
-      contentClassName="px-5 pb-10 pt-7 sm:px-8 sm:pb-12 sm:pt-9"
+      contentClassName="px-5 pb-10 pt-5 sm:px-8 sm:pb-12 sm:pt-6"
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--lumeo-paper-100)]"
     >
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <section className="lumeo-fade-up mb-6 max-w-3xl sm:mb-8">
-        <p className="aura-text-label text-[var(--text-premium)]">All PDF tools</p>
-        <h1 className="mt-3 font-serif font-medium text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[color:var(--text-primary)]">
-          Find the right tool
+
+      <header className="lumeo-fade-up mb-5 max-w-3xl">
+        <h1 className="font-serif text-[clamp(2rem,4vw,2.85rem)] font-semibold leading-[1.05] tracking-[var(--tracking-display)] text-[color:var(--text-primary)]">
+          All PDF Tools
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-          Search or filter the complete directory. Popular workflows stay easy to spot, while specialist tools remain one step away.
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
+          Choose a tool or continue working in your PDF Workspace.
         </p>
-      </section>
+      </header>
 
       <ToolsExplorer tools={discoveryTools} />
 
-      <div className="mt-10">
+      <section
+        className="mt-9 border-t border-[var(--border-hairline)] pt-7"
+        aria-labelledby="directory-workspace-heading"
+      >
+        <div className="grid gap-3 sm:grid-cols-[0.75fr_1.25fr] sm:items-start">
+          <h2
+            id="directory-workspace-heading"
+            className="font-serif text-lg font-semibold text-[var(--text-primary)]"
+          >
+            One PDF, connected work
+          </h2>
+          <p className="text-sm leading-6 text-[var(--text-secondary)]">
+            This directory remains the discovery layer. Compatible workflows
+            are progressively connecting into the Lumeo PDF Workspace so the
+            same document can move between tasks without unnecessary reopening.
+            Standalone tool pages remain available.
+          </p>
+        </div>
+      </section>
+
+      <div className="mt-9">
         <PublicFooter />
       </div>
     </PublicCatalogPageShell>
