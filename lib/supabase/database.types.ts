@@ -161,6 +161,10 @@ export type ErrorStatus =
   | "resolved"
   | "ignored";
 export type ErrorSource = "client" | "server_action" | "route_handler" | "error_boundary" | "unhandled_rejection";
+export type ErrorResolutionProvenance =
+  | "legacy_manual"
+  | "verified_fix"
+  | "automated_verified_fix";
 
 export type ErrorLog = {
   id: number;
@@ -187,6 +191,8 @@ export type ErrorLog = {
   last_fix_sha: string | null;
   fix_deployed_at: string | null;
   recurrence_after_fix: boolean;
+  resolution_provenance: ErrorResolutionProvenance | null;
+  verified_at: string | null;
 };
 
 export type FeedbackQueryType = "Query" | "Feedback";
