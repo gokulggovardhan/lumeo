@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  PDFDict,
   PDFDocument,
   PDFHexString,
+  PDFName,
   StandardFonts,
   beginText,
   endText,
@@ -242,6 +244,36 @@ test("native local-font writer rejects stale source text instead of applying to 
         asset: fx.asset,
       }),
     /changed after local-font validation/i,
+  );
+});
+
+test("native local-font writer rejects a same-named source font resource swapped after planning", async () => {
+  const fx = await planFixture();
+  assert.ok(isValidatedLocalFontSubstitutionPlan(fx.plan));
+  if (!isValidatedLocalFontSubstitutionPlan(fx.plan)) return;
+
+  const staleDoc = await PDFDocument.load(fx.bytes.slice());
+  const page = staleDoc.getPages()[0];
+  const resources = page.node.Resources()!;
+  const fonts = resources.lookup(PDFName.of("Font"), PDFDict);
+  const sourceKey = PDFName.of(fx.plan.originalFontResourceName);
+  const currentFont = staleDoc.context.lookup(fonts.get(sourceKey), PDFDict);
+  const replacementFont = staleDoc.context.obj({}) as PDFDict;
+  for (const [key, value] of currentFont.entries()) {
+    replacementFont.set(key, value);
+  }
+  const replacementRef = staleDoc.context.register(replacementFont);
+  fonts.set(sourceKey, replacementRef);
+  const staleBytes = await staleDoc.save();
+
+  await assert.rejects(
+    () =>
+      applyLocalFontSubstitutionToBytes({
+        sourceBytes: staleBytes,
+        plan: fx.plan,
+        asset: fx.asset,
+      }),
+    /font resource changed|changed after local-font validation/i,
   );
 });
 
