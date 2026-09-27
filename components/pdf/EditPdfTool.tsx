@@ -710,7 +710,9 @@ export default function EditPdfTool() {
     pageIndex: number;
   } | null>(null);
   const ocrActivityCurrent =
-    ocrActivity?.bytes === pdf?.bytes && ocrActivity.pageIndex === pageIndex
+    ocrActivity !== null &&
+    ocrActivity.bytes === pdf?.bytes &&
+    ocrActivity.pageIndex === pageIndex
       ? ocrActivity
       : null;
   const ocrBusy = ocrActivityCurrent !== null;
