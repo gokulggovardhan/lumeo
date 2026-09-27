@@ -301,3 +301,38 @@ test("Cloudflare Worker configuration stays deployable on the production Free pl
   assert.match(workflow, /Verify Cloudflare Worker plan compatibility/);
   assert.match(workflow, /verify-cloudflare-worker-config\.mjs dist\/server\/wrangler\.json/);
 });
+
+
+test("error lifecycle is recurrence-aware and development telemetry cannot pollute production", () => {
+  const migration = read("supabase/migrations/20260927165500_error_lifecycle_recurrence.sql");
+  const actions = read("app/admin/(protected)/errors/actions.ts");
+  const page = read("app/admin/(protected)/errors/page.tsx");
+  const clientCapture = read("lib/errors/client.ts");
+  const serverCapture = read("lib/errors/server.ts");
+
+  assert.match(migration, /fixed_pending_verification/);
+  assert.match(migration, /recurrence_after_fix = true/);
+  assert.match(migration, /status = case[\s\S]*then 'open'/);
+  assert.match(migration, /git_sha = coalesce\(excluded\.git_sha/);
+  assert.match(actions, /ERROR_VERIFICATION_WINDOW_MS = 24 \* 60 \* 60 \* 1000/);
+  assert.match(actions, /markErrorFixDeployed/);
+  assert.match(actions, /last_fix_sha/);
+  assert.match(page, /Fix deployed/);
+  assert.match(page, /Resolve after 24h/);
+  assert.match(page, /Recurred after fix/);
+  assert.match(clientCapture, /process\.env\.NODE_ENV !== "production"/);
+  assert.match(serverCapture, /process\.env\.NODE_ENV !== "production"/);
+});
+
+test("operation analytics exposes starts without a terminal outcome instead of hiding them", () => {
+  const data = read("lib/admin/data.ts");
+  const page = read("app/admin/(protected)/analytics/page.tsx");
+
+  assert.match(data, /unreconciledStarts/);
+  assert.match(
+    data,
+    /processingStarted - processingSucceeded - processingFailed/,
+  );
+  assert.match(page, /No terminal event/);
+  assert.match(page, /range-boundary spillover/);
+});
