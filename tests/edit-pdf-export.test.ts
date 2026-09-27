@@ -3,6 +3,7 @@ import test from "node:test";
 import zlib from "node:zlib";
 import { PDFDocument, degrees } from "pdf-lib";
 import { exportEditedPdf } from "../lib/pdf/edit/export.ts";
+import type { LocalCustomFontAsset } from "../lib/pdf/edit/localCustomFont.ts";
 import {
   createInkElement,
   createShapeElement,
@@ -76,6 +77,132 @@ test("exportEditedPdf draws a text element onto its page", async () => {
   assert.equal(reloaded.getPageCount(), 1);
   // A page with real drawn text/graphics content is larger than a blank one.
   assert.ok(bytes.byteLength > original.byteLength);
+});
+
+function fakeLocalFontAsset({
+  id = "local-font-demo",
+  familyName = "Demo Sans",
+  supported = new Set<number>([32, 65, 66]),
+}: {
+  id?: string;
+  familyName?: string;
+  supported?: Set<number>;
+} = {}): LocalCustomFontAsset {
+  return {
+    descriptor: {
+      id,
+      fileName: "demo.ttf",
+      familyName,
+      fullName: `${familyName} Regular`,
+      postScriptName: "DemoSans-Regular",
+      byteLength: 3,
+      sha256: "a".repeat(64),
+      browserFamilyName: "LumeoLocal_aaaaaaaaaaaaaaaa",
+    },
+    bytes: new Uint8Array([1, 2, 3]),
+    intelligence: {
+      metadata: {
+        engine: "@cantoo/fontkit@2.0.12",
+        fontType: "TTF",
+        postScriptName: "DemoSans-Regular",
+        fullName: `${familyName} Regular`,
+        familyName,
+        subfamilyName: "Regular",
+        version: null,
+        unitsPerEm: 1000,
+        ascent: 800,
+        descent: -200,
+        lineGap: 0,
+        capHeight: 700,
+        xHeight: 500,
+        italicAngle: 0,
+        bbox: { minX: 0, minY: -200, maxX: 1000, maxY: 800 },
+        numGlyphs: 10,
+        characterSetCount: supported.size,
+        availableFeatures: [],
+      },
+      hasGlyphForCodePoint(codePoint) {
+        return supported.has(codePoint);
+      },
+      glyphIdForCodePoint(codePoint) {
+        return supported.has(codePoint) ? codePoint : null;
+      },
+      advanceWidthForGlyphId(glyphId) {
+        return supported.has(glyphId) ? 600 : null;
+      },
+    },
+  };
+}
+
+test("exportEditedPdf fails closed when a placed text element references a missing local font asset", async () => {
+  const original = await makeBlankPdf(1);
+  const element = {
+    ...createTextElement("t-local-missing", 0, 20, 20),
+    text: "AB",
+    fontAssetId: "local-font-missing",
+    fontFamily: "Demo Sans",
+  };
+
+  await assert.rejects(
+    () => exportEditedPdf(original, [element], { localFontAssets: new Map() }),
+    /no longer available.*re-select/i,
+  );
+});
+
+test("exportEditedPdf fails closed when referenced local font bytes cannot be embedded", async () => {
+  const original = await makeBlankPdf(1);
+  const asset = fakeLocalFontAsset();
+  const element = {
+    ...createTextElement("t-local-invalid-program", 0, 20, 20),
+    text: "AB",
+    fontAssetId: asset.descriptor.id,
+    fontFamily: asset.descriptor.familyName,
+  };
+
+  await assert.rejects(() =>
+    exportEditedPdf(original, [element], {
+      localFontAssets: new Map([[asset.descriptor.id, asset]]),
+    }),
+  );
+});
+
+test("exportEditedPdf rejects unsupported local-font glyphs before mutating the PDF", async () => {
+  const original = await makeBlankPdf(1);
+  const asset = fakeLocalFontAsset();
+  const element = {
+    ...createTextElement("t-local-glyph", 0, 20, 20),
+    text: "ABZ",
+    fontAssetId: asset.descriptor.id,
+    fontFamily: asset.descriptor.familyName,
+  };
+
+  await assert.rejects(
+    () =>
+      exportEditedPdf(original, [element], {
+        localFontAssets: new Map([[asset.descriptor.id, asset]]),
+      }),
+    /does not contain.*Z.*U\+005A/i,
+  );
+});
+
+test("exportEditedPdf rejects synthetic bold or italic on a single local font face", async () => {
+  const original = await makeBlankPdf(1);
+  const asset = fakeLocalFontAsset();
+  const element = {
+    ...createTextElement("t-local-style", 0, 20, 20),
+    text: "AB",
+    bold: true,
+    fontAssetId: asset.descriptor.id,
+    fontFamily: asset.descriptor.familyName,
+  };
+
+  await assert.rejects(
+    () =>
+      exportEditedPdf(original, [element], {
+        localFontAssets: new Map([[asset.descriptor.id, asset]]),
+      }),
+    /single local font face.*synthetic Bold\/Italic/i,
+  );
 });
 
 test("exportEditedPdf draws shape and whiteout elements", async () => {
