@@ -69,3 +69,18 @@ test("standard or unavailable browser font previews remain honest fallback witho
   assert.equal(fallback.kind, "fallback");
   assert.match(fallback.detail, /appearance may differ slightly/i);
 });
+
+test("verified-equivalent claims fail closed when no PDF font profile exists", () => {
+  const fallback = describeFontPreviewFidelity({
+    profile: null,
+    loadedEmbeddedProgramSha256: null,
+    verifiedEquivalent: {
+      familyName: "Unbound Browser Font",
+      fontIdentityVerified: true,
+      glyphMetricsVerified: true,
+    },
+  });
+
+  assert.equal(fallback.kind, "fallback");
+});
+
