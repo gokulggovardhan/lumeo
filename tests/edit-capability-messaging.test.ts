@@ -70,6 +70,7 @@ test("run copy prefers the concrete unsafe native category over a generic arbitr
     nativeSpanKey: "native-0",
     category: "CLIPPED_TEXT",
     safelyRewritable: false,
+    authorization: "blocked",
     reason: "Internal clipping diagnostic.",
   };
 
