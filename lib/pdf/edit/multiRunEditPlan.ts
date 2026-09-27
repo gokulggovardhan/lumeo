@@ -20,6 +20,7 @@
 import type { TextShowOperator } from "./contentStream.ts";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "./fontEncoding.ts";
 import type { FontMetrics, TextShowState } from "./fontMetrics.ts";
+import type { ValidatedShapingWriteEvidence } from "./shapingWriteGuard.ts";
 import { compareAdvance } from "./fontMetrics.ts";
 import {
   buildEditPlan,
@@ -157,6 +158,8 @@ export function buildMultiRunEditPlan({
   resolvedFont,
   fontMetrics,
   embeddedGlyphEvidence = null,
+  embeddedProgramSha256 = null,
+  shapingWriteEvidence = null,
 }: {
   pageIndex: number;
   contentStreamIndex: number;
@@ -166,6 +169,8 @@ export function buildMultiRunEditPlan({
   resolvedFont: ResolvedFont;
   fontMetrics: FontMetrics;
   embeddedGlyphEvidence?: EmbeddedGlyphEvidence | null;
+  embeddedProgramSha256?: string | null;
+  shapingWriteEvidence?: ValidatedShapingWriteEvidence | null;
 }): MultiRunEditPlan {
   const sortedIndices = [...operatorIndices].sort((a, b) => a - b);
 
@@ -222,6 +227,8 @@ export function buildMultiRunEditPlan({
       resolvedFont,
       fontMetrics,
       embeddedGlyphEvidence,
+      embeddedProgramSha256: position === 0 ? embeddedProgramSha256 : null,
+      shapingWriteEvidence: position === 0 ? shapingWriteEvidence : null,
     }),
   );
 
