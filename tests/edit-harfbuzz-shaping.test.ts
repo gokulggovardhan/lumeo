@@ -169,6 +169,34 @@ test("HarfBuzz shapes a synthetic SFNT into deterministic glyph IDs and advances
   );
 });
 
+test("HarfBuzz clusters stay in JavaScript UTF-16 offsets for non-BMP text", async () => {
+  const text = "A😀B";
+  const shaped = await shapeEmbeddedFontText(
+    syntheticShapingFont(),
+    text,
+    { direction: "ltr", script: "Latn", language: "en" },
+  );
+
+  assert.deepEqual(
+    Array.from(new Set(shaped.glyphs.map((glyph) => glyph.clusterUtf16))).sort(
+      (a, b) => a - b,
+    ),
+    [0, 1, 3],
+  );
+  assert.deepEqual(
+    shaped.clusterMap.map((cluster) => [
+      cluster.startUtf16,
+      cluster.endUtf16,
+      cluster.text,
+    ]),
+    [
+      [0, 1, "A"],
+      [1, 3, "😀"],
+      [3, 4, "B"],
+    ],
+  );
+});
+
 test("HarfBuzz shaping fails closed on empty, oversized and malformed font input", async () => {
   await assert.rejects(
     () => shapeEmbeddedFontText(new Uint8Array(), "A"),
