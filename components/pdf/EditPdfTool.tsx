@@ -4696,6 +4696,7 @@ export default function EditPdfTool() {
                           const nativeKeyboard = event.nativeEvent as KeyboardEvent;
                           const isImeKey =
                             textCompositionActive ||
+                            nativeTextComposingRef.current === nativeTextSelectionKey ||
                             nativeKeyboard.isComposing ||
                             nativeKeyboard.keyCode === 229;
                           if (isImeKey) return;
@@ -4712,6 +4713,7 @@ export default function EditPdfTool() {
                           const nativeKeyboard = event.nativeEvent as KeyboardEvent;
                           if (
                             textCompositionActive ||
+                            nativeTextComposingRef.current === nativeTextSelectionKey ||
                             nativeKeyboard.isComposing ||
                             nativeKeyboard.keyCode === 229
                           ) {
@@ -5032,6 +5034,7 @@ export default function EditPdfTool() {
                             const nativeKeyboard = event.nativeEvent as KeyboardEvent;
                             const isImeKey =
                               textCompositionActive ||
+                              nativeTextComposingRef.current === nativeTextSelectionKey ||
                               nativeKeyboard.isComposing ||
                               nativeKeyboard.keyCode === 229;
                             if (isImeKey) return;
