@@ -85,8 +85,9 @@ async function readyAsset() {
     bytes,
     "native-local-font.ttf",
   );
-  assert.equal(result.kind, "ready");
-  if (result.kind !== "ready") assert.fail(result.reason);
+  if (result.kind !== "ready") {
+    assert.fail(`Expected the CI local font fixture to be ready: ${result.reason}`);
+  }
   return result.asset;
 }
 
