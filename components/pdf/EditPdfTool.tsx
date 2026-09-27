@@ -5529,7 +5529,7 @@ export default function EditPdfTool() {
                       </p>
 
                       {pageTextCapability.category === "SCANNED_IMAGE" ? (
-                        <div data-edit-ocr-panel data-edit-ocr-source="ocr" className="mt-2.5 grid gap-2">
+                        <div data-edit-ocr-panel data-edit-ocr-source="ocr" onClick={(event) => event.stopPropagation()} className="mt-2.5 grid gap-2">
                           {ocrPageResultCurrent ? (
                             <>
                               <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-primary)]/55">
