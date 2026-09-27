@@ -4,6 +4,7 @@ export type AnalyticsEventName =
   | "processing_started"
   | "processing_succeeded"
   | "processing_failed"
+  | "processing_cancelled"
   | "download_started";
 
 export type AnalyticsSizeBucket =
@@ -46,6 +47,15 @@ export type AnalyticsBrowserFamily =
   | "Other"
   | "Unknown";
 
+export type AnalyticsConversionStage =
+  | "preparing"
+  | "loading-engine"
+  | "converting"
+  | "generating"
+  | "validating"
+  | "finalizing"
+  | "unknown";
+
 export type AnalyticsOperatingSystem =
   | "Windows"
   | "macOS"
@@ -63,6 +73,7 @@ export type AnalyticsEventInput = {
   outputSizeBucket?: AnalyticsSizeBucket | null;
   success?: boolean | null;
   errorCode?: AnalyticsErrorCode | null;
+  failureStage?: AnalyticsConversionStage | null;
 };
 
 export type AnalyticsAvailability = "loading" | "enabled" | "disabled";
