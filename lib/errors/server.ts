@@ -19,6 +19,7 @@ let capturing = false;
  * re-entrancy so a failure while reporting can't itself trigger a report.
  */
 export async function captureServerError(input: ServerErrorCaptureInput): Promise<void> {
+  if (process.env.NODE_ENV !== "production") return;
   if (capturing) return;
   capturing = true;
 
