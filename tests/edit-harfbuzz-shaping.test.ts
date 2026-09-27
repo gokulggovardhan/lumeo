@@ -193,10 +193,14 @@ test("HarfBuzz shaping bounds replacement text before invoking the WASM engine",
 });
 
 
-test("HarfBuzz auto direction is reported as requested, not misrepresented as resolved", async () => {
+test("HarfBuzz auto direction is reported as requested without inventing a primary-axis advance", async () => {
   const shaped = await shapeEmbeddedFontText(syntheticShapingFont(), "AB");
   assert.equal(shaped.requestedDirection, "auto");
   assert.equal(shaped.directionWasExplicit, false);
+  assert.equal(shaped.totalAdvance, null);
+  assert.equal(shaped.totalAdvanceEm, null);
+  assert.equal(shaped.totalXAdvance, 1220);
+  assert.equal(shaped.totalYAdvance, 0);
 });
 
 test("HarfBuzz shaping rejects unsafe script and language labels before shaping", async () => {
