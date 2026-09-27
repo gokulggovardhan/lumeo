@@ -39,6 +39,14 @@ test("every Edit PDF capability category has stable plain-language product copy"
   }
 });
 
+test("scanned page copy points to local recognition without claiming native edit authority", () => {
+  const message = userMessageForCapabilityCategory("SCANNED_IMAGE");
+  assert.match(message.title, /scan/i);
+  assert.match(message.detail, /Recognize text/i);
+  assert.match(message.detail, /locally/i);
+  assert.match(message.detail, /separate from native PDF edit authority/i);
+});
+
 test("page copy explains native-text disagreement without exposing engine jargon", () => {
   const page: PageTextCapabilityClassification = {
     category: "NATIVE_TEXT",
