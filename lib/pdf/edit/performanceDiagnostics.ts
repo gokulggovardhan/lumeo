@@ -99,10 +99,12 @@ export class EditPdfPerformanceCollector {
   private fontRegistrySnapshot: EditPdfFontRegistryPerformanceSnapshot | null =
     null;
 
-  constructor(
-    private readonly maxRecentEvents = 200,
-    private readonly maxMemorySamples = 100,
-  ) {
+  private readonly maxRecentEvents: number;
+  private readonly maxMemorySamples: number;
+
+  constructor(maxRecentEvents = 200, maxMemorySamples = 100) {
+    this.maxRecentEvents = maxRecentEvents;
+    this.maxMemorySamples = maxMemorySamples;
     for (const kind of DURATION_KINDS) this.durations.set(kind, emptySummary());
   }
 
