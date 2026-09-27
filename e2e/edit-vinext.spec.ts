@@ -2,10 +2,13 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
+import { decodeTextShowOperator } from "../lib/pdf/edit/editPlan.ts";
+import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
 import {
   CLIPPED_TEXT_PDF,
   IMAGE_ONLY_PDF,
   SEARCHABLE_SCAN_PDF,
+  SHAPED_LTR_PDF,
   LARGE_DOCUMENT_PDF,
   MIXED_STYLE_PDF,
   SPLIT_RUN_PDF,
@@ -1074,6 +1077,84 @@ test("vinext Edit PDF applies one safe formatting transaction across mixed nativ
   await expect(redone.locator("[data-native-mixed-font-size]")).toHaveValue("16");
   await expect(redone.locator("[data-native-mixed-horizontal-scale]")).toHaveValue("90");
   await expect(redone.locator("[data-native-mixed-fill]")).toHaveValue("#008800");
+
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test("vinext Edit PDF applies a proven LTR shaped-glyph replacement as one native history transaction", async ({ page }) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
+  await uploadEditFixture(page, SHAPED_LTR_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+
+  const source = page
+    .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="AB"]')
+    .first();
+  await expect(source).toBeVisible({ timeout: 90_000 });
+  await source.click();
+
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toHaveValue("AB");
+  const replacement = "e\u0301";
+  await editor.fill(replacement);
+
+  const apply = page.locator("[data-edit-inline-apply]");
+  await expect(apply).toHaveCount(1);
+  await expect(apply).toBeEnabled({ timeout: 90_000 });
+  await apply.click();
+
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
+    timeout: 90_000,
+  });
+  await waitForStageReady(page);
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+  await expect(
+    page.locator('div[role="button"][aria-label^="Editable text: "][aria-label*="AB"]').first(),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Redo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
+    timeout: 90_000,
+  });
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", { name: "Download edited PDF" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  const outputPath = await download.path();
+  expect(outputPath).not.toBeNull();
+  const bytes = await readFile(outputPath!);
+
+  const exported = await PDFDocument.load(bytes);
+  const operators = collectPageTextOperators(exported, 0);
+  expect(operators).toHaveLength(1);
+  expect(operators[0]?.operator.kind).toBe("TJ");
+  const registry = new PdfFontRegistry(exported);
+  const resourceName = operators[0]?.operator.fontResourceName;
+  expect(resourceName).toBeTruthy();
+  const profile = registry.resolve(operators[0]!.resources, resourceName!);
+  expect(profile).not.toBeNull();
+  const decoded = decodeTextShowOperator(
+    operators[0]!.operator,
+    profile!.resolvedFont,
+  );
+  expect(decoded.allDecoded).toBe(true);
+  expect(decoded.text).toBe(replacement);
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
