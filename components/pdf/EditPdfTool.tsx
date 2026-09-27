@@ -685,8 +685,25 @@ export default function EditPdfTool() {
     result: LocalOcrResult;
   } | null>(null);
   const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrJobRevision, setOcrJobRevision] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+  } | null>(null);
   const [ocrProgress, setOcrProgress] = useState<LocalOcrProgress | null>(null);
-  const [ocrError, setOcrError] = useState("");
+  const [ocrErrorRevision, setOcrErrorRevision] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+    message: string;
+  } | null>(null);
+  const ocrBusyCurrent =
+    ocrBusy &&
+    ocrJobRevision?.bytes === pdf?.bytes &&
+    ocrJobRevision?.pageIndex === pageIndex;
+  const ocrErrorCurrent =
+    ocrErrorRevision?.bytes === pdf?.bytes &&
+    ocrErrorRevision?.pageIndex === pageIndex
+      ? ocrErrorRevision.message
+      : "";
   const ocrResultCurrent =
     ocrResultRevision?.bytes === pdf?.bytes &&
     ocrResultRevision?.pageIndex === pageIndex
@@ -963,8 +980,9 @@ export default function EditPdfTool() {
     const sourceBytes = pdf.bytes;
     const sourcePageIndex = pageIndex;
     setOcrBusy(true);
+    setOcrJobRevision({ bytes: sourceBytes, pageIndex: sourcePageIndex });
     setOcrProgress({ status: "preparing page", progress: 0 });
-    setOcrError("");
+    setOcrErrorRevision(null);
     setOcrResultRevision(null);
 
     try {
@@ -981,13 +999,17 @@ export default function EditPdfTool() {
       });
       setOcrProgress({ status: "complete", progress: 1 });
     } catch (error) {
-      setOcrError(
-        error instanceof Error
-          ? error.message
-          : "Local OCR could not read this page.",
-      );
+      setOcrErrorRevision({
+        bytes: sourceBytes,
+        pageIndex: sourcePageIndex,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Local OCR could not read this page.",
+      });
     } finally {
       setOcrBusy(false);
+      setOcrJobRevision(null);
     }
   }, [
     detectedTextRuns.length,
