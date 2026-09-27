@@ -43,6 +43,7 @@ export async function PublicNav({
       >
         <Link
           href="/"
+          prefetch={false}
           className="flex min-w-0 items-center rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]"
         >
           <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
