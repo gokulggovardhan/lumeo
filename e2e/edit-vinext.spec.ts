@@ -260,18 +260,35 @@ test("vinext Edit PDF aborts Replace All when the native PDF revision changes du
   await expect(status).toContainText(/Checking every match against the native PDF locally/i, {
     timeout: 30_000,
   });
-  await expect(find).toBeDisabled();
-  await expect(replace).toBeDisabled();
-  await expect(page.getByRole("combobox", { name: "Search scope" })).toBeDisabled();
-  await expect(page.getByRole("button", { name: "Find", exact: true })).toBeDisabled();
-  // Search request controls freeze, but document history stays interactive:
-  // Undo below must still be able to invalidate this preflight safely.
-  await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
+
+  // Interrupt at the first observable preflight state. WebKit can scan this
+  // synthetic 120-page file quickly enough that several actionability
+  // assertions before Undo let preflight finish and open confirmation first.
+  // The lock contract is still read in one parallel snapshot so this remains
+  // proof that request controls freeze while history stays interactive.
+  const scope = page.getByRole("combobox", { name: "Search scope" });
+  const findButton = page.getByRole("button", { name: "Find", exact: true });
+  const undo = page.getByRole("button", { name: "Undo" });
+  const [findLocked, replaceLocked, scopeLocked, findButtonLocked, undoEnabled] =
+    await Promise.all([
+      find.isDisabled(),
+      replace.isDisabled(),
+      scope.isDisabled(),
+      findButton.isDisabled(),
+      undo.isEnabled(),
+    ]);
+  expect({ findLocked, replaceLocked, scopeLocked, findButtonLocked, undoEnabled }).toEqual({
+    findLocked: true,
+    replaceLocked: true,
+    scopeLocked: true,
+    findButtonLocked: true,
+    undoEnabled: true,
+  });
 
   // Change the authoritative PDF revision while the 120-page preflight is
   // still scanning. Replace All must discard its old clone rather than
   // publishing stale bytes over this Undo result.
-  await page.getByRole("button", { name: "Undo" }).click();
+  await undo.click({ force: true });
 
   await expect(status).toContainText(/PDF changed while Replace All was checking matches/i, {
     timeout: 90_000,
@@ -307,11 +324,16 @@ test("vinext Edit PDF cancels document Replace All without publishing partial ch
   await expect(replaceAll).toBeEnabled({ timeout: 90_000 });
   await replaceAll.click();
 
-  const cancel = page.getByRole("button", { name: "Cancel Replace All" });
-  await expect(cancel).toBeVisible({ timeout: 30_000 });
-  await cancel.click();
-
   const status = page.locator("[data-edit-replace-all-status]");
+  await expect(status).toContainText(/Checking every match against the native PDF locally/i, {
+    timeout: 30_000,
+  });
+  const cancel = page.getByRole("button", { name: "Cancel Replace All" });
+  // Cancel is intentionally present only while preflight is active. Skip
+  // Playwright's stability wait so a fast WebKit preflight cannot detach the
+  // button between a visibility assertion and the click.
+  await cancel.click({ force: true });
+
   await expect(status).toContainText(/Replace All cancelled\. Nothing was changed/i, {
     timeout: 90_000,
   });
