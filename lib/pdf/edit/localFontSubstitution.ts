@@ -39,6 +39,7 @@ const LOCAL_NATIVE_RESOURCE_PREFIX = "LumeoNativeLocal";
 
 type SourceFontBinding = Readonly<{
   fontObjectRef: string | null;
+  embeddedProgramSha256: string | null;
   descriptorObjectRef: string | null;
   descendantObjectRef: string | null;
   fontProgramObjectRef: string | null;
@@ -181,9 +182,11 @@ function matrixEqual(
 
 function sourceBinding(
   identity: PdfFontResourceIdentity,
+  embeddedProgramSha256: string | null,
 ): SourceFontBinding {
   return {
     fontObjectRef: identity.fontObjectRef,
+    embeddedProgramSha256: embeddedProgramSha256?.toLowerCase() ?? null,
     descriptorObjectRef: identity.descriptorObjectRef,
     descendantObjectRef: identity.descendantObjectRef,
     fontProgramObjectRef: identity.fontProgramObjectRef,
@@ -196,9 +199,12 @@ function sourceBinding(
 function sourceBindingEqual(
   expected: SourceFontBinding,
   actual: PdfFontResourceIdentity,
+  actualEmbeddedProgramSha256: string | null,
 ): boolean {
   return (
     expected.fontObjectRef === actual.fontObjectRef &&
+    expected.embeddedProgramSha256 ===
+      (actualEmbeddedProgramSha256?.toLowerCase() ?? null) &&
     expected.descriptorObjectRef === actual.descriptorObjectRef &&
     expected.descendantObjectRef === actual.descendantObjectRef &&
     expected.fontProgramObjectRef === actual.fontProgramObjectRef &&
@@ -440,6 +446,7 @@ export async function buildLocalFontSubstitutionPlan({
   resolvedFont,
   fontMetrics,
   sourceResourceIdentity,
+  sourceEmbeddedProgramSha256 = null,
   embeddedGlyphEvidence = null,
   asset,
   shapeFont = shapeEmbeddedFontText,
@@ -452,6 +459,7 @@ export async function buildLocalFontSubstitutionPlan({
   resolvedFont: ResolvedFont;
   fontMetrics: FontMetrics;
   sourceResourceIdentity: PdfFontResourceIdentity;
+  sourceEmbeddedProgramSha256?: string | null;
   embeddedGlyphEvidence?: EmbeddedGlyphEvidence | null;
   asset: LocalCustomFontAsset | null;
   shapeFont?: ShapeLocalFont;
@@ -604,7 +612,10 @@ export async function buildLocalFontSubstitutionPlan({
     charSpacing: operator.charSpacing,
     horizontalScalingPct: operator.horizontalScalingPct,
     sourcePlan: decodedOriginalPlan,
-    sourceBinding: sourceBinding(sourceResourceIdentity),
+    sourceBinding: sourceBinding(
+      sourceResourceIdentity,
+      sourceEmbeddedProgramSha256,
+    ),
     operatorSnapshot: snapshot,
     localFontAssetId: asset.descriptor.id,
     localFontSha256: asset.descriptor.sha256.toLowerCase(),
@@ -675,16 +686,22 @@ function currentSourceMatchesPlan({
   operator,
   currentSourcePlan,
   identity,
+  embeddedProgramSha256,
 }: {
   plan: ValidatedLocalFontSubstitutionPlan;
   operator: TextShowOperator;
   currentSourcePlan: ValidatedEditPlan;
   identity: PdfFontResourceIdentity;
+  embeddedProgramSha256: string | null;
 }): boolean {
   return (
     sourcePlanEqual(plan.sourcePlan, currentSourcePlan) &&
     operatorSnapshotEqual(plan.operatorSnapshot, operator) &&
-    sourceBindingEqual(plan.sourceBinding, identity)
+    sourceBindingEqual(
+      plan.sourceBinding,
+      identity,
+      embeddedProgramSha256,
+    )
   );
 }
 
@@ -788,6 +805,7 @@ export async function applyLocalFontSubstitutionToBytes({
       operator: located.operator,
       currentSourcePlan,
       identity: sourceProfile.resourceIdentity,
+      embeddedProgramSha256: sourceProfile.embeddedProgramSha256,
     })
   ) {
     throw new Error(
