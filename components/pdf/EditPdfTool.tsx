@@ -746,10 +746,12 @@ export default function EditPdfTool() {
       ? ocrResultsRevision.pages.get(pageIndex) ?? null
       : null;
   const ocrSearchLayerBusy =
-    ocrSearchLayerActivity?.bytes === pdf?.bytes &&
+    ocrSearchLayerActivity !== null &&
+    ocrSearchLayerActivity.bytes === pdf?.bytes &&
     ocrSearchLayerActivity.pageIndex === pageIndex;
   const ocrSearchLayerNotice =
-    ocrSearchLayerNoticeRevision?.bytes === pdf?.bytes &&
+    ocrSearchLayerNoticeRevision !== null &&
+    ocrSearchLayerNoticeRevision.bytes === pdf?.bytes &&
     ocrSearchLayerNoticeRevision.pageIndex === pageIndex
       ? ocrSearchLayerNoticeRevision.message
       : "";
@@ -1497,7 +1499,7 @@ export default function EditPdfTool() {
           );
         }
       } finally {
-        await verificationDoc.destroy();
+        await verificationDoc.cleanup();
       }
 
       if (
