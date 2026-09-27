@@ -60,9 +60,34 @@ export type ParagraphEditPlan =
   | ValidatedParagraphEditPlan
   | RejectedParagraphEditPlan;
 
+const MATRIX_EPSILON = 1e-9;
+
 function sameMatrix(a: Matrix2x3 | undefined, b: Matrix2x3 | undefined): boolean {
   if (!a || !b) return false;
-  return a.every((value, index) => Math.abs(value - b[index]) <= 1e-9);
+  return a.every((value, index) => Math.abs(value - b[index]) <= MATRIX_EPSILON);
+}
+
+function sameLineOrientation(
+  a: Matrix2x3 | undefined,
+  b: Matrix2x3 | undefined,
+): boolean {
+  if (!a || !b) return false;
+  return [0, 1, 2, 3].every(
+    (index) => Math.abs(a[index] - b[index]) <= MATRIX_EPSILON,
+  );
+}
+
+function hasDistinctTextSpaceBaseline(
+  a: Matrix2x3 | undefined,
+  b: Matrix2x3 | undefined,
+): boolean {
+  if (!a || !b) return false;
+  // The text-line matrix is expressed in text space before the page CTM.
+  // A horizontal Td may change only x/e while keeping the same baseline.
+  // The first paragraph slice therefore requires a real text-space y/f
+  // change between adjacent lines; arbitrary same-baseline repositioning
+  // remains owned by the same-line planner/read-only paths.
+  return Math.abs(a[5] - b[5]) > MATRIX_EPSILON;
 }
 
 function normalizedReplacementLines(text: string): string[] {
@@ -175,7 +200,8 @@ export function isValidatedParagraphEditPlan(
  * - separate BT/ET text objects;
  * - different CTMs or font resources;
  * - two selected operators on the same line (use multiRunEditPlan);
- * - repeated/unknown line matrices;
+ * - horizontal-only repositioning that changes x but not the text-space baseline;
+ * - changed line orientation or repeated/unknown line matrices;
  * - replacement line-count changes;
  * - any per-line replacement buildEditPlan cannot independently validate.
  */
@@ -306,20 +332,23 @@ export function buildParagraphEditPlan({
     });
   }
 
-  for (let left = 0; left < lineMatrices.length; left += 1) {
-    for (let right = left + 1; right < lineMatrices.length; right += 1) {
-      if (sameMatrix(lineMatrices[left], lineMatrices[right])) {
-        return rejected({
-          pageIndex,
-          contentStreamIndex,
-          operatorIndices: sortedIndices,
-          replacementText,
-          replacementLines,
-          resolvedFont,
-          reason:
-            "More than one selected text operator belongs to the same native line. Edit that line as one same-line range first.",
-        });
-      }
+  for (let index = 1; index < lineMatrices.length; index += 1) {
+    const previous = lineMatrices[index - 1];
+    const current = lineMatrices[index];
+    if (
+      !sameLineOrientation(previous, current) ||
+      !hasDistinctTextSpaceBaseline(previous, current)
+    ) {
+      return rejected({
+        pageIndex,
+        contentStreamIndex,
+        operatorIndices: sortedIndices,
+        replacementText,
+        replacementLines,
+        resolvedFont,
+        reason:
+          "These operators are not proven as separate native text lines with one stable line orientation and distinct baselines. Edit them separately.",
+      });
     }
   }
 
