@@ -9,6 +9,7 @@ import {
   IMAGE_ONLY_PDF,
   SEARCHABLE_SCAN_PDF,
   SHAPED_LTR_PDF,
+  PARAGRAPH_LINES_PDF,
   LARGE_DOCUMENT_PDF,
   MIXED_STYLE_PDF,
   SPLIT_RUN_PDF,
@@ -1155,6 +1156,112 @@ test("vinext Edit PDF applies a proven LTR shaped-glyph replacement as one nativ
   );
   expect(decoded.allDecoded).toBe(true);
   expect(decoded.text).toBe(replacement);
+
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test("vinext Edit PDF applies a line-preserving paragraph edit as one native transaction", async ({ page }) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
+  await uploadEditFixture(page, PARAGRAPH_LINES_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+
+  const editableRuns = page.locator('div[role="button"][aria-label^="Editable text: "]');
+  await expect(editableRuns).toHaveCount(2, { timeout: 90_000 });
+  const labels = await editableRuns.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("aria-label") ?? ""),
+  );
+  const firstIndex = labels.findIndex((label) => label.includes("Paragraph first"));
+  const secondIndex = labels.findIndex((label) => label.includes("Paragraph second"));
+  expect(firstIndex).toBeGreaterThanOrEqual(0);
+  expect(secondIndex).toBeGreaterThan(firstIndex);
+
+  await editableRuns.nth(firstIndex).click();
+  await editableRuns.nth(secondIndex).click({ modifiers: ["Shift"] });
+
+  const panel = page.locator("[data-edit-paragraph-panel='true']");
+  await expect(panel).toBeVisible({ timeout: 90_000 });
+  await expect(panel).toHaveAttribute("data-logical-selection-span-count", "2");
+  await expect(panel).toHaveAttribute("data-logical-selection-whole-spans", "true");
+
+  const editor = panel.locator("[data-edit-paragraph-input]");
+  await expect(editor).toHaveValue("Paragraph first\nParagraph second", {
+    timeout: 90_000,
+  });
+
+  // Removing a native line must not silently trigger reflow or line deletion.
+  await editor.fill("Only one replacement line");
+  const apply = panel.locator("[data-edit-multi-run-apply]");
+  await expect(apply).toBeDisabled();
+  await expect(panel.getByRole("alert")).toContainText(
+    /exactly 2 replacement lines|2 proven PDF lines/i,
+  );
+
+  const replacement = "Changed first\nChanged second";
+  await editor.fill(replacement);
+  await expect(apply).toBeEnabled({ timeout: 90_000 });
+  await editor.press(process.platform === "darwin" ? "Meta+Enter" : "Control+Enter");
+
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
+    timeout: 90_000,
+  });
+  await waitForStageReady(page);
+  await expect(
+    page.locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Changed first"]'),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(
+    page.locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Changed second"]'),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+  await expect(
+    page.locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Paragraph first"]'),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(
+    page.locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Paragraph second"]'),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Redo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
+    timeout: 90_000,
+  });
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", { name: "Download edited PDF" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  const outputPath = await download.path();
+  expect(outputPath).not.toBeNull();
+  const bytes = await readFile(outputPath!);
+
+  const exported = await PDFDocument.load(bytes);
+  const operators = collectPageTextOperators(exported, 0);
+  expect(operators).toHaveLength(2);
+  const registry = new PdfFontRegistry(exported);
+  const decoded = operators.map((entry) => {
+    const resourceName = entry.operator.fontResourceName;
+    expect(resourceName).toBeTruthy();
+    const profile = registry.resolve(entry.resources, resourceName!);
+    expect(profile).not.toBeNull();
+    const result = decodeTextShowOperator(entry.operator, profile!.resolvedFont);
+    expect(result.allDecoded).toBe(true);
+    return result.text;
+  });
+  expect(decoded).toEqual(["Changed first", "Changed second"]);
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
