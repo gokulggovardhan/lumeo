@@ -44,10 +44,11 @@ export async function acknowledgeErrorLog(formData: FormData) {
     .from("error_logs")
     .update({ status: "acknowledged" })
     .eq("id", target.id)
+    .eq("status", "open")
     .select("id")
     .maybeSingle();
 
-  if (error || !updated) return errorState("Error log could not be acknowledged.");
+  if (error || !updated) return errorState("Only an open error can be acknowledged.");
 
   await auditStatus(
     target.id,
@@ -81,10 +82,13 @@ export async function markErrorFixDeployed(formData: FormData) {
       resolved_by: null,
     })
     .eq("id", target.id)
+    .in("status", ["open", "acknowledged"])
     .select("id")
     .maybeSingle();
 
-  if (error || !updated) return errorState("Fix deployment could not be recorded.");
+  if (error || !updated) {
+    return errorState("Only an open or acknowledged error can enter fix verification.");
+  }
 
   await auditStatus(
     target.id,
