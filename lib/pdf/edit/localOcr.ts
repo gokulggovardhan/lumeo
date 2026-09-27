@@ -1,4 +1,14 @@
+import type { PDFPageProxy } from "pdfjs-dist";
+import {
+  clampRenderScaleToMaxDimension,
+  clampRenderScaleToPixelBudget,
+  renderPageWithTimeout,
+} from "../pdfjs.ts";
+
 export const LOCAL_OCR_LANGUAGE = "eng";
+export const LOCAL_OCR_TARGET_DPI = 300;
+export const LOCAL_OCR_MAX_DIMENSION_PX = 5_000;
+export const LOCAL_OCR_MAX_PIXELS = 12_000_000;
 
 export type LocalOcrProgress = Readonly<{
   status: string;
@@ -96,6 +106,50 @@ export async function resetLocalOcrWorker(): Promise<void> {
     // Best-effort teardown. A failed/partially-created worker is already
     // discarded by clearing workerPromise above.
   }
+}
+
+export function localOcrRenderScale(
+  pageWidthPt: number,
+  pageHeightPt: number,
+): number {
+  const targetScale = LOCAL_OCR_TARGET_DPI / 72;
+  return clampRenderScaleToPixelBudget(
+    clampRenderScaleToMaxDimension(
+      targetScale,
+      pageWidthPt,
+      pageHeightPt,
+      LOCAL_OCR_MAX_DIMENSION_PX,
+    ),
+    pageWidthPt,
+    pageHeightPt,
+    LOCAL_OCR_MAX_PIXELS,
+  );
+}
+
+export async function renderPdfPageForLocalOcr(
+  page: PDFPageProxy,
+  pageNumber: number,
+): Promise<{ blob: Blob; width: number; height: number; scale: number }> {
+  const pointViewport = page.getViewport({ scale: 1 });
+  const scale = localOcrRenderScale(pointViewport.width, pointViewport.height);
+  const viewport = page.getViewport({ scale });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.floor(viewport.width));
+  canvas.height = Math.max(1, Math.floor(viewport.height));
+  const context = canvas.getContext("2d", { alpha: false });
+  if (!context) throw new Error("This browser could not prepare the page for local OCR.");
+  context.fillStyle = "#FFFFFF";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  const renderTask = page.render({ canvas, canvasContext: context, viewport });
+  await renderPageWithTimeout(renderTask, pageNumber);
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/png"),
+  );
+  canvas.width = 1;
+  canvas.height = 1;
+  if (!blob) throw new Error("This browser could not encode the OCR page image.");
+  return { blob, width: viewport.width, height: viewport.height, scale };
 }
 
 export async function recognizeLocalOcrImage({
