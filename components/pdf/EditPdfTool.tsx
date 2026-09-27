@@ -5147,18 +5147,25 @@ export default function EditPdfTool() {
   useEffect(() => {
     if (
       editPreview.kind !== "paragraph" ||
-      !editPreview.plan.originalText.includes("\n") ||
-      paragraphDraftSeededSelectionRef.current === nativeTextSelectionKey
+      !editPreview.plan.originalText.includes("\n")
     ) {
+      if (selectedRunIndices.length === 0) {
+        paragraphDraftSeededSelectionRef.current = null;
+      }
       return;
     }
-    paragraphDraftSeededSelectionRef.current = nativeTextSelectionKey;
+    if (paragraphDraftSeededSelectionRef.current === nativeTextSelectionKey) {
+      return;
+    }
     const concatenatedSelection = selectedRunIndices
       .map((index) => detectedTextRuns[index]?.str ?? "")
       .join("");
     if (editDraftText === concatenatedSelection) {
+      paragraphDraftSeededSelectionRef.current = nativeTextSelectionKey;
       setEditDraftText(editPreview.plan.originalText);
       setEditApplyError("");
+    } else if (editDraftText === editPreview.plan.originalText) {
+      paragraphDraftSeededSelectionRef.current = nativeTextSelectionKey;
     }
   }, [
     editPreview,
