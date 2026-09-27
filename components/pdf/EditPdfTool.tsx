@@ -2085,6 +2085,10 @@ export default function EditPdfTool() {
     setError("");
     const file = Array.from(files)[0];
     if (!file) return;
+    const performanceStartedAt = window.performance.now();
+    performanceDiagnosticsRef.current?.resetDocument({
+      fileSizeBytes: file.size,
+    });
 
     if (!isPdfNamedFile(file)) {
       setError("Please choose a PDF file.");
@@ -2112,6 +2116,17 @@ export default function EditPdfTool() {
       }
       const doc = await openPdfJsDocument(new Uint8Array(copyArrayBuffer(bytes)));
       const pageCount = doc.numPages;
+      performanceDiagnosticsRef.current?.setPageCount(pageCount);
+      performanceDiagnosticsRef.current?.recordDuration(
+        "document-open",
+        window.performance.now() - performanceStartedAt,
+        {
+          detail: {
+            fileSizeBytes: file.size,
+            pageCount,
+          },
+        },
+      );
 
       const pageCountError = checkPdfPageCount(pageCount);
       if (pageCountError) {
