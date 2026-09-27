@@ -392,6 +392,33 @@ test("document writer rejects a stale shaped plan when the native operator chang
   );
 });
 
+test("document writer rejects a same-named font resource swapped after shaped validation", async () => {
+  const fx = await fixture();
+  const plan = await planFor(fx);
+  if (!isValidatedShapedGlyphEditPlan(plan)) assert.fail(plan.reason);
+
+  const fonts = fx.resources.lookup(PDFName.of("Font"), PDFDict);
+  const current = fx.doc.context.lookup(
+    fonts.get(PDFName.of(fx.resourceName)),
+    PDFDict,
+  );
+  const replacement = fx.doc.context.obj({}) as PDFDict;
+  for (const [key, value] of current.entries()) {
+    replacement.set(key, value);
+  }
+  const replacementRef = fx.doc.context.register(replacement);
+  fonts.set(PDFName.of(fx.resourceName), replacementRef);
+
+  await assert.rejects(
+    () => applyShapedGlyphEditPlanToDocument(fx.doc, plan),
+    (error: unknown) =>
+      error instanceof EditPlanRejectedError &&
+      /font resource changed after shaped-glyph validation/i.test(
+        error.message,
+      ),
+  );
+});
+
 test("plain-object copies cannot cross the shaped-glyph writer authority boundary", async () => {
   const fx = await fixture();
   const plan = await planFor(fx);
