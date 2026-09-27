@@ -32,6 +32,12 @@ export type PageThumbnailSidebarProps = {
   onSelectPage: (pageIndex: number) => void;
   onToggleSelected: (pageIndex: number, additive: boolean) => void;
   onReorder: (fromIndex: number, toIndex: number) => void;
+  onPerformanceSample?: (sample: {
+    durationMs: number;
+    pageCount: number;
+    renderedCount: number;
+    failedCount: number;
+  }) => void;
 };
 
 type ThumbProps = {
@@ -135,6 +141,7 @@ export default function PageThumbnailSidebar({
   onSelectPage,
   onToggleSelected,
   onReorder,
+  onPerformanceSample,
 }: PageThumbnailSidebarProps) {
   // Thumbnails carry the document generation they were rendered from, so a
   // stale set is discarded by COMPARISON at render time rather than by
@@ -156,6 +163,9 @@ export default function PageThumbnailSidebar({
   useEffect(() => {
     let cancelled = false;
     const created: string[] = [];
+    const thumbnailBatchStartedAt = window.performance.now();
+    let renderedCount = 0;
+    let failedCount = 0;
 
     // Revoke the PREVIOUS set only after the new ones are in state, so the
     // rail never blanks between documents.
@@ -190,12 +200,14 @@ export default function PageThumbnailSidebar({
 
           const url = URL.createObjectURL(blob);
           created.push(url);
+          renderedCount += 1;
           setThumbnails((current) =>
             current.generation === docReady
               ? { generation: docReady, urls: { ...current.urls, [pageIndex]: url } }
               : { generation: docReady, urls: { [pageIndex]: url } },
           );
         } catch {
+          failedCount += 1;
           // Best-effort: a page without a thumbnail is still selectable and
           // still reorderable, so a single failed render must not take the
           // rail down with it.
@@ -211,13 +223,21 @@ export default function PageThumbnailSidebar({
       }
       await Promise.all(Array.from({ length: THUMBNAIL_CONCURRENCY }, worker));
       for (const url of previous) URL.revokeObjectURL(url);
+      if (!cancelled) {
+        onPerformanceSample?.({
+          durationMs: window.performance.now() - thumbnailBatchStartedAt,
+          pageCount,
+          renderedCount,
+          failedCount,
+        });
+      }
     })();
 
     return () => {
       cancelled = true;
       for (const url of previous) URL.revokeObjectURL(url);
     };
-  }, [docReady, pageCount, getDocument]);
+  }, [docReady, pageCount, getDocument, onPerformanceSample]);
 
   useEffect(
     () => () => {
