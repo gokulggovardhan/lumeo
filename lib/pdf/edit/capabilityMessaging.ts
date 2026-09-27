@@ -59,6 +59,11 @@ const CATEGORY_MESSAGES: Record<
     detail:
       "Changing it could also change what other page content is allowed to appear, so Lumeo keeps the text read-only instead of risking the page layout.",
   },
+  INVISIBLE_TEXT_LAYER: {
+    title: "This is an invisible PDF text layer",
+    detail:
+      "The text is hidden from the page view and may exist only for search, OCR or accessibility. Lumeo keeps it read-only instead of treating hidden text as visible native content.",
+  },
   VERTICAL_TEXT: {
     title: "Vertical text is not yet safe to rewrite",
     detail:
