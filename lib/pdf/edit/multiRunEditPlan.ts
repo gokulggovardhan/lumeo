@@ -20,7 +20,6 @@
 import type { TextShowOperator } from "./contentStream.ts";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "./fontEncoding.ts";
 import type { FontMetrics, TextShowState } from "./fontMetrics.ts";
-import { compareAdvance } from "./fontMetrics.ts";
 import {
   buildEditPlan,
   deriveValidatedEditPlanAdvance,
@@ -137,6 +136,17 @@ function isConsecutiveAscending(indices: number[]): boolean {
   return true;
 }
 
+function trailingTjAdjustmentForTargetAdvance(
+  targetAdvancePt: number,
+  replacementAdvancePt: number,
+  state: TextShowState,
+): number {
+  const scalePt = state.fontSizePt * (state.horizontalScalingPct / 100);
+  return scalePt === 0
+    ? 0
+    : ((replacementAdvancePt - targetAdvancePt) / scalePt) * 1000;
+}
+
 // Builds a dry-run MultiRunEditPlan for replacing a span of two or more
 // consecutive text-show operators with one logical replacement. Every
 // safety invariant is checked before any per-operator plan is built:
@@ -244,34 +254,37 @@ export function buildMultiRunEditPlan({
     validatedSubPlans.push(subPlan);
   }
 
-  // Recompute the first sub-plan's width/delta against the SPAN's true
-  // combined original width (every spanned operator's own original
-  // glyphs), not just the first operator's own -- otherwise the emptied
-  // operators' widths would be uncounted. Reuses fontMetrics.ts's own
-  // compareAdvance (the existing spacing engine), not a new calculation.
-  const combinedOriginalCodes = validatedSubPlans.flatMap(
-    (plan) => plan.originalGlyphCodes,
+  // Preserve the SPAN's proven effective advance using each operator's OWN
+  // validated text state. The old implementation concatenated all original
+  // glyph codes and remeasured them with the FIRST operator's font
+  // size/spacing/scaling; that is wrong when a valid same-font selection
+  // crosses a text-state change. Every sub-plan has already measured its
+  // effective original endpoint (including original TJ adjustments), so the
+  // combined target is the sum of those independently proven advances.
+  const combinedOriginalAdvancePt = validatedSubPlans.reduce(
+    (sum, plan) => sum + plan.originalWidthPt,
+    0,
   );
   const firstOperator = spanOperators[0];
-  const state: TextShowState = {
+  const firstState: TextShowState = {
     fontSizePt: firstOperator.fontSizePt,
     charSpacing: firstOperator.charSpacing,
     wordSpacing: firstOperator.wordSpacing,
     horizontalScalingPct: firstOperator.horizontalScalingPct,
   };
-  const comparison = compareAdvance(
-    combinedOriginalCodes,
-    validatedSubPlans[0].replacementGlyphCodes,
-    fontMetrics,
-    state,
+  const replacementAdvancePt = validatedSubPlans[0].replacementWidthPt;
+  const tjSpacingDelta = trailingTjAdjustmentForTargetAdvance(
+    combinedOriginalAdvancePt,
+    replacementAdvancePt,
+    firstState,
   );
 
   const mergedFirstPlan = deriveValidatedEditPlanAdvance(
     validatedSubPlans[0],
     {
-      originalWidthPt: comparison.originalAdvancePt,
-      replacementWidthPt: comparison.replacementAdvancePt,
-      tjSpacingDelta: comparison.tjAdjustment,
+      originalWidthPt: combinedOriginalAdvancePt,
+      replacementWidthPt: replacementAdvancePt,
+      tjSpacingDelta,
     },
   );
 
