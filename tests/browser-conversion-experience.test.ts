@@ -5,6 +5,7 @@ import test from "node:test";
 import {
   conversionUserError,
   normalizeConversionError,
+  toWordToPdfAnalyticsErrorCode,
 } from "../lib/conversion/errors.ts";
 
 test("conversion errors expose stable user-facing categories without raw internals", () => {
@@ -100,4 +101,35 @@ test("Word engine reports stages rather than invented conversion percentages", a
   assert.match(source, /message: "Generating PDF"/);
   assert.doesNotMatch(source, /Math\.floor\(\(loaded \/ total\) \* 100\)/);
   assert.doesNotMatch(source, /%"/);
+});
+
+
+test("Word to PDF telemetry distinguishes WASM compile, timeout, render and validation failures", () => {
+  const wasmCompile = conversionUserError("runtime-load-failed", {
+    technicalMessage:
+      'Aborted(CompileError: WebAssembly.instantiate(): section (code 3, "Function") extends past end of the module)',
+  });
+  assert.equal(
+    toWordToPdfAnalyticsErrorCode(wasmCompile),
+    "wasm_compile_error",
+  );
+
+  const timeout = conversionUserError("runtime-load-failed", {
+    technicalMessage:
+      "The local Office engine exceeded the startup safety watchdog.",
+  });
+  assert.equal(toWordToPdfAnalyticsErrorCode(timeout), "timeout");
+
+  const render = conversionUserError("conversion-failed", {
+    technicalMessage: "LibreOffice could not convert this document.",
+  });
+  assert.equal(toWordToPdfAnalyticsErrorCode(render), "render_error");
+
+  const validation = conversionUserError("output-failed", {
+    technicalMessage: "Generated PDF failed validation and could not reopen.",
+  });
+  assert.equal(
+    toWordToPdfAnalyticsErrorCode(validation),
+    "pdf_validation_error",
+  );
 });

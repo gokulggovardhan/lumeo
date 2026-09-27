@@ -3,7 +3,9 @@ import {
   resolveOfficeAssetConfig,
   type OfficeAssetConfig,
 } from "@/lib/conversion/browser/libreoffice/assetConfig";
+import { installOfficeClipboardPermissionCompatibility } from "@/lib/conversion/browser/libreoffice/permissionsCompat";
 
+const STARTUP_TIMEOUT_MS = 180_000;
 const READY_TIMEOUT_MS = 180_000;
 const CONVERSION_TIMEOUT_MS = 300_000;
 const IO_CHUNK_BYTES = 4 * 1024 * 1024;
@@ -114,12 +116,14 @@ function ensureOfficeCanvas(): HTMLCanvasElement {
 
 function loadZetaHelperConstructor(
   helperUrl: string,
+  signal: AbortSignal,
 ): Promise<ZetaHelperMainConstructor> {
   if (window.__lumeoBrowserOfficeZetaHelperMain) {
     return Promise.resolve(window.__lumeoBrowserOfficeZetaHelperMain);
   }
 
   return new Promise((resolve, reject) => {
+    throwIfAborted(signal);
     const eventName = `lumeo:zeta-helper:${crypto.randomUUID()}`;
     const moduleUrl = URL.createObjectURL(
       new Blob(
@@ -135,22 +139,41 @@ dispatchEvent(new CustomEvent(${JSON.stringify(eventName)}));`,
     script.type = "module";
     script.src = moduleUrl;
 
-    const cleanup = () => {
+    let settled = false;
+    const finish = (
+      callback: (value: ZetaHelperMainConstructor) => void,
+      constructor?: ZetaHelperMainConstructor,
+      error?: unknown,
+    ) => {
+      if (settled) return;
+      settled = true;
       script.remove();
       URL.revokeObjectURL(moduleUrl);
       window.removeEventListener(eventName, handleReady);
+      signal.removeEventListener("abort", handleAbort);
+      if (error !== undefined) {
+        reject(error);
+      } else if (constructor) {
+        callback(constructor);
+      } else {
+        reject(new Error("The browser Office helper did not initialize."));
+      }
     };
     const handleReady = () => {
-      const constructor = window.__lumeoBrowserOfficeZetaHelperMain;
-      cleanup();
-      if (constructor) resolve(constructor);
-      else reject(new Error("The browser Office helper did not initialize."));
+      finish(resolve, window.__lumeoBrowserOfficeZetaHelperMain);
+    };
+    const handleAbort = () => {
+      finish(resolve, undefined, abortError(signal));
     };
 
     window.addEventListener(eventName, handleReady, { once: true });
+    signal.addEventListener("abort", handleAbort, { once: true });
     script.onerror = () => {
-      cleanup();
-      reject(new Error("The browser Office helper could not be loaded."));
+      finish(
+        resolve,
+        undefined,
+        new Error("The browser Office helper could not be loaded."),
+      );
     };
     document.head.appendChild(script);
   });
@@ -354,7 +377,18 @@ export class BrowserLibreOfficeRuntime {
   }
 
   private async initialize(): Promise<void> {
-    const bootstrapSignal = new AbortController().signal;
+    const bootstrapController = new AbortController();
+    const startupTimer = window.setTimeout(() => {
+      bootstrapController.abort(
+        new DOMException(
+          "The local Office engine exceeded the startup safety watchdog.",
+          "TimeoutError",
+        ),
+      );
+    }, STARTUP_TIMEOUT_MS);
+    const bootstrapSignal = bootstrapController.signal;
+
+    installOfficeClipboardPermissionCompatibility();
 
     if (
       !crossOriginIsolated ||
@@ -367,25 +401,30 @@ export class BrowserLibreOfficeRuntime {
       );
     }
 
-    ensureOfficeCanvas();
-    await preflightOfficeAssetOrigin(this.assets, bootstrapSignal);
-
-    const ZetaHelperMain = await loadZetaHelperConstructor(this.assets.helperUrl);
-
-    this.officeThreadUrl = createOfficeThreadModule(this.assets.helperUrl);
-    const helper = new ZetaHelperMain(this.officeThreadUrl, {
-      threadJsType: "module",
-      wasmPkg: `url:${this.assets.officeBaseUrl}`,
-      blockPageScroll: false,
-    });
-    this.helper = helper;
-
     try {
+      ensureOfficeCanvas();
+      await preflightOfficeAssetOrigin(this.assets, bootstrapSignal);
+
+      const ZetaHelperMain = await loadZetaHelperConstructor(
+        this.assets.helperUrl,
+        bootstrapSignal,
+      );
+
+      this.officeThreadUrl = createOfficeThreadModule(this.assets.helperUrl);
+      const helper = new ZetaHelperMain(this.officeThreadUrl, {
+        threadJsType: "module",
+        wasmPkg: `url:${this.assets.officeBaseUrl}`,
+        blockPageScroll: false,
+      });
+      this.helper = helper;
+
       await waitForReady(helper, bootstrapSignal);
       this.ready = true;
     } catch (error) {
       this.destroyNow();
       throw error;
+    } finally {
+      window.clearTimeout(startupTimer);
     }
   }
 

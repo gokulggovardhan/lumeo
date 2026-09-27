@@ -154,7 +154,12 @@ export type AuditLog = {
 };
 
 export type ErrorSeverity = "low" | "medium" | "high" | "critical";
-export type ErrorStatus = "open" | "resolved" | "ignored";
+export type ErrorStatus =
+  | "open"
+  | "acknowledged"
+  | "fixed_pending_verification"
+  | "resolved"
+  | "ignored";
 export type ErrorSource = "client" | "server_action" | "route_handler" | "error_boundary" | "unhandled_rejection";
 
 export type ErrorLog = {
@@ -179,6 +184,9 @@ export type ErrorLog = {
   last_seen_at: string;
   resolved_at: string | null;
   resolved_by: string | null;
+  last_fix_sha: string | null;
+  fix_deployed_at: string | null;
+  recurrence_after_fix: boolean;
 };
 
 export type FeedbackQueryType = "Query" | "Feedback";

@@ -104,11 +104,17 @@ export default async function AnalyticsPage({
           </section>
 
           <AdminSectionCard title="Operation analytics" description={`Processing lifecycle metrics for ${range.label.toLowerCase()}.`}>
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
               <AdminMetricCard label="Processing Started" value={data.processingStarted} detail="Real processing attempts started." />
               <AdminMetricCard label="Processing Succeeded" value={data.processingSucceeded} detail="Usable outputs created." tone="success" />
               <AdminMetricCard label="Processing Failed" value={data.processingFailed} detail="Attempts reporting approved failure events." tone={data.processingFailed ? "danger" : "neutral"} />
-              <AdminMetricCard label="Success Rate" value={data.successRate === null ? "N/A" : `${data.successRate}%`} detail="Succeeded ÷ completed attempts." tone="gold" />
+              <AdminMetricCard
+                label="No terminal event"
+                value={data.unreconciledStarts}
+                detail="Started minus succeeded/failed in this range; may include cancellation, abandonment, stalls, or range-boundary spillover."
+                tone={data.unreconciledStarts ? "warning" : "neutral"}
+              />
+              <AdminMetricCard label="Success Rate" value={data.successRate === null ? "N/A" : `${data.successRate}%`} detail="Succeeded ÷ completed attempts only." tone="gold" />
               <AdminMetricCard label="Average Duration" value={formatDuration(data.averageDurationMs)} detail="Successful processing events only." />
             </section>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">

@@ -34,7 +34,7 @@ import { cleanupOrphanedConversionJobs } from "@/lib/conversion/browser/workspac
 import {
   conversionUserError,
   normalizeConversionError,
-  toAnalyticsConversionErrorCode,
+  toWordToPdfAnalyticsErrorCode,
   type ConversionUserError,
 } from "@/lib/conversion/errors";
 import {
@@ -353,7 +353,7 @@ export default function WordToPdfTool() {
         toolSlug: "word-to-pdf",
         durationMs: performance.now() - startedAt,
         success: false,
-        errorCode: toAnalyticsConversionErrorCode(normalized.code),
+        errorCode: toWordToPdfAnalyticsErrorCode(normalized),
       });
     } finally {
       if (abortRef.current === controller) abortRef.current = null;

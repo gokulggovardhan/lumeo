@@ -83,9 +83,21 @@ export type ErrorLogSummary = {
 
 export async function getErrorLogSummary(): Promise<DataResult<ErrorLogSummary>> {
   const supabase = await createClient();
+  const unresolvedStatuses: ErrorStatus[] = [
+    "open",
+    "acknowledged",
+    "fixed_pending_verification",
+  ];
   const [openResult, criticalResult, resolvedResult, allResult] = await Promise.all([
-    supabase.from("error_logs").select("id", { count: "exact", head: true }).eq("status", "open"),
-    supabase.from("error_logs").select("id", { count: "exact", head: true }).eq("status", "open").eq("severity", "critical"),
+    supabase
+      .from("error_logs")
+      .select("id", { count: "exact", head: true })
+      .in("status", unresolvedStatuses),
+    supabase
+      .from("error_logs")
+      .select("id", { count: "exact", head: true })
+      .in("status", unresolvedStatuses)
+      .eq("severity", "critical"),
     supabase.from("error_logs").select("id", { count: "exact", head: true }).eq("status", "resolved"),
     supabase.from("error_logs").select("occurrence_count"),
   ]);
