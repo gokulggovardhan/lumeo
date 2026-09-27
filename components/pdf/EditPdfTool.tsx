@@ -1417,6 +1417,139 @@ export default function EditPdfTool() {
     }
   }, [ocrPageResultCurrent, pageIndex, pdf?.bytes]);
 
+  const handleMakeOcrSearchable = useCallback(async () => {
+    if (
+      !pdf ||
+      !ocrPageResultCurrent ||
+      pageTextCapability.category !== "SCANNED_IMAGE" ||
+      ocrSearchableBusy
+    ) {
+      return;
+    }
+
+    const sourceBytes = pdf.bytes;
+    const sourcePageIndex = pageIndex;
+    const sourceResult = ocrPageResultCurrent;
+    const sourcePageCount = pdf.pageCount;
+
+    setOcrSearchableActivity({
+      bytes: sourceBytes,
+      pageIndex: sourcePageIndex,
+    });
+    setOcrSearchableNoticeRevision(null);
+    setOcrErrorRevision(null);
+
+    try {
+      const engine = await loadEditEngine();
+      const searchable = await engine.addSearchableOcrTextLayer({
+        sourceBytes,
+        result: sourceResult,
+      });
+      const nextBytes = searchable.bytes.slice().buffer as ArrayBuffer;
+
+      const currentContext = ocrContextRef.current;
+      if (
+        getHistoryState().pdfBytes !== sourceBytes ||
+        currentContext.bytes !== sourceBytes ||
+        currentContext.pageIndex !== sourcePageIndex
+      ) {
+        throw new Error(
+          "The PDF or page changed while Lumeo was preparing searchable text. Nothing was applied.",
+        );
+      }
+
+      // Post-verify through the independent PDF.js extraction path before
+      // publishing the new bytes into undo history. The writer intentionally
+      // creates invisible Tr=3 text; this check proves the resulting file is
+      // actually searchable/selectable rather than merely containing new PDF
+      // objects that a reader ignores.
+      const verificationDoc = await openPdfJsDocument(nextBytes);
+      try {
+        const verificationPage = await verificationDoc.getPage(sourcePageIndex + 1);
+        const content = await withPageTimeout(
+          verificationPage.getTextContent(),
+          sourcePageIndex + 1,
+          PAGE_RENDER_TIMEOUT_MS,
+          "verify searchable OCR text",
+        );
+        const extracted = (content.items as Array<{ str?: string }>)
+          .map((item) => item.str ?? "")
+          .join(" ")
+          .toLocaleLowerCase();
+        const expectedWords = sourceResult.words
+          .map((word) => word.text.trim())
+          .filter(Boolean);
+        const missingWord = expectedWords.find(
+          (word) => !extracted.includes(word.toLocaleLowerCase()),
+        );
+        if (missingWord) {
+          throw new Error(
+            "Searchable OCR verification could not find every recognized word in the rebuilt PDF. Nothing was applied.",
+          );
+        }
+      } finally {
+        await verificationDoc.destroy();
+      }
+
+      const latestContext = ocrContextRef.current;
+      if (
+        getHistoryState().pdfBytes !== sourceBytes ||
+        latestContext.bytes !== sourceBytes ||
+        latestContext.pageIndex !== sourcePageIndex
+      ) {
+        throw new Error(
+          "The PDF or page changed before searchable text could be published. Nothing was applied.",
+        );
+      }
+
+      const searchableEdit = createPageEditOperation({
+        operation: "ocr-searchable",
+        beforePageCount: sourcePageCount,
+        afterPageCount: sourcePageCount,
+        affectedPageIndices: [sourcePageIndex],
+        description: `Added a local searchable OCR text layer to page ${sourcePageIndex + 1}.`,
+      });
+
+      setHistoryState((current) => ({
+        ...current,
+        pdfBytes: nextBytes,
+        session: appendPdfEditOperations(current.session, [searchableEdit]),
+      }));
+      setOcrSearchableNoticeRevision({
+        bytes: nextBytes,
+        pageIndex: sourcePageIndex,
+        kind: "success",
+        message: `Page ${sourcePageIndex + 1} is now searchable with ${searchable.wordCount} recognized word${searchable.wordCount === 1 ? "" : "s"}. Undo is available.`,
+      });
+    } catch (searchableError) {
+      const currentBytes = getHistoryState().pdfBytes;
+      const currentPageIndex = ocrContextRef.current.pageIndex;
+      setOcrSearchableNoticeRevision({
+        bytes: currentBytes,
+        pageIndex: currentPageIndex,
+        kind: "error",
+        message:
+          searchableError instanceof Error
+            ? searchableError.message
+            : "Searchable OCR could not be completed. Nothing was changed.",
+      });
+    } finally {
+      setOcrSearchableActivity((current) =>
+        current?.bytes === sourceBytes && current.pageIndex === sourcePageIndex
+          ? null
+          : current,
+      );
+    }
+  }, [
+    getHistoryState,
+    ocrPageResultCurrent,
+    ocrSearchableBusy,
+    pageIndex,
+    pageTextCapability.category,
+    pdf,
+    setHistoryState,
+  ]);
+
   // Development-only fidelity diagnostics. This deliberately never renders
   // debug noise in the normal product and is compiled behind NODE_ENV.
   // In a local development build, the current page report can be inspected
