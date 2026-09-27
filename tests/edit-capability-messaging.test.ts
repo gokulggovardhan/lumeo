@@ -22,6 +22,7 @@ const categories: DocumentTextCapabilityCategory[] = [
   "TYPE3_TEXT",
   "FORM_XOBJECT_TEXT",
   "CLIPPED_TEXT",
+  "INVISIBLE_TEXT_LAYER",
   "VERTICAL_TEXT",
   "UNKNOWN_OR_UNSAFE",
 ];
@@ -80,6 +81,13 @@ test("run copy prefers the concrete unsafe native category over a generic arbitr
   });
   assert.ok(message);
   assert.match(message.title, /clipping/i);
+  assert.match(message.detail, /read-only/i);
+});
+
+test("invisible PDF text receives a specific read-only explanation", () => {
+  const message = userMessageForCapabilityCategory("INVISIBLE_TEXT_LAYER");
+  assert.match(message.title, /invisible PDF text layer/i);
+  assert.match(message.detail, /search|OCR|accessibility/i);
   assert.match(message.detail, /read-only/i);
 });
 
