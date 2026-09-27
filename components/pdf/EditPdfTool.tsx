@@ -85,6 +85,7 @@ import {
   userMessageForPageCapability,
   userMessageForTextRun,
 } from "@/lib/pdf/edit/capabilityMessaging";
+import { describeFontPreviewFidelity } from "@/lib/pdf/edit/fontPreviewFidelity";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
 import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
 import { summarizeNativeTextSelectionStyles } from "@/lib/pdf/edit/mixedStyleSelection";
@@ -3610,6 +3611,16 @@ export default function EditPdfTool() {
     singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
       ? browserFontPreview.family
       : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
+  const fontPreviewFidelity = describeFontPreviewFidelity({
+    profile: singleSelectedSpan?.fontProfile ?? null,
+    exactEmbeddedLoaded: Boolean(
+      singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id,
+    ),
+    // No live equivalent provider is wired yet. A future caller may supply
+    // independently verified equivalence evidence, but generic CSS stacks
+    // must remain fallback rather than being promoted by name similarity.
+    verifiedEquivalent: null,
+  });
   const editableNativeSpanKeys = new Set(
     effectiveTextArbitrations
       .filter((arbitration) => arbitration.decision === "editable")
@@ -4506,6 +4517,7 @@ export default function EditPdfTool() {
                           span={singleSelectedSpan}
                           draft={nativeStyleDraft}
                           fillCapability={nativeFillCapability}
+                          previewFidelity={fontPreviewFidelity}
                           panelPositionClass={nativeFormatPanelPositionClass}
                           horizontalClass={inlineEditorHorizontalClass}
                           onPatchDraft={(patch) => {
