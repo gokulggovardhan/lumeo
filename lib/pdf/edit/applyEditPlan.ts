@@ -74,7 +74,37 @@ function assertApplicable(plan: ValidatedEditPlan): void {
   if (!SUPPORTED_OPERATOR_TYPES.has(plan.operatorType)) {
     throw new EditPlanRejectedError(`This rewrite engine does not support the "${plan.operatorType}" operator.`);
   }
-  // A plan with zero replacement glyphs (any operator kind) produces
+  if (plan.shapedGlyphTjAdjustments) {
+    if (plan.operatorType !== "Tj" && plan.operatorType !== "TJ") {
+      throw new EditPlanRejectedError(
+        "Shaped glyph output is limited to Tj/TJ text-showing operators.",
+      );
+    }
+    if (
+      plan.shapedGlyphTjAdjustments.length !== plan.replacementGlyphCodes.length ||
+      plan.replacementGlyphCodes.length === 0
+    ) {
+      throw new EditPlanRejectedError(
+        "The shaped glyph plan does not contain one positioning adjustment per glyph.",
+      );
+    }
+    for (let index = 0; index < plan.replacementGlyphCodes.length; index += 1) {
+      const code = plan.replacementGlyphCodes[index];
+      const adjustment = plan.shapedGlyphTjAdjustments[index];
+      if (
+        !Number.isInteger(code) ||
+        code <= 0 ||
+        code > 0xffff ||
+        !Number.isFinite(adjustment)
+      ) {
+        throw new EditPlanRejectedError(
+          "The shaped glyph plan contains an invalid CID or positioning adjustment.",
+        );
+      }
+    }
+  }
+
+  // A plan with zero replacement glyphs (any ordinary operator kind) produces
   // `<>`/`[<>]` -- an empty string/array, syntactically valid PDF that
   // shows nothing. Proven safe and real, not just theoretically legal:
   // lib/pdf/edit/multiRunEditPlan.ts intentionally empties every operator
@@ -201,6 +231,30 @@ function buildFallbackOperatorText(plan: ValidatedEditPlan, fallbackResourceName
 //   persistent word/character-spacing side effects as well as the line move
 //   and the following text position.
 function buildReplacementOperatorText(plan: ValidatedEditPlan, bytesPerCode: 1 | 2): string {
+  if (plan.shapedGlyphTjAdjustments) {
+    if (bytesPerCode !== 2) {
+      throw new EditPlanRejectedError(
+        "Shaped glyph output requires the proven two-byte Identity-H CID encoding.",
+      );
+    }
+
+    const parts: string[] = [];
+    const lastIndex = plan.replacementGlyphCodes.length - 1;
+    for (let index = 0; index < plan.replacementGlyphCodes.length; index += 1) {
+      const code = plan.replacementGlyphCodes[index];
+      parts.push(`<${encodeGlyphCodesToHex([code], 2)}>`);
+
+      const shapingAdjustment = plan.shapedGlyphTjAdjustments[index] ?? 0;
+      const endpointAdjustment =
+        index === lastIndex ? plan.tjSpacingDelta : 0;
+      const adjustment = shapingAdjustment + endpointAdjustment;
+      if (Math.abs(adjustment) >= TJ_DELTA_EPSILON) {
+        parts.push(formatPdfNumber(adjustment));
+      }
+    }
+    return `[${parts.join(" ")}] TJ`;
+  }
+
   const hex = encodeGlyphCodesToHex(plan.replacementGlyphCodes, bytesPerCode);
   if (plan.operatorType === "Tj") {
     // Text-only replacement can change natural advance just as formatting
