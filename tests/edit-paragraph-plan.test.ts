@@ -158,7 +158,9 @@ test("paragraph planner rewrites existing native lines atomically without moving
 
   assert.equal(plan.editable, true);
   assert.equal(isValidatedParagraphEditPlan(plan), true);
-  if (!isValidatedParagraphEditPlan(plan)) assert.fail(plan.reason);
+  if (!isValidatedParagraphEditPlan(plan)) {
+    assert.fail("Expected a planner-issued validated paragraph plan.");
+  }
   assert.deepEqual(plan.originalLines, [
     "First line",
     "Second line",
@@ -308,7 +310,9 @@ test("paragraph writer rejects a forged plain-object aggregate plan", async () =
     fontMetrics,
   });
   assert.equal(plan.editable, true);
-  if (!isValidatedParagraphEditPlan(plan)) assert.fail(plan.reason);
+  if (!isValidatedParagraphEditPlan(plan)) {
+    assert.fail("Expected a planner-issued validated paragraph plan.");
+  }
 
   const forged = { ...plan };
   const edited = await PDFDocument.load(original.slice());
