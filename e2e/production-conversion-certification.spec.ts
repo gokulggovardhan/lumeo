@@ -112,12 +112,6 @@ function isRecoveredPdfWorkerBootstrapFailure(
   );
 }
 
-function isFirefoxUnsupportedClipboardPermissionError(message: string): boolean {
-  return /^'(clipboard-read|clipboard-write)' \(value of 'name' member of PermissionDescriptor\) is not a valid value for enumeration PermissionName\.$/.test(
-    message,
-  );
-}
-
 function isExpectedSandboxPreviewConsoleError(message: string): boolean {
   return /^Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set\.$/.test(
     message,
@@ -148,12 +142,7 @@ function expectCleanRuntime(
   browserName?: string,
   allowOfficeRuntimeDiagnostics = false,
 ): void {
-  const pageErrors =
-    browserName === "firefox"
-      ? watch.pageErrors.filter(
-          (message) => !isFirefoxUnsupportedClipboardPermissionError(message),
-        )
-      : watch.pageErrors;
+  const pageErrors = watch.pageErrors;
   const consoleErrors = watch.consoleErrors.filter(
     (message) =>
       !isExpectedSandboxPreviewConsoleError(message) &&
