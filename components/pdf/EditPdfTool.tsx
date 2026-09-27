@@ -718,6 +718,16 @@ export default function EditPdfTool() {
     bytes: ArrayBuffer | null;
     pageIndex: number;
   } | null>(null);
+  const [ocrSearchableActivity, setOcrSearchableActivity] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+  } | null>(null);
+  const [ocrSearchableNoticeRevision, setOcrSearchableNoticeRevision] = useState<{
+    bytes: ArrayBuffer | null;
+    pageIndex: number;
+    kind: "success" | "error";
+    message: string;
+  } | null>(null);
   const ocrActivityCurrent =
     ocrActivity !== null &&
     ocrActivity.bytes === pdf?.bytes &&
@@ -734,6 +744,14 @@ export default function EditPdfTool() {
   const ocrCopied =
     ocrCopiedRevision?.bytes === (pdf?.bytes ?? null) &&
     ocrCopiedRevision.pageIndex === pageIndex;
+  const ocrSearchableBusy =
+    ocrSearchableActivity?.bytes === (pdf?.bytes ?? null) &&
+    ocrSearchableActivity.pageIndex === pageIndex;
+  const ocrSearchableNotice =
+    ocrSearchableNoticeRevision?.bytes === (pdf?.bytes ?? null) &&
+    ocrSearchableNoticeRevision.pageIndex === pageIndex
+      ? ocrSearchableNoticeRevision
+      : null;
   const ocrPageResultCurrent =
     ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
       ? ocrResultsRevision.pages.get(pageIndex) ?? null
