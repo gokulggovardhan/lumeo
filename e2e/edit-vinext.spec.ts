@@ -212,6 +212,53 @@ test("vinext Edit PDF shares one linear semantic undo history across native Edit
     .toEqual({ employeeEdited: true, ssnRemoved: true, hasMask: true });
 });
 
+test("vinext Edit PDF keeps IME composition isolated until the candidate is committed", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-operation-count]");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+
+  const employeeRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    )
+    .first();
+  await employeeRun.click();
+
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  const apply = page.getByRole("button", { name: "Apply edit" });
+  await expect(editor).toBeVisible();
+
+  // Synthetic composition events are enough to exercise Lumeo's browser
+  // event boundary in Chromium/WebKit/Firefox. The PDF writer still sees
+  // nothing until compositionend releases the candidate.
+  await editor.dispatchEvent("compositionstart", { data: "file" });
+  await expect(editor).toHaveAttribute("data-ime-composing", "true");
+  await editor.fill("Employee file");
+
+  await expect(apply).toBeDisabled();
+  await editor.press("Enter");
+  await editor.press("Escape");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+  await expect(editor).toBeVisible();
+
+  await editor.dispatchEvent("compositionend", { data: "file" });
+  await expect(editor).toHaveAttribute("data-ime-composing", "false");
+  await expect(apply).toBeEnabled();
+
+  await editor.press("Enter");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+});
+
 test("vinext Edit PDF supports text matching, editing, and export", async ({
   page,
 }) => {
