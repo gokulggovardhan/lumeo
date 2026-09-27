@@ -31,6 +31,7 @@
 
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import type { EditElement } from "./elements";
+import { localCustomFontTextIssue, type LocalCustomFontAsset } from "./localCustomFont.ts";
 
 type PageRotation = 0 | 90 | 180 | 270;
 
@@ -106,10 +107,40 @@ function toNativeBox(
   };
 }
 
+export type ExportEditedPdfOptions = Readonly<{
+  localFontAssets?: ReadonlyMap<string, LocalCustomFontAsset>;
+}>;
+
 export async function exportEditedPdf(
   originalBytes: ArrayBuffer,
   elements: EditElement[],
+  options: ExportEditedPdfOptions = {},
 ): Promise<{ bytes: Uint8Array; skippedPages: number[] }> {
+  const localFontAssets = options.localFontAssets ?? new Map<string, LocalCustomFontAsset>();
+
+  const requiredLocalFontAssets = new Map<string, LocalCustomFontAsset>();
+
+  // Validate all local-font dependencies before mutating a PDFDocument so a
+  // missing browser-session asset or unsupported glyph can never degrade into
+  // a skipped page or a silent .notdef glyph.
+  for (const element of elements) {
+    if (element.type !== "text" || !element.fontAssetId || !element.text.trim()) continue;
+    const asset = localFontAssets.get(element.fontAssetId);
+    if (!asset) {
+      throw new Error(
+        `The local font “${element.fontFamily ?? "Custom font"}” is no longer available in this browser session. Re-select the font before exporting.`,
+      );
+    }
+    if (element.bold || element.italic) {
+      throw new Error(
+        `${asset.descriptor.familyName} is a single local font face. Synthetic Bold/Italic is not exported; choose the matching font file instead.`,
+      );
+    }
+    const issue = localCustomFontTextIssue(asset, element.text);
+    if (issue) throw new Error(issue);
+    requiredLocalFontAssets.set(asset.descriptor.id, asset);
+  }
+
   const doc = await PDFDocument.load(originalBytes);
   // Embedded lazily, one per distinct bold/italic combination actually
   // used -- embedFont() unconditionally adds a font object to the
@@ -117,6 +148,27 @@ export async function exportEditedPdf(
   // export with unused font objects whenever a document has no bold or
   // italic placed text at all (the common case).
   const fontCache = new Map<StandardFonts, Awaited<ReturnType<typeof doc.embedFont>>>();
+  const localFontCache = new Map<string, Awaited<ReturnType<typeof doc.embedFont>>>();
+  let customFontkitRegistered = false;
+
+  async function getLocalFont(asset: LocalCustomFontAsset) {
+    const cached = localFontCache.get(asset.descriptor.id);
+    if (cached) return cached;
+
+    if (!customFontkitRegistered) {
+      const fontkitModule = await import("@cantoo/fontkit");
+      const fontkit = fontkitModule.default ?? fontkitModule;
+      doc.registerFontkit(
+        fontkit as unknown as Parameters<PDFDocument["registerFontkit"]>[0],
+      );
+      customFontkitRegistered = true;
+    }
+
+    const embedded = await doc.embedFont(asset.bytes.slice(), { subset: true });
+    localFontCache.set(asset.descriptor.id, embedded);
+    return embedded;
+  }
+
   async function getFont(standardFont: StandardFonts) {
     let font = fontCache.get(standardFont);
     if (!font) {
@@ -125,6 +177,15 @@ export async function exportEditedPdf(
     }
     return font;
   }
+
+  // Custom-font embedding is a document-level dependency, not an optional
+  // per-page decoration. Resolve every referenced local font before entering
+  // the legacy page-isolation try/catch so a malformed/unembeddable font can
+  // never be downgraded into a silently skipped page.
+  for (const asset of requiredLocalFontAssets.values()) {
+    await getLocalFont(asset);
+  }
+
   const pngCache = new Map<string, Uint8Array>();
   const skippedPages: number[] = [];
 
@@ -154,15 +215,17 @@ export async function exportEditedPdf(
           if (!element.text.trim()) continue;
           const { r, g, b } = hexToRgb01(element.color);
           const color = rgb(r, g, b);
-          const font = await getFont(
-            element.bold && element.italic
-              ? StandardFonts.HelveticaBoldOblique
-              : element.bold
-                ? StandardFonts.HelveticaBold
-                : element.italic
-                  ? StandardFonts.HelveticaOblique
-                  : StandardFonts.Helvetica,
-          );
+          const font = element.fontAssetId
+            ? await getLocalFont(localFontAssets.get(element.fontAssetId)!)
+            : await getFont(
+                element.bold && element.italic
+                  ? StandardFonts.HelveticaBoldOblique
+                  : element.bold
+                    ? StandardFonts.HelveticaBold
+                    : element.italic
+                      ? StandardFonts.HelveticaOblique
+                      : StandardFonts.Helvetica,
+              );
           // Anchor is the visual top-left corner, nudged down by the font
           // size to approximate the baseline -- matches the pre-rotation
           // formula exactly when rotation is 0.
