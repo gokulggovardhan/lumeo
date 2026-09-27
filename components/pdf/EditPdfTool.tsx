@@ -967,6 +967,10 @@ export default function EditPdfTool() {
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
+  // Exact history ArrayBuffer revision that produced pdfJsDocRef.current.
+  // A non-null PDF.js document without this matching token is not valid
+  // evidence for native batch operations such as Structured Replace All.
+  const pdfJsDocBytesRef = useRef<ArrayBuffer | null>(null);
   const textSearchPageIndexesRef = useRef<Map<number, PdfTextSearchPageIndex>>(new Map());
   const textSearchBuildGenerationRef = useRef(0);
   // Phase 22: the render effect below already fetches this exact page and
@@ -1659,6 +1663,7 @@ export default function EditPdfTool() {
     setOcrCopiedRevision(null);
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     pdfJsDocRef.current = null;
+    pdfJsDocBytesRef.current = null;
     setDocReady(0);
     if (pendingInitialDocRef.current) {
       void (pendingInitialDocRef.current.doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
@@ -1722,6 +1727,7 @@ export default function EditPdfTool() {
     void (async () => {
       const previousDoc = pdfJsDocRef.current;
       pdfJsDocRef.current = null;
+      pdfJsDocBytesRef.current = null;
       setDocReady(0);
       if (previousDoc) void (previousDoc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
 
@@ -1738,6 +1744,7 @@ export default function EditPdfTool() {
       // re-runs on every pdfBytes change.
       const adopt = (doc: PDFDocumentProxy) => {
         pdfJsDocRef.current = doc;
+        pdfJsDocBytesRef.current = pdf.bytes;
         setDocReady((current) => current + 1);
         setPdfMeta((current) => (current && current.pageCount !== doc.numPages ? { ...current, pageCount: doc.numPages } : current));
       };
@@ -2927,6 +2934,15 @@ export default function EditPdfTool() {
     // shared history hook updates its authoritative ref synchronously, so
     // this remains reliable even if React has not re-rendered yet.
     const replaceAllSourceBytes = getCurrentHistoryState().pdfBytes;
+    if (
+      !pdfJsDocument ||
+      pdfJsDocBytesRef.current !== replaceAllSourceBytes
+    ) {
+      setTextSearchReplaceAllStatus(
+        "The PDF preview is still synchronizing with the current document revision. Try Replace All again after the page is ready.",
+      );
+      return;
+    }
     const query = textSearchQuery;
     const replacement = textSearchReplacement;
     const options = {
