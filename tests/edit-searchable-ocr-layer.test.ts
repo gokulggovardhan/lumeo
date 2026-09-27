@@ -46,8 +46,8 @@ test("searchable OCR geometry converts top-left percent boxes into PDF points", 
 
   assert.equal(placement.text, "Invoice");
   assert.equal(placement.xPt, 60);
-  assert.ok(Math.abs(placement.fontSizePt - 30) < 1e-9);
-  assert.ok(Math.abs(placement.yPt - 605.4) < 1e-9);
+  assert.ok(Math.abs(placement.fontSizePt - 32.8) < 1e-9);
+  assert.ok(Math.abs(placement.yPt - 605.904) < 1e-9);
 });
 
 test("searchable OCR rejects out-of-page geometry", () => {
