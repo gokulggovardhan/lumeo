@@ -254,3 +254,27 @@ export function readBrowserMemorySample(
         : null,
   };
 }
+
+
+export function downloadEditPdfPerformanceReport(
+  report: EditPdfPerformanceReport,
+  fileName = "lumeo-edit-performance-diagnostics.json",
+): void {
+  if (
+    typeof document === "undefined" ||
+    typeof URL === "undefined" ||
+    typeof Blob === "undefined"
+  ) {
+    throw new Error("Performance diagnostic downloads are only available in a browser.");
+  }
+  const blob = new Blob([JSON.stringify(report, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.rel = "noopener";
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
