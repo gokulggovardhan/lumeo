@@ -226,6 +226,15 @@ test("vinext Edit PDF applies native formatting and colour with one native histo
 
   const initial = await selectEmployeeAndOpenFormat();
   await expect(initial.panel).toContainText(/Helvetica|Arial/i);
+  const previewFidelity = initial.panel.locator("[data-font-preview-fidelity]");
+  await expect(previewFidelity).toHaveAttribute(
+    "data-font-preview-fidelity",
+    "fallback",
+  );
+  await expect(previewFidelity).toContainText("Preview: Fallback font");
+  await expect(
+    initial.panel.locator("[data-font-preview-fidelity-detail]"),
+  ).toContainText(/edit safety is evaluated separately/i);
   await expect(initial.colour).toHaveValue("#000000");
   await expect(initial.scale).toHaveValue("100");
   // Opening Format is inspection only; it must not dirty the document.

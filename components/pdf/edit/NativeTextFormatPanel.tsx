@@ -2,6 +2,7 @@
 
 import type { PdfTextSpan } from "@/lib/pdf/edit/documentModel";
 import type { NativeFillColorCapability } from "@/lib/pdf/edit/nativePaint";
+import type { FontPreviewFidelity } from "@/lib/pdf/edit/fontPreviewFidelity";
 
 export type NativeTextStyleDraft = {
   spanId: string;
@@ -16,6 +17,7 @@ type NativeTextFormatPanelProps = {
   span: PdfTextSpan;
   draft: NativeTextStyleDraft;
   fillCapability: NativeFillColorCapability | null;
+  previewFidelity: FontPreviewFidelity;
   panelPositionClass: string;
   horizontalClass: string;
   onPatchDraft: (patch: Partial<Omit<NativeTextStyleDraft, "spanId">>) => void;
@@ -27,6 +29,7 @@ export function NativeTextFormatPanel({
   span,
   draft,
   fillCapability,
+  previewFidelity,
   panelPositionClass,
   horizontalClass,
   onPatchDraft,
@@ -60,6 +63,22 @@ export function NativeTextFormatPanel({
             </span>
           ) : null}
         </div>
+      </div>
+
+      <div
+        data-font-preview-fidelity={previewFidelity.kind}
+        title={previewFidelity.detail}
+        className="mt-2 rounded-lg border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.025] px-2.5 py-2"
+      >
+        <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/58">
+          {previewFidelity.label}
+        </div>
+        <p
+          data-font-preview-fidelity-detail
+          className="mt-1 text-[9px] leading-4 text-[var(--text-primary)]/50"
+        >
+          {previewFidelity.detail}
+        </p>
       </div>
 
       <div className="mt-3 rounded-lg border border-[var(--text-primary)]/10 p-2.5">
