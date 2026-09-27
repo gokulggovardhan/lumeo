@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   AuraButton,
   AuraCard,
@@ -454,6 +454,15 @@ export function L2UploadStage({
   const [internalDragActive, setInternalDragActive] = useState(false);
   const canSelect = Boolean(onFilesSelected) && !disabled && !loading;
   const isDragActive = dragActive || internalDragActive;
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.setAttribute("data-l2-upload-client-ready", "true");
+    return () => {
+      input.removeAttribute("data-l2-upload-client-ready");
+    };
+  }, [onFilesSelected]);
 
   function openFileChooser() {
     if (!canSelect) return;
