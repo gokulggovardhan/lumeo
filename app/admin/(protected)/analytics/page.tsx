@@ -149,7 +149,7 @@ export default async function AnalyticsPage({
           <AdminSectionCard title="Recent activity" description="Latest approved public events, newest first. No session identifier, IP address, or precise coordinate is displayed.">
             {recentEvents.error ? <AdminEmptyState title="Recent activity is unavailable" description="Aggregate analytics are still valid, but the recent-events reader could not return verified rows." /> : <>
               <RecentActivityTable rows={activityRows.slice(0, RECENT_ACTIVITY_PREVIEW_SIZE)} />
-              {activityRows.length > RECENT_ACTIVITY_PREVIEW_SIZE ? <div className="mt-4 text-right"><Link href="/admin/analytics/activity" className="text-sm font-bold text-[var(--text-accent)] hover:underline">View full activity log →</Link></div> : null}
+              {activityRows.length > RECENT_ACTIVITY_PREVIEW_SIZE ? <div className="mt-4 text-right"><Link href="/admin/analytics/activity" prefetch={false} className="text-sm font-bold text-[var(--text-accent)] hover:underline">View full activity log →</Link></div> : null}
             </>}
           </AdminSectionCard>
         </>
