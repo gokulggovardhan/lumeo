@@ -139,6 +139,12 @@ export function useHistoryState<T>(initial: T, options?: HistorySizeOptions<T>) 
     applyHistory(next, [], []);
   }, [applyHistory]);
 
+  // Stable synchronous read of the same ref-backed authority used by
+  // set/undo/redo. Long-running local operations can capture one source
+  // snapshot, do work off to the side, then verify the live state has not
+  // advanced before publishing their result.
+  const getCurrent = useCallback((): T => stateRef.current, []);
+
   return {
     state,
     set,
@@ -147,6 +153,7 @@ export function useHistoryState<T>(initial: T, options?: HistorySizeOptions<T>) 
     undo,
     redo,
     reset,
+    getCurrent,
     canUndo: undoStack.length > 0,
     canRedo: redoStack.length > 0,
   };
