@@ -1102,3 +1102,37 @@ test("vinext Edit PDF searches across pages, highlights matches, and prepares a 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
+
+test("vinext Replace All does not depend on the best-effort Find index", async ({ page }) => {
+  await uploadEditFixture(page, TWO_PAGE_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("definitely-not-present-in-this-pdf");
+
+  // The navigation index truthfully has no matches, but exhaustive Replace
+  // All must still be available because it independently re-analyzes every
+  // requested page before deciding that there is nothing to change.
+  const count = page.locator("[data-edit-search-match-count]");
+  await expect(count).toHaveAttribute("data-edit-search-match-count", "0", {
+    timeout: 90_000,
+  });
+
+  const replaceAll = page.getByRole("button", { name: "Replace all safely" });
+  await expect(replaceAll).toBeEnabled();
+
+  await replaceAll.click();
+
+  const status = page.locator("[data-edit-replace-all-status]");
+  await expect(status).toContainText(
+    /No current matches for .*definitely-not-present-in-this-pdf.* were found in the document\. Nothing was changed\./i,
+    { timeout: 90_000 },
+  );
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+  await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+});
+
