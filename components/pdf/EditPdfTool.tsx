@@ -4632,6 +4632,7 @@ export default function EditPdfTool() {
                         onCompositionEnd={(event) => {
                           event.stopPropagation();
                           const input = event.currentTarget;
+                          const spanIdAtCompositionEnd = singleSelectedSpan?.id ?? null;
                           // Browser IMEs commit the final candidate at
                           // compositionend/input. Keep the controlled draft
                           // current, then restore Lumeo's logical selection on
@@ -4639,7 +4640,11 @@ export default function EditPdfTool() {
                           handleEditDraftTextChange(input.value);
                           setTextCompositionActive(false);
                           requestAnimationFrame(() => {
-                            if (inlineEditInputRef.current === input) {
+                            if (
+                              inlineEditInputRef.current === input &&
+                              spanIdAtCompositionEnd &&
+                              input.dataset.nativeSpanId === spanIdAtCompositionEnd
+                            ) {
                               syncSingleSpanLogicalSelection(input);
                             }
                           });
@@ -4700,6 +4705,7 @@ export default function EditPdfTool() {
                         }}
                         aria-label="Edit text"
                         data-ime-composing={textCompositionActive ? "true" : "false"}
+                        data-native-span-id={singleSelectedSpan?.id ?? undefined}
                         data-logical-selection-start={logicalSelectionStart ?? undefined}
                         data-logical-selection-end={logicalSelectionEnd ?? undefined}
                         data-logical-selection-direction={logicalSelectionDirection}
