@@ -558,6 +558,7 @@ async function measure(
           const reopenedPdfJs = await pdfjsLib.getDocument({
             data: exported.bytes.slice(),
             useWorkerFetch: false,
+            standardFontDataUrl: STANDARD_FONT_DATA_URL,
           }).promise;
           try {
             const page = await reopenedPdfJs.getPage(1);
