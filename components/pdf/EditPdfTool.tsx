@@ -4621,16 +4621,12 @@ export default function EditPdfTool() {
                         onKeyUp={(event) => {
                           event.stopPropagation();
                           // React's synthetic onSelect is not guaranteed to
-                          // observe every keyboard-driven selection mutation
+                          // observe every keyboard-driven caret/range mutation
                           // before the controlled-input mirror effect runs.
-                          // Re-read the browser selection after the key's
-                          // default action has completed. This updates only
-                          // Lumeo's grapheme-aware presentation range; PDF
-                          // geometry and writer authority remain native.
-                          syncSingleSpanLogicalSelection(event.currentTarget);
-                        }}
-                        onKeyUp={(event) => {
-                          event.stopPropagation();
+                          // Re-read the post-default browser selection for
+                          // navigation keys only. Ordinary text input remains
+                          // driven by onChange, which avoids interfering with
+                          // future IME/composition handling.
                           if (
                             event.key === "ArrowLeft" ||
                             event.key === "ArrowRight" ||
