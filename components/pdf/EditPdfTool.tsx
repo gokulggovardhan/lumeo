@@ -136,6 +136,7 @@ import type { ValidatedShapedGlyphEditPlan } from "@/lib/pdf/edit/shapedGlyphEdi
 import type { EditPdfPerformanceCollector } from "@/lib/pdf/edit/performanceDiagnostics";
 import {
   buildEditPlan,
+  decodeTextShowOperator,
   isValidatedEditPlan,
   type EditPlan,
 } from "@/lib/pdf/edit/editPlan";
@@ -148,6 +149,7 @@ import {
   isValidatedMultiRunEditPlan,
   type MultiRunEditPlan,
 } from "@/lib/pdf/edit/multiRunEditPlan";
+import type { ParagraphEditPlan } from "@/lib/pdf/edit/paragraphEditPlan";
 import {
   resolveCompatibleShapingWriteEvidence,
   shapingEvidenceRequestKey,
@@ -272,7 +274,8 @@ type EditPreview =
       substituteFont: string | null;
       shapedGlyphPlan?: ValidatedShapedGlyphEditPlan | null;
     }
-  | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont };
+  | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont }
+  | { kind: "paragraph"; editable: boolean; reason: string | null; plan: ParagraphEditPlan; resolvedFont: ResolvedFont };
 
 type ShapingEvidenceState =
   | { key: string; status: "validated"; evidence: ValidatedShapingWriteEvidence }
@@ -348,6 +351,9 @@ let editEngineModulePromise: Promise<{
   applyMultiRunEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyMultiRunEditPlanToDocument"];
   applyNativeTextStyleBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyNativeTextStyleBatchToDocument"];
   applyValidatedEditPlanBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyValidatedEditPlanBatchToDocument"];
+  buildParagraphEditPlan: (typeof import("@/lib/pdf/edit/paragraphEditPlan"))["buildParagraphEditPlan"];
+  isValidatedParagraphEditPlan: (typeof import("@/lib/pdf/edit/paragraphEditPlan"))["isValidatedParagraphEditPlan"];
+  applyParagraphEditPlanToDocument: (typeof import("@/lib/pdf/edit/paragraphEditPlan"))["applyParagraphEditPlanToDocument"];
   verifyPostExportNativeEdits: (typeof import("@/lib/pdf/edit/postExportVerification"))["verifyPostExportNativeEdits"];
   PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
   PDFName: (typeof import("pdf-lib"))["PDFName"];
@@ -368,7 +374,8 @@ function loadEditEngine() {
       import("@/lib/pdf/edit/fontRegistry"),
       import("@/lib/pdf/edit/postExportVerification"),
       import("@/lib/pdf/edit/shapedGlyphEditPlan"),
-    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod, postExportVerificationMod, shapedGlyphEditPlanMod]) => ({
+      import("@/lib/pdf/edit/paragraphEditPlan"),
+    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod, postExportVerificationMod, shapedGlyphEditPlanMod, paragraphEditPlanMod]) => ({
       exportEditedPdf: exportMod.exportEditedPdf,
       collectPageTextOperators: formXObjectsMod.collectPageTextOperators,
       resolveFont: fontEncodingMod.resolveFont,
@@ -380,6 +387,9 @@ function loadEditEngine() {
       applyMultiRunEditPlanToDocument: applyEditPlanMod.applyMultiRunEditPlanToDocument,
       applyNativeTextStyleBatchToDocument: applyEditPlanMod.applyNativeTextStyleBatchToDocument,
       applyValidatedEditPlanBatchToDocument: applyEditPlanMod.applyValidatedEditPlanBatchToDocument,
+      buildParagraphEditPlan: paragraphEditPlanMod.buildParagraphEditPlan,
+      isValidatedParagraphEditPlan: paragraphEditPlanMod.isValidatedParagraphEditPlan,
+      applyParagraphEditPlanToDocument: paragraphEditPlanMod.applyParagraphEditPlanToDocument,
       verifyPostExportNativeEdits: postExportVerificationMod.verifyPostExportNativeEdits,
       PDFDocument: pdfLibMod.PDFDocument,
       PDFName: pdfLibMod.PDFName,
