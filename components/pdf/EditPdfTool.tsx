@@ -1207,6 +1207,122 @@ export default function EditPdfTool() {
     pageTextCapability.spanClassifications,
   ]);
 
+  const terminateOcrJob = useCallback(
+    async (showCancelledMessage = false) => {
+      ocrJobRevisionRef.current = null;
+      const engine = ocrEngineRef.current;
+      ocrEngineRef.current = null;
+      setOcrBusy(false);
+      setOcrProgress(null);
+      if (showCancelledMessage) setOcrError("Recognition cancelled.");
+      if (engine) await engine.terminate();
+    },
+    [],
+  );
+
+  useEffect(() => {
+    setOcrCopied(false);
+    setOcrError("");
+    const active = ocrJobRevisionRef.current;
+    if (
+      active &&
+      (active.bytes !== (pdf?.bytes ?? null) || active.pageIndex !== pageIndex)
+    ) {
+      void terminateOcrJob(false);
+    }
+  }, [pdf?.bytes, pageIndex, terminateOcrJob]);
+
+  const handleRecognizeScannedPage = useCallback(async () => {
+    if (
+      !pdf ||
+      pageTextCapability.category !== "SCANNED_IMAGE" ||
+      !rasterImageEvidenceCurrent
+    ) {
+      setOcrError(
+        "OCR is available only after Lumeo proves this page is image-only and has no usable native text.",
+      );
+      return;
+    }
+    if (ocrBusy) return;
+    const doc = pdfJsDocRef.current;
+    if (!doc) {
+      setOcrError("The page is not ready for local recognition yet.");
+      return;
+    }
+
+    const revision = { bytes: pdf.bytes, pageIndex };
+    ocrJobRevisionRef.current = revision;
+    setOcrBusy(true);
+    setOcrError("");
+    setOcrCopied(false);
+    setOcrProgress({ status: "Preparing page locally", progress: 0 });
+
+    let engine = ocrEngineRef.current;
+    if (!engine) {
+      engine = createLocalOcrEngine();
+      ocrEngineRef.current = engine;
+    }
+
+    try {
+      const page = await doc.getPage(pageIndex + 1);
+      const result = await engine.recognizePage({
+        page,
+        pageIndex,
+        onProgress: (progress) => {
+          if (ocrJobRevisionRef.current !== revision) return;
+          setOcrProgress(progress);
+        },
+      });
+      const current = ocrContextRef.current;
+      if (
+        ocrJobRevisionRef.current !== revision ||
+        current.bytes !== revision.bytes ||
+        current.pageIndex !== revision.pageIndex
+      ) {
+        return;
+      }
+      setOcrResultsRevision((existing) => {
+        const pages =
+          existing?.bytes === revision.bytes
+            ? new Map(existing.pages)
+            : new Map<number, OcrPageResult>();
+        pages.set(revision.pageIndex, result);
+        return { bytes: revision.bytes, pages };
+      });
+    } catch (recognitionError) {
+      if (ocrJobRevisionRef.current !== revision) return;
+      const detail =
+        recognitionError instanceof Error
+          ? recognitionError.message
+          : "Unknown local OCR error.";
+      setOcrError(`Local recognition could not finish. ${detail}`);
+    } finally {
+      if (ocrJobRevisionRef.current === revision) {
+        ocrJobRevisionRef.current = null;
+        setOcrBusy(false);
+        setOcrProgress(null);
+      }
+    }
+  }, [
+    ocrBusy,
+    pageIndex,
+    pageTextCapability.category,
+    pdf,
+    rasterImageEvidenceCurrent,
+  ]);
+
+  const handleCopyOcrText = useCallback(async () => {
+    const text = ocrPageResultCurrent?.text.trim() ?? "";
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setOcrCopied(true);
+    } catch {
+      setOcrCopied(false);
+      setOcrError("The browser did not allow copying recognized text.");
+    }
+  }, [ocrPageResultCurrent]);
+
   // Development-only fidelity diagnostics. This deliberately never renders
   // debug noise in the normal product and is compiled behind NODE_ENV.
   // In a local development build, the current page report can be inspected
