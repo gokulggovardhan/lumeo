@@ -23,6 +23,19 @@ export type AnalyticsErrorCode =
   | "processing_error"
   | "browser_limit"
   | "cancelled"
+  | "input_validation"
+  | "docx_parse_error"
+  | "unsupported_document_feature"
+  | "wasm_load_error"
+  | "wasm_compile_error"
+  | "worker_error"
+  | "font_load_error"
+  | "render_error"
+  | "pdf_generation_error"
+  | "pdf_validation_error"
+  | "memory_limit"
+  | "timeout"
+  | "user_cancelled"
   | "unknown";
 
 export type AnalyticsBrowserFamily =
