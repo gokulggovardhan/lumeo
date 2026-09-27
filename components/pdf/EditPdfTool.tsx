@@ -4618,6 +4618,17 @@ export default function EditPdfTool() {
                             selectTextRun(null);
                           }
                         }}
+                        onKeyUp={(event) => {
+                          event.stopPropagation();
+                          if (
+                            event.key === "ArrowLeft" ||
+                            event.key === "ArrowRight" ||
+                            event.key === "Home" ||
+                            event.key === "End"
+                          ) {
+                            syncSingleSpanLogicalSelection(event.currentTarget);
+                          }
+                        }}
                         aria-label="Edit text"
                         data-logical-selection-start={logicalSelectionStart ?? undefined}
                         data-logical-selection-end={logicalSelectionEnd ?? undefined}
