@@ -2906,13 +2906,6 @@ export default function EditPdfTool() {
     ) {
       return;
     }
-    if (textSearchScope === "document" && textSearchIndexBusy) {
-      setTextSearchReplaceAllStatus(
-        "Finish indexing the document before Replace All so every match is counted honestly.",
-      );
-      return;
-    }
-
     // Document Replace All does its own complete native revalidation pass.
     // The normal background Find index is deliberately best-effort and can
     // skip a pathological page without blocking search elsewhere; that is
@@ -5006,8 +4999,7 @@ export default function EditPdfTool() {
               onClick={() => void applyStructuredTextSearchReplacement()}
               disabled={
                 textSearchReplaceAllBusy ||
-                textSearchMatches.length === 0 ||
-                (textSearchScope === "document" && textSearchIndexBusy)
+                textSearchMatches.length === 0
               }
               className="h-10 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/45 px-4 text-xs font-bold text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
             >
