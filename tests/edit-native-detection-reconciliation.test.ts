@@ -621,6 +621,7 @@ test("missing ascent/descent exposes approximate native geometry but remains fon
   const classification = classifyNativeTextSpan(span);
   assert.equal(classification.category, "NATIVE_TEXT_WITH_FONT_LIMITATIONS");
   assert.equal(classification.safelyRewritable, false);
+  assert.equal(classification.authorization, "needs-measured-reconciliation");
 
   const [run] = nativeDetectedRuns([span]);
   assert.ok(run);
@@ -630,6 +631,62 @@ test("missing ascent/descent exposes approximate native geometry but remains fon
     nativeSpans: [span],
   });
   assert.equal(arbitration.decision, "view-only");
+});
+
+test("measured PDF.js/native reconciliation can satisfy fallback-box geometry without promoting native-only fallback", () => {
+  const [span] = buildNativeContentStreamSpans({
+    operators: [located()],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () =>
+      profile({
+        ascentRatio: null,
+        descentRatio: null,
+      }),
+  });
+
+  const run = {
+    str: "Hi",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 2,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    baselineXPct: 10,
+    baselineYPct: 11.5,
+    ascentRatio: 0.8,
+    descentRatio: -0.2,
+    pdfJsTransform: [12, 0, 0, 12, 72, 700],
+    detectionSource: "pdfjs" as const,
+  };
+
+  const reconciliations = reconcileTextSignals({
+    runs: [run],
+    legacyMatches: [{ locatedOperator: span.locatedOperator, operator: span.locatedOperator.operator }],
+    nativeSpans: [span],
+    viewportTransform: viewport,
+  });
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [run],
+    reconciliations,
+    nativeSpans: [span],
+  });
+
+  assert.equal(reconciliations[0].confidence, "high");
+  assert.notEqual(reconciliations[0].baselineDistancePt, null);
+  assert.notEqual(reconciliations[0].angleDeltaDeg, null);
+  assert.equal(arbitration.decision, "editable");
+  assert.equal(arbitration.source, "reconciled");
+
+  const guarded = enforceSpanCapabilityOnArbitration({
+    arbitration,
+    spanClassification: classifyNativeTextSpan(span),
+  });
+  assert.equal(guarded.decision, "editable");
+  assert.equal(guarded.source, "reconciled");
 });
 
 test("capability guard keeps reconciled clipping text read-only and preserves safe native text", () => {
