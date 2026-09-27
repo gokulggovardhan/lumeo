@@ -10,6 +10,7 @@ import { PDFDocument, PDFName, StandardFonts, TextRenderingMode, beginText, endT
 import { createCanvas } from "@napi-rs/canvas";
 import { inspectPdfFontProgram } from "../lib/pdf/edit/fontProgramIntelligence.ts";
 import { shapeEmbeddedFontText } from "../lib/pdf/edit/harfbuzzShaping.ts";
+import { buildPreservedLineParagraphPdf } from "../tests/fixtures/paragraphFixture.ts";
 
 // Playwright transpiles specs to CJS, where import.meta is a syntax error --
 // resolve from the repo root (the runner's cwd) instead.
@@ -480,34 +481,6 @@ async function shapedLtrType0(): Promise<Uint8Array> {
   return doc.save();
 }
 
-async function paragraphNativeLines(): Promise<Uint8Array> {
-  const doc = await PDFDocument.create();
-  const page = doc.addPage([595, 842]);
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const context = doc.context;
-  const fonts = context.obj({});
-  fonts.set(PDFName.of("FPara"), font.ref);
-  page.node.Resources()!.set(PDFName.of("Font"), fonts);
-
-  const body = [
-    "BT",
-    "/FPara 18 Tf",
-    "24 TL",
-    "1 0 0 1 60 740 Tm",
-    "(Paragraph alpha) Tj",
-    "T*",
-    "(Paragraph beta) Tj",
-    "ET",
-  ].join("\n");
-  page.node.set(
-    PDFName.of("Contents"),
-    context.register(
-      context.flateStream(new TextEncoder().encode(body)),
-    ),
-  );
-  return doc.save();
-}
-
 /** Large but lightweight document for page-rail virtualization regressions. */
 async function largeDocument(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -551,5 +524,5 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(CLIPPED_TEXT_PDF, await clippedText());
   await writeFile(LARGE_DOCUMENT_PDF, await largeDocument());
   await writeFile(SHAPED_LTR_PDF, await shapedLtrType0());
-  await writeFile(PARAGRAPH_PDF, await paragraphNativeLines());
+  await writeFile(PARAGRAPH_PDF, await buildPreservedLineParagraphPdf());
 }
