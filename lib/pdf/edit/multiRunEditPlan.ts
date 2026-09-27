@@ -17,7 +17,7 @@
 // into one (see applyEditPlan.ts's buildReplacementOperatorText) --
 // applied here one level up, across operators instead of within one.
 
-import type { TextShowOperator } from "./contentStream.ts";
+import type { Matrix2x3, TextShowOperator } from "./contentStream.ts";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "./fontEncoding.ts";
 import type { FontMetrics, TextShowState } from "./fontMetrics.ts";
 import {
@@ -136,6 +136,11 @@ function isConsecutiveAscending(indices: number[]): boolean {
   return true;
 }
 
+function sameMatrix(a: Matrix2x3 | undefined, b: Matrix2x3 | undefined): boolean {
+  if (!a || !b) return false;
+  return a.every((value, index) => Math.abs(value - b[index]) <= 1e-9);
+}
+
 function trailingTjAdjustmentForTargetAdvance(
   targetAdvancePt: number,
   replacementAdvancePt: number,
@@ -217,6 +222,20 @@ export function buildMultiRunEditPlan({
       sortedIndices,
       replacementText,
       "This selection spans more than one font resource -- mixed-font multi-run edits are not supported.",
+    );
+  }
+
+  const firstLineMatrix = spanOperators[0].textLineMatrix;
+  if (
+    !firstLineMatrix ||
+    spanOperators.some((operator) => !sameMatrix(operator.textLineMatrix, firstLineMatrix))
+  ) {
+    return rejected(
+      pageIndex,
+      contentStreamIndex,
+      sortedIndices,
+      replacementText,
+      "This selection crosses a PDF text-positioning boundary or line break, so one horizontal endpoint compensation cannot preserve it safely.",
     );
   }
 
