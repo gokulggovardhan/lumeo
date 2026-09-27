@@ -280,11 +280,9 @@ export function createLocalOcrEngine(
     try {
       const resolved = await pending;
       if (terminated) {
-        try {
-          await resolved.terminate();
-        } catch {
-          // Best-effort cleanup after cancellation during worker startup.
-        }
+        // terminate() owns cleanup of a worker that was still starting. Do
+        // not terminate it here too; some worker implementations are not
+        // guaranteed to make duplicate termination idempotent.
         throw new Error("The OCR session has been terminated.");
       }
       worker = resolved;
