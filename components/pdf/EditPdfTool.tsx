@@ -81,6 +81,7 @@ import {
   type PageTextCapabilityClassification,
 } from "@/lib/pdf/edit/textCapabilityClassifier";
 import {
+  userMessageForCapabilityCategory,
   userMessageForPageCapability,
   userMessageForTextRun,
 } from "@/lib/pdf/edit/capabilityMessaging";
@@ -3609,6 +3610,12 @@ export default function EditPdfTool() {
     singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
       ? browserFontPreview.family
       : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
+  const editableNativeSpanKeys = new Set(
+    effectiveTextArbitrations
+      .filter((arbitration) => arbitration.decision === "editable")
+      .map((arbitration) => arbitration.nativeSpanKey)
+      .filter((key): key is string => Boolean(key)),
+  );
   const pageHasLimitedText =
     Boolean(
       pageTextModel &&
@@ -3619,12 +3626,18 @@ export default function EditPdfTool() {
       (arbitration) => arbitration.decision !== "editable",
     ) ||
     pageTextCapability.spanClassifications.some(
-      (classification) => !classification.safelyRewritable,
+      (classification) =>
+        !classification.safelyRewritable &&
+        !editableNativeSpanKeys.has(classification.nativeSpanKey),
     );
   const presentedPageCapability =
     pageTextModel?.capability === "native-editable" && pageHasLimitedText
       ? "mixed"
       : pageTextModel?.capability ?? null;
+  const presentedPageCapabilityMessage =
+    presentedPageCapability === "native-editable"
+      ? userMessageForCapabilityCategory("NATIVE_TEXT")
+      : pageCapabilityMessage;
   const pageCapabilityLabel = pageTextModel
     ? presentedPageCapability === "native-editable"
       ? `${pageTextModel.editableSpanCount} text span${pageTextModel.editableSpanCount === 1 ? "" : "s"} editable`
@@ -4110,8 +4123,8 @@ export default function EditPdfTool() {
                     <div
                       data-edit-page-capability={presentedPageCapability ?? pageTextModel.capability}
                       role="status"
-                      aria-label={`${pageCapabilityLabel}. ${pageCapabilityMessage.detail}`}
-                      title={presentedPageCapability === "native-editable" ? undefined : pageCapabilityMessage.detail}
+                      aria-label={`${pageCapabilityLabel}. ${presentedPageCapabilityMessage.detail}`}
+                      title={presentedPageCapability === "native-editable" ? undefined : presentedPageCapabilityMessage.detail}
                       className="pointer-events-none absolute right-2 top-2 z-20 rounded-full border border-black/10 bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-[#343842] shadow-sm backdrop-blur-sm"
                     >
                       {pageCapabilityLabel}
