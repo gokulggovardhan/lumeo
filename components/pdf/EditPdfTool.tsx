@@ -715,6 +715,16 @@ export default function EditPdfTool() {
     bytes: ArrayBuffer | null;
     pageIndex: number;
   } | null>(null);
+  const [ocrSearchLayerActivity, setOcrSearchLayerActivity] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+  } | null>(null);
+  const [ocrSearchLayerNoticeRevision, setOcrSearchLayerNoticeRevision] =
+    useState<{
+      bytes: ArrayBuffer;
+      pageIndex: number;
+      message: string;
+    } | null>(null);
   const ocrActivityCurrent =
     ocrActivity !== null &&
     ocrActivity.bytes === pdf?.bytes &&
@@ -735,6 +745,16 @@ export default function EditPdfTool() {
     ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
       ? ocrResultsRevision.pages.get(pageIndex) ?? null
       : null;
+  const ocrSearchLayerBusy =
+    ocrSearchLayerActivity !== null &&
+    ocrSearchLayerActivity.bytes === pdf?.bytes &&
+    ocrSearchLayerActivity.pageIndex === pageIndex;
+  const ocrSearchLayerNotice =
+    ocrSearchLayerNoticeRevision !== null &&
+    ocrSearchLayerNoticeRevision.bytes === pdf?.bytes &&
+    ocrSearchLayerNoticeRevision.pageIndex === pageIndex
+      ? ocrSearchLayerNoticeRevision.message
+      : "";
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
   // runMatches was derived from), kept around so a multi-run selection can
   // reconstruct the FULL, in-order operator list one specific content
@@ -1396,6 +1416,161 @@ export default function EditPdfTool() {
     }
   }, [ocrPageResultCurrent, pageIndex, pdf?.bytes]);
 
+  const handleAddSearchableOcrLayer = useCallback(async () => {
+    if (
+      !pdf ||
+      !ocrPageResultCurrent ||
+      pageTextCapability.category !== "SCANNED_IMAGE" ||
+      !rasterImageEvidenceCurrent
+    ) {
+      setOcrErrorRevision({
+        bytes: pdf?.bytes ?? null,
+        pageIndex,
+        message:
+          "A searchable OCR layer can be added only from the current local recognition result on a proven scanned page.",
+      });
+      return;
+    }
+    if (ocrBusy || ocrSearchLayerBusy) return;
+
+    const sourceBytes = getHistoryState().pdfBytes;
+    if (sourceBytes !== pdf.bytes) {
+      setOcrErrorRevision({
+        bytes: pdf.bytes,
+        pageIndex,
+        message:
+          "The PDF preview is still synchronizing with the current document revision. Try again after the page is ready.",
+      });
+      return;
+    }
+
+    const request = { bytes: sourceBytes, pageIndex };
+    setOcrSearchLayerActivity(request);
+    setOcrErrorRevision(null);
+    setOcrSearchLayerNoticeRevision(null);
+
+    try {
+      const { addSearchableOcrTextLayer, firstMissingSearchableOcrWord } = await import(
+        "@/lib/pdf/edit/searchableOcrLayer"
+      );
+      const outcome = await addSearchableOcrTextLayer(
+        sourceBytes,
+        ocrPageResultCurrent,
+      );
+
+      const context = ocrContextRef.current;
+      if (
+        getHistoryState().pdfBytes !== sourceBytes ||
+        context.bytes !== sourceBytes ||
+        context.pageIndex !== request.pageIndex
+      ) {
+        throw new Error(
+          "The PDF or active page changed while the searchable text layer was being prepared. Nothing was changed.",
+        );
+      }
+
+      // Independent reopen/searchability proof before history publication.
+      // The writer uses pdf-lib; PDF.js must be able to extract every word
+      // that the writer claims it inserted.
+      const verificationDoc = await openPdfJsDocument(outcome.bytes.slice());
+      try {
+        const verificationPage = await verificationDoc.getPage(pageIndex + 1);
+        const content = await withPageTimeout(
+          verificationPage.getTextContent(),
+          pageIndex + 1,
+          PAGE_RENDER_TIMEOUT_MS,
+          "verify searchable OCR text from",
+        );
+        const extractedItems = content.items
+          .map((item) => ("str" in item ? item.str : ""))
+          .filter((item) => item.trim().length > 0);
+        const missingWord = firstMissingSearchableOcrWord(
+          outcome.writtenWords,
+          extractedItems,
+        );
+        verificationPage.cleanup();
+        if (missingWord) {
+          throw new Error(
+            `PDF.js could not extract the OCR word “${missingWord}” after the searchable layer was written.`,
+          );
+        }
+      } finally {
+        await verificationDoc.cleanup();
+      }
+
+      if (
+        getHistoryState().pdfBytes !== sourceBytes ||
+        ocrContextRef.current.bytes !== sourceBytes ||
+        ocrContextRef.current.pageIndex !== request.pageIndex
+      ) {
+        throw new Error(
+          "The PDF or active page changed before the verified searchable layer could be published. Nothing was changed.",
+        );
+      }
+
+      const nextBytes = outcome.bytes.buffer.slice(
+        outcome.bytes.byteOffset,
+        outcome.bytes.byteOffset + outcome.bytes.byteLength,
+      ) as ArrayBuffer;
+      const writtenCount = outcome.writtenWords.length;
+      const skippedCount = outcome.skippedWords.length;
+      const description =
+        `Added ${writtenCount} local OCR word${writtenCount === 1 ? "" : "s"} as an invisible searchable text layer on page ${pageIndex + 1}.`;
+
+      setHistoryState((current) => ({
+        ...current,
+        pdfBytes: nextBytes,
+        session: appendPdfEditOperations(current.session, [
+          createPageEditOperation({
+            operation: "add-searchable-text-layer",
+            beforePageCount: pdf.pageCount,
+            afterPageCount: pdf.pageCount,
+            affectedPageIndices: [pageIndex],
+            description,
+          }),
+        ]),
+      }));
+      setOcrSearchLayerNoticeRevision({
+        bytes: nextBytes,
+        pageIndex,
+        message:
+          `Searchable text added locally · ${writtenCount} word${writtenCount === 1 ? "" : "s"}` +
+          (skippedCount > 0
+            ? ` · ${skippedCount} unsupported or unsafe word${skippedCount === 1 ? "" : "s"} skipped`
+            : "") +
+          ". The original scan pixels were not changed, and the new text layer stays read-only.",
+      });
+    } catch (layerError) {
+      const currentBytes = getHistoryState().pdfBytes;
+      const message =
+        layerError instanceof Error
+          ? layerError.message
+          : "The searchable OCR layer could not be created.";
+      setOcrErrorRevision({
+        bytes: currentBytes,
+        pageIndex: ocrContextRef.current.pageIndex,
+        message,
+      });
+    } finally {
+      setOcrSearchLayerActivity((current) =>
+        current?.bytes === request.bytes &&
+        current.pageIndex === request.pageIndex
+          ? null
+          : current,
+      );
+    }
+  }, [
+    getHistoryState,
+    ocrBusy,
+    ocrPageResultCurrent,
+    ocrSearchLayerBusy,
+    pageIndex,
+    pageTextCapability.category,
+    pdf,
+    rasterImageEvidenceCurrent,
+    setHistoryState,
+  ]);
+
   // Development-only fidelity diagnostics. This deliberately never renders
   // debug noise in the normal product and is compiled behind NODE_ENV.
   // In a local development build, the current page report can be inspected
@@ -1658,7 +1833,8 @@ export default function EditPdfTool() {
     ocrEngineRef.current = null;
     setOcrResultsRevision(null);
     setOcrActivity(null);
-    
+    setOcrSearchLayerActivity(null);
+    setOcrSearchLayerNoticeRevision(null);
     setOcrErrorRevision(null);
     setOcrCopiedRevision(null);
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
@@ -6007,8 +6183,16 @@ export default function EditPdfTool() {
                                 </button>
                                 <button
                                   type="button"
+                                  onClick={() => void handleAddSearchableOcrLayer()}
+                                  disabled={ocrBusy || ocrSearchLayerBusy}
+                                  className="rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {ocrSearchLayerBusy ? "Adding searchable text…" : "Make page searchable"}
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => void handleRecognizeScannedPage()}
-                                  disabled={ocrBusy}
+                                  disabled={ocrBusy || ocrSearchLayerBusy}
                                   className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   Recognize again
@@ -6019,7 +6203,7 @@ export default function EditPdfTool() {
                             <button
                               type="button"
                               onClick={() => void handleRecognizeScannedPage()}
-                              disabled={ocrBusy}
+                              disabled={ocrBusy || ocrSearchLayerBusy}
                               className="w-fit rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-55"
                             >
                               {ocrBusy ? "Recognizing locally…" : "Recognize text locally"}
@@ -6060,12 +6244,23 @@ export default function EditPdfTool() {
                           ) : null}
 
                           <p className="text-[9px] leading-4 text-[var(--text-primary)]/45">
-                            Recognized text is an OCR aid, not original PDF text. Native rewrite remains disabled for this scan.
+                            Recognized text is an OCR aid, not original PDF text. “Make page searchable” adds a separate invisible read-only text layer; native rewrite remains disabled and the scan pixels stay unchanged.
                           </p>
                         </div>
                       ) : null}
                     </div>
                   ) : null}
+
+                  {ocrSearchLayerNotice ? (
+                    <p
+                      role="status"
+                      data-edit-ocr-searchable-status
+                      className="absolute left-3 top-3 z-30 max-w-[360px] rounded-[var(--radius-lg)] border border-[var(--lumeo-gold)]/30 bg-[var(--atelier-surface-1)]/95 px-3 py-2 text-[10px] leading-4 text-[var(--text-primary)]/70 shadow-lg backdrop-blur-sm"
+                    >
+                      {ocrSearchLayerNotice}
+                    </p>
+                  ) : null}
+
                   {redactMode ? (
                     <RedactionLayer
                       boxes={redactionBoxes}
