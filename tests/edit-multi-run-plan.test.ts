@@ -22,7 +22,7 @@ import {
   showText,
 } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { walkTextShowOperators } from "../lib/pdf/edit/contentStream.ts";
+import { walkTextShowOperators, type Matrix2x3 } from "../lib/pdf/edit/contentStream.ts";
 import { resolveFont } from "../lib/pdf/edit/fontEncoding.ts";
 import { resolveFontMetrics, stringAdvancePt } from "../lib/pdf/edit/fontMetrics.ts";
 import { buildMultiRunEditPlan } from "../lib/pdf/edit/multiRunEditPlan.ts";
@@ -331,6 +331,74 @@ test("multi-run: partial selection (a middle span of a longer document) leaves e
     "Line five",
     "Line six",
   ]);
+});
+
+test("multi-run: rejects otherwise-adjacent operators from different PDF text objects", async () => {
+  const original = await buildMultiOperatorFixture([
+    { text: "First", kind: "Tj" },
+    { text: "Alpha", kind: "Tj" },
+    { text: "Beta", kind: "Tj", sameLineWithPrevious: true },
+    { text: "Last", kind: "Tj" },
+  ]);
+  const { resolvedFont, fontMetrics, allOperators } =
+    await buildMultiRunPlanForIndices(original, [1, 2], "Combined");
+  const altered = allOperators.map((operator, index) =>
+    index === 2
+      ? {
+          ...operator,
+          textObjectIndex: (operator.textObjectIndex ?? 0) + 1,
+        }
+      : operator,
+  );
+
+  const plan = buildMultiRunEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    allOperators: altered,
+    operatorIndices: [1, 2],
+    replacementText: "Combined",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /text-object boundaries/i);
+});
+
+test("multi-run: rejects otherwise-adjacent operators under different CTMs", async () => {
+  const original = await buildMultiOperatorFixture([
+    { text: "First", kind: "Tj" },
+    { text: "Alpha", kind: "Tj" },
+    { text: "Beta", kind: "Tj", sameLineWithPrevious: true },
+    { text: "Last", kind: "Tj" },
+  ]);
+  const { resolvedFont, fontMetrics, allOperators } =
+    await buildMultiRunPlanForIndices(original, [1, 2], "Combined");
+  const altered = allOperators.map((operator, index) => {
+    if (index !== 2 || !operator.ctm) return operator;
+    const ctm: Matrix2x3 = [
+      operator.ctm[0],
+      operator.ctm[1],
+      operator.ctm[2],
+      operator.ctm[3],
+      operator.ctm[4] + 10,
+      operator.ctm[5],
+    ];
+    return { ...operator, ctm };
+  });
+
+  const plan = buildMultiRunEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    allOperators: altered,
+    operatorIndices: [1, 2],
+    replacementText: "Combined",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /transform|positioning/i);
 });
 
 test("multi-run: rejects a discontinuous selection honestly, without guessing at a merge", async () => {
