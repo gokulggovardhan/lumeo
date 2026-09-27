@@ -674,6 +674,17 @@ test("capability guard keeps reconciled clipping text read-only and preserves sa
   });
   assert.equal(safeGuard.decision, "editable");
   assert.equal(safeGuard.source, "reconciled");
+
+  const missingClassificationGuard = enforceSpanCapabilityOnArbitration({
+    arbitration: {
+      ...reconciled,
+      nativeSpanKey: safe.key,
+    },
+    spanClassification: null,
+  });
+  assert.equal(missingClassificationGuard.decision, "view-only");
+  assert.equal(missingClassificationGuard.source, "conflict");
+  assert.match(missingClassificationGuard.reason, /classification is missing/i);
 });
 
 test("page classifier distinguishes native-only evidence from an unsupported empty page", () => {
