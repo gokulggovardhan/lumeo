@@ -184,3 +184,47 @@ test("a box drawn with coalesced pointermove and pointerup still commits", async
   await expect(page.locator('[aria-label^="Remove redaction box"]')).toHaveCount(1);
   await expect(page.getByRole("button", { name: /^Redact 1 run$/ })).toBeEnabled();
 });
+
+
+test("pointerup final coordinates commit a box even when no pointermove is delivered", async ({ page }) => {
+  await openWithPdf(page, TEXT_ONLY_PDF);
+  await enterRedactMode(page);
+
+  const run = page.locator(runSelectorFor("123-45-6789")).first();
+  const box = await run.boundingBox();
+  expect(box).not.toBeNull();
+
+  await page.evaluate(
+    ({ selector, rect }) => {
+      const layer = document.querySelector(selector) as HTMLElement;
+      (layer as unknown as { setPointerCapture: (id: number) => void }).setPointerCapture = () => {};
+      const options = {
+        bubbles: true,
+        cancelable: true,
+        pointerId: 7,
+        pointerType: "mouse",
+      };
+      layer.dispatchEvent(
+        new PointerEvent("pointerdown", {
+          ...options,
+          clientX: rect.x + 2,
+          clientY: rect.y + 1,
+        }),
+      );
+      // Intentionally no pointermove. A browser may coalesce the final
+      // position into pointerup, and the component must still commit the
+      // real drag geometry from that final event.
+      layer.dispatchEvent(
+        new PointerEvent("pointerup", {
+          ...options,
+          clientX: rect.x + rect.width - 2,
+          clientY: rect.y + rect.height - 1,
+        }),
+      );
+    },
+    { selector: LAYER_SELECTOR, rect: box! },
+  );
+
+  await expect(page.locator('[aria-label^="Remove redaction box"]')).toHaveCount(1);
+  await expect(page.getByRole("button", { name: /^Redact 1 run$/ })).toBeEnabled();
+});
