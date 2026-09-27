@@ -15,7 +15,10 @@ import {
   getSiteSettings,
   getUnreadInboxCount,
 } from "@/lib/admin/data";
-import { getErrorLogSummary, getErrorLogs } from "@/lib/admin/errors";
+import {
+  getErrorLogSummary,
+  getUnresolvedErrorLogs,
+} from "@/lib/admin/errors";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
 
 function formatDate(value: string | null) {
@@ -71,7 +74,7 @@ export default async function AdminPage() {
     getUnreadInboxCount(),
     getFeedbackQueries(5, 0),
     getErrorLogSummary(),
-    getErrorLogs(5, 0, { status: "open" }),
+    getUnresolvedErrorLogs(5, 0),
     getAuditLogs(5),
     getSiteSettings(),
   ]);
@@ -107,14 +110,14 @@ export default async function AdminPage() {
     attention.push({
       title: `${errorSummary.data.criticalOpenCount} critical error${errorSummary.data.criticalOpenCount === 1 ? "" : "s"} unresolved`,
       detail: "Review the highest-severity application errors.",
-      href: "/admin/errors?status=open&severity=critical",
+      href: "/admin/errors?severity=critical",
       tone: "danger",
     });
   } else if (!errorSummary.error && errorSummary.data.openCount > 0) {
     attention.push({
       title: `${errorSummary.data.openCount} open error${errorSummary.data.openCount === 1 ? "" : "s"}`,
       detail: "Review unresolved application errors.",
-      href: "/admin/errors?status=open",
+      href: "/admin/errors",
       tone: "warning",
     });
   }
@@ -281,6 +284,13 @@ export default async function AdminPage() {
               <StatusRow label="Started" value={String(analytics.data.processingStarted)} detail="Processing operations started." tone="neutral" />
               <StatusRow label="Succeeded" value={String(analytics.data.processingSucceeded)} detail="Processing operations completed successfully." tone="success" />
               <StatusRow label="Failed" value={String(analytics.data.processingFailed)} detail="Processing operations reporting failure." tone={analytics.data.processingFailed > 0 ? "warning" : "neutral"} />
+              <StatusRow label="Cancelled" value={String(analytics.data.processingCancelled)} detail="Explicitly cancelled processing operations." tone="neutral" />
+              <StatusRow
+                label="No terminal event"
+                value={String(analytics.data.unreconciledStarts)}
+                detail="Started attempts without success, failure, or an explicit cancellation in today's range."
+                tone={analytics.data.unreconciledStarts > 0 ? "warning" : "success"}
+              />
               <StatusRow
                 label="Average duration"
                 value={analytics.data.averageDurationMs === null ? "N/A" : `${(analytics.data.averageDurationMs / 1000).toFixed(1)}s`}
@@ -364,7 +374,7 @@ export default async function AdminPage() {
         <AdminSectionCard
           title="Recent errors"
           description="Newest unresolved application errors."
-          action={<Link href="/admin/errors?status=open" className="text-xs font-semibold text-[var(--text-accent)] hover:underline">View errors →</Link>}
+          action={<Link href="/admin/errors" className="text-xs font-semibold text-[var(--text-accent)] hover:underline">View errors →</Link>}
         >
           {recentErrors.error ? (
             <AdminEmptyState title="Error preview unavailable" description="Error monitoring could not be verified for this preview." />
@@ -377,7 +387,7 @@ export default async function AdminPage() {
                 error.occurrence_count,
                 formatDate(error.last_seen_at),
               ])}
-              empty={<AdminEmptyState title="No unresolved errors" description="No open error logs are currently recorded." />}
+              empty={<AdminEmptyState title="No unresolved errors" description="No open, acknowledged, or verifying error logs are currently recorded." />}
             />
           )}
         </AdminSectionCard>

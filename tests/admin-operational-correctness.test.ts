@@ -93,6 +93,9 @@ test("Dashboard avoids retired status queries and reads current operational sour
   assert.match(page, /getAnalyticsSummary\(\)/);
   assert.match(page, /getAuditLogs\(5\)/);
   assert.match(page, /getErrorLogSummary\(\)/);
+  assert.match(page, /getUnresolvedErrorLogs\(5, 0\)/);
+  assert.match(page, /processingCancelled/);
+  assert.match(page, /unreconciledStarts/);
   assert.match(page, /getUnreadInboxCount\(\)/);
   assert.match(page, /Requires attention/);
 });
@@ -329,10 +332,69 @@ test("operation analytics exposes starts without a terminal outcome instead of h
   const page = read("app/admin/(protected)/analytics/page.tsx");
 
   assert.match(data, /unreconciledStarts/);
+  assert.match(data, /processingCancelled/);
   assert.match(
     data,
-    /processingStarted - processingSucceeded - processingFailed/,
+    /processingStarted[\s\S]*processingSucceeded[\s\S]*processingFailed[\s\S]*processingCancelled/,
   );
+  assert.match(page, /Processing Cancelled/);
   assert.match(page, /No terminal event/);
   assert.match(page, /range-boundary spillover/);
+});
+
+
+test("error verification distinguishes legacy history and automatically resolves only recurrence-free fixes", () => {
+  const migration = read(
+    "supabase/migrations/20260927180000_error_verification_automation.sql",
+  );
+  const workflow = read(".github/workflows/error-fix-verification.yml");
+  const errorsData = read("lib/admin/errors.ts");
+  const errorsPage = read("app/admin/(protected)/errors/page.tsx");
+  const actions = read("app/admin/(protected)/errors/actions.ts");
+
+  assert.match(migration, /resolution_provenance/);
+  assert.match(migration, /error_logs_resolution_metadata_check/);
+  assert.match(migration, /legacy_manual/);
+  assert.match(migration, /automated_verified_fix/);
+  assert.match(migration, /fix_deployed_at <= now\(\) - interval '24 hours'/);
+  assert.match(migration, /last_seen_at <= fix_deployed_at/);
+  assert.match(migration, /recurrence_after_fix = false/);
+  assert.match(migration, /error_log\.automated_verified/);
+  assert.match(migration, /verification_window_hours/);
+  assert.match(workflow, /private\.verify_matured_error_fixes\(\)/);
+  assert.match(workflow, /SUPABASE_DB_URL/);
+  assert.match(errorsData, /verifiedResolvedCount/);
+  assert.match(errorsData, /legacyResolvedCount/);
+  assert.match(errorsPage, /Verified resolved/);
+  assert.match(errorsPage, /Legacy resolved/);
+  assert.match(actions, /resolution_provenance: "verified_fix"/);
+  assert.match(actions, /verified_at/);
+});
+
+test("conversion analytics tracks explicit cancellations separately and keeps failure stages privacy-safe", () => {
+  const migration = read(
+    "supabase/migrations/20260927181500_conversion_terminal_diagnostics.sql",
+  );
+  const analyticsTypes = read("lib/analytics/types.ts");
+  const analyticsClient = read("lib/analytics/client.ts");
+  const word = read("components/pdf/WordToPdfTool.tsx");
+  const pdf = read("components/pdf/PdfToWordTool.tsx");
+  const analyticsPage = read("app/admin/(protected)/analytics/page.tsx");
+
+  assert.match(migration, /processing_cancelled/);
+  assert.match(migration, /failure_stage/);
+  assert.match(migration, /get_admin_conversion_diagnostics/);
+  assert.doesNotMatch(migration, /filename|file_name|document_content|raw_error/i);
+  assert.match(analyticsTypes, /"processing_cancelled"/);
+  assert.match(analyticsClient, /failure_stage: input\.failureStage/);
+
+  for (const source of [word, pdf]) {
+    assert.match(source, /eventName: "processing_cancelled"/);
+    assert.match(source, /failureStage/);
+    assert.match(source, /if \(currentSession !== sessionRef\.current\) return/);
+  }
+
+  assert.match(analyticsPage, /Processing Cancelled/);
+  assert.match(analyticsPage, /Failure stages/);
+  assert.match(analyticsPage, /Cancellation stages/);
 });

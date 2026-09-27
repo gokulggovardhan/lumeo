@@ -65,6 +65,7 @@ export async function trackPublicAnalyticsEvent(
         operating_system: getOperatingSystem(),
         success: input.success ?? null,
         error_code: input.errorCode ?? null,
+        failure_stage: input.failureStage ?? null,
         country_code: geo?.country ?? null,
         region: geo?.region ?? null,
         city: geo?.city ?? null,

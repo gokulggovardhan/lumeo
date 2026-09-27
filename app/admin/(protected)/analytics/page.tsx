@@ -53,7 +53,7 @@ export default async function AnalyticsPage({
         eyebrow="Analytics"
         title="Analytics"
         description="Discovery & operation analytics, organized for quick decisions with privacy-preserving public signals. All date boundaries use Asia/Kolkata calendar days."
-        meta={<Link href="/admin/analytics/activity" className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border-subtle)] px-4 text-sm font-semibold text-[var(--text-secondary)] hover:border-[var(--border-premium)] hover:text-[var(--text-primary)]">Full activity log</Link>}
+        meta={<Link href="/admin/analytics/activity" prefetch={false} className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border-subtle)] px-4 text-sm font-semibold text-[var(--text-secondary)] hover:border-[var(--border-premium)] hover:text-[var(--text-primary)]">Full activity log</Link>}
       />
       <AnalyticsPrivacyNotice />
 
@@ -104,22 +104,25 @@ export default async function AnalyticsPage({
           </section>
 
           <AdminSectionCard title="Operation analytics" description={`Processing lifecycle metrics for ${range.label.toLowerCase()}.`}>
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-7">
               <AdminMetricCard label="Processing Started" value={data.processingStarted} detail="Real processing attempts started." />
               <AdminMetricCard label="Processing Succeeded" value={data.processingSucceeded} detail="Usable outputs created." tone="success" />
               <AdminMetricCard label="Processing Failed" value={data.processingFailed} detail="Attempts reporting approved failure events." tone={data.processingFailed ? "danger" : "neutral"} />
+              <AdminMetricCard label="Processing Cancelled" value={data.processingCancelled} detail="Explicit user/browser cancellations recorded as their own terminal outcome." tone="neutral" />
               <AdminMetricCard
                 label="No terminal event"
                 value={data.unreconciledStarts}
-                detail="Started minus succeeded/failed in this range; may include cancellation, abandonment, stalls, or range-boundary spillover."
+                detail="Started minus succeeded, failed, and explicitly cancelled attempts. Remaining rows may reflect abandonment, stalls, or range-boundary spillover."
                 tone={data.unreconciledStarts ? "warning" : "neutral"}
               />
-              <AdminMetricCard label="Success Rate" value={data.successRate === null ? "N/A" : `${data.successRate}%`} detail="Succeeded ÷ completed attempts only." tone="gold" />
+              <AdminMetricCard label="Success Rate" value={data.successRate === null ? "N/A" : `${data.successRate}%`} detail="Succeeded ÷ succeeded+failed completed attempts; cancellations are excluded." tone="gold" />
               <AdminMetricCard label="Average Duration" value={formatDuration(data.averageDurationMs)} detail="Successful processing events only." />
             </section>
             <div className="mt-4 grid gap-4 lg:grid-cols-2">
               <AnalyticsDistribution succeeded={data.processingSucceeded} failed={data.processingFailed} />
               <AnalyticsBarList title="Error categories" items={data.errorSummary.map((item) => ({ label: item.errorCode, value: item.count }))} emptyText="No analytics error categories were recorded in this range." />
+              <AnalyticsBarList title="Failure stages" items={data.failureStageSummary.map((item) => ({ label: item.label, value: item.count }))} emptyText="No staged conversion failures were recorded in this range." />
+              <AnalyticsBarList title="Cancellation stages" items={data.cancellationStageSummary.map((item) => ({ label: item.label, value: item.count }))} emptyText="No staged cancellations were recorded in this range." />
             </div>
           </AdminSectionCard>
 
@@ -131,7 +134,7 @@ export default async function AnalyticsPage({
           </AdminSectionCard>
 
           <AdminSectionCard title="Daily activity" description={`Verified IST calendar-day totals for ${range.label.toLowerCase()}.`}>
-            <AdminDataTable columns={["Date", "Unique visitors", "Page views", "Tool opens", "Succeeded", "Failed", "Events"]} rows={data.sevenDayTotals.map((metric) => [metric.date, metric.uniqueVisitors, metric.pageViews, metric.toolOpens, metric.succeeded, metric.failed, metric.events])} empty={<AdminEmptyState title="No daily analytics in this range" description="No approved analytics events were recorded for the selected calendar days." />} />
+            <AdminDataTable columns={["Date", "Unique visitors", "Page views", "Tool opens", "Succeeded", "Failed", "Cancelled", "Events"]} rows={data.sevenDayTotals.map((metric) => [metric.date, metric.uniqueVisitors, metric.pageViews, metric.toolOpens, metric.succeeded, metric.failed, metric.cancelled, metric.events])} empty={<AdminEmptyState title="No daily analytics in this range" description="No approved analytics events were recorded for the selected calendar days." />} />
           </AdminSectionCard>
 
           <AdminSectionCard title="Audience and environment" description="Coarse, privacy-preserving dimensions only. Location is approximate network-derived data.">
@@ -146,7 +149,7 @@ export default async function AnalyticsPage({
           <AdminSectionCard title="Recent activity" description="Latest approved public events, newest first. No session identifier, IP address, or precise coordinate is displayed.">
             {recentEvents.error ? <AdminEmptyState title="Recent activity is unavailable" description="Aggregate analytics are still valid, but the recent-events reader could not return verified rows." /> : <>
               <RecentActivityTable rows={activityRows.slice(0, RECENT_ACTIVITY_PREVIEW_SIZE)} />
-              {activityRows.length > RECENT_ACTIVITY_PREVIEW_SIZE ? <div className="mt-4 text-right"><Link href="/admin/analytics/activity" className="text-sm font-bold text-[var(--text-accent)] hover:underline">View full activity log →</Link></div> : null}
+              {activityRows.length > RECENT_ACTIVITY_PREVIEW_SIZE ? <div className="mt-4 text-right"><Link href="/admin/analytics/activity" prefetch={false} className="text-sm font-bold text-[var(--text-accent)] hover:underline">View full activity log →</Link></div> : null}
             </>}
           </AdminSectionCard>
         </>

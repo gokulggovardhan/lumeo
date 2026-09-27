@@ -161,6 +161,10 @@ export type ErrorStatus =
   | "resolved"
   | "ignored";
 export type ErrorSource = "client" | "server_action" | "route_handler" | "error_boundary" | "unhandled_rejection";
+export type ErrorResolutionProvenance =
+  | "legacy_manual"
+  | "verified_fix"
+  | "automated_verified_fix";
 
 export type ErrorLog = {
   id: number;
@@ -187,6 +191,8 @@ export type ErrorLog = {
   last_fix_sha: string | null;
   fix_deployed_at: string | null;
   recurrence_after_fix: boolean;
+  resolution_provenance: ErrorResolutionProvenance | null;
+  verified_at: string | null;
 };
 
 export type FeedbackQueryType = "Query" | "Feedback";
@@ -219,6 +225,7 @@ export type AnalyticsEvent = {
   country_code: string | null;
   success: boolean | null;
   error_code: string | null;
+  failure_stage: string | null;
   metadata: Json;
 };
 
@@ -308,8 +315,21 @@ export type ControlCenterDatabase = {
           operating_system?: string | null;
           success?: boolean | null;
           error_code?: string | null;
+          country_code?: string | null;
+          region?: string | null;
+          city?: string | null;
+          failure_stage?: string | null;
         };
         Returns: number;
+      };
+      get_admin_conversion_diagnostics: {
+        Args: { p_start_date: string; p_end_date: string };
+        Returns: {
+          processing_cancelled: number;
+          daily_cancelled: Array<{ date: string; event_count: number }>;
+          failure_stage_summary: Array<{ failure_stage: string; event_count: number }>;
+          cancellation_stage_summary: Array<{ failure_stage: string; event_count: number }>;
+        };
       };
       refresh_daily_tool_metrics: {
         Args: { target_date?: string | null };

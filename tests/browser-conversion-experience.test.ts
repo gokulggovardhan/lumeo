@@ -133,3 +133,20 @@ test("Word to PDF telemetry distinguishes WASM compile, timeout, render and vali
     "pdf_validation_error",
   );
 });
+
+
+test("Word and PDF conversion tools close started attempts with cancellation and coarse size telemetry", async () => {
+  const [word, pdf] = await Promise.all([
+    readFile("components/pdf/WordToPdfTool.tsx", "utf8"),
+    readFile("components/pdf/PdfToWordTool.tsx", "utf8"),
+  ]);
+
+  for (const source of [word, pdf]) {
+    assert.match(source, /bucketFileSize\(file\.size\)/);
+    assert.match(source, /eventName: "processing_started"[\s\S]*inputSizeBucket/);
+    assert.match(source, /eventName: "processing_succeeded"[\s\S]*outputSizeBucket/);
+    assert.match(source, /eventName: "processing_cancelled"/);
+    assert.match(source, /errorCode: "user_cancelled"/);
+    assert.match(source, /failureStage/);
+  }
+});

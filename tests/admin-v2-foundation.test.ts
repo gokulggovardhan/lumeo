@@ -39,7 +39,7 @@ test("Admin Console V2 Dashboard derives attention and metrics from real protect
     "getUnreadInboxCount",
     "getFeedbackQueries",
     "getErrorLogSummary",
-    "getErrorLogs",
+    "getUnresolvedErrorLogs",
     "getAuditLogs",
     "getSiteSettings",
   ]) {
