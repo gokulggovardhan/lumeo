@@ -1886,6 +1886,11 @@ export default function EditPdfTool() {
     const doc = pdfJsDocRef.current;
     const runs = detectedTextRuns;
     let cancelled = false;
+    const nativeMatchPerformanceStartedAt = window.performance.now();
+    let operatorCountForPerformance = 0;
+    let nativeSpanCountForPerformance = 0;
+    let authorizedRunCountForPerformance = 0;
+    let nativeMatchSucceeded = false;
 
     void (async () => {
       try {
@@ -1910,6 +1915,7 @@ export default function EditPdfTool() {
         if (cancelled || !pdfLibDocRef.current || !editEngineRef.current) return;
         const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
         if (cancelled) return;
+        operatorCountForPerformance = located.length;
         setPageOperators(located);
 
         const nativeSpans = buildNativeContentStreamSpans({
@@ -1927,6 +1933,7 @@ export default function EditPdfTool() {
             }
           },
         });
+        nativeSpanCountForPerformance = nativeSpans.length;
         setNativeTextSpans(nativeSpans);
 
         // If PDF.js exposes no text at all, retain the native parser as an
@@ -1940,6 +1947,8 @@ export default function EditPdfTool() {
           setTextArbitrations([]);
           setRunMatches([]);
           setRunProvenanceMatches([]);
+          authorizedRunCountForPerformance = nativeRuns.length;
+          nativeMatchSucceeded = true;
           if (nativeRuns.length > 0) setDetectedTextRuns(nativeRuns);
           return;
         }
@@ -2020,6 +2029,8 @@ export default function EditPdfTool() {
             : null;
         });
 
+        authorizedRunCountForPerformance = authorizedMatches.filter(Boolean).length;
+        nativeMatchSucceeded = true;
         setRunProvenanceMatches(provenanceMatches);
         setTextArbitrations(arbitrations);
         setRunMatches(authorizedMatches);
@@ -2039,6 +2050,26 @@ export default function EditPdfTool() {
           setTextArbitrations([]);
           setPageOperators([]);
           setTextMatchRevision(null);
+        }
+      } finally {
+        if (!cancelled) {
+          performanceDiagnosticsRef.current?.recordDuration(
+            "native-match",
+            window.performance.now() - nativeMatchPerformanceStartedAt,
+            {
+              pageNumber: pageIndex + 1,
+              detail: {
+                success: nativeMatchSucceeded,
+                pdfJsRunCount: runs.length,
+                operatorCount: operatorCountForPerformance,
+                nativeSpanCount: nativeSpanCountForPerformance,
+                authorizedRunCount: authorizedRunCountForPerformance,
+              },
+            },
+          );
+          performanceDiagnosticsRef.current?.setFontRegistrySnapshot(
+            fontRegistry.performanceSnapshot(),
+          );
         }
       }
     })();
