@@ -6168,6 +6168,16 @@ export default function EditPdfTool() {
                                 >
                                   Recognize again
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleMakeOcrSearchable()}
+                                  disabled={ocrBusy || ocrSearchableBusy}
+                                  aria-label="Make scanned page searchable"
+                                  title="Adds an invisible local text layer so the scan can be searched and selected. The scanned pixels are not replaced."
+                                  className="rounded-full border border-[var(--lumeo-gold)]/45 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--text-primary)]/75 transition hover:border-[var(--lumeo-gold)]/70 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {ocrSearchableBusy ? "Adding searchable text…" : "Make searchable"}
+                                </button>
                               </div>
                             </>
                           ) : (
@@ -6219,6 +6229,20 @@ export default function EditPdfTool() {
                           </p>
                         </div>
                       ) : null}
+                    </div>
+                  ) : null}
+                  {ocrSearchableNotice ? (
+                    <div
+                      data-edit-ocr-searchable-status
+                      data-edit-ocr-searchable-status-kind={ocrSearchableNotice.kind}
+                      role={ocrSearchableNotice.kind === "error" ? "alert" : "status"}
+                      className={`absolute right-3 top-3 z-30 max-w-[360px] rounded-[var(--radius-lg)] border px-3 py-2 text-[10px] leading-4 shadow-lg backdrop-blur-sm ${
+                        ocrSearchableNotice.kind === "error"
+                          ? "border-[var(--text-danger)]/35 bg-[var(--atelier-surface-1)]/95 text-[var(--text-danger)]"
+                          : "border-[var(--lumeo-gold)]/35 bg-[var(--atelier-surface-1)]/95 text-[var(--text-primary)]/68"
+                      }`}
+                    >
+                      {ocrSearchableNotice.message}
                     </div>
                   ) : null}
                   {redactMode ? (
