@@ -323,7 +323,13 @@ async function convertWordToPdf(
   page: Page,
   input: { name: string; buffer: Buffer; expectedFileName: string },
 ): Promise<Buffer> {
-  await page.locator('input[type="file"]').setInputFiles({
+  const fileInput = page.locator('input[type="file"]');
+  await expect(fileInput).toHaveAttribute(
+    "data-l2-upload-client-ready",
+    "true",
+    { timeout: 120_000 },
+  );
+  await fileInput.setInputFiles({
     name: input.name,
     mimeType:
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
