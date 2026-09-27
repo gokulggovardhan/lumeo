@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import {
   AuraButton,
   AuraCard,
@@ -452,6 +452,15 @@ export function L2UploadStage({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dragDepthRef = useRef(0);
   const [internalDragActive, setInternalDragActive] = useState(false);
+
+  useEffect(() => {
+    // The hidden input is server-rendered before React has necessarily
+    // attached its onChange handler. Automated production clients can set
+    // files directly on that native input; this marker lets them wait until
+    // the client handler is live so a synthetic file selection cannot be
+    // lost during hydration. Normal pointer/label selection is unchanged.
+    inputRef.current?.setAttribute("data-upload-client-ready", "true");
+  }, []);
   const canSelect = Boolean(onFilesSelected) && !disabled && !loading;
   const isDragActive = dragActive || internalDragActive;
 
