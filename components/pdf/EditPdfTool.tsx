@@ -4696,6 +4696,7 @@ export default function EditPdfTool() {
                           const nativeKeyboard = event.nativeEvent as KeyboardEvent;
                           const isImeKey =
                             textCompositionActive ||
+                            nativeTextComposingRef.current === nativeTextSelectionKey ||
                             nativeKeyboard.isComposing ||
                             nativeKeyboard.keyCode === 229;
                           if (isImeKey) return;
@@ -4712,6 +4713,7 @@ export default function EditPdfTool() {
                           const nativeKeyboard = event.nativeEvent as KeyboardEvent;
                           if (
                             textCompositionActive ||
+                            nativeTextComposingRef.current === nativeTextSelectionKey ||
                             nativeKeyboard.isComposing ||
                             nativeKeyboard.keyCode === 229
                           ) {
@@ -5026,6 +5028,23 @@ export default function EditPdfTool() {
                           }}
                           onChange={(event) => {
                             handleEditDraftTextChange(event.target.value);
+                          }}
+                          onKeyDown={(event) => {
+                            event.stopPropagation();
+                            const nativeKeyboard = event.nativeEvent as KeyboardEvent;
+                            const isImeKey =
+                              textCompositionActive ||
+                              nativeTextComposingRef.current === nativeTextSelectionKey ||
+                              nativeKeyboard.isComposing ||
+                              nativeKeyboard.keyCode === 229;
+                            if (isImeKey) return;
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              if (canApplyEdit) void applyTextRunEdit();
+                            } else if (event.key === "Escape") {
+                              event.preventDefault();
+                              selectTextRun(null);
+                            }
                           }}
                           data-ime-composing={textCompositionActive ? "true" : "false"}
                           className="mt-1 w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
