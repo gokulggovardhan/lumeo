@@ -1564,6 +1564,9 @@ export default function EditPdfTool() {
     return () => {
       if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
+      ocrJobRevisionRef.current = null;
+      void ocrEngineRef.current?.terminate();
+      ocrEngineRef.current = null;
       void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
       void (pendingInitialDocRef.current?.doc as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | undefined)?.destroy?.();
     };
@@ -1577,6 +1580,14 @@ export default function EditPdfTool() {
     if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
     pageImageUrlRef.current = "";
     downloadUrlRef.current = "";
+    ocrJobRevisionRef.current = null;
+    void ocrEngineRef.current?.terminate();
+    ocrEngineRef.current = null;
+    setOcrResultsRevision(null);
+    setOcrBusy(false);
+    setOcrProgress(null);
+    setOcrError("");
+    setOcrCopied(false);
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     pdfJsDocRef.current = null;
     setDocReady(0);
