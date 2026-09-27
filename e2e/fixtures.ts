@@ -10,7 +10,11 @@ import { PDFDocument, PDFName, StandardFonts, TextRenderingMode, beginText, endT
 import { createCanvas } from "@napi-rs/canvas";
 import { inspectPdfFontProgram } from "../lib/pdf/edit/fontProgramIntelligence.ts";
 import { shapeEmbeddedFontText } from "../lib/pdf/edit/harfbuzzShaping.ts";
-import { buildPreservedLineParagraphPdf } from "../tests/fixtures/paragraphFixture.ts";
+import {
+  buildFragmentedLineParagraphPdf,
+  buildPreservedLineParagraphPdf,
+  FRAGMENTED_PARAGRAPH_SOURCE_LINES,
+} from "../tests/fixtures/paragraphFixture.ts";
 
 // Playwright transpiles specs to CJS, where import.meta is a syntax error --
 // resolve from the repo root (the runner's cwd) instead.
@@ -26,6 +30,10 @@ export const CLIPPED_TEXT_PDF = path.join(TMP_DIR, "clipped-text.pdf");
 export const LARGE_DOCUMENT_PDF = path.join(TMP_DIR, "large-document-120-pages.pdf");
 export const SHAPED_LTR_PDF = path.join(TMP_DIR, "shaped-ltr-type0.pdf");
 export const PARAGRAPH_PDF = path.join(TMP_DIR, "paragraph-native-lines.pdf");
+export const FRAGMENTED_PARAGRAPH_PDF = path.join(
+  TMP_DIR,
+  "paragraph-fragmented-lines.pdf",
+);
 
 /** Widely spaced so each line is its own detected run and boxes cannot straddle two. */
 function drawSensitiveText(page: import("pdf-lib").PDFPage, font: import("pdf-lib").PDFFont) {
@@ -481,6 +489,55 @@ async function shapedLtrType0(): Promise<Uint8Array> {
   return doc.save();
 }
 
+async function assertFragmentedParagraphVisualRuns(
+  bytes: Uint8Array,
+): Promise<void> {
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const standardFontDataUrl =
+    path.join(process.cwd(), "node_modules", "pdfjs-dist", "standard_fonts") +
+    path.sep;
+  const doc = await pdfjsLib.getDocument({
+    data: bytes.slice(),
+    useWorkerFetch: false,
+    standardFontDataUrl,
+  }).promise;
+  try {
+    const page = await doc.getPage(1);
+    const items = (await page.getTextContent()).items as { str?: string }[];
+    const strings = items
+      .map((item) => item.str ?? "")
+      .filter((value) => value.length > 0);
+
+    for (const expected of FRAGMENTED_PARAGRAPH_SOURCE_LINES) {
+      if (!strings.some((value) => value.includes(expected))) {
+        throw new Error(
+          `fragmented paragraph fixture: PDF.js did not merge ${JSON.stringify(
+            expected,
+          )} into one visible run, got ${JSON.stringify(strings)}`,
+        );
+      }
+    }
+
+    const forbiddenHalves = [
+      "Fragmented ",
+      "alpha",
+      "beta",
+    ];
+    if (
+      strings.some((value) =>
+        forbiddenHalves.some((half) => value === half),
+      )
+    ) {
+      throw new Error(
+        `fragmented paragraph fixture: a native fragment leaked as a standalone PDF.js run: ${JSON.stringify(strings)}`,
+      );
+    }
+  } finally {
+    const destroy = (doc as { destroy?: () => Promise<void> | void }).destroy;
+    if (typeof destroy === "function") await destroy.call(doc);
+  }
+}
+
 /** Large but lightweight document for page-rail virtualization regressions. */
 async function largeDocument(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -525,4 +582,7 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(LARGE_DOCUMENT_PDF, await largeDocument());
   await writeFile(SHAPED_LTR_PDF, await shapedLtrType0());
   await writeFile(PARAGRAPH_PDF, await buildPreservedLineParagraphPdf());
+  const fragmentedParagraph = await buildFragmentedLineParagraphPdf();
+  await assertFragmentedParagraphVisualRuns(fragmentedParagraph);
+  await writeFile(FRAGMENTED_PARAGRAPH_PDF, fragmentedParagraph);
 }
