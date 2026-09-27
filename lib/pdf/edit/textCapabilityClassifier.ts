@@ -147,11 +147,25 @@ export function enforceSpanCapabilityOnArbitration({
   arbitration: TextEditArbitration;
   spanClassification: SpanTextCapabilityClassification | null;
 }): TextEditArbitration {
-  if (
-    arbitration.decision !== "editable" ||
-    !spanClassification ||
-    spanClassification.safelyRewritable
-  ) {
+  if (arbitration.decision !== "editable") {
+    return arbitration;
+  }
+
+  // An editable signal decision is necessary but not sufficient. If the
+  // corresponding native span cannot be classified at this boundary, the
+  // structural safety proof is incomplete and must fail closed rather than
+  // inheriting edit authority from reconciliation alone.
+  if (!spanClassification) {
+    return {
+      ...arbitration,
+      decision: "view-only",
+      source: "conflict",
+      reason:
+        "Native capability classification is missing; direct rewrite cannot be authorized safely.",
+    };
+  }
+
+  if (spanClassification.safelyRewritable) {
     return arbitration;
   }
 
