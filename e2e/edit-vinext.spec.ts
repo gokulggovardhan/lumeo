@@ -92,7 +92,7 @@ test("vinext Edit PDF explains read-only clipped text before an edit is attempte
   await expect(explanation).toBeVisible();
 });
 
-test("vinext Edit PDF classifies a proven image-only page as a scan", async ({
+test("vinext Edit PDF recognizes a proven scanned page locally without promoting it to native text", async ({
   page,
 }) => {
   await uploadEditFixture(page, IMAGE_ONLY_PDF);
@@ -113,8 +113,40 @@ test("vinext Edit PDF classifies a proven image-only page as a scan", async ({
     /image content without a proven native text layer/i,
     { timeout: 30_000 },
   );
-  await expect(explanation).toContainText(/OCR support/i);
+  await expect(explanation).toContainText(/recognize it locally with OCR/i);
+
+  const applicationOrigin = new URL(page.url()).origin;
+  const externalOcrRequests: string[] = [];
+  const recordOcrRequest = (request: { url(): string }) => {
+    const value = request.url();
+    const isOcrAsset =
+      /worker\.min\.js|tesseract-core|\.traineddata(?:\.gz)?/i.test(value);
+    if (!isOcrAsset) return;
+    const url = new URL(value);
+    if (url.origin !== applicationOrigin) externalOcrRequests.push(value);
+  };
+  page.on("request", recordOcrRequest);
+
+  await page.getByRole("button", { name: "Recognize text locally" }).click();
+  const recognizedText = page.getByRole("textbox", { name: "Recognized text (OCR)" });
+  await expect(recognizedText).toHaveValue(/SCANNED PAGE SAMPLE/i, {
+    timeout: 90_000,
+  });
+  await expect(recognizedText).toHaveValue(/text exists only in image pixels/i);
+  await expect(page.locator("[data-edit-ocr-panel]")).toHaveAttribute(
+    "data-edit-ocr-source",
+    "ocr",
+  );
+  const wordCount = Number(
+    await page.locator("[data-edit-ocr-overlay]").getAttribute("data-edit-ocr-word-count"),
+  );
+  expect(wordCount).toBeGreaterThan(0);
+  expect(externalOcrRequests).toEqual([]);
+
+  // Recognition is an aid for scanned pixels, never a shortcut into the
+  // native content-stream writer.
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+  page.off("request", recordOcrRequest);
 });
 
 test("vinext Edit PDF keeps a 120-page thumbnail rail bounded and scrollable", async ({
