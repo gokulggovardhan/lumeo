@@ -62,10 +62,11 @@ export function browserUsedHeapBytes(): number | null {
  */
 export class EditPerformanceDiagnostics {
   private readonly samples: EditPerformanceSample[] = [];
+  private readonly maxSamples: number;
 
-  constructor(
-    private readonly maxSamples = DEFAULT_EDIT_PERFORMANCE_SAMPLE_LIMIT,
-  ) {}
+  constructor(maxSamples = DEFAULT_EDIT_PERFORMANCE_SAMPLE_LIMIT) {
+    this.maxSamples = maxSamples;
+  }
 
   record(
     metric: EditPerformanceMetric,
