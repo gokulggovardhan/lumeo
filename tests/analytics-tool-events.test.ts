@@ -230,3 +230,40 @@ test("core processing algorithms remain unchanged by lifecycle analytics instrum
   assert.match(compress, /buildCompressedCandidate/);
   assert.match(compress, /Target Size Studio|target/i);
 });
+
+
+test("conversion cancellation is an approved terminal event with privacy-safe stage diagnostics", () => {
+  const state = readFileSync("lib/analytics/state.ts", "utf8");
+  const types = readFileSync("lib/analytics/types.ts", "utf8");
+  const client = readFileSync("lib/analytics/client.ts", "utf8");
+  const migration = readFileSync(
+    "supabase/migrations/20260927181500_conversion_terminal_diagnostics.sql",
+    "utf8",
+  );
+
+  const cancelled: AnalyticsEventInput = {
+    eventName: "processing_cancelled",
+    toolSlug: "word-to-pdf",
+    durationMs: 1250,
+    errorCode: "user_cancelled",
+    failureStage: "converting",
+  };
+
+  assert.deepEqual(
+    providerTrackDecision({
+      availability: "enabled",
+      doNotTrack: false,
+      event: cancelled,
+    }),
+    { accepted: true },
+  );
+  assert.match(state, /"processing_cancelled"/);
+  assert.match(types, /AnalyticsConversionStage/);
+  assert.match(client, /failure_stage: input\.failureStage/);
+  assert.match(migration, /processing_cancelled/);
+  assert.match(migration, /failure_stage/);
+  assert.doesNotMatch(
+    migration,
+    /file(name|_name)|document_content|raw_error|pdf_text/i,
+  );
+});
