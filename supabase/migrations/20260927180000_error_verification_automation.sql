@@ -34,6 +34,36 @@ set
 where status = 'resolved'
   and resolution_provenance is null;
 
+alter table public.error_logs
+  drop constraint if exists error_logs_resolution_metadata_check;
+
+alter table public.error_logs
+  add constraint error_logs_resolution_metadata_check
+  check (
+    (
+      status = 'resolved'
+      and resolved_at is not null
+      and resolution_provenance = 'legacy_manual'
+      and verified_at is null
+    )
+    or
+    (
+      status = 'resolved'
+      and resolved_at is not null
+      and resolution_provenance in ('verified_fix', 'automated_verified_fix')
+      and verified_at is not null
+      and last_fix_sha is not null
+      and fix_deployed_at is not null
+      and recurrence_after_fix = false
+    )
+    or
+    (
+      status <> 'resolved'
+      and resolution_provenance is null
+      and verified_at is null
+    )
+  );
+
 create or replace function private.normalize_error_resolution_metadata()
 returns trigger
 language plpgsql
