@@ -948,6 +948,54 @@ export default function EditPdfTool() {
   // never changes identity, so the child could not tell a swap had
   // happened) -- docReady is what signals that.
   const getPdfJsDocument = useCallback(() => pdfJsDocRef.current, []);
+  const handleRecognizeScannedPage = useCallback(async () => {
+    const doc = pdfJsDocRef.current;
+    if (
+      !pdf ||
+      !doc ||
+      !rasterImageEvidenceCurrent ||
+      detectedTextRuns.length > 0 ||
+      ocrBusy
+    ) {
+      return;
+    }
+
+    const sourceBytes = pdf.bytes;
+    const sourcePageIndex = pageIndex;
+    setOcrBusy(true);
+    setOcrProgress({ status: "preparing page", progress: 0 });
+    setOcrError("");
+    setOcrResultRevision(null);
+
+    try {
+      const page = await doc.getPage(sourcePageIndex + 1);
+      const { blob } = await renderPdfPageForLocalOcr(page, sourcePageIndex + 1);
+      const result = await recognizeLocalOcrImage({
+        image: blob,
+        onProgress: setOcrProgress,
+      });
+      setOcrResultRevision({
+        bytes: sourceBytes,
+        pageIndex: sourcePageIndex,
+        result,
+      });
+      setOcrProgress({ status: "complete", progress: 1 });
+    } catch (error) {
+      setOcrError(
+        error instanceof Error
+          ? error.message
+          : "Local OCR could not read this page.",
+      );
+    } finally {
+      setOcrBusy(false);
+    }
+  }, [
+    detectedTextRuns.length,
+    ocrBusy,
+    pageIndex,
+    pdf,
+    rasterImageEvidenceCurrent,
+  ]);
   const handleThumbnailPerformanceSample = useCallback(
     (sample: {
       durationMs: number;
