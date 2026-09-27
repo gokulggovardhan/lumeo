@@ -17,11 +17,10 @@
 // into one (see applyEditPlan.ts's buildReplacementOperatorText) --
 // applied here one level up, across operators instead of within one.
 
-import type { TextShowOperator } from "./contentStream.ts";
+import type { Matrix2x3, TextShowOperator } from "./contentStream.ts";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "./fontEncoding.ts";
 import type { FontMetrics, TextShowState } from "./fontMetrics.ts";
 import type { ValidatedShapingWriteEvidence } from "./shapingWriteGuard.ts";
-import { compareAdvance } from "./fontMetrics.ts";
 import {
   buildEditPlan,
   deriveValidatedEditPlanAdvance,
@@ -138,6 +137,22 @@ function isConsecutiveAscending(indices: number[]): boolean {
   return true;
 }
 
+function sameMatrix(a: Matrix2x3 | undefined, b: Matrix2x3 | undefined): boolean {
+  if (!a || !b) return false;
+  return a.every((value, index) => Math.abs(value - b[index]) <= 1e-9);
+}
+
+function trailingTjAdjustmentForTargetAdvance(
+  targetAdvancePt: number,
+  replacementAdvancePt: number,
+  state: TextShowState,
+): number {
+  const scalePt = state.fontSizePt * (state.horizontalScalingPct / 100);
+  return scalePt === 0
+    ? 0
+    : ((replacementAdvancePt - targetAdvancePt) / scalePt) * 1000;
+}
+
 // Builds a dry-run MultiRunEditPlan for replacing a span of two or more
 // consecutive text-show operators with one logical replacement. Every
 // safety invariant is checked before any per-operator plan is built:
@@ -215,6 +230,43 @@ export function buildMultiRunEditPlan({
     );
   }
 
+  const firstTextObjectIndex = spanOperators[0].textObjectIndex;
+  if (
+    firstTextObjectIndex === null ||
+    firstTextObjectIndex === undefined ||
+    spanOperators.some(
+      (operator) => operator.textObjectIndex !== firstTextObjectIndex,
+    )
+  ) {
+    return rejected(
+      pageIndex,
+      contentStreamIndex,
+      sortedIndices,
+      replacementText,
+      "These text pieces belong to separate native text groups, so one in-place replacement cannot preserve their formatting and position safely.",
+    );
+  }
+
+  const firstLineMatrix = spanOperators[0].textLineMatrix;
+  const firstCtm = spanOperators[0].ctm;
+  if (
+    !firstLineMatrix ||
+    !firstCtm ||
+    spanOperators.some(
+      (operator) =>
+        !sameMatrix(operator.textLineMatrix, firstLineMatrix) ||
+        !sameMatrix(operator.ctm, firstCtm),
+    )
+  ) {
+    return rejected(
+      pageIndex,
+      contentStreamIndex,
+      sortedIndices,
+      replacementText,
+      "These text pieces are positioned independently or cross a line break, so editing them as one range could move surrounding text. Edit one line at a time.",
+    );
+  }
+
   // One EditPlan per spanned operator: the first carries the full
   // replacement text, every other one is emptied.
   const subPlans: EditPlan[] = spanOperators.map((operator, position) =>
@@ -251,34 +303,37 @@ export function buildMultiRunEditPlan({
     validatedSubPlans.push(subPlan);
   }
 
-  // Recompute the first sub-plan's width/delta against the SPAN's true
-  // combined original width (every spanned operator's own original
-  // glyphs), not just the first operator's own -- otherwise the emptied
-  // operators' widths would be uncounted. Reuses fontMetrics.ts's own
-  // compareAdvance (the existing spacing engine), not a new calculation.
-  const combinedOriginalCodes = validatedSubPlans.flatMap(
-    (plan) => plan.originalGlyphCodes,
+  // Preserve the SPAN's proven effective advance using each operator's OWN
+  // validated text state. The old implementation concatenated all original
+  // glyph codes and remeasured them with the FIRST operator's font
+  // size/spacing/scaling; that is wrong when a valid same-font selection
+  // crosses a text-state change. Every sub-plan has already measured its
+  // effective original endpoint (including original TJ adjustments), so the
+  // combined target is the sum of those independently proven advances.
+  const combinedOriginalAdvancePt = validatedSubPlans.reduce(
+    (sum, plan) => sum + plan.originalWidthPt,
+    0,
   );
   const firstOperator = spanOperators[0];
-  const state: TextShowState = {
+  const firstState: TextShowState = {
     fontSizePt: firstOperator.fontSizePt,
     charSpacing: firstOperator.charSpacing,
     wordSpacing: firstOperator.wordSpacing,
     horizontalScalingPct: firstOperator.horizontalScalingPct,
   };
-  const comparison = compareAdvance(
-    combinedOriginalCodes,
-    validatedSubPlans[0].replacementGlyphCodes,
-    fontMetrics,
-    state,
+  const replacementAdvancePt = validatedSubPlans[0].replacementWidthPt;
+  const tjSpacingDelta = trailingTjAdjustmentForTargetAdvance(
+    combinedOriginalAdvancePt,
+    replacementAdvancePt,
+    firstState,
   );
 
   const mergedFirstPlan = deriveValidatedEditPlanAdvance(
     validatedSubPlans[0],
     {
-      originalWidthPt: comparison.originalAdvancePt,
-      replacementWidthPt: comparison.replacementAdvancePt,
-      tjSpacingDelta: comparison.tjAdjustment,
+      originalWidthPt: combinedOriginalAdvancePt,
+      replacementWidthPt: replacementAdvancePt,
+      tjSpacingDelta,
     },
   );
 
