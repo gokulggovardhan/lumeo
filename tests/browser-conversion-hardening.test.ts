@@ -5,6 +5,9 @@ import test from "node:test";
 import {
   hasLocalWorkspaceCapacity,
 } from "../lib/conversion/browser/workspace.ts";
+import {
+  isUnsupportedClipboardPermissionError,
+} from "../lib/conversion/browser/libreoffice/permissionsCompat.ts";
 
 test("workspace capacity policy falls back gracefully when quota is unknown", () => {
   assert.equal(
@@ -117,4 +120,45 @@ test("OPFS is a bounded abortable optimization with direct-file fallback", async
     assert.match(engine, /if \(signal\.aborted\) throw workspaceError/);
     assert.match(engine, /workspace = null/);
   }
+});
+
+
+test("Office clipboard permission compatibility only recognizes the Firefox-style unsupported optional probes", () => {
+  assert.equal(
+    isUnsupportedClipboardPermissionError(
+      new TypeError(
+        "'clipboard-read' (value of 'name' member of PermissionDescriptor) is not a valid value for enumeration PermissionName.",
+      ),
+      "clipboard-read",
+    ),
+    true,
+  );
+  assert.equal(
+    isUnsupportedClipboardPermissionError(
+      new TypeError("Permission denied."),
+      "clipboard-read",
+    ),
+    false,
+  );
+  assert.equal(
+    isUnsupportedClipboardPermissionError(
+      new TypeError(
+        "'geolocation' (value of 'name' member of PermissionDescriptor) is not a valid value for enumeration PermissionName.",
+      ),
+      "geolocation",
+    ),
+    false,
+  );
+});
+
+test("Office startup has one bounded watchdog and installs clipboard compatibility before ZetaOffice boots", async () => {
+  const source = await readFile(
+    "lib/conversion/browser/libreoffice/BrowserLibreOfficeRuntime.ts",
+    "utf8",
+  );
+
+  assert.match(source, /STARTUP_TIMEOUT_MS = 180_000/);
+  assert.match(source, /startup safety watchdog/);
+  assert.match(source, /installOfficeClipboardPermissionCompatibility\(\)/);
+  assert.match(source, /loadZetaHelperConstructor\([\s\S]*bootstrapSignal/);
 });
