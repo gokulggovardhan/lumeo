@@ -3042,6 +3042,16 @@ export default function EditPdfTool() {
         }
       }
 
+      // A revision can change while the final page itself is being analyzed.
+      // Re-check before trusting even a no-match result so status text never
+      // describes a stale PDF snapshot as if it were current.
+      if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
+        setTextSearchReplaceAllStatus(
+          "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again.",
+        );
+        return;
+      }
+
       const safeMatchCount = validatedUnits.reduce(
         (total, unit) => total + unit.candidate.matchIds.length,
         0,
