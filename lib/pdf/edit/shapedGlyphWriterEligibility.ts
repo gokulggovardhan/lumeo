@@ -33,9 +33,11 @@ function blocked(reason: string): ShapedGlyphWriterEligibility {
  * - Identity-H / Identity-V CMap;
  * - explicit /CIDToGIDMap /Identity;
  * - exact embedded font fingerprint already resolved by PdfFontRegistry;
+ * - every source cluster owns exactly one shaped glyph in this first slice;
  * - every shaped glyph ID is a legal two-byte CID;
  * - the existing ToUnicode map maps that exact CID to the owning HarfBuzz
- *   cluster text. This preserves reopen/search semantics, including ligatures.
+ *   cluster text. This preserves reopen/search semantics, including ligatures,
+ *   without duplicating logical text for one-to-many cluster expansion.
  *
  * A missing CIDToGIDMap is NOT treated as Identity. PDF producers and CIDFont
  * subtypes vary, so absence is insufficient proof for a native mutation.
@@ -122,6 +124,11 @@ export function inspectShapedGlyphWriterEligibility({
 
   const clusterByGlyph = new Map<number, string>();
   for (const cluster of shaped.clusterMap) {
+    if (cluster.glyphIndices.length !== 1) {
+      return blocked(
+        "A source cluster expands to multiple shaped glyphs; this first writer proof cannot preserve exact ToUnicode extraction for that one-to-many mapping.",
+      );
+    }
     for (const glyphIndex of cluster.glyphIndices) {
       if (
         !Number.isInteger(glyphIndex) ||
