@@ -149,6 +149,11 @@ import {
   type MultiRunEditPlan,
 } from "@/lib/pdf/edit/multiRunEditPlan";
 import {
+  buildParagraphEditPlan,
+  isValidatedParagraphEditPlan,
+  type ParagraphEditPlan,
+} from "@/lib/pdf/edit/paragraphEditPlan";
+import {
   resolveCompatibleShapingWriteEvidence,
   shapingEvidenceRequestKey,
 } from "@/lib/pdf/edit/compatibleShapingEvidence";
@@ -272,7 +277,8 @@ type EditPreview =
       substituteFont: string | null;
       shapedGlyphPlan?: ValidatedShapedGlyphEditPlan | null;
     }
-  | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont };
+  | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont }
+  | { kind: "paragraph"; editable: boolean; reason: string | null; plan: ParagraphEditPlan; resolvedFont: ResolvedFont };
 
 type ShapingEvidenceState =
   | { key: string; status: "validated"; evidence: ValidatedShapingWriteEvidence }
@@ -346,6 +352,7 @@ let editEngineModulePromise: Promise<{
   applyShapedGlyphEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyShapedGlyphEditPlanToDocument"];
   buildShapedGlyphEditPlan: (typeof import("@/lib/pdf/edit/shapedGlyphEditPlan"))["buildShapedGlyphEditPlan"];
   applyMultiRunEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyMultiRunEditPlanToDocument"];
+  applyParagraphEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyParagraphEditPlanToDocument"];
   applyNativeTextStyleBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyNativeTextStyleBatchToDocument"];
   applyValidatedEditPlanBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyValidatedEditPlanBatchToDocument"];
   verifyPostExportNativeEdits: (typeof import("@/lib/pdf/edit/postExportVerification"))["verifyPostExportNativeEdits"];
@@ -378,6 +385,7 @@ function loadEditEngine() {
       applyShapedGlyphEditPlanToDocument: applyEditPlanMod.applyShapedGlyphEditPlanToDocument,
       buildShapedGlyphEditPlan: shapedGlyphEditPlanMod.buildShapedGlyphEditPlan,
       applyMultiRunEditPlanToDocument: applyEditPlanMod.applyMultiRunEditPlanToDocument,
+      applyParagraphEditPlanToDocument: applyEditPlanMod.applyParagraphEditPlanToDocument,
       applyNativeTextStyleBatchToDocument: applyEditPlanMod.applyNativeTextStyleBatchToDocument,
       applyValidatedEditPlanBatchToDocument: applyEditPlanMod.applyValidatedEditPlanBatchToDocument,
       verifyPostExportNativeEdits: postExportVerificationMod.verifyPostExportNativeEdits,
@@ -4182,6 +4190,32 @@ export default function EditPdfTool() {
         embeddedProgramSha256,
         shapingWriteEvidence: currentShapingEvidence,
       });
+
+      if (!plan.editable) {
+        const paragraphPlan = buildParagraphEditPlan({
+          pageIndex,
+          contentStreamIndex: validation.contentStreamIndex,
+          allOperators: validation.allOperators,
+          operatorIndices: validation.operatorIndices,
+          replacementText: editDraftText,
+          resolvedFont,
+          fontMetrics,
+          embeddedGlyphEvidence,
+        });
+        if (
+          paragraphPlan.editable ||
+          (!paragraphPlan.editable && paragraphPlan.paragraphCandidate)
+        ) {
+          return {
+            kind: "paragraph",
+            editable: paragraphPlan.editable,
+            reason: paragraphPlan.reason,
+            plan: paragraphPlan,
+            resolvedFont,
+          };
+        }
+      }
+
       if (shapingRequirement.required && shapingEvidencePending) {
         return {
           kind: "multi",
@@ -4225,6 +4259,19 @@ export default function EditPdfTool() {
   const replacementLayoutDecision = useMemo(() => {
     if (editPreview.kind === "empty" || !editPreview.editable) return null;
     if (editPreview.kind === "single" && editPreview.shapedGlyphPlan) return null;
+    if (editPreview.kind === "paragraph") {
+      if (!isValidatedParagraphEditPlan(editPreview.plan)) return null;
+      for (const line of editPreview.plan.lines) {
+        const linePlan = line.subPlans[0];
+        if (!linePlan || linePlan.originalText === linePlan.replacementText) {
+          continue;
+        }
+        const decision = decideReplacementLayout(linePlan);
+        if (!decision.safeToApplyWithCurrentWriter) return decision;
+      }
+      return null;
+    }
+
     const plan =
       editPreview.kind === "single"
         ? editPreview.plan
@@ -4301,7 +4348,7 @@ export default function EditPdfTool() {
             nativePaintPlan: nativePaintPlan?.editable ? nativePaintPlan : undefined,
           });
         }
-      } else {
+      } else if (editPreview.kind === "multi") {
         const { plan, resolvedFont } = editPreview;
         if (!isValidatedMultiRunEditPlan(plan)) {
           throw new Error(
@@ -4309,6 +4356,18 @@ export default function EditPdfTool() {
           );
         }
         await engine.applyMultiRunEditPlanToDocument(
+          doc,
+          plan,
+          resolvedFont.bytesPerCode,
+        );
+      } else {
+        const { plan, resolvedFont } = editPreview;
+        if (!isValidatedParagraphEditPlan(plan)) {
+          throw new Error(
+            "The paragraph edit dry-run is no longer valid. Reselect the lines and try again.",
+          );
+        }
+        await engine.applyParagraphEditPlanToDocument(
           doc,
           plan,
           resolvedFont.bytesPerCode,
@@ -4372,7 +4431,7 @@ export default function EditPdfTool() {
           };
           semanticOperations.push(nativeTextStyleOperation({ target, before: beforeStyle, after: afterStyle }));
         }
-      } else {
+      } else if (editPreview.kind === "multi") {
         semanticOperations.push(
           nativeTextOperation({
             pageIndex,
@@ -4381,6 +4440,20 @@ export default function EditPdfTool() {
             formPath: null,
             operatorIndices: editPreview.plan.operatorIndices,
             fontResourceName: editPreview.plan.subPlans[0]?.fontResourceName ?? null,
+            originalText: editPreview.plan.originalText,
+            replacementText: editPreview.plan.replacementText,
+          }),
+        );
+      } else {
+        semanticOperations.push(
+          nativeTextOperation({
+            pageIndex,
+            spanIds,
+            contentStreamIndex: editPreview.plan.contentStreamIndex,
+            formPath: null,
+            operatorIndices: editPreview.plan.operatorIndices,
+            fontResourceName:
+              editPreview.plan.lines[0]?.subPlans[0]?.fontResourceName ?? null,
             originalText: editPreview.plan.originalText,
             replacementText: editPreview.plan.replacementText,
           }),
@@ -5070,6 +5143,33 @@ export default function EditPdfTool() {
   const pixelsPerPoint = stageWidthPx && pagePointSize && pagePointSize.width > 0
     ? stageWidthPx / pagePointSize.width
     : PAGE_RENDER_SCALE;
+  const paragraphDraftSeededSelectionRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (
+      editPreview.kind !== "paragraph" ||
+      !editPreview.plan.originalText.includes("\n") ||
+      paragraphDraftSeededSelectionRef.current === nativeTextSelectionKey
+    ) {
+      return;
+    }
+    paragraphDraftSeededSelectionRef.current = nativeTextSelectionKey;
+    const concatenatedSelection = selectedRunIndices
+      .map((index) => detectedTextRuns[index]?.str ?? "")
+      .join("");
+    if (editDraftText === concatenatedSelection) {
+      setEditDraftText(editPreview.plan.originalText);
+      setEditApplyError("");
+    }
+  }, [
+    editPreview,
+    nativeTextSelectionKey,
+    selectedRunIndices,
+    detectedTextRuns,
+    editDraftText,
+    setEditDraftText,
+    setEditApplyError,
+  ]);
+
   // Phase 11: single source of truth for "is there an edit ready to apply,"
   // shared by both the inline on-page toolbar and the sidebar panel -- was
   // previously computed inline in one place only; extracted so the two
@@ -5077,8 +5177,11 @@ export default function EditPdfTool() {
   const nativeStyleChanged =
     editPreview.kind === "single" && Boolean(editPreview.plan.replacementTextState);
   const nativePaintChanged = Boolean(nativePaintPlan?.editable);
-  const textDraftChanged =
-    editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
+  const previewOriginalText =
+    editPreview.kind === "empty"
+      ? selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("")
+      : editPreview.plan.originalText;
+  const textDraftChanged = editDraftText !== previewOriginalText;
   const canApplyEdit =
     !isApplyingEdit &&
     !textCompositionActive &&
@@ -6342,7 +6445,7 @@ export default function EditPdfTool() {
                     </div>
                   ) : null}
 
-                  {activeTool === "select" && textDetectionCurrent && selectedRunIndices.length > 1 && editPreview.kind === "multi" ? (
+                  {activeTool === "select" && textDetectionCurrent && selectedRunIndices.length > 1 && (editPreview.kind === "multi" || editPreview.kind === "paragraph") ? (
                     // Multi-run selection has no per-run inline editor (that's
                     // scoped to a single run) -- this compact floating panel,
                     // anchored to the first selected run, is the only UI path
@@ -6351,6 +6454,7 @@ export default function EditPdfTool() {
                     // to never activate for existing-PDF-text-run selections.
                     <div
                       data-edit-multi-run-panel
+                      data-edit-paragraph-panel={editPreview.kind === "paragraph" ? "true" : undefined}
                       className="absolute z-30"
                       style={{
                         left: `${detectedTextRuns[selectedRunIndices[0]].xPct}%`,
@@ -6364,47 +6468,111 @@ export default function EditPdfTool() {
                       }
                     >
                       <div className="w-72 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 p-3 shadow-lg">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with ({selectedRunIndices.length} runs selected)</span>
-                        <input
-                          data-edit-multi-run-input
-                          aria-label="Edit selected text runs"
-                          value={editDraftText}
-                          onCompositionStart={(event) => {
-                            event.stopPropagation();
-                            nativeTextComposingRef.current = nativeTextSelectionKey;
-                            setTextCompositionActive(true);
-                          }}
-                          onCompositionEnd={(event) => {
-                            event.stopPropagation();
-                            handleEditDraftTextChange(event.currentTarget.value);
-                            if (nativeTextComposingRef.current === nativeTextSelectionKey) {
-                              nativeTextComposingRef.current = null;
-                              setTextCompositionActive(false);
-                            }
-                          }}
-                          onChange={(event) => {
-                            handleEditDraftTextChange(event.target.value);
-                          }}
-                          onKeyDown={(event) => {
-                            event.stopPropagation();
-                            const nativeKeyboard = event.nativeEvent as KeyboardEvent;
-                            const isImeKey =
-                              textCompositionActive ||
-                              nativeTextComposingRef.current === nativeTextSelectionKey ||
-                              nativeKeyboard.isComposing ||
-                              nativeKeyboard.keyCode === 229;
-                            if (isImeKey) return;
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              if (canApplyEdit) void applyTextRunEdit();
-                            } else if (event.key === "Escape") {
-                              event.preventDefault();
-                              selectTextRun(null);
-                            }
-                          }}
-                          data-ime-composing={textCompositionActive ? "true" : "false"}
-                          className="mt-1 w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
-                        />
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
+                          {editPreview.kind === "paragraph"
+                            ? `Replace paragraph · ${editPreview.plan.editable ? editPreview.plan.lines.length : "multiple"} lines`
+                            : `Replace with (${selectedRunIndices.length} runs selected)`}
+                        </span>
+                        {editPreview.kind === "paragraph" ? (
+                          <textarea
+                            data-edit-paragraph-input
+                            aria-label="Edit selected paragraph lines"
+                            value={editDraftText}
+                            rows={Math.min(
+                              6,
+                              Math.max(
+                                2,
+                                editPreview.plan.editable
+                                  ? editPreview.plan.lines.length
+                                  : editPreview.plan.originalText.split("\n").length,
+                              ),
+                            )}
+                            onCompositionStart={(event) => {
+                              event.stopPropagation();
+                              nativeTextComposingRef.current = nativeTextSelectionKey;
+                              setTextCompositionActive(true);
+                            }}
+                            onCompositionEnd={(event) => {
+                              event.stopPropagation();
+                              handleEditDraftTextChange(event.currentTarget.value);
+                              if (nativeTextComposingRef.current === nativeTextSelectionKey) {
+                                nativeTextComposingRef.current = null;
+                                setTextCompositionActive(false);
+                              }
+                            }}
+                            onChange={(event) => {
+                              handleEditDraftTextChange(event.target.value);
+                            }}
+                            onKeyDown={(event) => {
+                              event.stopPropagation();
+                              const nativeKeyboard = event.nativeEvent as KeyboardEvent;
+                              const isImeKey =
+                                textCompositionActive ||
+                                nativeTextComposingRef.current === nativeTextSelectionKey ||
+                                nativeKeyboard.isComposing ||
+                                nativeKeyboard.keyCode === 229;
+                              if (isImeKey) return;
+                              if (event.key === "Escape") {
+                                event.preventDefault();
+                                selectTextRun(null);
+                              } else if (
+                                event.key === "Enter" &&
+                                (event.metaKey || event.ctrlKey)
+                              ) {
+                                event.preventDefault();
+                                if (canApplyEdit) void applyTextRunEdit();
+                              }
+                            }}
+                            data-ime-composing={textCompositionActive ? "true" : "false"}
+                            className="mt-1 w-full resize-y rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold leading-5 text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
+                          />
+                        ) : (
+                          <input
+                            data-edit-multi-run-input
+                            aria-label="Edit selected text runs"
+                            value={editDraftText}
+                            onCompositionStart={(event) => {
+                              event.stopPropagation();
+                              nativeTextComposingRef.current = nativeTextSelectionKey;
+                              setTextCompositionActive(true);
+                            }}
+                            onCompositionEnd={(event) => {
+                              event.stopPropagation();
+                              handleEditDraftTextChange(event.currentTarget.value);
+                              if (nativeTextComposingRef.current === nativeTextSelectionKey) {
+                                nativeTextComposingRef.current = null;
+                                setTextCompositionActive(false);
+                              }
+                            }}
+                            onChange={(event) => {
+                              handleEditDraftTextChange(event.target.value);
+                            }}
+                            onKeyDown={(event) => {
+                              event.stopPropagation();
+                              const nativeKeyboard = event.nativeEvent as KeyboardEvent;
+                              const isImeKey =
+                                textCompositionActive ||
+                                nativeTextComposingRef.current === nativeTextSelectionKey ||
+                                nativeKeyboard.isComposing ||
+                                nativeKeyboard.keyCode === 229;
+                              if (isImeKey) return;
+                              if (event.key === "Enter") {
+                                event.preventDefault();
+                                if (canApplyEdit) void applyTextRunEdit();
+                              } else if (event.key === "Escape") {
+                                event.preventDefault();
+                                selectTextRun(null);
+                              }
+                            }}
+                            data-ime-composing={textCompositionActive ? "true" : "false"}
+                            className="mt-1 w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
+                          />
+                        )}
+                        {editPreview.kind === "paragraph" ? (
+                          <p className="mt-1 text-[10px] leading-4 text-[var(--text-primary)]/45">
+                            Keep one line per existing PDF line · Ctrl/Cmd+Enter to apply
+                          </p>
+                        ) : null}
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"
