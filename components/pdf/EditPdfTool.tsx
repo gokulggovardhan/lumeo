@@ -2989,6 +2989,12 @@ export default function EditPdfTool() {
       let firstSkipDetail = "";
 
       for (const targetPageIndex of candidatePages) {
+        if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
+          setTextSearchReplaceAllStatus(
+            "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again.",
+          );
+          return;
+        }
         const targetPage = await pdfJsDocument.getPage(targetPageIndex + 1);
         try {
           const analysis = await analyzeNativeReplacePage({
@@ -3144,12 +3150,15 @@ export default function EditPdfTool() {
         `Replaced ${safeMatchCount} match${safeMatchCount === 1 ? "" : "es"} in one native PDF transaction${skippedMatchCount > 0 ? `; ${skippedMatchCount} unsafe match${skippedMatchCount === 1 ? "" : "es"} stayed unchanged` : ""}.`,
       );
     } catch (replaceAllError) {
-      const message =
-        replaceAllError instanceof Error
+      const sourceRevisionChanged =
+        getHistoryState().pdfBytes !== replaceAllSourceBytes;
+      const message = sourceRevisionChanged
+        ? "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again."
+        : replaceAllError instanceof Error
           ? replaceAllError.message
           : "Structured Replace All could not be completed.";
       setTextSearchReplaceAllStatus(message);
-      setEditApplyError(message);
+      if (!sourceRevisionChanged) setEditApplyError(message);
     } finally {
       setTextSearchReplaceAllBusy(false);
     }
