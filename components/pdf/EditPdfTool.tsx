@@ -3611,14 +3611,21 @@ export default function EditPdfTool() {
 
   const activeNativeStyleDraft =
     nativeStyleDraft?.spanId === singleSelectedSpan?.id ? nativeStyleDraft : null;
-  const inlineEditorFontFamily =
-    singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
-      ? browserFontPreview.family
-      : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
-  const selectedSpanEmbeddedPreviewSha =
-    singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
-      ? browserFontPreview.embeddedProgramSha256
-      : null;
+  const selectedSpanEmbeddedProgramSha =
+    singleSelectedSpan?.fontProfile?.embeddedProgramSha256 ?? null;
+  const browserFontPreviewMatchesSelectedSpan = Boolean(
+    singleSelectedSpan &&
+      browserFontPreview?.spanId === singleSelectedSpan.id &&
+      selectedSpanEmbeddedProgramSha &&
+      browserFontPreview.embeddedProgramSha256.toLowerCase() ===
+        selectedSpanEmbeddedProgramSha.toLowerCase(),
+  );
+  const inlineEditorFontFamily = browserFontPreviewMatchesSelectedSpan
+    ? browserFontPreview?.family
+    : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
+  const selectedSpanEmbeddedPreviewSha = browserFontPreviewMatchesSelectedSpan
+    ? browserFontPreview?.embeddedProgramSha256 ?? null
+    : null;
   const nativeFontPreviewFidelity = describeFontPreviewFidelity({
     profile: singleSelectedSpan?.fontProfile ?? null,
     loadedEmbeddedProgramSha256: selectedSpanEmbeddedPreviewSha,
