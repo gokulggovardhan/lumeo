@@ -7,6 +7,7 @@ import {
   writeEditPerformanceFixtures,
 } from "./edit-performance-fixtures.ts";
 import { runSelectorFor } from "./helpers.ts";
+import { THUMBNAIL_VIRTUALIZE_AFTER } from "../lib/pdf/edit/thumbnailVirtualization.ts";
 
 type PerformanceReport = {
   document: { fileSizeBytes: number | null; pageCount: number | null };
@@ -34,9 +35,11 @@ async function openFixture(page: Page, path: string, expectedPageCount: number) 
     timeout: 180_000,
   });
   const rail = page.locator("ul[data-thumbnail-virtualized]");
-  await expect(rail).toHaveAttribute("data-thumbnail-virtualized", "true", {
-    timeout: 30_000,
-  });
+  await expect(rail).toHaveAttribute(
+    "data-thumbnail-virtualized",
+    expectedPageCount > THUMBNAIL_VIRTUALIZE_AFTER ? "true" : "false",
+    { timeout: 30_000 },
+  );
 }
 
 async function openMeasuredPage(
