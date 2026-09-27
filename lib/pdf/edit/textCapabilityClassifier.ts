@@ -136,6 +136,7 @@ export function classifyNativeTextSpan(
     nativeSpanKey: span.key,
     category: "NATIVE_TEXT",
     safelyRewritable: true,
+    authorization: "span-safe",
     reason: "Native text has decodable source bytes, a resolved font and deterministic metrics.",
   };
 }
