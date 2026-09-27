@@ -24,6 +24,7 @@ export const MIXED_STYLE_PDF = path.join(TMP_DIR, "mixed-style.pdf");
 export const CLIPPED_TEXT_PDF = path.join(TMP_DIR, "clipped-text.pdf");
 export const LARGE_DOCUMENT_PDF = path.join(TMP_DIR, "large-document-120-pages.pdf");
 export const SHAPED_LTR_PDF = path.join(TMP_DIR, "shaped-ltr-type0.pdf");
+export const PARAGRAPH_LINES_PDF = path.join(TMP_DIR, "paragraph-lines.pdf");
 
 /** Widely spaced so each line is its own detected run and boxes cannot straddle two. */
 function drawSensitiveText(page: import("pdf-lib").PDFPage, font: import("pdf-lib").PDFFont) {
@@ -177,6 +178,36 @@ async function splitRun(): Promise<Uint8Array> {
     "ET",
   ].join("\n");
   page.node.set(PDFName.of("Contents"), context.register(context.flateStream(new TextEncoder().encode(body))));
+  return doc.save();
+}
+
+async function paragraphLines(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+
+  const context = doc.context;
+  const fonts = context.obj({});
+  fonts.set(PDFName.of("F1"), font.ref);
+  page.node.Resources()!.set(PDFName.of("Font"), fonts);
+
+  // Both lines stay inside one BT/ET text object, use one font/CTM, and have
+  // explicit native line matrices. This is the bounded paragraph structure
+  // Phase B is allowed to rewrite without inventing browser/CSS reflow.
+  const body = [
+    "BT",
+    "/F1 18 Tf",
+    "20 TL",
+    "1 0 0 1 60 740 Tm",
+    "(Paragraph first) Tj",
+    "T*",
+    "(Paragraph second) Tj",
+    "ET",
+  ].join("\n");
+  page.node.set(
+    PDFName.of("Contents"),
+    context.register(context.flateStream(new TextEncoder().encode(body))),
+  );
   return doc.save();
 }
 
@@ -522,4 +553,5 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(CLIPPED_TEXT_PDF, await clippedText());
   await writeFile(LARGE_DOCUMENT_PDF, await largeDocument());
   await writeFile(SHAPED_LTR_PDF, await shapedLtrType0());
+  await writeFile(PARAGRAPH_LINES_PDF, await paragraphLines());
 }
