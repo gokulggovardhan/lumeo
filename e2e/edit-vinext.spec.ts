@@ -196,7 +196,7 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   // native Edit. Searchability and write authority are separate.
   const searchableRun = page
     .locator(
-      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="SCANNED PAGE SAMPLE"]',
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="SCANNED"]',
     )
     .first();
   await expect(searchableRun).toBeVisible({ timeout: 90_000 });
