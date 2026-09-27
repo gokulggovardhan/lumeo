@@ -4335,7 +4335,7 @@ export default function EditPdfTool() {
           plan.originalText !== plan.replacementText ||
           plan.replacementTextState !== null,
       )
-      .map(decideReplacementLayout);
+      .map((plan) => decideReplacementLayout(plan));
     return (
       decisions.find((decision) => !decision.safeToApplyWithCurrentWriter) ??
       decisions[0] ??
