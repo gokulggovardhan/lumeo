@@ -112,7 +112,10 @@ async function pdfJsText(bytes: Uint8Array): Promise<string> {
       .map((item) => ("str" in item ? item.str : ""))
       .join("");
   } finally {
-    await doc.destroy();
+    const destroy = (doc as { destroy?: () => Promise<void> | void }).destroy;
+    if (typeof destroy === "function") {
+      await destroy.call(doc);
+    }
   }
 }
 
