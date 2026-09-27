@@ -18,7 +18,7 @@ export type VerifiedEquivalentFontPreviewEvidence = Readonly<{
 }>;
 
 type FontPreviewFidelityInput = {
-  profile: PdfFontProfile | null;
+  profile: Pick<PdfFontProfile, "isEmbedded" | "embeddedProgramSha256"> | null;
   loadedEmbeddedProgramSha256: string | null;
   verifiedEquivalent: VerifiedEquivalentFontPreviewEvidence | null;
 };
