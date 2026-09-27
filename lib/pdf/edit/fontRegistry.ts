@@ -32,12 +32,18 @@ import {
   inspectPdfFontProgram,
   type PdfFontProgramInspection,
 } from "./fontProgramIntelligence.ts";
+import { BoundedLruCache } from "./boundedLruCache.ts";
+import {
+  editPerformanceDiagnostics,
+  editPerformanceNow,
+} from "./editPerformanceDiagnostics.ts";
 
 const SUBSET_PREFIX = /^[A-Z]{6}\+/;
 const BOLD_NAME = /bold|black|heavy|semib|demib?|ultra/i;
 const ITALIC_NAME = /italic|oblique/i;
 const FLAG_SYMBOLIC = 1 << 2;
 const FLAG_NONSYMBOLIC = 1 << 5;
+export const MAX_CACHED_FONT_INTELLIGENCE = 8;
 
 export type BrowserFontProgramFormat =
   | "truetype"
@@ -400,7 +406,10 @@ export class PdfFontRegistry {
   private readonly profileCache = new WeakMap<PDFDict, PdfFontProfile>();
   private readonly programCache = new WeakMap<PDFDict, EmbeddedFontProgram | null>();
   private readonly browserFaceCache = new WeakMap<PDFDict, Promise<string | null>>();
-  private readonly intelligenceCache = new WeakMap<PDFDict, Promise<PdfFontProgramInspection>>();
+  private readonly intelligenceCache = new BoundedLruCache<
+    PDFDict,
+    Promise<PdfFontProgramInspection>
+  >(MAX_CACHED_FONT_INTELLIGENCE);
   private readonly context: PDFContext;
 
   constructor(document: PDFDocument) {
@@ -518,21 +527,38 @@ export class PdfFontRegistry {
 
     const profile = this.resolve(resources, resourceName);
     const program = this.embeddedProgramFor(fontResource.dict);
-    const promise = program
-      ? inspectPdfFontProgram(program.bytes, {
-          preferredPostScriptNames: [
-            profile?.resourceIdentity.descriptorFontName ?? "",
-            profile?.resourceIdentity.descendantBaseFont ?? "",
-            profile?.baseFont ?? "",
-          ],
-        })
-      : Promise.resolve<PdfFontProgramInspection>({
-          kind: "unavailable",
-          reason: "This PDF font does not contain an embedded font program.",
-        });
+    const startedAt = editPerformanceNow();
+    const promise = (
+      program
+        ? inspectPdfFontProgram(program.bytes, {
+            preferredPostScriptNames: [
+              profile?.resourceIdentity.descriptorFontName ?? "",
+              profile?.resourceIdentity.descendantBaseFont ?? "",
+              profile?.baseFont ?? "",
+            ],
+          })
+        : Promise.resolve<PdfFontProgramInspection>({
+            kind: "unavailable",
+            reason: "This PDF font does not contain an embedded font program.",
+          })
+    ).then((inspection) => {
+      editPerformanceDiagnostics.record(
+        "font-inspection",
+        editPerformanceNow() - startedAt,
+        {
+          byteCount: program?.bytes.byteLength ?? 0,
+          success: inspection.kind === "ok" || inspection.kind === "unavailable",
+        },
+      );
+      return inspection;
+    });
 
     this.intelligenceCache.set(fontResource.dict, promise);
     return promise;
+  }
+
+  fontIntelligenceCacheSizeForDiagnostics(): number {
+    return this.intelligenceCache.size;
   }
 
   private embeddedProgramFor(fontDict: PDFDict): EmbeddedFontProgram | null {
