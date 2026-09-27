@@ -84,16 +84,42 @@ export default function RedactionLayer({ boxes, targetedRuns, disabled, onAddBox
     [toPercent],
   );
 
-  const handlePointerUp = useCallback(() => {
-    const box = draftRef.current;
+  const handlePointerUp = useCallback(
+    (event: React.PointerEvent<HTMLDivElement>) => {
+      const origin = originRef.current;
+      const point = origin ? toPercent(event) : null;
+      // Pointermove is not guaranteed to be delivered before pointerup in
+      // every browser/automation/touch sequence. Recompute from the final
+      // pointerup coordinates so a real drag cannot collapse back to the
+      // zero-area pointerdown draft merely because the last move was
+      // coalesced.
+      const box =
+        origin && point
+          ? {
+              xPct: Math.min(origin.xPct, point.xPct),
+              yPct: Math.min(origin.yPct, point.yPct),
+              widthPct: Math.abs(point.xPct - origin.xPct),
+              heightPct: Math.abs(point.yPct - origin.yPct),
+            }
+          : draftRef.current;
+      originRef.current = null;
+      draftRef.current = null;
+      setDraft(null);
+      // A stray click is not a redaction. Without this floor, tapping the page
+      // silently adds a zero-area box that redacts nothing and clutters the
+      // review list.
+      if (box && box.widthPct >= MIN_BOX_PCT && box.heightPct >= MIN_BOX_PCT) {
+        onAddBox(box);
+      }
+    },
+    [onAddBox, toPercent],
+  );
+
+  const handlePointerCancel = useCallback(() => {
     originRef.current = null;
     draftRef.current = null;
     setDraft(null);
-    // A stray click is not a redaction. Without this floor, tapping the page
-    // silently adds a zero-area box that redacts nothing and clutters the
-    // review list.
-    if (box && box.widthPct >= MIN_BOX_PCT && box.heightPct >= MIN_BOX_PCT) onAddBox(box);
-  }, [onAddBox]);
+  }, []);
 
   return (
     <>
@@ -102,7 +128,7 @@ export default function RedactionLayer({ boxes, targetedRuns, disabled, onAddBox
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
+        onPointerCancel={handlePointerCancel}
         role="application"
         aria-label="Draw a box over text to redact it"
         className={`absolute inset-0 z-30 ${disabled ? "" : "cursor-crosshair"}`}

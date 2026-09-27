@@ -11,7 +11,14 @@ import {
   TWO_PAGE_PDF,
   writeFixtures,
 } from "./fixtures.ts";
-import { waitForStageReady } from "./helpers.ts";
+import {
+  applyRedactionThroughModal,
+  blackMaskCount,
+  detectedRunTexts,
+  dragBoxOverRun,
+  enterRedactMode,
+  waitForStageReady,
+} from "./helpers.ts";
 
 test.beforeAll(async () => {
   await writeFixtures();
@@ -102,6 +109,107 @@ test("vinext Edit PDF keeps a 120-page thumbnail rail bounded and scrollable", a
   expect(
     await page.getByRole("button", { name: /^Open page \d+$/ }).count(),
   ).toBeLessThan(30);
+});
+
+test("vinext Edit PDF shares one linear semantic undo history across native Edit and Redaction", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+
+  const employeeRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    )
+    .first();
+  await employeeRun.click();
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await editor.fill("Employee file");
+  await page.getByRole("button", { name: "Apply edit" }).click();
+  await waitForStageReady(page);
+
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1");
+  let texts = await detectedRunTexts(page);
+  expect(texts.some((text) => text.includes("Employee file"))).toBe(true);
+  expect(texts.some((text) => text.includes("123-45-6789"))).toBe(true);
+
+  await enterRedactMode(page);
+  await dragBoxOverRun(page, "123-45-6789");
+  await applyRedactionThroughModal(page);
+
+  // Redaction is one undo snapshot containing two semantic facts: the
+  // redaction page operation and the inserted black mask. The earlier text
+  // edit remains before both in the SAME journal.
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "3");
+  texts = await detectedRunTexts(page);
+  expect(texts.some((text) => text.includes("Employee file"))).toBe(true);
+  expect(texts.some((text) => text.includes("123-45-6789"))).toBe(false);
+  expect(await blackMaskCount(page)).toBeGreaterThan(0);
+
+  // Undo redaction only: the prior native edit remains.
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1");
+  await expect
+    .poll(
+      async () => ({
+        employeeEdited: (await detectedRunTexts(page)).some((text) =>
+          text.includes("Employee file"),
+        ),
+        ssnRestored: (await detectedRunTexts(page)).some((text) =>
+          text.includes("123-45-6789"),
+        ),
+        masks: await blackMaskCount(page),
+      }),
+      {
+        timeout: 90_000,
+        message: "first undo should reverse only Redaction and preserve the Edit",
+      },
+    )
+    .toEqual({ employeeEdited: true, ssnRestored: true, masks: 0 });
+
+  // Undo again: now the earlier Edit is reversed.
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+  texts = await detectedRunTexts(page);
+  expect(texts.some((text) => text.includes("Employee record"))).toBe(true);
+  expect(texts.some((text) => text.includes("Employee file"))).toBe(false);
+  expect(texts.some((text) => text.includes("123-45-6789"))).toBe(true);
+
+  // Redo in the same order: Edit first, then Redaction.
+  await page.getByRole("button", { name: "Redo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1");
+  texts = await detectedRunTexts(page);
+  expect(texts.some((text) => text.includes("Employee file"))).toBe(true);
+  expect(texts.some((text) => text.includes("123-45-6789"))).toBe(true);
+  expect(await blackMaskCount(page)).toBe(0);
+
+  await page.getByRole("button", { name: "Redo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "3");
+  await expect
+    .poll(
+      async () => ({
+        employeeEdited: (await detectedRunTexts(page)).some((text) =>
+          text.includes("Employee file"),
+        ),
+        ssnRemoved: !(await detectedRunTexts(page)).some((text) =>
+          text.includes("123-45-6789"),
+        ),
+        hasMask: (await blackMaskCount(page)) > 0,
+      }),
+      {
+        timeout: 90_000,
+        message: "second redo should reapply Redaction after the Edit",
+      },
+    )
+    .toEqual({ employeeEdited: true, ssnRemoved: true, hasMask: true });
 });
 
 test("vinext Edit PDF supports text matching, editing, and export", async ({

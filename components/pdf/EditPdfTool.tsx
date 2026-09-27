@@ -4059,6 +4059,8 @@ export default function EditPdfTool() {
       className="relative l2-workspace-deep grid gap-4 pb-40 lg:pb-28"
       data-edit-operation-count={historyState.session.operations.length}
       data-edit-session-next-sequence={historyState.session.nextSequence}
+      data-edit-semantic-history-count={historyState.session.semanticHistory.entries.length}
+      data-edit-semantic-history-next-sequence={historyState.session.semanticHistory.nextSequence}
     >
       <L2WorkspaceHeader
         title="Edit PDF"

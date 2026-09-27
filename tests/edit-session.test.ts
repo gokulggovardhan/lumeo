@@ -26,11 +26,30 @@ test("PdfEditSession appends deterministic semantic operations without mutating 
   ]);
 
   assert.equal(initial.operations.length, 0);
+  assert.equal(initial.semanticHistory.entries.length, 0);
   assert.equal(initial.nextSequence, 1);
   assert.equal(next.sourceByteLength, 2048);
   assert.equal(next.operations.length, 1);
   assert.equal(next.operations[0].id, "edit-op-1");
   assert.equal(next.operations[0].kind, "replaceText");
+  assert.equal(next.semanticHistory.entries.length, 1);
+  const semantic = next.semanticHistory.entries[0];
+  assert.equal(semantic.tool, "edit");
+  assert.equal(semantic.type, "replace-text");
+  assert.deepEqual(semantic.target, {
+    kind: "text",
+    source: "native",
+    pageIndex: 0,
+    ids: ["p0-span-3"],
+  });
+  assert.deepEqual(semantic.before, {
+    present: true,
+    text: "Employee record",
+  });
+  assert.deepEqual(semantic.after, {
+    present: true,
+    text: "Employee file",
+  });
   assert.equal(next.nextSequence, 2);
 });
 
@@ -103,6 +122,48 @@ test("page operations retain page counts and affected indices for deterministic 
   });
 });
 
+
+test("page and redaction operations use the shared pages vocabulary without storing redacted text", () => {
+  const pageDelete = pageOperation({
+    operation: "delete",
+    beforePageCount: 5,
+    afterPageCount: 4,
+    affectedPageIndices: [2],
+    description: "Removed page 3.",
+  });
+  const redact = pageOperation({
+    operation: "redact",
+    beforePageCount: 4,
+    afterPageCount: 4,
+    affectedPageIndices: [1],
+    description: "Redacted 2 detected regions on page 2.",
+  });
+
+  const next = appendPdfEditOperations(createPdfEditSession(4096), [
+    pageDelete,
+    redact,
+  ]);
+
+  const [deleteEntry, redactEntry] = next.semanticHistory.entries;
+  assert.equal(deleteEntry.tool, "pages");
+  assert.equal(deleteEntry.type, "delete-pages");
+  assert.deepEqual(deleteEntry.target, {
+    kind: "pages",
+    pageIndices: [2],
+  });
+  assert.deepEqual(deleteEntry.before, { pageCount: 5 });
+  assert.deepEqual(deleteEntry.after, { pageCount: 4 });
+
+  assert.equal(redactEntry.tool, "redaction");
+  assert.equal(redactEntry.type, "redact");
+  assert.deepEqual(redactEntry.target, {
+    kind: "pages",
+    pageIndices: [1],
+  });
+  assert.deepEqual(redactEntry.before, { pageCount: 4 });
+  assert.deepEqual(redactEntry.after, { pageCount: 4 });
+  assert.equal(JSON.stringify(redactEntry).includes("detected regions"), true);
+});
 
 test("native text formatting is journaled as a real changeStyle operation", () => {
   const target = {

@@ -1,4 +1,13 @@
 import type { EditElement, TextEditElement } from "./elements.ts";
+import {
+  appendPdfSemanticHistory,
+  createPdfSemanticHistory,
+  type PdfSemanticHistoryDraft,
+  type PdfSemanticHistoryJournal,
+  type PdfSemanticState,
+  type PdfSemanticTarget,
+  type PdfSemanticTextStyle,
+} from "../history/semanticHistory.ts";
 
 export type PdfEditGeometry = {
   pageIndex: number;
@@ -101,6 +110,7 @@ export type PdfEditSessionState = {
   sourceByteLength: number;
   nextSequence: number;
   operations: PdfEditOperation[];
+  semanticHistory: PdfSemanticHistoryJournal;
 };
 
 export function createPdfEditSession(sourceByteLength = 0): PdfEditSessionState {
@@ -108,6 +118,7 @@ export function createPdfEditSession(sourceByteLength = 0): PdfEditSessionState 
     sourceByteLength,
     nextSequence: 1,
     operations: [],
+    semanticHistory: createPdfSemanticHistory(),
   };
 }
 
@@ -132,6 +143,10 @@ export function appendPdfEditOperations(
     ...session,
     nextSequence: sequence,
     operations: [...session.operations, ...appended],
+    semanticHistory: appendPdfSemanticHistory(
+      session.semanticHistory,
+      drafts.map(semanticDraftForOperation),
+    ),
   };
 }
 
@@ -153,6 +168,147 @@ function styleOf(element: TextEditElement): PdfEditTextStyle {
     italic: element.italic,
     underline: element.underline,
   };
+}
+
+function semanticGeometry(geometry: PdfEditGeometry) {
+  return { ...geometry };
+}
+
+function semanticStyle(style: PdfEditTextStyle): PdfSemanticTextStyle {
+  return { ...style };
+}
+
+function semanticTextTarget(target: PdfTextTarget): PdfSemanticTarget {
+  return target.kind === "native-text"
+    ? {
+        kind: "text",
+        source: "native",
+        pageIndex: target.pageIndex,
+        ids: [...target.spanIds],
+      }
+    : {
+        kind: "text",
+        source: "overlay",
+        pageIndex: target.pageIndex,
+        ids: [target.elementId],
+      };
+}
+
+function semanticElementTarget(element: EditElement): PdfSemanticTarget {
+  return {
+    kind: "element",
+    pageIndex: element.pageIndex,
+    elementId: element.id,
+    elementType: element.type,
+  };
+}
+
+function semanticElementState(element: EditElement): PdfSemanticState {
+  return element.type === "text"
+    ? {
+        present: true,
+        text: element.text,
+        geometry: semanticGeometry(geometryOf(element)),
+        style: semanticStyle(styleOf(element)),
+      }
+    : {
+        present: true,
+        geometry: semanticGeometry(geometryOf(element)),
+      };
+}
+
+function semanticDraftForOperation(
+  operation: PdfEditOperationDraft,
+): PdfSemanticHistoryDraft {
+  switch (operation.kind) {
+    case "replaceText":
+      return {
+        tool: "edit",
+        type: "replace-text",
+        target: semanticTextTarget(operation.target),
+        before: { present: true, text: operation.originalText },
+        after: { present: true, text: operation.replacementText },
+      };
+    case "insertText":
+      return {
+        tool: "edit",
+        type: "insert",
+        target: semanticTextTarget(operation.target),
+        before: null,
+        after: {
+          present: true,
+          text: operation.text,
+          style: semanticStyle(operation.style),
+          geometry: semanticGeometry(operation.geometry),
+        },
+      };
+    case "deleteText":
+      return {
+        tool: "edit",
+        type: "delete",
+        target: semanticTextTarget(operation.target),
+        before: { present: true, text: operation.originalText },
+        after: null,
+      };
+    case "changeStyle":
+      return {
+        tool: "edit",
+        type: "change-style",
+        target: semanticTextTarget(operation.target),
+        before: { style: semanticStyle(operation.before) },
+        after: { style: semanticStyle(operation.after) },
+      };
+    case "changeGeometry":
+      return {
+        tool: "edit",
+        type: "change-geometry",
+        target: {
+          kind: "element",
+          pageIndex: operation.target.pageIndex,
+          elementId: operation.target.elementId,
+          elementType: "edit-element",
+        },
+        before: { geometry: semanticGeometry(operation.before) },
+        after: { geometry: semanticGeometry(operation.after) },
+      };
+    case "insertElement":
+      return {
+        tool: "edit",
+        type: "insert",
+        target: semanticElementTarget(operation.element),
+        before: null,
+        after: semanticElementState(operation.element),
+      };
+    case "deleteElement":
+      return {
+        tool: "edit",
+        type: "delete",
+        target: semanticElementTarget(operation.element),
+        before: semanticElementState(operation.element),
+        after: null,
+      };
+    case "pageOperation": {
+      const type =
+        operation.operation === "reorder"
+          ? "reorder-pages"
+          : operation.operation === "delete"
+            ? "delete-pages"
+            : operation.operation === "merge"
+              ? "merge-pages"
+              : "redact";
+      return {
+        tool: operation.operation === "redact" ? "redaction" : "pages",
+        type,
+        target: {
+          kind: "pages",
+          pageIndices: [...operation.affectedPageIndices],
+        },
+        before: { pageCount: operation.beforePageCount },
+        after: { pageCount: operation.afterPageCount },
+        description: operation.description,
+      };
+    }
+  }
 }
 
 function sameGeometry(a: PdfEditGeometry, b: PdfEditGeometry): boolean {

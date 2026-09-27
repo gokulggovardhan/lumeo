@@ -51,6 +51,12 @@ import {
   setDefaultSignature,
 } from "@/lib/sign/signatureLibrary";
 import type { PlacedElement, PlacedElementType, SavedSignature } from "@/lib/sign/types";
+import { deriveSignSemanticHistory } from "@/lib/sign/signSemanticHistory";
+import {
+  appendPdfSemanticHistory,
+  createPdfSemanticHistory,
+  type PdfSemanticHistoryJournal,
+} from "@/lib/pdf/history/semanticHistory";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
@@ -85,6 +91,11 @@ const DEFAULT_FONT_SIZE_PT = 20;
 
 type Toast = { id: string; message: string; tone: "success" | "error" };
 
+type SignHistorySnapshot = {
+  elements: PlacedElement[];
+  semanticHistory: PdfSemanticHistoryJournal;
+};
+
 const THUMBNAIL_SCALE = 0.2;
 
 function sanitizePdfFileName(value: string, fallback = "lumeo-signed") {
@@ -118,7 +129,59 @@ export default function SignPdfTool() {
   const [error, setError] = useState("");
   const [pageLoading, setPageLoading] = useState(false);
 
-  const { state: elements, set: setElements, undo, redo, canUndo, canRedo, reset: resetElements } = useHistoryState<PlacedElement[]>([]);
+  const {
+    state: signHistoryState,
+    set: setSignHistoryState,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    reset: resetSignHistory,
+  } = useHistoryState<SignHistorySnapshot>({
+    elements: [],
+    semanticHistory: createPdfSemanticHistory(),
+  });
+  const elements = signHistoryState.elements;
+  // Preserve Sign's exact existing setElements contract and ref-backed
+  // useHistoryState authority. The semantic journal travels inside the same
+  // snapshot, so one placement/drag/edit is still one undo step.
+  const setElements = useCallback(
+    (
+      updater:
+        | PlacedElement[]
+        | ((current: PlacedElement[]) => PlacedElement[]),
+    ) => {
+      setSignHistoryState((current) => {
+        const nextElements =
+          typeof updater === "function"
+            ? (updater as (items: PlacedElement[]) => PlacedElement[])(
+                current.elements,
+              )
+            : updater;
+        const semanticDrafts = deriveSignSemanticHistory(
+          current.elements,
+          nextElements,
+        );
+        return {
+          elements: nextElements,
+          semanticHistory: appendPdfSemanticHistory(
+            current.semanticHistory,
+            semanticDrafts,
+          ),
+        };
+      });
+    },
+    [setSignHistoryState],
+  );
+  const resetElements = useCallback(
+    (nextElements: PlacedElement[]) => {
+      resetSignHistory({
+        elements: nextElements,
+        semanticHistory: createPdfSemanticHistory(),
+      });
+    },
+    [resetSignHistory],
+  );
   const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [armedSignature, setArmedSignature] = useState<CreatedSignature | SavedSignature | null>(null);
@@ -600,7 +663,11 @@ export default function SignPdfTool() {
   }
 
   return (
-    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+    <section
+      className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6"
+      data-sign-semantic-history-count={signHistoryState.semanticHistory.entries.length}
+      data-sign-semantic-history-next-sequence={signHistoryState.semanticHistory.nextSequence}
+    >
       <L2WorkspaceHeader
         title="Sign PDF"
         description={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
