@@ -886,6 +886,8 @@ export default function EditPdfTool() {
       pageCount: number;
       renderedCount: number;
       failedCount: number;
+      mountedCount: number;
+      virtualized: boolean;
     }) => {
       performanceDiagnosticsRef.current?.recordDuration(
         "thumbnail-batch",
@@ -895,7 +897,8 @@ export default function EditPdfTool() {
             pageCount: sample.pageCount,
             renderedCount: sample.renderedCount,
             failedCount: sample.failedCount,
-            eagerDomRowCount: sample.pageCount,
+            mountedDomRowCount: sample.mountedCount,
+            virtualized: sample.virtualized,
           },
         },
       );
