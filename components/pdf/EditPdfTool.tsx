@@ -3879,6 +3879,12 @@ export default function EditPdfTool() {
           spanId: singleSelectedSpan.id,
           family: `"${family}", ${fallback}`,
         });
+      })
+      .finally(() => {
+        if (cancelled) return;
+        performanceDiagnosticsRef.current?.setFontRegistrySnapshot(
+          fontRegistry.performanceSnapshot(),
+        );
       });
     return () => {
       cancelled = true;
