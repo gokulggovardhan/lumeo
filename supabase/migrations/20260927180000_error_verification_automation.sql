@@ -30,7 +30,7 @@ comment on column public.error_logs.verified_at is
 update public.error_logs
 set
   resolution_provenance = 'legacy_manual',
-  verified_at = coalesce(verified_at, resolved_at)
+  verified_at = null
 where status = 'resolved'
   and resolution_provenance is null;
 
