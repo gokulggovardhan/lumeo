@@ -41,6 +41,10 @@ import {
   isValidatedShapedGlyphEditPlan,
   type ValidatedShapedGlyphEditPlan,
 } from "./shapedGlyphEditPlan.ts";
+import {
+  isValidatedParagraphEditPlan,
+  type ValidatedParagraphEditPlan,
+} from "./paragraphEditPlan.ts";
 import { ensureFallbackFontResource, resolveFallbackFontsDict } from "./fallbackFont.ts";
 import {
   isValidatedMultiRunEditPlan,
@@ -1069,4 +1073,40 @@ export async function applyValidatedEditPlanBatchToDocument(
       bytes,
     );
   }
+}
+
+
+/**
+ * Applies one already-validated line-preserving paragraph edit atomically.
+ *
+ * Paragraph planning never invents line geometry: every line owns ordinary
+ * validated EditPlans whose byte offsets were measured against the same
+ * original stream. Reusing the generic right-to-left batch writer preserves
+ * those offsets and publishes the paragraph only after every line succeeds.
+ */
+export async function applyParagraphEditPlanToDocument(
+  doc: PDFDocument,
+  plan: ValidatedParagraphEditPlan,
+  bytesPerCode: 1 | 2,
+): Promise<void> {
+  if (!isValidatedParagraphEditPlan(plan)) {
+    throw new EditPlanRejectedError(
+      "This paragraph edit plan was not issued by the validated paragraph planner.",
+    );
+  }
+
+  const entries = plan.lines.flatMap((line) =>
+    line.subPlans.map((subPlan) => ({
+      plan: subPlan,
+      bytesPerCode,
+    })),
+  );
+
+  if (entries.length === 0) {
+    throw new EditPlanRejectedError(
+      "This paragraph edit contains no validated native text plans.",
+    );
+  }
+
+  await applyValidatedEditPlanBatchToDocument(doc, entries);
 }
