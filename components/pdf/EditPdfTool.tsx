@@ -5438,7 +5438,7 @@ export default function EditPdfTool() {
                   ) : null}
 
                   {activeTool === "select" && textDetectionCurrent && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
-                    <div className="absolute left-3 top-3 z-20 max-w-[260px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
+                    <div className="absolute left-3 top-3 z-20 max-w-[360px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
                         {pageTextCapability.nativeSpanCount > 0
                           ? pageCapabilityMessage.title
@@ -5454,6 +5454,79 @@ export default function EditPdfTool() {
                             ? pageCapabilityMessage.detail
                             : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
                       </p>
+                      {pageTextCapability.rasterImageEvidence ? (
+                        <div
+                          data-edit-local-ocr
+                          className="mt-3 border-t border-[var(--text-primary)]/10 pt-3"
+                        >
+                          <button
+                            type="button"
+                            onClick={() => void handleRecognizeScannedPage()}
+                            disabled={ocrBusy}
+                            className="min-h-10 rounded-lg border border-[var(--lumeo-gold)]/45 bg-[var(--lumeo-gold)]/10 px-3 text-[11px] font-bold text-[var(--text-primary)] transition hover:border-[var(--lumeo-gold)]/70 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {ocrBusyCurrent
+                              ? "Recognizing locally…"
+                              : ocrBusy
+                                ? "OCR busy on another page…"
+                                : ocrResultCurrent
+                                  ? "Recognize again locally"
+                                  : "Recognize text locally"}
+                          </button>
+                          {ocrBusyCurrent ? (
+                            <div
+                              role="status"
+                              data-edit-ocr-progress
+                              className="mt-2 text-[10px] text-[var(--text-primary)]/55"
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <span className="capitalize">
+                                  {ocrProgress?.status ?? "Starting OCR"}
+                                </span>
+                                <span>{Math.round((ocrProgress?.progress ?? 0) * 100)}%</span>
+                              </div>
+                              <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--text-primary)]/10">
+                                <div
+                                  className="h-full rounded-full bg-[var(--lumeo-gold)] transition-[width]"
+                                  style={{
+                                    width: `${Math.round((ocrProgress?.progress ?? 0) * 100)}%`,
+                                  }}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+                          {ocrErrorCurrent ? (
+                            <p
+                              role="alert"
+                              data-edit-ocr-error
+                              className="mt-2 text-[10px] leading-4 text-[var(--text-danger)]"
+                            >
+                              {ocrErrorCurrent}
+                            </p>
+                          ) : null}
+                          {ocrResultCurrent ? (
+                            <div data-edit-ocr-result className="mt-3">
+                              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold text-[var(--text-primary)]/65">
+                                <span>Recognized text</span>
+                                <span>·</span>
+                                <span>{localOcrConfidenceLabel(ocrResultCurrent.confidence)}</span>
+                                {ocrResultCurrent.confidence !== null ? (
+                                  <span>· {Math.round(ocrResultCurrent.confidence)}%</span>
+                                ) : null}
+                              </div>
+                              <textarea
+                                readOnly
+                                aria-label="Recognized OCR text"
+                                value={ocrResultCurrent.text}
+                                className="mt-2 h-28 w-full resize-y rounded-lg border border-[var(--text-primary)]/12 bg-[var(--surface-input)] p-2 text-[11px] leading-5 text-[var(--text-primary)] outline-none"
+                              />
+                              <p className="mt-1.5 text-[9px] leading-4 text-[var(--text-primary)]/45">
+                                OCR runs in your browser. Review the result before using it; recognized text does not become native PDF edit authority automatically.
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                   {redactMode ? (
