@@ -12,9 +12,18 @@
 // effects would make both harder to follow. The pattern mirrors
 // OrganizePdfTool's rail, which has the same job.
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { renderPageWithTimeout } from "@/lib/pdf/pdfjs";
+import {
+  THUMBNAIL_ROW_HEIGHT_PX,
+  computeThumbnailWindow,
+  scrollTopForThumbnail,
+} from "@/lib/pdf/edit/thumbnailVirtualization";
+import {
+  editPerformanceDiagnostics,
+  editPerformanceNow,
+} from "@/lib/pdf/edit/editPerformanceDiagnostics";
 
 const THUMBNAIL_SCALE = 0.28;
 const THUMBNAIL_CONCURRENCY = 3;
@@ -42,6 +51,7 @@ type ThumbProps = {
   dragging: boolean;
   dropTarget: boolean;
   disabled: boolean;
+  virtualized: boolean;
   onOpen: (pageIndex: number) => void;
   onToggle: (pageIndex: number, additive: boolean) => void;
   onDragStart: (pageIndex: number) => void;
@@ -58,6 +68,7 @@ const Thumb = memo(function Thumb({
   dragging,
   dropTarget,
   disabled,
+  virtualized,
   onOpen,
   onToggle,
   onDragStart,
@@ -76,7 +87,7 @@ const Thumb = memo(function Thumb({
       // The drop indicator is a border on the neighbour rather than a
       // separate inserted node, so the list never reflows mid-drag -- a
       // shifting list makes the drop target move out from under the cursor.
-      className={`relative ${dropTarget ? "before:absolute before:-top-1 before:left-2 before:right-2 before:h-0.5 before:rounded before:bg-[var(--lumeo-gold)]" : ""}`}
+      className={`relative ${virtualized ? "h-[148px]" : ""} ${dropTarget ? "before:absolute before:-top-1 before:left-2 before:right-2 before:h-0.5 before:rounded before:bg-[var(--lumeo-gold)]" : ""}`}
     >
       <div
         draggable={!disabled}
@@ -149,6 +160,61 @@ export default function PageThumbnailSidebar({
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
   const urlsRef = useRef<string[]>([]);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const [scrollMetrics, setScrollMetrics] = useState({
+    top: 0,
+    height: THUMBNAIL_ROW_HEIGHT_PX * 8,
+  });
+  const thumbnailWindow = useMemo(
+    () =>
+      computeThumbnailWindow({
+        pageCount,
+        scrollTop: scrollMetrics.top,
+        viewportHeight: scrollMetrics.height,
+      }),
+    [pageCount, scrollMetrics.height, scrollMetrics.top],
+  );
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    const measure = () => {
+      setScrollMetrics((current) => {
+        const next = {
+          top: list.scrollTop,
+          height: Math.max(1, list.clientHeight),
+        };
+        return current.top === next.top && current.height === next.height
+          ? current
+          : next;
+      });
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(list);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!thumbnailWindow.virtualized) return;
+    const list = listRef.current;
+    if (!list) return;
+    const targetTop = activePageIndex * THUMBNAIL_ROW_HEIGHT_PX;
+    const targetBottom = targetTop + THUMBNAIL_ROW_HEIGHT_PX;
+    const visibleTop = list.scrollTop;
+    const visibleBottom = visibleTop + list.clientHeight;
+    if (targetTop >= visibleTop && targetBottom <= visibleBottom) return;
+    const nextTop = scrollTopForThumbnail({
+      pageIndex: activePageIndex,
+      viewportHeight: list.clientHeight,
+    });
+    list.scrollTop = nextTop;
+    setScrollMetrics({
+      top: nextTop,
+      height: Math.max(1, list.clientHeight),
+    });
+  }, [activePageIndex, thumbnailWindow.virtualized]);
 
   // Keyed on docReady as well as pageCount: a reorder or a text edit
   // replaces the document without necessarily changing how many pages it
@@ -165,9 +231,16 @@ export default function PageThumbnailSidebar({
     void (async () => {
       const doc = getDocument();
       if (!doc || pageCount === 0) return;
-      const pending = Array.from({ length: pageCount }, (_, index) => index);
+      const pending = Array.from(
+        {
+          length:
+            thumbnailWindow.endIndexExclusive - thumbnailWindow.startIndex,
+        },
+        (_, offset) => thumbnailWindow.startIndex + offset,
+      );
 
       async function renderOne(pageIndex: number) {
+        const performanceStartedAt = editPerformanceNow();
         try {
           const page = await doc!.getPage(pageIndex + 1);
           if (cancelled) return;
@@ -190,12 +263,34 @@ export default function PageThumbnailSidebar({
 
           const url = URL.createObjectURL(blob);
           created.push(url);
+          editPerformanceDiagnostics.record(
+            "thumbnail-render",
+            editPerformanceNow() - performanceStartedAt,
+            {
+              pageIndex,
+              pageCount,
+              itemCount: canvas.width * canvas.height,
+              byteCount: blob.size,
+              success: true,
+            },
+          );
           setThumbnails((current) =>
             current.generation === docReady
               ? { generation: docReady, urls: { ...current.urls, [pageIndex]: url } }
               : { generation: docReady, urls: { [pageIndex]: url } },
           );
         } catch {
+          if (!cancelled) {
+            editPerformanceDiagnostics.record(
+              "thumbnail-render",
+              editPerformanceNow() - performanceStartedAt,
+              {
+                pageIndex,
+                pageCount,
+                success: false,
+              },
+            );
+          }
           // Best-effort: a page without a thumbnail is still selectable and
           // still reorderable, so a single failed render must not take the
           // rail down with it.
@@ -217,7 +312,13 @@ export default function PageThumbnailSidebar({
       cancelled = true;
       for (const url of previous) URL.revokeObjectURL(url);
     };
-  }, [docReady, pageCount, getDocument]);
+  }, [
+    docReady,
+    pageCount,
+    getDocument,
+    thumbnailWindow.endIndexExclusive,
+    thumbnailWindow.startIndex,
+  ]);
 
   useEffect(
     () => () => {
@@ -244,28 +345,55 @@ export default function PageThumbnailSidebar({
       <p className="px-2 pt-2 text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
         Pages
       </p>
-      <ul className="flex-1 space-y-1 overflow-y-auto overscroll-contain p-1.5">
-        {Array.from({ length: pageCount }, (_, pageIndex) => (
-          <Thumb
-            key={pageIndex}
-            pageIndex={pageIndex}
-            url={visibleThumbnails[pageIndex]}
-            active={pageIndex === activePageIndex}
-            selected={selected.has(pageIndex)}
-            dragging={dragIndex === pageIndex}
-            dropTarget={overIndex === pageIndex && dragIndex !== null && dragIndex !== pageIndex}
-            disabled={busy}
-            onOpen={onSelectPage}
-            onToggle={onToggleSelected}
-            onDragStart={setDragIndex}
-            onDragOver={setOverIndex}
-            onDrop={handleDrop}
-            onDragEnd={() => {
-              setDragIndex(null);
-              setOverIndex(null);
-            }}
+      <ul
+        ref={listRef}
+        data-thumbnail-virtualized={thumbnailWindow.virtualized ? "true" : "false"}
+        data-thumbnail-window-size={thumbnailWindow.indices.length}
+        onScroll={(event) => {
+          const list = event.currentTarget;
+          setScrollMetrics({
+            top: list.scrollTop,
+            height: Math.max(1, list.clientHeight),
+          });
+        }}
+        className="flex-1 overflow-y-auto overscroll-contain p-1.5"
+      >
+        {thumbnailWindow.topSpacerPx > 0 ? (
+          <li
+            aria-hidden="true"
+            style={{ height: thumbnailWindow.topSpacerPx }}
           />
-        ))}
+        ) : null}
+        <div className="space-y-1">
+          {thumbnailWindow.indices.map((pageIndex) => (
+            <Thumb
+              key={pageIndex}
+              pageIndex={pageIndex}
+              url={visibleThumbnails[pageIndex]}
+              active={pageIndex === activePageIndex}
+              selected={selected.has(pageIndex)}
+              dragging={dragIndex === pageIndex}
+              dropTarget={overIndex === pageIndex && dragIndex !== null && dragIndex !== pageIndex}
+              disabled={busy}
+              virtualized={thumbnailWindow.virtualized}
+              onOpen={onSelectPage}
+              onToggle={onToggleSelected}
+              onDragStart={setDragIndex}
+              onDragOver={setOverIndex}
+              onDrop={handleDrop}
+              onDragEnd={() => {
+                setDragIndex(null);
+                setOverIndex(null);
+              }}
+            />
+          ))}
+        </div>
+        {thumbnailWindow.bottomSpacerPx > 0 ? (
+          <li
+            aria-hidden="true"
+            style={{ height: thumbnailWindow.bottomSpacerPx }}
+          />
+        ) : null}
       </ul>
     </aside>
   );
