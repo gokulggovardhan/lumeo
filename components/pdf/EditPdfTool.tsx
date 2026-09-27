@@ -4403,6 +4403,13 @@ export default function EditPdfTool() {
             nativePaintPlan: nativePaintPlan?.editable ? nativePaintPlan : undefined,
           });
         }
+      } else if (editPreview.kind === "paragraph") {
+        if (!engine.isValidatedParagraphEditPlan(editPreview.plan)) {
+          throw new Error(
+            "The paragraph edit dry-run is no longer valid. Reselect the lines and try again.",
+          );
+        }
+        await engine.applyParagraphEditPlanToDocument(doc, editPreview.plan);
       } else {
         const { plan, resolvedFont } = editPreview;
         if (!isValidatedMultiRunEditPlan(plan)) {
