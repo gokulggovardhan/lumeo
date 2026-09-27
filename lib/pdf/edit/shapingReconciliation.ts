@@ -180,6 +180,11 @@ export function reconcileShapingWithPdfCharacterCodes({
     if (!shapedGlyph) {
       return unresolved("HarfBuzz cluster references a missing shaped glyph.");
     }
+    if (shapedGlyph.clusterUtf16 !== cluster.startUtf16) {
+      return unresolved(
+        "HarfBuzz glyph cluster metadata does not agree with the source cluster that owns it.",
+      );
+    }
 
     const expectedGlyphId = intelligence.glyphIdForCodePoint(codePoint);
     if (expectedGlyphId === null) {
