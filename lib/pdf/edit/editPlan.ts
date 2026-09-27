@@ -23,6 +23,12 @@ import type { EmbeddedGlyphEvidence, ResolvedFont } from "./fontEncoding.ts";
 import { resolveGlyphAuthority } from "./glyphAuthority.ts";
 import type { FontMetrics } from "./fontMetrics.ts";
 import { compareAdvance, compareAdvanceAcrossFonts, compareAdvanceAcrossStates, type TextShowState } from "./fontMetrics.ts";
+import {
+  detectComplexShapingRequirement,
+  isValidatedShapingWriteEvidence,
+  shapingEvidenceMatchesReplacement,
+  type ValidatedShapingWriteEvidence,
+} from "./shapingWriteGuard.ts";
 
 // All four PDF text-showing operators are in scope for in-place editing:
 // Tj, TJ (#197, #198), and ' and " (this slice). ' and " each also
@@ -351,6 +357,8 @@ export function buildEditPlan({
   resolvedFont,
   fontMetrics,
   embeddedGlyphEvidence = null,
+  embeddedProgramSha256 = null,
+  shapingWriteEvidence = null,
   fallbackStyleHints = null,
   replacementTextState = null,
 }: {
@@ -369,6 +377,18 @@ export function buildEditPlan({
    * behaviour.
    */
   embeddedGlyphEvidence?: EmbeddedGlyphEvidence | null;
+  /**
+   * Exact SHA-256 of the embedded font program that produced any shaping
+   * evidence supplied below. Required only when the replacement itself needs
+   * canonical shaping.
+   */
+  embeddedProgramSha256?: string | null;
+  /**
+   * Planner-issued proof that HarfBuzz shaping for this exact replacement and
+   * embedded font is representable by the existing character-code writer.
+   * Advisory shaping data or a plain object cannot satisfy this boundary.
+   */
+  shapingWriteEvidence?: ValidatedShapingWriteEvidence | null;
   /**
    * Opt in to lib/pdf/edit/fallbackFont.ts's substitute-font path for
    * characters the run's own font can't be proven to render: pass the
@@ -566,6 +586,48 @@ export function buildEditPlan({
       editable: false,
       reason: "This font's glyph widths could not be resolved, so replacement spacing can't be computed.",
     };
+  }
+
+  const shapingRequirement = detectComplexShapingRequirement(replacementText);
+  if (shapingRequirement.required) {
+    const shapingRejection = {
+      ...base,
+      originalWidthPt: 0,
+      replacementGlyphCodes: [] as number[],
+      replacementWidthPt: 0,
+      tjSpacingDelta: 0,
+      editable: false as const,
+    };
+
+    if (!shapingWriteEvidence) {
+      return {
+        ...shapingRejection,
+        reason:
+          `${shapingRequirement.reason} Matching HarfBuzz evidence for this exact text and embedded font is required before the native writer can apply it.`,
+      };
+    }
+
+    if (!isValidatedShapingWriteEvidence(shapingWriteEvidence)) {
+      return {
+        ...shapingRejection,
+        reason:
+          "The supplied shaping evidence is not a validated planner-issued proof, so this complex-script edit remains blocked.",
+      };
+    }
+
+    if (
+      !shapingEvidenceMatchesReplacement({
+        evidence: shapingWriteEvidence,
+        replacementText,
+        embeddedProgramSha256,
+      })
+    ) {
+      return {
+        ...shapingRejection,
+        reason:
+          "The shaping proof does not match this exact replacement text and embedded font fingerprint, so it cannot be reused for this edit.",
+      };
+    }
   }
 
   const replacementGlyphCodes: number[] = [];

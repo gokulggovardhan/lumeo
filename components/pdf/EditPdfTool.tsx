@@ -127,6 +127,14 @@ import {
   type MultiRunEditPlan,
 } from "@/lib/pdf/edit/multiRunEditPlan";
 import {
+  resolveCompatibleShapingWriteEvidence,
+  shapingEvidenceRequestKey,
+} from "@/lib/pdf/edit/compatibleShapingEvidence";
+import {
+  detectComplexShapingRequirement,
+  type ValidatedShapingWriteEvidence,
+} from "@/lib/pdf/edit/shapingWriteGuard";
+import {
   buildNativeTextStyleBatchPlan,
   type NativeTextStyleBatchPatch,
 } from "@/lib/pdf/edit/multiStylePlan";
@@ -242,6 +250,10 @@ type EditPreview =
       substituteFont: string | null;
     }
   | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont };
+
+type ShapingEvidenceState =
+  | { key: string; status: "validated"; evidence: ValidatedShapingWriteEvidence }
+  | { key: string; status: "blocked"; reason: string };
 
 // Phase 11 UX audit -- Shape tool's place in Edit PDF, decided: KEEP.
 // Rect/ellipse/line are genuine freeform annotation shapes with no other
@@ -707,6 +719,8 @@ export default function EditPdfTool() {
     family: string;
     embeddedProgramSha256: string;
   } | null>(null);
+  const [shapingEvidenceState, setShapingEvidenceState] =
+    useState<ShapingEvidenceState | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
   const [textSearchOpen, setTextSearchOpen] = useState(false);
   const [textSearchQuery, setTextSearchQuery] = useState("");
@@ -2882,12 +2896,18 @@ export default function EditPdfTool() {
         operator: LocatedTextOperator["operator"];
         fallbackStyleHints: import("@/lib/pdf/edit/fallbackFont").FallbackStyleHints;
         embeddedGlyphEvidence: EmbeddedGlyphEvidence | null;
+        embeddedProgramSha256: string | null;
+        resources: PDFDict;
+        fontResourceName: string;
       }
     | {
         kind: "multi";
         resolvedFont: ResolvedFont;
         fontMetrics: FontMetrics;
         embeddedGlyphEvidence: EmbeddedGlyphEvidence | null;
+        embeddedProgramSha256: string | null;
+        resources: PDFDict;
+        fontResourceName: string;
         validation: Extract<MultiRunValidation, { kind: "valid" }>;
       };
 
@@ -2924,6 +2944,9 @@ export default function EditPdfTool() {
             resolvedFont,
             fontMetrics,
             embeddedGlyphEvidence,
+            embeddedProgramSha256: profile.embeddedProgramSha256,
+            resources: validation.resources,
+            fontResourceName: validation.fontResourceName,
             validation,
           };
         }
@@ -2935,6 +2958,9 @@ export default function EditPdfTool() {
           operator,
           fallbackStyleHints,
           embeddedGlyphEvidence,
+          embeddedProgramSha256: profile.embeddedProgramSha256,
+          resources: locatedOperator.resources,
+          fontResourceName: operator.fontResourceName,
         };
       }
 
@@ -2950,6 +2976,9 @@ export default function EditPdfTool() {
         resolvedFont: profile.resolvedFont,
         fontMetrics: profile.metrics,
         embeddedGlyphEvidence: profile.embeddedGlyphEvidence,
+        embeddedProgramSha256: profile.embeddedProgramSha256,
+        resources: validation.resources,
+        fontResourceName: validation.fontResourceName,
         validation,
       };
     } catch (resolveError) {
@@ -2958,6 +2987,120 @@ export default function EditPdfTool() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over the explicitly listed page/write evidence below.
   }, [fontRegistry, selectedRunIndices, editableRunMatches, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions, pageTextModel, logicalSelection]);
+
+  const shapingRequirement = useMemo(
+    () => detectComplexShapingRequirement(editDraftText),
+    [editDraftText],
+  );
+
+  const shapingEvidenceRequest = useMemo(() => {
+    if (
+      !shapingRequirement.required ||
+      (resolvedEditContext.kind !== "single" &&
+        resolvedEditContext.kind !== "multi")
+    ) {
+      return null;
+    }
+
+    return {
+      key: shapingEvidenceRequestKey({
+        pageIndex,
+        selectionKey: nativeTextSelectionKey,
+        resourceName: resolvedEditContext.fontResourceName,
+        embeddedProgramSha256: resolvedEditContext.embeddedProgramSha256,
+        replacementText: editDraftText,
+      }),
+      replacementText: editDraftText,
+      embeddedProgramSha256: resolvedEditContext.embeddedProgramSha256,
+      resources: resolvedEditContext.resources,
+      resourceName: resolvedEditContext.fontResourceName,
+    };
+  }, [
+    shapingRequirement.required,
+    resolvedEditContext,
+    pageIndex,
+    nativeTextSelectionKey,
+    editDraftText,
+  ]);
+
+  useEffect(() => {
+    if (!fontRegistry || !shapingEvidenceRequest) return;
+
+    let cancelled = false;
+    const request = shapingEvidenceRequest;
+
+    void (async () => {
+      try {
+        // HarfBuzz remains completely off the ordinary edit path. It is
+        // imported only after the replacement text itself proves shaping is
+        // required, and all bytes stay browser-local.
+        const { shapeEmbeddedFontText } = await import(
+          "@/lib/pdf/edit/harfbuzzShaping"
+        );
+        const result = await resolveCompatibleShapingWriteEvidence({
+          replacementText: request.replacementText,
+          embeddedProgramSha256: request.embeddedProgramSha256,
+          inspect: (options, shapeText) =>
+            fontRegistry.inspectShapingCompatibility(
+              request.resources,
+              request.resourceName,
+              request.replacementText,
+              options,
+              shapeText,
+            ),
+          shapeText: shapeEmbeddedFontText,
+        });
+
+        if (cancelled) return;
+        if (result.kind === "validated") {
+          setShapingEvidenceState({
+            key: request.key,
+            status: "validated",
+            evidence: result.evidence,
+          });
+        } else if (result.kind === "blocked") {
+          setShapingEvidenceState({
+            key: request.key,
+            status: "blocked",
+            reason: result.reason,
+          });
+        } else {
+          setShapingEvidenceState(null);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setShapingEvidenceState({
+          key: request.key,
+          status: "blocked",
+          reason:
+            error instanceof Error
+              ? error.message
+              : "The embedded font could not be shaped safely.",
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fontRegistry, shapingEvidenceRequest]);
+
+  const currentShapingEvidence =
+    shapingEvidenceRequest &&
+    shapingEvidenceState?.key === shapingEvidenceRequest.key &&
+    shapingEvidenceState.status === "validated"
+      ? shapingEvidenceState.evidence
+      : null;
+  const currentShapingBlockReason =
+    shapingEvidenceRequest &&
+    shapingEvidenceState?.key === shapingEvidenceRequest.key &&
+    shapingEvidenceState.status === "blocked"
+      ? shapingEvidenceState.reason
+      : null;
+  const shapingEvidencePending =
+    Boolean(shapingEvidenceRequest) &&
+    (!shapingEvidenceState ||
+      shapingEvidenceState.key !== shapingEvidenceRequest?.key);
 
   // Phase 9.2: the live dry-run preview driving both the Apply button's
   // disabled state and the specific reason shown next to it -- see
@@ -2984,6 +3127,7 @@ export default function EditPdfTool() {
         operator,
         fallbackStyleHints,
         embeddedGlyphEvidence,
+        embeddedProgramSha256,
       } = resolvedEditContext;
       const planInputs = {
         pageIndex,
@@ -2995,6 +3139,8 @@ export default function EditPdfTool() {
         resolvedFont,
         fontMetrics,
         embeddedGlyphEvidence,
+        embeddedProgramSha256,
+        shapingWriteEvidence: currentShapingEvidence,
         replacementTextState: nativeStyleOverride,
       };
 
@@ -3011,6 +3157,8 @@ export default function EditPdfTool() {
           resolvedFont,
           fontMetrics,
           embeddedGlyphEvidence,
+          embeddedProgramSha256,
+          shapingWriteEvidence: currentShapingEvidence,
           replacementTextState: nativeStyleOverride,
         });
         if (snapshotPlan.kind === "blocked") {
@@ -3036,7 +3184,11 @@ export default function EditPdfTool() {
       // and the substitution path can never quietly pre-empt a perfect
       // same-font edit.
       let substitutePlan: EditPlan | null = null;
-      if (!strictPlan.editable && !nativeStyleOverride) {
+      if (
+        !strictPlan.editable &&
+        !nativeStyleOverride &&
+        !shapingRequirement.required
+      ) {
         if (activeCaretTextStyleSnapshot && editDraftText.length > 0) {
           const snapshotFallback = buildCaretRetypePlan({
             snapshot: activeCaretTextStyleSnapshot,
@@ -3045,6 +3197,8 @@ export default function EditPdfTool() {
             resolvedFont,
             fontMetrics,
             embeddedGlyphEvidence,
+            embeddedProgramSha256,
+            shapingWriteEvidence: currentShapingEvidence,
             fallbackStyleHints,
           });
           substitutePlan =
@@ -3059,6 +3213,29 @@ export default function EditPdfTool() {
       }
       const substituteAvailable = substitutePlan?.editable ? substitutePlan : null;
       const plan = useSubstituteFont && substituteAvailable ? substituteAvailable : strictPlan;
+
+      if (shapingRequirement.required && shapingEvidencePending) {
+        return {
+          kind: "single",
+          editable: false,
+          reason: "Checking this text against the exact embedded font locally…",
+          plan,
+          resolvedFont,
+          locatedOperator,
+          substituteFont: null,
+        };
+      }
+      if (shapingRequirement.required && currentShapingBlockReason) {
+        return {
+          kind: "single",
+          editable: false,
+          reason: currentShapingBlockReason,
+          plan,
+          resolvedFont,
+          locatedOperator,
+          substituteFont: null,
+        };
+      }
 
       // Real bug, found via live browser testing: see
       // lib/pdf/edit/matchTextRun.ts's runSpansMultipleOperators for the
@@ -3093,6 +3270,7 @@ export default function EditPdfTool() {
       resolvedFont,
       fontMetrics,
       embeddedGlyphEvidence,
+      embeddedProgramSha256,
       validation,
     } = resolvedEditContext;
     try {
@@ -3105,13 +3283,46 @@ export default function EditPdfTool() {
         resolvedFont,
         fontMetrics,
         embeddedGlyphEvidence,
+        embeddedProgramSha256,
+        shapingWriteEvidence: currentShapingEvidence,
       });
+      if (shapingRequirement.required && shapingEvidencePending) {
+        return {
+          kind: "multi",
+          editable: false,
+          reason: "Checking this text against the exact embedded font locally…",
+          plan,
+          resolvedFont,
+        };
+      }
+      if (shapingRequirement.required && currentShapingBlockReason) {
+        return {
+          kind: "multi",
+          editable: false,
+          reason: currentShapingBlockReason,
+          plan,
+          resolvedFont,
+        };
+      }
       return { kind: "multi", editable: plan.editable, reason: plan.reason, plan, resolvedFont };
     } catch (previewError) {
       const reason = previewError instanceof Error ? previewError.message : "Could not validate this edit.";
       return { kind: "multi", editable: false, reason, plan: null as never, resolvedFont: null as never };
     }
-  }, [resolvedEditContext, editDraftText, detectedTextRuns, selectedRunIndices, pageIndex, useSubstituteFont, nativeStyleOverride, activeCaretTextStyleSnapshot]);
+  }, [
+    resolvedEditContext,
+    editDraftText,
+    detectedTextRuns,
+    selectedRunIndices,
+    pageIndex,
+    useSubstituteFont,
+    nativeStyleOverride,
+    activeCaretTextStyleSnapshot,
+    shapingRequirement.required,
+    shapingEvidencePending,
+    currentShapingEvidence,
+    currentShapingBlockReason,
+  ]);
 
   const replacementLayoutDecision = useMemo(() => {
     if (editPreview.kind === "empty" || !editPreview.editable) return null;
