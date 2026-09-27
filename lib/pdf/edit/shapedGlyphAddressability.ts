@@ -57,6 +57,9 @@ function clusterTextByGlyphIndex(
     if (!cluster.text) {
       return "HarfBuzz returned an empty source cluster for a shaped glyph.";
     }
+    if (cluster.glyphIndices.length !== 1) {
+      return "This first shaped-glyph proof requires exactly one addressed PDF glyph per logical source cluster; multi-glyph clusters remain read-only.";
+    }
     for (const glyphIndex of cluster.glyphIndices) {
       if (
         !Number.isInteger(glyphIndex) ||
