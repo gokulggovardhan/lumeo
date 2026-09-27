@@ -358,6 +358,8 @@ test("error verification distinguishes legacy history and automatically resolves
   assert.match(migration, /fix_deployed_at <= now\(\) - interval '24 hours'/);
   assert.match(migration, /last_seen_at <= fix_deployed_at/);
   assert.match(migration, /recurrence_after_fix = false/);
+  assert.match(migration, /error_log\.automated_verified/);
+  assert.match(migration, /verification_window_hours/);
   assert.match(workflow, /private\.verify_matured_error_fixes\(\)/);
   assert.match(workflow, /SUPABASE_DB_URL/);
   assert.match(errorsData, /verifiedResolvedCount/);
