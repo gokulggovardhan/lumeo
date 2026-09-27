@@ -691,15 +691,35 @@ export default function EditPdfTool() {
     bytes: null,
     pageIndex: 0,
   });
-  ocrContextRef.current = { bytes: pdf?.bytes ?? null, pageIndex };
   const [ocrResultsRevision, setOcrResultsRevision] = useState<{
     bytes: ArrayBuffer;
     pages: Map<number, OcrPageResult>;
   } | null>(null);
-  const [ocrBusy, setOcrBusy] = useState(false);
-  const [ocrProgress, setOcrProgress] = useState<OcrProgress | null>(null);
-  const [ocrError, setOcrError] = useState("");
-  const [ocrCopied, setOcrCopied] = useState(false);
+  const [ocrActivity, setOcrActivity] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+    progress: OcrProgress;
+  } | null>(null);
+  const [ocrErrorRevision, setOcrErrorRevision] = useState<{
+    bytes: ArrayBuffer | null;
+    pageIndex: number;
+    message: string;
+  } | null>(null);
+  const [ocrCopiedRevision, setOcrCopiedRevision] = useState<{
+    bytes: ArrayBuffer | null;
+    pageIndex: number;
+  } | null>(null);
+  const ocrBusy =
+    ocrActivity?.bytes === pdf?.bytes && ocrActivity.pageIndex === pageIndex;
+  const ocrProgress = ocrBusy ? ocrActivity.progress : null;
+  const ocrError =
+    ocrErrorRevision?.bytes === (pdf?.bytes ?? null) &&
+    ocrErrorRevision.pageIndex === pageIndex
+      ? ocrErrorRevision.message
+      : "";
+  const ocrCopied =
+    ocrCopiedRevision?.bytes === (pdf?.bytes ?? null) &&
+    ocrCopiedRevision.pageIndex === pageIndex;
   const ocrPageResultCurrent =
     ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
       ? ocrResultsRevision.pages.get(pageIndex) ?? null
@@ -1209,28 +1229,36 @@ export default function EditPdfTool() {
 
   const terminateOcrJob = useCallback(
     async (showCancelledMessage = false) => {
+      const context = ocrJobRevisionRef.current ?? ocrContextRef.current;
       ocrJobRevisionRef.current = null;
       const engine = ocrEngineRef.current;
       ocrEngineRef.current = null;
-      setOcrBusy(false);
-      setOcrProgress(null);
-      if (showCancelledMessage) setOcrError("Recognition cancelled.");
+      setOcrActivity(null);
+      if (showCancelledMessage) {
+        setOcrErrorRevision({
+          bytes: context.bytes,
+          pageIndex: context.pageIndex,
+          message: "Recognition cancelled.",
+        });
+      }
       if (engine) await engine.terminate();
     },
     [],
   );
 
   useEffect(() => {
-    setOcrCopied(false);
-    setOcrError("");
+    ocrContextRef.current = { bytes: pdf?.bytes ?? null, pageIndex };
     const active = ocrJobRevisionRef.current;
     if (
       active &&
       (active.bytes !== (pdf?.bytes ?? null) || active.pageIndex !== pageIndex)
     ) {
-      void terminateOcrJob(false);
+      ocrJobRevisionRef.current = null;
+      const engine = ocrEngineRef.current;
+      ocrEngineRef.current = null;
+      void engine?.terminate();
     }
-  }, [pdf?.bytes, pageIndex, terminateOcrJob]);
+  }, [pdf?.bytes, pageIndex]);
 
   const handleRecognizeScannedPage = useCallback(async () => {
     if (
@@ -1238,24 +1266,33 @@ export default function EditPdfTool() {
       pageTextCapability.category !== "SCANNED_IMAGE" ||
       !rasterImageEvidenceCurrent
     ) {
-      setOcrError(
-        "OCR is available only after Lumeo proves this page is image-only and has no usable native text.",
-      );
+      setOcrErrorRevision({
+        bytes: pdf?.bytes ?? null,
+        pageIndex,
+        message:
+          "OCR is available only after Lumeo proves this page is image-only and has no usable native text.",
+      });
       return;
     }
     if (ocrBusy) return;
     const doc = pdfJsDocRef.current;
     if (!doc) {
-      setOcrError("The page is not ready for local recognition yet.");
+      setOcrErrorRevision({
+        bytes: pdf?.bytes ?? null,
+        pageIndex,
+        message: "The page is not ready for local recognition yet.",
+      });
       return;
     }
 
     const revision = { bytes: pdf.bytes, pageIndex };
     ocrJobRevisionRef.current = revision;
-    setOcrBusy(true);
-    setOcrError("");
-    setOcrCopied(false);
-    setOcrProgress({ status: "Preparing page locally", progress: 0 });
+    setOcrErrorRevision(null);
+    setOcrCopiedRevision(null);
+    setOcrActivity({
+      ...revision,
+      progress: { status: "Preparing page locally", progress: 0 },
+    });
 
     let engine = ocrEngineRef.current;
     if (!engine) {
@@ -1270,7 +1307,12 @@ export default function EditPdfTool() {
         pageIndex,
         onProgress: (progress) => {
           if (ocrJobRevisionRef.current !== revision) return;
-          setOcrProgress(progress);
+          setOcrActivity((current) =>
+            current?.bytes === revision.bytes &&
+            current.pageIndex === revision.pageIndex
+              ? { ...current, progress }
+              : current,
+          );
         },
       });
       const current = ocrContextRef.current;
@@ -1295,13 +1337,21 @@ export default function EditPdfTool() {
         recognitionError instanceof Error
           ? recognitionError.message
           : "Unknown local OCR error.";
-      setOcrError(`Local recognition could not finish. ${detail}`);
+      setOcrErrorRevision({
+        bytes: revision.bytes,
+        pageIndex: revision.pageIndex,
+        message: `Local recognition could not finish. ${detail}`,
+      });
     } finally {
       if (ocrJobRevisionRef.current === revision) {
         ocrJobRevisionRef.current = null;
-        setOcrBusy(false);
-        setOcrProgress(null);
       }
+      setOcrActivity((current) =>
+        current?.bytes === revision.bytes &&
+        current.pageIndex === revision.pageIndex
+          ? null
+          : current,
+      );
     }
   }, [
     ocrBusy,
@@ -1314,14 +1364,19 @@ export default function EditPdfTool() {
   const handleCopyOcrText = useCallback(async () => {
     const text = ocrPageResultCurrent?.text.trim() ?? "";
     if (!text) return;
+    const revision = { bytes: pdf?.bytes ?? null, pageIndex };
     try {
       await navigator.clipboard.writeText(text);
-      setOcrCopied(true);
+      setOcrCopiedRevision(revision);
+      setOcrErrorRevision(null);
     } catch {
-      setOcrCopied(false);
-      setOcrError("The browser did not allow copying recognized text.");
+      setOcrCopiedRevision(null);
+      setOcrErrorRevision({
+        ...revision,
+        message: "The browser did not allow copying recognized text.",
+      });
     }
-  }, [ocrPageResultCurrent]);
+  }, [ocrPageResultCurrent, pageIndex, pdf?.bytes]);
 
   // Development-only fidelity diagnostics. This deliberately never renders
   // debug noise in the normal product and is compiled behind NODE_ENV.
@@ -1584,10 +1639,10 @@ export default function EditPdfTool() {
     void ocrEngineRef.current?.terminate();
     ocrEngineRef.current = null;
     setOcrResultsRevision(null);
-    setOcrBusy(false);
-    setOcrProgress(null);
-    setOcrError("");
-    setOcrCopied(false);
+    setOcrActivity(null);
+    
+    setOcrErrorRevision(null);
+    setOcrCopiedRevision(null);
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     pdfJsDocRef.current = null;
     setDocReady(0);
