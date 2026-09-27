@@ -4,7 +4,9 @@ export type EditPerformanceMetric =
   | "text-detection"
   | "native-reconciliation"
   | "thumbnail-render"
-  | "font-inspection";
+  | "thumbnail-scroll"
+  | "font-inspection"
+  | "memory-snapshot";
 
 export type EditPerformanceSample = {
   metric: EditPerformanceMetric;
@@ -37,6 +39,19 @@ export function editPerformanceNow(): number {
   return typeof performance !== "undefined" && typeof performance.now === "function"
     ? performance.now()
     : Date.now();
+}
+
+export function browserUsedHeapBytes(): number | null {
+  if (typeof performance === "undefined") return null;
+  const memory = (
+    performance as Performance & {
+      memory?: { usedJSHeapSize?: number };
+    }
+  ).memory;
+  const value = memory?.usedJSHeapSize;
+  return typeof value === "number" && Number.isFinite(value) && value >= 0
+    ? value
+    : null;
 }
 
 /**
