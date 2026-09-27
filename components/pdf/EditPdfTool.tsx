@@ -676,12 +676,28 @@ export default function EditPdfTool() {
     nativeFormatOpen,
     setNativeFormatOpen,
     logicalSelection,
+    textCompositionActive,
+    setTextCompositionActive,
     clearSelection: clearNativeTextSelection,
     resetInteraction: resetNativeTextInteraction,
     selectDetectedRun,
     selectRunIndices,
     updateSingleSpanLogicalSelection,
   } = useNativeTextSelectionState();
+  const nativeTextSelectionKey = selectedRunIndices.join(",");
+  const nativeTextComposingRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // A composition owner is selection-scoped. If the editor moves to a
+    // different native selection and the browser never delivers
+    // compositionend for the unmounted input, discard the stale immediate
+    // guard so revisiting the old run cannot remain permanently blocked.
+    const owner = nativeTextComposingRef.current;
+    if (owner !== null && owner !== nativeTextSelectionKey) {
+      nativeTextComposingRef.current = null;
+    }
+  }, [nativeTextSelectionKey]);
+
   // Browser FontFace previews are keyed to a model span id so an async font
   // load can never leak the previous selection's face into a newly-selected
   // run. Export safety remains governed by fontEncoding/editPlan, not by
@@ -3141,6 +3157,16 @@ export default function EditPdfTool() {
   // overlay-element
   // export pipeline) all see this edit without any separate wiring.
   const applyTextRunEdit = useCallback(async () => {
+    // IME candidate text is provisional. The mutable ref closes the small
+    // window before React commits the controller state, while the keyed state
+    // keeps the guard scoped to the selection that owns the composition.
+    if (
+      textCompositionActive ||
+      nativeTextComposingRef.current === nativeTextSelectionKey
+    ) {
+      return;
+    }
+
     const doc = pdfLibDocRef.current;
     const engine = editEngineRef.current;
     if (!doc || !engine || editPreview.kind === "empty" || !editPreview.editable) return;
@@ -3262,7 +3288,7 @@ export default function EditPdfTool() {
     } finally {
       setIsApplyingEdit(false);
     }
-  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan, nativePaintPlan]);
+  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan, nativePaintPlan, textCompositionActive, nativeTextSelectionKey]);
 
   // Phase 2.4B: formatting a logical multi-span selection is a DIFFERENT
   // transaction from multi-run text replacement. Each selected span keeps its
@@ -3783,6 +3809,7 @@ export default function EditPdfTool() {
     editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
   const canApplyEdit =
     !isApplyingEdit &&
+    !textCompositionActive &&
     editPreview.kind !== "empty" &&
     editPreview.editable &&
     (replacementLayoutDecision?.safeToApplyWithCurrentWriter ?? true) &&
@@ -3823,6 +3850,7 @@ export default function EditPdfTool() {
     const input = inlineEditInputRef.current;
     if (
       !input ||
+      textCompositionActive ||
       logicalSelectionStart === null ||
       logicalSelectionEnd === null
     ) {
@@ -3845,6 +3873,7 @@ export default function EditPdfTool() {
     logicalSelectionEnd,
     logicalSelectionDirection,
     editDraftText,
+    textCompositionActive,
   ]);
 
   const activeNativeStyleDraft =
@@ -4620,17 +4649,56 @@ export default function EditPdfTool() {
                       <input
                         ref={inlineEditInputRef}
                         value={editDraftText}
+                        onCompositionStart={(event) => {
+                          event.stopPropagation();
+                          nativeTextComposingRef.current = nativeTextSelectionKey;
+                          setTextCompositionActive(true);
+                        }}
+                        onCompositionEnd={(event) => {
+                          event.stopPropagation();
+                          const input = event.currentTarget;
+                          const spanIdAtCompositionEnd = singleSelectedSpan?.id ?? null;
+                          // Browser IMEs commit the final candidate at
+                          // compositionend/input. Keep the controlled draft
+                          // current, then restore Lumeo's logical selection on
+                          // the next frame after the browser releases the caret.
+                          handleEditDraftTextChange(input.value);
+                          if (nativeTextComposingRef.current === nativeTextSelectionKey) {
+                            nativeTextComposingRef.current = null;
+                            setTextCompositionActive(false);
+                          }
+                          requestAnimationFrame(() => {
+                            if (
+                              inlineEditInputRef.current === input &&
+                              spanIdAtCompositionEnd &&
+                              input.dataset.nativeSpanId === spanIdAtCompositionEnd
+                            ) {
+                              syncSingleSpanLogicalSelection(input);
+                            }
+                          });
+                        }}
                         onChange={(event) => {
                           handleEditDraftTextChange(event.currentTarget.value);
-                          syncSingleSpanLogicalSelection(event.currentTarget);
+                          const nativeInput = event.nativeEvent as InputEvent;
+                          if (!textCompositionActive && !nativeInput.isComposing) {
+                            syncSingleSpanLogicalSelection(event.currentTarget);
+                          }
                         }}
                         onSelect={(event) => {
                           event.stopPropagation();
-                          syncSingleSpanLogicalSelection(event.currentTarget);
+                          if (!textCompositionActive) {
+                            syncSingleSpanLogicalSelection(event.currentTarget);
+                          }
                         }}
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => {
                           event.stopPropagation();
+                          const nativeKeyboard = event.nativeEvent as KeyboardEvent;
+                          const isImeKey =
+                            textCompositionActive ||
+                            nativeKeyboard.isComposing ||
+                            nativeKeyboard.keyCode === 229;
+                          if (isImeKey) return;
                           if (event.key === "Enter") {
                             event.preventDefault();
                             if (canApplyEdit) void applyTextRunEdit();
@@ -4641,13 +4709,19 @@ export default function EditPdfTool() {
                         }}
                         onKeyUp={(event) => {
                           event.stopPropagation();
+                          const nativeKeyboard = event.nativeEvent as KeyboardEvent;
+                          if (
+                            textCompositionActive ||
+                            nativeKeyboard.isComposing ||
+                            nativeKeyboard.keyCode === 229
+                          ) {
+                            return;
+                          }
                           // React's synthetic onSelect is not guaranteed to
                           // observe every keyboard-driven caret/range mutation
                           // before the controlled-input mirror effect runs.
                           // Re-read the post-default browser selection for
-                          // navigation keys only. Ordinary text input remains
-                          // driven by onChange, which avoids interfering with
-                          // future IME/composition handling.
+                          // navigation keys only after composition has ended.
                           if (
                             event.key === "ArrowLeft" ||
                             event.key === "ArrowRight" ||
@@ -4658,6 +4732,8 @@ export default function EditPdfTool() {
                           }
                         }}
                         aria-label="Edit text"
+                        data-ime-composing={textCompositionActive ? "true" : "false"}
+                        data-native-span-id={singleSelectedSpan?.id ?? undefined}
                         data-logical-selection-start={logicalSelectionStart ?? undefined}
                         data-logical-selection-end={logicalSelectionEnd ?? undefined}
                         data-logical-selection-direction={logicalSelectionDirection}
@@ -4935,9 +5011,23 @@ export default function EditPdfTool() {
                           data-edit-multi-run-input
                           aria-label="Edit selected text runs"
                           value={editDraftText}
+                          onCompositionStart={(event) => {
+                            event.stopPropagation();
+                            nativeTextComposingRef.current = nativeTextSelectionKey;
+                            setTextCompositionActive(true);
+                          }}
+                          onCompositionEnd={(event) => {
+                            event.stopPropagation();
+                            handleEditDraftTextChange(event.currentTarget.value);
+                            if (nativeTextComposingRef.current === nativeTextSelectionKey) {
+                              nativeTextComposingRef.current = null;
+                              setTextCompositionActive(false);
+                            }
+                          }}
                           onChange={(event) => {
                             handleEditDraftTextChange(event.target.value);
                           }}
+                          data-ime-composing={textCompositionActive ? "true" : "false"}
                           className="mt-1 w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
                         />
                         <div className="mt-2 flex gap-2">

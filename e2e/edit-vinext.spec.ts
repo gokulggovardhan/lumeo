@@ -212,6 +212,126 @@ test("vinext Edit PDF shares one linear semantic undo history across native Edit
     .toEqual({ employeeEdited: true, ssnRemoved: true, hasMask: true });
 });
 
+test("vinext Edit PDF keeps IME composition isolated until the candidate is committed", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-operation-count]");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+
+  const employeeRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    )
+    .first();
+  await employeeRun.click();
+
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  const apply = page.getByRole("button", { name: "Apply edit" });
+  await expect(editor).toBeVisible();
+
+  // Synthetic composition events are enough to exercise Lumeo's browser
+  // event boundary in Chromium/WebKit/Firefox. The PDF writer still sees
+  // nothing until compositionend releases the candidate.
+  await editor.dispatchEvent("compositionstart", { data: "file" });
+  await expect(editor).toHaveAttribute("data-ime-composing", "true");
+
+  // Playwright fill() may implicitly terminate composition in Firefox, so
+  // drive the browser's real provisional input boundary directly. Calling
+  // the native value setter bypasses React's value tracker, allowing the
+  // bubbling InputEvent to exercise onChange while isComposing remains true.
+  await editor.evaluate((node) => {
+    const input = node as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    if (!setter) throw new Error("HTMLInputElement value setter is unavailable");
+    setter.call(input, "Employee file");
+    input.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        data: "Employee file",
+        inputType: "insertCompositionText",
+        isComposing: true,
+      }),
+    );
+  });
+
+  await expect(editor).toHaveValue("Employee file");
+  await expect(editor).toHaveAttribute("data-ime-composing", "true");
+  await expect(apply).toBeDisabled();
+  await editor.press("Enter");
+  await editor.press("Escape");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+  await expect(editor).toBeVisible();
+
+  await editor.dispatchEvent("compositionend", { data: "file" });
+  await expect(editor).toHaveAttribute("data-ime-composing", "false");
+  await expect(apply).toBeEnabled();
+
+  await editor.press("Enter");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+});
+
+test("vinext Edit PDF clears an abandoned IME owner when native selection changes", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-operation-count]");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+
+  const employeeRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    )
+    .first();
+  const ssnRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="123-45-6789"]',
+    )
+    .first();
+
+  await employeeRun.click();
+  let editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await editor.dispatchEvent("compositionstart", { data: "draft" });
+  await expect(editor).toHaveAttribute("data-ime-composing", "true");
+
+  // Deliberately abandon this synthetic composition without dispatching
+  // compositionend. A browser can effectively do the same when the input is
+  // unmounted because selection/tool state changed. The immediate guard must
+  // be selection-scoped rather than surviving forever under the old run key.
+  await ssnRun.click();
+  editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveAttribute("data-ime-composing", "false");
+
+  await employeeRun.click();
+  editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await editor.fill("Employee file");
+  await page.getByRole("button", { name: "Apply edit" }).click();
+
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+});
+
 test("vinext Edit PDF supports text matching, editing, and export", async ({
   page,
 }) => {
