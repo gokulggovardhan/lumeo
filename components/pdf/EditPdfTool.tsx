@@ -682,6 +682,7 @@ export default function EditPdfTool() {
     selectRunIndices,
     updateSingleSpanLogicalSelection,
   } = useNativeTextSelectionState();
+  const nativeTextSelectionKey = selectedRunIndices.join(",");
   // Browser FontFace previews are keyed to a model span id so an async font
   // load can never leak the previous selection's face into a newly-selected
   // run. Export safety remains governed by fontEncoding/editPlan, not by
@@ -708,8 +709,11 @@ export default function EditPdfTool() {
   // the disclosure notice -- see restyleSelectedRun for when that happens.
   const [restyleKeptOriginalText, setRestyleKeptOriginalText] = useState(false);
   const [isApplyingEdit, setIsApplyingEdit] = useState(false);
-  const [isNativeTextComposing, setIsNativeTextComposing] = useState(false);
-  const nativeTextComposingRef = useRef(false);
+  const [nativeTextCompositionKey, setNativeTextCompositionKey] = useState<string | null>(null);
+  const nativeTextComposingRef = useRef<string | null>(null);
+  const isNativeTextComposing =
+    nativeTextCompositionKey !== null &&
+    nativeTextCompositionKey === nativeTextSelectionKey;
   const runOverlayNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
   // Phase 11: the inline caret-over-the-PDF input for a single selected,
   // editable text run -- see the JSX below (rendered next to the run's
@@ -718,11 +722,6 @@ export default function EditPdfTool() {
   const textSearchInputRef = useRef<HTMLInputElement | null>(null);
   const uploadClientReadyRef = useRef<HTMLElement | null>(null);
   const performanceDiagnosticsRef = useRef<EditPdfPerformanceCollector | null>(null);
-
-  useEffect(() => {
-    nativeTextComposingRef.current = false;
-    setIsNativeTextComposing(false);
-  }, [selectedRunIndices]);
 
   useEffect(() => {
     // SSR can render the file input before React has attached its change
@@ -3150,7 +3149,7 @@ export default function EditPdfTool() {
   const applyTextRunEdit = useCallback(async () => {
     // IME composition text is provisional. Never serialize a half-composed
     // value even if a keyboard/button event races the React disabled state.
-    if (nativeTextComposingRef.current) return;
+    if (nativeTextComposingRef.current === nativeTextSelectionKey) return;
 
     const doc = pdfLibDocRef.current;
     const engine = editEngineRef.current;
@@ -3273,7 +3272,7 @@ export default function EditPdfTool() {
     } finally {
       setIsApplyingEdit(false);
     }
-  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan, nativePaintPlan]);
+  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan, nativePaintPlan, nativeTextSelectionKey]);
 
   // Phase 2.4B: formatting a logical multi-span selection is a DIFFERENT
   // transaction from multi-run text replacement. Each selected span keeps its
@@ -4636,20 +4635,22 @@ export default function EditPdfTool() {
                         value={editDraftText}
                         onChange={(event) => {
                           handleEditDraftTextChange(event.currentTarget.value);
-                          if (!nativeTextComposingRef.current) {
+                          if (nativeTextComposingRef.current !== nativeTextSelectionKey) {
                             syncSingleSpanLogicalSelection(event.currentTarget);
                           }
                         }}
                         onCompositionStart={(event) => {
                           event.stopPropagation();
-                          nativeTextComposingRef.current = true;
-                          setIsNativeTextComposing(true);
+                          nativeTextComposingRef.current = nativeTextSelectionKey;
+                          setNativeTextCompositionKey(nativeTextSelectionKey);
                         }}
                         onCompositionEnd={(event) => {
                           event.stopPropagation();
                           const input = event.currentTarget;
-                          nativeTextComposingRef.current = false;
-                          setIsNativeTextComposing(false);
+                          if (nativeTextComposingRef.current === nativeTextSelectionKey) {
+                            nativeTextComposingRef.current = null;
+                            setNativeTextCompositionKey(null);
+                          }
                           handleEditDraftTextChange(input.value);
                           requestAnimationFrame(() => {
                             if (inlineEditInputRef.current === input) {
@@ -4659,7 +4660,7 @@ export default function EditPdfTool() {
                         }}
                         onSelect={(event) => {
                           event.stopPropagation();
-                          if (!nativeTextComposingRef.current) {
+                          if (nativeTextComposingRef.current !== nativeTextSelectionKey) {
                             syncSingleSpanLogicalSelection(event.currentTarget);
                           }
                         }}
@@ -4667,7 +4668,7 @@ export default function EditPdfTool() {
                         onKeyDown={(event) => {
                           event.stopPropagation();
                           if (
-                            nativeTextComposingRef.current ||
+                            nativeTextComposingRef.current === nativeTextSelectionKey ||
                             event.nativeEvent.isComposing
                           ) {
                             return;
@@ -4689,7 +4690,7 @@ export default function EditPdfTool() {
                           // navigation keys only. IME owns the caret until
                           // compositionend, so never mirror through it.
                           if (
-                            !nativeTextComposingRef.current &&
+                            nativeTextComposingRef.current !== nativeTextSelectionKey &&
                             (event.key === "ArrowLeft" ||
                               event.key === "ArrowRight" ||
                               event.key === "Home" ||
@@ -4982,13 +4983,15 @@ export default function EditPdfTool() {
                           }}
                           onCompositionStart={(event) => {
                             event.stopPropagation();
-                            nativeTextComposingRef.current = true;
-                            setIsNativeTextComposing(true);
+                            nativeTextComposingRef.current = nativeTextSelectionKey;
+                            setNativeTextCompositionKey(nativeTextSelectionKey);
                           }}
                           onCompositionEnd={(event) => {
                             event.stopPropagation();
-                            nativeTextComposingRef.current = false;
-                            setIsNativeTextComposing(false);
+                            if (nativeTextComposingRef.current === nativeTextSelectionKey) {
+                              nativeTextComposingRef.current = null;
+                              setNativeTextCompositionKey(null);
+                            }
                             handleEditDraftTextChange(event.currentTarget.value);
                           }}
                           data-ime-composing={isNativeTextComposing ? "true" : "false"}
