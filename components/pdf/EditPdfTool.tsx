@@ -541,7 +541,6 @@ export default function EditPdfTool() {
     canUndo,
     canRedo,
     reset: resetHistory,
-    getCurrent: getCurrentHistoryState,
   } = useHistoryState<EditHistorySnapshot>(
     { elements: [], pdfBytes: new ArrayBuffer(0), session: createPdfEditSession(0) },
     { maxTotalSize: EDIT_HISTORY_MAX_BYTES, sizeOf: (snapshot) => snapshot.pdfBytes.byteLength },
@@ -2919,9 +2918,11 @@ export default function EditPdfTool() {
     // The normal background Find index is deliberately best-effort and can
     // skip a pathological page without blocking search elsewhere; that is
     // acceptable for navigation but not for a command named "Replace All".
+    const requestedPageIndex = pageIndex;
+    const requestedScope = textSearchScope;
     const candidatePages =
-      textSearchScope === "page"
-        ? [pageIndex]
+      requestedScope === "page"
+        ? [requestedPageIndex]
         : Array.from({ length: pdf.pageCount }, (_unused, index) => index);
     if (candidatePages.length === 0) {
       setTextSearchReplaceAllStatus("No search matches are available to replace.");
@@ -2933,7 +2934,7 @@ export default function EditPdfTool() {
     // Identity token for the exact native PDF snapshot being analyzed. The
     // shared history hook updates its authoritative ref synchronously, so
     // this remains reliable even if React has not re-rendered yet.
-    const replaceAllSourceBytes = getCurrentHistoryState().pdfBytes;
+    const replaceAllSourceBytes = getHistoryState().pdfBytes;
     if (
       !pdfJsDocument ||
       pdfJsDocBytesRef.current !== replaceAllSourceBytes
@@ -3045,8 +3046,12 @@ export default function EditPdfTool() {
       );
 
       if (requestedMatchCount === 0) {
+        const noMatchScope =
+          requestedScope === "document"
+            ? "the document"
+            : `page ${requestedPageIndex + 1}`;
         setTextSearchReplaceAllStatus(
-          "The search results changed while Replace All was checking the current PDF. Run Find again.",
+          `No current matches for “${query}” were found in ${noMatchScope}. Nothing was changed.`,
         );
         return;
       }
@@ -3058,8 +3063,17 @@ export default function EditPdfTool() {
         return;
       }
 
+      if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
+        setTextSearchReplaceAllStatus(
+          "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again.",
+        );
+        return;
+      }
+
       const scopeLabel =
-        textSearchScope === "document" ? "the document" : "this page";
+        requestedScope === "document"
+          ? "the document"
+          : `page ${requestedPageIndex + 1}`;
       const skippedText =
         skippedMatchCount > 0
           ? ` ${skippedMatchCount} match${skippedMatchCount === 1 ? "" : "es"} will stay unchanged because they did not pass every native rewrite check.`
@@ -3070,6 +3084,13 @@ export default function EditPdfTool() {
       if (!confirmed) {
         setTextSearchReplaceAllStatus(
           `Replace All cancelled. ${safeMatchCount} safe match${safeMatchCount === 1 ? "" : "es"} had been preflighted; no PDF bytes changed.`,
+        );
+        return;
+      }
+
+      if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
+        setTextSearchReplaceAllStatus(
+          "The PDF changed before Replace All could start its validated write. Nothing was changed; run Replace All again.",
         );
         return;
       }
@@ -3086,11 +3107,6 @@ export default function EditPdfTool() {
       );
 
       const saved = await planningDoc.save();
-      if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
-        throw new Error(
-          "The PDF changed before Replace All could publish its validated batch. Nothing from this batch was applied; run Replace All again.",
-        );
-      }
       const nextBytes = saved.buffer.slice(
         saved.byteOffset,
         saved.byteOffset + saved.byteLength,
@@ -3109,9 +3125,9 @@ export default function EditPdfTool() {
           }),
       );
 
-      if (getCurrentHistoryState().pdfBytes !== replaceAllSourceBytes) {
+      if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
         throw new Error(
-          "The PDF changed while Replace All was checking matches. No replacement was applied; run Find again.",
+          "The PDF changed before Replace All could publish its validated batch. Nothing from this batch was applied; run Replace All again.",
         );
       }
 
@@ -5032,7 +5048,7 @@ export default function EditPdfTool() {
               onClick={() => void applyStructuredTextSearchReplacement()}
               disabled={
                 textSearchReplaceAllBusy ||
-                textSearchMatches.length === 0
+                !textSearchQuery.trim()
               }
               className="h-10 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/45 px-4 text-xs font-bold text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
             >
