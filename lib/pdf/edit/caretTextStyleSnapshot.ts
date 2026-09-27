@@ -5,6 +5,7 @@ import type { FontMetrics } from "./fontMetrics.ts";
 import type { LocatedTextOperator, StreamLocator } from "./formXObjects.ts";
 import type { FallbackStyleHints } from "./fallbackFont.ts";
 import { buildEditPlan, type EditPlan } from "./editPlan.ts";
+import type { ValidatedShapingWriteEvidence } from "./shapingWriteGuard.ts";
 
 export type CaretTextStyleSnapshot = {
   version: 1;
@@ -245,6 +246,8 @@ export function buildCaretRetypePlan({
   resolvedFont,
   fontMetrics,
   embeddedGlyphEvidence = null,
+  embeddedProgramSha256 = null,
+  shapingWriteEvidence = null,
   fallbackStyleHints = null,
   replacementTextState = null,
 }: {
@@ -254,6 +257,8 @@ export function buildCaretRetypePlan({
   resolvedFont: ResolvedFont;
   fontMetrics: FontMetrics;
   embeddedGlyphEvidence?: EmbeddedGlyphEvidence | null;
+  embeddedProgramSha256?: string | null;
+  shapingWriteEvidence?: ValidatedShapingWriteEvidence | null;
   fallbackStyleHints?: FallbackStyleHints | null;
   replacementTextState?: {
     fontSizePt?: number;
@@ -278,6 +283,8 @@ export function buildCaretRetypePlan({
       resolvedFont,
       fontMetrics,
       embeddedGlyphEvidence,
+      embeddedProgramSha256,
+      shapingWriteEvidence,
       fallbackStyleHints,
       replacementTextState:
         replacementTextState ?? replacementTextStateFromCaretSnapshot(snapshot),
