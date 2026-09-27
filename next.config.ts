@@ -2,6 +2,16 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  turbopack: {
+    resolveAlias: {
+      // harfbuzzjs contains a Node-only createRequire branch in its generated
+      // Emscripten module. Browser execution never enters that branch, but
+      // Turbopack still resolves the dynamic "module" import while building
+      // the client graph. Keep Node's real builtin on server targets and use
+      // an inert browser-only alias, as supported by Next.js 16.
+      module: { browser: "./lib/browser-node-module-shim.ts" },
+    },
+  },
   async headers() {
     return [
       {
