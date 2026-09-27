@@ -21,6 +21,7 @@ import {
 import { AuraStatus } from "@/components/ui/Aura";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
+import type { AnalyticsConversionStage } from "@/lib/analytics/types";
 import { ConversionCoordinator } from "@/lib/conversion/ConversionCoordinator";
 import { BrowserWordToPdfEngine } from "@/lib/conversion/browser/BrowserWordToPdfEngine";
 import {
@@ -87,6 +88,14 @@ function stageForPhase(phase: ConversionPhase): Stage {
   return "converting";
 }
 
+function analyticsStageForPhase(
+  phase: ConversionPhase | null,
+): AnalyticsConversionStage {
+  if (!phase) return "unknown";
+  if (phase === "uploading") return "preparing";
+  return phase;
+}
+
 function selectedFileType(file: File): string {
   const match = /\.([a-z0-9]+)$/i.exec(file.name);
   return match ? match[1].toUpperCase() : "Word document";
@@ -97,6 +106,7 @@ export default function WordToPdfTool() {
   const openedTrackedRef = useRef(false);
   const sessionRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  const conversionPhaseRef = useRef<ConversionPhase | null>(null);
 
   const [selected, setSelected] = useState<SelectedFile | null>(null);
   const [stage, setStage] = useState<Stage>("idle");
@@ -283,6 +293,7 @@ export default function WordToPdfTool() {
     setError(null);
     setResult(null);
     setPhase("preparing");
+    conversionPhaseRef.current = "preparing";
     setStage("preparing");
     setStatusLabel("Preparing document");
 
@@ -296,6 +307,7 @@ export default function WordToPdfTool() {
           onProgress: (progress) => {
             if (currentSession !== sessionRef.current) return;
             setPhase(progress.phase);
+            conversionPhaseRef.current = progress.phase;
             setStage(stageForPhase(progress.phase));
             setStatusLabel(progress.message);
           },
@@ -321,20 +333,35 @@ export default function WordToPdfTool() {
         fileSize: conversionResult.blob.size,
       });
     } catch (conversionError) {
-      if (currentSession !== sessionRef.current) return;
-
       const normalized = normalizeConversionError(conversionError);
+      const failureStage = analyticsStageForPhase(conversionPhaseRef.current);
+      const cancelled =
+        normalized.code === "cancelled" || controller.signal.aborted;
+
       if (process.env.NODE_ENV === "development") {
         console.error("Word to PDF conversion failed", conversionError);
       }
 
-      if (normalized.code === "cancelled" || controller.signal.aborted) {
+      if (cancelled) {
+        track({
+          eventName: "processing_cancelled",
+          toolSlug: "word-to-pdf",
+          durationMs: performance.now() - startedAt,
+          success: false,
+          errorCode: "user_cancelled",
+          failureStage,
+        });
+
+        if (currentSession !== sessionRef.current) return;
+
         setPhase(null);
         setStage("cancelled");
         setStatusLabel("Conversion cancelled");
         setError(null);
         return;
       }
+
+      if (currentSession !== sessionRef.current) return;
 
       setPhase(null);
       setError(normalized);
@@ -354,6 +381,7 @@ export default function WordToPdfTool() {
         durationMs: performance.now() - startedAt,
         success: false,
         errorCode: toWordToPdfAnalyticsErrorCode(normalized),
+        failureStage,
       });
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
