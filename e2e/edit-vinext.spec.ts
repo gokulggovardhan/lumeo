@@ -335,6 +335,55 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
 });
 
 
+test("vinext Edit PDF defers native apply until IME composition ends", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-operation-count]");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+
+  const employeeRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    )
+    .first();
+  await employeeRun.click();
+
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  const inlineApply = page.locator("[data-edit-inline-apply]");
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveAttribute("data-ime-composing", "false");
+
+  // Synthetic composition events exercise Lumeo's browser-input contract
+  // without relying on an OS IME being available inside CI. While the
+  // composition is active, the draft may update visually but must never be
+  // serialized into PDF bytes by Enter or the Apply button.
+  await editor.dispatchEvent("compositionstart", { data: "Employee file" });
+  await expect(editor).toHaveAttribute("data-ime-composing", "true");
+
+  await editor.fill("Employee file");
+  await expect(inlineApply).toBeDisabled();
+
+  await editor.press("Enter");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+  await expect(editor).toBeVisible();
+
+  await editor.dispatchEvent("compositionend", { data: "Employee file" });
+  await expect(editor).toHaveAttribute("data-ime-composing", "false");
+  await expect(inlineApply).toBeEnabled();
+
+  await editor.press("Enter");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+});
+
 test("vinext Edit PDF applies native formatting and colour with one native history transaction", async ({ page }) => {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
