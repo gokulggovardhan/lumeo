@@ -185,7 +185,14 @@ async function splitRun(): Promise<Uint8Array> {
  */
 async function assertGenuinelySplit(bytes: Uint8Array): Promise<void> {
   const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const doc = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+  const standardFontDataUrl =
+    path.join(process.cwd(), "node_modules", "pdfjs-dist", "standard_fonts") +
+    path.sep;
+  const doc = await pdfjsLib.getDocument({
+    data: bytes.slice(),
+    useWorkerFetch: false,
+    standardFontDataUrl,
+  }).promise;
   const page = await doc.getPage(1);
   const items = (await page.getTextContent()).items as { str?: string }[];
   const strings = items.map((item) => item.str ?? "");
