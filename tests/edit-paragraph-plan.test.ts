@@ -180,12 +180,15 @@ test("paragraph planner preserves two existing native lines and exports both rep
     { text: "After", kind: "Tj" },
   ]);
 
-  const { plan, resolvedFont } = await planFor(
+  const { plan, resolvedFont, allOperators } = await planFor(
     original,
     [1, 2],
     "New line one\nNew line two",
   );
   assert.ok(isValidatedParagraphEditPlan(plan));
+  const originalLineMatrices = [1, 2].map(
+    (index) => allOperators[index]?.textLineMatrix,
+  );
   assert.equal(plan.lines.length, 2);
   assert.equal(plan.originalText, "Old line one\nOld line two");
   assert.equal(plan.lines[0]?.replacementText, "New line one");
@@ -204,6 +207,15 @@ test("paragraph planner preserves two existing native lines and exports both rep
     "New line two",
     "After",
   ]);
+
+  const editedOperators = walkTextShowOperators(
+    await decodedContentStreamBytes(edited.slice()),
+  );
+  assert.deepEqual(
+    [1, 2].map((index) => editedOperators[index]?.textLineMatrix),
+    originalLineMatrices,
+    "paragraph editing must preserve every existing native line matrix",
+  );
 });
 
 test("paragraph planner reuses same-line multi-run authority independently inside one paragraph line", async () => {
