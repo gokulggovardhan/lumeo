@@ -3803,6 +3803,62 @@ export default function EditPdfTool() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over the explicitly listed page/write evidence below.
   }, [fontRegistry, selectedRunIndices, editableRunMatches, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions, pageTextModel, logicalSelection]);
 
+  const paragraphSelectionTemplate = useMemo(() => {
+    if (
+      !editEngine ||
+      resolvedEditContext.kind !== "multi" ||
+      selectedRunIndices.length < 2
+    ) {
+      return null;
+    }
+
+    const { validation, resolvedFont, fontMetrics, embeddedGlyphEvidence } =
+      resolvedEditContext;
+    const originalLines: string[] = [];
+    for (const operatorIndex of validation.operatorIndices) {
+      const operator = validation.allOperators[operatorIndex];
+      if (!operator) return null;
+      const decoded = decodeTextShowOperator(operator, resolvedFont);
+      if (!decoded.allDecoded) return null;
+      originalLines.push(decoded.text);
+    }
+
+    const plan = editEngine.buildParagraphEditPlan({
+      pageIndex,
+      contentStreamIndex: validation.contentStreamIndex,
+      allOperators: validation.allOperators,
+      operatorIndices: validation.operatorIndices,
+      replacementText: originalLines.join("\n"),
+      resolvedFont,
+      fontMetrics,
+      embeddedGlyphEvidence,
+    });
+    return plan.editable ? plan : null;
+  }, [
+    editEngine,
+    resolvedEditContext,
+    selectedRunIndices.length,
+    pageIndex,
+  ]);
+
+  useEffect(() => {
+    if (!paragraphSelectionTemplate) return;
+    const currentFlatDraft = selectedRunIndices
+      .map((index) => detectedTextRuns[index]?.str ?? "")
+      .join("");
+    if (editDraftText === currentFlatDraft) {
+      setEditDraftText(paragraphSelectionTemplate.originalText);
+      setEditApplyError("");
+    }
+  }, [
+    paragraphSelectionTemplate,
+    selectedRunIndices,
+    detectedTextRuns,
+    editDraftText,
+    setEditDraftText,
+    setEditApplyError,
+  ]);
+
   const shapingRequirement = useMemo(
     () => detectComplexShapingRequirement(editDraftText),
     [editDraftText],
@@ -3811,6 +3867,7 @@ export default function EditPdfTool() {
   const shapingEvidenceRequest = useMemo(() => {
     if (
       !shapingRequirement.required ||
+      paragraphSelectionTemplate ||
       (resolvedEditContext.kind !== "single" &&
         resolvedEditContext.kind !== "multi")
     ) {
@@ -3851,6 +3908,7 @@ export default function EditPdfTool() {
     };
   }, [
     shapingRequirement.required,
+    paragraphSelectionTemplate,
     resolvedEditContext,
     pageIndex,
     nativeTextSelectionKey,
