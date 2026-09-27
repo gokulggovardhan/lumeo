@@ -58,6 +58,7 @@ export type RejectedParagraphEditPlan = Readonly<{
   originalText: string;
   replacementText: string;
   lines: readonly ParagraphEditLine[];
+  paragraphCandidate: boolean;
   editable: false;
   reason: string;
 }>;
@@ -93,6 +94,7 @@ function rejected({
   reason,
   originalText = "",
   lines = [],
+  paragraphCandidate = false,
 }: {
   pageIndex: number;
   contentStreamIndex: number;
@@ -101,6 +103,7 @@ function rejected({
   reason: string;
   originalText?: string;
   lines?: readonly ParagraphEditLine[];
+  paragraphCandidate?: boolean;
 }): RejectedParagraphEditPlan {
   return Object.freeze({
     pageIndex,
@@ -109,6 +112,7 @@ function rejected({
     originalText,
     replacementText,
     lines: Object.freeze([...lines]),
+    paragraphCandidate,
     editable: false as const,
     reason,
   });
@@ -323,6 +327,7 @@ export function buildParagraphEditPlan({
       replacementText,
       reason:
         `This selection contains ${groups.length} proven PDF lines. Enter exactly ${groups.length} replacement lines so Lumeo can preserve every existing baseline without inventing reflow.`,
+      paragraphCandidate: true,
     });
   }
 
@@ -341,6 +346,7 @@ export function buildParagraphEditPlan({
         reason:
           "This multi-line replacement requires complex shaping. Edit that line individually so the shaped-glyph writer can prove it separately.",
         lines,
+        paragraphCandidate: true,
       });
     }
 
@@ -368,6 +374,7 @@ export function buildParagraphEditPlan({
           replacementText,
           reason: plan.reason,
           lines,
+          paragraphCandidate: true,
         });
       }
       if (plan.fallbackFont) {
@@ -379,6 +386,7 @@ export function buildParagraphEditPlan({
           reason:
             "This paragraph line would require a substitute font. Edit that line individually instead of changing paragraph font resources implicitly.",
           lines,
+          paragraphCandidate: true,
         });
       }
       lineOriginalText = plan.originalText;
@@ -402,6 +410,7 @@ export function buildParagraphEditPlan({
           replacementText,
           reason: multi.reason,
           lines,
+          paragraphCandidate: true,
         });
       }
       if (multi.subPlans.some((plan) => plan.fallbackFont)) {
@@ -413,6 +422,7 @@ export function buildParagraphEditPlan({
           reason:
             "This paragraph line would require a substitute font. Edit that line individually instead of changing paragraph font resources implicitly.",
           lines,
+          paragraphCandidate: true,
         });
       }
       lineOriginalText = multi.originalText;
