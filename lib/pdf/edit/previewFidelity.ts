@@ -67,6 +67,7 @@ export function describeFontPreviewFidelity({
   }
 
   if (
+    profile &&
     verifiedEquivalent?.familyName.trim() &&
     verifiedEquivalent.fontIdentityVerified === true &&
     verifiedEquivalent.glyphMetricsVerified === true
