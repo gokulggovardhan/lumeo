@@ -3,8 +3,12 @@ import test from "node:test";
 import {
   PDFDict,
   PDFDocument,
+  PDFArray,
   PDFHexString,
   PDFName,
+  PDFNumber,
+  PDFOperator,
+  PDFOperatorNames,
   StandardFonts,
   beginText,
   endText,
@@ -50,6 +54,26 @@ async function sourcePdf(
     moveText(72, 700),
     showText(font.encodeText(firstText)),
     showText(font.encodeText(secondText)),
+    endText(),
+  );
+  return doc.save();
+}
+
+async function adjustedTjSourcePdf(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const fontKey = page.node.newFontDictionary(font.name, font.ref);
+  const adjusted = PDFArray.withContext(doc.context);
+  adjusted.push(font.encodeText("WW"));
+  adjusted.push(PDFNumber.of(120));
+  adjusted.push(font.encodeText("WW"));
+  page.pushOperators(
+    beginText(),
+    setFontAndSize(fontKey, 20),
+    moveText(72, 700),
+    PDFOperator.of(PDFOperatorNames.ShowTextAdjusted, [adjusted]),
+    showText(font.encodeText("TAIL")),
     endText(),
   );
   return doc.save();
@@ -191,6 +215,34 @@ test("native local-font writer embeds a subset, preserves searchable text, resto
     "endpoint compensation must keep following text at its original PDF-space position",
   );
 
+  const visibleText = await pdfJsText(result.bytes);
+  assert.ok(visibleText.includes("iiii"));
+  assert.ok(visibleText.includes("TAIL"));
+  assert.ok(!visibleText.includes("WWWW"));
+});
+
+test("native local-font writer preserves the following endpoint when the source is an adjusted TJ array", async () => {
+  const bytes = await adjustedTjSourcePdf();
+  const fx = await planFixture("iiii", bytes);
+  assert.ok(isValidatedLocalFontSubstitutionPlan(fx.plan));
+  if (!isValidatedLocalFontSubstitutionPlan(fx.plan)) return;
+  assert.equal(fx.entries[0].operator.kind, "TJ");
+
+  const originalSecondMatrix = fx.entries[1].operator.textRenderingMatrix;
+  const result = await applyLocalFontSubstitutionToBytes({
+    sourceBytes: fx.bytes,
+    plan: fx.plan,
+    asset: fx.asset,
+  });
+
+  const reopened = await PDFDocument.load(result.bytes.slice());
+  const entries = collectPageTextOperators(reopened, 0);
+  assert.equal(entries.length, 2);
+  assert.equal(entries[0].operator.kind, "TJ");
+  assert.ok(
+    matrixClose(entries[1].operator.textRenderingMatrix, originalSecondMatrix),
+    "TJ source spacing must be folded into endpoint compensation for following text",
+  );
   const visibleText = await pdfJsText(result.bytes);
   assert.ok(visibleText.includes("iiii"));
   assert.ok(visibleText.includes("TAIL"));
