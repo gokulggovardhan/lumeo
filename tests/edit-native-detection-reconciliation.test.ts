@@ -26,6 +26,8 @@ function located({
   kind = "Tj",
   bytes = new Uint8Array([72, 105]),
   renderMode = 0,
+  fillOpacity = 1,
+  strokeOpacity = 1,
   locator = { kind: "page", contentStreamIndex: 0 } as const,
   operatorIndex = 2,
   textRenderingMatrix = [12, 0, 0, 12, 72, 700] as [number, number, number, number, number, number],
@@ -33,6 +35,8 @@ function located({
   kind?: "Tj" | "TJ";
   bytes?: Uint8Array;
   renderMode?: number;
+  fillOpacity?: number | null;
+  strokeOpacity?: number | null;
   locator?: LocatedTextOperator["locator"];
   operatorIndex?: number;
   textRenderingMatrix?: [number, number, number, number, number, number];
@@ -58,6 +62,8 @@ function located({
       leading: 14,
       textRise: 0,
       renderMode,
+      fillOpacity,
+      strokeOpacity,
     },
     streamBytes: new Uint8Array(),
     resources: {} as PDFDict,
@@ -564,6 +570,63 @@ test("classifier refuses unknown encoding and clipping instead of claiming safe 
     "NATIVE_TEXT_WITH_ENCODING_LIMITATIONS",
   );
   assert.equal(classifyNativeTextSpan(encodingLimited).safelyRewritable, false);
+
+  const invisible = buildNativeContentStreamSpans({
+    operators: [located({ renderMode: 3 })],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  })[0];
+  const invisibleClassification = classifyNativeTextSpan(invisible);
+  assert.equal(invisibleClassification.category, "INVISIBLE_TEXT_LAYER");
+  assert.equal(invisibleClassification.safelyRewritable, false);
+  assert.equal(invisibleClassification.authorization, "blocked");
+
+  const invisibleArbitration = enforceSpanCapabilityOnArbitration({
+    arbitration: {
+      pdfJsRunIndex: 0,
+      decision: "editable",
+      nativeSpanKey: invisible.key,
+      source: "reconciled",
+      reason: "Strong visible/native identity agreement.",
+    },
+    spanClassification: invisibleClassification,
+  });
+  assert.equal(invisibleArbitration.decision, "view-only");
+  assert.equal(invisibleArbitration.source, "conflict");
+  assert.match(invisibleArbitration.reason, /invisible|rendering mode 3/i);
+
+  for (const transparentOperator of [
+    located({ renderMode: 0, fillOpacity: 0 }),
+    located({ renderMode: 1, strokeOpacity: 0 }),
+    located({ renderMode: 2, fillOpacity: 0, strokeOpacity: 0 }),
+  ]) {
+    const transparent = buildNativeContentStreamSpans({
+      operators: [transparentOperator],
+      viewportTransform: viewport,
+      pageWidthPt: 612,
+      pageHeightPt: 792,
+      resolveFontProfile: () => profile(),
+    })[0];
+    const transparentClassification = classifyNativeTextSpan(transparent);
+    assert.equal(transparentClassification.category, "INVISIBLE_TEXT_LAYER");
+    assert.equal(transparentClassification.safelyRewritable, false);
+    assert.equal(transparentClassification.authorization, "blocked");
+    assert.match(transparentClassification.reason, /zero effective alpha/i);
+  }
+
+  const partlyVisible = buildNativeContentStreamSpans({
+    operators: [located({ renderMode: 2, fillOpacity: 0, strokeOpacity: 1 })],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  })[0];
+  assert.notEqual(
+    classifyNativeTextSpan(partlyVisible).category,
+    "INVISIBLE_TEXT_LAYER",
+  );
 
   const clipped = buildNativeContentStreamSpans({
     operators: [located({ renderMode: 7 })],
