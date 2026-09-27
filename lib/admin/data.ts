@@ -51,6 +51,7 @@ export type AnalyticsSummary = {
   processingStarted: number;
   processingSucceeded: number;
   processingFailed: number;
+  processingCancelled: number;
   unreconciledStarts: number;
   downloadsStarted: number;
   successRate: number | null;
@@ -65,10 +66,13 @@ export type AnalyticsSummary = {
     toolOpens: number;
     succeeded: number;
     failed: number;
+    cancelled: number;
   }>;
   topToolsByOpens: Array<{ toolSlug: string; count: number }>;
   topToolsBySuccess: Array<{ toolSlug: string; count: number }>;
   errorSummary: Array<{ errorCode: string; count: number }>;
+  failureStageSummary: Array<{ label: string; count: number }>;
+  cancellationStageSummary: Array<{ label: string; count: number }>;
   deviceSummary: Array<{ label: string; count: number }>;
   browserSummary: Array<{ label: string; count: number }>;
   osSummary: Array<{ label: string; count: number }>;
@@ -219,6 +223,7 @@ function unavailableAnalyticsSummary(): AnalyticsSummary {
     processingStarted: 0,
     processingSucceeded: 0,
     processingFailed: 0,
+    processingCancelled: 0,
     unreconciledStarts: 0,
     downloadsStarted: 0,
     successRate: null,
@@ -229,6 +234,8 @@ function unavailableAnalyticsSummary(): AnalyticsSummary {
     topToolsByOpens: [],
     topToolsBySuccess: [],
     errorSummary: [],
+    failureStageSummary: [],
+    cancellationStageSummary: [],
     deviceSummary: [],
     browserSummary: [],
     osSummary: [],
@@ -315,6 +322,7 @@ function parseDailyRows(value: unknown) {
     uniqueVisitors: number;
     succeeded: number;
     failed: number;
+    cancelled: number;
     toolOpens: number;
     processingStarted: number;
     downloadsStarted: number;
@@ -337,6 +345,7 @@ function parseDailyRows(value: unknown) {
       uniqueVisitors,
       succeeded,
       failed,
+      cancelled: 0,
       toolOpens,
       processingStarted,
       downloadsStarted,
@@ -354,7 +363,52 @@ function parseDailyRows(value: unknown) {
   return rows;
 }
 
-function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
+type ConversionDiagnostics = {
+  processingCancelled: number;
+  dailyCancelled: Map<string, number>;
+  failureStageSummary: Array<{ label: string; count: number }>;
+  cancellationStageSummary: Array<{ label: string; count: number }>;
+};
+
+function parseConversionDiagnostics(value: unknown): ConversionDiagnostics | null {
+  if (!isRecord(value)) return null;
+
+  const dailyCancelled = new Map<string, number>();
+  if (Array.isArray(value.daily_cancelled)) {
+    for (const row of value.daily_cancelled) {
+      if (!isRecord(row)) return null;
+      const date = stringValue(row.date);
+      const count = numberValue(row.event_count);
+      if (!date || count === null) return null;
+      dailyCancelled.set(date, count);
+    }
+  } else {
+    return null;
+  }
+
+  const failureStageSummary = parseCategoryRows(
+    value.failure_stage_summary,
+    "failure_stage",
+  );
+  const cancellationStageSummary = parseCategoryRows(
+    value.cancellation_stage_summary,
+    "failure_stage",
+  );
+
+  if (!failureStageSummary || !cancellationStageSummary) return null;
+
+  return {
+    processingCancelled: parseCount(value.processing_cancelled),
+    dailyCancelled,
+    failureStageSummary,
+    cancellationStageSummary,
+  };
+}
+
+function parseAdminAnalyticsSummary(
+  value: unknown,
+  diagnosticsValue?: unknown,
+): AnalyticsSummary | null {
   if (!isRecord(value) || !isRecord(value.summary)) return null;
 
   const dailyRows = parseDailyRows(value.daily_trend);
@@ -368,6 +422,7 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
   // exists after 20260719_017 is applied, and an unrelated-but-unmigrated
   // database shouldn't take the rest of a working analytics page down.
   const locationSummary = parseLocationRows(value.location_summary) ?? [];
+  const diagnostics = parseConversionDiagnostics(diagnosticsValue);
 
   if (
     !dailyRows ||
@@ -383,6 +438,7 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
 
   const processingSucceeded = parseCount(value.summary.processing_succeeded);
   const processingFailed = parseCount(value.summary.processing_failed);
+  const processingCancelled = diagnostics?.processingCancelled ?? 0;
   const eventsToday = parseCount(value.summary.total_events);
   const uniqueVisitorsToday = parseCount(value.summary.unique_visitors);
   const toolOpens = parseCount(value.summary.tool_opens);
@@ -398,6 +454,7 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
       processingStarted -
       processingSucceeded -
       processingFailed -
+      processingCancelled -
       downloadsStarted,
   );
 
@@ -410,15 +467,21 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
     processingStarted,
     processingSucceeded,
     processingFailed,
+    processingCancelled,
     unreconciledStarts: Math.max(
       0,
-      processingStarted - processingSucceeded - processingFailed,
+      processingStarted -
+        processingSucceeded -
+        processingFailed -
+        processingCancelled,
     ),
     downloadsStarted,
     successRate: completed > 0 ? Math.round((processingSucceeded / completed) * 1000) / 10 : null,
     averageDurationMs: numberValue(averageDuration),
     latestEventAt: stringValue(value.summary.latest_event_at),
-    dailyMetrics: dailyRows.map((row) => ({
+    dailyMetrics: dailyRows.map((row) => {
+      const cancelled = diagnostics?.dailyCancelled.get(row.date) ?? 0;
+      return {
       metric_date: row.date,
       tool_slug: "all",
       tool_opens: row.toolOpens,
@@ -426,16 +489,21 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
       processing_succeeded: row.succeeded,
       processing_failed: row.failed,
       total_duration_ms: successfulDurationTotal,
-    })),
-    sevenDayTotals: dailyRows.map((row) => ({
+      };
+    }),
+    sevenDayTotals: dailyRows.map((row) => {
+      const cancelled = diagnostics?.dailyCancelled.get(row.date) ?? 0;
+      return {
       date: row.date,
       events: row.events,
       uniqueVisitors: row.uniqueVisitors,
-      pageViews: row.pageViews,
+      pageViews: Math.max(0, row.pageViews - cancelled),
       toolOpens: row.toolOpens,
       succeeded: row.succeeded,
       failed: row.failed,
-    })),
+      cancelled,
+      };
+    }),
     topToolsByOpens: topToolsByOpens.map((row) => ({
       toolSlug: row.toolSlug,
       count: row.count,
@@ -448,6 +516,8 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
       errorCode: row.errorCode,
       count: row.count,
     })),
+    failureStageSummary: diagnostics?.failureStageSummary ?? [],
+    cancellationStageSummary: diagnostics?.cancellationStageSummary ?? [],
     deviceSummary: deviceSummary.map((row) => ({
       label: row.label,
       count: row.count,
@@ -476,10 +546,16 @@ export async function getAnalyticsSummary(
   // Overview behavior remains unchanged below: real "today" summary cards
   // plus a seven-day trend.
   if (range) {
-    const rangeResult = await supabase.rpc("get_admin_analytics_summary", {
-      p_start_date: range.startDate,
-      p_end_date: range.endDate,
-    });
+    const [rangeResult, diagnosticsResult] = await Promise.all([
+      supabase.rpc("get_admin_analytics_summary", {
+        p_start_date: range.startDate,
+        p_end_date: range.endDate,
+      }),
+      supabase.rpc("get_admin_conversion_diagnostics", {
+        p_start_date: range.startDate,
+        p_end_date: range.endDate,
+      }),
+    ]);
 
     if (rangeResult.error) {
       return safe(unavailableAnalyticsSummary(), rangeResult.error);
@@ -487,6 +563,7 @@ export async function getAnalyticsSummary(
 
     const parsedRange = parseAdminAnalyticsSummary(
       rangeResult.data as AdminAnalyticsSummaryResult | unknown,
+      diagnosticsResult.error ? undefined : diagnosticsResult.data,
     );
 
     return parsedRange
@@ -504,16 +581,38 @@ export async function getAnalyticsSummary(
   // daily_trend array off the same start/end range. A single 7-day-wide call
   // would silently turn "Events Today" into a 7-day sum; a single today-only
   // call (the prior behavior) silently turned "seven-day trend" into one day.
-  const [todayResult, trendResult] = await Promise.all([
-    supabase.rpc("get_admin_analytics_summary", { p_start_date: today, p_end_date: today }),
-    supabase.rpc("get_admin_analytics_summary", { p_start_date: sevenDaysAgo, p_end_date: today }),
+  const [
+    todayResult,
+    trendResult,
+    todayDiagnosticsResult,
+    trendDiagnosticsResult,
+  ] = await Promise.all([
+    supabase.rpc("get_admin_analytics_summary", {
+      p_start_date: today,
+      p_end_date: today,
+    }),
+    supabase.rpc("get_admin_analytics_summary", {
+      p_start_date: sevenDaysAgo,
+      p_end_date: today,
+    }),
+    supabase.rpc("get_admin_conversion_diagnostics", {
+      p_start_date: today,
+      p_end_date: today,
+    }),
+    supabase.rpc("get_admin_conversion_diagnostics", {
+      p_start_date: sevenDaysAgo,
+      p_end_date: today,
+    }),
   ]);
 
   if (todayResult.error) {
     return safe(unavailableAnalyticsSummary(), todayResult.error);
   }
 
-  const parsedToday = parseAdminAnalyticsSummary(todayResult.data as AdminAnalyticsSummaryResult | unknown);
+  const parsedToday = parseAdminAnalyticsSummary(
+    todayResult.data as AdminAnalyticsSummaryResult | unknown,
+    todayDiagnosticsResult.error ? undefined : todayDiagnosticsResult.data,
+  );
   if (!parsedToday) {
     return safe(unavailableAnalyticsSummary(), new Error("Malformed admin analytics aggregate."));
   }
@@ -522,7 +621,10 @@ export async function getAnalyticsSummary(
   // today's real numbers rather than hiding the whole dashboard behind it.
   const parsedTrend = trendResult.error
     ? null
-    : parseAdminAnalyticsSummary(trendResult.data as AdminAnalyticsSummaryResult | unknown);
+    : parseAdminAnalyticsSummary(
+        trendResult.data as AdminAnalyticsSummaryResult | unknown,
+        trendDiagnosticsResult.error ? undefined : trendDiagnosticsResult.data,
+      );
 
   return safe(
     {
