@@ -1450,7 +1450,7 @@ export default function EditPdfTool() {
     setOcrSearchLayerNoticeRevision(null);
 
     try {
-      const { addSearchableOcrTextLayer } = await import(
+      const { addSearchableOcrTextLayer, firstMissingSearchableOcrWord } = await import(
         "@/lib/pdf/edit/searchableOcrLayer"
       );
       const outcome = await addSearchableOcrTextLayer(
@@ -1481,16 +1481,12 @@ export default function EditPdfTool() {
           PAGE_RENDER_TIMEOUT_MS,
           "verify searchable OCR text from",
         );
-        const extracted = content.items
+        const extractedItems = content.items
           .map((item) => ("str" in item ? item.str : ""))
-          .join(" ")
-          .normalize("NFKC")
-          .toLocaleLowerCase();
-        const missingWord = outcome.writtenWords.find(
-          (word) =>
-            !extracted.includes(
-              word.normalize("NFKC").toLocaleLowerCase(),
-            ),
+          .filter((item) => item.trim().length > 0);
+        const missingWord = firstMissingSearchableOcrWord(
+          outcome.writtenWords,
+          extractedItems,
         );
         verificationPage.cleanup();
         if (missingWord) {
