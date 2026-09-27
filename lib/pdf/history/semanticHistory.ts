@@ -13,7 +13,8 @@ export type PdfSemanticHistoryType =
   | "reorder-pages"
   | "delete-pages"
   | "merge-pages"
-  | "redact"\n  | "add-searchable-text-layer";
+  | "redact"
+  | "add-searchable-text-layer";
 
 export type PdfSemanticGeometry = {
   pageIndex: number;
