@@ -5186,8 +5186,10 @@ export default function EditPdfTool() {
   const nativeStyleChanged =
     editPreview.kind === "single" && Boolean(editPreview.plan.replacementTextState);
   const nativePaintChanged = Boolean(nativePaintPlan?.editable);
-  const textDraftChanged =
-    editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
+  const selectedOriginalDraftText =
+    paragraphSelectionTemplate?.originalText ??
+    selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
+  const textDraftChanged = editDraftText !== selectedOriginalDraftText;
   const canApplyEdit =
     !isApplyingEdit &&
     !textCompositionActive &&
@@ -6451,7 +6453,10 @@ export default function EditPdfTool() {
                     </div>
                   ) : null}
 
-                  {activeTool === "select" && textDetectionCurrent && selectedRunIndices.length > 1 && editPreview.kind === "multi" ? (
+                  {activeTool === "select" &&
+                    textDetectionCurrent &&
+                    selectedRunIndices.length > 1 &&
+                    (editPreview.kind === "multi" || editPreview.kind === "paragraph") ? (
                     // Multi-run selection has no per-run inline editor (that's
                     // scoped to a single run) -- this compact floating panel,
                     // anchored to the first selected run, is the only UI path
@@ -6473,10 +6478,24 @@ export default function EditPdfTool() {
                       }
                     >
                       <div className="w-72 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 p-3 shadow-lg">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with ({selectedRunIndices.length} runs selected)</span>
-                        <input
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
+                          {editPreview.kind === "paragraph"
+                            ? `Edit paragraph (${editPreview.plan.originalLines.length} preserved lines)`
+                            : `Replace with (${selectedRunIndices.length} runs selected)`}
+                        </span>
+                        <textarea
                           data-edit-multi-run-input
-                          aria-label="Edit selected text runs"
+                          data-edit-paragraph-input={editPreview.kind === "paragraph" ? "true" : undefined}
+                          aria-label={
+                            editPreview.kind === "paragraph"
+                              ? "Edit selected paragraph lines"
+                              : "Edit selected text runs"
+                          }
+                          rows={
+                            editPreview.kind === "paragraph"
+                              ? Math.min(8, Math.max(2, editPreview.plan.originalLines.length))
+                              : 1
+                          }
                           value={editDraftText}
                           onCompositionStart={(event) => {
                             event.stopPropagation();
@@ -6504,16 +6523,28 @@ export default function EditPdfTool() {
                               nativeKeyboard.keyCode === 229;
                             if (isImeKey) return;
                             if (event.key === "Enter") {
-                              event.preventDefault();
-                              if (canApplyEdit) void applyTextRunEdit();
+                              if (editPreview.kind === "paragraph") {
+                                if (event.metaKey || event.ctrlKey) {
+                                  event.preventDefault();
+                                  if (canApplyEdit) void applyTextRunEdit();
+                                }
+                              } else {
+                                event.preventDefault();
+                                if (canApplyEdit) void applyTextRunEdit();
+                              }
                             } else if (event.key === "Escape") {
                               event.preventDefault();
                               selectTextRun(null);
                             }
                           }}
                           data-ime-composing={textCompositionActive ? "true" : "false"}
-                          className="mt-1 w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
+                          className="mt-1 w-full resize-y rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
                         />
+                        {editPreview.kind === "paragraph" ? (
+                          <span className="mt-1 block text-[10px] leading-4 text-[var(--text-primary)]/46">
+                            Existing PDF baselines are preserved. Keep the same number of lines. Use Ctrl/⌘+Enter to apply.
+                          </span>
+                        ) : null}
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"
