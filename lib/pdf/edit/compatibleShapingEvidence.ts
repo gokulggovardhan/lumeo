@@ -78,6 +78,7 @@ export async function resolveCompatibleShapingWriteEvidence({
   resourceIdentity = null,
   resolvedFont = null,
   fontMetrics = null,
+  forceInspection = false,
 }: {
   replacementText: string;
   embeddedProgramSha256: string | null;
@@ -90,11 +91,19 @@ export async function resolveCompatibleShapingWriteEvidence({
     "kind" | "bytesPerCode" | "glyphCodeToUnicode"
   > | null;
   fontMetrics?: FontMetrics | null;
+  /**
+   * Opt-in for an already-proven shaped-glyph-capable PDF resource. This lets
+   * ordinary LTR text discover real GSUB/GPOS (for example fi ligatures or
+   * kerning) without making HarfBuzz part of the normal editor fast path.
+   */
+  forceInspection?: boolean;
 }): Promise<CompatibleShapingEvidenceResolution> {
   const requirement = detectComplexShapingRequirement(replacementText);
-  if (!requirement.required) return { kind: "not-required" };
+  if (!requirement.required && !forceInspection) return { kind: "not-required" };
 
-  const direction = explicitDirectionForShapingRequirement(requirement);
+  const direction = requirement.required
+    ? explicitDirectionForShapingRequirement(requirement)
+    : "ltr";
   if (!embeddedProgramSha256) {
     return {
       kind: "blocked",
