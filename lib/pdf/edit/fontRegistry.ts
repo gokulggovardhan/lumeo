@@ -643,7 +643,10 @@ export class PdfFontRegistry {
     }
 
     try {
-      const shaped = await shapeText(program.bytes, text, options);
+      // The shaping engine is advisory and injected. Give it an isolated
+      // copy so a buggy/mutating implementation cannot corrupt the registry's
+      // cached embedded font program or later identity/intelligence evidence.
+      const shaped = await shapeText(program.bytes.slice(), text, options);
       return {
         kind: "reconciled",
         shaped,
