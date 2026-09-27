@@ -550,14 +550,20 @@ async function measure(
     let writeApplied = false;
 
     if (fixture.editMode === "paragraph") {
-      const pageEntries = editableLocated
-        .filter(
-          (entry) =>
-            entry.locator.kind === "page" &&
-            entry.locator.contentStreamIndex ===
-              target.located.locator.contentStreamIndex,
-        )
-        .sort((left, right) => left.operatorIndex - right.operatorIndex);
+      const targetStreamIndex =
+        target.located.locator.kind === "page"
+          ? target.located.locator.contentStreamIndex
+          : null;
+      const pageEntries =
+        targetStreamIndex === null
+          ? []
+          : editableLocated
+              .filter(
+                (entry) =>
+                  entry.locator.kind === "page" &&
+                  entry.locator.contentStreamIndex === targetStreamIndex,
+              )
+              .sort((left, right) => left.operatorIndex - right.operatorIndex);
       const resourceName = pageEntries[0]?.operator.fontResourceName;
       if (resourceName && pageEntries.length === PARAGRAPH_SOURCE_LINES.length) {
         const profile = editableRegistry.resolve(
