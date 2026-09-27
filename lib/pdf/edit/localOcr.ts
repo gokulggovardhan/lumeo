@@ -70,11 +70,16 @@ type OcrWorker = Readonly<{
   terminate(): Promise<unknown>;
 }>;
 
-type CreateWorker = (
+export type LocalOcrWorkerFactory = (
   langs: string,
   oem: number,
   options: Record<string, unknown>,
 ) => Promise<OcrWorker>;
+
+export type LocalOcrEngineDependencies = Readonly<{
+  createWorker?: LocalOcrWorkerFactory;
+  createCanvas?: () => HTMLCanvasElement;
+}>;
 
 export type LocalOcrAssetUrls = Readonly<{
   workerPath: string;
@@ -175,6 +180,8 @@ export function ocrWordsFromBlocks(
 async function renderPageForOcr(
   page: Pick<PDFPageProxy, "getViewport" | "render">,
   pageNumber: number,
+  createCanvas: () => HTMLCanvasElement,
+  onRenderTask: (task: { cancel: () => void } | null) => void,
 ): Promise<{
   canvas: HTMLCanvasElement;
   scale: number;
@@ -182,7 +189,7 @@ async function renderPageForOcr(
   const pointViewport = page.getViewport({ scale: 1 });
   const scale = computeOcrRenderScale(pointViewport.width, pointViewport.height);
   const viewport = page.getViewport({ scale });
-  const canvas = document.createElement("canvas");
+  const canvas = createCanvas();
   canvas.width = Math.max(1, Math.ceil(viewport.width));
   canvas.height = Math.max(1, Math.ceil(viewport.height));
   const context = canvas.getContext("2d", { alpha: false });
@@ -190,8 +197,13 @@ async function renderPageForOcr(
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, canvas.width, canvas.height);
   const renderTask = page.render({ canvas, canvasContext: context, viewport });
-  await renderPageWithTimeout(renderTask, pageNumber);
-  return { canvas, scale };
+  onRenderTask(renderTask);
+  try {
+    await renderPageWithTimeout(renderTask, pageNumber);
+    return { canvas, scale };
+  } finally {
+    onRenderTask(null);
+  }
 }
 
 export type LocalOcrEngine = Readonly<{
@@ -203,29 +215,44 @@ export type LocalOcrEngine = Readonly<{
   terminate(): Promise<void>;
 }>;
 
-export function createLocalOcrEngine(origin?: string): LocalOcrEngine {
+export function createLocalOcrEngine(
+  origin?: string,
+  dependencies: LocalOcrEngineDependencies = {},
+): LocalOcrEngine {
   let workerPromise: Promise<OcrWorker> | null = null;
+  let worker: OcrWorker | null = null;
+  let activeRenderTask: { cancel: () => void } | null = null;
+  let recognitionActive = false;
   let terminated = false;
   let currentProgressListener: ((progress: OcrProgress) => void) | null = null;
+  const createCanvas =
+    dependencies.createCanvas ?? (() => document.createElement("canvas"));
+
+  const loadWorkerFactory = async (): Promise<LocalOcrWorkerFactory> => {
+    if (dependencies.createWorker) return dependencies.createWorker;
+    const tesseract = await import("tesseract.js");
+    const dynamicModule = tesseract as unknown as {
+      createWorker?: LocalOcrWorkerFactory;
+      default?: { createWorker?: LocalOcrWorkerFactory };
+    };
+    const createWorker =
+      dynamicModule.createWorker ?? dynamicModule.default?.createWorker;
+    if (!createWorker) throw new Error("Tesseract OCR could not be loaded.");
+    return createWorker;
+  };
 
   const ensureWorker = async (): Promise<OcrWorker> => {
     if (terminated) throw new Error("The OCR session has been terminated.");
+    if (worker) return worker;
     if (!workerPromise) {
+      const applicationOrigin =
+        origin ?? (typeof window !== "undefined" ? window.location.origin : "");
+      if (!applicationOrigin) {
+        throw new Error("OCR can only start in a browser application origin.");
+      }
+      const assets = localOcrAssetUrls(applicationOrigin);
       workerPromise = (async () => {
-        const tesseract = await import("tesseract.js");
-        const dynamicModule = tesseract as unknown as {
-          createWorker?: CreateWorker;
-          default?: { createWorker?: CreateWorker };
-        };
-        const createWorker =
-          dynamicModule.createWorker ?? dynamicModule.default?.createWorker;
-        if (!createWorker) throw new Error("Tesseract OCR could not be loaded.");
-        const applicationOrigin =
-          origin ?? (typeof window !== "undefined" ? window.location.origin : "");
-        if (!applicationOrigin) {
-          throw new Error("OCR can only start in a browser application origin.");
-        }
-        const assets = localOcrAssetUrls(applicationOrigin);
+        const createWorker = await loadWorkerFactory();
         return createWorker("eng", 1, {
           ...assets,
           workerBlobURL: false,
@@ -248,27 +275,69 @@ export function createLocalOcrEngine(origin?: string): LocalOcrEngine {
         });
       })();
     }
-    return workerPromise;
+
+    const pending = workerPromise;
+    try {
+      const resolved = await pending;
+      if (terminated) {
+        try {
+          await resolved.terminate();
+        } catch {
+          // Best-effort cleanup after cancellation during worker startup.
+        }
+        throw new Error("The OCR session has been terminated.");
+      }
+      worker = resolved;
+      if (workerPromise === pending) workerPromise = null;
+      return resolved;
+    } catch (error) {
+      if (workerPromise === pending) workerPromise = null;
+      throw error;
+    }
+  };
+
+  const discardWorker = async (failedWorker: OcrWorker | null): Promise<void> => {
+    if (!failedWorker) return;
+    if (worker === failedWorker) worker = null;
+    try {
+      await failedWorker.terminate();
+    } catch {
+      // Failed OCR workers are never reused; cleanup remains best-effort.
+    }
   };
 
   return {
     async recognizePage({ page, pageIndex, onProgress }) {
       if (terminated) throw new Error("The OCR session has been terminated.");
+      if (recognitionActive) {
+        throw new Error("Another local OCR recognition is already running.");
+      }
       if (!Number.isInteger(pageIndex) || pageIndex < 0) {
         throw new Error("OCR page index must be a non-negative integer.");
       }
+      recognitionActive = true;
       currentProgressListener = onProgress ?? null;
+      let activeWorker: OcrWorker | null = null;
       try {
         onProgress?.({ status: "Preparing page locally", progress: 0 });
-        const [{ canvas, scale }, worker] = await Promise.all([
-          renderPageForOcr(page, pageIndex + 1),
+        const [rendered, readyWorker] = await Promise.all([
+          renderPageForOcr(
+            page,
+            pageIndex + 1,
+            createCanvas,
+            (task) => {
+              activeRenderTask = task;
+            },
+          ),
           ensureWorker(),
         ]);
+        const { canvas, scale } = rendered;
+        activeWorker = readyWorker;
         if (terminated) throw new Error("The OCR session was cancelled.");
-        await worker.setParameters({
+        await activeWorker.setParameters({
           user_defined_dpi: String(Math.max(72, Math.round(scale * 72))),
         });
-        const recognition = await worker.recognize(
+        const recognition = await activeWorker.recognize(
           canvas,
           {},
           { text: true, blocks: true },
@@ -297,20 +366,51 @@ export function createLocalOcrEngine(origin?: string): LocalOcrEngine {
           imageHeightPx: canvas.height,
           words,
         };
+      } catch (error) {
+        if (!terminated) {
+          await discardWorker(activeWorker);
+        }
+        throw error;
       } finally {
+        recognitionActive = false;
         currentProgressListener = null;
+        activeRenderTask = null;
       }
     },
 
     async terminate() {
       terminated = true;
+      recognitionActive = false;
       currentProgressListener = null;
+
+      const renderTask = activeRenderTask;
+      activeRenderTask = null;
+      if (renderTask) {
+        try {
+          renderTask.cancel();
+        } catch {
+          // Best-effort: the render may already have completed.
+        }
+      }
+
+      const currentWorker = worker;
+      worker = null;
       const pending = workerPromise;
       workerPromise = null;
+
+      if (currentWorker) {
+        try {
+          await currentWorker.terminate();
+        } catch {
+          // Best-effort cleanup: cancellation must not surface a second error.
+        }
+        return;
+      }
+
       if (!pending) return;
       try {
-        const worker = await pending;
-        await worker.terminate();
+        const pendingWorker = await pending;
+        await pendingWorker.terminate();
       } catch {
         // Best-effort cleanup: cancellation must not surface a second error.
       }
