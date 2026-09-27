@@ -5,6 +5,7 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import {
   addSearchableOcrTextLayer,
+  firstMissingSearchableOcrWord,
   MAX_SEARCHABLE_OCR_WORDS,
 } from "../lib/pdf/edit/searchableOcrLayer.ts";
 import type { OcrPageResult, OcrWord } from "../lib/pdf/edit/localOcr.ts";
@@ -66,6 +67,28 @@ async function extractedText(bytes: Uint8Array): Promise<string> {
     if (destroy) await destroy.call(doc);
   }
 }
+
+test("searchable OCR verification requires one extracted occurrence per claimed word", () => {
+  assert.equal(
+    firstMissingSearchableOcrWord(["scan", "scan"], ["SCAN"]),
+    "scan",
+  );
+  assert.equal(
+    firstMissingSearchableOcrWord(["scan", "scan"], ["SCAN", "scan"]),
+    null,
+  );
+});
+
+test("searchable OCR verification does not accept a substring as proof", () => {
+  assert.equal(
+    firstMissingSearchableOcrWord(["scan"], ["SCANNED"]),
+    "scan",
+  );
+  assert.equal(
+    firstMissingSearchableOcrWord(["Scan"], ["  scan  "]),
+    null,
+  );
+});
 
 test("searchable OCR layer writes extractable text with native rendering mode 3", async () => {
   const source = await blankPdf();
