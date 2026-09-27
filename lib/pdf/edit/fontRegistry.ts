@@ -423,17 +423,17 @@ function cidToGidAddressingSourceFor(
   }
 
   if (resolved instanceof PDFRawStream) {
-    try {
-      return {
-        kind: "stream",
-        bytes: decodePDFRawStream(resolved).decode(),
-      };
-    } catch {
+    if (resolved.dict.has(PDFName.of("Filter"))) {
       return {
         kind: "blocked",
-        reason: "The CIDToGIDMap stream could not be decoded safely.",
+        reason:
+          "Compressed CIDToGIDMap streams are not decoded by this first bounded proof slice.",
       };
     }
+    return {
+      kind: "stream",
+      bytes: resolved.getContents().slice(),
+    };
   }
 
   return {
