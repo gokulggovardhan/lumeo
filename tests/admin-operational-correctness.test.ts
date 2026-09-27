@@ -93,6 +93,9 @@ test("Dashboard avoids retired status queries and reads current operational sour
   assert.match(page, /getAnalyticsSummary\(\)/);
   assert.match(page, /getAuditLogs\(5\)/);
   assert.match(page, /getErrorLogSummary\(\)/);
+  assert.match(page, /getUnresolvedErrorLogs\(5, 0\)/);
+  assert.match(page, /processingCancelled/);
+  assert.match(page, /unreconciledStarts/);
   assert.match(page, /getUnreadInboxCount\(\)/);
   assert.match(page, /Requires attention/);
 });
