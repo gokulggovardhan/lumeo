@@ -3691,6 +3691,7 @@ export default function EditPdfTool() {
         fallbackStyleHints: import("@/lib/pdf/edit/fallbackFont").FallbackStyleHints;
         embeddedGlyphEvidence: EmbeddedGlyphEvidence | null;
         embeddedProgramSha256: string | null;
+        resourceIdentity: import("@/lib/pdf/edit/fontRegistry").PdfFontResourceIdentity;
         resources: PDFDict;
         fontResourceName: string;
       }
@@ -3700,6 +3701,7 @@ export default function EditPdfTool() {
         fontMetrics: FontMetrics;
         embeddedGlyphEvidence: EmbeddedGlyphEvidence | null;
         embeddedProgramSha256: string | null;
+        resourceIdentity: import("@/lib/pdf/edit/fontRegistry").PdfFontResourceIdentity;
         resources: PDFDict;
         fontResourceName: string;
         validation: Extract<MultiRunValidation, { kind: "valid" }>;
