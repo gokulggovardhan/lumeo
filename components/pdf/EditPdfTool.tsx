@@ -684,6 +684,8 @@ export default function EditPdfTool() {
     selectRunIndices,
     updateSingleSpanLogicalSelection,
   } = useNativeTextSelectionState();
+  const nativeTextSelectionKey = selectedRunIndices.join(",");
+  const nativeTextComposingRef = useRef<string | null>(null);
   // Browser FontFace previews are keyed to a model span id so an async font
   // load can never leak the previous selection's face into a newly-selected
   // run. Export safety remains governed by fontEncoding/editPlan, not by
@@ -3143,6 +3145,16 @@ export default function EditPdfTool() {
   // overlay-element
   // export pipeline) all see this edit without any separate wiring.
   const applyTextRunEdit = useCallback(async () => {
+    // IME candidate text is provisional. The mutable ref closes the small
+    // window before React commits the controller state, while the keyed state
+    // keeps the guard scoped to the selection that owns the composition.
+    if (
+      textCompositionActive ||
+      nativeTextComposingRef.current === nativeTextSelectionKey
+    ) {
+      return;
+    }
+
     const doc = pdfLibDocRef.current;
     const engine = editEngineRef.current;
     if (!doc || !engine || editPreview.kind === "empty" || !editPreview.editable) return;
@@ -3264,7 +3276,7 @@ export default function EditPdfTool() {
     } finally {
       setIsApplyingEdit(false);
     }
-  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan, nativePaintPlan]);
+  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan, nativePaintPlan, textCompositionActive, nativeTextSelectionKey]);
 
   // Phase 2.4B: formatting a logical multi-span selection is a DIFFERENT
   // transaction from multi-run text replacement. Each selected span keeps its
@@ -4627,6 +4639,7 @@ export default function EditPdfTool() {
                         value={editDraftText}
                         onCompositionStart={(event) => {
                           event.stopPropagation();
+                          nativeTextComposingRef.current = nativeTextSelectionKey;
                           setTextCompositionActive(true);
                         }}
                         onCompositionEnd={(event) => {
@@ -4638,7 +4651,10 @@ export default function EditPdfTool() {
                           // current, then restore Lumeo's logical selection on
                           // the next frame after the browser releases the caret.
                           handleEditDraftTextChange(input.value);
-                          setTextCompositionActive(false);
+                          if (nativeTextComposingRef.current === nativeTextSelectionKey) {
+                            nativeTextComposingRef.current = null;
+                            setTextCompositionActive(false);
+                          }
                           requestAnimationFrame(() => {
                             if (
                               inlineEditInputRef.current === input &&
@@ -4985,12 +5001,16 @@ export default function EditPdfTool() {
                           value={editDraftText}
                           onCompositionStart={(event) => {
                             event.stopPropagation();
+                            nativeTextComposingRef.current = nativeTextSelectionKey;
                             setTextCompositionActive(true);
                           }}
                           onCompositionEnd={(event) => {
                             event.stopPropagation();
                             handleEditDraftTextChange(event.currentTarget.value);
-                            setTextCompositionActive(false);
+                            if (nativeTextComposingRef.current === nativeTextSelectionKey) {
+                              nativeTextComposingRef.current = null;
+                              setTextCompositionActive(false);
+                            }
                           }}
                           onChange={(event) => {
                             handleEditDraftTextChange(event.target.value);
