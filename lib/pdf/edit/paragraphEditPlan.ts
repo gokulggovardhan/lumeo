@@ -373,6 +373,7 @@ export function buildParagraphEditPlan({
         reason:
           "This multi-line replacement requires complex shaping. Edit that line individually so the shaped-glyph writer can prove it separately.",
         lines,
+        originalText: decodedOriginalText,
         paragraphCandidate: true,
       });
     }
@@ -401,6 +402,7 @@ export function buildParagraphEditPlan({
           replacementText,
           reason: plan.reason,
           lines,
+        originalText: decodedOriginalText,
           paragraphCandidate: true,
         });
       }
@@ -413,6 +415,7 @@ export function buildParagraphEditPlan({
           reason:
             "This paragraph line would require a substitute font. Edit that line individually instead of changing paragraph font resources implicitly.",
           lines,
+        originalText: decodedOriginalText,
           paragraphCandidate: true,
         });
       }
@@ -437,6 +440,7 @@ export function buildParagraphEditPlan({
           replacementText,
           reason: multi.reason,
           lines,
+        originalText: decodedOriginalText,
           paragraphCandidate: true,
         });
       }
@@ -449,6 +453,7 @@ export function buildParagraphEditPlan({
           reason:
             "This paragraph line would require a substitute font. Edit that line individually instead of changing paragraph font resources implicitly.",
           lines,
+        originalText: decodedOriginalText,
           paragraphCandidate: true,
         });
       }
