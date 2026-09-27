@@ -87,7 +87,9 @@ test("searchable OCR writes extractable text with invisible native rendering mod
 
   const searchable = await addSearchableOcrTextLayer({ sourceBytes, result });
 
-  const searchableLoadingTask = pdfjsLib.getDocument({ data: searchable.bytes });
+  const searchableLoadingTask = pdfjsLib.getDocument({
+    data: searchable.bytes.slice(),
+  });
   const pdfjs = await searchableLoadingTask.promise;
   try {
     const page = await pdfjs.getPage(1);
