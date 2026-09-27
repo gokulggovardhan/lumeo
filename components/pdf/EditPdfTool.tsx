@@ -1475,12 +1475,12 @@ export default function EditPdfTool() {
         const extracted = (content.items as Array<{ str?: string }>)
           .map((item) => item.str ?? "")
           .join(" ")
-          .toLocaleLowerCase();
+          .toLowerCase();
         const expectedWords = sourceResult.words
           .map((word) => word.text.trim())
           .filter(Boolean);
         const missingWord = expectedWords.find(
-          (word) => !extracted.includes(word.toLocaleLowerCase()),
+          (word) => !extracted.includes(word.toLowerCase()),
         );
         if (missingWord) {
           throw new Error(
@@ -1523,16 +1523,22 @@ export default function EditPdfTool() {
       });
     } catch (searchableError) {
       const currentBytes = getHistoryState().pdfBytes;
-      const currentPageIndex = ocrContextRef.current.pageIndex;
-      setOcrSearchableNoticeRevision({
-        bytes: currentBytes,
-        pageIndex: currentPageIndex,
-        kind: "error",
-        message:
-          searchableError instanceof Error
-            ? searchableError.message
-            : "Searchable OCR could not be completed. Nothing was changed.",
-      });
+      const currentContext = ocrContextRef.current;
+      if (
+        currentBytes === sourceBytes &&
+        currentContext.bytes === sourceBytes &&
+        currentContext.pageIndex === sourcePageIndex
+      ) {
+        setOcrSearchableNoticeRevision({
+          bytes: sourceBytes,
+          pageIndex: sourcePageIndex,
+          kind: "error",
+          message:
+            searchableError instanceof Error
+              ? searchableError.message
+              : "Searchable OCR could not be completed. Nothing was changed.",
+        });
+      }
     } finally {
       setOcrSearchableActivity((current) =>
         current?.bytes === sourceBytes && current.pageIndex === sourcePageIndex
