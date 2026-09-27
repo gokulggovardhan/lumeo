@@ -686,7 +686,11 @@ export default function EditPdfTool() {
   // load can never leak the previous selection's face into a newly-selected
   // run. Export safety remains governed by fontEncoding/editPlan, not by
   // whether a browser happens to accept the embedded font bytes.
-  const [browserFontPreview, setBrowserFontPreview] = useState<{ spanId: string; family: string } | null>(null);
+  const [browserFontPreview, setBrowserFontPreview] = useState<{
+    spanId: string;
+    family: string;
+    embeddedProgramSha256: string;
+  } | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
   const [textSearchOpen, setTextSearchOpen] = useState(false);
   const [textSearchQuery, setTextSearchQuery] = useState("");
@@ -3845,15 +3849,23 @@ export default function EditPdfTool() {
 
   const activeNativeStyleDraft =
     nativeStyleDraft?.spanId === singleSelectedSpan?.id ? nativeStyleDraft : null;
-  const inlineEditorFontFamily =
-    singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
-      ? browserFontPreview.family
-      : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
+  const selectedSpanEmbeddedProgramSha =
+    singleSelectedSpan?.fontProfile?.embeddedProgramSha256 ?? null;
+  const browserFontPreviewMatchesSelectedSpan = Boolean(
+    singleSelectedSpan &&
+      browserFontPreview?.spanId === singleSelectedSpan.id &&
+      selectedSpanEmbeddedProgramSha &&
+      browserFontPreview.embeddedProgramSha256.toLowerCase() ===
+        selectedSpanEmbeddedProgramSha.toLowerCase(),
+  );
+  const inlineEditorFontFamily = browserFontPreviewMatchesSelectedSpan
+    ? browserFontPreview?.family
+    : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
   const fontPreviewFidelity = describeFontPreviewFidelity({
     profile: singleSelectedSpan?.fontProfile ?? null,
-    exactEmbeddedLoaded: Boolean(
-      singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id,
-    ),
+    loadedEmbeddedProgramSha256: browserFontPreviewMatchesSelectedSpan
+      ? browserFontPreview?.embeddedProgramSha256 ?? null
+      : null,
     // No live equivalent provider is wired yet. A future caller may supply
     // independently verified equivalence evidence, but generic CSS stacks
     // must remain fallback rather than being promoted by name similarity.
@@ -3905,7 +3917,15 @@ export default function EditPdfTool() {
   useEffect(() => {
     if (!fontRegistry || !singleSelectedSpan || !singleSelectedRunMatch) return;
     const resourceName = singleSelectedRunMatch.operator.fontResourceName;
-    if (!resourceName || !singleSelectedSpan.fontProfile?.browserPreviewPossible) return;
+    const profile = singleSelectedSpan.fontProfile;
+    if (
+      !resourceName ||
+      !profile?.browserPreviewPossible ||
+      !profile.embeddedProgramSha256
+    ) {
+      return;
+    }
+    const embeddedProgramSha256 = profile.embeddedProgramSha256;
 
     let cancelled = false;
     void fontRegistry
@@ -3916,6 +3936,7 @@ export default function EditPdfTool() {
         setBrowserFontPreview({
           spanId: singleSelectedSpan.id,
           family: `"${family}", ${fallback}`,
+          embeddedProgramSha256,
         });
       })
       .finally(() => {

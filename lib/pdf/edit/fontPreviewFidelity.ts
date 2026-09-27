@@ -19,22 +19,35 @@ export type FontPreviewFidelity = {
 
 type PreviewProfile = Pick<
   PdfFontProfile,
-  "isEmbedded" | "browserPreviewPossible" | "cssFallbackFamily" | "familyName"
+  | "isEmbedded"
+  | "browserPreviewPossible"
+  | "cssFallbackFamily"
+  | "familyName"
+  | "embeddedProgramSha256"
 >;
+
+function normalizedSha256(value: string | null | undefined): string | null {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  return /^[0-9a-f]{64}$/.test(normalized) ? normalized : null;
+}
 
 export function describeFontPreviewFidelity({
   profile,
-  exactEmbeddedLoaded,
+  loadedEmbeddedProgramSha256,
   verifiedEquivalent,
 }: {
   profile: PreviewProfile | null;
-  exactEmbeddedLoaded: boolean;
+  loadedEmbeddedProgramSha256: string | null;
   verifiedEquivalent?: VerifiedEquivalentFontPreview | null;
 }): FontPreviewFidelity {
+  const expectedEmbeddedSha = normalizedSha256(profile?.embeddedProgramSha256);
+  const loadedEmbeddedSha = normalizedSha256(loadedEmbeddedProgramSha256);
+
   if (
-    exactEmbeddedLoaded &&
     profile?.isEmbedded &&
-    profile.browserPreviewPossible
+    profile.browserPreviewPossible &&
+    expectedEmbeddedSha &&
+    loadedEmbeddedSha === expectedEmbeddedSha
   ) {
     return {
       kind: "exact-embedded",
@@ -45,7 +58,7 @@ export function describeFontPreviewFidelity({
     };
   }
 
-  if (verifiedEquivalent) {
+  if (profile && verifiedEquivalent) {
     return {
       kind: "verified-equivalent",
       label: "Preview: Verified equivalent",
