@@ -85,6 +85,7 @@ import {
   userMessageForPageCapability,
   userMessageForTextRun,
 } from "@/lib/pdf/edit/capabilityMessaging";
+import { describeFontPreviewFidelity } from "@/lib/pdf/edit/previewFidelity";
 import { PdfCoordinateMapper } from "@/lib/pdf/edit/coordinateMapper";
 import { buildPdfPageTextModel } from "@/lib/pdf/edit/documentModel";
 import { summarizeNativeTextSelectionStyles } from "@/lib/pdf/edit/mixedStyleSelection";
@@ -684,7 +685,11 @@ export default function EditPdfTool() {
   // load can never leak the previous selection's face into a newly-selected
   // run. Export safety remains governed by fontEncoding/editPlan, not by
   // whether a browser happens to accept the embedded font bytes.
-  const [browserFontPreview, setBrowserFontPreview] = useState<{ spanId: string; family: string } | null>(null);
+  const [browserFontPreview, setBrowserFontPreview] = useState<{
+    spanId: string;
+    family: string;
+    embeddedProgramSha256: string;
+  } | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
   const [textSearchOpen, setTextSearchOpen] = useState(false);
   const [textSearchQuery, setTextSearchQuery] = useState("");
@@ -3610,6 +3615,18 @@ export default function EditPdfTool() {
     singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
       ? browserFontPreview.family
       : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
+  const selectedSpanEmbeddedPreviewSha =
+    singleSelectedSpan && browserFontPreview?.spanId === singleSelectedSpan.id
+      ? browserFontPreview.embeddedProgramSha256
+      : null;
+  const nativeFontPreviewFidelity = describeFontPreviewFidelity({
+    profile: singleSelectedSpan?.fontProfile ?? null,
+    loadedEmbeddedProgramSha256: selectedSpanEmbeddedPreviewSha,
+    // No current browser fallback has independent identity + glyph-metric
+    // proof. Standard-14 CSS stacks therefore remain honestly "fallback"
+    // until a future verifier can supply explicit equivalent evidence.
+    verifiedEquivalent: null,
+  });
   const editableNativeSpanKeys = new Set(
     effectiveTextArbitrations
       .filter((arbitration) => arbitration.decision === "editable")
@@ -3656,7 +3673,15 @@ export default function EditPdfTool() {
   useEffect(() => {
     if (!fontRegistry || !singleSelectedSpan || !singleSelectedRunMatch) return;
     const resourceName = singleSelectedRunMatch.operator.fontResourceName;
-    if (!resourceName || !singleSelectedSpan.fontProfile?.browserPreviewPossible) return;
+    const profile = singleSelectedSpan.fontProfile;
+    if (
+      !resourceName ||
+      !profile?.browserPreviewPossible ||
+      !profile.embeddedProgramSha256
+    ) {
+      return;
+    }
+    const embeddedProgramSha256 = profile.embeddedProgramSha256;
 
     let cancelled = false;
     void fontRegistry
@@ -3667,6 +3692,7 @@ export default function EditPdfTool() {
         setBrowserFontPreview({
           spanId: singleSelectedSpan.id,
           family: `"${family}", ${fallback}`,
+          embeddedProgramSha256,
         });
       });
     return () => {
@@ -4506,6 +4532,7 @@ export default function EditPdfTool() {
                           span={singleSelectedSpan}
                           draft={nativeStyleDraft}
                           fillCapability={nativeFillCapability}
+                          previewFidelity={nativeFontPreviewFidelity}
                           panelPositionClass={nativeFormatPanelPositionClass}
                           horizontalClass={inlineEditorHorizontalClass}
                           onPatchDraft={(patch) => {
