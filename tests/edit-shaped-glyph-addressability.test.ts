@@ -193,6 +193,56 @@ test("shaped glyph addressability binds Identity-H CID == GID to exact ToUnicode
   ]);
 });
 
+test("shaped glyph addressability can bind one ligature glyph to an exact multi-codepoint ToUnicode cluster", async () => {
+  const fixture = await cidFontFixture({
+    toUnicode: new Map([[3, "fi"]]),
+  })();
+  const result = new PdfFontRegistry(fixture.doc).inspectShapedGlyphAddressability(
+    fixture.resources,
+    "FShape",
+    shapedRun([{ glyphId: 3, clusterText: "fi" }]),
+  );
+
+  assert.equal(result.kind, "addressable");
+  if (result.kind !== "addressable") return;
+  assert.equal(result.addresses[0]?.clusterText, "fi");
+  assert.equal(result.addresses[0]?.cid, 3);
+});
+
+test("shaped glyph addressability keeps multi-glyph logical clusters read-only until search semantics are proven", async () => {
+  const fixture = await cidFontFixture({
+    toUnicode: new Map([
+      [3, "क्ष"],
+      [4, "क्ष"],
+    ]),
+    widths: new Map([
+      [3, 600],
+      [4, 600],
+    ]),
+  })();
+  const shaped = shapedRun([
+    { glyphId: 3, clusterText: "क्ष" },
+    { glyphId: 4, clusterText: "क्ष" },
+  ]);
+  shaped.clusterMap = [
+    {
+      startUtf16: 0,
+      endUtf16: "क्ष".length,
+      text: "क्ष",
+      glyphIndices: [0, 1],
+    },
+  ];
+
+  const result = new PdfFontRegistry(fixture.doc).inspectShapedGlyphAddressability(
+    fixture.resources,
+    "FShape",
+    shaped,
+  );
+
+  assert.equal(result.kind, "blocked");
+  if (result.kind === "blocked") assert.match(result.reason, /multi-glyph clusters/i);
+});
+
 test("shaped glyph addressability decodes an explicit CIDToGIDMap stream and keeps PDF code identity", async () => {
   const map = Uint8Array.from([
     0, 0,
