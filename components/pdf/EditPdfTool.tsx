@@ -540,6 +540,7 @@ export default function EditPdfTool() {
     canUndo,
     canRedo,
     reset: resetHistory,
+    getCurrent: getCurrentHistoryState,
   } = useHistoryState<EditHistorySnapshot>(
     { elements: [], pdfBytes: new ArrayBuffer(0), session: createPdfEditSession(0) },
     { maxTotalSize: EDIT_HISTORY_MAX_BYTES, sizeOf: (snapshot) => snapshot.pdfBytes.byteLength },
@@ -2921,6 +2922,10 @@ export default function EditPdfTool() {
 
     const engine = editEngineRef.current;
     const pdfJsDocument = pdfJsDocRef.current;
+    // Identity token for the exact native PDF snapshot being analyzed. The
+    // shared history hook updates its authoritative ref synchronously, so
+    // this remains reliable even if React has not re-rendered yet.
+    const replaceAllSourceBytes = getCurrentHistoryState().pdfBytes;
     const query = textSearchQuery;
     const replacement = textSearchReplacement;
     const options = {
@@ -2937,7 +2942,7 @@ export default function EditPdfTool() {
       // current history bytes. Nothing in the live document/history changes
       // unless every selected write below succeeds and this clone saves.
       const planningDoc = await engine.PDFDocument.load(
-        copyArrayBuffer(historyState.pdfBytes),
+        copyArrayBuffer(replaceAllSourceBytes),
       );
       const planningRegistry = new engine.PdfFontRegistry(planningDoc);
 
@@ -3081,6 +3086,12 @@ export default function EditPdfTool() {
             replacementText: unit.candidate.replacementText,
           }),
       );
+
+      if (getCurrentHistoryState().pdfBytes !== replaceAllSourceBytes) {
+        throw new Error(
+          "The PDF changed while Replace All was checking matches. No replacement was applied; run Find again.",
+        );
+      }
 
       setHistoryState((current) => ({
         ...current,
