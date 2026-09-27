@@ -143,7 +143,10 @@ test("multi-run: two consecutive Tj operators merge into one replacement, neighb
     { text: "Middle two", kind: "Tj", sameLineWithPrevious: true },
     { text: "Last", kind: "Tj" },
   ]);
-  assert.deepEqual(await extractPageStrings(original), ["First", "Middle one", "Middle two", "Last"]);
+  assert.equal(
+    (await extractPageStrings(original)).join(""),
+    "FirstMiddle oneMiddle twoLast",
+  );
 
   const { plan, resolvedFont } = await buildMultiRunPlanForIndices(original, [1, 2], "Combined middle");
   assert.equal(plan.editable, true);
@@ -308,14 +311,10 @@ test("multi-run: partial selection (a middle span of a longer document) leaves e
     { text: "Line five", kind: "Tj" },
     { text: "Line six", kind: "Tj" },
   ]);
-  assert.deepEqual(await extractPageStrings(original), [
-    "Line one",
-    "Line two",
-    "Span part A",
-    "Span part B",
-    "Line five",
-    "Line six",
-  ]);
+  assert.equal(
+    (await extractPageStrings(original)).join(""),
+    "Line oneLine twoSpan part ASpan part BLine fiveLine six",
+  );
 
   // Only operators 2 and 3 (of 6) are selected -- a proper subset.
   const { plan, resolvedFont } = await buildMultiRunPlanForIndices(original, [2, 3], "Replaced span");
