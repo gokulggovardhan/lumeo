@@ -289,6 +289,48 @@ test("vinext Edit PDF aborts Replace All when the native PDF revision changes du
   ).toHaveCount(0);
 });
 
+test("vinext Edit PDF cancels document Replace All without publishing partial changes", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, LARGE_DOCUMENT_PDF);
+  await waitForStageReady(page);
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("page");
+  const replace = page.getByRole("textbox", {
+    name: "Replace search match with",
+  });
+  await replace.fill("sheet");
+
+  const replaceAll = page.getByRole("button", { name: "Replace all safely" });
+  await expect(replaceAll).toBeEnabled({ timeout: 90_000 });
+  await replaceAll.click();
+
+  const cancel = page.getByRole("button", { name: "Cancel Replace All" });
+  await expect(cancel).toBeVisible({ timeout: 30_000 });
+  await cancel.click();
+
+  const status = page.locator("[data-edit-replace-all-status]");
+  await expect(status).toContainText(/Replace All cancelled\. Nothing was changed/i, {
+    timeout: 90_000,
+  });
+  await expect(cancel).toHaveCount(0);
+  await expect(replaceAll).toBeEnabled({ timeout: 30_000 });
+
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large document page 1"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large document sheet 1"]',
+    ),
+  ).toHaveCount(0);
+});
+
 test("vinext Edit PDF shares one linear semantic undo history across native Edit and Redaction", async ({
   page,
 }) => {
