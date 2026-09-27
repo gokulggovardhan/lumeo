@@ -715,6 +715,16 @@ export default function EditPdfTool() {
     bytes: ArrayBuffer | null;
     pageIndex: number;
   } | null>(null);
+  const [ocrSearchLayerActivity, setOcrSearchLayerActivity] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+  } | null>(null);
+  const [ocrSearchLayerNoticeRevision, setOcrSearchLayerNoticeRevision] =
+    useState<{
+      bytes: ArrayBuffer;
+      pageIndex: number;
+      message: string;
+    } | null>(null);
   const ocrActivityCurrent =
     ocrActivity !== null &&
     ocrActivity.bytes === pdf?.bytes &&
@@ -735,6 +745,14 @@ export default function EditPdfTool() {
     ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
       ? ocrResultsRevision.pages.get(pageIndex) ?? null
       : null;
+  const ocrSearchLayerBusy =
+    ocrSearchLayerActivity?.bytes === pdf?.bytes &&
+    ocrSearchLayerActivity.pageIndex === pageIndex;
+  const ocrSearchLayerNotice =
+    ocrSearchLayerNoticeRevision?.bytes === pdf?.bytes &&
+    ocrSearchLayerNoticeRevision.pageIndex === pageIndex
+      ? ocrSearchLayerNoticeRevision.message
+      : "";
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
   // runMatches was derived from), kept around so a multi-run selection can
   // reconstruct the FULL, in-order operator list one specific content
