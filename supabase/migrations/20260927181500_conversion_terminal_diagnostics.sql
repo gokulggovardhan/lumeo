@@ -22,7 +22,7 @@ alter table public.analytics_events
   );
 
 comment on column public.analytics_events.failure_stage is
-  'Privacy-safe conversion lifecycle stage for processing_failed or processing_cancelled events. Never contains document content, filenames, or free-form messages.';
+  'Privacy-safe conversion lifecycle stage for processing_failed or processing_cancelled events. Never contains document content or free-form diagnostic messages.';
 
 create or replace function public.record_public_analytics_event(
   event_name text,
