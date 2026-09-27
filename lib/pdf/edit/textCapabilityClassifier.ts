@@ -82,14 +82,6 @@ export function classifyNativeTextSpan(
         "The source baseline is known, but font ascent/descent metrics are unavailable and the visible text box uses an approximate fallback.",
     };
   }
-  if (span.locatedOperator.locator.kind === "xobject") {
-    return {
-      nativeSpanKey: span.key,
-      category: "FORM_XOBJECT_TEXT",
-      safelyRewritable: span.decodeComplete && profile?.encodingSource !== "Unknown",
-      reason: "The text is inside a Form XObject and retains form-local resource scope.",
-    };
-  }
   if (!profile || profile.encodingSource === "Unknown" || !span.decodeComplete) {
     return {
       nativeSpanKey: span.key,
@@ -112,6 +104,19 @@ export function classifyNativeTextSpan(
       category: "COMPLEX_VECTOR_TEXT",
       safelyRewritable: false,
       reason: "The text transform is materially skewed and is kept read-only.",
+    };
+  }
+
+  // Form/XObject scope is a resource-location property, not permission to
+  // bypass the same encoding, metrics and geometry bars page text must pass.
+  // Classify it only AFTER those fail-closed checks have succeeded.
+  if (span.locatedOperator.locator.kind === "xobject") {
+    return {
+      nativeSpanKey: span.key,
+      category: "FORM_XOBJECT_TEXT",
+      safelyRewritable: true,
+      reason:
+        "The text is inside a Form XObject, retains form-local resource scope, and clears the same encoding, metrics and geometry safety checks as direct page text.",
     };
   }
 
