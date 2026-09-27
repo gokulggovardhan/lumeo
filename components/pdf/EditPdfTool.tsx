@@ -6151,16 +6151,6 @@ export default function EditPdfTool() {
                             : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
                       </p>
 
-                      {ocrSearchLayerNotice ? (
-                        <p
-                          role="status"
-                          data-edit-ocr-searchable-status
-                          className="mt-2 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/25 bg-[var(--lumeo-gold)]/[0.07] px-2.5 py-2 text-[10px] leading-4 text-[var(--text-primary)]/65"
-                        >
-                          {ocrSearchLayerNotice}
-                        </p>
-                      ) : null}
-
                       {pageTextCapability.category === "SCANNED_IMAGE" ? (
                         <div data-edit-ocr-panel data-edit-ocr-source="ocr" onClick={(event) => event.stopPropagation()} className="mt-2.5 grid gap-2">
                           {ocrPageResultCurrent ? (
@@ -6262,6 +6252,17 @@ export default function EditPdfTool() {
                       ) : null}
                     </div>
                   ) : null}
+
+                  {ocrSearchLayerNotice ? (
+                    <p
+                      role="status"
+                      data-edit-ocr-searchable-status
+                      className="absolute left-3 top-3 z-30 max-w-[360px] rounded-[var(--radius-lg)] border border-[var(--lumeo-gold)]/30 bg-[var(--atelier-surface-1)]/95 px-3 py-2 text-[10px] leading-4 text-[var(--text-primary)]/70 shadow-lg backdrop-blur-sm"
+                    >
+                      {ocrSearchLayerNotice}
+                    </p>
+                  ) : null}
+
                   {redactMode ? (
                     <RedactionLayer
                       boxes={redactionBoxes}
