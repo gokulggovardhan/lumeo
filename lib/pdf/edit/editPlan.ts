@@ -22,11 +22,13 @@ import { encodeWithFallbackFont, fallbackFontMetrics, firstUnencodableChar, pick
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "./fontEncoding.ts";
 import { resolveGlyphAuthority } from "./glyphAuthority.ts";
 import type { FontMetrics } from "./fontMetrics.ts";
-import { compareAdvance, compareAdvanceAcrossFonts, compareAdvanceAcrossStates, type TextShowState } from "./fontMetrics.ts";
+import { compareAdvance, compareAdvanceAcrossFonts, compareAdvanceAcrossStates, stringAdvancePt, type TextShowState } from "./fontMetrics.ts";
+import type { PdfFontResourceIdentity } from "./fontRegistry.ts";
 import {
   detectComplexShapingRequirement,
   isValidatedShapingWriteEvidence,
   shapingEvidenceMatchesReplacement,
+  shapedGlyphEvidenceMatchesResource,
   type ValidatedShapingWriteEvidence,
 } from "./shapingWriteGuard.ts";
 
@@ -122,6 +124,13 @@ export type EditPlanFields = {
   tjSpacingDelta: number;
   byteOffset: number;
   byteLength: number;
+  /**
+   * Per-glyph shaping TJ adjustments. Null for the established character-code
+   * writer. When present, it is index-aligned with replacementGlyphCodes and
+   * contains shaping-only adjustments; tjSpacingDelta remains the independent
+   * final endpoint-preservation adjustment.
+   */
+  shapedGlyphTjAdjustments: number[] | null;
   fallbackFont: FallbackFontUse | null;
 };
 
@@ -177,6 +186,7 @@ function issueValidatedEditPlan(
   Object.freeze(plan.replacementGlyphCodes);
   if (plan.formPath) Object.freeze(plan.formPath);
   if (plan.replacementTextState) Object.freeze(plan.replacementTextState);
+  if (plan.shapedGlyphTjAdjustments) Object.freeze(plan.shapedGlyphTjAdjustments);
   if (plan.fallbackFont) Object.freeze(plan.fallbackFont);
   Object.freeze(plan);
   return plan;
@@ -241,6 +251,9 @@ export function deriveValidatedEditPlanAdvance(
     tjSpacingDelta: override.tjSpacingDelta,
     byteOffset: plan.byteOffset,
     byteLength: plan.byteLength,
+    shapedGlyphTjAdjustments: plan.shapedGlyphTjAdjustments
+      ? [...plan.shapedGlyphTjAdjustments]
+      : null,
     fallbackFont: plan.fallbackFont ? { ...plan.fallbackFont } : null,
   });
 }
@@ -359,6 +372,7 @@ export function buildEditPlan({
   embeddedGlyphEvidence = null,
   embeddedProgramSha256 = null,
   shapingWriteEvidence = null,
+  fontResourceIdentity = null,
   fallbackStyleHints = null,
   replacementTextState = null,
 }: {
@@ -389,6 +403,11 @@ export function buildEditPlan({
    * Advisory shaping data or a plain object cannot satisfy this boundary.
    */
   shapingWriteEvidence?: ValidatedShapingWriteEvidence | null;
+  /**
+   * Exact resource identity used only by the shaped-glyph writer. Ordinary
+   * character-code edits do not need this additional evidence.
+   */
+  fontResourceIdentity?: PdfFontResourceIdentity | null;
   /**
    * Opt in to lib/pdf/edit/fallbackFont.ts's substitute-font path for
    * characters the run's own font can't be proven to render: pass the
@@ -438,6 +457,7 @@ export function buildEditPlan({
     originalTjAdjustmentTotal: originalTjTotal ?? 0,
     byteOffset: operator.start,
     byteLength: operator.end - operator.start,
+    shapedGlyphTjAdjustments: null,
     // Overridden only by the substitute-font branch at the very bottom;
     // every rejection path below therefore reports "no fallback used"
     // without having to say so individually.
@@ -627,6 +647,86 @@ export function buildEditPlan({
         reason:
           "The shaping proof does not match this exact replacement text and embedded font fingerprint, so it cannot be reused for this edit.",
       };
+    }
+
+    if (shapingWriteEvidence.writerMode === "shaped-glyphs") {
+      if (
+        !shapedGlyphEvidenceMatchesResource({
+          evidence: shapingWriteEvidence,
+          resourceName: operator.fontResourceName,
+          resourceIdentity: fontResourceIdentity,
+        })
+      ) {
+        return {
+          ...shapingRejection,
+          reason:
+            "The shaped-glyph proof does not match this exact PDF font resource identity, so it cannot be reused for this edit.",
+        };
+      }
+
+      const instruction = shapingWriteEvidence.shapedGlyphWrite;
+      if (
+        !instruction ||
+        instruction.glyphCodes.length === 0 ||
+        instruction.glyphCodes.length !==
+          instruction.glyphTjAdjustments.length
+      ) {
+        return {
+          ...shapingRejection,
+          reason:
+            "The shaped-glyph proof is incomplete, so the native writer remains blocked.",
+        };
+      }
+
+      const originalNaturalAdvancePt = stringAdvancePt(
+        originalCodes,
+        fontMetrics,
+        state,
+      );
+      const originalScalePt = textHorizontalScalePt(state);
+      const originalEffectiveAdvancePt =
+        originalNaturalAdvancePt -
+        (originalTjTotal / 1000) * originalScalePt;
+
+      const replacementScale = targetState.horizontalScalingPct / 100;
+      const replacementWidthPt =
+        ((instruction.naturalAdvanceUnits1000 / 1000) *
+          targetState.fontSizePt +
+          targetState.charSpacing * instruction.glyphCodes.length) *
+        replacementScale;
+      const replacementScalePt = textHorizontalScalePt(targetState);
+      if (
+        !Number.isFinite(originalEffectiveAdvancePt) ||
+        !Number.isFinite(replacementWidthPt) ||
+        replacementScalePt === 0
+      ) {
+        return {
+          ...shapingRejection,
+          reason:
+            "The shaped-glyph replacement advance could not be resolved safely.",
+        };
+      }
+
+      const trailingTjAdjustment =
+        ((replacementWidthPt - originalEffectiveAdvancePt) /
+          replacementScalePt) *
+        1000;
+      if (!Number.isFinite(trailingTjAdjustment)) {
+        return {
+          ...shapingRejection,
+          reason:
+            "The shaped-glyph endpoint compensation is not finite.",
+        };
+      }
+
+      return issueValidatedEditPlan({
+        ...base,
+        originalWidthPt: originalEffectiveAdvancePt,
+        replacementGlyphCodes: [...instruction.glyphCodes],
+        replacementWidthPt,
+        tjSpacingDelta: trailingTjAdjustment,
+        shapedGlyphTjAdjustments: [...instruction.glyphTjAdjustments],
+      });
     }
   }
 
