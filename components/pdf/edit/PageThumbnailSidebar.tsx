@@ -159,7 +159,8 @@ export default function PageThumbnailSidebar({
   const visibleThumbnails = thumbnails.generation === docReady ? thumbnails.urls : {};
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
-  const urlsRef = useRef<string[]>([]);
+  const urlsRef = useRef<Map<number, string>>(new Map());
+  const thumbnailGenerationRef = useRef(-1);
   const listRef = useRef<HTMLUListElement | null>(null);
   const [scrollMetrics, setScrollMetrics] = useState({
     top: 0,
@@ -218,31 +219,48 @@ export default function PageThumbnailSidebar({
 
   // Keyed on docReady as well as pageCount: a reorder or a text edit
   // replaces the document without necessarily changing how many pages it
-  // has, and every thumbnail is stale the moment it does.
+  // has, and every thumbnail is stale the moment it does. For large
+  // documents only the current virtual window is retained; overlapping
+  // pages are reused and URLs outside the window are revoked immediately.
   useEffect(() => {
     let cancelled = false;
-    const created: string[] = [];
-
-    // Revoke the PREVIOUS set only after the new ones are in state, so the
-    // rail never blanks between documents.
-    const previous = urlsRef.current;
-    urlsRef.current = created;
 
     void (async () => {
       const doc = getDocument();
       if (!doc || pageCount === 0) return;
-      const pending = Array.from(
-        {
-          length:
-            thumbnailWindow.endIndexExclusive - thumbnailWindow.startIndex,
-        },
-        (_, offset) => thumbnailWindow.startIndex + offset,
+
+      // Keep state writes out of the synchronous effect body while still
+      // invalidating stale document generations deterministically.
+      await Promise.resolve();
+      if (cancelled) return;
+
+      if (thumbnailGenerationRef.current !== docReady) {
+        for (const url of urlsRef.current.values()) URL.revokeObjectURL(url);
+        urlsRef.current.clear();
+        thumbnailGenerationRef.current = docReady;
+        setThumbnails({ generation: docReady, urls: {} });
+      }
+
+      const desiredIndices = new Set(thumbnailWindow.indices);
+      for (const [pageIndex, url] of urlsRef.current) {
+        if (desiredIndices.has(pageIndex)) continue;
+        URL.revokeObjectURL(url);
+        urlsRef.current.delete(pageIndex);
+      }
+
+      setThumbnails({
+        generation: docReady,
+        urls: Object.fromEntries(urlsRef.current),
+      });
+
+      const pending = thumbnailWindow.indices.filter(
+        (pageIndex) => !urlsRef.current.has(pageIndex),
       );
 
       async function renderOne(pageIndex: number) {
         const performanceStartedAt = editPerformanceNow();
         try {
-          const page = await doc!.getPage(pageIndex + 1);
+          const page = await doc.getPage(pageIndex + 1);
           if (cancelled) return;
           const viewport = page.getViewport({ scale: THUMBNAIL_SCALE });
           const canvas = document.createElement("canvas");
@@ -250,35 +268,46 @@ export default function PageThumbnailSidebar({
           if (!context) return;
           canvas.width = Math.max(1, Math.floor(viewport.width));
           canvas.height = Math.max(1, Math.floor(viewport.height));
+          const pixelCount = canvas.width * canvas.height;
           context.fillStyle = "#FFFFFF";
           context.fillRect(0, 0, canvas.width, canvas.height);
 
-          await renderPageWithTimeout(page.render({ canvas, canvasContext: context, viewport }), pageIndex + 1);
-          if (cancelled) return;
+          await renderPageWithTimeout(
+            page.render({ canvas, canvasContext: context, viewport }),
+            pageIndex + 1,
+          );
+          if (cancelled) {
+            canvas.width = 0;
+            canvas.height = 0;
+            return;
+          }
 
-          const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.7));
+          const blob = await new Promise<Blob | null>((resolve) =>
+            canvas.toBlob(resolve, "image/jpeg", 0.7),
+          );
           canvas.width = 0;
           canvas.height = 0;
-          if (!blob || cancelled) return;
+          if (!blob || cancelled || !desiredIndices.has(pageIndex)) return;
 
+          const previousUrl = urlsRef.current.get(pageIndex);
+          if (previousUrl) URL.revokeObjectURL(previousUrl);
           const url = URL.createObjectURL(blob);
-          created.push(url);
+          urlsRef.current.set(pageIndex, url);
           editPerformanceDiagnostics.record(
             "thumbnail-render",
             editPerformanceNow() - performanceStartedAt,
             {
               pageIndex,
               pageCount,
-              itemCount: canvas.width * canvas.height,
+              itemCount: pixelCount,
               byteCount: blob.size,
               success: true,
             },
           );
-          setThumbnails((current) =>
-            current.generation === docReady
-              ? { generation: docReady, urls: { ...current.urls, [pageIndex]: url } }
-              : { generation: docReady, urls: { [pageIndex]: url } },
-          );
+          setThumbnails({
+            generation: docReady,
+            urls: Object.fromEntries(urlsRef.current),
+          });
         } catch {
           if (!cancelled) {
             editPerformanceDiagnostics.record(
@@ -292,8 +321,7 @@ export default function PageThumbnailSidebar({
             );
           }
           // Best-effort: a page without a thumbnail is still selectable and
-          // still reorderable, so a single failed render must not take the
-          // rail down with it.
+          // still reorderable, so one failed raster never takes down the rail.
         }
       }
 
@@ -304,13 +332,14 @@ export default function PageThumbnailSidebar({
           await renderOne(next);
         }
       }
-      await Promise.all(Array.from({ length: THUMBNAIL_CONCURRENCY }, worker));
-      for (const url of previous) URL.revokeObjectURL(url);
+
+      await Promise.all(
+        Array.from({ length: THUMBNAIL_CONCURRENCY }, () => worker()),
+      );
     })();
 
     return () => {
       cancelled = true;
-      for (const url of previous) URL.revokeObjectURL(url);
     };
   }, [
     docReady,
@@ -322,8 +351,8 @@ export default function PageThumbnailSidebar({
 
   useEffect(
     () => () => {
-      for (const url of urlsRef.current) URL.revokeObjectURL(url);
-      urlsRef.current = [];
+      for (const url of urlsRef.current.values()) URL.revokeObjectURL(url);
+      urlsRef.current.clear();
     },
     [],
   );
@@ -356,7 +385,7 @@ export default function PageThumbnailSidebar({
             height: Math.max(1, list.clientHeight),
           });
         }}
-        className="flex-1 overflow-y-auto overscroll-contain p-1.5"
+        className={`flex-1 overflow-y-auto overscroll-contain p-1.5 ${thumbnailWindow.virtualized ? "" : "space-y-1"}`}
       >
         {thumbnailWindow.topSpacerPx > 0 ? (
           <li
@@ -364,30 +393,28 @@ export default function PageThumbnailSidebar({
             style={{ height: thumbnailWindow.topSpacerPx }}
           />
         ) : null}
-        <div className="space-y-1">
-          {thumbnailWindow.indices.map((pageIndex) => (
-            <Thumb
-              key={pageIndex}
-              pageIndex={pageIndex}
-              url={visibleThumbnails[pageIndex]}
-              active={pageIndex === activePageIndex}
-              selected={selected.has(pageIndex)}
-              dragging={dragIndex === pageIndex}
-              dropTarget={overIndex === pageIndex && dragIndex !== null && dragIndex !== pageIndex}
-              disabled={busy}
-              virtualized={thumbnailWindow.virtualized}
-              onOpen={onSelectPage}
-              onToggle={onToggleSelected}
-              onDragStart={setDragIndex}
-              onDragOver={setOverIndex}
-              onDrop={handleDrop}
-              onDragEnd={() => {
-                setDragIndex(null);
-                setOverIndex(null);
-              }}
-            />
-          ))}
-        </div>
+        {thumbnailWindow.indices.map((pageIndex) => (
+          <Thumb
+            key={pageIndex}
+            pageIndex={pageIndex}
+            url={visibleThumbnails[pageIndex]}
+            active={pageIndex === activePageIndex}
+            selected={selected.has(pageIndex)}
+            dragging={dragIndex === pageIndex}
+            dropTarget={overIndex === pageIndex && dragIndex !== null && dragIndex !== pageIndex}
+            disabled={busy}
+            virtualized={thumbnailWindow.virtualized}
+            onOpen={onSelectPage}
+            onToggle={onToggleSelected}
+            onDragStart={setDragIndex}
+            onDragOver={setOverIndex}
+            onDrop={handleDrop}
+            onDragEnd={() => {
+              setDragIndex(null);
+              setOverIndex(null);
+            }}
+          />
+        ))}
         {thumbnailWindow.bottomSpacerPx > 0 ? (
           <li
             aria-hidden="true"
