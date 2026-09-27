@@ -3638,6 +3638,7 @@ export default function EditPdfTool() {
     presentedPageCapability === "native-editable"
       ? userMessageForCapabilityCategory("NATIVE_TEXT")
       : pageCapabilityMessage;
+  const presentedPageCapabilityExplanation = `${presentedPageCapabilityMessage.title}. ${presentedPageCapabilityMessage.detail}`;
   const pageCapabilityLabel = pageTextModel
     ? presentedPageCapability === "native-editable"
       ? `${pageTextModel.editableSpanCount} text span${pageTextModel.editableSpanCount === 1 ? "" : "s"} editable`
@@ -4123,8 +4124,8 @@ export default function EditPdfTool() {
                     <div
                       data-edit-page-capability={presentedPageCapability ?? pageTextModel.capability}
                       role="status"
-                      aria-label={`${pageCapabilityLabel}. ${presentedPageCapabilityMessage.detail}`}
-                      title={presentedPageCapability === "native-editable" ? undefined : presentedPageCapabilityMessage.detail}
+                      aria-label={`${pageCapabilityLabel}. ${presentedPageCapabilityExplanation}`}
+                      title={presentedPageCapability === "native-editable" ? undefined : presentedPageCapabilityExplanation}
                       className="pointer-events-none absolute right-2 top-2 z-20 rounded-full border border-black/10 bg-white/92 px-2.5 py-1 text-[10px] font-semibold text-[#343842] shadow-sm backdrop-blur-sm"
                     >
                       {pageCapabilityLabel}
