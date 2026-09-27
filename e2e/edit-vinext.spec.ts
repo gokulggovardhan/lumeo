@@ -101,10 +101,14 @@ test("vinext Edit PDF keeps invisible searchable-scan text read-only", async ({
 
   const hiddenRun = page
     .locator(
-      'div[role="button"][aria-label^="Editable text: "][aria-label*="SEARCHABLE SCAN SAMPLE"]',
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="SEARCHABLE SCAN SAMPLE"]',
     )
     .first();
   await expect(hiddenRun).toBeVisible({ timeout: 90_000 });
+  await expect(hiddenRun).toHaveAttribute(
+    "aria-label",
+    /Not yet editable text: SEARCHABLE SCAN SAMPLE/i,
+  );
 
   await hiddenRun.hover();
   const explanation = page.locator("[data-edit-capability-explanation]");
