@@ -565,6 +565,32 @@ test("classifier refuses unknown encoding and clipping instead of claiming safe 
   );
   assert.equal(classifyNativeTextSpan(encodingLimited).safelyRewritable, false);
 
+  const invisible = buildNativeContentStreamSpans({
+    operators: [located({ renderMode: 3 })],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  })[0];
+  const invisibleClassification = classifyNativeTextSpan(invisible);
+  assert.equal(invisibleClassification.category, "INVISIBLE_TEXT_LAYER");
+  assert.equal(invisibleClassification.safelyRewritable, false);
+  assert.equal(invisibleClassification.authorization, "blocked");
+
+  const invisibleArbitration = enforceSpanCapabilityOnArbitration({
+    arbitration: {
+      pdfJsRunIndex: 0,
+      decision: "editable",
+      nativeSpanKey: invisible.key,
+      source: "reconciled",
+      reason: "Strong visible/native identity agreement.",
+    },
+    spanClassification: invisibleClassification,
+  });
+  assert.equal(invisibleArbitration.decision, "view-only");
+  assert.equal(invisibleArbitration.source, "conflict");
+  assert.match(invisibleArbitration.reason, /invisible|rendering mode 3/i);
+
   const clipped = buildNativeContentStreamSpans({
     operators: [located({ renderMode: 7 })],
     viewportTransform: viewport,
