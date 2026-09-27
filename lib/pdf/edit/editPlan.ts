@@ -650,6 +650,13 @@ export function buildEditPlan({
     }
 
     if (shapingWriteEvidence.writerMode === "shaped-glyphs") {
+      if (operator.kind !== "Tj" && operator.kind !== "TJ") {
+        return {
+          ...shapingRejection,
+          reason:
+            "The first shaped-glyph writer supports only Tj/TJ text shows; quote operators remain read-only.",
+        };
+      }
       if (
         !shapedGlyphEvidenceMatchesResource({
           evidence: shapingWriteEvidence,
