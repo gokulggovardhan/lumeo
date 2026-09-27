@@ -1463,7 +1463,9 @@ export default function EditPdfTool() {
       // creates invisible Tr=3 text; this check proves the resulting file is
       // actually searchable/selectable rather than merely containing new PDF
       // objects that a reader ignores.
-      const verificationDoc = await openPdfJsDocument(nextBytes);
+      const verificationDoc = await openPdfJsDocument(
+        new Uint8Array(copyArrayBuffer(nextBytes)),
+      );
       try {
         const verificationPage = await verificationDoc.getPage(sourcePageIndex + 1);
         const content = await withPageTimeout(
