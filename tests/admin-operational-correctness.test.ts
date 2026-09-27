@@ -353,6 +353,7 @@ test("error verification distinguishes legacy history and automatically resolves
   const actions = read("app/admin/(protected)/errors/actions.ts");
 
   assert.match(migration, /resolution_provenance/);
+  assert.match(migration, /error_logs_resolution_metadata_check/);
   assert.match(migration, /legacy_manual/);
   assert.match(migration, /automated_verified_fix/);
   assert.match(migration, /fix_deployed_at <= now\(\) - interval '24 hours'/);
