@@ -554,6 +554,10 @@ export default function EditPdfTool() {
     { elements: [], pdfBytes: new ArrayBuffer(0), session: createPdfEditSession(0) },
     { maxTotalSize: EDIT_HISTORY_MAX_BYTES, sizeOf: (snapshot) => snapshot.pdfBytes.byteLength },
   );
+  // Monotonic local mutation epoch for long-running browser-only work.
+  // Snapshot identity alone is insufficient because Undo can return to the
+  // exact same snapshot object after an intervening change.
+  const historyMutationRevisionRef = useRef(0);
   // Every document mutation -- placing, moving, restyling or deleting an
   // element, applying a text edit, or undoing/redoing any of those -- makes
   // an already-exported PDF stale. These three wrappers are the single choke
@@ -566,14 +570,17 @@ export default function EditPdfTool() {
   // resetHistory is deliberately NOT wrapped: its only callers, resetTool and
   // addFile, revoke the URL and clear it themselves as part of a wider reset.
   const setHistoryState = useCallback((updater: EditHistorySnapshot | ((current: EditHistorySnapshot) => EditHistorySnapshot)) => {
+    historyMutationRevisionRef.current += 1;
     setHistoryStateRaw(updater);
     setDownloadUrl("");
   }, [setHistoryStateRaw]);
   const undo = useCallback(() => {
+    historyMutationRevisionRef.current += 1;
     undoRaw();
     setDownloadUrl("");
   }, [undoRaw]);
   const redo = useCallback(() => {
+    historyMutationRevisionRef.current += 1;
     redoRaw();
     setDownloadUrl("");
   }, [redoRaw]);
@@ -4813,6 +4820,7 @@ export default function EditPdfTool() {
     // ArrayBuffer while changing the target element; publishing after that
     // would resurrect a stale font choice.
     const sourceHistorySnapshot = getHistoryState();
+    const sourceHistoryMutationRevision = historyMutationRevisionRef.current;
     const sourceRevision = sourceHistorySnapshot.pdfBytes;
     setLocalCustomFontBusy(true);
     setLocalCustomFontError("");
@@ -4833,6 +4841,7 @@ export default function EditPdfTool() {
       const asset = result.asset;
       let snapshot = getHistoryState();
       if (
+        historyMutationRevisionRef.current !== sourceHistoryMutationRevision ||
         snapshot !== sourceHistorySnapshot ||
         snapshot.pdfBytes !== sourceRevision
       ) {
@@ -4869,6 +4878,7 @@ export default function EditPdfTool() {
       if (localCustomFontRequestRef.current !== requestId) return;
       snapshot = getHistoryState();
       if (
+        historyMutationRevisionRef.current !== sourceHistoryMutationRevision ||
         snapshot !== sourceHistorySnapshot ||
         snapshot.pdfBytes !== sourceRevision
       ) {
