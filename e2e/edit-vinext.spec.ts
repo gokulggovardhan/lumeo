@@ -5,6 +5,7 @@ import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import {
   CLIPPED_TEXT_PDF,
   IMAGE_ONLY_PDF,
+  SEARCHABLE_SCAN_PDF,
   LARGE_DOCUMENT_PDF,
   MIXED_STYLE_PDF,
   SPLIT_RUN_PDF,
@@ -90,6 +91,38 @@ test("vinext Edit PDF explains read-only clipped text before an edit is attempte
   await limitedRun.press("Enter");
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
   await expect(explanation).toBeVisible();
+});
+
+test("vinext Edit PDF keeps invisible searchable-scan text read-only", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, SEARCHABLE_SCAN_PDF);
+
+  // This fixture is intentionally composed only of an image plus hidden
+  // searchable text. Waiting for the generic editable-run helper would be a
+  // contradiction: the proof we want is that ZERO native runs become
+  // editable. Wait directly for the read-only hidden run instead.
+  const hiddenRun = page
+    .locator(
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="SEARCHABLE SCAN SAMPLE"]',
+    )
+    .first();
+  await expect(hiddenRun).toBeVisible({ timeout: 90_000 });
+  await expect(hiddenRun).toHaveAttribute(
+    "aria-label",
+    /Not yet editable text: SEARCHABLE SCAN SAMPLE/i,
+  );
+
+  await hiddenRun.hover();
+  const explanation = page.locator("[data-edit-capability-explanation]");
+  await expect(explanation).toBeVisible();
+  await expect(explanation).toContainText(/invisible PDF text layer/i);
+  await expect(explanation).toContainText(/read-only/i);
+
+  await hiddenRun.focus();
+  await hiddenRun.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Recognize text locally" })).toHaveCount(0);
 });
 
 test("vinext Edit PDF recognizes a proven scanned page locally without promoting it to native text", async ({
