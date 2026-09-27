@@ -84,6 +84,55 @@ jobs:
           echo "FAIL production did not reach expected revision $EXPECTED_SHA"
           exit 1
 
+      - name: Wait for production analytics schema
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${SUPABASE_DB_URL:?Missing SUPABASE_DB_URL repository secret}"
+
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql-client
+          fi
+
+          ready=0
+          for attempt in {1..30}; do
+            signature_count="$(
+              psql "$SUPABASE_DB_URL" \
+                --no-psqlrc \
+                --quiet \
+                --tuples-only \
+                --no-align \
+                --set ON_ERROR_STOP=1 \
+                --command "select count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='record_public_analytics_event' and pg_get_function_identity_arguments(p.oid) like '%failure_stage text%';"
+            )"
+            signature_count="$(printf '%s' "$signature_count" | tr -d '[:space:]')"
+
+            if [ "$signature_count" = "1" ]; then
+              psql "$SUPABASE_DB_URL" \
+                --no-psqlrc \
+                --quiet \
+                --set ON_ERROR_STOP=1 \
+                --command "select pg_notify('pgrst', 'reload schema');" >/dev/null
+              ready=1
+              break
+            fi
+
+            echo "Waiting for analytics terminal-diagnostics migration attempt $attempt/30"
+            sleep 10
+          done
+
+          if [ "$ready" != "1" ]; then
+            echo "FAIL production analytics schema is not ready."
+            exit 1
+          fi
+
+          # Give PostgREST a short bounded window to consume the schema reload.
+          sleep 5
+          echo "PASS production analytics schema includes failure_stage."
+
       - name: Install deterministic document fidelity tooling
         run: |
           sudo apt-get update

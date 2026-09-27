@@ -175,6 +175,38 @@ async function downloadBytes(download: Download): Promise<Buffer> {
   return readFile(path);
 }
 
+async function waitForWordToPdfClientReady(page: Page): Promise<void> {
+  await expect(
+    page.locator("[data-word-to-pdf-client-ready='true']"),
+  ).toBeAttached({ timeout: 30_000 });
+}
+
+async function gotoProductionRoute(page: Page, path: string): Promise<void> {
+  let lastStatus: number | null = null;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const response = await page.goto(path, { waitUntil: "domcontentloaded" });
+    lastStatus = response?.status() ?? null;
+    if (response?.ok()) return;
+
+    if (lastStatus && [502, 503, 504].includes(lastStatus) && attempt < 3) {
+      console.warn(
+        `Transient production navigation status ${lastStatus} for ${path}; retry ${attempt}/3.`,
+      );
+      await page.waitForTimeout(attempt * 1_000);
+      continue;
+    }
+
+    throw new Error(
+      `Production navigation failed for ${path} with status ${lastStatus ?? "unknown"}.`,
+    );
+  }
+
+  throw new Error(
+    `Production navigation did not recover for ${path}; last status ${lastStatus ?? "unknown"}.`,
+  );
+}
+
 async function replaceControlledText(
   page: Page,
   label: string,
@@ -317,7 +349,7 @@ test("production PDF to Word preserves semantic/table/two-column classification 
   browserName,
 }) => {
   const runtime = watchConversionRuntime(page);
-  await page.goto("/pdf/pdf-to-word", { waitUntil: "domcontentloaded" });
+  await gotoProductionRoute(page, "/pdf/pdf-to-word");
   await expect(page.getByText(/Processed locally in your browser/i).first()).toBeVisible();
 
   const semantic = await convertPdfToWord(page, {
@@ -371,7 +403,8 @@ test("production Word to PDF reuses Office runtime, survives cancellation, and c
   test.skip(browserName !== "chromium", "Full threaded Office runtime certification runs in Chromium.");
 
   const runtime = watchConversionRuntime(page);
-  await page.goto("/pdf/word-to-pdf", { waitUntil: "domcontentloaded" });
+  await gotoProductionRoute(page, "/pdf/word-to-pdf");
+  await waitForWordToPdfClientReady(page);
   await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
 
   const professional = await makeProfessionalDocx();
@@ -437,7 +470,7 @@ test("production Word to PDF is capability-honest on non-Chromium browsers", asy
   test.skip(browserName === "chromium", "Chromium is covered by the full Office runtime certification.");
 
   const runtime = watchConversionRuntime(page);
-  await page.goto("/pdf/word-to-pdf", { waitUntil: "domcontentloaded" });
+  await gotoProductionRoute(page, "/pdf/word-to-pdf");
   const source = await makeProfessionalDocx();
   await page.locator('input[type="file"]').setInputFiles({
     name: `capability-${browserName}.docx`,
@@ -501,7 +534,7 @@ test("production HTML to PDF preserves styled multi-page content and supports re
   browserName,
 }, testInfo) => {
   const runtime = watchConversionRuntime(page);
-  await page.goto("/pdf/html-to-pdf", { waitUntil: "domcontentloaded" });
+  await gotoProductionRoute(page, "/pdf/html-to-pdf");
 
   const repeatedParagraphs = Array.from(
     { length: 80 },

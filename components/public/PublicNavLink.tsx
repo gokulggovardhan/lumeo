@@ -13,5 +13,11 @@ import type { ComponentProps } from "react";
 export function PublicNavLink(props: ComponentProps<typeof L2PublicNavLink>) {
   const pathname = usePathname();
   const href = typeof props.href === "string" ? props.href : props.href.pathname;
-  return <L2PublicNavLink {...props} active={pathname === href} />;
+  return (
+    <L2PublicNavLink
+      {...props}
+      prefetch={props.prefetch ?? false}
+      active={pathname === href}
+    />
+  );
 }
