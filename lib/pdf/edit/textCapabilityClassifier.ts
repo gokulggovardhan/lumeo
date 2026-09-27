@@ -21,6 +21,10 @@ export type SpanTextCapabilityClassification = {
   nativeSpanKey: string;
   category: DocumentTextCapabilityCategory;
   safelyRewritable: boolean;
+  authorization:
+    | "span-safe"
+    | "needs-measured-reconciliation"
+    | "blocked";
   reason: string;
 };
 
@@ -54,6 +58,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "CLIPPED_TEXT",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "The text participates in a clipping rendering mode.",
     };
   }
@@ -62,6 +67,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "TYPE3_TEXT",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "Type3 glyph programs are not yet proven safe for native rewrite.",
     };
   }
@@ -70,6 +76,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "VERTICAL_TEXT",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "The Type0 font uses a vertical CMap; vertical native rewrite is not yet proven safe.",
     };
   }
@@ -78,8 +85,9 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "NATIVE_TEXT_WITH_FONT_LIMITATIONS",
       safelyRewritable: false,
+      authorization: "needs-measured-reconciliation",
       reason:
-        "The source baseline is known, but font ascent/descent metrics are unavailable and the visible text box uses an approximate fallback.",
+        "The native-only display box is approximate because font ascent/descent metrics are unavailable. Direct editing still requires independently measured PDF.js/native geometry.",
     };
   }
   if (!profile || profile.encodingSource === "Unknown" || !span.decodeComplete) {
@@ -87,6 +95,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "NATIVE_TEXT_WITH_ENCODING_LIMITATIONS",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "The source character encoding cannot be proven completely.",
     };
   }
@@ -95,6 +104,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "NATIVE_TEXT_WITH_FONT_LIMITATIONS",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "The source font exists, but deterministic glyph metrics are unavailable.",
     };
   }
@@ -103,6 +113,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "COMPLEX_VECTOR_TEXT",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "The text transform is materially skewed and is kept read-only.",
     };
   }
@@ -115,6 +126,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "FORM_XOBJECT_TEXT",
       safelyRewritable: true,
+      authorization: "span-safe",
       reason:
         "The text is inside a Form XObject, retains form-local resource scope, and clears the same encoding, metrics and geometry safety checks as direct page text.",
     };
@@ -166,6 +178,20 @@ export function enforceSpanCapabilityOnArbitration({
   }
 
   if (spanClassification.safelyRewritable) {
+    return arbitration;
+  }
+
+  // A fallback native-only box is presentation evidence only. It can never
+  // authorize a write. However, the Phase 1 arbitration already has a separate
+  // measured-geometry proof for reconciled PDF.js runs and for exact
+  // fragmented reconstruction. Preserve that stronger authority instead of
+  // downgrading otherwise-safe standard-font text merely because its PDF font
+  // dictionary omits ascent/descent.
+  if (
+    spanClassification.authorization === "needs-measured-reconciliation" &&
+    (arbitration.source === "reconciled" ||
+      arbitration.source === "fragmented-reconstruction")
+  ) {
     return arbitration;
   }
 
