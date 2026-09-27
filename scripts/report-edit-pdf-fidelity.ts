@@ -38,7 +38,6 @@ import {
 const RENDER_SCALE = 2;
 const EDIT_MASK_MARGIN_PX = 2;
 const MAX_BASELINE_ERROR_PT = 0.05;
-const STANDARD_FONT_DATA_URL = `${resolve("node_modules/pdfjs-dist/standard_fonts")}/`;
 
 type Fixture = {
   id: string;
@@ -206,7 +205,6 @@ async function renderFirstPage(bytes: Uint8Array): Promise<RenderedPage> {
   const doc = await pdfjsLib.getDocument({
     data: bytes.slice(),
     useWorkerFetch: false,
-    standardFontDataUrl: STANDARD_FONT_DATA_URL,
   }).promise;
   try {
     const page = await doc.getPage(1);
@@ -377,7 +375,6 @@ async function measure(
   const pdfJsDoc = await pdfjsLib.getDocument({
     data: fixture.bytes.slice(),
     useWorkerFetch: false,
-    standardFontDataUrl: STANDARD_FONT_DATA_URL,
   }).promise;
   const pdfJsPage = await pdfJsDoc.getPage(1);
   const viewport = pdfJsPage.getViewport({ scale: 1 });
@@ -558,7 +555,6 @@ async function measure(
           const reopenedPdfJs = await pdfjsLib.getDocument({
             data: exported.bytes.slice(),
             useWorkerFetch: false,
-            standardFontDataUrl: STANDARD_FONT_DATA_URL,
           }).promise;
           try {
             const page = await reopenedPdfJs.getPage(1);
