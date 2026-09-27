@@ -41,7 +41,7 @@ export type PageThumbnailSidebarProps = {
     pageCount: number;
     renderedCount: number;
     failedCount: number;
-    mountedCount: number;
+    mountedRowCount: number;
     virtualized: boolean;
   }) => void;
 };
@@ -329,7 +329,7 @@ export default function PageThumbnailSidebar({
           pageCount,
           renderedCount,
           failedCount,
-          mountedCount: thumbnailWindow.indices.length,
+          mountedRowCount: thumbnailWindow.indices.length,
           virtualized: thumbnailWindow.virtualized,
         });
       }
