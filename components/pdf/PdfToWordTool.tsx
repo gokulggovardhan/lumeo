@@ -21,6 +21,7 @@ import {
 import { AuraStatus } from "@/components/ui/Aura";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
+import { bucketFileSize } from "@/lib/analytics/size-bucket";
 import type { AnalyticsConversionStage } from "@/lib/analytics/types";
 import { ConversionCoordinator } from "@/lib/conversion/ConversionCoordinator";
 import { BrowserPdfToWordEngine } from "@/lib/conversion/browser/BrowserPdfToWordEngine";
@@ -185,7 +186,12 @@ export default function PdfToWordTool() {
     setStatusLabel("Preparing document");
 
     const startedAt = performance.now();
-    track({ eventName: "processing_started", toolSlug: "pdf-to-word" });
+    const inputSizeBucket = bucketFileSize(file.size);
+    track({
+      eventName: "processing_started",
+      toolSlug: "pdf-to-word",
+      inputSizeBucket,
+    });
 
     try {
       const conversionResult = await conversionCoordinator.convert(
@@ -213,6 +219,8 @@ export default function PdfToWordTool() {
         toolSlug: "pdf-to-word",
         durationMs: performance.now() - startedAt,
         success: true,
+        inputSizeBucket,
+        outputSizeBucket: bucketFileSize(conversionResult.blob.size),
       });
       recordRecentFile({
         tool: "pdf-to-word",
@@ -236,6 +244,7 @@ export default function PdfToWordTool() {
           durationMs: performance.now() - startedAt,
           success: false,
           errorCode: "user_cancelled",
+          inputSizeBucket,
           failureStage,
         });
 
@@ -268,6 +277,7 @@ export default function PdfToWordTool() {
         durationMs: performance.now() - startedAt,
         success: false,
         errorCode: toAnalyticsConversionErrorCode(normalized.code),
+        inputSizeBucket,
         failureStage,
       });
     } finally {
