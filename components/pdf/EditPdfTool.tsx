@@ -812,6 +812,7 @@ export default function EditPdfTool() {
   const [textSearchIndexBusy, setTextSearchIndexBusy] = useState(false);
   const [textSearchReplaceAllBusy, setTextSearchReplaceAllBusy] = useState(false);
   const [textSearchReplaceAllStatus, setTextSearchReplaceAllStatus] = useState("");
+  const textSearchReplaceAllJobRef = useRef<{ cancelled: boolean } | null>(null);
   // True when the last Restyle could not blank the original glyphs from the
   // content stream, so the covered text is still in the exported file. Drives
   // the disclosure notice -- see restyleSelectedRun for when that happens.
@@ -2951,6 +2952,14 @@ export default function EditPdfTool() {
       wholeWord: textSearchWholeWord,
     };
 
+    const replaceAllJob = { cancelled: false };
+    textSearchReplaceAllJobRef.current = replaceAllJob;
+    const replaceAllCancelled = () =>
+      replaceAllJob.cancelled || textSearchReplaceAllJobRef.current !== replaceAllJob;
+    const reportReplaceAllCancelled = () => {
+      setTextSearchReplaceAllStatus("Replace All cancelled. Nothing was changed.");
+    };
+
     setTextSearchReplaceAllBusy(true);
     setTextSearchReplaceAllStatus("Checking every match against the native PDF locally…");
     setEditApplyError("");
@@ -2989,6 +2998,10 @@ export default function EditPdfTool() {
       let firstSkipDetail = "";
 
       for (const targetPageIndex of candidatePages) {
+        if (replaceAllCancelled()) {
+          reportReplaceAllCancelled();
+          return;
+        }
         if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
           setTextSearchReplaceAllStatus(
             "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again.",
@@ -3042,6 +3055,11 @@ export default function EditPdfTool() {
         }
       }
 
+      if (replaceAllCancelled()) {
+        reportReplaceAllCancelled();
+        return;
+      }
+
       // A revision can change while the final page itself is being analyzed.
       // Re-check before trusting even a no-match result so status text never
       // describes a stale PDF snapshot as if it were current.
@@ -3086,6 +3104,11 @@ export default function EditPdfTool() {
         return;
       }
 
+      if (replaceAllCancelled()) {
+        reportReplaceAllCancelled();
+        return;
+      }
+
       const scopeLabel =
         requestedScope === "document"
           ? "the document"
@@ -3104,6 +3127,10 @@ export default function EditPdfTool() {
         return;
       }
 
+      if (replaceAllCancelled()) {
+        reportReplaceAllCancelled();
+        return;
+      }
       if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
         setTextSearchReplaceAllStatus(
           "The PDF changed before Replace All could start its validated write. Nothing was changed; run Replace All again.",
@@ -3141,6 +3168,10 @@ export default function EditPdfTool() {
           }),
       );
 
+      if (replaceAllCancelled()) {
+        reportReplaceAllCancelled();
+        return;
+      }
       if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
         throw new Error(
           "The PDF changed before Replace All could publish its validated batch. Nothing from this batch was applied; run Replace All again.",
@@ -3160,17 +3191,24 @@ export default function EditPdfTool() {
         `Replaced ${safeMatchCount} match${safeMatchCount === 1 ? "" : "es"} in one native PDF transaction${skippedMatchCount > 0 ? `; ${skippedMatchCount} unsafe match${skippedMatchCount === 1 ? "" : "es"} stayed unchanged` : ""}.`,
       );
     } catch (replaceAllError) {
-      const sourceRevisionChanged =
-        getHistoryState().pdfBytes !== replaceAllSourceBytes;
-      const message = sourceRevisionChanged
-        ? "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again."
-        : replaceAllError instanceof Error
-          ? replaceAllError.message
-          : "Structured Replace All could not be completed.";
-      setTextSearchReplaceAllStatus(message);
-      if (!sourceRevisionChanged) setEditApplyError(message);
+      if (replaceAllCancelled()) {
+        reportReplaceAllCancelled();
+      } else {
+        const sourceRevisionChanged =
+          getHistoryState().pdfBytes !== replaceAllSourceBytes;
+        const message = sourceRevisionChanged
+          ? "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again."
+          : replaceAllError instanceof Error
+            ? replaceAllError.message
+            : "Structured Replace All could not be completed.";
+        setTextSearchReplaceAllStatus(message);
+        if (!sourceRevisionChanged) setEditApplyError(message);
+      }
     } finally {
-      setTextSearchReplaceAllBusy(false);
+      if (textSearchReplaceAllJobRef.current === replaceAllJob) {
+        textSearchReplaceAllJobRef.current = null;
+        setTextSearchReplaceAllBusy(false);
+      }
     }
   }
 
@@ -5084,6 +5122,23 @@ export default function EditPdfTool() {
                   ? "Replace all safely"
                   : "Replace all on page"}
             </button>
+            {textSearchReplaceAllBusy ? (
+              <button
+                type="button"
+                aria-label="Cancel Replace All"
+                onClick={() => {
+                  const job = textSearchReplaceAllJobRef.current;
+                  if (!job || job.cancelled) return;
+                  job.cancelled = true;
+                  setTextSearchReplaceAllStatus(
+                    "Cancelling Replace All… no changes will be published.",
+                  );
+                }}
+                className="h-10 rounded-[var(--radius-md)] border border-[var(--text-primary)]/20 px-3 text-xs font-bold text-[var(--text-primary)]"
+              >
+                Cancel
+              </button>
+            ) : null}
             <span className="pb-2 text-[10px] leading-4 text-[var(--text-secondary)]">
               {activeTextSearchMatch?.pageIndex !== pageIndex
                 ? "Navigate to the match first."
