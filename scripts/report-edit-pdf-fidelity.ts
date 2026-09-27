@@ -1083,7 +1083,7 @@ async function buildFixtures(): Promise<Fixture[]> {
     makeSimpleFixture("common-payslip", "payslip", "Net Pay 84500.00", "Net Pay 87200.00", { font: StandardFonts.Courier }),
     makeSimpleFixture("common-insurance-policy", "insurance-policy", "Policy status: Active", "Policy status: Renewed", { font: StandardFonts.TimesRoman }),
     makeSimpleFixture("common-shipping-label", "shipping-label", "Shipment PNQ-1182", "Shipment PNQ-2246", { font: StandardFonts.HelveticaBold }),
-    makeSimpleFixture("common-certificate", "certificate", "Certificate ID CERT-2026-18", "Certificate ID CERT-2026-19", { font: StandardFonts.TimesRomanBold }),
+    makeSimpleFixture("common-certificate", "certificate", "Certificate ID CERT-2026-18", "Certificate ID CERT-2026-19", { font: StandardFonts.TimesRoman }),
     makeSimpleFixture("common-policy-document", "policy-document", "Review cycle: Annual", "Review cycle: Quarterly", { font: StandardFonts.Helvetica }),
     makeSimpleFixture("common-project-plan", "project-plan", "Phase status: In review", "Phase status: Approved", { font: StandardFonts.Helvetica }),
     makeSimpleFixture("common-audit-report", "audit-report", "Finding count: 12", "Finding count: 9", { font: StandardFonts.TimesRoman }),
