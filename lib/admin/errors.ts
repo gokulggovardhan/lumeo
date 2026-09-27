@@ -74,6 +74,21 @@ export async function getErrorLogs(
   return { data: page.data.rows, error: page.error };
 }
 
+export async function getUnresolvedErrorLogs(
+  limit = 50,
+  offset = 0,
+): Promise<DataResult<ErrorLog[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("error_logs")
+    .select("*")
+    .in("status", ["open", "acknowledged", "fixed_pending_verification"])
+    .order("last_seen_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  return safe((data ?? []) as ErrorLog[], error);
+}
+
 export type ErrorLogSummary = {
   openCount: number;
   criticalOpenCount: number;
