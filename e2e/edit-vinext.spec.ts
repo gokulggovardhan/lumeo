@@ -749,9 +749,15 @@ test("vinext Edit PDF applies native formatting and colour with one native histo
     // must stay non-actionable through that gap rather than accepting a
     // click that silently does nothing (a WebKit race caught in PR #438).
     await expect(formatButton).toBeEnabled({ timeout: 90_000 });
-    await formatButton.click();
     const panel = page.locator("[data-native-text-formatting]");
-    await expect(panel).toBeVisible();
+    // Format is an intentional toggle. After Apply/Undo/Redo WebKit can keep
+    // the panel mounted for the same selected native span; blindly clicking
+    // the toggle here would close an already-open panel and turn a valid
+    // product state into a false test failure. Open only when needed.
+    if (!(await panel.isVisible())) {
+      await formatButton.click();
+    }
+    await expect(panel).toBeVisible({ timeout: 90_000 });
     return {
       run,
       panel,
