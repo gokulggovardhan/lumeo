@@ -92,7 +92,7 @@ test("vinext Edit PDF explains read-only clipped text before an edit is attempte
   await expect(explanation).toBeVisible();
 });
 
-test("vinext Edit PDF classifies a proven image-only page as a scan", async ({
+test("vinext Edit PDF recognizes a proven scan locally without promoting native edit authority", async ({
   page,
 }) => {
   await uploadEditFixture(page, IMAGE_ONLY_PDF);
@@ -113,7 +113,32 @@ test("vinext Edit PDF classifies a proven image-only page as a scan", async ({
     /image content without a proven native text layer/i,
     { timeout: 30_000 },
   );
-  await expect(explanation).toContainText(/OCR support/i);
+  await expect(explanation).toContainText(/Recognize text/i);
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+
+  const forbiddenOcrHosts: string[] = [];
+  page.on("request", (request) => {
+    const host = new URL(request.url()).hostname;
+    if (
+      host === "cdn.jsdelivr.net" ||
+      host === "unpkg.com" ||
+      host === "tessdata.projectnaptha.com"
+    ) {
+      forbiddenOcrHosts.push(request.url());
+    }
+  });
+
+  const ocrPanel = page.locator("[data-edit-local-ocr]");
+  await expect(ocrPanel).toBeVisible();
+  await ocrPanel.getByRole("button", { name: "Recognize text locally" }).click();
+
+  const recognized = page.getByRole("textbox", { name: "Recognized OCR text" });
+  await expect(recognized).toBeVisible({ timeout: 120_000 });
+  await expect(recognized).toHaveValue(/SCANNED PAGE SAMPLE/i);
+  expect(forbiddenOcrHosts).toEqual([]);
+
+  // OCR is evidence/readout only in this phase. It must not synthesize a
+  // native editable run or bypass the existing writer authority.
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
 });
 
