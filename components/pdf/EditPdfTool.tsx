@@ -1490,7 +1490,11 @@ export default function EditPdfTool() {
           );
         }
       } finally {
-        await verificationDoc.destroy();
+        await (
+          verificationDoc as PDFDocumentProxy & {
+            destroy?: () => Promise<void> | void;
+          }
+        ).destroy?.();
       }
 
       const latestContext = ocrContextRef.current;
