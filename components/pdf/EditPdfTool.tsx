@@ -4995,6 +4995,22 @@ export default function EditPdfTool() {
             >
               Replace this match
             </button>
+            <button
+              type="button"
+              onClick={() => void applyStructuredTextSearchReplacement()}
+              disabled={
+                textSearchReplaceAllBusy ||
+                textSearchMatches.length === 0 ||
+                (textSearchScope === "document" && textSearchIndexBusy)
+              }
+              className="h-10 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/45 px-4 text-xs font-bold text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {textSearchReplaceAllBusy
+                ? "Checking all…"
+                : textSearchScope === "document"
+                  ? "Replace all safely"
+                  : "Replace all on page"}
+            </button>
             <span className="pb-2 text-[10px] leading-4 text-[var(--text-secondary)]">
               {activeTextSearchMatch?.pageIndex !== pageIndex
                 ? "Navigate to the match first."
@@ -5003,6 +5019,15 @@ export default function EditPdfTool() {
                   : activeTextSearchMatch?.capabilityReason ?? "Only safely editable native text can be replaced."}
             </span>
           </div>
+          {textSearchReplaceAllStatus ? (
+            <div
+              role="status"
+              data-edit-replace-all-status
+              className="rounded-[var(--radius-md)] border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.025] px-3 py-2 text-[10px] leading-4 text-[var(--text-secondary)]"
+            >
+              {textSearchReplaceAllStatus}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
