@@ -480,7 +480,6 @@ function parseAdminAnalyticsSummary(
     averageDurationMs: numberValue(averageDuration),
     latestEventAt: stringValue(value.summary.latest_event_at),
     dailyMetrics: dailyRows.map((row) => {
-      const cancelled = diagnostics?.dailyCancelled.get(row.date) ?? 0;
       return {
       metric_date: row.date,
       tool_slug: "all",
