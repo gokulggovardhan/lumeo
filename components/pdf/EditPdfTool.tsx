@@ -1812,7 +1812,8 @@ export default function EditPdfTool() {
     ocrEngineRef.current = null;
     setOcrResultsRevision(null);
     setOcrActivity(null);
-    
+    setOcrSearchableActivity(null);
+    setOcrSearchableNoticeRevision(null);
     setOcrErrorRevision(null);
     setOcrCopiedRevision(null);
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
