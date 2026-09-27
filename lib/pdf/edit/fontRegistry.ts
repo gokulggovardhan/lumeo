@@ -32,11 +32,10 @@ import {
   inspectPdfFontProgram,
   type PdfFontProgramInspection,
 } from "./fontProgramIntelligence.ts";
-import {
-  shapeEmbeddedFontText,
-  type ShapeEmbeddedFontOptions,
-  type ShapedRun,
-  type TextShapingDirection,
+import type {
+  ShapeEmbeddedFontOptions,
+  ShapedRun,
+  TextShapingDirection,
 } from "./harfbuzzShaping.ts";
 import {
   reconcileShapingWithPdfCharacterCodes,
@@ -75,6 +74,12 @@ export type PdfFontShapingInspection =
 type ExplicitShapingOptions = Omit<ShapeEmbeddedFontOptions, "direction"> & {
   direction: Exclude<TextShapingDirection, "auto">;
 };
+
+export type PdfEmbeddedFontTextShaper = (
+  fontBytes: Uint8Array,
+  text: string,
+  options: ExplicitShapingOptions,
+) => Promise<ShapedRun>;
 
 
 export type PdfCidSystemInfo = {
@@ -596,12 +601,19 @@ export class PdfFontRegistry {
    * This is inspection only. A "reconciled" result is never write authority:
    * PDF encoding/ToUnicode, glyph proof, EditPlan validation and the native
    * content-stream writer remain independently mandatory.
+   *
+   * The shaping runtime is injected deliberately. PdfFontRegistry is shared
+   * by unrelated browser tools, so importing HarfBuzz here would make every
+   * client bundle depend on the WASM/runtime package. A dedicated shaping
+   * boundary (for example a local Worker) may inject shapeEmbeddedFontText
+   * only when advanced text inspection is actually requested.
    */
   async inspectShapingCompatibility(
     resources: PDFDict,
     resourceName: string,
     text: string,
     options: ExplicitShapingOptions,
+    shapeText: PdfEmbeddedFontTextShaper,
   ): Promise<PdfFontShapingInspection> {
     const profile = this.resolve(resources, resourceName);
     if (!profile) {
@@ -631,7 +643,7 @@ export class PdfFontRegistry {
     }
 
     try {
-      const shaped = await shapeEmbeddedFontText(program.bytes, text, options);
+      const shaped = await shapeText(program.bytes, text, options);
       return {
         kind: "reconciled",
         shaped,
