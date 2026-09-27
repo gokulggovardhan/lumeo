@@ -126,7 +126,10 @@ import {
   type LocalCustomFontAsset,
 } from "@/lib/pdf/edit/localCustomFont";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
-import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
+import {
+  pickHorizontalAlign,
+  pickInlineTextToolbarPlacement,
+} from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
@@ -5372,8 +5375,31 @@ export default function EditPdfTool() {
   // rather than inside the JSX below, so it stays plain render-time
   // derivation, not a nested closure the React Compiler's static analysis
   // has to reason about.
+  const inlineEditorSelectedRunIndex =
+    selectedRunIndices.length === 1 ? selectedRunIndices[0] : -1;
   const inlineEditorVerticalPlacement = singleSelectedRun
-    ? pickVerticalPlacement(singleSelectedRun.yPct, singleSelectedRun.yPct + singleSelectedRun.heightPct, 24, true)
+    ? pickInlineTextToolbarPlacement({
+        anchor: {
+          leftPct: singleSelectedRun.xPct,
+          rightPct: singleSelectedRun.xPct + singleSelectedRun.widthPct,
+          topPct: singleSelectedRun.yPct,
+          bottomPct: singleSelectedRun.yPct + singleSelectedRun.heightPct,
+        },
+        editableObstacles: detectedTextRuns.flatMap((run, index) =>
+          index === inlineEditorSelectedRunIndex || !editableRunMatches[index]
+            ? []
+            : [
+                {
+                  leftPct: run.xPct,
+                  rightPct: run.xPct + run.widthPct,
+                  topPct: run.yPct,
+                  bottomPct: run.yPct + run.heightPct,
+                },
+              ],
+        ),
+        edgeMarginPct: 24,
+        toolbarClearancePct: 6,
+      })
     : "below";
   const inlineEditorHorizontalAlign = singleSelectedRun
     ? pickHorizontalAlign(singleSelectedRun.xPct, singleSelectedRun.xPct + singleSelectedRun.widthPct)
