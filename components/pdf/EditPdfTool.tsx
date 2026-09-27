@@ -334,6 +334,7 @@ let editEngineModulePromise: Promise<{
   applyNativeTextStyleBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyNativeTextStyleBatchToDocument"];
   applyValidatedEditPlanBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyValidatedEditPlanBatchToDocument"];
   verifyPostExportNativeEdits: (typeof import("@/lib/pdf/edit/postExportVerification"))["verifyPostExportNativeEdits"];
+  addSearchableOcrTextLayer: (typeof import("@/lib/pdf/edit/searchableOcrLayer"))["addSearchableOcrTextLayer"];
   PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
   PDFName: (typeof import("pdf-lib"))["PDFName"];
   PDFDict: (typeof import("pdf-lib"))["PDFDict"];
@@ -352,7 +353,8 @@ function loadEditEngine() {
       import("@/lib/pdf/edit/fallbackFont"),
       import("@/lib/pdf/edit/fontRegistry"),
       import("@/lib/pdf/edit/postExportVerification"),
-    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod, postExportVerificationMod]) => ({
+      import("@/lib/pdf/edit/searchableOcrLayer"),
+    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod, postExportVerificationMod, searchableOcrMod]) => ({
       exportEditedPdf: exportMod.exportEditedPdf,
       collectPageTextOperators: formXObjectsMod.collectPageTextOperators,
       resolveFont: fontEncodingMod.resolveFont,
@@ -363,6 +365,7 @@ function loadEditEngine() {
       applyNativeTextStyleBatchToDocument: applyEditPlanMod.applyNativeTextStyleBatchToDocument,
       applyValidatedEditPlanBatchToDocument: applyEditPlanMod.applyValidatedEditPlanBatchToDocument,
       verifyPostExportNativeEdits: postExportVerificationMod.verifyPostExportNativeEdits,
+      addSearchableOcrTextLayer: searchableOcrMod.addSearchableOcrTextLayer,
       PDFDocument: pdfLibMod.PDFDocument,
       PDFName: pdfLibMod.PDFName,
       PDFDict: pdfLibMod.PDFDict,
