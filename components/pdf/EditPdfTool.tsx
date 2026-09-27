@@ -173,6 +173,7 @@ import {
 import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget, computeAdaptiveRenderScale, quantizeRenderScale } from "@/lib/pdf/pdfjs";
 import {
+  browserUsedHeapBytes,
   editPerformanceDiagnostics,
   editPerformanceNow,
 } from "@/lib/pdf/edit/editPerformanceDiagnostics";
@@ -1575,6 +1576,15 @@ export default function EditPdfTool() {
               success: true,
             },
           );
+          const usedHeapBytes = browserUsedHeapBytes();
+          if (usedHeapBytes !== null) {
+            editPerformanceDiagnostics.record("memory-snapshot", 0, {
+              pageIndex,
+              pageCount: pdf.pageCount,
+              byteCount: usedHeapBytes,
+              success: true,
+            });
+          }
           setPageLoading(false);
         }
       } catch {
@@ -2115,6 +2125,14 @@ export default function EditPdfTool() {
           success: true,
         },
       );
+      const usedHeapBytes = browserUsedHeapBytes();
+      if (usedHeapBytes !== null) {
+        editPerformanceDiagnostics.record("memory-snapshot", 0, {
+          pageCount,
+          byteCount: usedHeapBytes,
+          success: true,
+        });
+      }
 
       const pageCountError = checkPdfPageCount(pageCount);
       if (pageCountError) {
