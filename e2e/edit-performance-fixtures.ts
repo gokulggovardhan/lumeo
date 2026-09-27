@@ -49,14 +49,19 @@ async function buildPerformancePdf(pageCount: number): Promise<Uint8Array> {
   return doc.save({ useObjectStreams: false });
 }
 
-export async function writeEditPerformanceFixtures(): Promise<void> {
+export async function writeEditPerformance120Fixture(): Promise<void> {
   await mkdir(TMP_DIR, { recursive: true });
-  const [small, large] = await Promise.all([
-    buildPerformancePdf(120),
-    buildPerformancePdf(320),
-  ]);
+  await writeFile(EDIT_PERFORMANCE_120_PDF, await buildPerformancePdf(120));
+}
+
+export async function writeEditPerformance320Fixture(): Promise<void> {
+  await mkdir(TMP_DIR, { recursive: true });
+  await writeFile(EDIT_PERFORMANCE_320_PDF, await buildPerformancePdf(320));
+}
+
+export async function writeEditPerformanceFixtures(): Promise<void> {
   await Promise.all([
-    writeFile(EDIT_PERFORMANCE_120_PDF, small),
-    writeFile(EDIT_PERFORMANCE_320_PDF, large),
+    writeEditPerformance120Fixture(),
+    writeEditPerformance320Fixture(),
   ]);
 }
