@@ -207,6 +207,38 @@ async function downloadBytes(download: Download): Promise<Buffer> {
   return readFile(path);
 }
 
+async function gotoProductionRoute(page: Page, path: string): Promise<void> {
+  let lastStatus: number | null = null;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    const response = await page.goto(path, { waitUntil: "domcontentloaded" });
+    lastStatus = response?.status() ?? null;
+    if (response?.ok()) return;
+
+    if (lastStatus && [502, 503, 504].includes(lastStatus) && attempt < 3) {
+      console.warn(
+        `Transient production navigation status ${lastStatus} for ${path}; retry ${attempt}/3.`,
+      );
+      await page.waitForTimeout(attempt * 1_000);
+      continue;
+    }
+
+    throw new Error(
+      `Production navigation failed for ${path} with status ${lastStatus ?? "unknown"}.`,
+    );
+  }
+
+  throw new Error(
+    `Production navigation did not recover for ${path}; last status ${lastStatus ?? "unknown"}.`,
+  );
+}
+
+async function waitForWordToPdfClientReady(page: Page): Promise<void> {
+  await expect(
+    page.locator("[data-word-to-pdf-client-ready='true']"),
+  ).toBeAttached({ timeout: 30_000 });
+}
+
 test.beforeAll(async () => {
   await writeFixtures();
 });
@@ -239,7 +271,7 @@ test("production Edit PDF certifies native colour, formatting, history and expor
     };
   };
 
-  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+  await gotoProductionRoute(page, "/pdf/edit");
   await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });
   await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
 
@@ -299,7 +331,7 @@ test("production Edit PDF certifies native colour, formatting, history and expor
   expect(operators[0].operator.horizontalScalingPct).toBe(95);
   expect(operators[1].operator.fillColor?.cssHex).toBe("#000000");
 
-  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+  await gotoProductionRoute(page, "/pdf/edit");
   await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({ timeout: 30_000 });
   await page.locator('input[type="file"]').first().setInputFiles({
     name: "native-colour-production-reopened.pdf",
@@ -320,7 +352,7 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
 }) => {
   test.skip(browserName !== "chromium", "Threaded Office runtime production smoke runs in Chromium.");
 
-  await page.goto("/pdf-tools", { waitUntil: "domcontentloaded" });
+  await gotoProductionRoute(page, "/pdf-tools");
   expect(await page.evaluate(() => window.crossOriginIsolated)).toBe(false);
 
   const wordToPdfLink = page.locator('a[href="/pdf/word-to-pdf"]').first();
@@ -339,6 +371,7 @@ test("production Word to PDF converts locally and downloaded PDF opens", async (
       { timeout: 30_000 },
     )
     .toBe(true);
+  await waitForWordToPdfClientReady(page);
   await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
 
   // Begin conversion/privacy observation after the intentional isolation reload
@@ -385,7 +418,8 @@ test("production Word to PDF preserves professional formatting against native re
   );
 
   const runtime = watchConversionRuntime(page);
-  await page.goto("/pdf/word-to-pdf");
+  await gotoProductionRoute(page, "/pdf/word-to-pdf");
+  await waitForWordToPdfClientReady(page);
   await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
 
   const source = await makeProfessionalDocx();
@@ -483,7 +517,7 @@ test("production PDF to Word reconstructs locally and downloaded DOCX opens", as
   page,
 }) => {
   const runtime = watchConversionRuntime(page);
-  await page.goto("/pdf/pdf-to-word");
+  await gotoProductionRoute(page, "/pdf/pdf-to-word");
   await expect(page.getByText(/Processed locally in your browser/i).first()).toBeVisible();
 
   const pdf = await makePdf();
@@ -518,7 +552,7 @@ test("production PDF to Word preserves fixed-layout invoice and AMC fidelity", a
   browserName,
 }, testInfo) => {
   const runtime = watchConversionRuntime(page);
-  await page.goto("/pdf/pdf-to-word");
+  await gotoProductionRoute(page, "/pdf/pdf-to-word");
   await expect(
     page.getByText(/Processed locally in your browser/i).first(),
   ).toBeVisible();
@@ -636,7 +670,7 @@ test("production HTML to PDF generates and downloads a valid PDF locally", async
   test.skip(browserName !== "chromium", "HTML production smoke runs once in Chromium.");
 
   const runtime = watchConversionRuntime(page);
-  await page.goto("/pdf/html-to-pdf");
+  await gotoProductionRoute(page, "/pdf/html-to-pdf");
   await page.getByLabel("HTML and CSS source").fill(
     `<!doctype html><html><body><h1>Lumeo HTML production smoke</h1><p>Browser-only HTML to PDF validation.</p></body></html>`,
   );
