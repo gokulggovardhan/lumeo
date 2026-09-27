@@ -708,6 +708,8 @@ export default function EditPdfTool() {
   // the disclosure notice -- see restyleSelectedRun for when that happens.
   const [restyleKeptOriginalText, setRestyleKeptOriginalText] = useState(false);
   const [isApplyingEdit, setIsApplyingEdit] = useState(false);
+  const [isNativeTextComposing, setIsNativeTextComposing] = useState(false);
+  const nativeTextComposingRef = useRef(false);
   const runOverlayNodesRef = useRef<Map<number, HTMLDivElement>>(new Map());
   // Phase 11: the inline caret-over-the-PDF input for a single selected,
   // editable text run -- see the JSX below (rendered next to the run's
@@ -716,6 +718,11 @@ export default function EditPdfTool() {
   const textSearchInputRef = useRef<HTMLInputElement | null>(null);
   const uploadClientReadyRef = useRef<HTMLElement | null>(null);
   const performanceDiagnosticsRef = useRef<EditPdfPerformanceCollector | null>(null);
+
+  useEffect(() => {
+    nativeTextComposingRef.current = false;
+    setIsNativeTextComposing(false);
+  }, [selectedRunIndices]);
 
   useEffect(() => {
     // SSR can render the file input before React has attached its change
@@ -3141,6 +3148,10 @@ export default function EditPdfTool() {
   // overlay-element
   // export pipeline) all see this edit without any separate wiring.
   const applyTextRunEdit = useCallback(async () => {
+    // IME composition text is provisional. Never serialize a half-composed
+    // value even if a keyboard/button event races the React disabled state.
+    if (nativeTextComposingRef.current) return;
+
     const doc = pdfLibDocRef.current;
     const engine = editEngineRef.current;
     if (!doc || !engine || editPreview.kind === "empty" || !editPreview.editable) return;
@@ -3783,6 +3794,7 @@ export default function EditPdfTool() {
     editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
   const canApplyEdit =
     !isApplyingEdit &&
+    !isNativeTextComposing &&
     editPreview.kind !== "empty" &&
     editPreview.editable &&
     (replacementLayoutDecision?.safeToApplyWithCurrentWriter ?? true) &&
@@ -3822,6 +3834,7 @@ export default function EditPdfTool() {
   useEffect(() => {
     const input = inlineEditInputRef.current;
     if (
+      isNativeTextComposing ||
       !input ||
       logicalSelectionStart === null ||
       logicalSelectionEnd === null
@@ -3845,6 +3858,7 @@ export default function EditPdfTool() {
     logicalSelectionEnd,
     logicalSelectionDirection,
     editDraftText,
+    isNativeTextComposing,
   ]);
 
   const activeNativeStyleDraft =
@@ -4622,15 +4636,42 @@ export default function EditPdfTool() {
                         value={editDraftText}
                         onChange={(event) => {
                           handleEditDraftTextChange(event.currentTarget.value);
-                          syncSingleSpanLogicalSelection(event.currentTarget);
+                          if (!nativeTextComposingRef.current) {
+                            syncSingleSpanLogicalSelection(event.currentTarget);
+                          }
+                        }}
+                        onCompositionStart={(event) => {
+                          event.stopPropagation();
+                          nativeTextComposingRef.current = true;
+                          setIsNativeTextComposing(true);
+                        }}
+                        onCompositionEnd={(event) => {
+                          event.stopPropagation();
+                          const input = event.currentTarget;
+                          nativeTextComposingRef.current = false;
+                          setIsNativeTextComposing(false);
+                          handleEditDraftTextChange(input.value);
+                          requestAnimationFrame(() => {
+                            if (inlineEditInputRef.current === input) {
+                              syncSingleSpanLogicalSelection(input);
+                            }
+                          });
                         }}
                         onSelect={(event) => {
                           event.stopPropagation();
-                          syncSingleSpanLogicalSelection(event.currentTarget);
+                          if (!nativeTextComposingRef.current) {
+                            syncSingleSpanLogicalSelection(event.currentTarget);
+                          }
                         }}
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => {
                           event.stopPropagation();
+                          if (
+                            nativeTextComposingRef.current ||
+                            event.nativeEvent.isComposing
+                          ) {
+                            return;
+                          }
                           if (event.key === "Enter") {
                             event.preventDefault();
                             if (canApplyEdit) void applyTextRunEdit();
@@ -4645,19 +4686,20 @@ export default function EditPdfTool() {
                           // observe every keyboard-driven caret/range mutation
                           // before the controlled-input mirror effect runs.
                           // Re-read the post-default browser selection for
-                          // navigation keys only. Ordinary text input remains
-                          // driven by onChange, which avoids interfering with
-                          // future IME/composition handling.
+                          // navigation keys only. IME owns the caret until
+                          // compositionend, so never mirror through it.
                           if (
-                            event.key === "ArrowLeft" ||
-                            event.key === "ArrowRight" ||
-                            event.key === "Home" ||
-                            event.key === "End"
+                            !nativeTextComposingRef.current &&
+                            (event.key === "ArrowLeft" ||
+                              event.key === "ArrowRight" ||
+                              event.key === "Home" ||
+                              event.key === "End")
                           ) {
                             syncSingleSpanLogicalSelection(event.currentTarget);
                           }
                         }}
                         aria-label="Edit text"
+                        data-ime-composing={isNativeTextComposing ? "true" : "false"}
                         data-logical-selection-start={logicalSelectionStart ?? undefined}
                         data-logical-selection-end={logicalSelectionEnd ?? undefined}
                         data-logical-selection-direction={logicalSelectionDirection}
@@ -4936,8 +4978,20 @@ export default function EditPdfTool() {
                           aria-label="Edit selected text runs"
                           value={editDraftText}
                           onChange={(event) => {
-                            handleEditDraftTextChange(event.target.value);
+                            handleEditDraftTextChange(event.currentTarget.value);
                           }}
+                          onCompositionStart={(event) => {
+                            event.stopPropagation();
+                            nativeTextComposingRef.current = true;
+                            setIsNativeTextComposing(true);
+                          }}
+                          onCompositionEnd={(event) => {
+                            event.stopPropagation();
+                            nativeTextComposingRef.current = false;
+                            setIsNativeTextComposing(false);
+                            handleEditDraftTextChange(event.currentTarget.value);
+                          }}
+                          data-ime-composing={isNativeTextComposing ? "true" : "false"}
                           className="mt-1 w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
                         />
                         <div className="mt-2 flex gap-2">
