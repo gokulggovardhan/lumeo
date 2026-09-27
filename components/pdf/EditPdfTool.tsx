@@ -3538,44 +3538,103 @@ export default function EditPdfTool() {
       };
     }
 
-    const matches = indices.map((i) => runMatches[i]);
+    const matches = indices.map((i) => editableRunMatches[i]);
     if (matches.some((m) => !m)) {
       return { kind: "invalid", reason: "One or more selected lines couldn't be matched to editable text -- try selecting fewer lines." };
     }
     const nonNull = matches as NonNullable<RunMatch>[];
-    const firstLocator = nonNull[0].locatedOperator.locator;
+
+    // One visible PDF.js run may already have exact proof that it reconstructs
+    // from several byte-adjacent native Tj/TJ operators. Expand that EXISTING
+    // proof here instead of discarding all but the run's first operator. This
+    // is evidence reuse only: reconstructFragmentedRun has already proved exact
+    // decoded text, one page stream, one font/text state, byte adjacency and no
+    // intervening content operator. Paragraph planning still independently
+    // decides whether those expanded operators form writable native lines.
+    const firstFragment = fragmentedRunReconstructions.get(indices[0]);
+    const firstLocated =
+      firstFragment?.locatedOperators[0] ?? nonNull[0].locatedOperator;
+    const firstLocator = firstLocated.locator;
     if (firstLocator.kind !== "page") {
       return { kind: "invalid", reason: "Multi-line editing inside a Form XObject (e.g. a stamp or logo) isn't supported yet -- edit one line at a time." };
     }
-    const sameStream = nonNull.every(
-      (m) => m.locatedOperator.locator.kind === "page" && m.locatedOperator.locator.contentStreamIndex === firstLocator.contentStreamIndex,
-    );
-    if (!sameStream) {
-      // Phase 20 (M): was "Selected lines must be part of the same content
-      // stream." -- accurate but meaningless to a non-technical user (the
-      // phase's own explicit example of the kind of message to avoid).
-      return { kind: "invalid", reason: "This text is split internally by the PDF and can't be edited as one piece here -- try editing one part at a time." };
+
+    const contentStreamIndex = firstLocator.contentStreamIndex;
+    const expandedOperatorIndices: number[] = [];
+    let fontResourceName: string | null = null;
+    let resources: PDFDict | null = null;
+
+    for (let position = 0; position < indices.length; position += 1) {
+      const runIndex = indices[position];
+      const match = nonNull[position];
+      const fragment = fragmentedRunReconstructions.get(runIndex);
+
+      if (fragment) {
+        if (fragment.contentStreamIndex !== contentStreamIndex) {
+          return { kind: "invalid", reason: "This text is split internally by the PDF and can't be edited as one piece here -- try editing one part at a time." };
+        }
+        if (
+          fontResourceName !== null &&
+          fragment.fontResourceName !== fontResourceName
+        ) {
+          return { kind: "invalid", reason: "Selected lines use different fonts -- multi-line edits must share one font." };
+        }
+        fontResourceName ??= fragment.fontResourceName;
+        resources ??= fragment.resources;
+        expandedOperatorIndices.push(...fragment.operatorIndices);
+        continue;
+      }
+
+      const locator = match.locatedOperator.locator;
+      if (
+        locator.kind !== "page" ||
+        locator.contentStreamIndex !== contentStreamIndex
+      ) {
+        return { kind: "invalid", reason: "This text is split internally by the PDF and can't be edited as one piece here -- try editing one part at a time." };
+      }
+      const resourceName = match.operator.fontResourceName;
+      if (!resourceName) {
+        return { kind: "invalid", reason: "This text's font couldn't be identified, so it can't be edited here." };
+      }
+      if (fontResourceName !== null && resourceName !== fontResourceName) {
+        return { kind: "invalid", reason: "Selected lines use different fonts -- multi-line edits must share one font." };
+      }
+      fontResourceName ??= resourceName;
+      resources ??= match.locatedOperator.resources;
+      expandedOperatorIndices.push(match.locatedOperator.operatorIndex);
     }
-    const operatorIndices = [...nonNull.map((m) => m.locatedOperator.operatorIndex)].sort((a, b) => a - b);
+
+    if (!fontResourceName || !resources) {
+      return { kind: "invalid", reason: "This text's font couldn't be identified, so it can't be edited here." };
+    }
+
+    const operatorIndices = [...expandedOperatorIndices].sort((a, b) => a - b);
+    if (new Set(operatorIndices).size !== operatorIndices.length) {
+      return {
+        kind: "invalid",
+        reason:
+          "Selected lines overlap the same native PDF text operator, so one unambiguous paragraph edit cannot be proven.",
+      };
+    }
     for (let i = 1; i < operatorIndices.length; i += 1) {
       if (operatorIndices[i] !== operatorIndices[i - 1] + 1) {
         return { kind: "invalid", reason: "Selected lines must be consecutive, with nothing unselected in between." };
       }
     }
-    const fontResourceName = nonNull[0].operator.fontResourceName;
-    if (!fontResourceName) {
-      return { kind: "invalid", reason: "This text's font couldn't be identified, so it can't be edited here." };
-    }
-    if (nonNull.some((m) => m.operator.fontResourceName !== fontResourceName)) {
-      return { kind: "invalid", reason: "Selected lines use different fonts -- multi-line edits must share one font." };
-    }
 
     const allOperators = pageOperators
-      .filter((lo) => lo.locator.kind === "page" && lo.locator.contentStreamIndex === firstLocator.contentStreamIndex)
+      .filter((lo) => lo.locator.kind === "page" && lo.locator.contentStreamIndex === contentStreamIndex)
       .sort((a, b) => a.operatorIndex - b.operatorIndex)
       .map((lo) => lo.operator);
 
-    return { kind: "valid", contentStreamIndex: firstLocator.contentStreamIndex, operatorIndices, allOperators, resources: nonNull[0].locatedOperator.resources, fontResourceName };
+    return {
+      kind: "valid",
+      contentStreamIndex,
+      operatorIndices,
+      allOperators,
+      resources,
+      fontResourceName,
+    };
   }
 
   const selectedNativeSpans = useMemo(
@@ -3804,7 +3863,7 @@ export default function EditPdfTool() {
       return { kind: "error", reason, multi: selectedRunIndices.length > 1 };
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over the explicitly listed page/write evidence below.
-  }, [fontRegistry, selectedRunIndices, editableRunMatches, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions, pageTextModel, logicalSelection]);
+  }, [fontRegistry, selectedRunIndices, editableRunMatches, pageOperators, pageIndex, fragmentedRunReconstructions, pageTextModel, logicalSelection]);
 
   const paragraphSelectionTemplate = useMemo(() => {
     if (
