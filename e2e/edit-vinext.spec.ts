@@ -282,6 +282,56 @@ test("vinext Edit PDF keeps IME composition isolated until the candidate is comm
   ).toBeVisible({ timeout: 90_000 });
 });
 
+test("vinext Edit PDF clears an abandoned IME owner when native selection changes", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-operation-count]");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+
+  const employeeRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    )
+    .first();
+  const ssnRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="123-45-6789"]',
+    )
+    .first();
+
+  await employeeRun.click();
+  let editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await editor.dispatchEvent("compositionstart", { data: "draft" });
+  await expect(editor).toHaveAttribute("data-ime-composing", "true");
+
+  // Deliberately abandon this synthetic composition without dispatching
+  // compositionend. A browser can effectively do the same when the input is
+  // unmounted because selection/tool state changed. The immediate guard must
+  // be selection-scoped rather than surviving forever under the old run key.
+  await ssnRun.click();
+  editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveAttribute("data-ime-composing", "false");
+
+  await employeeRun.click();
+  editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await editor.fill("Employee file");
+  await page.getByRole("button", { name: "Apply edit" }).click();
+
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+});
+
 test("vinext Edit PDF supports text matching, editing, and export", async ({
   page,
 }) => {
