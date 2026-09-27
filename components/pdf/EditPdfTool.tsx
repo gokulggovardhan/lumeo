@@ -4841,6 +4841,10 @@ export default function EditPdfTool() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={pageImageUrl} alt={`Page ${pageIndex + 1} preview`} className="pointer-events-none block h-full w-full select-none" />
 
+                  {ocrPageResultCurrent ? (
+                    <OcrWordOverlay result={ocrPageResultCurrent} />
+                  ) : null}
+
                   {whiteoutDraft ? (
                     // Phase 11: live drag-to-create preview -- semi-transparent
                     // so the text/content underneath stays visible while
@@ -5507,9 +5511,9 @@ export default function EditPdfTool() {
                   ) : null}
 
                   {activeTool === "select" && textDetectionCurrent && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
-                    <div className="absolute left-3 top-3 z-20 max-w-[260px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/90 p-3 shadow-lg">
+                    <div className="absolute left-3 top-3 z-20 max-w-[340px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/94 p-3 shadow-lg backdrop-blur-sm">
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
-                        {pageTextCapability.nativeSpanCount > 0
+                        {pageTextCapability.nativeSpanCount > 0 || pageTextCapability.rasterImageEvidence
                           ? pageCapabilityMessage.title
                           : "No editable text found"}
                       </span>
@@ -5523,6 +5527,98 @@ export default function EditPdfTool() {
                             ? pageCapabilityMessage.detail
                             : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
                       </p>
+
+                      {pageTextCapability.category === "SCANNED_IMAGE" ? (
+                        <div data-edit-ocr-panel data-edit-ocr-source="ocr" className="mt-2.5 grid gap-2">
+                          {ocrPageResultCurrent ? (
+                            <>
+                              <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-primary)]/55">
+                                <span className="rounded-full border border-[var(--lumeo-gold)]/30 bg-[var(--lumeo-gold)]/10 px-2 py-0.5 font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/65">
+                                  OCR · local
+                                </span>
+                                <span data-edit-ocr-confidence>
+                                  {Math.round(ocrPageResultCurrent.confidence)}% confidence
+                                </span>
+                                <span>·</span>
+                                <span data-edit-ocr-word-summary>
+                                  {ocrPageResultCurrent.words.length} word{ocrPageResultCurrent.words.length === 1 ? "" : "s"}
+                                </span>
+                              </div>
+                              <textarea
+                                readOnly
+                                aria-label="Recognized text (OCR)"
+                                data-edit-ocr-text
+                                value={ocrPageResultCurrent.text}
+                                rows={5}
+                                className="w-full resize-y rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 bg-white/70 px-2.5 py-2 text-[11px] leading-5 text-[#242833] outline-none"
+                              />
+                              <div className="flex flex-wrap gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleCopyOcrText()}
+                                  className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45"
+                                >
+                                  {ocrCopied ? "Copied" : "Copy text"}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleRecognizeScannedPage()}
+                                  disabled={ocrBusy}
+                                  className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  Recognize again
+                                </button>
+                              </div>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => void handleRecognizeScannedPage()}
+                              disabled={ocrBusy}
+                              className="w-fit rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.09em] text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-55"
+                            >
+                              {ocrBusy ? "Recognizing locally…" : "Recognize text locally"}
+                            </button>
+                          )}
+
+                          {ocrBusy ? (
+                            <div className="grid gap-1" role="status" data-edit-ocr-progress>
+                              <div className="flex items-center justify-between gap-2 text-[10px] text-[var(--text-primary)]/55">
+                                <span>{ocrProgress?.status ?? "Working locally"}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => void terminateOcrJob(true)}
+                                  className="font-semibold text-[var(--text-primary)]/65 underline decoration-dotted underline-offset-2"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                              <div
+                                role="progressbar"
+                                aria-valuemin={0}
+                                aria-valuemax={100}
+                                aria-valuenow={Math.round((ocrProgress?.progress ?? 0) * 100)}
+                                className="h-1.5 overflow-hidden rounded-full bg-[var(--text-primary)]/10"
+                              >
+                                <div
+                                  className="h-full rounded-full bg-[var(--lumeo-gold)] transition-[width]"
+                                  style={{ width: `${Math.round((ocrProgress?.progress ?? 0) * 100)}%` }}
+                                />
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {ocrError ? (
+                            <p role="alert" className="text-[10px] leading-4 text-[var(--text-danger)]">
+                              {ocrError}
+                            </p>
+                          ) : null}
+
+                          <p className="text-[9px] leading-4 text-[var(--text-primary)]/45">
+                            Recognized text is an OCR aid, not original PDF text. Native rewrite remains disabled for this scan.
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
                   ) : null}
                   {redactMode ? (
