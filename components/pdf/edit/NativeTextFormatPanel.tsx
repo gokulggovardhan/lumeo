@@ -2,6 +2,7 @@
 
 import type { PdfTextSpan } from "@/lib/pdf/edit/documentModel";
 import type { NativeFillColorCapability } from "@/lib/pdf/edit/nativePaint";
+import type { FontPreviewFidelity } from "@/lib/pdf/edit/previewFidelity";
 
 export type NativeTextStyleDraft = {
   spanId: string;
@@ -16,6 +17,7 @@ type NativeTextFormatPanelProps = {
   span: PdfTextSpan;
   draft: NativeTextStyleDraft;
   fillCapability: NativeFillColorCapability | null;
+  previewFidelity: FontPreviewFidelity;
   panelPositionClass: string;
   horizontalClass: string;
   onPatchDraft: (patch: Partial<Omit<NativeTextStyleDraft, "spanId">>) => void;
@@ -27,6 +29,7 @@ export function NativeTextFormatPanel({
   span,
   draft,
   fillCapability,
+  previewFidelity,
   panelPositionClass,
   horizontalClass,
   onPatchDraft,
@@ -49,6 +52,14 @@ export function NativeTextFormatPanel({
           <div className="mt-0.5 truncate font-semibold">
             {span.style.fontFamily || span.style.baseFont || "PDF font"}
           </div>
+          <span
+            data-font-preview-fidelity={previewFidelity.kind}
+            aria-label={previewFidelity.label}
+            title={previewFidelity.detail}
+            className="mt-1 inline-flex rounded-full border border-[var(--text-primary)]/12 px-2 py-0.5 text-[9px] font-semibold text-[var(--text-primary)]/58"
+          >
+            {previewFidelity.label}
+          </span>
         </div>
         <div className="flex shrink-0 gap-1">
           <span className="rounded-full border border-[var(--text-primary)]/12 px-2 py-0.5 text-[9px] font-semibold text-[var(--text-primary)]/65">
