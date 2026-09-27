@@ -221,6 +221,67 @@ test("vinext Edit PDF keeps a 120-page thumbnail rail bounded and scrollable", a
   ).toBeLessThan(30);
 });
 
+test("vinext Edit PDF aborts Replace All when the native PDF revision changes during preflight", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, LARGE_DOCUMENT_PDF);
+  await waitForStageReady(page);
+
+  const firstRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large document page 1"]',
+    )
+    .first();
+  await firstRun.click();
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await editor.fill("Large dossier page 1");
+  await page.getByRole("button", { name: "Apply edit" }).click();
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large dossier page 1"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("page");
+  const replace = page.getByRole("textbox", {
+    name: "Replace search match with",
+  });
+  await replace.fill("sheet");
+
+  const replaceAll = page.getByRole("button", { name: "Replace all safely" });
+  await expect(replaceAll).toBeEnabled({ timeout: 90_000 });
+  await replaceAll.click();
+
+  const status = page.locator("[data-edit-replace-all-status]");
+  await expect(status).toContainText(/Checking every match against the native PDF locally/i, {
+    timeout: 30_000,
+  });
+
+  // Change the authoritative PDF revision while the 120-page preflight is
+  // still scanning. Replace All must discard its old clone rather than
+  // publishing stale bytes over this Undo result.
+  await page.getByRole("button", { name: "Undo" }).click();
+
+  await expect(status).toContainText(/PDF changed while Replace All was checking matches/i, {
+    timeout: 90_000,
+  });
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large document page 1"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large dossier sheet 1"]',
+    ),
+  ).toHaveCount(0);
+});
+
 test("vinext Edit PDF shares one linear semantic undo history across native Edit and Redaction", async ({
   page,
 }) => {
