@@ -867,6 +867,28 @@ export default function EditPdfTool() {
   // never changes identity, so the child could not tell a swap had
   // happened) -- docReady is what signals that.
   const getPdfJsDocument = useCallback(() => pdfJsDocRef.current, []);
+  const handleThumbnailPerformanceSample = useCallback(
+    (sample: {
+      durationMs: number;
+      pageCount: number;
+      renderedCount: number;
+      failedCount: number;
+    }) => {
+      performanceDiagnosticsRef.current?.recordDuration(
+        "thumbnail-batch",
+        sample.durationMs,
+        {
+          detail: {
+            pageCount: sample.pageCount,
+            renderedCount: sample.renderedCount,
+            failedCount: sample.failedCount,
+            eagerDomRowCount: sample.pageCount,
+          },
+        },
+      );
+    },
+    [],
+  );
   // Redaction state. `redactMode` gates the drag surface; boxes are the
   // user's drawn rectangles in percent space; outcome is what the last run
   // could and could not remove, kept on screen until dismissed because its
@@ -4261,6 +4283,7 @@ export default function EditPdfTool() {
                     onSelectPage={setPageIndex}
                     onToggleSelected={togglePageSelected}
                     onReorder={handleReorderPages}
+                    onPerformanceSample={handleThumbnailPerformanceSample}
                   />
                 </div>
               ) : null}
