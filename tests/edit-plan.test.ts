@@ -14,6 +14,12 @@ import { walkTextShowOperators, type TextShowOperator } from "../lib/pdf/edit/co
 import { resolveFont, type ResolvedFont } from "../lib/pdf/edit/fontEncoding.ts";
 import { resolveFontMetrics, type FontMetrics } from "../lib/pdf/edit/fontMetrics.ts";
 import { buildEditPlan } from "../lib/pdf/edit/editPlan.ts";
+import type { ShapedRun } from "../lib/pdf/edit/harfbuzzShaping.ts";
+import type { ShapingReconciliation } from "../lib/pdf/edit/shapingReconciliation.ts";
+import {
+  validateShapingEvidenceForCharacterCodeWriter,
+  type ValidatedShapingWriteEvidence,
+} from "../lib/pdf/edit/shapingWriteGuard.ts";
 
 async function decodedContentStreamBytes(pdfBytes: Uint8Array): Promise<Uint8Array> {
   const loaded = await PDFDocument.load(pdfBytes);
@@ -640,4 +646,184 @@ test("buildEditPlan: embedded subset with proven glyph still fails closed when P
 
   assert.equal(plan.editable, false);
   assert.match(plan.reason ?? "", /verified glyph/i);
+});
+
+
+function thaiType0Fixture(): {
+  resolvedFont: ResolvedFont;
+  fontMetrics: FontMetrics;
+  operator: TextShowOperator;
+} {
+  const resolvedFont: ResolvedFont = {
+    kind: "Type0",
+    baseFont: "ABCDEF+ThaiDemo",
+    isEmbedded: true,
+    isSubset: true,
+    bytesPerCode: 2,
+    encodingSource: "ToUnicode",
+    glyphCodeToUnicode: new Map([[3, "ก"]]),
+    unicodeToGlyphCode: new Map([["ก", 3]]),
+  };
+  const fontMetrics: FontMetrics = {
+    bytesPerCode: 2,
+    defaultWidth: 1000,
+    glyphWidths: new Map([[3, 600]]),
+    source: "W",
+  };
+  const operator = fixedOperator({
+    strings: [Uint8Array.from([0x00, 0x03])],
+    fontSizePt: 12,
+  });
+  return { resolvedFont, fontMetrics, operator };
+}
+
+function compatibleThaiShaping(): {
+  shaped: ShapedRun;
+  reconciliation: ShapingReconciliation;
+} {
+  return {
+    shaped: {
+      text: "ก",
+      glyphs: [
+        {
+          glyphId: 3,
+          clusterUtf16: 0,
+          flags: 0,
+          xAdvance: 600,
+          yAdvance: 0,
+          xOffset: 0,
+          yOffset: 0,
+          xAdvanceEm: 0.6,
+          yAdvanceEm: 0,
+          xOffsetEm: 0,
+          yOffsetEm: 0,
+        },
+      ],
+      clusterMap: [
+        { startUtf16: 0, endUtf16: 1, text: "ก", glyphIndices: [0] },
+      ],
+      unitsPerEm: 1000,
+      totalAdvance: 600,
+      totalAdvanceEm: 0.6,
+      totalXAdvance: 600,
+      totalYAdvance: 0,
+      requestedDirection: "ltr",
+      directionWasExplicit: true,
+      engine: "harfbuzz",
+      engineVersion: "14.5.0",
+    },
+    reconciliation: {
+      kind: "compatible-character-codes",
+      advisoryOnly: true,
+      reason:
+        "HarfBuzz keeps a one-codepoint/one-glyph sequence with no required per-glyph shaping offsets.",
+      advanceAgreement: "matched",
+      harfBuzzAdvanceEm: 0.6,
+      pdfAdvanceEm: 0.6,
+      advanceDeltaEm: 0,
+      requiresPerGlyphPositioning: false,
+      requiresGlyphSubstitution: false,
+    },
+  };
+}
+
+test("buildEditPlan: complex-script replacement is blocked until exact shaping proof is supplied", () => {
+  const { resolvedFont, fontMetrics, operator } = thaiType0Fixture();
+
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator,
+    replacementText: "ก",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /HarfBuzz evidence|canonical shaping/i);
+});
+
+test("buildEditPlan: plain-object shaping claims cannot cross the native writer authority boundary", () => {
+  const { resolvedFont, fontMetrics, operator } = thaiType0Fixture();
+  const forged = {
+    replacementText: "ก",
+    embeddedProgramSha256: "a".repeat(64),
+    engineVersion: "forged",
+    advanceAgreement: "matched",
+  } as unknown as ValidatedShapingWriteEvidence;
+
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator,
+    replacementText: "ก",
+    resolvedFont,
+    fontMetrics,
+    embeddedProgramSha256: "a".repeat(64),
+    shapingWriteEvidence: forged,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /validated planner-issued proof/i);
+});
+
+test("buildEditPlan: shaping proof is bound to the exact embedded font fingerprint", () => {
+  const { resolvedFont, fontMetrics, operator } = thaiType0Fixture();
+  const { shaped, reconciliation } = compatibleThaiShaping();
+  const result = validateShapingEvidenceForCharacterCodeWriter({
+    replacementText: "ก",
+    embeddedProgramSha256: "a".repeat(64),
+    shaped,
+    reconciliation,
+  });
+  assert.equal(result.kind, "validated");
+  if (result.kind !== "validated") return;
+
+  const stale = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator,
+    replacementText: "ก",
+    resolvedFont,
+    fontMetrics,
+    embeddedProgramSha256: "b".repeat(64),
+    shapingWriteEvidence: result.evidence,
+  });
+
+  assert.equal(stale.editable, false);
+  assert.match(stale.reason ?? "", /does not match.*font fingerprint|cannot be reused/i);
+});
+
+test("buildEditPlan: exact compatible shaping proof closes only the shaping gap", () => {
+  const { resolvedFont, fontMetrics, operator } = thaiType0Fixture();
+  const fingerprint = "a".repeat(64);
+  const { shaped, reconciliation } = compatibleThaiShaping();
+  const result = validateShapingEvidenceForCharacterCodeWriter({
+    replacementText: "ก",
+    embeddedProgramSha256: fingerprint,
+    shaped,
+    reconciliation,
+  });
+  assert.equal(result.kind, "validated");
+  if (result.kind !== "validated") return;
+
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator,
+    replacementText: "ก",
+    resolvedFont,
+    fontMetrics,
+    embeddedProgramSha256: fingerprint,
+    shapingWriteEvidence: result.evidence,
+  });
+
+  assert.equal(plan.editable, true);
+  assert.equal(plan.reason, null);
+  assert.deepEqual(plan.replacementGlyphCodes, [3]);
+  assert.equal(plan.fallbackFont, null);
 });
