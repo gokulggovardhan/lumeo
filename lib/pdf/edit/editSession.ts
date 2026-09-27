@@ -19,6 +19,7 @@ export type PdfEditGeometry = {
 
 export type PdfEditTextStyle = {
   fontFamily?: string;
+  fontIdentity?: string;
   fontSizePt?: number;
   color?: string;
   bold?: boolean;
@@ -162,7 +163,8 @@ function geometryOf(element: EditElement): PdfEditGeometry {
 
 function styleOf(element: TextEditElement): PdfEditTextStyle {
   return {
-    fontFamily: element.fontFamily,
+    ...(element.fontFamily ? { fontFamily: element.fontFamily } : {}),
+    ...(element.fontAssetId ? { fontIdentity: element.fontAssetId } : {}),
     fontSizePt: element.fontSizePt,
     color: element.color,
     bold: element.bold,
@@ -330,6 +332,7 @@ function sameStyle(a: PdfEditTextStyle, b: PdfEditTextStyle): boolean {
     a.italic === b.italic &&
     a.underline === b.underline &&
     a.fontFamily === b.fontFamily &&
+    a.fontIdentity === b.fontIdentity &&
     a.charSpacingPt === b.charSpacingPt &&
     a.wordSpacingPt === b.wordSpacingPt &&
     a.horizontalScalingPct === b.horizontalScalingPct
