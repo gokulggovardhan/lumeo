@@ -225,6 +225,7 @@ export type AnalyticsEvent = {
   country_code: string | null;
   success: boolean | null;
   error_code: string | null;
+  failure_stage: string | null;
   metadata: Json;
 };
 
@@ -314,8 +315,21 @@ export type ControlCenterDatabase = {
           operating_system?: string | null;
           success?: boolean | null;
           error_code?: string | null;
+          country_code?: string | null;
+          region?: string | null;
+          city?: string | null;
+          failure_stage?: string | null;
         };
         Returns: number;
+      };
+      get_admin_conversion_diagnostics: {
+        Args: { p_start_date: string; p_end_date: string };
+        Returns: {
+          processing_cancelled: number;
+          daily_cancelled: Array<{ date: string; event_count: number }>;
+          failure_stage_summary: Array<{ failure_stage: string; event_count: number }>;
+          cancellation_stage_summary: Array<{ failure_stage: string; event_count: number }>;
+        };
       };
       refresh_daily_tool_metrics: {
         Args: { target_date?: string | null };
