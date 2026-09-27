@@ -111,6 +111,7 @@ import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
+import type { EditPdfPerformanceCollector } from "@/lib/pdf/edit/performanceDiagnostics";
 import {
   buildEditPlan,
   isValidatedEditPlan,
@@ -710,6 +711,7 @@ export default function EditPdfTool() {
   const inlineEditInputRef = useRef<HTMLInputElement | null>(null);
   const textSearchInputRef = useRef<HTMLInputElement | null>(null);
   const uploadClientReadyRef = useRef<HTMLElement | null>(null);
+  const performanceDiagnosticsRef = useRef<EditPdfPerformanceCollector | null>(null);
 
   useEffect(() => {
     // SSR can render the file input before React has attached its change
@@ -717,6 +719,93 @@ export default function EditPdfTool() {
     // browsers—and assistive automation using the raw file input—never race
     // a visually-present but not-yet-interactive control.
     uploadClientReadyRef.current?.setAttribute("data-edit-client-ready", "true");
+  }, []);
+
+  // Development-only, browser-local performance diagnostics. No PDF bytes,
+  // extracted text, font programs or measurements are transmitted anywhere.
+  // The collector exists only to measure before Phase 5 optimizes.
+  useEffect(() => {
+    if (
+      process.env.NODE_ENV === "production" &&
+      process.env.NEXT_PUBLIC_EDIT_PERFORMANCE_DIAGNOSTICS !== "1"
+    ) {
+      return;
+    }
+
+    let active = true;
+    let memoryTimer: number | null = null;
+    let scrollRaf: number | null = null;
+    let removeScrollListener: (() => void) | null = null;
+
+    void import("@/lib/pdf/edit/performanceDiagnostics").then((diagnostics) => {
+      if (!active) return;
+      const collector = new diagnostics.EditPdfPerformanceCollector();
+      performanceDiagnosticsRef.current = collector;
+
+      const host = window as typeof window & {
+        __LUMEO_EDIT_PDF_PERFORMANCE__?: {
+          report: () => unknown;
+          download: () => void;
+        };
+      };
+
+      const report = () =>
+        collector.report(new Date().toISOString());
+      host.__LUMEO_EDIT_PDF_PERFORMANCE__ = {
+        report,
+        download: () =>
+          diagnostics.downloadEditPdfPerformanceReport(report()),
+      };
+
+      const captureMemory = () => {
+        collector.recordMemory(
+          diagnostics.readBrowserMemorySample(window.performance),
+        );
+      };
+      captureMemory();
+      memoryTimer = window.setInterval(captureMemory, 2_000);
+
+      const handleScroll = (event: Event) => {
+        if (scrollRaf !== null) return;
+        const startedAt = window.performance.now();
+        const target = event.target;
+        const scrollPosition =
+          target instanceof HTMLElement ? target.scrollTop : window.scrollY;
+        scrollRaf = window.requestAnimationFrame(() => {
+          scrollRaf = null;
+          collector.recordDuration(
+            "scroll-raf",
+            window.performance.now() - startedAt,
+            {
+              detail: {
+                scrollPosition,
+                viewportHeight: window.innerHeight,
+              },
+            },
+          );
+        });
+      };
+      document.addEventListener("scroll", handleScroll, {
+        passive: true,
+        capture: true,
+      });
+      removeScrollListener = () =>
+        document.removeEventListener("scroll", handleScroll, {
+          capture: true,
+        });
+    });
+
+    return () => {
+      active = false;
+      if (memoryTimer !== null) window.clearInterval(memoryTimer);
+      if (scrollRaf !== null) window.cancelAnimationFrame(scrollRaf);
+      removeScrollListener?.();
+      performanceDiagnosticsRef.current = null;
+      const host = window as typeof window & {
+        __LUMEO_EDIT_PDF_PERFORMANCE__?: unknown;
+      };
+      delete host.__LUMEO_EDIT_PDF_PERFORMANCE__;
+    };
   }, []);
 
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
@@ -791,6 +880,28 @@ export default function EditPdfTool() {
   // never changes identity, so the child could not tell a swap had
   // happened) -- docReady is what signals that.
   const getPdfJsDocument = useCallback(() => pdfJsDocRef.current, []);
+  const handleThumbnailPerformanceSample = useCallback(
+    (sample: {
+      durationMs: number;
+      pageCount: number;
+      renderedCount: number;
+      failedCount: number;
+    }) => {
+      performanceDiagnosticsRef.current?.recordDuration(
+        "thumbnail-batch",
+        sample.durationMs,
+        {
+          detail: {
+            pageCount: sample.pageCount,
+            renderedCount: sample.renderedCount,
+            failedCount: sample.failedCount,
+            eagerDomRowCount: sample.pageCount,
+          },
+        },
+      );
+    },
+    [],
+  );
   // Redaction state. `redactMode` gates the drag surface; boxes are the
   // user's drawn rectangles in percent space; outcome is what the last run
   // could and could not remove, kept on screen until dismissed because its
@@ -1497,6 +1608,10 @@ export default function EditPdfTool() {
     // (rather than only setting `cancelled`) avoids leaving an orphaned
     // render task racing a new one on the next effect run.
     let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
+    const rasterPerformanceStartedAt = window.performance.now();
+    const rasterWasRefresh =
+      renderedPageRef.current === pageIndex &&
+      pageImageUrlRef.current !== "";
 
     void (async () => {
       try {
@@ -1519,7 +1634,21 @@ export default function EditPdfTool() {
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d", { alpha: false });
         if (!context) {
-          if (!cancelled) setError("This page is too large to preview in this browser. Try a different page or a smaller file.");
+          if (!cancelled) {
+            performanceDiagnosticsRef.current?.recordDuration(
+              "page-raster",
+              window.performance.now() - rasterPerformanceStartedAt,
+              {
+                pageNumber: pageIndex + 1,
+                detail: {
+                  success: false,
+                  refresh: rasterWasRefresh,
+                  reason: "canvas-context-unavailable",
+                },
+              },
+            );
+            setError("This page is too large to preview in this browser. Try a different page or a smaller file.");
+          }
           return;
         }
         canvas.width = Math.max(1, Math.floor(viewport.width));
@@ -1530,7 +1659,22 @@ export default function EditPdfTool() {
         await renderPageWithTimeout(renderTask, pageIndex + 1);
 
         const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-        if (cancelled || !blob) return;
+        if (cancelled) return;
+        if (!blob) {
+          performanceDiagnosticsRef.current?.recordDuration(
+            "page-raster",
+            window.performance.now() - rasterPerformanceStartedAt,
+            {
+              pageNumber: pageIndex + 1,
+              detail: {
+                success: false,
+                refresh: rasterWasRefresh,
+                reason: "jpeg-blob-unavailable",
+              },
+            },
+          );
+          return;
+        }
         // Revoke the PREVIOUS url only after the new one is in state.
         // Revoking first (as this used to) blanks the <img> for a frame,
         // which was invisible when a re-render only ever happened on a page
@@ -1558,7 +1702,22 @@ export default function EditPdfTool() {
         // on it. Detected runs still populate a moment later and the select
         // tool's highlighting appears as soon as they do -- nothing about
         // detection itself changed, only when the page stops being "loading".
-        if (!cancelled) setPageLoading(false);
+        if (!cancelled) {
+          performanceDiagnosticsRef.current?.recordDuration(
+            "page-raster",
+            window.performance.now() - rasterPerformanceStartedAt,
+            {
+              pageNumber: pageIndex + 1,
+              detail: {
+                success: true,
+                refresh: rasterWasRefresh,
+                rasterScale: dimensionScale,
+                pixelCount: canvas.width * canvas.height,
+              },
+            },
+          );
+          setPageLoading(false);
+        }
       } catch {
         // A cancelled render's promise rejects (RenderingCancelledException)
         // -- that's expected teardown, not a real preview failure.
@@ -1578,6 +1737,20 @@ export default function EditPdfTool() {
         // No retry loop: rasterScale is unchanged by the failure, so this
         // effect will not re-run until something else actually changes.
         const isRefreshOfVisiblePage = renderedPageRef.current === pageIndex && pageImageUrlRef.current !== "";
+        if (!cancelled) {
+          performanceDiagnosticsRef.current?.recordDuration(
+            "page-raster",
+            window.performance.now() - rasterPerformanceStartedAt,
+            {
+              pageNumber: pageIndex + 1,
+              detail: {
+                success: false,
+                refresh: rasterWasRefresh,
+                reason: "render-failed",
+              },
+            },
+          );
+        }
         if (!cancelled && !isRefreshOfVisiblePage) {
           setError("This page could not be previewed. Try a different page.");
         }
@@ -1614,6 +1787,9 @@ export default function EditPdfTool() {
     if (!pdf || !pdfJsDocRef.current) return;
     const doc = pdfJsDocRef.current;
     let cancelled = false;
+    const textDetectionPerformanceStartedAt = window.performance.now();
+    let detectedRunCountForPerformance = 0;
+    let textDetectionSucceeded = false;
 
     void (async () => {
       try {
@@ -1630,6 +1806,8 @@ export default function EditPdfTool() {
           pointViewport.height,
           content.styles as never,
         );
+        detectedRunCountForPerformance = runs.length;
+        textDetectionSucceeded = true;
         setPdfJsDetectedRunCount(runs.length);
         setDetectedTextRuns(runs);
       } catch {
@@ -1642,6 +1820,17 @@ export default function EditPdfTool() {
         // revision that produced the result. This stamp makes stale results
         // fail closed during history/document transitions.
         if (!cancelled) {
+          performanceDiagnosticsRef.current?.recordDuration(
+            "text-detection",
+            window.performance.now() - textDetectionPerformanceStartedAt,
+            {
+              pageNumber: pageIndex + 1,
+              detail: {
+                success: textDetectionSucceeded,
+                runCount: detectedRunCountForPerformance,
+              },
+            },
+          );
           setTextDetectionRevision({ bytes: pdf.bytes, pageIndex });
           setTextDetectionReady(true);
         }
@@ -1732,6 +1921,11 @@ export default function EditPdfTool() {
     const doc = pdfJsDocRef.current;
     const runs = detectedTextRuns;
     let cancelled = false;
+    const nativeMatchPerformanceStartedAt = window.performance.now();
+    let operatorCountForPerformance = 0;
+    let nativeSpanCountForPerformance = 0;
+    let authorizedRunCountForPerformance = 0;
+    let nativeMatchSucceeded = false;
 
     void (async () => {
       try {
@@ -1756,6 +1950,7 @@ export default function EditPdfTool() {
         if (cancelled || !pdfLibDocRef.current || !editEngineRef.current) return;
         const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
         if (cancelled) return;
+        operatorCountForPerformance = located.length;
         setPageOperators(located);
 
         const nativeSpans = buildNativeContentStreamSpans({
@@ -1773,6 +1968,7 @@ export default function EditPdfTool() {
             }
           },
         });
+        nativeSpanCountForPerformance = nativeSpans.length;
         setNativeTextSpans(nativeSpans);
 
         // If PDF.js exposes no text at all, retain the native parser as an
@@ -1786,6 +1982,8 @@ export default function EditPdfTool() {
           setTextArbitrations([]);
           setRunMatches([]);
           setRunProvenanceMatches([]);
+          authorizedRunCountForPerformance = nativeRuns.length;
+          nativeMatchSucceeded = true;
           if (nativeRuns.length > 0) setDetectedTextRuns(nativeRuns);
           return;
         }
@@ -1866,6 +2064,8 @@ export default function EditPdfTool() {
             : null;
         });
 
+        authorizedRunCountForPerformance = authorizedMatches.filter(Boolean).length;
+        nativeMatchSucceeded = true;
         setRunProvenanceMatches(provenanceMatches);
         setTextArbitrations(arbitrations);
         setRunMatches(authorizedMatches);
@@ -1885,6 +2085,26 @@ export default function EditPdfTool() {
           setTextArbitrations([]);
           setPageOperators([]);
           setTextMatchRevision(null);
+        }
+      } finally {
+        if (!cancelled) {
+          performanceDiagnosticsRef.current?.recordDuration(
+            "native-match",
+            window.performance.now() - nativeMatchPerformanceStartedAt,
+            {
+              pageNumber: pageIndex + 1,
+              detail: {
+                success: nativeMatchSucceeded,
+                pdfJsRunCount: runs.length,
+                operatorCount: operatorCountForPerformance,
+                nativeSpanCount: nativeSpanCountForPerformance,
+                authorizedRunCount: authorizedRunCountForPerformance,
+              },
+            },
+          );
+          performanceDiagnosticsRef.current?.setFontRegistrySnapshot(
+            fontRegistry.performanceSnapshot(),
+          );
         }
       }
     })();
@@ -2009,6 +2229,10 @@ export default function EditPdfTool() {
     setError("");
     const file = Array.from(files)[0];
     if (!file) return;
+    const performanceStartedAt = window.performance.now();
+    performanceDiagnosticsRef.current?.resetDocument({
+      fileSizeBytes: file.size,
+    });
 
     if (!isPdfNamedFile(file)) {
       setError("Please choose a PDF file.");
@@ -2036,6 +2260,17 @@ export default function EditPdfTool() {
       }
       const doc = await openPdfJsDocument(new Uint8Array(copyArrayBuffer(bytes)));
       const pageCount = doc.numPages;
+      performanceDiagnosticsRef.current?.setPageCount(pageCount);
+      performanceDiagnosticsRef.current?.recordDuration(
+        "document-open",
+        window.performance.now() - performanceStartedAt,
+        {
+          detail: {
+            fileSizeBytes: file.size,
+            pageCount,
+          },
+        },
+      );
 
       const pageCountError = checkPdfPageCount(pageCount);
       if (pageCountError) {
@@ -3679,6 +3914,12 @@ export default function EditPdfTool() {
           spanId: singleSelectedSpan.id,
           family: `"${family}", ${fallback}`,
         });
+      })
+      .finally(() => {
+        if (cancelled) return;
+        performanceDiagnosticsRef.current?.setFontRegistrySnapshot(
+          fontRegistry.performanceSnapshot(),
+        );
       });
     return () => {
       cancelled = true;
@@ -4055,6 +4296,7 @@ export default function EditPdfTool() {
                     onSelectPage={setPageIndex}
                     onToggleSelected={togglePageSelected}
                     onReorder={handleReorderPages}
+                    onPerformanceSample={handleThumbnailPerformanceSample}
                   />
                 </div>
               ) : null}

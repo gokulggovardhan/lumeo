@@ -32,6 +32,7 @@ import {
   inspectPdfFontProgram,
   type PdfFontProgramInspection,
 } from "./fontProgramIntelligence.ts";
+import type { EditPdfFontRegistryPerformanceSnapshot } from "./performanceDiagnostics.ts";
 
 const SUBSET_PREFIX = /^[A-Z]{6}\+/;
 const BOLD_NAME = /bold|black|heavy|semib|demib?|ultra/i;
@@ -401,6 +402,19 @@ export class PdfFontRegistry {
   private readonly programCache = new WeakMap<PDFDict, EmbeddedFontProgram | null>();
   private readonly browserFaceCache = new WeakMap<PDFDict, Promise<string | null>>();
   private readonly intelligenceCache = new WeakMap<PDFDict, Promise<PdfFontProgramInspection>>();
+  private readonly performanceStats: EditPdfFontRegistryPerformanceSnapshot = {
+    resolveCalls: 0,
+    profileCacheHits: 0,
+    profileCacheMisses: 0,
+    programCacheHits: 0,
+    programCacheMisses: 0,
+    intelligenceCacheHits: 0,
+    intelligenceCacheMisses: 0,
+    browserFaceCacheHits: 0,
+    browserFaceAttempts: 0,
+    browserFaceLoads: 0,
+    browserFaceFailures: 0,
+  };
   private readonly context: PDFContext;
 
   constructor(document: PDFDocument) {
@@ -408,12 +422,17 @@ export class PdfFontRegistry {
   }
 
   resolve(resources: PDFDict, resourceName: string): PdfFontProfile | null {
+    this.performanceStats.resolveCalls += 1;
     const fontResource = resolveFontResource(resources, resourceName, this.context);
     if (!fontResource) return null;
     const fontDict = fontResource.dict;
 
     const cached = this.profileCache.get(fontDict);
-    if (cached) return cached;
+    if (cached) {
+      this.performanceStats.profileCacheHits += 1;
+      return cached;
+    }
+    this.performanceStats.profileCacheMisses += 1;
 
     const resolvedFont = resolveFont(fontDict, this.context);
     const metrics = resolveFontMetrics(fontDict, this.context, resolvedFont);
@@ -514,7 +533,11 @@ export class PdfFontRegistry {
     }
 
     const cached = this.intelligenceCache.get(fontResource.dict);
-    if (cached) return cached;
+    if (cached) {
+      this.performanceStats.intelligenceCacheHits += 1;
+      return cached;
+    }
+    this.performanceStats.intelligenceCacheMisses += 1;
 
     const profile = this.resolve(resources, resourceName);
     const program = this.embeddedProgramFor(fontResource.dict);
@@ -537,8 +560,10 @@ export class PdfFontRegistry {
 
   private embeddedProgramFor(fontDict: PDFDict): EmbeddedFontProgram | null {
     if (this.programCache.has(fontDict)) {
+      this.performanceStats.programCacheHits += 1;
       return this.programCache.get(fontDict) ?? null;
     }
+    this.performanceStats.programCacheMisses += 1;
     const program = readEmbeddedProgram(fontDict, this.context);
     this.programCache.set(fontDict, program);
     return program;
@@ -554,7 +579,10 @@ export class PdfFontRegistry {
     if (!fontDict) return Promise.resolve(null);
 
     const cached = this.browserFaceCache.get(fontDict);
-    if (cached) return cached;
+    if (cached) {
+      this.performanceStats.browserFaceCacheHits += 1;
+      return cached;
+    }
 
     const profile = this.resolve(resources, resourceName);
     const program = this.embeddedProgramFor(fontDict);
@@ -569,6 +597,7 @@ export class PdfFontRegistry {
       }
 
       try {
+        this.performanceStats.browserFaceAttempts += 1;
         const bytes = program.bytes.slice().buffer as ArrayBuffer;
         const face = new FontFace(profile.browserFamilyName, bytes, {
           weight: String(profile.weight),
@@ -576,8 +605,10 @@ export class PdfFontRegistry {
         });
         const loaded = await face.load();
         document.fonts.add(loaded);
+        this.performanceStats.browserFaceLoads += 1;
         return profile.browserFamilyName;
       } catch {
+        this.performanceStats.browserFaceFailures += 1;
         // Embedded PDF subsets commonly omit browser-facing cmap metadata.
         // A failed preview registration is expected and must never make the
         // underlying PDF text uneditable.
@@ -587,5 +618,13 @@ export class PdfFontRegistry {
 
     this.browserFaceCache.set(fontDict, promise);
     return promise;
+  }
+
+  /**
+   * Local diagnostics only. Returns counters, never font bytes or document
+   * content, and never participates in edit/write authorization.
+   */
+  performanceSnapshot(): EditPdfFontRegistryPerformanceSnapshot {
+    return { ...this.performanceStats };
   }
 }
