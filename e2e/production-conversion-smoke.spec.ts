@@ -121,12 +121,29 @@ function isRecoveredPdfWorkerBootstrapFailure(
   return isBundledPdfWorker && successfulResponseUrls.has(failure.url);
 }
 
-function isExpectedAnalyticsNavigationAbort(failure: FailedRequest): boolean {
+const PUBLIC_RPC_NAVIGATION_ABORT_PATHS = new Set([
+  "/rest/v1/rpc/get_public_analytics_setting",
+  "/rest/v1/rpc/get_public_announcements",
+  "/rest/v1/rpc/record_public_analytics_event",
+]);
+
+function isExpectedPublicRpcNavigationAbort(failure: FailedRequest): boolean {
   if (failure.method !== "POST") return false;
 
   const url = new URL(failure.url);
-  if (url.pathname !== "/rest/v1/rpc/record_public_analytics_event") return false;
+  if (
+    !url.hostname.endsWith(".supabase.co") ||
+    !PUBLIC_RPC_NAVIGATION_ABORT_PATHS.has(url.pathname)
+  ) {
+    return false;
+  }
 
+  // Safari/WebKit reports requests that are still in flight when a test
+  // intentionally navigates to the next Lumeo route as transport failures.
+  // These exact public RPCs are best-effort UI/bootstrap calls: analytics
+  // setting fails closed to disabled, announcements fail open to no banner,
+  // and analytics event recording is already non-blocking. Ignore ONLY a
+  // browser-declared cancellation; real network/server failures remain fatal.
   return /(?:Load request cancelled|NS_BINDING_ABORTED|net::ERR_ABORTED)/i.test(
     failure.errorText,
   );
@@ -139,7 +156,7 @@ function expectCleanRuntime(watch: RuntimeWatch) {
       !isRecoveredPdfWorkerBootstrapFailure(
         failure,
         watch.successfulResponseUrls,
-      ) && !isExpectedAnalyticsNavigationAbort(failure),
+      ) && !isExpectedPublicRpcNavigationAbort(failure),
   );
   expect(
     unrecoveredFailures.map(
