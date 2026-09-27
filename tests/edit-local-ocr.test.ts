@@ -5,6 +5,7 @@ import {
   OCR_MAX_TOTAL_PIXELS,
   OCR_TARGET_DPI,
   computeOcrRenderScale,
+  createLocalOcrEngine,
   localOcrAssetUrls,
   ocrWordsFromBlocks,
 } from "../lib/pdf/edit/localOcr.ts";
@@ -111,4 +112,170 @@ test("OCR geometry clamps hostile or out-of-range boxes", () => {
     widthPct: 100,
     heightPct: 100,
   });
+});
+
+
+function fakeOcrCanvas(): HTMLCanvasElement {
+  const context = {
+    fillStyle: "",
+    fillRect() {},
+  };
+  return {
+    width: 0,
+    height: 0,
+    getContext: () => context,
+  } as unknown as HTMLCanvasElement;
+}
+
+function resolvedRenderPage() {
+  return {
+    getViewport: ({ scale }: { scale: number }) => ({
+      width: 100 * scale,
+      height: 50 * scale,
+    }),
+    render: () => ({
+      promise: Promise.resolve(),
+      cancel() {},
+    }),
+  };
+}
+
+function successfulWorker(text = "Recovered text") {
+  return {
+    async setParameters() {},
+    async recognize() {
+      return {
+        data: {
+          text,
+          confidence: 97,
+          blocks: [],
+        },
+      };
+    },
+    async terminate() {},
+  };
+}
+
+test("local OCR retries cleanly after worker startup fails", async () => {
+  let attempts = 0;
+  const engine = createLocalOcrEngine("https://lumeo.in", {
+    createCanvas: fakeOcrCanvas,
+    createWorker: async () => {
+      attempts += 1;
+      if (attempts === 1) throw new Error("worker startup failed");
+      return successfulWorker();
+    },
+  });
+
+  await assert.rejects(
+    engine.recognizePage({ page: resolvedRenderPage() as never, pageIndex: 0 }),
+    /worker startup failed/,
+  );
+
+  const result = await engine.recognizePage({
+    page: resolvedRenderPage() as never,
+    pageIndex: 0,
+  });
+  assert.equal(attempts, 2);
+  assert.equal(result.text, "Recovered text");
+  await engine.terminate();
+});
+
+test("local OCR discards a worker after recognition failure before retrying", async () => {
+  let workersCreated = 0;
+  let failedWorkerTerminated = 0;
+  const engine = createLocalOcrEngine("https://lumeo.in", {
+    createCanvas: fakeOcrCanvas,
+    createWorker: async () => {
+      workersCreated += 1;
+      if (workersCreated === 1) {
+        return {
+          async setParameters() {},
+          async recognize() {
+            throw new Error("recognition failed");
+          },
+          async terminate() {
+            failedWorkerTerminated += 1;
+          },
+        };
+      }
+      return successfulWorker("Second worker");
+    },
+  });
+
+  await assert.rejects(
+    engine.recognizePage({ page: resolvedRenderPage() as never, pageIndex: 0 }),
+    /recognition failed/,
+  );
+
+  const result = await engine.recognizePage({
+    page: resolvedRenderPage() as never,
+    pageIndex: 0,
+  });
+  assert.equal(workersCreated, 2);
+  assert.equal(failedWorkerTerminated, 1);
+  assert.equal(result.text, "Second worker");
+  await engine.terminate();
+});
+
+test("local OCR rejects overlapping recognition jobs in one engine", async () => {
+  let rejectRecognition: ((error: Error) => void) | null = null;
+  const engine = createLocalOcrEngine("https://lumeo.in", {
+    createCanvas: fakeOcrCanvas,
+    createWorker: async () => ({
+      async setParameters() {},
+      recognize() {
+        return new Promise((_resolve, reject) => {
+          rejectRecognition = reject;
+        });
+      },
+      async terminate() {
+        rejectRecognition?.(new Error("worker terminated"));
+      },
+    }),
+  });
+
+  const first = engine.recognizePage({
+    page: resolvedRenderPage() as never,
+    pageIndex: 0,
+  });
+
+  await assert.rejects(
+    engine.recognizePage({ page: resolvedRenderPage() as never, pageIndex: 1 }),
+    /already running/i,
+  );
+
+  await engine.terminate();
+  await assert.rejects(first);
+});
+
+test("terminating local OCR cancels an in-progress page raster", async () => {
+  let renderCancelled = false;
+  let rejectRender: ((error: Error) => void) | null = null;
+  const page = {
+    getViewport: ({ scale }: { scale: number }) => ({
+      width: 100 * scale,
+      height: 50 * scale,
+    }),
+    render: () => ({
+      promise: new Promise<void>((_resolve, reject) => {
+        rejectRender = reject;
+      }),
+      cancel() {
+        renderCancelled = true;
+        rejectRender?.(new Error("render cancelled"));
+      },
+    }),
+  };
+
+  const engine = createLocalOcrEngine("https://lumeo.in", {
+    createCanvas: fakeOcrCanvas,
+    createWorker: async () => successfulWorker(),
+  });
+
+  const pending = engine.recognizePage({ page: page as never, pageIndex: 0 });
+  await engine.terminate();
+
+  assert.equal(renderCancelled, true);
+  await assert.rejects(pending);
 });
