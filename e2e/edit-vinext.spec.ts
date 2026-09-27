@@ -97,8 +97,11 @@ test("vinext Edit PDF keeps invisible searchable-scan text read-only", async ({
   page,
 }) => {
   await uploadEditFixture(page, SEARCHABLE_SCAN_PDF);
-  await waitForStageReady(page);
 
+  // This fixture is intentionally composed only of an image plus hidden
+  // searchable text. Waiting for the generic editable-run helper would be a
+  // contradiction: the proof we want is that ZERO native runs become
+  // editable. Wait directly for the read-only hidden run instead.
   const hiddenRun = page
     .locator(
       'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="SEARCHABLE SCAN SAMPLE"]',
