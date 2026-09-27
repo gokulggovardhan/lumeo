@@ -175,6 +175,12 @@ async function downloadBytes(download: Download): Promise<Buffer> {
   return readFile(path);
 }
 
+async function waitForWordToPdfClientReady(page: Page): Promise<void> {
+  await expect(
+    page.locator("[data-word-to-pdf-client-ready='true']"),
+  ).toBeAttached({ timeout: 30_000 });
+}
+
 async function replaceControlledText(
   page: Page,
   label: string,
@@ -372,6 +378,7 @@ test("production Word to PDF reuses Office runtime, survives cancellation, and c
 
   const runtime = watchConversionRuntime(page);
   await page.goto("/pdf/word-to-pdf", { waitUntil: "domcontentloaded" });
+  await waitForWordToPdfClientReady(page);
   await expect(page.getByText(/Processed locally in your browser/i)).toBeVisible();
 
   const professional = await makeProfessionalDocx();
