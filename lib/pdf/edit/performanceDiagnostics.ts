@@ -5,6 +5,7 @@ export type EditPdfPerformanceDurationKind =
   | "page-raster"
   | "text-detection"
   | "native-match"
+  | "thumbnail-batch"
   | "scroll-raf";
 
 export type EditPdfPerformanceDurationSummary = {
@@ -68,6 +69,7 @@ const DURATION_KINDS: readonly EditPdfPerformanceDurationKind[] = [
   "page-raster",
   "text-detection",
   "native-match",
+  "thumbnail-batch",
   "scroll-raf",
 ];
 
