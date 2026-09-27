@@ -120,7 +120,10 @@ export default function WordToPdfTool() {
 
   useEffect(() => {
     const reloadingForIsolation = ensureWordToPdfCrossOriginIsolation();
-    if (!reloadingForIsolation) setClientReady(true);
+    if (reloadingForIsolation) return;
+
+    const readyTimer = window.setTimeout(() => setClientReady(true), 0);
+    return () => window.clearTimeout(readyTimer);
   }, []);
 
   useEffect(() => {
