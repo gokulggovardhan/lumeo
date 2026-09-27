@@ -4879,6 +4879,7 @@ export default function EditPdfTool() {
         <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
 
         <L2ToolbarButton
+          disabled={textSearchReplaceAllBusy}
           onClick={() => {
             setTextSearchOpen((open) => {
               const next = !open;
@@ -4939,6 +4940,7 @@ export default function EditPdfTool() {
                 role="searchbox"
                 aria-label="Find text in PDF"
                 value={textSearchQuery}
+                disabled={textSearchReplaceAllBusy}
                 onChange={(event) => {
                   setTextSearchQuery(event.target.value);
                   setTextSearchReplaceAllStatus("");
@@ -4957,6 +4959,7 @@ export default function EditPdfTool() {
               <select
                 aria-label="Search scope"
                 value={textSearchScope}
+                disabled={textSearchReplaceAllBusy}
                 onChange={(event) => {
                   const nextScope = event.target.value as PdfTextSearchScope;
                   setTextSearchScope(nextScope);
@@ -4974,6 +4977,7 @@ export default function EditPdfTool() {
               <input
                 type="checkbox"
                 checked={textSearchCaseSensitive}
+                disabled={textSearchReplaceAllBusy}
                 onChange={(event) => {
                   setTextSearchCaseSensitive(event.target.checked);
                   setTextSearchActiveIndex(-1);
@@ -4985,6 +4989,7 @@ export default function EditPdfTool() {
               <input
                 type="checkbox"
                 checked={textSearchWholeWord}
+                disabled={textSearchReplaceAllBusy}
                 onChange={(event) => {
                   setTextSearchWholeWord(event.target.checked);
                   setTextSearchActiveIndex(-1);
@@ -5027,6 +5032,7 @@ export default function EditPdfTool() {
               <button
                 type="button"
                 aria-label="Close find"
+                disabled={textSearchReplaceAllBusy}
                 onClick={() => {
                   setTextSearchOpen(false);
                   setTextSearchIndexBusy(false);
@@ -5046,6 +5052,7 @@ export default function EditPdfTool() {
               <input
                 aria-label="Replace search match with"
                 value={textSearchReplacement}
+                disabled={textSearchReplaceAllBusy}
                 onChange={(event) => {
                   setTextSearchReplacement(event.target.value);
                   setTextSearchReplaceAllStatus("");
@@ -5057,7 +5064,7 @@ export default function EditPdfTool() {
             <button
               type="button"
               onClick={prepareActiveTextSearchReplacement}
-              disabled={!activeTextSearchReplacementPlan}
+              disabled={textSearchReplaceAllBusy || !activeTextSearchReplacementPlan}
               className="h-10 rounded-[var(--radius-md)] bg-[var(--lumeo-gold)] px-4 text-xs font-bold text-[var(--atelier-surface-0)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               Replace this match
