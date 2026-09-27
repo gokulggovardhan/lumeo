@@ -285,6 +285,11 @@ async function convertPdfToWord(
   input: { name: string; buffer: Buffer; expectedFileName: string },
 ): Promise<{ bytes: Buffer; xml: string }> {
   const fileInput = page.locator('input[type="file"]');
+  await expect(fileInput).toHaveAttribute(
+    "data-l2-upload-client-ready",
+    "true",
+    { timeout: 120_000 },
+  );
   const removeButton = page.getByRole("button", { name: `Remove ${input.name}` });
   const filePayload = {
     name: input.name,
