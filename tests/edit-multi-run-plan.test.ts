@@ -22,9 +22,9 @@ import {
   showText,
 } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { walkTextShowOperators } from "../lib/pdf/edit/contentStream.ts";
+import { walkTextShowOperators, type Matrix2x3 } from "../lib/pdf/edit/contentStream.ts";
 import { resolveFont } from "../lib/pdf/edit/fontEncoding.ts";
-import { resolveFontMetrics } from "../lib/pdf/edit/fontMetrics.ts";
+import { resolveFontMetrics, stringAdvancePt } from "../lib/pdf/edit/fontMetrics.ts";
 import { buildMultiRunEditPlan } from "../lib/pdf/edit/multiRunEditPlan.ts";
 import { applyMultiRunEditPlanToDocument } from "../lib/pdf/edit/applyEditPlan.ts";
 
@@ -73,7 +73,7 @@ async function extractPageStrings(pdfBytes: Uint8Array, pageNumber = 1): Promise
 // low-level operator-builder approach already proven in earlier PRs'
 // content-stream tests.
 async function buildMultiOperatorFixture(
-  lines: Array<{ text: string; kind: "Tj" | "TJ" | "'" | '"'; wordSpacing?: number; charSpacing?: number }>,
+  lines: Array<{ text: string; kind: "Tj" | "TJ" | "'" | '"'; wordSpacing?: number; charSpacing?: number; fontSizePt?: number; sameLineWithPrevious?: boolean }>,
 ): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   const page = doc.addPage([612, 792]);
@@ -83,11 +83,14 @@ async function buildMultiOperatorFixture(
 
   const ops = [beginText(), setFontAndSize(fontKey, 18), setLineHeight(20), moveText(50, 700)];
   lines.forEach((line, index) => {
+    if (line.fontSizePt !== undefined) {
+      ops.push(setFontAndSize(fontKey, line.fontSizePt));
+    }
     if (line.kind === "Tj") {
-      if (index > 0) ops.push(nextLine());
+      if (index > 0 && !line.sameLineWithPrevious) ops.push(nextLine());
       ops.push(showText(PDFHexString.of(hexOf(line.text))));
     } else if (line.kind === "TJ") {
-      if (index > 0) ops.push(nextLine());
+      if (index > 0 && !line.sameLineWithPrevious) ops.push(nextLine());
       const array = PDFArray.withContext(doc.context);
       array.push(PDFHexString.of(hexOf(line.text)));
       ops.push(PDFOperator.of(PDFOperatorNames.ShowTextAdjusted, [array]));
@@ -130,17 +133,20 @@ async function buildMultiRunPlanForIndices(pdfBytes: Uint8Array, operatorIndices
     resolvedFont,
     fontMetrics,
   });
-  return { plan, resolvedFont, allOperators };
+  return { plan, resolvedFont, fontMetrics, allOperators };
 }
 
 test("multi-run: two consecutive Tj operators merge into one replacement, neighbors untouched", async () => {
   const original = await buildMultiOperatorFixture([
     { text: "First", kind: "Tj" },
     { text: "Middle one", kind: "Tj" },
-    { text: "Middle two", kind: "Tj" },
+    { text: "Middle two", kind: "Tj", sameLineWithPrevious: true },
     { text: "Last", kind: "Tj" },
   ]);
-  assert.deepEqual(await extractPageStrings(original), ["First", "Middle one", "Middle two", "Last"]);
+  assert.equal(
+    (await extractPageStrings(original)).join(""),
+    "FirstMiddle oneMiddle twoLast",
+  );
 
   const { plan, resolvedFont } = await buildMultiRunPlanForIndices(original, [1, 2], "Combined middle");
   assert.equal(plan.editable, true);
@@ -160,7 +166,7 @@ test("multi-run: two consecutive TJ operators merge into one replacement", async
   const original = await buildMultiOperatorFixture([
     { text: "First", kind: "Tj" },
     { text: "Alpha", kind: "TJ" },
-    { text: "Beta", kind: "TJ" },
+    { text: "Beta", kind: "TJ", sameLineWithPrevious: true },
     { text: "Last", kind: "Tj" },
   ]);
 
@@ -179,7 +185,7 @@ test("multi-run: a Tj followed by a TJ merge into one replacement", async () => 
   const original = await buildMultiOperatorFixture([
     { text: "First", kind: "Tj" },
     { text: "PlainPart", kind: "Tj" },
-    { text: "AdjustedPart", kind: "TJ" },
+    { text: "AdjustedPart", kind: "TJ", sameLineWithPrevious: true },
     { text: "Last", kind: "Tj" },
   ]);
 
@@ -194,7 +200,7 @@ test("multi-run: a Tj followed by a TJ merge into one replacement", async () => 
   assert.deepEqual(await extractPageStrings(editedBytes), ["First", "Merged text", "Last"]);
 });
 
-test("multi-run: a TJ followed by a ' merge into one replacement, the quote's own line move is preserved", async () => {
+test("multi-run: rejects a quote operator that moves onto a new text line", async () => {
   const original = await buildMultiOperatorFixture([
     { text: "First", kind: "Tj" },
     { text: "TjPart", kind: "TJ" },
@@ -203,41 +209,66 @@ test("multi-run: a TJ followed by a ' merge into one replacement, the quote's ow
   ]);
   assert.deepEqual(await extractPageStrings(original), ["First", "TjPart", "QuotePart", "Last"]);
 
-  const { plan, resolvedFont, allOperators } = await buildMultiRunPlanForIndices(original, [1, 2], "One merged line");
+  const { plan, allOperators } = await buildMultiRunPlanForIndices(
+    original,
+    [1, 2],
+    "One merged line",
+  );
   assert.equal(allOperators.length, 4);
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /positioned independently|line break/i);
+});
+
+test("multi-run: combined advance uses each selected operator's own text state", async () => {
+  const original = await buildMultiOperatorFixture([
+    { text: "First", kind: "Tj" },
+    { text: "Small", kind: "Tj", fontSizePt: 12 },
+    { text: "Large", kind: "Tj", fontSizePt: 30, sameLineWithPrevious: true },
+    { text: "Last", kind: "Tj", fontSizePt: 18 },
+  ]);
+
+  const { plan, resolvedFont, fontMetrics, allOperators } =
+    await buildMultiRunPlanForIndices(original, [1, 2], "Combined");
   assert.equal(plan.editable, true);
-  assert.equal(plan.originalText, "TjPartQuotePart");
+
+  const selectedOperators = [allOperators[1], allOperators[2]];
+  const expectedOriginalAdvance = plan.subPlans.reduce((sum, subPlan, index) => {
+    const operator = selectedOperators[index];
+    return (
+      sum +
+      stringAdvancePt(subPlan.originalGlyphCodes, fontMetrics, {
+        fontSizePt: operator.fontSizePt,
+        charSpacing: operator.charSpacing,
+        wordSpacing: operator.wordSpacing,
+        horizontalScalingPct: operator.horizontalScalingPct,
+      })
+    );
+  }, 0);
+
+  assert.ok(
+    Math.abs(plan.subPlans[0].originalWidthPt - expectedOriginalAdvance) < 1e-9,
+    `combined original advance should preserve per-operator text state: expected ${expectedOriginalAdvance}, got ${plan.subPlans[0].originalWidthPt}`,
+  );
 
   const editedDoc = await PDFDocument.load(original.slice());
-  await applyMultiRunEditPlanToDocument(editedDoc, plan, resolvedFont.bytesPerCode);
+  await applyMultiRunEditPlanToDocument(
+    editedDoc,
+    plan,
+    resolvedFont.bytesPerCode,
+  );
   const editedBytes = await editedDoc.save();
-
-  // "Last" must still be on its OWN line, at its original position --
-  // proving the emptied ' operator's own line move (which the merge
-  // deliberately keeps) still ran, even though it shows no text anymore.
-  assert.deepEqual(await extractPageStrings(editedBytes), ["First", "One merged line", "Last"]);
-
-  const editedDoc2 = await pdfjsLib.getDocument({ data: editedBytes.slice() }).promise;
-  const editedPage = await editedDoc2.getPage(1);
-  const editedContent = await editedPage.getTextContent();
-  const lastItem = editedContent.items.find((item) => "str" in item && item.str === "Last") as { transform: number[] } | undefined;
-  assert.ok(lastItem);
-
-  const originalDoc2 = await pdfjsLib.getDocument({ data: original.slice() }).promise;
-  const originalPage = await originalDoc2.getPage(1);
-  const originalContent = await originalPage.getTextContent();
-  const originalLastItem = originalContent.items.find((item) => "str" in item && item.str === "Last") as
-    | { transform: number[] }
-    | undefined;
-  assert.ok(originalLastItem);
-  assert.equal(lastItem!.transform[5], originalLastItem!.transform[5]);
+  assert.deepEqual(await extractPageStrings(editedBytes), [
+    "First",
+    "Combined",
+    "Last",
+  ]);
 });
 
 test("multi-run: shorter replacement produces valid, correctly-extractable text", async () => {
   const original = await buildMultiOperatorFixture([
     { text: "First", kind: "Tj" },
     { text: "A much longer piece of text", kind: "Tj" },
-    { text: "and even more text here", kind: "Tj" },
+    { text: "and even more text here", kind: "Tj", sameLineWithPrevious: true },
     { text: "Last", kind: "Tj" },
   ]);
 
@@ -256,7 +287,7 @@ test("multi-run: longer replacement produces valid, correctly-extractable text",
   const original = await buildMultiOperatorFixture([
     { text: "First", kind: "Tj" },
     { text: "Sm", kind: "Tj" },
-    { text: "all", kind: "Tj" },
+    { text: "all", kind: "Tj", sameLineWithPrevious: true },
     { text: "Last", kind: "Tj" },
   ]);
 
@@ -276,18 +307,14 @@ test("multi-run: partial selection (a middle span of a longer document) leaves e
     { text: "Line one", kind: "Tj" },
     { text: "Line two", kind: "Tj" },
     { text: "Span part A", kind: "Tj" },
-    { text: "Span part B", kind: "TJ" },
+    { text: "Span part B", kind: "TJ", sameLineWithPrevious: true },
     { text: "Line five", kind: "Tj" },
     { text: "Line six", kind: "Tj" },
   ]);
-  assert.deepEqual(await extractPageStrings(original), [
-    "Line one",
-    "Line two",
-    "Span part A",
-    "Span part B",
-    "Line five",
-    "Line six",
-  ]);
+  assert.equal(
+    (await extractPageStrings(original)).join(""),
+    "Line oneLine twoSpan part ASpan part BLine fiveLine six",
+  );
 
   // Only operators 2 and 3 (of 6) are selected -- a proper subset.
   const { plan, resolvedFont } = await buildMultiRunPlanForIndices(original, [2, 3], "Replaced span");
@@ -304,6 +331,74 @@ test("multi-run: partial selection (a middle span of a longer document) leaves e
     "Line five",
     "Line six",
   ]);
+});
+
+test("multi-run: rejects otherwise-adjacent operators from different PDF text objects", async () => {
+  const original = await buildMultiOperatorFixture([
+    { text: "First", kind: "Tj" },
+    { text: "Alpha", kind: "Tj" },
+    { text: "Beta", kind: "Tj", sameLineWithPrevious: true },
+    { text: "Last", kind: "Tj" },
+  ]);
+  const { resolvedFont, fontMetrics, allOperators } =
+    await buildMultiRunPlanForIndices(original, [1, 2], "Combined");
+  const altered = allOperators.map((operator, index) =>
+    index === 2
+      ? {
+          ...operator,
+          textObjectIndex: (operator.textObjectIndex ?? 0) + 1,
+        }
+      : operator,
+  );
+
+  const plan = buildMultiRunEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    allOperators: altered,
+    operatorIndices: [1, 2],
+    replacementText: "Combined",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /separate native text groups/i);
+});
+
+test("multi-run: rejects otherwise-adjacent operators under different CTMs", async () => {
+  const original = await buildMultiOperatorFixture([
+    { text: "First", kind: "Tj" },
+    { text: "Alpha", kind: "Tj" },
+    { text: "Beta", kind: "Tj", sameLineWithPrevious: true },
+    { text: "Last", kind: "Tj" },
+  ]);
+  const { resolvedFont, fontMetrics, allOperators } =
+    await buildMultiRunPlanForIndices(original, [1, 2], "Combined");
+  const altered = allOperators.map((operator, index) => {
+    if (index !== 2 || !operator.ctm) return operator;
+    const ctm: Matrix2x3 = [
+      operator.ctm[0],
+      operator.ctm[1],
+      operator.ctm[2],
+      operator.ctm[3],
+      operator.ctm[4] + 10,
+      operator.ctm[5],
+    ];
+    return { ...operator, ctm };
+  });
+
+  const plan = buildMultiRunEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    allOperators: altered,
+    operatorIndices: [1, 2],
+    replacementText: "Combined",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /positioned independently|line break/i);
 });
 
 test("multi-run: rejects a discontinuous selection honestly, without guessing at a merge", async () => {
