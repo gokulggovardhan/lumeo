@@ -10,6 +10,7 @@ import { PDFDocument, PDFName, StandardFonts, TextRenderingMode, beginText, endT
 import { createCanvas } from "@napi-rs/canvas";
 import { inspectPdfFontProgram } from "../lib/pdf/edit/fontProgramIntelligence.ts";
 import { shapeEmbeddedFontText } from "../lib/pdf/edit/harfbuzzShaping.ts";
+import { buildPreservedLineParagraphPdf } from "../tests/fixtures/paragraphFixture.ts";
 
 // Playwright transpiles specs to CJS, where import.meta is a syntax error --
 // resolve from the repo root (the runner's cwd) instead.
@@ -24,6 +25,7 @@ export const MIXED_STYLE_PDF = path.join(TMP_DIR, "mixed-style.pdf");
 export const CLIPPED_TEXT_PDF = path.join(TMP_DIR, "clipped-text.pdf");
 export const LARGE_DOCUMENT_PDF = path.join(TMP_DIR, "large-document-120-pages.pdf");
 export const SHAPED_LTR_PDF = path.join(TMP_DIR, "shaped-ltr-type0.pdf");
+export const PARAGRAPH_PDF = path.join(TMP_DIR, "paragraph-native-lines.pdf");
 
 /** Widely spaced so each line is its own detected run and boxes cannot straddle two. */
 function drawSensitiveText(page: import("pdf-lib").PDFPage, font: import("pdf-lib").PDFFont) {
@@ -522,4 +524,5 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(CLIPPED_TEXT_PDF, await clippedText());
   await writeFile(LARGE_DOCUMENT_PDF, await largeDocument());
   await writeFile(SHAPED_LTR_PDF, await shapedLtrType0());
+  await writeFile(PARAGRAPH_PDF, await buildPreservedLineParagraphPdf());
 }

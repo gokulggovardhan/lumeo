@@ -24,9 +24,18 @@ import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
 import { shapeEmbeddedFontText } from "../lib/pdf/edit/harfbuzzShaping.ts";
 import { buildShapedGlyphEditPlan } from "../lib/pdf/edit/shapedGlyphEditPlan.ts";
 import {
+  applyParagraphEditPlanToDocument,
+  buildParagraphEditPlan,
+} from "../lib/pdf/edit/paragraphEditPlan.ts";
+import {
   buildShapedLtrType0Pdf,
   SHAPED_LTR_REPLACEMENT,
 } from "../tests/fixtures/shapedGlyphFixture.ts";
+import {
+  buildPreservedLineParagraphPdf,
+  PARAGRAPH_REPLACEMENT_LINES,
+  PARAGRAPH_SOURCE_LINES,
+} from "../tests/fixtures/paragraphFixture.ts";
 import {
   buildOperatorSpatialIndex,
   matchDetectedRunToOperatorIndexed,
@@ -55,7 +64,7 @@ type Fixture = {
   editTarget: string;
   replacementText: string;
   bytes: Uint8Array;
-  editMode?: "ordinary" | "shaped-ltr";
+  editMode?: "ordinary" | "shaped-ltr" | "paragraph";
 };
 
 type RenderedPage = {
@@ -323,6 +332,28 @@ function unionRects(a: PixelRect, b: PixelRect): PixelRect {
   };
 }
 
+function rectForExpectedTexts({
+  rendered,
+  texts,
+}: {
+  rendered: RenderedPage;
+  texts: readonly string[];
+}): PixelRect | null {
+  let combined: PixelRect | null = null;
+  for (const text of texts) {
+    const rect = uniqueRunSequenceRect({
+      runs: rendered.runs,
+      expectedText: text,
+      width: rendered.width,
+      height: rendered.height,
+      viewportTransform: rendered.viewportTransform,
+    });
+    if (!rect) return null;
+    combined = combined ? unionRects(combined, rect) : rect;
+  }
+  return combined;
+}
+
 function normalizedVisibleText(value: string): string {
   return value.replace(/\s+/gu, "");
 }
@@ -518,7 +549,51 @@ async function measure(
   if (target) {
     let writeApplied = false;
 
-    if (fixture.editMode === "shaped-ltr") {
+    if (fixture.editMode === "paragraph") {
+      const targetStreamIndex =
+        target.located.locator.kind === "page"
+          ? target.located.locator.contentStreamIndex
+          : null;
+      const pageEntries =
+        targetStreamIndex === null
+          ? []
+          : editableLocated
+              .filter(
+                (entry) =>
+                  entry.locator.kind === "page" &&
+                  entry.locator.contentStreamIndex === targetStreamIndex,
+              )
+              .sort((left, right) => left.operatorIndex - right.operatorIndex);
+      const resourceName = pageEntries[0]?.operator.fontResourceName;
+      if (resourceName && pageEntries.length === PARAGRAPH_SOURCE_LINES.length) {
+        const profile = editableRegistry.resolve(
+          pageEntries[0].resources,
+          resourceName,
+        );
+        if (profile) {
+          const paragraphPlan = buildParagraphEditPlan({
+            pageIndex: 0,
+            contentStreamIndex:
+              pageEntries[0].locator.kind === "page"
+                ? pageEntries[0].locator.contentStreamIndex
+                : 0,
+            allOperators: pageEntries.map((entry) => entry.operator),
+            operatorIndices: pageEntries.map((_entry, index) => index),
+            replacementText: fixture.replacementText,
+            resolvedFont: profile.resolvedFont,
+            fontMetrics: profile.metrics,
+            embeddedGlyphEvidence: profile.embeddedGlyphEvidence,
+          });
+          if (paragraphPlan.editable) {
+            await applyParagraphEditPlanToDocument(
+              editableDoc,
+              paragraphPlan,
+            );
+            writeApplied = true;
+          }
+        }
+      }
+    } else if (fixture.editMode === "shaped-ltr") {
       const resourceName = target.located.operator.fontResourceName;
       if (resourceName) {
         const shapingInspection =
@@ -634,9 +709,15 @@ async function measure(
             const reopenedText = reopenedContent.items
               .map((item) => ("str" in item ? item.str : ""))
               .join("");
+            const expectedReopenText =
+              fixture.editMode === "paragraph"
+                ? fixture.replacementText.split("\n")
+                : [fixture.replacementText];
             reopenSuccess =
               reopenedPageCount === 1 &&
-              reopenedText.includes(fixture.replacementText);
+              expectedReopenText.every((text) =>
+                reopenedText.includes(text),
+              );
           } finally {
             const destroyReopened = (reopenedPdfJs as {
               destroy?: () => Promise<void> | void;
@@ -651,20 +732,32 @@ async function measure(
 
         const before = await renderFirstPage(fixture.bytes);
         const after = await renderFirstPage(exported.bytes);
-        const beforeRect = uniqueRunSequenceRect({
-          runs: before.runs,
-          expectedText: fixture.editTarget,
-          width: before.width,
-          height: before.height,
-          viewportTransform: before.viewportTransform,
-        });
-        const afterRect = uniqueRunSequenceRect({
-          runs: after.runs,
-          expectedText: fixture.replacementText,
-          width: after.width,
-          height: after.height,
-          viewportTransform: after.viewportTransform,
-        });
+        const beforeRect =
+          fixture.editMode === "paragraph"
+            ? rectForExpectedTexts({
+                rendered: before,
+                texts: fixture.expectedRuns,
+              })
+            : uniqueRunSequenceRect({
+                runs: before.runs,
+                expectedText: fixture.editTarget,
+                width: before.width,
+                height: before.height,
+                viewportTransform: before.viewportTransform,
+              });
+        const afterRect =
+          fixture.editMode === "paragraph"
+            ? rectForExpectedTexts({
+                rendered: after,
+                texts: fixture.replacementText.split("\n"),
+              })
+            : uniqueRunSequenceRect({
+                runs: after.runs,
+                expectedText: fixture.replacementText,
+                width: after.width,
+                height: after.height,
+                viewportTransform: after.viewportTransform,
+              });
 
         if (
           beforeRect &&
@@ -1187,6 +1280,15 @@ async function buildFixtures(): Promise<Fixture[]> {
     replacementText: SHAPED_LTR_REPLACEMENT,
     bytes: await buildShapedLtrType0Pdf(),
     editMode: "shaped-ltr",
+  });
+  fixtures.push({
+    id: "advanced-preserved-line-paragraph",
+    category: "native-paragraph-preserved-lines",
+    expectedRuns: [...PARAGRAPH_SOURCE_LINES],
+    editTarget: PARAGRAPH_SOURCE_LINES[0],
+    replacementText: PARAGRAPH_REPLACEMENT_LINES.join("\n"),
+    bytes: await buildPreservedLineParagraphPdf(),
+    editMode: "paragraph",
   });
   return fixtures;
 }

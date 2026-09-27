@@ -126,7 +126,10 @@ import {
   type LocalCustomFontAsset,
 } from "@/lib/pdf/edit/localCustomFont";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
-import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
+import {
+  pickHorizontalAlign,
+  pickInlineTextToolbarPlacement,
+} from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
@@ -136,6 +139,7 @@ import type { ValidatedShapedGlyphEditPlan } from "@/lib/pdf/edit/shapedGlyphEdi
 import type { EditPdfPerformanceCollector } from "@/lib/pdf/edit/performanceDiagnostics";
 import {
   buildEditPlan,
+  decodeTextShowOperator,
   isValidatedEditPlan,
   type EditPlan,
 } from "@/lib/pdf/edit/editPlan";
@@ -148,6 +152,7 @@ import {
   isValidatedMultiRunEditPlan,
   type MultiRunEditPlan,
 } from "@/lib/pdf/edit/multiRunEditPlan";
+import type { ParagraphEditPlan } from "@/lib/pdf/edit/paragraphEditPlan";
 import {
   resolveCompatibleShapingWriteEvidence,
   shapingEvidenceRequestKey,
@@ -272,7 +277,8 @@ type EditPreview =
       substituteFont: string | null;
       shapedGlyphPlan?: ValidatedShapedGlyphEditPlan | null;
     }
-  | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont };
+  | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont }
+  | { kind: "paragraph"; editable: boolean; reason: string | null; plan: ParagraphEditPlan; resolvedFont: ResolvedFont };
 
 type ShapingEvidenceState =
   | { key: string; status: "validated"; evidence: ValidatedShapingWriteEvidence }
@@ -348,6 +354,9 @@ let editEngineModulePromise: Promise<{
   applyMultiRunEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyMultiRunEditPlanToDocument"];
   applyNativeTextStyleBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyNativeTextStyleBatchToDocument"];
   applyValidatedEditPlanBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyValidatedEditPlanBatchToDocument"];
+  buildParagraphEditPlan: (typeof import("@/lib/pdf/edit/paragraphEditPlan"))["buildParagraphEditPlan"];
+  isValidatedParagraphEditPlan: (typeof import("@/lib/pdf/edit/paragraphEditPlan"))["isValidatedParagraphEditPlan"];
+  applyParagraphEditPlanToDocument: (typeof import("@/lib/pdf/edit/paragraphEditPlan"))["applyParagraphEditPlanToDocument"];
   verifyPostExportNativeEdits: (typeof import("@/lib/pdf/edit/postExportVerification"))["verifyPostExportNativeEdits"];
   PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
   PDFName: (typeof import("pdf-lib"))["PDFName"];
@@ -368,7 +377,8 @@ function loadEditEngine() {
       import("@/lib/pdf/edit/fontRegistry"),
       import("@/lib/pdf/edit/postExportVerification"),
       import("@/lib/pdf/edit/shapedGlyphEditPlan"),
-    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod, postExportVerificationMod, shapedGlyphEditPlanMod]) => ({
+      import("@/lib/pdf/edit/paragraphEditPlan"),
+    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod, postExportVerificationMod, shapedGlyphEditPlanMod, paragraphEditPlanMod]) => ({
       exportEditedPdf: exportMod.exportEditedPdf,
       collectPageTextOperators: formXObjectsMod.collectPageTextOperators,
       resolveFont: fontEncodingMod.resolveFont,
@@ -380,6 +390,9 @@ function loadEditEngine() {
       applyMultiRunEditPlanToDocument: applyEditPlanMod.applyMultiRunEditPlanToDocument,
       applyNativeTextStyleBatchToDocument: applyEditPlanMod.applyNativeTextStyleBatchToDocument,
       applyValidatedEditPlanBatchToDocument: applyEditPlanMod.applyValidatedEditPlanBatchToDocument,
+      buildParagraphEditPlan: paragraphEditPlanMod.buildParagraphEditPlan,
+      isValidatedParagraphEditPlan: paragraphEditPlanMod.isValidatedParagraphEditPlan,
+      applyParagraphEditPlanToDocument: paragraphEditPlanMod.applyParagraphEditPlanToDocument,
       verifyPostExportNativeEdits: postExportVerificationMod.verifyPostExportNativeEdits,
       PDFDocument: pdfLibMod.PDFDocument,
       PDFName: pdfLibMod.PDFName,
@@ -3793,6 +3806,62 @@ export default function EditPdfTool() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over the explicitly listed page/write evidence below.
   }, [fontRegistry, selectedRunIndices, editableRunMatches, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions, pageTextModel, logicalSelection]);
 
+  const paragraphSelectionTemplate = useMemo(() => {
+    if (
+      !editEngine ||
+      resolvedEditContext.kind !== "multi" ||
+      selectedRunIndices.length < 2
+    ) {
+      return null;
+    }
+
+    const { validation, resolvedFont, fontMetrics, embeddedGlyphEvidence } =
+      resolvedEditContext;
+    const originalLines: string[] = [];
+    for (const operatorIndex of validation.operatorIndices) {
+      const operator = validation.allOperators[operatorIndex];
+      if (!operator) return null;
+      const decoded = decodeTextShowOperator(operator, resolvedFont);
+      if (!decoded.allDecoded) return null;
+      originalLines.push(decoded.text);
+    }
+
+    const plan = editEngine.buildParagraphEditPlan({
+      pageIndex,
+      contentStreamIndex: validation.contentStreamIndex,
+      allOperators: validation.allOperators,
+      operatorIndices: validation.operatorIndices,
+      replacementText: originalLines.join("\n"),
+      resolvedFont,
+      fontMetrics,
+      embeddedGlyphEvidence,
+    });
+    return plan.editable ? plan : null;
+  }, [
+    editEngine,
+    resolvedEditContext,
+    selectedRunIndices.length,
+    pageIndex,
+  ]);
+
+  useEffect(() => {
+    if (!paragraphSelectionTemplate) return;
+    const currentFlatDraft = selectedRunIndices
+      .map((index) => detectedTextRuns[index]?.str ?? "")
+      .join("");
+    if (editDraftText === currentFlatDraft) {
+      setEditDraftText(paragraphSelectionTemplate.originalText);
+      setEditApplyError("");
+    }
+  }, [
+    paragraphSelectionTemplate,
+    selectedRunIndices,
+    detectedTextRuns,
+    editDraftText,
+    setEditDraftText,
+    setEditApplyError,
+  ]);
+
   const shapingRequirement = useMemo(
     () => detectComplexShapingRequirement(editDraftText),
     [editDraftText],
@@ -3801,6 +3870,7 @@ export default function EditPdfTool() {
   const shapingEvidenceRequest = useMemo(() => {
     if (
       !shapingRequirement.required ||
+      paragraphSelectionTemplate ||
       (resolvedEditContext.kind !== "single" &&
         resolvedEditContext.kind !== "multi")
     ) {
@@ -3841,6 +3911,7 @@ export default function EditPdfTool() {
     };
   }, [
     shapingRequirement.required,
+    paragraphSelectionTemplate,
     resolvedEditContext,
     pageIndex,
     nativeTextSelectionKey,
@@ -4170,6 +4241,36 @@ export default function EditPdfTool() {
       validation,
     } = resolvedEditContext;
     try {
+      if (paragraphSelectionTemplate && editEngine) {
+        const paragraphPlan = editEngine.buildParagraphEditPlan({
+          pageIndex,
+          contentStreamIndex: validation.contentStreamIndex,
+          allOperators: validation.allOperators,
+          operatorIndices: validation.operatorIndices,
+          replacementText: editDraftText,
+          resolvedFont,
+          fontMetrics,
+          embeddedGlyphEvidence,
+        });
+        if (shapingRequirement.required) {
+          return {
+            kind: "paragraph",
+            editable: false,
+            reason:
+              "Complex shaping across several native PDF lines is not yet proven safe. Edit each shaped line separately.",
+            plan: paragraphPlan,
+            resolvedFont,
+          };
+        }
+        return {
+          kind: "paragraph",
+          editable: paragraphPlan.editable,
+          reason: paragraphPlan.reason,
+          plan: paragraphPlan,
+          resolvedFont,
+        };
+      }
+
       const plan = buildMultiRunEditPlan({
         pageIndex,
         contentStreamIndex: validation.contentStreamIndex,
@@ -4220,25 +4321,29 @@ export default function EditPdfTool() {
     currentShapedGlyphPlan,
     currentShapingBlockReason,
     nativePaintPlan,
+    paragraphSelectionTemplate,
+    editEngine,
   ]);
 
   const replacementLayoutDecision = useMemo(() => {
     if (editPreview.kind === "empty" || !editPreview.editable) return null;
     if (editPreview.kind === "single" && editPreview.shapedGlyphPlan) return null;
-    const plan =
+    const plans =
       editPreview.kind === "single"
-        ? editPreview.plan
-        : editPreview.plan.subPlans[0];
-    if (!plan) return null;
-
-    // Layout warnings are about a requested change in text advance. Merely
-    // selecting/inspecting a run (or changing paint only) must not surface a
-    // "replacement is wider" warning from font-metric round-tripping when no
-    // layout-affecting edit has actually been requested.
-    const layoutAffectingChange =
-      plan.originalText !== plan.replacementText ||
-      plan.replacementTextState !== null;
-    return layoutAffectingChange ? decideReplacementLayout(plan) : null;
+        ? [editPreview.plan]
+        : [...editPreview.plan.subPlans];
+    const decisions = plans
+      .filter(
+        (plan) =>
+          plan.originalText !== plan.replacementText ||
+          plan.replacementTextState !== null,
+      )
+      .map((plan) => decideReplacementLayout(plan));
+    return (
+      decisions.find((decision) => !decision.safeToApplyWithCurrentWriter) ??
+      decisions[0] ??
+      null
+    );
   }, [editPreview]);
 
   // Phase 9.2: the actual write-back for whatever editPreview currently
@@ -4301,6 +4406,13 @@ export default function EditPdfTool() {
             nativePaintPlan: nativePaintPlan?.editable ? nativePaintPlan : undefined,
           });
         }
+      } else if (editPreview.kind === "paragraph") {
+        if (!engine.isValidatedParagraphEditPlan(editPreview.plan)) {
+          throw new Error(
+            "The paragraph edit dry-run is no longer valid. Reselect the lines and try again.",
+          );
+        }
+        await engine.applyParagraphEditPlanToDocument(doc, editPreview.plan);
       } else {
         const { plan, resolvedFont } = editPreview;
         if (!isValidatedMultiRunEditPlan(plan)) {
@@ -5077,8 +5189,10 @@ export default function EditPdfTool() {
   const nativeStyleChanged =
     editPreview.kind === "single" && Boolean(editPreview.plan.replacementTextState);
   const nativePaintChanged = Boolean(nativePaintPlan?.editable);
-  const textDraftChanged =
-    editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
+  const selectedOriginalDraftText =
+    paragraphSelectionTemplate?.originalText ??
+    selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
+  const textDraftChanged = editDraftText !== selectedOriginalDraftText;
   const canApplyEdit =
     !isApplyingEdit &&
     !textCompositionActive &&
@@ -5261,8 +5375,31 @@ export default function EditPdfTool() {
   // rather than inside the JSX below, so it stays plain render-time
   // derivation, not a nested closure the React Compiler's static analysis
   // has to reason about.
+  const inlineEditorSelectedRunIndex =
+    selectedRunIndices.length === 1 ? selectedRunIndices[0] : -1;
   const inlineEditorVerticalPlacement = singleSelectedRun
-    ? pickVerticalPlacement(singleSelectedRun.yPct, singleSelectedRun.yPct + singleSelectedRun.heightPct, 24, true)
+    ? pickInlineTextToolbarPlacement({
+        anchor: {
+          leftPct: singleSelectedRun.xPct,
+          rightPct: singleSelectedRun.xPct + singleSelectedRun.widthPct,
+          topPct: singleSelectedRun.yPct,
+          bottomPct: singleSelectedRun.yPct + singleSelectedRun.heightPct,
+        },
+        editableObstacles: detectedTextRuns.flatMap((run, index) =>
+          index === inlineEditorSelectedRunIndex || !editableRunMatches[index]
+            ? []
+            : [
+                {
+                  leftPct: run.xPct,
+                  rightPct: run.xPct + run.widthPct,
+                  topPct: run.yPct,
+                  bottomPct: run.yPct + run.heightPct,
+                },
+              ],
+        ),
+        edgeMarginPct: 24,
+        toolbarClearancePct: 6,
+      })
     : "below";
   const inlineEditorHorizontalAlign = singleSelectedRun
     ? pickHorizontalAlign(singleSelectedRun.xPct, singleSelectedRun.xPct + singleSelectedRun.widthPct)
@@ -6342,7 +6479,10 @@ export default function EditPdfTool() {
                     </div>
                   ) : null}
 
-                  {activeTool === "select" && textDetectionCurrent && selectedRunIndices.length > 1 && editPreview.kind === "multi" ? (
+                  {activeTool === "select" &&
+                    textDetectionCurrent &&
+                    selectedRunIndices.length > 1 &&
+                    (editPreview.kind === "multi" || editPreview.kind === "paragraph") ? (
                     // Multi-run selection has no per-run inline editor (that's
                     // scoped to a single run) -- this compact floating panel,
                     // anchored to the first selected run, is the only UI path
@@ -6364,10 +6504,24 @@ export default function EditPdfTool() {
                       }
                     >
                       <div className="w-72 rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/96 p-3 shadow-lg">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">Replace with ({selectedRunIndices.length} runs selected)</span>
-                        <input
+                        <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
+                          {editPreview.kind === "paragraph"
+                            ? `Edit paragraph (${editPreview.plan.originalLines.length} preserved lines)`
+                            : `Replace with (${selectedRunIndices.length} runs selected)`}
+                        </span>
+                        <textarea
                           data-edit-multi-run-input
-                          aria-label="Edit selected text runs"
+                          data-edit-paragraph-input={editPreview.kind === "paragraph" ? "true" : undefined}
+                          aria-label={
+                            editPreview.kind === "paragraph"
+                              ? "Edit selected paragraph lines"
+                              : "Edit selected text runs"
+                          }
+                          rows={
+                            editPreview.kind === "paragraph"
+                              ? Math.min(8, Math.max(2, editPreview.plan.originalLines.length))
+                              : 1
+                          }
                           value={editDraftText}
                           onCompositionStart={(event) => {
                             event.stopPropagation();
@@ -6395,16 +6549,28 @@ export default function EditPdfTool() {
                               nativeKeyboard.keyCode === 229;
                             if (isImeKey) return;
                             if (event.key === "Enter") {
-                              event.preventDefault();
-                              if (canApplyEdit) void applyTextRunEdit();
+                              if (editPreview.kind === "paragraph") {
+                                if (event.metaKey || event.ctrlKey) {
+                                  event.preventDefault();
+                                  if (canApplyEdit) void applyTextRunEdit();
+                                }
+                              } else {
+                                event.preventDefault();
+                                if (canApplyEdit) void applyTextRunEdit();
+                              }
                             } else if (event.key === "Escape") {
                               event.preventDefault();
                               selectTextRun(null);
                             }
                           }}
                           data-ime-composing={textCompositionActive ? "true" : "false"}
-                          className="mt-1 w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
+                          className="mt-1 w-full resize-y rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
                         />
+                        {editPreview.kind === "paragraph" ? (
+                          <span className="mt-1 block text-[10px] leading-4 text-[var(--text-primary)]/46">
+                            Existing PDF baselines are preserved. Keep the same number of lines. Use Ctrl/⌘+Enter to apply.
+                          </span>
+                        ) : null}
                         <div className="mt-2 flex gap-2">
                           <button
                             type="button"

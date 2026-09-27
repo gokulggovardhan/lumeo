@@ -77,3 +77,71 @@ export function pickHorizontalAlign(
   if (100 - rightPct < marginPct) return "end";
   return "center";
 }
+
+
+export type PercentRect = Readonly<{
+  leftPct: number;
+  rightPct: number;
+  topPct: number;
+  bottomPct: number;
+}>;
+
+function rangesOverlap(
+  firstStart: number,
+  firstEnd: number,
+  secondStart: number,
+  secondEnd: number,
+): boolean {
+  return Math.min(firstEnd, secondEnd) > Math.max(firstStart, secondStart);
+}
+
+/**
+ * Inline native-text editing normally prefers its toolbar below the selected
+ * run. A nearby editable run can occupy that same visual band, though, making
+ * Shift+click multi-selection impossible because the toolbar intercepts the
+ * pointer. This helper keeps the old edge policy, then flips above only when:
+ *
+ * - the normal decision is below;
+ * - another editable run horizontally overlaps the selected run;
+ * - that run begins inside the toolbar's conservative below-clearance band;
+ * - there is enough room above the selected run for the same clearance.
+ *
+ * Percent-space geometry stays advisory UI placement only; it never
+ * participates in PDF write geometry or EditPlan authority.
+ */
+export function pickInlineTextToolbarPlacement({
+  anchor,
+  editableObstacles,
+  edgeMarginPct = 24,
+  toolbarClearancePct = 6,
+}: {
+  anchor: PercentRect;
+  editableObstacles: readonly PercentRect[];
+  edgeMarginPct?: number;
+  toolbarClearancePct?: number;
+}): VerticalPlacement {
+  const edgePlacement = pickVerticalPlacement(
+    anchor.topPct,
+    anchor.bottomPct,
+    edgeMarginPct,
+    true,
+  );
+  if (edgePlacement === "above") return "above";
+
+  const blocksBelow = editableObstacles.some(
+    (obstacle) =>
+      rangesOverlap(
+        anchor.leftPct,
+        anchor.rightPct,
+        obstacle.leftPct,
+        obstacle.rightPct,
+      ) &&
+      obstacle.topPct < anchor.bottomPct + toolbarClearancePct &&
+      obstacle.bottomPct > anchor.bottomPct,
+  );
+
+  if (blocksBelow && anchor.topPct >= toolbarClearancePct) {
+    return "above";
+  }
+  return edgePlacement;
+}
