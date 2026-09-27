@@ -1,11 +1,15 @@
+import type { ResolvedFont } from "./fontEncoding.ts";
+import type { FontMetrics } from "./fontMetrics.ts";
 import type {
   PdfEmbeddedFontTextShaper,
+  PdfFontResourceIdentity,
   PdfFontShapingInspection,
 } from "./fontRegistry.ts";
 import type { ShapeEmbeddedFontOptions } from "./harfbuzzShaping.ts";
 import {
   detectComplexShapingRequirement,
   validateShapingEvidenceForCharacterCodeWriter,
+  validateShapingEvidenceForIdentityCidGlyphWriter,
   type ComplexShapingRequirement,
   type ValidatedShapingWriteEvidence,
 } from "./shapingWriteGuard.ts";
@@ -70,11 +74,22 @@ export async function resolveCompatibleShapingWriteEvidence({
   embeddedProgramSha256,
   inspect,
   shapeText,
+  resourceName = null,
+  resourceIdentity = null,
+  resolvedFont = null,
+  fontMetrics = null,
 }: {
   replacementText: string;
   embeddedProgramSha256: string | null;
   inspect: LocalShapingInspection;
   shapeText: PdfEmbeddedFontTextShaper;
+  resourceName?: string | null;
+  resourceIdentity?: PdfFontResourceIdentity | null;
+  resolvedFont?: Pick<
+    ResolvedFont,
+    "kind" | "bytesPerCode" | "glyphCodeToUnicode"
+  > | null;
+  fontMetrics?: FontMetrics | null;
 }): Promise<CompatibleShapingEvidenceResolution> {
   const requirement = detectComplexShapingRequirement(replacementText);
   if (!requirement.required) return { kind: "not-required" };
@@ -100,7 +115,31 @@ export async function resolveCompatibleShapingWriteEvidence({
     shaped: inspection.shaped,
     reconciliation: inspection.reconciliation,
   });
-  return proof.kind === "validated"
-    ? { kind: "validated", direction, evidence: proof.evidence }
-    : { kind: "blocked", direction, reason: proof.reason };
+  if (proof.kind === "validated") {
+    return { kind: "validated", direction, evidence: proof.evidence };
+  }
+
+  if (
+    inspection.reconciliation.kind === "requires-shaped-glyph-write" &&
+    resourceName &&
+    resourceIdentity &&
+    resolvedFont &&
+    fontMetrics
+  ) {
+    const shapedProof = validateShapingEvidenceForIdentityCidGlyphWriter({
+      replacementText,
+      embeddedProgramSha256,
+      shaped: inspection.shaped,
+      reconciliation: inspection.reconciliation,
+      resourceName,
+      resourceIdentity,
+      resolvedFont,
+      fontMetrics,
+    });
+    return shapedProof.kind === "validated"
+      ? { kind: "validated", direction, evidence: shapedProof.evidence }
+      : { kind: "blocked", direction, reason: shapedProof.reason };
+  }
+
+  return { kind: "blocked", direction, reason: proof.reason };
 }
