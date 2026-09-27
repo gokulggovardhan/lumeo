@@ -162,6 +162,8 @@ export default function PageThumbnailSidebar({
   const urlsRef = useRef<Map<number, string>>(new Map());
   const thumbnailGenerationRef = useRef(-1);
   const listRef = useRef<HTMLUListElement | null>(null);
+  const scrollFrameRef = useRef<number | null>(null);
+  const scrollFrameStartedAtRef = useRef<number | null>(null);
   const [scrollMetrics, setScrollMetrics] = useState({
     top: 0,
     height: THUMBNAIL_ROW_HEIGHT_PX * 8,
@@ -353,6 +355,10 @@ export default function PageThumbnailSidebar({
     () => () => {
       for (const url of urlsRef.current.values()) URL.revokeObjectURL(url);
       urlsRef.current.clear();
+      if (scrollFrameRef.current !== null) {
+        cancelAnimationFrame(scrollFrameRef.current);
+        scrollFrameRef.current = null;
+      }
     },
     [],
   );
@@ -384,6 +390,30 @@ export default function PageThumbnailSidebar({
             top: list.scrollTop,
             height: Math.max(1, list.clientHeight),
           });
+          if (scrollFrameRef.current === null) {
+            scrollFrameStartedAtRef.current = editPerformanceNow();
+            scrollFrameRef.current = requestAnimationFrame(() => {
+              const currentList = listRef.current;
+              const startedAt = scrollFrameStartedAtRef.current;
+              scrollFrameRef.current = null;
+              scrollFrameStartedAtRef.current = null;
+              if (!currentList || startedAt === null) return;
+              const nextWindow = computeThumbnailWindow({
+                pageCount,
+                scrollTop: currentList.scrollTop,
+                viewportHeight: Math.max(1, currentList.clientHeight),
+              });
+              editPerformanceDiagnostics.record(
+                "thumbnail-scroll",
+                editPerformanceNow() - startedAt,
+                {
+                  pageCount,
+                  itemCount: nextWindow.indices.length,
+                  success: true,
+                },
+              );
+            });
+          }
         }}
         className={`flex-1 overflow-y-auto overscroll-contain p-1.5 ${thumbnailWindow.virtualized ? "" : "space-y-1"}`}
       >
