@@ -43,6 +43,40 @@ test("PdfFontRegistry caches a deterministic profile for a standard PDF font", a
   assert.match(first.cssFallbackFamily, /Arial|Helvetica/);
 });
 
+test("PdfFontRegistry performance counters report cache use without exposing document content", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("Cache measurement", { x: 72, y: 700, size: 12, font });
+
+  const saved = await doc.save();
+  const loaded = await PDFDocument.load(saved);
+  const { resources, resourceName } = firstFontResource(loaded.getPage(0));
+  const registry = new PdfFontRegistry(loaded);
+
+  assert.ok(registry.resolve(resources, resourceName));
+  assert.ok(registry.resolve(resources, resourceName));
+  assert.equal(registry.embeddedProgram(resources, resourceName), null);
+  assert.equal(registry.embeddedProgram(resources, resourceName), null);
+  await registry.inspectEmbeddedFontProgram(resources, resourceName);
+  await registry.inspectEmbeddedFontProgram(resources, resourceName);
+  await registry.ensureBrowserFont(resources, resourceName);
+  await registry.ensureBrowserFont(resources, resourceName);
+
+  const snapshot = registry.performanceSnapshot();
+  assert.equal(snapshot.resolveCalls >= 3, true);
+  assert.equal(snapshot.profileCacheMisses, 1);
+  assert.equal(snapshot.profileCacheHits >= 2, true);
+  assert.equal(snapshot.programCacheMisses, 1);
+  assert.equal(snapshot.programCacheHits >= 2, true);
+  assert.equal(snapshot.intelligenceCacheMisses, 1);
+  assert.equal(snapshot.intelligenceCacheHits, 1);
+  assert.equal(snapshot.browserFaceCacheHits, 1);
+  assert.equal(snapshot.browserFaceAttempts, 0);
+  assert.equal(snapshot.browserFaceLoads, 0);
+  assert.equal(snapshot.browserFaceFailures, 0);
+});
+
 test("PdfFontRegistry exposes browser-loadable embedded TrueType bytes without treating preview as export authority", async () => {
   const doc = await PDFDocument.create();
   const context = doc.context;
