@@ -486,8 +486,7 @@ export async function buildLocalFontSubstitutionPlan({
       "Choose a local font only when the replacement contains visible text.",
     );
   }
-  if (/[
-	]/.test(replacementText)) {
+  if (/[\r\n\t]/.test(replacementText)) {
     return rejectHere(
       "Native local-font substitution is currently limited to one text line without tabs.",
     );
