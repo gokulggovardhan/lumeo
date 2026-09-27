@@ -480,3 +480,69 @@ test("PdfFontRegistry bounds professional font-intelligence cache across many em
 
   assert.equal(registry.fontIntelligenceCacheSizeForDiagnostics(), 8);
 });
+
+
+test("PdfFontRegistry shaping inspection stays unavailable for non-embedded standard fonts", async () => {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.drawText("Simple text", { x: 72, y: 700, size: 12, font });
+
+  const saved = await doc.save();
+  const loaded = await PDFDocument.load(saved);
+  const { resources, resourceName } = firstFontResource(loaded.getPage(0));
+  const registry = new PdfFontRegistry(loaded);
+
+  const result = await registry.inspectShapingCompatibility(
+    resources,
+    resourceName,
+    "Simple text",
+    { direction: "ltr", script: "Latn", language: "en" },
+  );
+
+  assert.equal(result.kind, "unavailable");
+  if (result.kind === "unavailable") {
+    assert.match(result.reason, /does not contain an embedded font program/i);
+  }
+});
+
+test("PdfFontRegistry shaping inspection fails closed when embedded bytes are not a valid SFNT", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const fakeTtf = Uint8Array.from([0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0]);
+  const fontFileRef = context.register(context.flateStream(fakeTtf));
+  const descriptor = context.obj({
+    Type: "FontDescriptor",
+    FontName: "ABCDEF+BrokenShape",
+    Flags: 32,
+    ItalicAngle: 0,
+    FontWeight: 400,
+    FontFile2: fontFileRef,
+  });
+  const fontDict = context.obj({
+    Type: "Font",
+    Subtype: "TrueType",
+    BaseFont: "ABCDEF+BrokenShape",
+    FirstChar: 65,
+    LastChar: 65,
+    Widths: [600],
+    Encoding: "WinAnsiEncoding",
+    FontDescriptor: descriptor,
+  });
+  const resources = context.obj({
+    Font: context.obj({ FBrokenShape: fontDict }),
+  });
+  const registry = new PdfFontRegistry(doc);
+
+  const result = await registry.inspectShapingCompatibility(
+    resources,
+    "FBrokenShape",
+    "A",
+    { direction: "ltr", script: "Latn", language: "en" },
+  );
+
+  assert.equal(result.kind, "unavailable");
+  if (result.kind === "unavailable") {
+    assert.match(result.reason, /supported SFNT|could not shape|font program/i);
+  }
+});
