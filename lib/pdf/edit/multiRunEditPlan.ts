@@ -238,7 +238,7 @@ export function buildMultiRunEditPlan({
       contentStreamIndex,
       sortedIndices,
       replacementText,
-      "This selection crosses PDF text-object boundaries, so one native replacement cannot preserve its text state safely.",
+      "These text pieces belong to separate native text groups, so one in-place replacement cannot preserve their formatting and position safely.",
     );
   }
 
@@ -258,7 +258,7 @@ export function buildMultiRunEditPlan({
       contentStreamIndex,
       sortedIndices,
       replacementText,
-      "This selection crosses a PDF text-positioning, transform, or line boundary, so one horizontal endpoint compensation cannot preserve it safely.",
+      "These text pieces are positioned independently or cross a line break, so editing them as one range could move surrounding text. Edit one line at a time.",
     );
   }
 
