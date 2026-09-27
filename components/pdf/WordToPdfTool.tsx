@@ -247,7 +247,6 @@ export default function WordToPdfTool() {
   }
 
   function handleFiles(files: FileList | File[]) {
-    if (!clientReady) return;
     const file = Array.from(files)[0];
     if (!file) return;
 
@@ -438,7 +437,7 @@ export default function WordToPdfTool() {
         icon={<WordIcon />}
         buttonLabel="Select Word document"
         onFilesSelected={handleFiles}
-        disabled={isBusy || !clientReady}
+        disabled={isBusy}
       />
     </div>
   );
