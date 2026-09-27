@@ -686,6 +686,18 @@ export default function EditPdfTool() {
   } = useNativeTextSelectionState();
   const nativeTextSelectionKey = selectedRunIndices.join(",");
   const nativeTextComposingRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    // A composition owner is selection-scoped. If the editor moves to a
+    // different native selection and the browser never delivers
+    // compositionend for the unmounted input, discard the stale immediate
+    // guard so revisiting the old run cannot remain permanently blocked.
+    const owner = nativeTextComposingRef.current;
+    if (owner !== null && owner !== nativeTextSelectionKey) {
+      nativeTextComposingRef.current = null;
+    }
+  }, [nativeTextSelectionKey]);
+
   // Browser FontFace previews are keyed to a model span id so an async font
   // load can never leak the previous selection's face into a newly-selected
   // run. Export safety remains governed by fontEncoding/editPlan, not by
