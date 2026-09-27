@@ -18,6 +18,8 @@ export async function loadPdfJsModule() {
   return pdfJsModulePromise;
 }
 
+const STANDARD_FONT_DATA_URL = "/pdfjs-standard-fonts/";
+
 // Opens a pdf.js document from already-in-memory bytes. Always disables
 // useWorkerFetch -- without it, one call site (Merge) silently hung forever
 // on every getDocument() call: no error, no thumbnail, no page render, just
@@ -25,9 +27,21 @@ export async function loadPdfJsModule() {
 // when it's already been handed over from the main thread. Every other tool
 // had already discovered this the hard way and set the flag inline; this
 // wrapper makes it impossible for a new call site to forget it.
+//
+// Standard-14 font data is also served from Lumeo's own static application
+// assets. These files come from the exact installed pdfjs-dist package and
+// are prepared by scripts/prepare-pdfjs-assets.mjs; they are NOT fonts from
+// the user's document. Supplying the base URL keeps non-embedded standard
+// fonts deterministic across Chromium/WebKit/Firefox and lets PDF.js retain
+// its independent text/geometry evidence without sending any PDF content to
+// a backend.
 export async function openPdfJsDocument(data: ArrayBuffer | Uint8Array) {
   const pdfjs = await loadPdfJsModule();
-  return pdfjs.getDocument({ data, useWorkerFetch: false }).promise;
+  return pdfjs.getDocument({
+    data,
+    useWorkerFetch: false,
+    standardFontDataUrl: STANDARD_FONT_DATA_URL,
+  }).promise;
 }
 
 // A single page's canvas render should never take this long. Real-world PDFs

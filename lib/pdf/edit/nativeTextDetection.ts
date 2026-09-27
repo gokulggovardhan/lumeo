@@ -2,7 +2,13 @@ import type { LocatedTextOperator } from "./formXObjects.ts";
 import type { PdfFontProfile } from "./fontRegistry.ts";
 import { transformPoint2x3, type DetectedTextRun } from "./textRuns.ts";
 
-export type NativeGeometryConfidence = "exact-simple-run" | "source-only";
+export type NativeGeometryConfidence =
+  | "exact-simple-run"
+  | "fallback-box"
+  | "source-only";
+
+const FALLBACK_ASCENT_RATIO = 0.85;
+const FALLBACK_DESCENT_RATIO = -0.15;
 
 export type NativeContentStreamSpan = {
   key: string;
@@ -135,25 +141,35 @@ function synthesizeRun({
   viewportTransform: readonly number[];
   pageWidthPt: number;
   pageHeightPt: number;
-}): DetectedTextRun | null {
+}): {
+  run: DetectedTextRun;
+  geometryConfidence: Exclude<NativeGeometryConfidence, "source-only">;
+} | null {
   const operator = located.operator;
 
   // TJ includes explicit numeric positioning adjustments which are not yet
   // retained on TextShowOperator. Do not fabricate native geometry for it.
   if (operator.kind === "TJ") return null;
-  if (operator.renderMode >= 4) return null;
+  // Text clipping changes EDIT safety, not the geometry of the glyph run.
+  // Keep the proven box/baseline so the product can expose this text as a
+  // read-only native run and explain WHY it cannot be rewritten. The
+  // limitationReason/classifier below still fail closed for edit authority.
   if (profile.kind === "Type3") return null;
   if (profile.encodingSource === "Unknown" || profile.metricsSource === "Unknown") {
     return null;
   }
-  if (
-    profile.ascentRatio === null ||
-    profile.descentRatio === null ||
-    !Number.isFinite(profile.ascentRatio) ||
-    !Number.isFinite(profile.descentRatio)
-  ) {
-    return null;
-  }
+
+  const hasDescriptorVerticalMetrics =
+    profile.ascentRatio !== null &&
+    profile.descentRatio !== null &&
+    Number.isFinite(profile.ascentRatio) &&
+    Number.isFinite(profile.descentRatio);
+  const ascentRatio = hasDescriptorVerticalMetrics
+    ? profile.ascentRatio!
+    : FALLBACK_ASCENT_RATIO;
+  const descentRatio = hasDescriptorVerticalMetrics
+    ? profile.descentRatio!
+    : FALLBACK_DESCENT_RATIO;
 
   const advance = normalizedAdvance(glyphCodes, profile, operator);
   if (advance === null) return null;
@@ -171,20 +187,20 @@ function synthesizeRun({
   const base = [tx[4], tx[5]] as const;
   const end = [base[0] + tx[0] * advance, base[1] + tx[1] * advance] as const;
   const topStart = [
-    base[0] + tx[2] * profile.ascentRatio,
-    base[1] + tx[3] * profile.ascentRatio,
+    base[0] + tx[2] * ascentRatio,
+    base[1] + tx[3] * ascentRatio,
   ] as const;
   const topEnd = [
-    end[0] + tx[2] * profile.ascentRatio,
-    end[1] + tx[3] * profile.ascentRatio,
+    end[0] + tx[2] * ascentRatio,
+    end[1] + tx[3] * ascentRatio,
   ] as const;
   const bottomStart = [
-    base[0] + tx[2] * profile.descentRatio,
-    base[1] + tx[3] * profile.descentRatio,
+    base[0] + tx[2] * descentRatio,
+    base[1] + tx[3] * descentRatio,
   ] as const;
   const bottomEnd = [
-    end[0] + tx[2] * profile.descentRatio,
-    end[1] + tx[3] * profile.descentRatio,
+    end[0] + tx[2] * descentRatio,
+    end[1] + tx[3] * descentRatio,
   ] as const;
 
   const xs = [topStart[0], topEnd[0], bottomStart[0], bottomEnd[0]];
@@ -208,21 +224,29 @@ function synthesizeRun({
   }
 
   return {
-    str: text,
-    fontName: profile.resourceName,
-    xPct: (left / pageWidthPt) * 100,
-    yPct: (top / pageHeightPt) * 100,
-    widthPct: (width / pageWidthPt) * 100,
-    heightPct: (height / pageHeightPt) * 100,
-    fontSizePt: operator.fontSizePt,
-    rotated: Math.abs(axisAngleDeg(tx[0], tx[1])) > 0.1,
-    baselineXPct: (base[0] / pageWidthPt) * 100,
-    baselineYPct: (base[1] / pageHeightPt) * 100,
-    ascentRatio: profile.ascentRatio,
-    descentRatio: profile.descentRatio,
-    verticalWriting: profile.resourceIdentity.writingMode === "vertical",
-    detectionSource: "native",
-    nativeSourceKey: key,
+    geometryConfidence: hasDescriptorVerticalMetrics
+      ? "exact-simple-run"
+      : "fallback-box",
+    run: {
+      str: text,
+      fontName: profile.resourceName,
+      xPct: (left / pageWidthPt) * 100,
+      yPct: (top / pageHeightPt) * 100,
+      widthPct: (width / pageWidthPt) * 100,
+      heightPct: (height / pageHeightPt) * 100,
+      fontSizePt: operator.fontSizePt,
+      rotated: Math.abs(axisAngleDeg(tx[0], tx[1])) > 0.1,
+      // The baseline comes directly from the native text-rendering matrix and
+      // remains exact even when the visible box needs approximate vertical
+      // font metrics.
+      baselineXPct: (base[0] / pageWidthPt) * 100,
+      baselineYPct: (base[1] / pageHeightPt) * 100,
+      ascentRatio,
+      descentRatio,
+      verticalWriting: profile.resourceIdentity.writingMode === "vertical",
+      detectionSource: "native",
+      nativeSourceKey: key,
+    },
   };
 }
 
@@ -245,9 +269,12 @@ export function buildNativeContentStreamSpans({
       limitationReason = "The PDF font resource could not be resolved.";
     } else if (!decoded.complete) {
       limitationReason = "The PDF character encoding could not be decoded completely.";
+    } else if (located.operator.renderMode >= 4) {
+      limitationReason =
+        "The native text geometry is measurable, but the text participates in a clipping rendering mode and must remain read-only.";
     }
 
-    const detectedRun =
+    const synthesized =
       profile && decoded.complete && decoded.text.trim()
         ? synthesizeRun({
             key,
@@ -260,8 +287,22 @@ export function buildNativeContentStreamSpans({
             pageHeightPt,
           })
         : null;
+    const detectedRun = synthesized?.run ?? null;
+    const geometryConfidence =
+      synthesized?.geometryConfidence ?? "source-only";
 
-    if (!limitationReason && decoded.complete && decoded.text.trim() && !detectedRun) {
+    if (
+      !limitationReason &&
+      geometryConfidence === "fallback-box"
+    ) {
+      limitationReason =
+        "Native text was decoded and its source baseline is known, but font ascent/descent metrics are unavailable. The visible box uses an approximate fallback and remains read-only.";
+    } else if (
+      !limitationReason &&
+      decoded.complete &&
+      decoded.text.trim() &&
+      !detectedRun
+    ) {
       limitationReason =
         "Native text was decoded, but its geometry is not yet proven safe enough to expose as an editable run.";
     }
@@ -273,7 +314,7 @@ export function buildNativeContentStreamSpans({
       decodeComplete: decoded.complete,
       locatedOperator: located,
       fontProfile: profile,
-      geometryConfidence: detectedRun ? "exact-simple-run" : "source-only",
+      geometryConfidence,
       detectedRun,
       limitationReason,
     };

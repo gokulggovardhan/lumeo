@@ -30,7 +30,8 @@
 // range-select convention, and the same Shift+Arrow keyboard equivalent
 // the parent wires at the stage level.
 
-import { memo, type KeyboardEvent, type MouseEvent } from "react";
+import { memo, useId, type KeyboardEvent, type MouseEvent } from "react";
+import type { TextCapabilityUserMessage } from "@/lib/pdf/edit/capabilityMessaging";
 import type { DetectedTextRun } from "@/lib/pdf/edit/textRuns.ts";
 
 type TextRunOverlayProps = {
@@ -38,10 +39,13 @@ type TextRunOverlayProps = {
   editable: boolean;
   selected: boolean;
   hovered: boolean;
+  focused: boolean;
+  limitationMessage: TextCapabilityUserMessage | null;
   onSelect: (shiftKey: boolean) => void;
   onHoverStart: () => void;
   onHoverEnd: () => void;
   onFocusRun: () => void;
+  onBlurRun: () => void;
   registerNode: (node: HTMLDivElement | null) => void;
 };
 
@@ -59,12 +63,17 @@ function TextRunOverlayImpl({
   editable,
   selected,
   hovered,
+  focused,
+  limitationMessage,
   onSelect,
   onHoverStart,
   onHoverEnd,
   onFocusRun,
+  onBlurRun,
   registerNode,
 }: TextRunOverlayProps) {
+  const limitationId = useId();
+
   function handleClick(event: MouseEvent<HTMLDivElement>) {
     event.stopPropagation();
     onSelect(event.shiftKey);
@@ -92,6 +101,13 @@ function TextRunOverlayImpl({
       : editable
         ? "border border-transparent bg-[var(--lumeo-gold)]/[0.025]"
         : "border border-transparent";
+  const showLimitation =
+    !editable &&
+    limitationMessage !== null &&
+    (hovered || focused || selected);
+  const limitationVerticalClass =
+    run.yPct < 18 ? "top-[calc(100%+4px)]" : "bottom-[calc(100%+4px)]";
+  const limitationHorizontalClass = run.xPct > 70 ? "right-0" : "left-0";
 
   return (
     <div
@@ -99,12 +115,15 @@ function TextRunOverlayImpl({
       role="button"
       tabIndex={0}
       aria-label={`${editable ? "Editable" : "Not yet editable"} text: ${run.str}`}
+      aria-describedby={showLimitation ? limitationId : undefined}
       aria-pressed={selected}
+      title={!editable && limitationMessage ? limitationMessage.title : undefined}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
       onMouseEnter={onHoverStart}
       onMouseLeave={onHoverEnd}
       onFocus={onFocusRun}
+      onBlur={onBlurRun}
       className={`absolute z-10 rounded-[2px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${borderClass} ${editable ? "cursor-text" : "cursor-not-allowed"}`}
       style={{
         left: `${run.xPct}%`,
@@ -112,7 +131,21 @@ function TextRunOverlayImpl({
         width: `${run.widthPct}%`,
         height: `${run.heightPct}%`,
       }}
-    />
+    >
+      {showLimitation && limitationMessage ? (
+        <span
+          id={limitationId}
+          role="status"
+          data-edit-capability-explanation
+          className={`pointer-events-none absolute z-40 w-max max-w-[240px] rounded-lg border border-black/10 bg-white/96 px-2.5 py-2 text-left text-[10px] leading-4 text-[#343842] shadow-lg ${limitationVerticalClass} ${limitationHorizontalClass}`}
+        >
+          <strong className="block font-bold">{limitationMessage.title}</strong>
+          <span className="mt-0.5 block font-medium text-[#5d6470]">
+            {limitationMessage.detail}
+          </span>
+        </span>
+      ) : null}
+    </div>
   );
 }
 

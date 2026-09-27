@@ -1,5 +1,8 @@
 import type { NativeContentStreamSpan } from "./nativeTextDetection.ts";
-import type { TextSignalReconciliation } from "./textReconciliation.ts";
+import type {
+  TextEditArbitration,
+  TextSignalReconciliation,
+} from "./textReconciliation.ts";
 
 export type DocumentTextCapabilityCategory =
   | "NATIVE_TEXT"
@@ -18,6 +21,10 @@ export type SpanTextCapabilityClassification = {
   nativeSpanKey: string;
   category: DocumentTextCapabilityCategory;
   safelyRewritable: boolean;
+  authorization:
+    | "span-safe"
+    | "needs-measured-reconciliation"
+    | "blocked";
   reason: string;
 };
 
@@ -51,6 +58,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "CLIPPED_TEXT",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "The text participates in a clipping rendering mode.",
     };
   }
@@ -59,6 +67,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "TYPE3_TEXT",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "Type3 glyph programs are not yet proven safe for native rewrite.",
     };
   }
@@ -67,15 +76,18 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "VERTICAL_TEXT",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "The Type0 font uses a vertical CMap; vertical native rewrite is not yet proven safe.",
     };
   }
-  if (span.locatedOperator.locator.kind === "xobject") {
+  if (span.geometryConfidence === "fallback-box") {
     return {
       nativeSpanKey: span.key,
-      category: "FORM_XOBJECT_TEXT",
-      safelyRewritable: span.decodeComplete && profile?.encodingSource !== "Unknown",
-      reason: "The text is inside a Form XObject and retains form-local resource scope.",
+      category: "NATIVE_TEXT_WITH_FONT_LIMITATIONS",
+      safelyRewritable: false,
+      authorization: "needs-measured-reconciliation",
+      reason:
+        "The native-only display box is approximate because font ascent/descent metrics are unavailable. Direct editing still requires independently measured PDF.js/native geometry.",
     };
   }
   if (!profile || profile.encodingSource === "Unknown" || !span.decodeComplete) {
@@ -83,6 +95,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "NATIVE_TEXT_WITH_ENCODING_LIMITATIONS",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "The source character encoding cannot be proven completely.",
     };
   }
@@ -91,6 +104,7 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "NATIVE_TEXT_WITH_FONT_LIMITATIONS",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "The source font exists, but deterministic glyph metrics are unavailable.",
     };
   }
@@ -99,7 +113,22 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "COMPLEX_VECTOR_TEXT",
       safelyRewritable: false,
+      authorization: "blocked",
       reason: "The text transform is materially skewed and is kept read-only.",
+    };
+  }
+
+  // Form/XObject scope is a resource-location property, not permission to
+  // bypass the same encoding, metrics and geometry bars page text must pass.
+  // Classify it only AFTER those fail-closed checks have succeeded.
+  if (span.locatedOperator.locator.kind === "xobject") {
+    return {
+      nativeSpanKey: span.key,
+      category: "FORM_XOBJECT_TEXT",
+      safelyRewritable: true,
+      authorization: "span-safe",
+      reason:
+        "The text is inside a Form XObject, retains form-local resource scope, and clears the same encoding, metrics and geometry safety checks as direct page text.",
     };
   }
 
@@ -107,7 +136,72 @@ export function classifyNativeTextSpan(
     nativeSpanKey: span.key,
     category: "NATIVE_TEXT",
     safelyRewritable: true,
+    authorization: "span-safe",
     reason: "Native text has decodable source bytes, a resolved font and deterministic metrics.",
+  };
+}
+
+/**
+ * Final fail-closed bridge between signal reconciliation and native PDF
+ * capability evidence.
+ *
+ * Signal arbitration answers "did the visible run and native source agree?"
+ * It does not, by itself, know whether the agreed source uses a clipping
+ * render mode, Type3 glyph program, vertical writing, missing metrics, etc.
+ * This function prevents those structurally unsafe classes from being
+ * advertised as editable merely because identity/geometry reconciliation was
+ * strong. Writers still retain their own validation; this closes the UI/edit
+ * authorization layer earlier.
+ */
+export function enforceSpanCapabilityOnArbitration({
+  arbitration,
+  spanClassification,
+}: {
+  arbitration: TextEditArbitration;
+  spanClassification: SpanTextCapabilityClassification | null;
+}): TextEditArbitration {
+  if (arbitration.decision !== "editable") {
+    return arbitration;
+  }
+
+  // An editable signal decision is necessary but not sufficient. If the
+  // corresponding native span cannot be classified at this boundary, the
+  // structural safety proof is incomplete and must fail closed rather than
+  // inheriting edit authority from reconciliation alone.
+  if (!spanClassification) {
+    return {
+      ...arbitration,
+      decision: "view-only",
+      source: "conflict",
+      reason:
+        "Native capability classification is missing; direct rewrite cannot be authorized safely.",
+    };
+  }
+
+  if (spanClassification.safelyRewritable) {
+    return arbitration;
+  }
+
+  // A fallback native-only box is presentation evidence only. It can never
+  // authorize a write. However, the Phase 1 arbitration already has a separate
+  // measured-geometry proof for reconciled PDF.js runs and for exact
+  // fragmented reconstruction. Preserve that stronger authority instead of
+  // downgrading otherwise-safe standard-font text merely because its PDF font
+  // dictionary omits ascent/descent.
+  if (
+    spanClassification.authorization === "needs-measured-reconciliation" &&
+    (arbitration.source === "reconciled" ||
+      arbitration.source === "fragmented-reconstruction")
+  ) {
+    return arbitration;
+  }
+
+  return {
+    ...arbitration,
+    decision: "view-only",
+    source: "conflict",
+    reason:
+      `Native capability classification blocks direct rewrite: ${spanClassification.reason}`,
   };
 }
 

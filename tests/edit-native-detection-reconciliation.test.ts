@@ -17,6 +17,7 @@ import {
 import {
   DocumentTextCapabilityClassifier,
   classifyNativeTextSpan,
+  enforceSpanCapabilityOnArbitration,
 } from "../lib/pdf/edit/textCapabilityClassifier.ts";
 
 const viewport = [1, 0, 0, -1, 0, 792];
@@ -476,6 +477,47 @@ test("classifier identifies Form XObject text without flattening away its resour
   assert.equal(classification.safelyRewritable, true);
 });
 
+test("Form XObject classification still fails closed for missing metrics and complex geometry", () => {
+  const locator = { kind: "xobject" as const, formPath: ["Fm1"] };
+
+  const fontLimited = buildNativeContentStreamSpans({
+    operators: [located({ locator })],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () =>
+      profile({
+        metricsSource: "Unknown",
+        metrics: {
+          ...profile().metrics,
+          source: "Unknown",
+        },
+      }),
+  })[0];
+  const fontClassification = classifyNativeTextSpan(fontLimited);
+  assert.equal(
+    fontClassification.category,
+    "NATIVE_TEXT_WITH_FONT_LIMITATIONS",
+  );
+  assert.equal(fontClassification.safelyRewritable, false);
+
+  const skewed = buildNativeContentStreamSpans({
+    operators: [
+      located({
+        locator,
+        textRenderingMatrix: [12, 3, 0, 12, 72, 700],
+      }),
+    ],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  })[0];
+  const skewClassification = classifyNativeTextSpan(skewed);
+  assert.equal(skewClassification.category, "COMPLEX_VECTOR_TEXT");
+  assert.equal(skewClassification.safelyRewritable, false);
+});
+
 test("classifier detects vertical Type0 text from retained font CMap evidence", () => {
   const [span] = buildNativeContentStreamSpans({
     operators: [located()],
@@ -528,10 +570,178 @@ test("classifier refuses unknown encoding and clipping instead of claiming safe 
     viewportTransform: viewport,
     pageWidthPt: 612,
     pageHeightPt: 792,
-    resolveFontProfile: () => profile(),
+    // Model the real standard-font fixture: deterministic widths exist, but
+    // the PDF does not expose descriptor ascent/descent.
+    resolveFontProfile: () =>
+      profile({
+        ascentRatio: null,
+        descentRatio: null,
+      }),
   })[0];
   assert.equal(classifyNativeTextSpan(clipped).category, "CLIPPED_TEXT");
   assert.equal(classifyNativeTextSpan(clipped).safelyRewritable, false);
+
+  // Clipping changes rewrite safety, not the ability to locate the native
+  // glyph box. Missing vertical font metrics may use the explicit approximate
+  // display box, but that confidence can never authorize an edit.
+  assert.equal(clipped.geometryConfidence, "fallback-box");
+  assert.ok(clipped.detectedRun);
+  assert.match(clipped.limitationReason ?? "", /clipping rendering mode/i);
+  const [clippedRun] = nativeDetectedRuns([clipped]);
+  assert.ok(clippedRun);
+
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [clippedRun],
+    reconciliations: [],
+    nativeSpans: [clipped],
+  });
+  assert.equal(arbitration.decision, "view-only");
+  assert.equal(arbitration.nativeSpanKey, clipped.key);
+});
+
+test("missing ascent/descent exposes approximate native geometry but remains font-limited and read-only", () => {
+  const [span] = buildNativeContentStreamSpans({
+    operators: [located()],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () =>
+      profile({
+        ascentRatio: null,
+        descentRatio: null,
+      }),
+  });
+
+  assert.equal(span.geometryConfidence, "fallback-box");
+  assert.ok(span.detectedRun);
+  assert.equal(span.detectedRun.ascentRatio, 0.85);
+  assert.equal(span.detectedRun.descentRatio, -0.15);
+  assert.match(span.limitationReason ?? "", /approximate fallback/i);
+
+  const classification = classifyNativeTextSpan(span);
+  assert.equal(classification.category, "NATIVE_TEXT_WITH_FONT_LIMITATIONS");
+  assert.equal(classification.safelyRewritable, false);
+  assert.equal(classification.authorization, "needs-measured-reconciliation");
+
+  const [run] = nativeDetectedRuns([span]);
+  assert.ok(run);
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [run],
+    reconciliations: [],
+    nativeSpans: [span],
+  });
+  assert.equal(arbitration.decision, "view-only");
+});
+
+test("measured PDF.js/native reconciliation can satisfy fallback-box geometry without promoting native-only fallback", () => {
+  const [span] = buildNativeContentStreamSpans({
+    operators: [located()],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () =>
+      profile({
+        ascentRatio: null,
+        descentRatio: null,
+      }),
+  });
+
+  const run = {
+    str: "Hi",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 2,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: false,
+    baselineXPct: 10,
+    baselineYPct: 11.5,
+    ascentRatio: 0.8,
+    descentRatio: -0.2,
+    pdfJsTransform: [12, 0, 0, 12, 72, 700],
+    detectionSource: "pdfjs" as const,
+  };
+
+  const reconciliations = reconcileTextSignals({
+    runs: [run],
+    legacyMatches: [{ locatedOperator: span.locatedOperator, operator: span.locatedOperator.operator }],
+    nativeSpans: [span],
+    viewportTransform: viewport,
+  });
+  const [arbitration] = buildTextEditArbitrations({
+    runs: [run],
+    reconciliations,
+    nativeSpans: [span],
+  });
+
+  assert.equal(reconciliations[0].confidence, "high");
+  assert.notEqual(reconciliations[0].baselineDistancePt, null);
+  assert.notEqual(reconciliations[0].angleDeltaDeg, null);
+  assert.equal(arbitration.decision, "editable");
+  assert.equal(arbitration.source, "reconciled");
+
+  const guarded = enforceSpanCapabilityOnArbitration({
+    arbitration,
+    spanClassification: classifyNativeTextSpan(span),
+  });
+  assert.equal(guarded.decision, "editable");
+  assert.equal(guarded.source, "reconciled");
+});
+
+test("capability guard keeps reconciled clipping text read-only and preserves safe native text", () => {
+  const clipped = buildNativeContentStreamSpans({
+    operators: [located({ renderMode: 4 })],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  })[0];
+  const safe = buildNativeContentStreamSpans({
+    operators: [located({ renderMode: 0 })],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  })[0];
+
+  const reconciled = {
+    pdfJsRunIndex: 0,
+    decision: "editable" as const,
+    nativeSpanKey: clipped.key,
+    source: "reconciled" as const,
+    reason: "Strong Unicode and geometry agreement.",
+  };
+
+  const clippedGuard = enforceSpanCapabilityOnArbitration({
+    arbitration: reconciled,
+    spanClassification: classifyNativeTextSpan(clipped),
+  });
+  assert.equal(clippedGuard.decision, "view-only");
+  assert.equal(clippedGuard.source, "conflict");
+  assert.match(clippedGuard.reason, /capability classification/i);
+  assert.match(clippedGuard.reason, /clipping/i);
+
+  const safeGuard = enforceSpanCapabilityOnArbitration({
+    arbitration: {
+      ...reconciled,
+      nativeSpanKey: safe.key,
+    },
+    spanClassification: classifyNativeTextSpan(safe),
+  });
+  assert.equal(safeGuard.decision, "editable");
+  assert.equal(safeGuard.source, "reconciled");
+
+  const missingClassificationGuard = enforceSpanCapabilityOnArbitration({
+    arbitration: {
+      ...reconciled,
+      nativeSpanKey: safe.key,
+    },
+    spanClassification: null,
+  });
+  assert.equal(missingClassificationGuard.decision, "view-only");
+  assert.equal(missingClassificationGuard.source, "conflict");
+  assert.match(missingClassificationGuard.reason, /classification is missing/i);
 });
 
 test("page classifier distinguishes native-only evidence from an unsupported empty page", () => {
