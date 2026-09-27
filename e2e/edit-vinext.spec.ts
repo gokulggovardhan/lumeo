@@ -9,6 +9,7 @@ import {
   IMAGE_ONLY_PDF,
   SEARCHABLE_SCAN_PDF,
   SHAPED_LTR_PDF,
+  PARAGRAPH_PDF,
   LARGE_DOCUMENT_PDF,
   MIXED_STYLE_PDF,
   SPLIT_RUN_PDF,
@@ -1077,6 +1078,110 @@ test("vinext Edit PDF applies one safe formatting transaction across mixed nativ
   await expect(redone.locator("[data-native-mixed-font-size]")).toHaveValue("16");
   await expect(redone.locator("[data-native-mixed-horizontal-scale]")).toHaveValue("90");
   await expect(redone.locator("[data-native-mixed-fill]")).toHaveValue("#008800");
+
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test("vinext Edit PDF edits preserved native paragraph lines as one atomic history transaction", async ({ page }) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
+  const originalBytes = await readFile(PARAGRAPH_PDF);
+  const originalDoc = await PDFDocument.load(originalBytes);
+  const originalOperators = collectPageTextOperators(originalDoc, 0);
+  expect(originalOperators).toHaveLength(2);
+  const originalLineMatrices = originalOperators.map(
+    (entry) => entry.operator.textLineMatrix,
+  );
+
+  await uploadEditFixture(page, PARAGRAPH_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+
+  const editableRuns = page.locator('div[role="button"][aria-label^="Editable text: "]');
+  await expect(editableRuns).toHaveCount(2, { timeout: 90_000 });
+  const labels = await editableRuns.evaluateAll((nodes) =>
+    nodes.map((node) => node.getAttribute("aria-label") ?? ""),
+  );
+  const firstIndex = labels.findIndex((label) => label.includes("Paragraph alpha"));
+  const secondIndex = labels.findIndex((label) => label.includes("Paragraph beta"));
+  expect(firstIndex).toBeGreaterThanOrEqual(0);
+  expect(secondIndex).toBeGreaterThanOrEqual(0);
+
+  await editableRuns.nth(firstIndex).click();
+  await editableRuns.nth(secondIndex).click({ modifiers: ["Shift"] });
+
+  const panel = page.locator("[data-edit-multi-run-panel]");
+  await expect(panel).toBeVisible();
+  const editor = panel.locator("[data-edit-paragraph-input='true']");
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveValue("Paragraph alpha\nParagraph beta");
+
+  const apply = panel.locator("[data-edit-multi-run-apply]");
+  await expect(apply).toBeDisabled();
+  await editor.fill("Alpha revised\nBeta revised");
+  await expect(apply).toBeEnabled();
+  await apply.click();
+
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
+    timeout: 90_000,
+  });
+  await waitForStageReady(page);
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+  await expect(
+    page.locator('div[role="button"][aria-label*="Paragraph alpha"]').first(),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Redo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
+    timeout: 90_000,
+  });
+  await expect(
+    page.locator('div[role="button"][aria-label*="Alpha revised"]').first(),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(
+    page.locator('div[role="button"][aria-label*="Beta revised"]').first(),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", { name: "Download edited PDF" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  const outputPath = await download.path();
+  expect(outputPath).not.toBeNull();
+  const exportedBytes = await readFile(outputPath!);
+
+  const exportedDoc = await PDFDocument.load(exportedBytes);
+  const exportedOperators = collectPageTextOperators(exportedDoc, 0);
+  expect(exportedOperators).toHaveLength(2);
+  expect(exportedOperators.map((entry) => entry.operator.textLineMatrix)).toEqual(
+    originalLineMatrices,
+  );
+
+  const registry = new PdfFontRegistry(exportedDoc);
+  const decoded = exportedOperators.map((entry) => {
+    const resourceName = entry.operator.fontResourceName;
+    expect(resourceName).toBeTruthy();
+    const profile = registry.resolve(entry.resources, resourceName!);
+    expect(profile).not.toBeNull();
+    const text = decodeTextShowOperator(entry.operator, profile!.resolvedFont);
+    expect(text.allDecoded).toBe(true);
+    return text.text;
+  });
+  expect(decoded).toEqual(["Alpha revised", "Beta revised"]);
 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
