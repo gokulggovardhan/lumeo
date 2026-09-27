@@ -116,6 +116,14 @@ import {
   type OcrPageResult,
   type OcrProgress,
 } from "@/lib/pdf/edit/localOcr";
+import {
+  MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES,
+  createLocalCustomFontAsset,
+  loadLocalCustomFontFace,
+  localCustomFontTextIssue,
+  removeLocalCustomFontFace,
+  type LocalCustomFontAsset,
+} from "@/lib/pdf/edit/localCustomFont";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
@@ -796,6 +804,16 @@ export default function EditPdfTool() {
     family: string;
     embeddedProgramSha256: string;
   } | null>(null);
+  // Custom fonts are browser-session assets for newly placed text only.
+  // Undo snapshots store only the asset fingerprint/family on TextEditElement;
+  // the binary font program stays in this bounded in-memory registry.
+  const [localCustomFontAssets, setLocalCustomFontAssets] = useState<
+    ReadonlyMap<string, LocalCustomFontAsset>
+  >(() => new Map());
+  const localCustomFontFacesRef = useRef<Map<string, FontFace>>(new Map());
+  const localCustomFontRequestRef = useRef(0);
+  const [localCustomFontBusy, setLocalCustomFontBusy] = useState(false);
+  const [localCustomFontError, setLocalCustomFontError] = useState("");
   const [shapingEvidenceState, setShapingEvidenceState] =
     useState<ShapingEvidenceState | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
@@ -1627,6 +1645,21 @@ export default function EditPdfTool() {
     textSearchQuery,
   ]);
 
+  const disposeLocalCustomFontFaces = useCallback(() => {
+    localCustomFontRequestRef.current += 1;
+    for (const face of localCustomFontFacesRef.current.values()) {
+      removeLocalCustomFontFace(face);
+    }
+    localCustomFontFacesRef.current.clear();
+  }, []);
+
+  const resetLocalCustomFonts = useCallback(() => {
+    disposeLocalCustomFontFaces();
+    setLocalCustomFontAssets(new Map());
+    setLocalCustomFontBusy(false);
+    setLocalCustomFontError("");
+  }, [disposeLocalCustomFontFaces]);
+
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
     const result = track({ eventName: "tool_opened", toolSlug: "edit" });
@@ -1642,8 +1675,9 @@ export default function EditPdfTool() {
       ocrEngineRef.current = null;
       void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
       void (pendingInitialDocRef.current?.doc as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | undefined)?.destroy?.();
+      disposeLocalCustomFontFaces();
     };
-  }, []);
+  }, [disposeLocalCustomFontFaces]);
 
   // Same cleanup an unmount already does, plus a full reset of every piece
   // of state a new upload doesn't already reinitialize -- returns to the
@@ -1661,6 +1695,7 @@ export default function EditPdfTool() {
     
     setOcrErrorRevision(null);
     setOcrCopiedRevision(null);
+    resetLocalCustomFonts();
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     pdfJsDocRef.current = null;
     pdfJsDocBytesRef.current = null;
@@ -2579,6 +2614,11 @@ export default function EditPdfTool() {
         return;
       }
 
+      // A new PDF starts a new private font-asset session. Release
+      // browser FontFace objects only after the new file has passed all PDF
+      // validation, so a failed replacement attempt cannot damage the
+      // current document session.
+      resetLocalCustomFonts();
       pendingInitialDocRef.current = { bytes, doc };
       setPdfMeta({ file, pageCount });
       setPageIndex(0);
