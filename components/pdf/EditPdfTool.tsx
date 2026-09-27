@@ -701,7 +701,7 @@ export default function EditPdfTool() {
   const [ocrError, setOcrError] = useState("");
   const [ocrCopied, setOcrCopied] = useState(false);
   const ocrPageResultCurrent =
-    ocrResultsRevision?.bytes === pdf?.bytes
+    ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
       ? ocrResultsRevision.pages.get(pageIndex) ?? null
       : null;
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
