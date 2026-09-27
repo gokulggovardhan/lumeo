@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   EditPerformanceDiagnostics,
+  browserUsedHeapBytes,
   editPerformanceNow,
 } from "../lib/pdf/edit/editPerformanceDiagnostics.ts";
 
@@ -64,4 +65,10 @@ test("editPerformanceNow returns a finite monotonic-clock compatible value", () 
   const value = editPerformanceNow();
   assert.equal(Number.isFinite(value), true);
   assert.equal(value >= 0, true);
+});
+
+
+test("browserUsedHeapBytes is fail-safe when the runtime exposes no memory API", () => {
+  const value = browserUsedHeapBytes();
+  assert.equal(value === null || (Number.isFinite(value) && value >= 0), true);
 });
