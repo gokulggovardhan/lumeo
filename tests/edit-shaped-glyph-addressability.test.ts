@@ -84,7 +84,7 @@ function cidFontFixture({
       }),
     );
 
-    const widthEntries: unknown[] = [];
+    const widthEntries: (number | number[])[] = [];
     for (const [cid, width] of [...widths.entries()].sort((a, b) => a[0] - b[0])) {
       widthEntries.push(cid, [width]);
     }
@@ -287,4 +287,73 @@ test("shaped glyph addressability rejects malformed CIDToGIDMap stream bytes", a
 
   assert.equal(result.kind, "blocked");
   if (result.kind === "blocked") assert.match(result.reason, /odd byte length/i);
+});
+
+
+test("shaped glyph addressability does not unbounded-decode compressed CIDToGIDMap streams", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const fakeTtf = Uint8Array.from([
+    0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0,
+  ]);
+  const fontFileRef = context.register(context.flateStream(fakeTtf));
+  const descriptorRef = context.register(
+    context.obj({
+      Type: "FontDescriptor",
+      FontName: "ABCDEF+CompressedMap",
+      Flags: 32,
+      ItalicAngle: 0,
+      FontFile2: fontFileRef,
+    }),
+  );
+  const compressedMapRef = context.register(
+    context.flateStream(Uint8Array.from([0, 0, 0, 0, 0, 0, 0, 7])),
+  );
+  const descendantRef = context.register(
+    context.obj({
+      Type: "Font",
+      Subtype: "CIDFontType2",
+      BaseFont: "ABCDEF+CompressedMap",
+      CIDSystemInfo: {
+        Registry: "Adobe",
+        Ordering: "Identity",
+        Supplement: 0,
+      },
+      FontDescriptor: descriptorRef,
+      DW: 1000,
+      W: [3, [600]],
+      CIDToGIDMap: compressedMapRef,
+    }),
+  );
+  const toUnicodeRef = context.register(
+    context.stream([
+      "1 beginbfchar",
+      "<0003> <0048>",
+      "endbfchar",
+    ].join("\n")),
+  );
+  const type0Ref = context.register(
+    context.obj({
+      Type: "Font",
+      Subtype: "Type0",
+      BaseFont: "ABCDEF+CompressedMap",
+      Encoding: "Identity-H",
+      DescendantFonts: [descendantRef],
+      ToUnicode: toUnicodeRef,
+    }),
+  );
+  const resources = context.obj({
+    Font: context.obj({ FShape: type0Ref }),
+  });
+
+  const result = new PdfFontRegistry(doc).inspectShapedGlyphAddressability(
+    resources,
+    "FShape",
+    shapedRun([{ glyphId: 7, clusterText: "H" }]),
+  );
+
+  assert.equal(result.kind, "blocked");
+  if (result.kind === "blocked") {
+    assert.match(result.reason, /Compressed CIDToGIDMap/i);
+  }
 });
