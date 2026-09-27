@@ -108,8 +108,8 @@ function cloneState(state: PdfSemanticState | null): PdfSemanticState | null {
   if (!state) return null;
   return {
     ...state,
-    geometry: state.geometry ? { ...state.geometry } : undefined,
-    style: state.style ? { ...state.style } : undefined,
+    ...(state.geometry ? { geometry: { ...state.geometry } } : {}),
+    ...(state.style ? { style: { ...state.style } } : {}),
   };
 }
 
