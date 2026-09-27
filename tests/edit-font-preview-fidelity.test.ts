@@ -2,24 +2,56 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { describeFontPreviewFidelity } from "../lib/pdf/edit/fontPreviewFidelity.ts";
 
+const EMBEDDED_SHA = "a".repeat(64);
 const embeddedProfile = {
   isEmbedded: true,
   browserPreviewPossible: true,
   cssFallbackFamily: "Arial, Helvetica, sans-serif",
   familyName: "Demo Sans",
+  embeddedProgramSha256: EMBEDDED_SHA,
 };
 
-test("font preview fidelity reports an exact embedded face only after that embedded program loaded", () => {
+test("font preview fidelity reports exact only for the loaded embedded program fingerprint", () => {
   const exact = describeFontPreviewFidelity({
     profile: embeddedProfile,
-    exactEmbeddedLoaded: true,
+    loadedEmbeddedProgramSha256: EMBEDDED_SHA.toUpperCase(),
   });
 
   assert.equal(exact.kind, "exact-embedded");
   assert.equal(exact.family, "Demo Sans");
   assert.match(exact.label, /Exact embedded font/i);
+  assert.match(exact.detail, /same embedded font program/i);
   assert.match(exact.detail, /informational only/i);
-  assert.match(exact.detail, /edit safety/i);
+});
+
+test("font preview fidelity fails closed when a loaded embedded face has a different fingerprint", () => {
+  const fallback = describeFontPreviewFidelity({
+    profile: embeddedProfile,
+    loadedEmbeddedProgramSha256: "b".repeat(64),
+  });
+
+  assert.equal(fallback.kind, "fallback");
+  assert.equal(fallback.family, "Arial, Helvetica, sans-serif");
+  assert.match(fallback.detail, /fingerprint-matched/i);
+});
+
+test("font preview fidelity fails closed when fingerprint evidence is missing or malformed", () => {
+  for (const loadedEmbeddedProgramSha256 of [null, "not-a-sha"]) {
+    const fallback = describeFontPreviewFidelity({
+      profile: embeddedProfile,
+      loadedEmbeddedProgramSha256,
+    });
+    assert.equal(fallback.kind, "fallback");
+  }
+
+  const missingRegistryFingerprint = describeFontPreviewFidelity({
+    profile: {
+      ...embeddedProfile,
+      embeddedProgramSha256: null,
+    },
+    loadedEmbeddedProgramSha256: EMBEDDED_SHA,
+  });
+  assert.equal(missingRegistryFingerprint.kind, "fallback");
 });
 
 test("font preview fidelity supports independently verified equivalents without making them write authority", () => {
@@ -28,8 +60,9 @@ test("font preview fidelity supports independently verified equivalents without 
       ...embeddedProfile,
       isEmbedded: false,
       browserPreviewPossible: false,
+      embeddedProgramSha256: null,
     },
-    exactEmbeddedLoaded: false,
+    loadedEmbeddedProgramSha256: null,
     verifiedEquivalent: {
       family: "Verified Sans Substitute",
       evidence: "independent metric and visual equivalence proof",
@@ -42,18 +75,6 @@ test("font preview fidelity supports independently verified equivalents without 
   assert.match(equivalent.detail, /does not authorize/i);
 });
 
-test("font preview fidelity stays fallback when an embedded browser face has not actually loaded", () => {
-  const fallback = describeFontPreviewFidelity({
-    profile: embeddedProfile,
-    exactEmbeddedLoaded: false,
-  });
-
-  assert.equal(fallback.kind, "fallback");
-  assert.equal(fallback.family, "Arial, Helvetica, sans-serif");
-  assert.match(fallback.label, /Fallback font/i);
-  assert.match(fallback.detail, /evaluated separately/i);
-});
-
 test("font preview fidelity never calls a generic Standard-14 CSS stack verified-equivalent without proof", () => {
   const standardFont = describeFontPreviewFidelity({
     profile: {
@@ -61,8 +82,9 @@ test("font preview fidelity never calls a generic Standard-14 CSS stack verified
       browserPreviewPossible: false,
       cssFallbackFamily: "Arial, Helvetica, sans-serif",
       familyName: "Helvetica",
+      embeddedProgramSha256: null,
     },
-    exactEmbeddedLoaded: false,
+    loadedEmbeddedProgramSha256: null,
   });
 
   assert.equal(standardFont.kind, "fallback");
