@@ -18,6 +18,11 @@ export type ShapedGlyphResourceBinding = Readonly<{
   cidToGidMapKind: "identity" | "stream";
 }>;
 
+type ShapedGlyphResourceBindingInput = Omit<
+  ShapedGlyphResourceBinding,
+  "cidToGidMapKind"
+>;
+
 export type ShapedGlyphPdfAddress = Readonly<{
   glyphIndex: number;
   glyphId: number;
@@ -144,7 +149,7 @@ export function proveShapedGlyphAddressability({
   defaultWidth,
   shaped,
 }: {
-  binding: ShapedGlyphResourceBinding;
+  binding: ShapedGlyphResourceBindingInput;
   fontKind: string;
   descendantSubtype: string | null;
   type0Encoding: string | null;
