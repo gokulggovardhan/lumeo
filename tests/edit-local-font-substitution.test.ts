@@ -66,9 +66,10 @@ async function readyAsset() {
 
 async function planFixture(
   replacementText = "iiii",
-  bytes = await sourcePdf(),
+  bytes?: Uint8Array,
 ) {
-  const doc = await PDFDocument.load(bytes.slice());
+  const sourceBytes = bytes ?? (await sourcePdf());
+  const doc = await PDFDocument.load(sourceBytes.slice());
   const entries = collectPageTextOperators(doc, 0);
   assert.equal(entries.length, 2);
   const first = entries[0];
@@ -94,7 +95,7 @@ async function planFixture(
     embeddedGlyphEvidence: profile!.embeddedGlyphEvidence,
     asset,
   });
-  return { bytes, doc, entries, profile: profile!, asset, plan };
+  return { bytes: sourceBytes, doc, entries, profile: profile!, asset, plan };
 }
 
 async function pdfJsText(bytes: Uint8Array): Promise<string> {
