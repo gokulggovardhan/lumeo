@@ -83,8 +83,45 @@ export async function enterRedactMode(page: Page): Promise<void> {
  */
 export async function dragBoxOverRun(page: Page, needle: string): Promise<void> {
   const run = page.locator(runSelectorFor(needle)).first();
+
+  // Firefox can still be finishing a smooth scroll started by the editor's
+  // focus/selection choreography after a native edit. Starting a viewport-
+  // coordinate mouse drag while the page is moving makes the page-relative
+  // redaction box drift away from the run even though the initial
+  // boundingBox() was correct. Require several consecutive stable geometry
+  // samples before pressing the pointer; this waits on observable layout
+  // state rather than hiding the race behind a fixed sleep.
+  let previous = await run.boundingBox();
+  if (!previous) throw new Error(`run containing "${needle}" has no box`);
+  let stableSamples = 0;
+  await expect
+    .poll(
+      async () => {
+        const next = await run.boundingBox();
+        if (!next) {
+          stableSamples = 0;
+          previous = next;
+          return stableSamples;
+        }
+        const stable =
+          previous !== null &&
+          Math.abs(next.x - previous.x) <= 0.5 &&
+          Math.abs(next.y - previous.y) <= 0.5 &&
+          Math.abs(next.width - previous.width) <= 0.5 &&
+          Math.abs(next.height - previous.height) <= 0.5;
+        stableSamples = stable ? stableSamples + 1 : 0;
+        previous = next;
+        return stableSamples;
+      },
+      {
+        timeout: 10_000,
+        message: `run containing "${needle}" should stop moving before a redaction drag starts`,
+      },
+    )
+    .toBeGreaterThanOrEqual(2);
+
   const box = await run.boundingBox();
-  if (!box) throw new Error(`run containing "${needle}" has no box`);
+  if (!box) throw new Error(`run containing "${needle}" disappeared before the drag`);
 
   await page.mouse.move(box.x + 2, box.y + 1);
   await page.mouse.down();
@@ -95,6 +132,14 @@ export async function dragBoxOverRun(page: Page, needle: string): Promise<void> 
   await page.mouse.up();
 
   await expect(page.locator('[aria-label^="Remove redaction box"]')).toHaveCount(1);
+
+  // A visible box is not sufficient proof: if the page moved during the
+  // gesture the box can exist while intersecting zero detected runs. Guard
+  // the semantic condition the next action depends on so failures point at
+  // the drag itself instead of timing out later on a disabled modal button.
+  await expect(
+    page.getByRole("button", { name: /^Redact [1-9]\d* runs?$/ }),
+  ).toBeEnabled({ timeout: 10_000 });
 }
 
 export async function applyRedactionThroughModal(page: Page): Promise<void> {
