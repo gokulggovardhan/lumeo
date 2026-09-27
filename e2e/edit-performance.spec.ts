@@ -6,11 +6,17 @@ import {
   EDIT_PERFORMANCE_320_PDF,
   writeEditPerformanceFixtures,
 } from "./edit-performance-fixtures.ts";
+import { THUMBNAIL_ROW_HEIGHT_PX } from "../lib/pdf/edit/thumbnailVirtualization.ts";
 import { runSelectorFor } from "./helpers.ts";
 
 type PerformanceReport = {
   document: { fileSizeBytes: number | null; pageCount: number | null };
   durations: Record<string, { count: number; maxMs: number; averageMs: number }>;
+  recentEvents: Array<{
+    kind: string;
+    durationMs: number;
+    detail: Record<string, number | string | boolean | null>;
+  }>;
   memory: { peakUsedJsHeapBytes: number | null };
   fontRegistry: Record<string, number> | null;
 };
@@ -19,21 +25,64 @@ test.beforeAll(async () => {
   await writeEditPerformanceFixtures();
 });
 
+async function pageRail(page: Page) {
+  return page
+    .getByRole("complementary", { name: "Pages" })
+    .locator("ul[data-thumbnail-virtualized]");
+}
+
+async function assertBoundedVirtualRail(page: Page) {
+  const rail = await pageRail(page);
+  await expect(rail).toHaveAttribute("data-thumbnail-virtualized", "true", {
+    timeout: 60_000,
+  });
+  await expect
+    .poll(
+      async () => Number(await rail.getAttribute("data-thumbnail-window-size")),
+      { timeout: 60_000 },
+    )
+    .toBeLessThan(30);
+  expect(
+    await page.getByRole("button", { name: /^Open page \d+$/ }).count(),
+  ).toBeLessThan(30);
+  return rail;
+}
+
+async function scrollRailToPage(page: Page, pageNumber: number) {
+  const rail = await assertBoundedVirtualRail(page);
+  await rail.evaluate(
+    (node, targetTop) => {
+      const list = node as HTMLUListElement;
+      list.scrollTop = Math.min(
+        Math.max(0, targetTop),
+        Math.max(0, list.scrollHeight - list.clientHeight),
+      );
+      list.dispatchEvent(new Event("scroll", { bubbles: true }));
+    },
+    (pageNumber - 1) * THUMBNAIL_ROW_HEIGHT_PX,
+  );
+  await expect(
+    page.getByRole("button", { name: `Open page ${pageNumber}` }),
+  ).toBeAttached({ timeout: 60_000 });
+}
+
 async function openFixture(page: Page, path: string, expectedPageCount: number) {
   await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
   await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({
     timeout: 30_000,
   });
   await page.locator('input[type="file"]').first().setInputFiles(path);
-  await expect(page.locator(runSelectorFor("Performance page 1")).first()).toBeVisible({
+  await expect(
+    page.locator(runSelectorFor("Performance page 1")).first(),
+  ).toBeVisible({
     timeout: 180_000,
   });
-  await expect(
-    page.getByRole("button", { name: `Open page ${expectedPageCount}` }),
-  ).toBeAttached({ timeout: 30_000 });
+  await assertBoundedVirtualRail(page);
+  expect(expectedPageCount).toBeGreaterThan(60);
 }
 
 async function openMeasuredPage(page: Page, pageNumber: number) {
+  await scrollRailToPage(page, pageNumber);
   await page.getByRole("button", { name: `Open page ${pageNumber}` }).click();
   await expect(
     page.locator(runSelectorFor(`Performance page ${pageNumber}`)).first(),
@@ -41,12 +90,16 @@ async function openMeasuredPage(page: Page, pageNumber: number) {
 }
 
 async function exerciseRailScroll(page: Page) {
-  const rail = page.getByRole("complementary", { name: "Pages" }).locator("ul");
+  const rail = await assertBoundedVirtualRail(page);
   await rail.evaluate((node) => {
-    node.scrollTop = Math.max(0, node.scrollHeight / 2);
+    const list = node as HTMLUListElement;
+    list.scrollTop = Math.max(0, list.scrollHeight / 2);
+    list.dispatchEvent(new Event("scroll", { bubbles: true }));
   });
   await rail.evaluate((node) => {
-    node.scrollTop = node.scrollHeight;
+    const list = node as HTMLUListElement;
+    list.scrollTop = list.scrollHeight;
+    list.dispatchEvent(new Event("scroll", { bubbles: true }));
   });
   await expect
     .poll(
@@ -109,6 +162,17 @@ async function collectScenario(
   expect(report.durations["text-detection"].count).toBeGreaterThanOrEqual(3);
   expect(report.durations["native-match"].count).toBeGreaterThanOrEqual(3);
   expect(report.durations["thumbnail-batch"].count).toBeGreaterThanOrEqual(1);
+
+  const thumbnailEvents = report.recentEvents.filter(
+    (event) => event.kind === "thumbnail-batch",
+  );
+  expect(thumbnailEvents.length).toBeGreaterThan(0);
+  for (const event of thumbnailEvents) {
+    expect(event.detail.virtualized).toBe(true);
+    expect(Number(event.detail.mountedDomRowCount)).toBeLessThan(30);
+    expect(Number(event.detail.renderedCount)).toBeLessThan(30);
+  }
+  await assertBoundedVirtualRail(page);
 
   const outputDir = join(process.cwd(), "test-results", "edit-performance");
   await mkdir(outputDir, { recursive: true });
