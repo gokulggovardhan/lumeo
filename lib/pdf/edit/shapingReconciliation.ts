@@ -125,14 +125,34 @@ export function reconcileShapingWithPdfCharacterCodes({
     );
   }
 
+  if (
+    text.length > 0 &&
+    (shaped.clusterMap.length === 0 || shaped.glyphs.length === 0)
+  ) {
+    return unresolved(
+      "HarfBuzz returned no shaping clusters or glyphs for non-empty source text.",
+    );
+  }
+
   const pdfCodes: number[] = [];
+  const consumedGlyphIndices = new Set<number>();
+  let expectedClusterStart = 0;
   let requiresPerGlyphPositioning = false;
   let requiresGlyphSubstitution = false;
 
   for (const cluster of shaped.clusterMap) {
-    if (cluster.startUtf16 < 0 || cluster.endUtf16 > text.length) {
-      return unresolved("HarfBuzz returned a shaping cluster outside the source text.");
+    if (
+      cluster.startUtf16 !== expectedClusterStart ||
+      cluster.startUtf16 < 0 ||
+      cluster.endUtf16 <= cluster.startUtf16 ||
+      cluster.endUtf16 > text.length ||
+      cluster.text !== text.slice(cluster.startUtf16, cluster.endUtf16)
+    ) {
+      return unresolved(
+        "HarfBuzz cluster coverage is gapped, overlapping, out of order, or does not match the source text.",
+      );
     }
+    expectedClusterStart = cluster.endUtf16;
 
     const codePoint = singleCodePoint(cluster.text);
     if (codePoint === null || cluster.glyphIndices.length !== 1) {
@@ -144,6 +164,18 @@ export function reconcileShapingWithPdfCharacterCodes({
     }
 
     const glyphIndex = cluster.glyphIndices[0];
+    if (
+      !Number.isInteger(glyphIndex) ||
+      glyphIndex < 0 ||
+      glyphIndex >= shaped.glyphs.length ||
+      consumedGlyphIndices.has(glyphIndex)
+    ) {
+      return unresolved(
+        "HarfBuzz cluster references an invalid or duplicated shaped glyph.",
+      );
+    }
+    consumedGlyphIndices.add(glyphIndex);
+
     const shapedGlyph = shaped.glyphs[glyphIndex];
     if (!shapedGlyph) {
       return unresolved("HarfBuzz cluster references a missing shaped glyph.");
@@ -184,6 +216,15 @@ export function reconcileShapingWithPdfCharacterCodes({
       );
     }
     pdfCodes.push(pdfCode);
+  }
+
+  if (
+    expectedClusterStart !== text.length ||
+    consumedGlyphIndices.size !== shaped.glyphs.length
+  ) {
+    return unresolved(
+      "HarfBuzz shaping evidence does not cover the source text and shaped glyph list exactly once.",
+    );
   }
 
   if (requiresGlyphSubstitution || requiresPerGlyphPositioning) {
