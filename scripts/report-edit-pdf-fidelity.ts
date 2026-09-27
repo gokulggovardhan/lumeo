@@ -1088,7 +1088,7 @@ async function buildFixtures(): Promise<Fixture[]> {
     makeSimpleFixture("common-project-plan", "project-plan", "Phase status: In review", "Phase status: Approved", { font: StandardFonts.Helvetica }),
     makeSimpleFixture("common-audit-report", "audit-report", "Finding count: 12", "Finding count: 9", { font: StandardFonts.TimesRoman }),
     makeSimpleFixture("common-maintenance-report", "maintenance-report", "Service status: Pending", "Service status: Complete", { font: StandardFonts.Helvetica }),
-    makeSimpleFixture("common-meeting-minutes", "meeting-minutes", "Decision: Revisit scope", "Decision: Approve scope", { font: StandardFonts.Courier }),
+    makeSimpleFixture("common-meeting-minutes", "meeting-minutes", "Minutes item 100", "Minutes item 200", { font: StandardFonts.Courier }),
     makeSimpleFixture("common-quotation", "quotation", "Quoted total 18500.00", "Quoted total 19250.00", { font: StandardFonts.Helvetica }),
     makeSimpleFixture("common-tax-summary", "tax-summary", "Tax payable 12800.00", "Tax payable 13150.00", { font: StandardFonts.Courier }),
     makeSimpleFixture("common-inventory-report", "inventory-report", "Available units 184", "Available units 206", { font: StandardFonts.Courier }),
