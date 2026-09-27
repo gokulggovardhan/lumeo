@@ -4632,7 +4632,12 @@ export default function EditPdfTool() {
   async function handleLocalCustomFontFile(elementId: string, file: File) {
     const requestId = localCustomFontRequestRef.current + 1;
     localCustomFontRequestRef.current = requestId;
-    const sourceRevision = getHistoryState().pdfBytes;
+    // Bind this async request to the exact ref-backed history snapshot, not
+    // only to pdfBytes. Overlay-only edits and Undo/Redo can keep the same
+    // ArrayBuffer while changing the target element; publishing after that
+    // would resurrect a stale font choice.
+    const sourceHistorySnapshot = getHistoryState();
+    const sourceRevision = sourceHistorySnapshot.pdfBytes;
     setLocalCustomFontBusy(true);
     setLocalCustomFontError("");
 
@@ -4651,7 +4656,12 @@ export default function EditPdfTool() {
 
       const asset = result.asset;
       let snapshot = getHistoryState();
-      if (snapshot.pdfBytes !== sourceRevision) return;
+      if (
+        snapshot !== sourceHistorySnapshot ||
+        snapshot.pdfBytes !== sourceRevision
+      ) {
+        return;
+      }
       let currentElement = snapshot.elements.find((item) => item.id === elementId);
       if (!currentElement || currentElement.type !== "text") return;
 
@@ -4682,7 +4692,12 @@ export default function EditPdfTool() {
 
       if (localCustomFontRequestRef.current !== requestId) return;
       snapshot = getHistoryState();
-      if (snapshot.pdfBytes !== sourceRevision) return;
+      if (
+        snapshot !== sourceHistorySnapshot ||
+        snapshot.pdfBytes !== sourceRevision
+      ) {
+        return;
+      }
       currentElement = snapshot.elements.find((item) => item.id === elementId);
       if (!currentElement || currentElement.type !== "text") return;
 
