@@ -676,6 +676,8 @@ export default function EditPdfTool() {
     nativeFormatOpen,
     setNativeFormatOpen,
     logicalSelection,
+    textCompositionActive,
+    setTextCompositionActive,
     clearSelection: clearNativeTextSelection,
     resetInteraction: resetNativeTextInteraction,
     selectDetectedRun,
@@ -3783,6 +3785,7 @@ export default function EditPdfTool() {
     editDraftText !== selectedRunIndices.map((i) => detectedTextRuns[i]?.str ?? "").join("");
   const canApplyEdit =
     !isApplyingEdit &&
+    !textCompositionActive &&
     editPreview.kind !== "empty" &&
     editPreview.editable &&
     (replacementLayoutDecision?.safeToApplyWithCurrentWriter ?? true) &&
@@ -3823,6 +3826,7 @@ export default function EditPdfTool() {
     const input = inlineEditInputRef.current;
     if (
       !input ||
+      textCompositionActive ||
       logicalSelectionStart === null ||
       logicalSelectionEnd === null
     ) {
@@ -3845,6 +3849,7 @@ export default function EditPdfTool() {
     logicalSelectionEnd,
     logicalSelectionDirection,
     editDraftText,
+    textCompositionActive,
   ]);
 
   const activeNativeStyleDraft =
@@ -4620,17 +4625,47 @@ export default function EditPdfTool() {
                       <input
                         ref={inlineEditInputRef}
                         value={editDraftText}
+                        onCompositionStart={(event) => {
+                          event.stopPropagation();
+                          setTextCompositionActive(true);
+                        }}
+                        onCompositionEnd={(event) => {
+                          event.stopPropagation();
+                          const input = event.currentTarget;
+                          // Browser IMEs commit the final candidate at
+                          // compositionend/input. Keep the controlled draft
+                          // current, then restore Lumeo's logical selection on
+                          // the next frame after the browser releases the caret.
+                          handleEditDraftTextChange(input.value);
+                          setTextCompositionActive(false);
+                          requestAnimationFrame(() => {
+                            if (inlineEditInputRef.current === input) {
+                              syncSingleSpanLogicalSelection(input);
+                            }
+                          });
+                        }}
                         onChange={(event) => {
                           handleEditDraftTextChange(event.currentTarget.value);
-                          syncSingleSpanLogicalSelection(event.currentTarget);
+                          const nativeInput = event.nativeEvent as InputEvent;
+                          if (!textCompositionActive && !nativeInput.isComposing) {
+                            syncSingleSpanLogicalSelection(event.currentTarget);
+                          }
                         }}
                         onSelect={(event) => {
                           event.stopPropagation();
-                          syncSingleSpanLogicalSelection(event.currentTarget);
+                          if (!textCompositionActive) {
+                            syncSingleSpanLogicalSelection(event.currentTarget);
+                          }
                         }}
                         onClick={(event) => event.stopPropagation()}
                         onKeyDown={(event) => {
                           event.stopPropagation();
+                          const nativeKeyboard = event.nativeEvent as KeyboardEvent;
+                          const isImeKey =
+                            textCompositionActive ||
+                            nativeKeyboard.isComposing ||
+                            nativeKeyboard.keyCode === 229;
+                          if (isImeKey) return;
                           if (event.key === "Enter") {
                             event.preventDefault();
                             if (canApplyEdit) void applyTextRunEdit();
@@ -4641,13 +4676,19 @@ export default function EditPdfTool() {
                         }}
                         onKeyUp={(event) => {
                           event.stopPropagation();
+                          const nativeKeyboard = event.nativeEvent as KeyboardEvent;
+                          if (
+                            textCompositionActive ||
+                            nativeKeyboard.isComposing ||
+                            nativeKeyboard.keyCode === 229
+                          ) {
+                            return;
+                          }
                           // React's synthetic onSelect is not guaranteed to
                           // observe every keyboard-driven caret/range mutation
                           // before the controlled-input mirror effect runs.
                           // Re-read the post-default browser selection for
-                          // navigation keys only. Ordinary text input remains
-                          // driven by onChange, which avoids interfering with
-                          // future IME/composition handling.
+                          // navigation keys only after composition has ended.
                           if (
                             event.key === "ArrowLeft" ||
                             event.key === "ArrowRight" ||
@@ -4658,6 +4699,7 @@ export default function EditPdfTool() {
                           }
                         }}
                         aria-label="Edit text"
+                        data-ime-composing={textCompositionActive ? "true" : "false"}
                         data-logical-selection-start={logicalSelectionStart ?? undefined}
                         data-logical-selection-end={logicalSelectionEnd ?? undefined}
                         data-logical-selection-direction={logicalSelectionDirection}
@@ -4935,9 +4977,19 @@ export default function EditPdfTool() {
                           data-edit-multi-run-input
                           aria-label="Edit selected text runs"
                           value={editDraftText}
+                          onCompositionStart={(event) => {
+                            event.stopPropagation();
+                            setTextCompositionActive(true);
+                          }}
+                          onCompositionEnd={(event) => {
+                            event.stopPropagation();
+                            handleEditDraftTextChange(event.currentTarget.value);
+                            setTextCompositionActive(false);
+                          }}
                           onChange={(event) => {
                             handleEditDraftTextChange(event.target.value);
                           }}
+                          data-ime-composing={textCompositionActive ? "true" : "false"}
                           className="mt-1 w-full rounded-md border border-[var(--text-primary)]/14 bg-transparent px-2 py-1.5 text-sm font-semibold text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)]/45"
                         />
                         <div className="mt-2 flex gap-2">
