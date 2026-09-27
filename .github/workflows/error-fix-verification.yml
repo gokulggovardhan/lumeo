@@ -1,0 +1,47 @@
+name: Verify Error Fixes
+
+on:
+  schedule:
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-error-fixes
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Resolve recurrence-free fixes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify matured error fixes
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${SUPABASE_DB_URL:?Missing SUPABASE_DB_URL repository secret}"
+
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq postgresql-client
+          fi
+
+          verified_count="$(
+            psql "$SUPABASE_DB_URL"               --no-psqlrc               --quiet               --tuples-only               --no-align               --set ON_ERROR_STOP=1               --command "select private.verify_matured_error_fixes();"
+          )"
+
+          verified_count="$(printf '%s' "$verified_count" | tr -d '[:space:]')"
+          case "$verified_count" in
+            ''|*[!0-9]*)
+              echo "Invalid verifier result."
+              exit 1
+              ;;
+          esac
+
+          echo "Verified error fixes resolved: $verified_count"
+          echo "Verified error fixes resolved: **$verified_count**" >> "$GITHUB_STEP_SUMMARY"

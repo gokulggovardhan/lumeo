@@ -4,6 +4,7 @@ import JSZip from "jszip";
 import { PDFDocument } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 
+import { makeAdvancedLayoutDocx } from "./advanced-word-docx-fixture";
 import { makeProfessionalDocx } from "./professional-docx-fixture";
 import {
   makeSemanticLetterPdf,
@@ -384,11 +385,14 @@ test("production Word to PDF reuses Office runtime, survives cancellation, and c
   expect(officeRequestsAfterFirstConversion).toBeGreaterThan(0);
 
   await page.getByRole("button", { name: "Convert another" }).click();
-  await convertWordToPdf(page, {
-    name: "runtime-reuse.docx",
-    buffer: professional,
-    expectedFileName: "runtime-reuse.pdf",
+  const advanced = await makeAdvancedLayoutDocx();
+  const advancedPdfBytes = await convertWordToPdf(page, {
+    name: "advanced-columns-shape.docx",
+    buffer: advanced,
+    expectedFileName: "advanced-columns-shape.pdf",
   });
+  const advancedPdf = await PDFDocument.load(advancedPdfBytes);
+  expect(advancedPdf.getPageCount()).toBe(2);
   expect(runtime.officeRuntimeRequests.length).toBe(officeRequestsAfterFirstConversion);
 
   await page.getByRole("button", { name: "Convert another" }).click();

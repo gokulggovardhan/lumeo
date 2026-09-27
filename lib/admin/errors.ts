@@ -74,10 +74,27 @@ export async function getErrorLogs(
   return { data: page.data.rows, error: page.error };
 }
 
+export async function getUnresolvedErrorLogs(
+  limit = 50,
+  offset = 0,
+): Promise<DataResult<ErrorLog[]>> {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("error_logs")
+    .select("*")
+    .in("status", ["open", "acknowledged", "fixed_pending_verification"])
+    .order("last_seen_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  return safe((data ?? []) as ErrorLog[], error);
+}
+
 export type ErrorLogSummary = {
   openCount: number;
   criticalOpenCount: number;
-  resolvedCount: number;
+  verifyingCount: number;
+  verifiedResolvedCount: number;
+  legacyResolvedCount: number;
   totalOccurrences: number;
 };
 
@@ -88,7 +105,14 @@ export async function getErrorLogSummary(): Promise<DataResult<ErrorLogSummary>>
     "acknowledged",
     "fixed_pending_verification",
   ];
-  const [openResult, criticalResult, resolvedResult, allResult] = await Promise.all([
+  const [
+    openResult,
+    criticalResult,
+    verifyingResult,
+    verifiedResolvedResult,
+    legacyResolvedResult,
+    allResult,
+  ] = await Promise.all([
     supabase
       .from("error_logs")
       .select("id", { count: "exact", head: true })
@@ -98,11 +122,31 @@ export async function getErrorLogSummary(): Promise<DataResult<ErrorLogSummary>>
       .select("id", { count: "exact", head: true })
       .in("status", unresolvedStatuses)
       .eq("severity", "critical"),
-    supabase.from("error_logs").select("id", { count: "exact", head: true }).eq("status", "resolved"),
+    supabase
+      .from("error_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "fixed_pending_verification"),
+    supabase
+      .from("error_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "resolved")
+      .in("resolution_provenance", ["verified_fix", "automated_verified_fix"]),
+    supabase
+      .from("error_logs")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "resolved")
+      .eq("resolution_provenance", "legacy_manual"),
     supabase.from("error_logs").select("occurrence_count"),
   ]);
 
-  const hasError = Boolean(openResult.error || criticalResult.error || resolvedResult.error || allResult.error);
+  const hasError = Boolean(
+    openResult.error ||
+      criticalResult.error ||
+      verifyingResult.error ||
+      verifiedResolvedResult.error ||
+      legacyResolvedResult.error ||
+      allResult.error,
+  );
   const totalOccurrences = (allResult.data ?? []).reduce(
     (sum, row) => sum + ((row as { occurrence_count: number }).occurrence_count ?? 0),
     0,
@@ -112,7 +156,9 @@ export async function getErrorLogSummary(): Promise<DataResult<ErrorLogSummary>>
     {
       openCount: openResult.count ?? 0,
       criticalOpenCount: criticalResult.count ?? 0,
-      resolvedCount: resolvedResult.count ?? 0,
+      verifyingCount: verifyingResult.count ?? 0,
+      verifiedResolvedCount: verifiedResolvedResult.count ?? 0,
+      legacyResolvedCount: legacyResolvedResult.count ?? 0,
       totalOccurrences,
     },
     hasError,
