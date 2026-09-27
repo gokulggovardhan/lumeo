@@ -93,7 +93,7 @@ export type PdfEditOperation =
     })
   | (OperationBase & {
       kind: "pageOperation";
-      operation: "reorder" | "delete" | "merge" | "redact";
+      operation: "reorder" | "delete" | "merge" | "redact" | "ocr-searchable";
       beforePageCount: number;
       afterPageCount: number;
       affectedPageIndices: number[];
@@ -295,9 +295,16 @@ function semanticDraftForOperation(
             ? "delete-pages"
             : operation.operation === "merge"
               ? "merge-pages"
-              : "redact";
+              : operation.operation === "redact"
+                ? "redact"
+                : "add-searchable-text-layer";
       return {
-        tool: operation.operation === "redact" ? "redaction" : "pages",
+        tool:
+          operation.operation === "redact"
+            ? "redaction"
+            : operation.operation === "ocr-searchable"
+              ? "edit"
+              : "pages",
         type,
         target: {
           kind: "pages",
