@@ -141,7 +141,10 @@ test("paragraph planner rewrites existing native lines atomically without moving
   const beforeMatrices = allOperators.map((operator) =>
     matrixCopy(operator.textLineMatrix),
   );
-  const beforeKinds = allOperators.map((operator) => operator.kind);
+  const beforeTextObjectIndices = allOperators.map(
+    (operator) => operator.textObjectIndex,
+  );
+  const beforeCtms = allOperators.map((operator) => matrixCopy(operator.ctm));
 
   const plan = buildParagraphEditPlan({
     pageIndex: 0,
@@ -180,9 +183,14 @@ test("paragraph planner rewrites existing native lines atomically without moving
   const afterOperators = walkTextShowOperators(
     await decodedContentStreamBytes(bytes),
   );
+  assert.equal(afterOperators.length, 3);
   assert.deepEqual(
-    afterOperators.map((operator) => operator.kind),
-    beforeKinds,
+    afterOperators.map((operator) => operator.textObjectIndex),
+    beforeTextObjectIndices,
+  );
+  assert.deepEqual(
+    afterOperators.map((operator) => operator.ctm),
+    beforeCtms,
   );
   assert.deepEqual(
     afterOperators.map((operator) => operator.textLineMatrix),
