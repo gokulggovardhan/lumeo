@@ -53,7 +53,7 @@ export default async function AnalyticsPage({
         eyebrow="Analytics"
         title="Analytics"
         description="Discovery & operation analytics, organized for quick decisions with privacy-preserving public signals. All date boundaries use Asia/Kolkata calendar days."
-        meta={<Link href="/admin/analytics/activity" className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border-subtle)] px-4 text-sm font-semibold text-[var(--text-secondary)] hover:border-[var(--border-premium)] hover:text-[var(--text-primary)]">Full activity log</Link>}
+        meta={<Link href="/admin/analytics/activity" prefetch={false} className="inline-flex min-h-11 items-center rounded-xl border border-[var(--border-subtle)] px-4 text-sm font-semibold text-[var(--text-secondary)] hover:border-[var(--border-premium)] hover:text-[var(--text-primary)]">Full activity log</Link>}
       />
       <AnalyticsPrivacyNotice />
 
