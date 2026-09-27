@@ -116,6 +116,15 @@ import {
   type OcrPageResult,
   type OcrProgress,
 } from "@/lib/pdf/edit/localOcr";
+import {
+  MAX_LOCAL_CUSTOM_FONT_BYTES,
+  MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES,
+  createLocalCustomFontAsset,
+  loadLocalCustomFontFace,
+  localCustomFontTextIssue,
+  removeLocalCustomFontFace,
+  type LocalCustomFontAsset,
+} from "@/lib/pdf/edit/localCustomFont";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
@@ -816,6 +825,16 @@ export default function EditPdfTool() {
     family: string;
     embeddedProgramSha256: string;
   } | null>(null);
+  // Custom fonts are browser-session assets for newly placed text only.
+  // Undo snapshots store only the asset fingerprint/family on TextEditElement;
+  // the binary font program stays in this bounded in-memory registry.
+  const [localCustomFontAssets, setLocalCustomFontAssets] = useState<
+    ReadonlyMap<string, LocalCustomFontAsset>
+  >(() => new Map());
+  const localCustomFontFacesRef = useRef<Map<string, FontFace>>(new Map());
+  const localCustomFontRequestRef = useRef(0);
+  const [localCustomFontBusy, setLocalCustomFontBusy] = useState(false);
+  const [localCustomFontError, setLocalCustomFontError] = useState("");
   const [shapingEvidenceState, setShapingEvidenceState] =
     useState<ShapingEvidenceState | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
@@ -1802,6 +1821,21 @@ export default function EditPdfTool() {
     textSearchQuery,
   ]);
 
+  const disposeLocalCustomFontFaces = useCallback(() => {
+    localCustomFontRequestRef.current += 1;
+    for (const face of localCustomFontFacesRef.current.values()) {
+      removeLocalCustomFontFace(face);
+    }
+    localCustomFontFacesRef.current.clear();
+  }, []);
+
+  const resetLocalCustomFonts = useCallback(() => {
+    disposeLocalCustomFontFaces();
+    setLocalCustomFontAssets(new Map());
+    setLocalCustomFontBusy(false);
+    setLocalCustomFontError("");
+  }, [disposeLocalCustomFontFaces]);
+
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
     const result = track({ eventName: "tool_opened", toolSlug: "edit" });
@@ -1817,8 +1851,9 @@ export default function EditPdfTool() {
       ocrEngineRef.current = null;
       void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
       void (pendingInitialDocRef.current?.doc as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | undefined)?.destroy?.();
+      disposeLocalCustomFontFaces();
     };
-  }, []);
+  }, [disposeLocalCustomFontFaces]);
 
   // Same cleanup an unmount already does, plus a full reset of every piece
   // of state a new upload doesn't already reinitialize -- returns to the
@@ -1837,6 +1872,7 @@ export default function EditPdfTool() {
     setOcrSearchLayerNoticeRevision(null);
     setOcrErrorRevision(null);
     setOcrCopiedRevision(null);
+    resetLocalCustomFonts();
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     pdfJsDocRef.current = null;
     pdfJsDocBytesRef.current = null;
@@ -2755,6 +2791,11 @@ export default function EditPdfTool() {
         return;
       }
 
+      // A new PDF starts a new private font-asset session. Release
+      // browser FontFace objects only after the new file has passed all PDF
+      // validation, so a failed replacement attempt cannot damage the
+      // current document session.
+      resetLocalCustomFonts();
       pendingInitialDocRef.current = { bytes, doc };
       setPdfMeta({ file, pageCount });
       setPageIndex(0);
@@ -4736,6 +4777,158 @@ export default function EditPdfTool() {
     }
   }
   const selectedElement = useMemo(() => elements.find((item) => item.id === selectedId) ?? null, [elements, selectedId]);
+
+  const localCustomFontExportIssue = useMemo(() => {
+    for (const element of elements) {
+      if (element.type !== "text" || !element.fontAssetId || !element.text.trim()) continue;
+      const asset = localCustomFontAssets.get(element.fontAssetId);
+      if (!asset) {
+        return `The local font “${element.fontFamily ?? "Custom font"}” is no longer available in this browser session. Re-select it before exporting.`;
+      }
+      if (element.bold || element.italic) {
+        return `${asset.descriptor.familyName} is a single local font face. Choose the matching bold/italic font file instead of synthetic styling.`;
+      }
+      const issue = localCustomFontTextIssue(asset, element.text);
+      if (issue) return issue;
+    }
+    return null;
+  }, [elements, localCustomFontAssets]);
+
+  const selectedLocalCustomFontAsset =
+    selectedElement?.type === "text" && selectedElement.fontAssetId
+      ? localCustomFontAssets.get(selectedElement.fontAssetId) ?? null
+      : null;
+  const selectedLocalCustomFontIssue =
+    selectedElement?.type === "text" && selectedLocalCustomFontAsset
+      ? localCustomFontTextIssue(selectedLocalCustomFontAsset, selectedElement.text)
+      : selectedElement?.type === "text" && selectedElement.fontAssetId
+        ? "This local font is no longer available in this browser session. Re-select it before exporting."
+        : null;
+
+  async function handleLocalCustomFontFile(elementId: string, file: File) {
+    const requestId = localCustomFontRequestRef.current + 1;
+    localCustomFontRequestRef.current = requestId;
+    // Bind this async request to the exact ref-backed history snapshot, not
+    // only to pdfBytes. Overlay-only edits and Undo/Redo can keep the same
+    // ArrayBuffer while changing the target element; publishing after that
+    // would resurrect a stale font choice.
+    const sourceHistorySnapshot = getHistoryState();
+    const sourceRevision = sourceHistorySnapshot.pdfBytes;
+    setLocalCustomFontBusy(true);
+    setLocalCustomFontError("");
+
+    let loadedFace: FontFace | null = null;
+    let faceAdopted = false;
+    try {
+      if (file.size > MAX_LOCAL_CUSTOM_FONT_BYTES) {
+        throw new Error("This font is larger than Lumeo's 16 MB local-font safety limit.");
+      }
+      const result = await createLocalCustomFontAsset(
+        new Uint8Array(await file.arrayBuffer()),
+        file.name,
+      );
+      if (localCustomFontRequestRef.current !== requestId) return;
+      if (result.kind !== "ready") throw new Error(result.reason);
+
+      const asset = result.asset;
+      let snapshot = getHistoryState();
+      if (
+        snapshot !== sourceHistorySnapshot ||
+        snapshot.pdfBytes !== sourceRevision
+      ) {
+        return;
+      }
+      let currentElement = snapshot.elements.find((item) => item.id === elementId);
+      if (!currentElement || currentElement.type !== "text") return;
+
+      const issue = localCustomFontTextIssue(asset, currentElement.text);
+      if (issue) throw new Error(issue);
+
+      const alreadyStored = localCustomFontAssets.get(asset.descriptor.id);
+      const storedBytes = Array.from(localCustomFontAssets.values()).reduce(
+        (sum, existing) => sum + existing.descriptor.byteLength,
+        0,
+      );
+      const nextBytes =
+        storedBytes + (alreadyStored ? 0 : asset.descriptor.byteLength);
+      if (nextBytes > MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES) {
+        throw new Error(
+          "Local fonts in this PDF session would exceed Lumeo's 32 MB safety limit. Reuse a font already selected in this session or start a new PDF session.",
+        );
+      }
+
+      let face = localCustomFontFacesRef.current.get(asset.descriptor.id) ?? null;
+      if (!face) {
+        loadedFace = await loadLocalCustomFontFace(asset);
+        if (!loadedFace) {
+          throw new Error("This font could not be loaded for browser preview.");
+        }
+        face = loadedFace;
+      }
+
+      if (localCustomFontRequestRef.current !== requestId) return;
+      snapshot = getHistoryState();
+      if (
+        snapshot !== sourceHistorySnapshot ||
+        snapshot.pdfBytes !== sourceRevision
+      ) {
+        return;
+      }
+      currentElement = snapshot.elements.find((item) => item.id === elementId);
+      if (!currentElement || currentElement.type !== "text") return;
+
+      const currentTextIssue = localCustomFontTextIssue(asset, currentElement.text);
+      if (currentTextIssue) throw new Error(currentTextIssue);
+
+      if (!alreadyStored) {
+        setLocalCustomFontAssets((current) => {
+          const next = new Map(current);
+          next.set(asset.descriptor.id, asset);
+          return next;
+        });
+      }
+      if (!localCustomFontFacesRef.current.has(asset.descriptor.id)) {
+        localCustomFontFacesRef.current.set(asset.descriptor.id, face);
+      }
+      faceAdopted = true;
+
+      setElements((current) =>
+        patchElement(current, elementId, {
+          fontAssetId: asset.descriptor.id,
+          fontFamily: asset.descriptor.familyName,
+          bold: false,
+          italic: false,
+        } as Partial<EditElement>),
+      );
+    } catch (fontError) {
+      if (localCustomFontRequestRef.current === requestId) {
+        setLocalCustomFontError(
+          fontError instanceof Error
+            ? fontError.message
+            : "This local font could not be used safely.",
+        );
+      }
+    } finally {
+      if (loadedFace && !faceAdopted) removeLocalCustomFontFace(loadedFace);
+      if (localCustomFontRequestRef.current === requestId) {
+        setLocalCustomFontBusy(false);
+      }
+    }
+  }
+
+  function handleUseStandardFont(elementId: string) {
+    localCustomFontRequestRef.current += 1;
+    setLocalCustomFontBusy(false);
+    setLocalCustomFontError("");
+    setElements((current) =>
+      patchElement(current, elementId, {
+        fontAssetId: undefined,
+        fontFamily: undefined,
+        bold: false,
+        italic: false,
+      } as Partial<EditElement>),
+    );
+  }
   // DISPLAYED CSS pixels per PDF point -- what EditElementView needs to size
   // a placed text element's glyphs to match the page under them
   // (`element.fontSizePt * pixelsPerPoint`).
@@ -4979,7 +5172,9 @@ export default function EditPdfTool() {
       // here is a cheap no-op if already loaded, and otherwise loads it now.
       const engine = await loadEditEngine();
       const { bytes, skippedPages } = await runWithTimeout(
-        engine.exportEditedPdf(copyArrayBuffer(pdf.bytes), elements),
+        engine.exportEditedPdf(copyArrayBuffer(pdf.bytes), elements, {
+          localFontAssets: localCustomFontAssets,
+        }),
         "Generating the PDF took too long. Try fewer elements or a smaller file.",
       );
       if (skippedPages.length > 0) {
@@ -5022,7 +5217,7 @@ export default function EditPdfTool() {
     } finally {
       setIsExporting(false);
     }
-  }, [pdf, elements, outputName, track, historyState.session]);
+  }, [pdf, elements, outputName, track, historyState.session, localCustomFontAssets]);
 
   function downloadEditedPdf() {
     if (!downloadUrl) return;
@@ -5495,6 +5690,7 @@ export default function EditPdfTool() {
                         // clear any active text-run selection too, or both
                         // could show their own floating controls at once.
                         selectTextRun(null);
+                        setLocalCustomFontError("");
                         setSelectedId(element.id);
                       }}
                       onChange={(patch) => setElements((current) => patchElement(current, element.id, patch))}
@@ -5504,6 +5700,21 @@ export default function EditPdfTool() {
                       }}
                       onTextChange={(text) => setElements((current) => patchElement(current, element.id, { text } as Partial<EditElement>))}
                       pixelsPerPoint={pixelsPerPoint}
+                      fontFamilyCss={
+                        element.type === "text" && element.fontAssetId
+                          ? localCustomFontAssets.get(element.fontAssetId)?.descriptor.browserFamilyName
+                          : undefined
+                      }
+                      customFontIssue={
+                        element.type === "text" && element.fontAssetId
+                          ? (() => {
+                              const asset = localCustomFontAssets.get(element.fontAssetId);
+                              return asset
+                                ? localCustomFontTextIssue(asset, element.text)
+                                : "This local font is no longer available in this browser session.";
+                            })()
+                          : null
+                      }
                     />
                   ))}
                   </div>
@@ -6506,6 +6717,16 @@ export default function EditPdfTool() {
             mode="text-inspector"
             element={selectedElement}
             onPatch={(patch) => setElements((current) => patchElement(current, selectedElement.id, patch as Partial<EditElement>))}
+            fontLabel={
+              selectedLocalCustomFontAsset?.descriptor.familyName ??
+              selectedElement.fontFamily ??
+              "Helvetica"
+            }
+            customFontActive={Boolean(selectedElement.fontAssetId)}
+            customFontBusy={localCustomFontBusy}
+            customFontIssue={localCustomFontError || selectedLocalCustomFontIssue}
+            onLocalFontFile={(file) => void handleLocalCustomFontFile(selectedElement.id, file)}
+            onUseStandardFont={() => handleUseStandardFont(selectedElement.id)}
           />
         ) : (
           <FloatingIsland
@@ -6534,7 +6755,11 @@ export default function EditPdfTool() {
         ) : (
           <button
             type="button"
-            disabled={(elements.length === 0 && !hasTextEdits) || isExporting}
+            disabled={
+              (elements.length === 0 && !hasTextEdits) ||
+              isExporting ||
+              Boolean(localCustomFontExportIssue)
+            }
             onClick={() => void generateEditedPdf()}
             // Phase 28: the only reason this button is ever disabled OTHER
             // than mid-export is "nothing has been edited yet" (same
@@ -6543,7 +6768,13 @@ export default function EditPdfTool() {
             // button with no explanation. isExporting already has its own
             // visible spinner/label, so it doesn't need a redundant tooltip
             // repeating that.
-            title={!isExporting && elements.length === 0 && !hasTextEdits ? "No edits to export yet." : undefined}
+            title={
+              !isExporting && localCustomFontExportIssue
+                ? localCustomFontExportIssue
+                : !isExporting && elements.length === 0 && !hasTextEdits
+                  ? "No edits to export yet."
+                  : undefined
+            }
             className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--lumeo-gold)] px-5 text-sm font-bold text-[var(--atelier-surface-0)] transition hover:-translate-y-0.5 hover:bg-[var(--lumeo-gold)]/85 disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
           >
             {isExporting ? (
