@@ -172,6 +172,10 @@ import {
 } from "@/lib/pdf/edit/redaction";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument, renderPageWithTimeout, withPageTimeout, PAGE_RENDER_TIMEOUT_MS, clampRenderScaleToMaxDimension, clampRenderScaleToPixelBudget, computeAdaptiveRenderScale, quantizeRenderScale } from "@/lib/pdf/pdfjs";
+import {
+  editPerformanceDiagnostics,
+  editPerformanceNow,
+} from "@/lib/pdf/edit/editPerformanceDiagnostics";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
@@ -1499,6 +1503,7 @@ export default function EditPdfTool() {
     let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
 
     void (async () => {
+      const performanceStartedAt = editPerformanceNow();
       try {
         const page = await doc.getPage(pageIndex + 1);
         const pointViewport = page.getViewport({ scale: 1 });
@@ -1558,8 +1563,32 @@ export default function EditPdfTool() {
         // on it. Detected runs still populate a moment later and the select
         // tool's highlighting appears as soon as they do -- nothing about
         // detection itself changed, only when the page stops being "loading".
-        if (!cancelled) setPageLoading(false);
+        if (!cancelled) {
+          editPerformanceDiagnostics.record(
+            "page-raster",
+            editPerformanceNow() - performanceStartedAt,
+            {
+              pageIndex,
+              pageCount: pdf.pageCount,
+              itemCount: canvas.width * canvas.height,
+              byteCount: blob.size,
+              success: true,
+            },
+          );
+          setPageLoading(false);
+        }
       } catch {
+        if (!cancelled) {
+          editPerformanceDiagnostics.record(
+            "page-raster",
+            editPerformanceNow() - performanceStartedAt,
+            {
+              pageIndex,
+              pageCount: pdf.pageCount,
+              success: false,
+            },
+          );
+        }
         // A cancelled render's promise rejects (RenderingCancelledException)
         // -- that's expected teardown, not a real preview failure.
         //
@@ -1616,6 +1645,7 @@ export default function EditPdfTool() {
     let cancelled = false;
 
     void (async () => {
+      const performanceStartedAt = editPerformanceNow();
       try {
         const page = await doc.getPage(pageIndex + 1);
         const pointViewport = page.getViewport({ scale: 1 });
@@ -1632,8 +1662,27 @@ export default function EditPdfTool() {
         );
         setPdfJsDetectedRunCount(runs.length);
         setDetectedTextRuns(runs);
+        editPerformanceDiagnostics.record(
+          "text-detection",
+          editPerformanceNow() - performanceStartedAt,
+          {
+            pageIndex,
+            pageCount: pdf.pageCount,
+            itemCount: runs.length,
+            success: true,
+          },
+        );
       } catch {
         if (!cancelled) {
+          editPerformanceDiagnostics.record(
+            "text-detection",
+            editPerformanceNow() - performanceStartedAt,
+            {
+              pageIndex,
+              pageCount: pdf.pageCount,
+              success: false,
+            },
+          );
           setPdfJsDetectedRunCount(0);
           setDetectedTextRuns([]);
         }
@@ -1734,6 +1783,7 @@ export default function EditPdfTool() {
     let cancelled = false;
 
     void (async () => {
+      const performanceStartedAt = editPerformanceNow();
       try {
         // Matching happens in the SAME point space detection used (see the
         // render effect's own comment). matchTextRun.ts is scale-relative
@@ -1870,8 +1920,27 @@ export default function EditPdfTool() {
         setTextArbitrations(arbitrations);
         setRunMatches(authorizedMatches);
         setTextMatchRevision({ bytes: pdf.bytes, pageIndex });
+        editPerformanceDiagnostics.record(
+          "native-reconciliation",
+          editPerformanceNow() - performanceStartedAt,
+          {
+            pageIndex,
+            pageCount: pdf.pageCount,
+            itemCount: nativeSpans.length,
+            success: true,
+          },
+        );
       } catch (matchError) {
         if (!cancelled) {
+          editPerformanceDiagnostics.record(
+            "native-reconciliation",
+            editPerformanceNow() - performanceStartedAt,
+            {
+              pageIndex,
+              pageCount: pdf.pageCount,
+              success: false,
+            },
+          );
           console.error(
             "[Edit PDF] content-stream matching failed",
             matchError instanceof Error
@@ -2020,6 +2089,7 @@ export default function EditPdfTool() {
       return;
     }
 
+    const performanceStartedAt = editPerformanceNow();
     try {
       const bytes = await file.arrayBuffer();
       if (!hasPdfMagicBytes(bytes)) {
@@ -2036,6 +2106,15 @@ export default function EditPdfTool() {
       }
       const doc = await openPdfJsDocument(new Uint8Array(copyArrayBuffer(bytes)));
       const pageCount = doc.numPages;
+      editPerformanceDiagnostics.record(
+        "document-open",
+        editPerformanceNow() - performanceStartedAt,
+        {
+          pageCount,
+          byteCount: bytes.byteLength,
+          success: true,
+        },
+      );
 
       const pageCountError = checkPdfPageCount(pageCount);
       if (pageCountError) {
@@ -2052,6 +2131,14 @@ export default function EditPdfTool() {
       setSelectedId(null);
       setDownloadUrl("");
     } catch (uploadError) {
+      editPerformanceDiagnostics.record(
+        "document-open",
+        editPerformanceNow() - performanceStartedAt,
+        {
+          byteCount: file.size,
+          success: false,
+        },
+      );
       const message =
         uploadError instanceof Error && /password|encrypt/i.test(uploadError.message)
           ? "This file appears to be password-protected or encrypted."
