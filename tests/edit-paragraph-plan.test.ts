@@ -241,7 +241,36 @@ test("paragraph planner rejects two selected operators on the same native line",
   });
 
   assert.equal(plan.editable, false);
-  assert.match(plan.reason, /same native line/i);
+  assert.match(plan.reason, /separate native text lines|distinct baselines/i);
+});
+
+test("paragraph planner rejects horizontal-only repositioning on one baseline", async () => {
+  const original = await fixture(["One", "Two"]);
+  const { resolvedFont, fontMetrics, allOperators } =
+    await planningContext(original);
+
+  const firstMatrix = matrixCopy(allOperators[0].textLineMatrix);
+  assert.ok(firstMatrix);
+  const shiftedSameBaseline: Matrix2x3 = [...firstMatrix];
+  shiftedSameBaseline[4] += 24;
+  const altered = allOperators.map((operator, index) =>
+    index === 1
+      ? { ...operator, textLineMatrix: shiftedSameBaseline }
+      : operator,
+  );
+
+  const plan = buildParagraphEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    allOperators: altered,
+    operatorIndices: [0, 1],
+    replacementText: "Alpha\nBeta",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason, /distinct baselines|separate native text lines/i);
 });
 
 test("paragraph planner rejects lines from different text objects", async () => {
