@@ -156,7 +156,7 @@ export async function exportEditedPdf(
     if (cached) return cached;
 
     if (!customFontkitRegistered) {
-      const fontkitModule = await import("@cantoo/fontkit");
+      const fontkitModule = await import("@pdf-lib/fontkit");
       const fontkit = fontkitModule.default ?? fontkitModule;
       doc.registerFontkit(
         fontkit as unknown as Parameters<PDFDocument["registerFontkit"]>[0],
