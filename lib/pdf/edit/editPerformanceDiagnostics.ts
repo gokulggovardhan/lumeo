@@ -65,6 +65,11 @@ export class EditPerformanceDiagnostics {
   private readonly maxSamples: number;
 
   constructor(maxSamples = DEFAULT_EDIT_PERFORMANCE_SAMPLE_LIMIT) {
+    if (!Number.isInteger(maxSamples) || maxSamples < 1) {
+      throw new Error(
+        "EditPerformanceDiagnostics maxSamples must be a positive integer.",
+      );
+    }
     this.maxSamples = maxSamples;
   }
 
