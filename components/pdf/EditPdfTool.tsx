@@ -252,7 +252,6 @@ type EditPreview =
   | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont };
 
 type ShapingEvidenceState =
-  | { key: string; status: "pending" }
   | { key: string; status: "validated"; evidence: ValidatedShapingWriteEvidence }
   | { key: string; status: "blocked"; reason: string };
 
@@ -3025,14 +3024,10 @@ export default function EditPdfTool() {
   ]);
 
   useEffect(() => {
-    if (!fontRegistry || !shapingEvidenceRequest) {
-      setShapingEvidenceState(null);
-      return;
-    }
+    if (!fontRegistry || !shapingEvidenceRequest) return;
 
     let cancelled = false;
     const request = shapingEvidenceRequest;
-    setShapingEvidenceState({ key: request.key, status: "pending" });
 
     void (async () => {
       try {
@@ -3105,8 +3100,7 @@ export default function EditPdfTool() {
   const shapingEvidencePending =
     Boolean(shapingEvidenceRequest) &&
     (!shapingEvidenceState ||
-      shapingEvidenceState.key !== shapingEvidenceRequest?.key ||
-      shapingEvidenceState.status === "pending");
+      shapingEvidenceState.key !== shapingEvidenceRequest?.key);
 
   // Phase 9.2: the live dry-run preview driving both the Apply button's
   // disabled state and the specific reason shown next to it -- see
