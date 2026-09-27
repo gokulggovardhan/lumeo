@@ -118,6 +118,8 @@ export async function exportEditedPdf(
 ): Promise<{ bytes: Uint8Array; skippedPages: number[] }> {
   const localFontAssets = options.localFontAssets ?? new Map<string, LocalCustomFontAsset>();
 
+  const requiredLocalFontAssets = new Map<string, LocalCustomFontAsset>();
+
   // Validate all local-font dependencies before mutating a PDFDocument so a
   // missing browser-session asset or unsupported glyph can never degrade into
   // a skipped page or a silent .notdef glyph.
@@ -136,6 +138,7 @@ export async function exportEditedPdf(
     }
     const issue = localCustomFontTextIssue(asset, element.text);
     if (issue) throw new Error(issue);
+    requiredLocalFontAssets.set(asset.descriptor.id, asset);
   }
 
   const doc = await PDFDocument.load(originalBytes);
@@ -174,6 +177,15 @@ export async function exportEditedPdf(
     }
     return font;
   }
+
+  // Custom-font embedding is a document-level dependency, not an optional
+  // per-page decoration. Resolve every referenced local font before entering
+  // the legacy page-isolation try/catch so a malformed/unembeddable font can
+  // never be downgraded into a silently skipped page.
+  for (const asset of requiredLocalFontAssets.values()) {
+    await getLocalFont(asset);
+  }
+
   const pngCache = new Map<string, Uint8Array>();
   const skippedPages: number[] = [];
 
