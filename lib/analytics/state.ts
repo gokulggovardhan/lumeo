@@ -10,6 +10,7 @@ const allowedEvents = new Set([
   "processing_started",
   "processing_succeeded",
   "processing_failed",
+  "processing_cancelled",
   "download_started",
 ]);
 
