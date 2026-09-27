@@ -2913,12 +2913,14 @@ export default function EditPdfTool() {
       return;
     }
 
+    // Document Replace All does its own complete native revalidation pass.
+    // The normal background Find index is deliberately best-effort and can
+    // skip a pathological page without blocking search elsewhere; that is
+    // acceptable for navigation but not for a command named "Replace All".
     const candidatePages =
       textSearchScope === "page"
         ? [pageIndex]
-        : [...new Set(textSearchMatches.map((match) => match.pageIndex))].sort(
-            (a, b) => a - b,
-          );
+        : Array.from({ length: pdf.pageCount }, (_unused, index) => index);
     if (candidatePages.length === 0) {
       setTextSearchReplaceAllStatus("No search matches are available to replace.");
       return;
@@ -4878,6 +4880,7 @@ export default function EditPdfTool() {
                 value={textSearchQuery}
                 onChange={(event) => {
                   setTextSearchQuery(event.target.value);
+                  setTextSearchReplaceAllStatus("");
                   if (!event.target.value.trim()) setTextSearchIndexBusy(false);
                   setTextSearchActiveIndex(-1);
                 }}
@@ -4982,7 +4985,10 @@ export default function EditPdfTool() {
               <input
                 aria-label="Replace search match with"
                 value={textSearchReplacement}
-                onChange={(event) => setTextSearchReplacement(event.target.value)}
+                onChange={(event) => {
+                  setTextSearchReplacement(event.target.value);
+                  setTextSearchReplaceAllStatus("");
+                }}
                 placeholder="Leave empty to delete the match"
                 className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)] focus:ring-2 focus:ring-[var(--lumeo-gold)]/20"
               />
