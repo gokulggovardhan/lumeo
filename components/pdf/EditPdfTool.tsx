@@ -4981,7 +4981,9 @@ export default function EditPdfTool() {
       // here is a cheap no-op if already loaded, and otherwise loads it now.
       const engine = await loadEditEngine();
       const { bytes, skippedPages } = await runWithTimeout(
-        engine.exportEditedPdf(copyArrayBuffer(pdf.bytes), elements),
+        engine.exportEditedPdf(copyArrayBuffer(pdf.bytes), elements, {
+          localFontAssets: localCustomFontAssets,
+        }),
         "Generating the PDF took too long. Try fewer elements or a smaller file.",
       );
       if (skippedPages.length > 0) {
@@ -5024,7 +5026,7 @@ export default function EditPdfTool() {
     } finally {
       setIsExporting(false);
     }
-  }, [pdf, elements, outputName, track, historyState.session]);
+  }, [pdf, elements, outputName, track, historyState.session, localCustomFontAssets]);
 
   function downloadEditedPdf() {
     if (!downloadUrl) return;
@@ -5497,6 +5499,7 @@ export default function EditPdfTool() {
                         // clear any active text-run selection too, or both
                         // could show their own floating controls at once.
                         selectTextRun(null);
+                        setLocalCustomFontError("");
                         setSelectedId(element.id);
                       }}
                       onChange={(patch) => setElements((current) => patchElement(current, element.id, patch))}
@@ -5506,6 +5509,21 @@ export default function EditPdfTool() {
                       }}
                       onTextChange={(text) => setElements((current) => patchElement(current, element.id, { text } as Partial<EditElement>))}
                       pixelsPerPoint={pixelsPerPoint}
+                      fontFamilyCss={
+                        element.type === "text" && element.fontAssetId
+                          ? localCustomFontAssets.get(element.fontAssetId)?.descriptor.browserFamilyName
+                          : undefined
+                      }
+                      customFontIssue={
+                        element.type === "text" && element.fontAssetId
+                          ? (() => {
+                              const asset = localCustomFontAssets.get(element.fontAssetId);
+                              return asset
+                                ? localCustomFontTextIssue(asset, element.text)
+                                : "This local font is no longer available in this browser session.";
+                            })()
+                          : null
+                      }
                     />
                   ))}
                   </div>
@@ -6489,6 +6507,16 @@ export default function EditPdfTool() {
             mode="text-inspector"
             element={selectedElement}
             onPatch={(patch) => setElements((current) => patchElement(current, selectedElement.id, patch as Partial<EditElement>))}
+            fontLabel={
+              selectedLocalCustomFontAsset?.descriptor.familyName ??
+              selectedElement.fontFamily ??
+              "Helvetica"
+            }
+            customFontActive={Boolean(selectedElement.fontAssetId)}
+            customFontBusy={localCustomFontBusy}
+            customFontIssue={localCustomFontError || selectedLocalCustomFontIssue}
+            onLocalFontFile={(file) => void handleLocalCustomFontFile(selectedElement.id, file)}
+            onUseStandardFont={() => handleUseStandardFont(selectedElement.id)}
           />
         ) : (
           <FloatingIsland
@@ -6517,7 +6545,11 @@ export default function EditPdfTool() {
         ) : (
           <button
             type="button"
-            disabled={(elements.length === 0 && !hasTextEdits) || isExporting}
+            disabled={
+              (elements.length === 0 && !hasTextEdits) ||
+              isExporting ||
+              Boolean(localCustomFontExportIssue)
+            }
             onClick={() => void generateEditedPdf()}
             // Phase 28: the only reason this button is ever disabled OTHER
             // than mid-export is "nothing has been edited yet" (same
@@ -6526,7 +6558,13 @@ export default function EditPdfTool() {
             // button with no explanation. isExporting already has its own
             // visible spinner/label, so it doesn't need a redundant tooltip
             // repeating that.
-            title={!isExporting && elements.length === 0 && !hasTextEdits ? "No edits to export yet." : undefined}
+            title={
+              !isExporting && localCustomFontExportIssue
+                ? localCustomFontExportIssue
+                : !isExporting && elements.length === 0 && !hasTextEdits
+                  ? "No edits to export yet."
+                  : undefined
+            }
             className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center gap-2 rounded-[var(--radius-md)] bg-[var(--lumeo-gold)] px-5 text-sm font-bold text-[var(--atelier-surface-0)] transition hover:-translate-y-0.5 hover:bg-[var(--lumeo-gold)]/85 disabled:cursor-not-allowed disabled:opacity-[var(--v2-interactive-disabled-opacity)] active:scale-[0.98] sm:w-auto"
           >
             {isExporting ? (
