@@ -5202,7 +5202,7 @@ export default function EditPdfTool() {
     } finally {
       setIsExporting(false);
     }
-  }, [pdf, elements, outputName, track, historyState.session]);
+  }, [pdf, elements, outputName, track, historyState.session, localCustomFontAssets]);
 
   function downloadEditedPdf() {
     if (!downloadUrl) return;
