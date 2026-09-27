@@ -32,6 +32,15 @@ import {
   inspectPdfFontProgram,
   type PdfFontProgramInspection,
 } from "./fontProgramIntelligence.ts";
+import type {
+  ShapeEmbeddedFontOptions,
+  ShapedRun,
+  TextShapingDirection,
+} from "./harfbuzzShaping.ts";
+import {
+  reconcileShapingWithPdfCharacterCodes,
+  type ShapingReconciliation,
+} from "./shapingReconciliation.ts";
 import type { EditPdfFontRegistryPerformanceSnapshot } from "./performanceDiagnostics.ts";
 import { BoundedLruCache } from "./boundedLruCache.ts";
 
@@ -50,6 +59,28 @@ export type BrowserFontProgramFormat =
   | "unknown";
 
 export type PdfFontWritingMode = "horizontal" | "vertical" | "unknown";
+
+export type PdfFontShapingInspection =
+  | Readonly<{
+      kind: "reconciled";
+      shaped: ShapedRun;
+      reconciliation: ShapingReconciliation;
+    }>
+  | Readonly<{
+      kind: "unavailable";
+      reason: string;
+    }>;
+
+type ExplicitShapingOptions = Omit<ShapeEmbeddedFontOptions, "direction"> & {
+  direction: Exclude<TextShapingDirection, "auto">;
+};
+
+export type PdfEmbeddedFontTextShaper = (
+  fontBytes: Uint8Array,
+  text: string,
+  options: ExplicitShapingOptions,
+) => Promise<ShapedRun>;
+
 
 export type PdfCidSystemInfo = {
   registry: string | null;
@@ -561,6 +592,81 @@ export class PdfFontRegistry {
 
     this.intelligenceCache.set(fontResource.dict, promise);
     return promise;
+  }
+
+  /**
+   * Shapes text with the exact embedded PDF font program and reconciles that
+   * evidence against the PDF character-code/width model.
+   *
+   * This is inspection only. A "reconciled" result is never write authority:
+   * PDF encoding/ToUnicode, glyph proof, EditPlan validation and the native
+   * content-stream writer remain independently mandatory.
+   *
+   * The shaping runtime is injected deliberately. PdfFontRegistry is shared
+   * by unrelated browser tools, so importing HarfBuzz here would make every
+   * client bundle depend on the WASM/runtime package. A dedicated shaping
+   * boundary (for example a local Worker) may inject shapeEmbeddedFontText
+   * only when advanced text inspection is actually requested.
+   */
+  async inspectShapingCompatibility(
+    resources: PDFDict,
+    resourceName: string,
+    text: string,
+    options: ExplicitShapingOptions,
+    shapeText: PdfEmbeddedFontTextShaper,
+  ): Promise<PdfFontShapingInspection> {
+    const profile = this.resolve(resources, resourceName);
+    if (!profile) {
+      return {
+        kind: "unavailable",
+        reason: "The PDF font resource could not be resolved.",
+      };
+    }
+
+    const program = this.embeddedProgram(resources, resourceName);
+    if (!program) {
+      return {
+        kind: "unavailable",
+        reason: "This PDF font does not contain an embedded font program.",
+      };
+    }
+
+    const inspection = await this.inspectEmbeddedFontProgram(
+      resources,
+      resourceName,
+    );
+    if (inspection.kind !== "ok") {
+      return {
+        kind: "unavailable",
+        reason: inspection.reason,
+      };
+    }
+
+    try {
+      // The shaping engine is advisory and injected. Give it an isolated
+      // copy so a buggy/mutating implementation cannot corrupt the registry's
+      // cached embedded font program or later identity/intelligence evidence.
+      const shaped = await shapeText(program.bytes.slice(), text, options);
+      return {
+        kind: "reconciled",
+        shaped,
+        reconciliation: reconcileShapingWithPdfCharacterCodes({
+          text,
+          shaped,
+          resolvedFont: profile.resolvedFont,
+          fontMetrics: profile.metrics,
+          intelligence: inspection.intelligence,
+        }),
+      };
+    } catch (error) {
+      return {
+        kind: "unavailable",
+        reason:
+          error instanceof Error
+            ? error.message
+            : "The embedded font could not be shaped safely.",
+      };
+    }
   }
 
   /** Advisory fontkit cache size only; structural PDF font caches remain complete. */
