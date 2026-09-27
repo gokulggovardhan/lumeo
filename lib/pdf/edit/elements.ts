@@ -31,6 +31,10 @@ export type TextEditElement = EditElementBase & {
   bold: boolean;
   italic: boolean;
   underline: boolean;
+  /** Browser-session local font asset. Font bytes live outside history. */
+  fontAssetId?: string;
+  /** Human-readable inspected family name for history/UI semantics. */
+  fontFamily?: string;
 };
 
 export type ShapeEditElement = EditElementBase & {
