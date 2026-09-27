@@ -36,8 +36,13 @@ export type ShapedRun = {
   glyphs: readonly ShapedGlyph[];
   clusterMap: readonly ShapedCluster[];
   unitsPerEm: number;
-  totalAdvance: number;
-  totalAdvanceEm: number;
+  /**
+   * Primary-axis advance when the caller supplied an explicit direction.
+   * Null for "auto" because HarfBuzzJS v1.6.2 does not expose the direction
+   * guessed internally by hb_buffer_guess_segment_properties().
+   */
+  totalAdvance: number | null;
+  totalAdvanceEm: number | null;
   totalXAdvance: number;
   totalYAdvance: number;
   requestedDirection: TextShapingDirection;
@@ -147,7 +152,8 @@ function primaryAdvance(
   direction: TextShapingDirection,
   x: number,
   y: number,
-): number {
+): number | null {
+  if (direction === "auto") return null;
   if (direction === "ttb" || direction === "btt") return Math.abs(y);
   return Math.abs(x);
 }
@@ -326,7 +332,7 @@ export async function shapeEmbeddedFontText(
       clusterMap: clusterMapFor(text, glyphs),
       unitsPerEm: face.upem,
       totalAdvance,
-      totalAdvanceEm: totalAdvance / face.upem,
+      totalAdvanceEm: totalAdvance === null ? null : totalAdvance / face.upem,
       totalXAdvance,
       totalYAdvance,
       requestedDirection: direction,
