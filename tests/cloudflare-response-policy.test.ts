@@ -51,3 +51,37 @@ test("does not force cross-origin isolation onto unrelated production tools", ()
   assert.equal(response.headers.get("cross-origin-opener-policy"), null);
   assert.equal(response.headers.get("cross-origin-embedder-policy"), null);
 });
+
+
+test("production RSC responses are non-cacheable and vary by navigation headers", () => {
+  const request = new Request("https://lumeo.in/", {
+    headers: {
+      RSC: "1",
+      "Next-Router-Prefetch": "1",
+    },
+  });
+  const source = new Response("flight", {
+    headers: {
+      "Content-Type": "text/x-component",
+      "Cache-Control": "public, s-maxage=300",
+      Vary: "Accept-Encoding",
+    },
+  });
+
+  const response = withProductionSecurityHeaders(request, source);
+
+  assert.equal(
+    response.headers.get("cache-control"),
+    "private, no-store, max-age=0, must-revalidate",
+  );
+  const vary = response.headers.get("vary") ?? "";
+  for (const value of [
+    "Accept-Encoding",
+    "RSC",
+    "Next-Router-State-Tree",
+    "Next-Router-Prefetch",
+    "Next-Router-Segment-Prefetch",
+  ]) {
+    assert.match(vary, new RegExp(value, "i"));
+  }
+});
