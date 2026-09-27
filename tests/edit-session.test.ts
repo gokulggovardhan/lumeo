@@ -199,3 +199,25 @@ test("native text formatting is journaled as a real changeStyle operation", () =
   assert.equal(operation.after.fontSizePt, 14);
   assert.equal(operation.after.horizontalScalingPct, 96);
 });
+
+
+test("searchable OCR layer is one edit semantic operation on the affected page", () => {
+  const operation = pageOperation({
+    operation: "add-searchable-text-layer",
+    beforePageCount: 2,
+    afterPageCount: 2,
+    affectedPageIndices: [0],
+    description: "Added 7 local OCR words as an invisible searchable text layer.",
+  });
+
+  const next = appendPdfEditOperations(createPdfEditSession(4096), [operation]);
+  assert.equal(next.operations.length, 1);
+  assert.equal(next.operations[0].kind, "pageOperation");
+  const semantic = next.semanticHistory.entries[0];
+  assert.equal(semantic.tool, "edit");
+  assert.equal(semantic.type, "add-searchable-text-layer");
+  assert.deepEqual(semantic.target, { kind: "pages", pageIndices: [0] });
+  assert.deepEqual(semantic.before, { pageCount: 2 });
+  assert.deepEqual(semantic.after, { pageCount: 2 });
+  assert.match(semantic.description ?? "", /invisible searchable text layer/i);
+});
