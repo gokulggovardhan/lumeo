@@ -149,6 +149,23 @@ test("exportEditedPdf fails closed when a placed text element references a missi
   );
 });
 
+test("exportEditedPdf fails closed when referenced local font bytes cannot be embedded", async () => {
+  const original = await makeBlankPdf(1);
+  const asset = fakeLocalFontAsset();
+  const element = {
+    ...createTextElement("t-local-invalid-program", 0, 20, 20),
+    text: "AB",
+    fontAssetId: asset.descriptor.id,
+    fontFamily: asset.descriptor.familyName,
+  };
+
+  await assert.rejects(() =>
+    exportEditedPdf(original, [element], {
+      localFontAssets: new Map([[asset.descriptor.id, asset]]),
+    }),
+  );
+});
+
 test("exportEditedPdf rejects unsupported local-font glyphs before mutating the PDF", async () => {
   const original = await makeBlankPdf(1);
   const asset = fakeLocalFontAsset();
