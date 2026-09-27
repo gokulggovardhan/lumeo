@@ -19,28 +19,41 @@ export type FontPreviewFidelity = {
 
 type PreviewProfile = Pick<
   PdfFontProfile,
-  "isEmbedded" | "browserPreviewPossible" | "cssFallbackFamily" | "familyName"
+  | "isEmbedded"
+  | "browserPreviewPossible"
+  | "cssFallbackFamily"
+  | "familyName"
+  | "embeddedProgramSha256"
 >;
+
+function normalizedSha256(value: string | null | undefined): string | null {
+  const normalized = value?.trim().toLowerCase() ?? "";
+  return /^[0-9a-f]{64}$/.test(normalized) ? normalized : null;
+}
 
 export function describeFontPreviewFidelity({
   profile,
-  exactEmbeddedLoaded,
+  loadedEmbeddedProgramSha256,
   verifiedEquivalent,
 }: {
   profile: PreviewProfile | null;
-  exactEmbeddedLoaded: boolean;
+  loadedEmbeddedProgramSha256: string | null;
   verifiedEquivalent?: VerifiedEquivalentFontPreview | null;
 }): FontPreviewFidelity {
+  const expectedEmbeddedSha = normalizedSha256(profile?.embeddedProgramSha256);
+  const loadedEmbeddedSha = normalizedSha256(loadedEmbeddedProgramSha256);
+
   if (
-    exactEmbeddedLoaded &&
     profile?.isEmbedded &&
-    profile.browserPreviewPossible
+    profile.browserPreviewPossible &&
+    expectedEmbeddedSha &&
+    loadedEmbeddedSha === expectedEmbeddedSha
   ) {
     return {
       kind: "exact-embedded",
       label: "Preview: Exact embedded font",
       detail:
-        "The editor is displaying the font program embedded in this PDF. Preview fidelity is informational only; PDF edit safety is still decided by source, glyph, geometry and writer validation.",
+        "The editor is displaying the same embedded font program fingerprinted from this PDF. Preview fidelity is informational only; PDF edit safety is still decided by source, glyph, geometry and writer validation.",
       family: profile.familyName,
     };
   }
@@ -59,7 +72,7 @@ export function describeFontPreviewFidelity({
     kind: "fallback",
     label: "Preview: Fallback font",
     detail:
-      "The browser is displaying a fallback font for this editor preview because the original PDF font is not available as an exact browser face. Native edit safety is evaluated separately and is not weakened or strengthened by this preview.",
+      "The browser is displaying a fallback font for this editor preview because the original PDF font is not available as a fingerprint-matched browser face. Native edit safety is evaluated separately and is not weakened or strengthened by this preview.",
     family: profile?.cssFallbackFamily ?? null,
   };
 }
