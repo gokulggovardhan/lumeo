@@ -254,7 +254,34 @@ test("vinext Edit PDF keeps IME composition isolated until the candidate is comm
   // Synthetic composition events are enough to exercise Lumeo's browser
   // event boundary in Chromium/WebKit/Firefox. The PDF writer still sees
   // nothing until compositionend releases the candidate.
-  await editor.dispatchEvent("compositionstart", { data: "file" });
+  // Fire compositionstart and keyboard actions in the SAME browser task.
+  // React has not had a render turn to expose textCompositionActive yet, so
+  // this specifically proves the immediate selection-scoped owner ref guards
+  // the tiny pre-render race for both Enter and Escape.
+  await editor.evaluate((node) => {
+    node.dispatchEvent(
+      new CompositionEvent("compositionstart", {
+        bubbles: true,
+        data: "file",
+      }),
+    );
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "Enter",
+      }),
+    );
+    node.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        bubbles: true,
+        cancelable: true,
+        key: "Escape",
+      }),
+    );
+  });
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+  await expect(editor).toBeVisible();
   await expect(editor).toHaveAttribute("data-ime-composing", "true");
 
   // Playwright fill() may implicitly terminate composition in Firefox, so
