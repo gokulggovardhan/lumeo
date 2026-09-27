@@ -15,7 +15,7 @@ import {
   EDIT_PERFORMANCE_120_PDF,
   writeEditPerformance120Fixture,
 } from "./edit-performance-fixtures.ts";
-import { waitForStageReady } from "./helpers.ts";
+import { runSelectorFor, waitForStageReady } from "./helpers.ts";
 
 test.beforeAll(async () => {
   await Promise.all([
