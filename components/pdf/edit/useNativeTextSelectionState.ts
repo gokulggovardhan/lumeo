@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { CaretTextStyleSnapshot } from "@/lib/pdf/edit/caretTextStyleSnapshot";
 import type { PdfPageTextModel, PdfTextSpan } from "@/lib/pdf/edit/documentModel";
 import {
@@ -35,6 +35,10 @@ export function contiguousRunRange(
  */
 export function useNativeTextSelectionState() {
   const [selectionAnchorIndex, setSelectionAnchorIndex] = useState<number | null>(null);
+  // Pointer events can arrive before React commits the previous anchor state.
+  // Keep the interaction-critical anchor synchronous while state remains the
+  // render/debug surface.
+  const selectionAnchorIndexRef = useRef<number | null>(null);
   const [selectedRunIndices, setSelectedRunIndices] = useState<number[]>([]);
   const [hoveredRunIndex, setHoveredRunIndex] = useState(-1);
   const [focusedRunIndex, setFocusedRunIndex] = useState<number | null>(null);
@@ -48,6 +52,7 @@ export function useNativeTextSelectionState() {
   const [textCompositionActive, setTextCompositionActive] = useState(false);
 
   const clearSelection = useCallback((closeFormatPanel = true) => {
+    selectionAnchorIndexRef.current = null;
     setSelectionAnchorIndex(null);
     setSelectedRunIndices([]);
     setEditDraftText("");
@@ -60,6 +65,7 @@ export function useNativeTextSelectionState() {
   }, []);
 
   const resetInteraction = useCallback(() => {
+    selectionAnchorIndexRef.current = null;
     setSelectionAnchorIndex(null);
     setSelectedRunIndices([]);
     setHoveredRunIndex(-1);
@@ -79,10 +85,14 @@ export function useNativeTextSelectionState() {
       runs: readonly TextRunLike[],
       pageTextModel: PdfPageTextModel | null,
     ) => {
-      const range = contiguousRunRange(selectionAnchorIndex, index, extend);
+      const currentAnchor = selectionAnchorIndexRef.current;
+      const range = contiguousRunRange(currentAnchor, index, extend);
       const anchorIndex =
-        extend && selectionAnchorIndex !== null ? selectionAnchorIndex : index;
-      if (!extend) setSelectionAnchorIndex(index);
+        extend && currentAnchor !== null ? currentAnchor : index;
+      if (!extend) {
+        selectionAnchorIndexRef.current = index;
+        setSelectionAnchorIndex(index);
+      }
       setSelectedRunIndices(range);
       setEditDraftText(range.map((runIndex) => runs[runIndex]?.str ?? "").join(""));
       setLogicalSelection(
@@ -97,7 +107,7 @@ export function useNativeTextSelectionState() {
       if (!extend) setNativeFormatOpen(false);
       return range;
     },
-    [selectionAnchorIndex],
+    [],
   );
 
   const selectRunIndices = useCallback(
@@ -119,6 +129,7 @@ export function useNativeTextSelectionState() {
       const ordered = [...new Set(indices)].sort((a, b) => a - b);
       const first = ordered[0];
       const last = ordered[ordered.length - 1];
+      selectionAnchorIndexRef.current = first;
       setSelectionAnchorIndex(first);
       setSelectedRunIndices(ordered);
       const nextDraft =
