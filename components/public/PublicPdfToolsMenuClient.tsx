@@ -109,6 +109,7 @@ export function PublicPdfToolsMenuClient({
                 <Link
                   key={tile.route}
                   href={tile.route}
+                  prefetch={false}
                   role="menuitem"
                   onClick={() => setOpen(false)}
                   className="lumeo-tool-menuitem group flex items-center gap-3 rounded-[var(--radius-lg)] px-2.5 py-2.5 text-left transition duration-[var(--v2-motion-normal)] hover:bg-[rgba(var(--paper-rgb),0.075)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-subtle)]"
@@ -133,6 +134,7 @@ export function PublicPdfToolsMenuClient({
 
             <Link
               href="/pdf-tools"
+              prefetch={false}
               role="menuitem"
               onClick={() => setOpen(false)}
               className="mt-3 flex min-h-11 items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.055)] px-3 text-sm font-black text-[var(--text-primary)] shadow-[inset_0_1px_0_rgba(255,253,248,0.07)] transition hover:bg-[rgba(var(--paper-rgb),0.085)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
@@ -144,6 +146,7 @@ export function PublicPdfToolsMenuClient({
             <div className="mt-2 grid grid-cols-2 gap-2 md:hidden">
               <Link
                 href="/guides"
+                prefetch={false}
                 role="menuitem"
                 onClick={() => setOpen(false)}
                 className="flex min-h-11 items-center justify-center rounded-[var(--radius-lg)] px-3 text-sm font-bold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.06)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
@@ -152,6 +155,7 @@ export function PublicPdfToolsMenuClient({
               </Link>
               <Link
                 href="/about"
+                prefetch={false}
                 role="menuitem"
                 onClick={() => setOpen(false)}
                 className="flex min-h-11 items-center justify-center rounded-[var(--radius-lg)] px-3 text-sm font-bold text-[var(--text-secondary)] transition hover:bg-[rgba(var(--paper-rgb),0.06)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)]"
