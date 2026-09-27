@@ -1573,6 +1573,10 @@ export default function EditPdfTool() {
     // (rather than only setting `cancelled`) avoids leaving an orphaned
     // render task racing a new one on the next effect run.
     let renderTask: { cancel: () => void; promise: Promise<void> } | null = null;
+    const rasterPerformanceStartedAt = window.performance.now();
+    const rasterWasRefresh =
+      renderedPageRef.current === pageIndex &&
+      pageImageUrlRef.current !== "";
 
     void (async () => {
       try {
@@ -1595,7 +1599,21 @@ export default function EditPdfTool() {
         const canvas = document.createElement("canvas");
         const context = canvas.getContext("2d", { alpha: false });
         if (!context) {
-          if (!cancelled) setError("This page is too large to preview in this browser. Try a different page or a smaller file.");
+          if (!cancelled) {
+            performanceDiagnosticsRef.current?.recordDuration(
+              "page-raster",
+              window.performance.now() - rasterPerformanceStartedAt,
+              {
+                pageNumber: pageIndex + 1,
+                detail: {
+                  success: false,
+                  refresh: rasterWasRefresh,
+                  reason: "canvas-context-unavailable",
+                },
+              },
+            );
+            setError("This page is too large to preview in this browser. Try a different page or a smaller file.");
+          }
           return;
         }
         canvas.width = Math.max(1, Math.floor(viewport.width));
@@ -1606,7 +1624,22 @@ export default function EditPdfTool() {
         await renderPageWithTimeout(renderTask, pageIndex + 1);
 
         const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.9));
-        if (cancelled || !blob) return;
+        if (cancelled) return;
+        if (!blob) {
+          performanceDiagnosticsRef.current?.recordDuration(
+            "page-raster",
+            window.performance.now() - rasterPerformanceStartedAt,
+            {
+              pageNumber: pageIndex + 1,
+              detail: {
+                success: false,
+                refresh: rasterWasRefresh,
+                reason: "jpeg-blob-unavailable",
+              },
+            },
+          );
+          return;
+        }
         // Revoke the PREVIOUS url only after the new one is in state.
         // Revoking first (as this used to) blanks the <img> for a frame,
         // which was invisible when a re-render only ever happened on a page
@@ -1634,7 +1667,22 @@ export default function EditPdfTool() {
         // on it. Detected runs still populate a moment later and the select
         // tool's highlighting appears as soon as they do -- nothing about
         // detection itself changed, only when the page stops being "loading".
-        if (!cancelled) setPageLoading(false);
+        if (!cancelled) {
+          performanceDiagnosticsRef.current?.recordDuration(
+            "page-raster",
+            window.performance.now() - rasterPerformanceStartedAt,
+            {
+              pageNumber: pageIndex + 1,
+              detail: {
+                success: true,
+                refresh: rasterWasRefresh,
+                rasterScale: dimensionScale,
+                pixelCount: canvas.width * canvas.height,
+              },
+            },
+          );
+          setPageLoading(false);
+        }
       } catch {
         // A cancelled render's promise rejects (RenderingCancelledException)
         // -- that's expected teardown, not a real preview failure.
@@ -1654,6 +1702,20 @@ export default function EditPdfTool() {
         // No retry loop: rasterScale is unchanged by the failure, so this
         // effect will not re-run until something else actually changes.
         const isRefreshOfVisiblePage = renderedPageRef.current === pageIndex && pageImageUrlRef.current !== "";
+        if (!cancelled) {
+          performanceDiagnosticsRef.current?.recordDuration(
+            "page-raster",
+            window.performance.now() - rasterPerformanceStartedAt,
+            {
+              pageNumber: pageIndex + 1,
+              detail: {
+                success: false,
+                refresh: rasterWasRefresh,
+                reason: "render-failed",
+              },
+            },
+          );
+        }
         if (!cancelled && !isRefreshOfVisiblePage) {
           setError("This page could not be previewed. Try a different page.");
         }
