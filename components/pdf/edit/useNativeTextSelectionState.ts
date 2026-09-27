@@ -45,6 +45,7 @@ export function useNativeTextSelectionState() {
   const [editApplyError, setEditApplyError] = useState("");
   const [nativeFormatOpen, setNativeFormatOpen] = useState(false);
   const [logicalSelection, setLogicalSelection] = useState<LogicalTextRange | null>(null);
+  const [textCompositionActive, setTextCompositionActive] = useState(false);
 
   const clearSelection = useCallback((closeFormatPanel = true) => {
     setSelectionAnchorIndex(null);
@@ -54,6 +55,7 @@ export function useNativeTextSelectionState() {
     setEditApplyError("");
     setUseSubstituteFont(false);
     setLogicalSelection(null);
+    setTextCompositionActive(false);
     if (closeFormatPanel) setNativeFormatOpen(false);
   }, []);
 
@@ -67,6 +69,7 @@ export function useNativeTextSelectionState() {
     setEditApplyError("");
     setUseSubstituteFont(false);
     setLogicalSelection(null);
+    setTextCompositionActive(false);
   }, []);
 
   const selectDetectedRun = useCallback(
@@ -90,6 +93,7 @@ export function useNativeTextSelectionState() {
       setCaretTextStyleSnapshot(null);
       setEditApplyError("");
       setUseSubstituteFont(false);
+      setTextCompositionActive(false);
       if (!extend) setNativeFormatOpen(false);
       return range;
     },
@@ -139,6 +143,7 @@ export function useNativeTextSelectionState() {
       setCaretTextStyleSnapshot(null);
       setEditApplyError("");
       setUseSubstituteFont(false);
+      setTextCompositionActive(false);
       setNativeFormatOpen(false);
     },
     [clearSelection],
