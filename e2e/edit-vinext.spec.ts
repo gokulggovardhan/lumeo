@@ -934,3 +934,77 @@ test("vinext Edit PDF searches across pages, highlights matches, and prepares a 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
+
+
+test("vinext Edit PDF replaces all safe document matches in one undo step", async ({ page }) => {
+  await uploadEditFixture(page, TWO_PAGE_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("record");
+  const count = page.locator("[data-edit-search-match-count]");
+  await expect(count).toHaveAttribute("data-edit-search-match-count", "2", {
+    timeout: 90_000,
+  });
+
+  const replacement = page.getByRole("textbox", {
+    name: "Replace search match with",
+  });
+  await replacement.fill("file");
+
+  const replaceAll = page.getByRole("button", { name: "Replace all safely" });
+  await expect(replaceAll).toBeEnabled({ timeout: 90_000 });
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toMatch(/Replace 2 safely editable matches/i);
+    expect(dialog.message()).toMatch(/one Undo step/i);
+    await dialog.accept();
+  });
+  await replaceAll.click();
+
+  const status = page.locator("[data-edit-replace-all-status]");
+  await expect(status).toContainText(/Replaced 2 matches in one native PDF transaction/i, {
+    timeout: 90_000,
+  });
+  // One history snapshot can carry two semantic native-text operations.
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "2", {
+    timeout: 90_000,
+  });
+
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Open page 2" }).click();
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Second page file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0", {
+    timeout: 90_000,
+  });
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Second page record"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Open page 1" }).click();
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+});
