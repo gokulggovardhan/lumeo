@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
+import { THUMBNAIL_ROW_HEIGHT_PX } from "../lib/pdf/edit/thumbnailVirtualization.ts";
 import {
   CLIPPED_TEXT_PDF,
   MIXED_STYLE_PDF,
@@ -10,10 +11,17 @@ import {
   TWO_PAGE_PDF,
   writeFixtures,
 } from "./fixtures.ts";
+import {
+  EDIT_PERFORMANCE_120_PDF,
+  writeEditPerformance120Fixture,
+} from "./edit-performance-fixtures.ts";
 import { waitForStageReady } from "./helpers.ts";
 
 test.beforeAll(async () => {
-  await writeFixtures();
+  await Promise.all([
+    writeFixtures(),
+    writeEditPerformance120Fixture(),
+  ]);
 });
 
 async function uploadEditFixture(page: Page, fixturePath: string) {
@@ -62,6 +70,55 @@ test("vinext Edit PDF explains read-only clipped text before an edit is attempte
   await limitedRun.press("Enter");
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
   await expect(explanation).toBeVisible();
+});
+
+test("vinext Edit PDF virtualizes a 120-page rail across browsers", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, EDIT_PERFORMANCE_120_PDF);
+  await expect(
+    page.locator(runSelectorFor("Performance page 1")).first(),
+  ).toBeVisible({ timeout: 180_000 });
+
+  const rail = page
+    .getByRole("complementary", { name: "Pages" })
+    .locator("ul[data-thumbnail-virtualized]");
+  await expect(rail).toHaveAttribute("data-thumbnail-virtualized", "true", {
+    timeout: 90_000,
+  });
+
+  const initialWindowSize = Number(
+    await rail.getAttribute("data-thumbnail-window-size"),
+  );
+  expect(initialWindowSize).toBeGreaterThan(0);
+  expect(initialWindowSize).toBeLessThan(30);
+  expect(
+    await page.getByRole("button", { name: /^Open page \d+$/ }).count(),
+  ).toBeLessThan(30);
+
+  await rail.evaluate(
+    (node, targetTop) => {
+      const list = node as HTMLUListElement;
+      list.scrollTop = Math.min(
+        targetTop,
+        Math.max(0, list.scrollHeight - list.clientHeight),
+      );
+      list.dispatchEvent(new Event("scroll", { bubbles: true }));
+    },
+    119 * THUMBNAIL_ROW_HEIGHT_PX,
+  );
+
+  await expect(
+    page.getByRole("button", { name: "Open page 120" }),
+  ).toBeVisible({ timeout: 90_000 });
+  expect(
+    await page.getByRole("button", { name: /^Open page \d+$/ }).count(),
+  ).toBeLessThan(30);
+
+  await page.getByRole("button", { name: "Open page 120" }).click();
+  await expect(
+    page.locator(runSelectorFor("Performance page 120")).first(),
+  ).toBeVisible({ timeout: 180_000 });
 });
 
 test("vinext Edit PDF supports text matching, editing, and export", async ({
