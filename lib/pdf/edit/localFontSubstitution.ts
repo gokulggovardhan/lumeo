@@ -499,7 +499,15 @@ export async function buildLocalFontSubstitutionPlan({
       "Clipping text remains read-only because changing its font would also change the clipping path.",
     );
   }
-  if (sourceResourceIdentity.writingMode !== "horizontal") {
+  if (
+    resolvedFont.kind === "Type0" &&
+    sourceResourceIdentity.writingMode !== "horizontal"
+  ) {
+    return rejectHere(
+      "Native local-font substitution is currently limited to horizontal PDF text.",
+    );
+  }
+  if (sourceResourceIdentity.writingMode === "vertical") {
     return rejectHere(
       "Native local-font substitution is currently limited to horizontal PDF text.",
     );
