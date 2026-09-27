@@ -260,6 +260,13 @@ test("vinext Edit PDF aborts Replace All when the native PDF revision changes du
   await expect(status).toContainText(/Checking every match against the native PDF locally/i, {
     timeout: 30_000,
   });
+  await expect(find).toBeDisabled();
+  await expect(replace).toBeDisabled();
+  await expect(page.getByRole("combobox", { name: "Search scope" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Find", exact: true })).toBeDisabled();
+  // Search request controls freeze, but document history stays interactive:
+  // Undo below must still be able to invalidate this preflight safely.
+  await expect(page.getByRole("button", { name: "Undo" })).toBeEnabled();
 
   // Change the authoritative PDF revision while the 120-page preflight is
   // still scanning. Replace All must discard its old clone rather than
