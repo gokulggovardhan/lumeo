@@ -477,6 +477,47 @@ test("classifier identifies Form XObject text without flattening away its resour
   assert.equal(classification.safelyRewritable, true);
 });
 
+test("Form XObject classification still fails closed for missing metrics and complex geometry", () => {
+  const locator = { kind: "xobject" as const, formPath: ["Fm1"] };
+
+  const fontLimited = buildNativeContentStreamSpans({
+    operators: [located({ locator })],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () =>
+      profile({
+        metricsSource: "Unknown",
+        metrics: {
+          ...profile().metrics,
+          source: "Unknown",
+        },
+      }),
+  })[0];
+  const fontClassification = classifyNativeTextSpan(fontLimited);
+  assert.equal(
+    fontClassification.category,
+    "NATIVE_TEXT_WITH_FONT_LIMITATIONS",
+  );
+  assert.equal(fontClassification.safelyRewritable, false);
+
+  const skewed = buildNativeContentStreamSpans({
+    operators: [
+      located({
+        locator,
+        textRenderingMatrix: [12, 3, 0, 12, 72, 700],
+      }),
+    ],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile(),
+  })[0];
+  const skewClassification = classifyNativeTextSpan(skewed);
+  assert.equal(skewClassification.category, "COMPLEX_VECTOR_TEXT");
+  assert.equal(skewClassification.safelyRewritable, false);
+});
+
 test("classifier detects vertical Type0 text from retained font CMap evidence", () => {
   const [span] = buildNativeContentStreamSpans({
     operators: [located()],
