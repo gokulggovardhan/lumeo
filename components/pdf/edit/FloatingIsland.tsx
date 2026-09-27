@@ -59,6 +59,12 @@ export type FloatingIslandProps =
       mode: "text-inspector";
       element: TextEditElement;
       onPatch: (patch: Partial<TextEditElement>) => void;
+      fontLabel: string;
+      customFontActive: boolean;
+      customFontBusy: boolean;
+      customFontIssue: string | null;
+      onLocalFontFile: (file: File) => void;
+      onUseStandardFont: () => void;
     };
 
 export function FloatingIsland(props: FloatingIslandProps) {
@@ -110,6 +116,36 @@ export function FloatingIsland(props: FloatingIslandProps) {
         </>
       ) : (
         <>
+          <label
+            className="relative flex h-11 max-w-44 cursor-pointer items-center gap-1.5 rounded-full border border-[var(--text-primary)]/14 px-3 text-xs font-bold text-[var(--text-secondary)] transition hover:border-[var(--lumeo-gold)]/45 hover:text-[var(--text-primary)] focus-within:ring-2 focus-within:ring-[var(--lumeo-gold)]"
+            title={props.customFontActive ? `Local font: ${props.fontLabel}` : "Choose a local .ttf or .otf font for added text"}
+          >
+            <span className="max-w-28 truncate" data-edit-local-font-label>{props.customFontBusy ? "Loading font…" : props.fontLabel}</span>
+            <span aria-hidden="true" className="text-[10px] opacity-55">▾</span>
+            <input
+              type="file"
+              accept=".ttf,.otf,font/ttf,font/otf,application/font-sfnt"
+              aria-label="Choose local font"
+              disabled={props.customFontBusy}
+              className="sr-only"
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = "";
+                if (file) props.onLocalFontFile(file);
+              }}
+            />
+          </label>
+          {props.customFontActive ? (
+            <button
+              type="button"
+              onClick={props.onUseStandardFont}
+              disabled={props.customFontBusy}
+              className="grid h-11 shrink-0 place-items-center rounded-full border border-[var(--text-primary)]/14 px-3 text-[10px] font-bold text-[var(--text-secondary)] transition hover:border-[var(--lumeo-gold)]/45 hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] disabled:opacity-40"
+              title="Use standard Helvetica instead"
+            >
+              Reset font
+            </button>
+          ) : null}
           <input
             type="number"
             min={8}
@@ -128,19 +164,38 @@ export function FloatingIsland(props: FloatingIslandProps) {
             title="Text color"
             className="h-11 w-11 shrink-0 rounded-full border border-[var(--text-primary)]/14 bg-transparent"
           />
-          <button type="button" aria-pressed={props.element.bold} onClick={() => props.onPatch({ bold: !props.element.bold })} aria-label="Bold" title="Bold" className={toggleClass(props.element.bold)}>
+          <button
+            type="button"
+            aria-pressed={props.element.bold}
+            disabled={props.customFontActive}
+            onClick={() => props.onPatch({ bold: !props.element.bold })}
+            aria-label="Bold"
+            title={props.customFontActive ? "Choose a bold font file instead of synthetic bold." : "Bold"}
+            className={toggleClass(props.element.bold)}
+          >
             B
           </button>
           <button
             type="button"
             aria-pressed={props.element.italic}
+            disabled={props.customFontActive}
             onClick={() => props.onPatch({ italic: !props.element.italic })}
             aria-label="Italic"
-            title="Italic"
+            title={props.customFontActive ? "Choose an italic font file instead of synthetic italic." : "Italic"}
             className={`${toggleClass(props.element.italic)} italic`}
           >
             I
           </button>
+          {props.customFontIssue ? (
+            <span
+              role="alert"
+              data-edit-local-font-issue
+              className="max-w-56 rounded-full border border-[var(--border-danger)]/30 bg-[var(--surface-danger)] px-3 py-1.5 text-[10px] font-semibold leading-4 text-[var(--text-danger)]"
+              title={props.customFontIssue}
+            >
+              Font missing a character
+            </span>
+          ) : null}
           <button
             type="button"
             aria-pressed={props.element.underline}
