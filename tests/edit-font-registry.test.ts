@@ -401,7 +401,7 @@ test("PdfFontRegistry caches professional inspection for the same embedded PDF f
 test("PdfFontRegistry bounds professional font-intelligence cache across many embedded fonts", async () => {
   const doc = await PDFDocument.create();
   const context = doc.context;
-  const fontEntries: Record<string, unknown> = {};
+  const fonts = context.obj({});
 
   for (let index = 0; index < 20; index += 1) {
     const fakeTtf = Uint8Array.from([
@@ -430,11 +430,11 @@ test("PdfFontRegistry bounds professional font-intelligence cache across many em
         FontDescriptor: descriptorRef,
       }),
     );
-    fontEntries[`F${index}`] = fontRef;
+    fonts.set(PDFName.of(`F${index}`), fontRef);
   }
 
   const resources = context.obj({
-    Font: context.obj(fontEntries),
+    Font: fonts,
   });
   const registry = new PdfFontRegistry(doc);
 
