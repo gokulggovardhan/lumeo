@@ -237,8 +237,31 @@ test("vinext Edit PDF keeps IME composition isolated until the candidate is comm
   // nothing until compositionend releases the candidate.
   await editor.dispatchEvent("compositionstart", { data: "file" });
   await expect(editor).toHaveAttribute("data-ime-composing", "true");
-  await editor.fill("Employee file");
 
+  // Playwright fill() may implicitly terminate composition in Firefox, so
+  // drive the browser's real provisional input boundary directly. Calling
+  // the native value setter bypasses React's value tracker, allowing the
+  // bubbling InputEvent to exercise onChange while isComposing remains true.
+  await editor.evaluate((node) => {
+    const input = node as HTMLInputElement;
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )?.set;
+    if (!setter) throw new Error("HTMLInputElement value setter is unavailable");
+    setter.call(input, "Employee file");
+    input.dispatchEvent(
+      new InputEvent("input", {
+        bubbles: true,
+        data: "Employee file",
+        inputType: "insertCompositionText",
+        isComposing: true,
+      }),
+    );
+  });
+
+  await expect(editor).toHaveValue("Employee file");
+  await expect(editor).toHaveAttribute("data-ime-composing", "true");
   await expect(apply).toBeDisabled();
   await editor.press("Enter");
   await editor.press("Escape");
