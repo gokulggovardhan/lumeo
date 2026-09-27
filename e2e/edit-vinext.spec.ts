@@ -4,6 +4,7 @@ import { PDFDocument } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import {
   CLIPPED_TEXT_PDF,
+  LARGE_DOCUMENT_PDF,
   MIXED_STYLE_PDF,
   SPLIT_RUN_PDF,
   TEXT_ONLY_PDF,
@@ -62,6 +63,45 @@ test("vinext Edit PDF explains read-only clipped text before an edit is attempte
   await limitedRun.press("Enter");
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
   await expect(explanation).toBeVisible();
+});
+
+test("vinext Edit PDF keeps a 120-page thumbnail rail bounded and scrollable", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, LARGE_DOCUMENT_PDF);
+  await waitForStageReady(page);
+
+  const rail = page.locator("ul[data-thumbnail-virtualized]");
+  await expect(rail).toHaveAttribute("data-thumbnail-virtualized", "true", {
+    timeout: 90_000,
+  });
+
+  const initialWindowSize = Number(
+    await rail.getAttribute("data-thumbnail-window-size"),
+  );
+  expect(initialWindowSize).toBeGreaterThan(0);
+  expect(initialWindowSize).toBeLessThan(30);
+  expect(
+    await page.getByRole("button", { name: /^Open page \d+$/ }).count(),
+  ).toBeLessThan(30);
+
+  await rail.evaluate((node) => {
+    const list = node as HTMLUListElement;
+    list.scrollTop = list.scrollHeight;
+    list.dispatchEvent(new Event("scroll", { bubbles: true }));
+  });
+
+  await expect(page.getByRole("button", { name: "Open page 120" })).toBeVisible({
+    timeout: 90_000,
+  });
+  const finalWindowSize = Number(
+    await rail.getAttribute("data-thumbnail-window-size"),
+  );
+  expect(finalWindowSize).toBeGreaterThan(0);
+  expect(finalWindowSize).toBeLessThan(30);
+  expect(
+    await page.getByRole("button", { name: /^Open page \d+$/ }).count(),
+  ).toBeLessThan(30);
 });
 
 test("vinext Edit PDF supports text matching, editing, and export", async ({

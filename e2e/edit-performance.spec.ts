@@ -11,6 +11,11 @@ import { runSelectorFor } from "./helpers.ts";
 type PerformanceReport = {
   document: { fileSizeBytes: number | null; pageCount: number | null };
   durations: Record<string, { count: number; maxMs: number; averageMs: number }>;
+  recentEvents: Array<{
+    kind: string;
+    durationMs: number;
+    detail: Record<string, number | string | boolean | null>;
+  }>;
   memory: { peakUsedJsHeapBytes: number | null };
   fontRegistry: Record<string, number> | null;
 };
@@ -28,13 +33,31 @@ async function openFixture(page: Page, path: string, expectedPageCount: number) 
   await expect(page.locator(runSelectorFor("Performance page 1")).first()).toBeVisible({
     timeout: 180_000,
   });
-  await expect(
-    page.getByRole("button", { name: `Open page ${expectedPageCount}` }),
-  ).toBeAttached({ timeout: 30_000 });
+  const rail = page.locator("ul[data-thumbnail-virtualized]");
+  await expect(rail).toHaveAttribute("data-thumbnail-virtualized", "true", {
+    timeout: 30_000,
+  });
 }
 
-async function openMeasuredPage(page: Page, pageNumber: number) {
-  await page.getByRole("button", { name: `Open page ${pageNumber}` }).click();
+async function openMeasuredPage(
+  page: Page,
+  pageNumber: number,
+  pageCount: number,
+) {
+  const rail = page.locator("ul[data-thumbnail-virtualized]");
+  await rail.evaluate(
+    (node, { pageNumber, pageCount }) => {
+      const list = node as HTMLUListElement;
+      const ratio =
+        pageCount <= 1 ? 0 : Math.max(0, Math.min(1, (pageNumber - 1) / (pageCount - 1)));
+      list.scrollTop = ratio * Math.max(0, list.scrollHeight - list.clientHeight);
+      list.dispatchEvent(new Event("scroll", { bubbles: true }));
+    },
+    { pageNumber, pageCount },
+  );
+  const button = page.getByRole("button", { name: `Open page ${pageNumber}` });
+  await expect(button).toBeAttached({ timeout: 30_000 });
+  await button.click();
   await expect(
     page.locator(runSelectorFor(`Performance page ${pageNumber}`)).first(),
   ).toBeVisible({ timeout: 180_000 });
@@ -71,8 +94,8 @@ async function collectScenario(
   name: string,
 ) {
   await openFixture(page, fixturePath, pageCount);
-  await openMeasuredPage(page, Math.ceil(pageCount / 2));
-  await openMeasuredPage(page, pageCount);
+  await openMeasuredPage(page, Math.ceil(pageCount / 2), pageCount);
+  await openMeasuredPage(page, pageCount, pageCount);
   await exerciseRailScroll(page);
 
   await expect
@@ -88,7 +111,7 @@ async function collectScenario(
         }),
       {
         timeout: 600_000,
-        message: "eager thumbnail batch should finish so its cost can be measured",
+        message: "thumbnail window batch should finish so its cost can be measured",
       },
     )
     .toBeGreaterThan(0);
@@ -110,6 +133,27 @@ async function collectScenario(
   expect(report.durations["native-match"].count).toBeGreaterThanOrEqual(3);
   expect(report.durations["thumbnail-batch"].count).toBeGreaterThanOrEqual(1);
 
+  const thumbnailEvents = report.recentEvents.filter(
+    (event) => event.kind === "thumbnail-batch",
+  );
+  expect(thumbnailEvents.length).toBeGreaterThan(0);
+  expect(
+    thumbnailEvents.some(
+      (event) =>
+        event.detail.virtualized === true &&
+        typeof event.detail.mountedRowCount === "number" &&
+        event.detail.mountedRowCount > 0 &&
+        event.detail.mountedRowCount < pageCount,
+    ),
+  ).toBe(true);
+
+  const maxMountedRows = Math.max(
+    ...thumbnailEvents
+      .map((event) => event.detail.mountedRowCount)
+      .filter((value): value is number => typeof value === "number"),
+  );
+  expect(maxMountedRows).toBeLessThan(30);
+
   const outputDir = join(process.cwd(), "test-results", "edit-performance");
   await mkdir(outputDir, { recursive: true });
   await writeFile(
@@ -124,6 +168,7 @@ async function collectScenario(
       maxTextDetectionMs: report.durations["text-detection"].maxMs,
       maxNativeMatchMs: report.durations["native-match"].maxMs,
       thumbnailBatchMs: report.durations["thumbnail-batch"].maxMs,
+      maxMountedThumbnailRows: maxMountedRows,
       peakUsedJsHeapBytes: report.memory.peakUsedJsHeapBytes,
       fontRegistry: report.fontRegistry,
     })}`,

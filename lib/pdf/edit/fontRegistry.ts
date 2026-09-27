@@ -33,12 +33,14 @@ import {
   type PdfFontProgramInspection,
 } from "./fontProgramIntelligence.ts";
 import type { EditPdfFontRegistryPerformanceSnapshot } from "./performanceDiagnostics.ts";
+import { BoundedLruCache } from "./boundedLruCache.ts";
 
 const SUBSET_PREFIX = /^[A-Z]{6}\+/;
 const BOLD_NAME = /bold|black|heavy|semib|demib?|ultra/i;
 const ITALIC_NAME = /italic|oblique/i;
 const FLAG_SYMBOLIC = 1 << 2;
 const FLAG_NONSYMBOLIC = 1 << 5;
+export const MAX_CACHED_FONT_INTELLIGENCE = 8;
 
 export type BrowserFontProgramFormat =
   | "truetype"
@@ -401,7 +403,10 @@ export class PdfFontRegistry {
   private readonly profileCache = new WeakMap<PDFDict, PdfFontProfile>();
   private readonly programCache = new WeakMap<PDFDict, EmbeddedFontProgram | null>();
   private readonly browserFaceCache = new WeakMap<PDFDict, Promise<string | null>>();
-  private readonly intelligenceCache = new WeakMap<PDFDict, Promise<PdfFontProgramInspection>>();
+  private readonly intelligenceCache = new BoundedLruCache<
+    PDFDict,
+    Promise<PdfFontProgramInspection>
+  >(MAX_CACHED_FONT_INTELLIGENCE);
   private readonly performanceStats: EditPdfFontRegistryPerformanceSnapshot = {
     resolveCalls: 0,
     profileCacheHits: 0,
@@ -556,6 +561,11 @@ export class PdfFontRegistry {
 
     this.intelligenceCache.set(fontResource.dict, promise);
     return promise;
+  }
+
+  /** Advisory fontkit cache size only; structural PDF font caches remain complete. */
+  fontIntelligenceCacheSizeForDiagnostics(): number {
+    return this.intelligenceCache.size;
   }
 
   private embeddedProgramFor(fontDict: PDFDict): EmbeddedFontProgram | null {

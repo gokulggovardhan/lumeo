@@ -430,3 +430,53 @@ test("PdfFontRegistry caches professional inspection for the same embedded PDF f
   const result = await first;
   assert.equal(result.kind, "parse-error");
 });
+
+
+test("PdfFontRegistry bounds professional font-intelligence cache across many embedded fonts", async () => {
+  const doc = await PDFDocument.create();
+  const context = doc.context;
+  const fonts = context.obj({});
+
+  for (let index = 0; index < 20; index += 1) {
+    const fakeTtf = Uint8Array.from([
+      0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, index & 0xff,
+    ]);
+    const fontFileRef = context.register(context.flateStream(fakeTtf));
+    const descriptorRef = context.register(
+      context.obj({
+        Type: "FontDescriptor",
+        FontName: `ABCDEF+PerfFont${index}`,
+        Flags: 32,
+        ItalicAngle: 0,
+        FontWeight: 400,
+        FontFile2: fontFileRef,
+      }),
+    );
+    const fontRef = context.register(
+      context.obj({
+        Type: "Font",
+        Subtype: "TrueType",
+        BaseFont: `ABCDEF+PerfFont${index}`,
+        FirstChar: 65,
+        LastChar: 65,
+        Widths: [600],
+        Encoding: "WinAnsiEncoding",
+        FontDescriptor: descriptorRef,
+      }),
+    );
+    fonts.set(PDFName.of(`F${index}`), fontRef);
+  }
+
+  const resources = context.obj({ Font: fonts });
+  const registry = new PdfFontRegistry(doc);
+
+  for (let index = 0; index < 20; index += 1) {
+    await registry.inspectEmbeddedFontProgram(resources, `F${index}`);
+    assert.equal(
+      registry.fontIntelligenceCacheSizeForDiagnostics() <= 8,
+      true,
+    );
+  }
+
+  assert.equal(registry.fontIntelligenceCacheSizeForDiagnostics(), 8);
+});

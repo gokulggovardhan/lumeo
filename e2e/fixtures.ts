@@ -18,6 +18,7 @@ export const SPLIT_RUN_PDF = path.join(TMP_DIR, "split-run.pdf");
 export const TWO_PAGE_PDF = path.join(TMP_DIR, "two-page.pdf");
 export const MIXED_STYLE_PDF = path.join(TMP_DIR, "mixed-style.pdf");
 export const CLIPPED_TEXT_PDF = path.join(TMP_DIR, "clipped-text.pdf");
+export const LARGE_DOCUMENT_PDF = path.join(TMP_DIR, "large-document-120-pages.pdf");
 
 /** Widely spaced so each line is its own detected run and boxes cannot straddle two. */
 function drawSensitiveText(page: import("pdf-lib").PDFPage, font: import("pdf-lib").PDFFont) {
@@ -202,6 +203,23 @@ async function clippedText(): Promise<Uint8Array> {
   return doc.save();
 }
 
+/** Large but lightweight document for page-rail virtualization regressions. */
+async function largeDocument(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  for (let index = 0; index < 120; index += 1) {
+    const page = doc.addPage([595, 842]);
+    page.drawText(`Large document page ${index + 1}`, {
+      x: 60,
+      y: 740,
+      size: 14,
+      font,
+      color: rgb(0, 0, 0),
+    });
+  }
+  return doc.save();
+}
+
 /** Two pages, so the PAGES rail renders -- it is hidden for a single page. */
 async function twoPage(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -224,4 +242,5 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(TWO_PAGE_PDF, await twoPage());
   await writeFile(MIXED_STYLE_PDF, await mixedStyle());
   await writeFile(CLIPPED_TEXT_PDF, await clippedText());
+  await writeFile(LARGE_DOCUMENT_PDF, await largeDocument());
 }
