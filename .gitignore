@@ -76,3 +76,6 @@ playwright-report/
 
 # Generated from the exact installed pdfjs-dist package before app builds.
 /public/pdfjs-standard-fonts/
+
+# Generated from pinned Tesseract packages before app builds.
+/public/tesseract/
