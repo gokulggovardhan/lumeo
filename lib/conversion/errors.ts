@@ -202,3 +202,50 @@ export function toAnalyticsConversionErrorCode(
       return "processing_error";
   }
 }
+
+
+export function toWordToPdfAnalyticsErrorCode(
+  error: ConversionUserError,
+): AnalyticsErrorCode {
+  const detail = (error.technicalMessage ?? "").toLowerCase();
+
+  switch (error.code) {
+    case "unsupported-file":
+    case "file-too-large":
+    case "encrypted-input":
+      return "input_validation";
+    case "malformed-input":
+      return "docx_parse_error";
+    case "browser-unsupported":
+      return "browser_limit";
+    case "insufficient-resources":
+      return "memory_limit";
+    case "cancelled":
+      return "user_cancelled";
+    case "runtime-load-failed":
+      if (
+        /webassembly\.instantiate|compileerror|wasm.*compile|section .*extends past end/.test(
+          detail,
+        )
+      ) {
+        return "wasm_compile_error";
+      }
+      if (/worker|pthread/.test(detail)) return "worker_error";
+      if (/font/.test(detail)) return "font_load_error";
+      if (/timeout|watchdog|exceeded/.test(detail)) return "timeout";
+      return "wasm_load_error";
+    case "conversion-failed":
+      if (/worker|pthread/.test(detail)) return "worker_error";
+      if (/font/.test(detail)) return "font_load_error";
+      if (/timeout|watchdog|exceeded/.test(detail)) return "timeout";
+      if (/unsupported.*feature|not supported.*document/.test(detail)) {
+        return "unsupported_document_feature";
+      }
+      return "render_error";
+    case "output-failed":
+      if (/validat|invalid pdf|parser|reopen|page count|blank/.test(detail)) {
+        return "pdf_validation_error";
+      }
+      return "pdf_generation_error";
+  }
+}
