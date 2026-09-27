@@ -37,6 +37,10 @@ import {
   isValidatedEditPlan,
   type ValidatedEditPlan,
 } from "./editPlan.ts";
+import {
+  isValidatedShapedGlyphEditPlan,
+  type ValidatedShapedGlyphEditPlan,
+} from "./shapedGlyphEditPlan.ts";
 import { ensureFallbackFontResource, resolveFallbackFontsDict } from "./fallbackFont.ts";
 import {
   isValidatedMultiRunEditPlan,
@@ -47,7 +51,11 @@ import {
   type ValidatedNativeTextStyleBatchPlan,
 } from "./multiStylePlan.ts";
 import type { NativePaintPlan } from "./nativePaint.ts";
-import { resolveStreamTarget, resolveIsolatedStreamTarget } from "./formXObjects.ts";
+import {
+  collectPageTextOperators,
+  resolveStreamTarget,
+  resolveIsolatedStreamTarget,
+} from "./formXObjects.ts";
 
 export class EditPlanRejectedError extends Error {}
 
@@ -530,6 +538,221 @@ export async function applyEditPlanToDocument(
   const fallbackResourceName = await registerFallbackFont(doc, plan, null);
   const newBytes = await applyPlanToTargetBytes(located.decodedBytes, plan, bytesPerCode, fallbackResourceName, options.nativePaintPlan);
   replaceContentStream(page, located, plan.contentStreamIndex, newBytes);
+}
+
+function assertShapedApplicable(
+  plan: ValidatedShapedGlyphEditPlan,
+): void {
+  if (!isValidatedShapedGlyphEditPlan(plan)) {
+    throw new EditPlanRejectedError(
+      "This shaped-glyph edit plan was not issued by the validated shaped-glyph planner.",
+    );
+  }
+  if (plan.operatorType !== "Tj" && plan.operatorType !== "TJ") {
+    throw new EditPlanRejectedError(
+      "The shaped-glyph writer supports only Tj/TJ operators.",
+    );
+  }
+  if (plan.glyphs.length === 0) {
+    throw new EditPlanRejectedError(
+      "A shaped-glyph write must contain at least one proven PDF glyph.",
+    );
+  }
+}
+
+function buildShapedGlyphOperatorText(
+  plan: ValidatedShapedGlyphEditPlan,
+): string {
+  const parts: string[] = [];
+  for (const glyph of plan.glyphs) {
+    parts.push(`<${encodeGlyphCodesToHex([glyph.pdfCode], 2)}>`);
+    if (Math.abs(glyph.tjAdjustment) >= TJ_DELTA_EPSILON) {
+      parts.push(formatPdfNumber(glyph.tjAdjustment));
+    }
+  }
+  return `[${parts.join(" ")}] TJ`;
+}
+
+/**
+ * Pure shaped-glyph byte writer. Every glyph is emitted through the already
+ * proven two-byte CID and each HarfBuzz x-advance is represented with native
+ * TJ positioning. The final glyph's adjustment also carries endpoint
+ * compensation so following native text remains anchored exactly where the
+ * original operator ended.
+ */
+export function applyShapedGlyphEditPlanToBytes(
+  contentStreamBytes: Uint8Array,
+  plan: ValidatedShapedGlyphEditPlan,
+): Uint8Array {
+  assertShapedApplicable(plan);
+
+  if (
+    plan.byteOffset < 0 ||
+    plan.byteLength <= 0 ||
+    plan.byteOffset + plan.byteLength > contentStreamBytes.byteLength
+  ) {
+    throw new EditPlanRejectedError(
+      "The shaped-glyph plan targets a byte range outside the current content stream.",
+    );
+  }
+
+  const newOperatorBytes = new TextEncoder().encode(
+    buildShapedGlyphOperatorText(plan),
+  );
+  const before = contentStreamBytes.subarray(0, plan.byteOffset);
+  const after = contentStreamBytes.subarray(
+    plan.byteOffset + plan.byteLength,
+  );
+  const result = new Uint8Array(
+    before.length + newOperatorBytes.length + after.length,
+  );
+  result.set(before, 0);
+  result.set(newOperatorBytes, before.length);
+  result.set(after, before.length + newOperatorBytes.length);
+  return result;
+}
+
+function sameStringArray(
+  a: readonly string[],
+  b: readonly string[],
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every((value, index) => value === b[index])
+  );
+}
+
+function twoByteCodesFromStrings(
+  strings: readonly Uint8Array[],
+): number[] | null {
+  const codes: number[] = [];
+  for (const bytes of strings) {
+    if (bytes.byteLength % 2 !== 0) return null;
+    for (let index = 0; index < bytes.byteLength; index += 2) {
+      codes.push((bytes[index] << 8) | bytes[index + 1]);
+    }
+  }
+  return codes;
+}
+
+function sameNumbers(
+  a: readonly number[],
+  b: readonly number[],
+): boolean {
+  return (
+    a.length === b.length &&
+    a.every((value, index) => value === b[index])
+  );
+}
+
+function originalTjTotalForCurrentOperator(
+  adjustments: readonly number[] | undefined,
+): number | null {
+  if (!adjustments?.length) return 0;
+  let total = 0;
+  for (const adjustment of adjustments) {
+    if (!Number.isFinite(adjustment)) return null;
+    total += adjustment;
+    if (!Number.isFinite(total)) return null;
+  }
+  return total;
+}
+
+/**
+ * Re-resolves the exact page/Form operator immediately before mutation.
+ * Shaping can be asynchronous, so a formerly-valid plan is never allowed to
+ * write into a stream that changed underneath it.
+ */
+function assertShapedTargetStillCurrent(
+  doc: PDFDocument,
+  plan: ValidatedShapedGlyphEditPlan,
+): void {
+  const located = collectPageTextOperators(doc, plan.pageIndex);
+  const candidate = located.find((item) => {
+    if (item.operatorIndex !== plan.operatorIndex) return false;
+    if (plan.formPath) {
+      return (
+        item.locator.kind === "xobject" &&
+        sameStringArray(item.locator.formPath, plan.formPath)
+      );
+    }
+    return (
+      item.locator.kind === "page" &&
+      item.locator.contentStreamIndex === plan.contentStreamIndex
+    );
+  });
+
+  if (!candidate) {
+    throw new EditPlanRejectedError(
+      "The shaped-glyph target no longer resolves to the planned PDF operator.",
+    );
+  }
+
+  const current = candidate.operator;
+  const currentCodes = twoByteCodesFromStrings(current.strings);
+  const currentTjTotal = originalTjTotalForCurrentOperator(
+    current.tjAdjustments,
+  );
+  const sameTarget =
+    current.kind === plan.operatorType &&
+    current.start === plan.byteOffset &&
+    current.end - current.start === plan.byteLength &&
+    current.fontResourceName === plan.fontResourceName &&
+    current.fontSizePt === plan.fontSizePt &&
+    current.charSpacing === plan.charSpacing &&
+    current.wordSpacing === plan.wordSpacing &&
+    current.horizontalScalingPct === plan.horizontalScalingPct &&
+    current.renderMode === plan.renderMode &&
+    currentCodes !== null &&
+    sameNumbers(currentCodes, plan.originalGlyphCodes) &&
+    currentTjTotal === plan.originalTjAdjustmentTotal;
+
+  if (!sameTarget) {
+    throw new EditPlanRejectedError(
+      "The PDF text operator changed after shaped-glyph validation; reselect the text and build a fresh plan.",
+    );
+  }
+}
+
+/**
+ * Applies one nominal shaped-glyph plan to the exact page/Form stream while
+ * preserving the original stream encoding and Form dictionary identity.
+ */
+export async function applyShapedGlyphEditPlanToDocument(
+  doc: PDFDocument,
+  plan: ValidatedShapedGlyphEditPlan,
+  options: { isolate?: boolean } = {},
+): Promise<void> {
+  assertShapedApplicable(plan);
+  assertShapedTargetStillCurrent(doc, plan);
+
+  const target =
+    plan.formPath && options.isolate
+      ? resolveIsolatedStreamTarget(
+          doc,
+          plan.pageIndex,
+          plan.contentStreamIndex,
+          [...plan.formPath],
+        )
+      : resolveStreamTarget(
+          doc,
+          plan.pageIndex,
+          plan.contentStreamIndex,
+          plan.formPath ? [...plan.formPath] : null,
+        );
+
+  const newBytes = applyShapedGlyphEditPlanToBytes(
+    target.decodedBytes,
+    plan,
+  );
+  const newStream = isFlateEncoded(target.originalStream)
+    ? target.context.flateStream(newBytes)
+    : target.context.stream(newBytes);
+  copyStreamDictExceptLengthAndFilter(
+    target.originalStream,
+    newStream,
+  );
+  target.writeBack(target.context.register(newStream));
 }
 
 // Embeds and registers the substitute font a plan asks for, returning the
