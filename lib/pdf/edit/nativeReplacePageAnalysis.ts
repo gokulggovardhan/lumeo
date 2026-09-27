@@ -1,6 +1,10 @@
 import type { PDFDocument } from "pdf-lib";
 import type { PDFPageProxy } from "pdfjs-dist";
 import {
+  PAGE_RENDER_TIMEOUT_MS,
+  withPageTimeout,
+} from "../pdfjs.ts";
+import {
   buildPdfPageTextModel,
   type PdfPageTextModel,
 } from "./documentModel.ts";
@@ -90,7 +94,12 @@ export async function analyzeNativeReplacePage({
   }
 
   const viewport = page.getViewport({ scale: 1 });
-  const content = await page.getTextContent();
+  const content = await withPageTimeout(
+    page.getTextContent(),
+    pageIndex + 1,
+    PAGE_RENDER_TIMEOUT_MS,
+    "extract text from",
+  );
   let runs = textRunsFromContent(
     content.items as never,
     viewport.transform,
@@ -201,6 +210,24 @@ export async function analyzeNativeReplacePage({
     nativeSpans,
   });
 
+  // Mirror EditPdfTool's first authority layer: an editable arbitration with
+  // an exact native span key may point more strongly than a legacy positional
+  // provenance match. Final structural capability gating is applied below.
+  const authorizedMatches = initialArbitrations.map(
+    (arbitration): NativeReplaceRunMatch => {
+      if (arbitration.decision !== "editable" || !arbitration.nativeSpanKey) {
+        return null;
+      }
+      const native = nativeByKey.get(arbitration.nativeSpanKey);
+      return native
+        ? {
+            locatedOperator: native.locatedOperator,
+            operator: native.locatedOperator.operator,
+          }
+        : null;
+    },
+  );
+
   const fontProfiles = runs.map((run, index) => {
     const match = provenanceMatches[index];
     const resourceName = match?.operator.fontResourceName;
@@ -269,7 +296,7 @@ export async function analyzeNativeReplacePage({
   const editableRunMatches = runs.map(
     (_run, index): NativeReplaceRunMatch => {
       if (arbitrations[index]?.decision !== "editable") return null;
-      return provenanceMatches[index] ?? null;
+      return authorizedMatches[index] ?? provenanceMatches[index] ?? null;
     },
   );
 
