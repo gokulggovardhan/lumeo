@@ -106,6 +106,13 @@ import {
 } from "@/lib/pdf/edit/textSearch";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { detectRasterImageEvidence } from "@/lib/pdf/edit/rasterImageEvidence";
+import {
+  localOcrConfidenceLabel,
+  recognizeLocalOcrImage,
+  renderPdfPageForLocalOcr,
+  type LocalOcrProgress,
+  type LocalOcrResult,
+} from "@/lib/pdf/edit/localOcr";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
@@ -672,6 +679,19 @@ export default function EditPdfTool() {
     rasterImageEvidenceRevision?.pageIndex === pageIndex
       ? rasterImageEvidenceRevision.evidence
       : false;
+  const [ocrResultRevision, setOcrResultRevision] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+    result: LocalOcrResult;
+  } | null>(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState<LocalOcrProgress | null>(null);
+  const [ocrError, setOcrError] = useState("");
+  const ocrResultCurrent =
+    ocrResultRevision?.bytes === pdf?.bytes &&
+    ocrResultRevision?.pageIndex === pageIndex
+      ? ocrResultRevision.result
+      : null;
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
   // runMatches was derived from), kept around so a multi-run selection can
   // reconstruct the FULL, in-order operator list one specific content
