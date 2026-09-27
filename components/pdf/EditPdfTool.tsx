@@ -2896,6 +2896,221 @@ export default function EditPdfTool() {
     }
   }
 
+  async function applyStructuredTextSearchReplacement() {
+    if (
+      !pdf ||
+      !pdfJsDocRef.current ||
+      !editEngineRef.current ||
+      !textSearchQuery.trim() ||
+      textSearchReplaceAllBusy
+    ) {
+      return;
+    }
+    if (textSearchScope === "document" && textSearchIndexBusy) {
+      setTextSearchReplaceAllStatus(
+        "Finish indexing the document before Replace All so every match is counted honestly.",
+      );
+      return;
+    }
+
+    const candidatePages =
+      textSearchScope === "page"
+        ? [pageIndex]
+        : [...new Set(textSearchMatches.map((match) => match.pageIndex))].sort(
+            (a, b) => a - b,
+          );
+    if (candidatePages.length === 0) {
+      setTextSearchReplaceAllStatus("No search matches are available to replace.");
+      return;
+    }
+
+    const engine = editEngineRef.current;
+    const pdfJsDocument = pdfJsDocRef.current;
+    const query = textSearchQuery;
+    const replacement = textSearchReplacement;
+    const options = {
+      caseSensitive: textSearchCaseSensitive,
+      wholeWord: textSearchWholeWord,
+    };
+
+    setTextSearchReplaceAllBusy(true);
+    setTextSearchReplaceAllStatus("Checking every match against the native PDF locally…");
+    setEditApplyError("");
+
+    try {
+      // Preflight and mutation happen on a disposable clone of the exact
+      // current history bytes. Nothing in the live document/history changes
+      // unless every selected write below succeeds and this clone saves.
+      const planningDoc = await engine.PDFDocument.load(
+        copyArrayBuffer(historyState.pdfBytes),
+      );
+      const planningRegistry = new engine.PdfFontRegistry(planningDoc);
+
+      let shapingModulePromise:
+        | Promise<typeof import("@/lib/pdf/edit/harfbuzzShaping")>
+        | null = null;
+      const shapeText: import("@/lib/pdf/edit/fontRegistry").PdfEmbeddedFontTextShaper =
+        async (fontBytes, text, shapingOptions) => {
+          if (!shapingModulePromise) {
+            shapingModulePromise = import("@/lib/pdf/edit/harfbuzzShaping");
+          }
+          const shapingModule = await shapingModulePromise;
+          return shapingModule.shapeEmbeddedFontText(
+            fontBytes,
+            text,
+            shapingOptions,
+          );
+        };
+
+      const validatedUnits: Array<
+        import("@/lib/pdf/edit/structuredReplaceWritePlan").StructuredReplaceWriteUnit
+      > = [];
+      let requestedMatchCount = 0;
+      let structurallySkippedCount = 0;
+      let writerSkippedCount = 0;
+      let firstSkipDetail = "";
+
+      for (const targetPageIndex of candidatePages) {
+        const targetPage = await pdfJsDocument.getPage(targetPageIndex + 1);
+        try {
+          const analysis = await analyzeNativeReplacePage({
+            page: targetPage,
+            pdfDocument: planningDoc,
+            pageIndex: targetPageIndex,
+            dependencies: {
+              collectPageTextOperators: engine.collectPageTextOperators,
+              fontRegistry: planningRegistry,
+            },
+          });
+          const freshMatches = searchPdfPageText(
+            analysis.pageTextModel,
+            query,
+            options,
+          );
+          requestedMatchCount += freshMatches.length;
+          if (freshMatches.length === 0) continue;
+
+          const pagePlan = planStructuredReplaceAllPage({
+            page: analysis.pageTextModel,
+            matches: freshMatches,
+            replacement,
+          });
+          structurallySkippedCount += pagePlan.skipped.length;
+          if (!firstSkipDetail && pagePlan.skipped[0]?.detail) {
+            firstSkipDetail = pagePlan.skipped[0].detail;
+          }
+
+          const writePreflight = await preflightStructuredReplacePageWrites({
+            analysis,
+            pagePlan,
+            dependencies: {
+              fontRegistry: planningRegistry,
+              shapeText,
+            },
+          });
+          writerSkippedCount += writePreflight.skipped.length;
+          if (!firstSkipDetail && writePreflight.skipped[0]?.detail) {
+            firstSkipDetail = writePreflight.skipped[0].detail;
+          }
+          validatedUnits.push(...writePreflight.units);
+        } finally {
+          if (targetPageIndex !== pageIndex) targetPage.cleanup();
+        }
+      }
+
+      const safeMatchCount = validatedUnits.reduce(
+        (total, unit) => total + unit.candidate.matchIds.length,
+        0,
+      );
+      const skippedMatchCount = Math.max(
+        requestedMatchCount - safeMatchCount,
+        structurallySkippedCount + writerSkippedCount,
+      );
+
+      if (requestedMatchCount === 0) {
+        setTextSearchReplaceAllStatus(
+          "The search results changed while Replace All was checking the current PDF. Run Find again.",
+        );
+        return;
+      }
+      if (safeMatchCount === 0 || validatedUnits.length === 0) {
+        setTextSearchReplaceAllStatus(
+          firstSkipDetail ||
+            "None of these matches currently pass every native PDF rewrite check.",
+        );
+        return;
+      }
+
+      const scopeLabel =
+        textSearchScope === "document" ? "the document" : "this page";
+      const skippedText =
+        skippedMatchCount > 0
+          ? ` ${skippedMatchCount} match${skippedMatchCount === 1 ? "" : "es"} will stay unchanged because they did not pass every native rewrite check.`
+          : "";
+      const confirmed = window.confirm(
+        `Replace ${safeMatchCount} safely editable match${safeMatchCount === 1 ? "" : "es"} in ${scopeLabel}?${skippedText} This will be one Undo step.`,
+      );
+      if (!confirmed) {
+        setTextSearchReplaceAllStatus(
+          `Replace All cancelled. ${safeMatchCount} safe match${safeMatchCount === 1 ? "" : "es"} had been preflighted; no PDF bytes changed.`,
+        );
+        return;
+      }
+
+      const batchEntries = validatedUnits.flatMap((unit) =>
+        unit.plans.map((plan) => ({
+          plan,
+          bytesPerCode: unit.bytesPerCode,
+        })),
+      );
+      await engine.applyValidatedEditPlanBatchToDocument(
+        planningDoc,
+        batchEntries,
+      );
+
+      const saved = await planningDoc.save();
+      const nextBytes = saved.buffer.slice(
+        saved.byteOffset,
+        saved.byteOffset + saved.byteLength,
+      ) as ArrayBuffer;
+      const semanticOperations: PdfEditOperationDraft[] = validatedUnits.map(
+        (unit) =>
+          nativeTextOperation({
+            pageIndex: unit.candidate.pageIndex,
+            spanIds: [...unit.candidate.spanIds],
+            contentStreamIndex: unit.contentStreamIndex,
+            formPath: null,
+            operatorIndices: [...unit.operatorIndices],
+            fontResourceName: unit.fontResourceName,
+            originalText: unit.candidate.originalText,
+            replacementText: unit.candidate.replacementText,
+          }),
+      );
+
+      setHistoryState((current) => ({
+        ...current,
+        pdfBytes: nextBytes,
+        session: appendPdfEditOperations(
+          current.session,
+          semanticOperations,
+        ),
+      }));
+      setTextSearchActiveIndex(-1);
+      setTextSearchReplaceAllStatus(
+        `Replaced ${safeMatchCount} match${safeMatchCount === 1 ? "" : "es"} in one native PDF transaction${skippedMatchCount > 0 ? `; ${skippedMatchCount} unsafe match${skippedMatchCount === 1 ? "" : "es"} stayed unchanged` : ""}.`,
+      );
+    } catch (replaceAllError) {
+      const message =
+        replaceAllError instanceof Error
+          ? replaceAllError.message
+          : "Structured Replace All could not be completed.";
+      setTextSearchReplaceAllStatus(message);
+      setEditApplyError(message);
+    } finally {
+      setTextSearchReplaceAllBusy(false);
+    }
+  }
+
   // Hover highlighting for the select tool -- a discrete "did the hit-test
   // result change" comparison before setState, not a per-pixel update, so a
   // mousemove sweeping across one run's box (or the empty page background)
