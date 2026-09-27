@@ -67,18 +67,44 @@ as $$
 declare
   verified_count integer := 0;
 begin
-  update public.error_logs
-  set
-    status = 'resolved',
-    resolved_at = now(),
-    resolved_by = null,
-    resolution_provenance = 'automated_verified_fix',
-    verified_at = now()
-  where status = 'fixed_pending_verification'
-    and recurrence_after_fix = false
-    and fix_deployed_at is not null
-    and fix_deployed_at <= now() - interval '24 hours'
-    and last_seen_at <= fix_deployed_at;
+  with verified as (
+    update public.error_logs
+    set
+      status = 'resolved',
+      resolved_at = now(),
+      resolved_by = null,
+      resolution_provenance = 'automated_verified_fix',
+      verified_at = now()
+    where status = 'fixed_pending_verification'
+      and recurrence_after_fix = false
+      and fix_deployed_at is not null
+      and fix_deployed_at <= now() - interval '24 hours'
+      and last_seen_at <= fix_deployed_at
+    returning id, last_fix_sha, fix_deployed_at, last_seen_at
+  )
+  insert into public.audit_logs (
+    actor_user_id,
+    actor_role,
+    action,
+    entity_type,
+    entity_id,
+    summary,
+    changes
+  )
+  select
+    null,
+    null,
+    'error_log.automated_verified',
+    'error_log',
+    verified.id::text,
+    'Automatically resolved error after a 24-hour recurrence-free production verification window.',
+    jsonb_build_object(
+      'fix_sha', verified.last_fix_sha,
+      'fix_deployed_at', verified.fix_deployed_at,
+      'last_seen_at', verified.last_seen_at,
+      'verification_window_hours', 24
+    )
+  from verified;
 
   get diagnostics verified_count = row_count;
   return verified_count;
