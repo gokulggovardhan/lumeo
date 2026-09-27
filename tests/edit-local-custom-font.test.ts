@@ -76,6 +76,26 @@ test("local custom font assets are fingerprinted, copied and named from inspecte
   assert.equal(result.asset.bytes[0], 1, "asset must own a copy of local font bytes");
 });
 
+test("local custom font assets reject non-TTF/OTF files before inspection", async () => {
+  let calls = 0;
+  const result = await createLocalCustomFontAsset(
+    new Uint8Array([1, 2, 3]),
+    "demo.woff2",
+    {
+      inspectFont: async () => {
+        calls += 1;
+        return okInspection();
+      },
+    },
+  );
+
+  assert.deepEqual(result, {
+    kind: "blocked",
+    reason: "Choose a .ttf or .otf font file.",
+  });
+  assert.equal(calls, 0);
+});
+
 test("local custom font assets fail closed before inspection when empty or oversized", async () => {
   let calls = 0;
   const inspectFont = async (): Promise<PdfFontProgramInspection> => {
