@@ -764,8 +764,14 @@ export class PdfFontRegistry {
         fontObjectRef: profile.resourceIdentity.fontObjectRef,
         descendantObjectRef: profile.resourceIdentity.descendantObjectRef,
         fontProgramObjectRef: profile.resourceIdentity.fontProgramObjectRef,
+        toUnicodeObjectRef: profile.resourceIdentity.toUnicodeObjectRef,
+        encodingObjectRef: profile.resourceIdentity.encodingObjectRef,
         cidToGidMapObjectRef:
           profile.resourceIdentity.cidToGidMap?.objectRef ?? null,
+        cidToGidMapKind:
+          profile.resourceIdentity.cidToGidMap?.kind === "stream"
+            ? "stream"
+            : "identity",
       },
       fontKind: profile.kind,
       descendantSubtype: profile.resourceIdentity.descendantSubtype,
