@@ -1,6 +1,7 @@
 import type { Matrix2x3, TextShowOperator } from "./contentStream.ts";
 import {
   buildEditPlan,
+  decodeTextShowOperator,
   isValidatedEditPlan,
   type ValidatedEditPlan,
 } from "./editPlan.ts";
@@ -318,6 +319,31 @@ export function buildParagraphEditPlan({
     });
   }
 
+  const decodedOriginalLines: string[] = [];
+  for (const group of groups) {
+    let text = "";
+    for (const operatorIndex of group.operatorIndices) {
+      const decoded = decodeTextShowOperator(
+        allOperators[operatorIndex]!,
+        resolvedFont,
+      );
+      if (!decoded.allDecoded) {
+        return rejected({
+          pageIndex,
+          contentStreamIndex,
+          operatorIndices: sortedIndices,
+          replacementText,
+          reason:
+            "One selected line could not be decoded completely with the proven PDF font mapping.",
+          paragraphCandidate: true,
+        });
+      }
+      text += decoded.text;
+    }
+    decodedOriginalLines.push(text);
+  }
+  const decodedOriginalText = decodedOriginalLines.join("\n");
+
   const replacementLines = normalizedLines(replacementText);
   if (replacementLines.length !== groups.length) {
     return rejected({
@@ -328,6 +354,7 @@ export function buildParagraphEditPlan({
       reason:
         `This selection contains ${groups.length} proven PDF lines. Enter exactly ${groups.length} replacement lines so Lumeo can preserve every existing baseline without inventing reflow.`,
       paragraphCandidate: true,
+      originalText: decodedOriginalText,
     });
   }
 
