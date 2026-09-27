@@ -22,7 +22,7 @@ const CATEGORY_MESSAGES: Record<
   SCANNED_IMAGE: {
     title: "This page appears to be a scan",
     detail:
-      "The page contains image content without a proven native text layer. Direct text editing is unavailable until OCR support is added.",
+      "The page contains image content without a proven native text layer. You can recognize it locally with OCR; recognized text remains separate from native PDF editing.",
   },
   HYBRID_TEXT_AND_IMAGE: {
     title: "This page mixes text and images",
