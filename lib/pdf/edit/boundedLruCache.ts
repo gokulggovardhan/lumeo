@@ -1,10 +1,12 @@
 export class BoundedLruCache<K, V> {
   private readonly entries = new Map<K, V>();
+  private readonly maxEntries: number;
 
-  constructor(private readonly maxEntries: number) {
+  constructor(maxEntries: number) {
     if (!Number.isInteger(maxEntries) || maxEntries < 1) {
       throw new Error("BoundedLruCache maxEntries must be a positive integer.");
     }
+    this.maxEntries = maxEntries;
   }
 
   get size(): number {
