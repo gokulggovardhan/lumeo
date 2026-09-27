@@ -5120,19 +5120,29 @@ export default function EditPdfTool() {
                           event.stopPropagation();
                           const input = event.currentTarget;
                           const spanIdAtCompositionEnd = singleSelectedSpan?.id ?? null;
+                          // A browser may dispatch compositionend after the
+                          // composing input has already been unmounted because
+                          // the native selection changed. That stale event
+                          // must not overwrite the draft owned by the new
+                          // selection. The immediate owner ref is authoritative
+                          // here because React state can lag one event turn.
+                          if (
+                            nativeTextComposingRef.current !== nativeTextSelectionKey ||
+                            !spanIdAtCompositionEnd ||
+                            input.dataset.nativeSpanId !== spanIdAtCompositionEnd
+                          ) {
+                            return;
+                          }
                           // Browser IMEs commit the final candidate at
                           // compositionend/input. Keep the controlled draft
                           // current, then restore Lumeo's logical selection on
                           // the next frame after the browser releases the caret.
                           handleEditDraftTextChange(input.value);
-                          if (nativeTextComposingRef.current === nativeTextSelectionKey) {
-                            nativeTextComposingRef.current = null;
-                            setTextCompositionActive(false);
-                          }
+                          nativeTextComposingRef.current = null;
+                          setTextCompositionActive(false);
                           requestAnimationFrame(() => {
                             if (
                               inlineEditInputRef.current === input &&
-                              spanIdAtCompositionEnd &&
                               input.dataset.nativeSpanId === spanIdAtCompositionEnd
                             ) {
                               syncSingleSpanLogicalSelection(input);
