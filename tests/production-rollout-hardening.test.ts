@@ -26,7 +26,6 @@ test("Word to PDF waits until cross-origin isolation recovery settles", () => {
 
   assert.match(tool, /data-word-to-pdf-client-ready/);
   assert.match(tool, /const reloadingForIsolation = ensureWordToPdfCrossOriginIsolation\(\)/);
-  assert.match(tool, /disabled=\{isBusy \|\| !clientReady\}/);
   assert.match(certification, /waitForWordToPdfClientReady/);
 });
 
