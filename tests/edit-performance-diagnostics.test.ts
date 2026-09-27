@@ -72,3 +72,15 @@ test("browserUsedHeapBytes is fail-safe when the runtime exposes no memory API",
   const value = browserUsedHeapBytes();
   assert.equal(value === null || (Number.isFinite(value) && value >= 0), true);
 });
+
+
+test("EditPerformanceDiagnostics rejects an invalid bound instead of becoming unbounded", () => {
+  assert.throws(
+    () => new EditPerformanceDiagnostics(0),
+    /positive integer/i,
+  );
+  assert.throws(
+    () => new EditPerformanceDiagnostics(Number.NaN),
+    /positive integer/i,
+  );
+});
