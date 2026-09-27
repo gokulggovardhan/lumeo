@@ -174,12 +174,9 @@ test("validated replacement batch rewrites multiple original offsets right-to-le
   assert.doesNotMatch(text, /Alpha/);
   assert.doesNotMatch(text, /Beta/);
 
+  const emptyBatchDoc = await PDFDocument.load(original.slice());
   await assert.rejects(
-    () =>
-      applyValidatedEditPlanBatchToDocument(
-        PDFDocument.load(original.slice()) as never,
-        [],
-      ),
+    () => applyValidatedEditPlanBatchToDocument(emptyBatchDoc, []),
     /no validated edit plans/i,
   );
 });
