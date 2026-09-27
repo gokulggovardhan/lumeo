@@ -14,6 +14,7 @@ export type DocumentTextCapabilityCategory =
   | "TYPE3_TEXT"
   | "FORM_XOBJECT_TEXT"
   | "CLIPPED_TEXT"
+  | "INVISIBLE_TEXT_LAYER"
   | "VERTICAL_TEXT"
   | "UNKNOWN_OR_UNSAFE";
 
@@ -47,12 +48,35 @@ function matrixSkewMagnitudeDeg(matrix: readonly number[]): number {
   return Math.min(delta, 180 - delta);
 }
 
+function textPaintIsFullyTransparent(
+  operator: NativeContentStreamSpan["locatedOperator"]["operator"],
+): boolean {
+  if (operator.renderMode === 0) return operator.fillOpacity === 0;
+  if (operator.renderMode === 1) return operator.strokeOpacity === 0;
+  if (operator.renderMode === 2) {
+    return operator.fillOpacity === 0 && operator.strokeOpacity === 0;
+  }
+  return false;
+}
+
 export function classifyNativeTextSpan(
   span: NativeContentStreamSpan,
 ): SpanTextCapabilityClassification {
   const operator = span.locatedOperator.operator;
   const profile = span.fontProfile;
 
+  if (operator.renderMode === 3 || textPaintIsFullyTransparent(operator)) {
+    return {
+      nativeSpanKey: span.key,
+      category: "INVISIBLE_TEXT_LAYER",
+      safelyRewritable: false,
+      authorization: "blocked",
+      reason:
+        operator.renderMode === 3
+          ? "The text uses PDF rendering mode 3 and is intentionally invisible; it may be a search/OCR/accessibility layer rather than visible page text."
+          : "The text paints with zero effective alpha and is intentionally invisible; it may be a search/OCR/accessibility layer rather than visible page text.",
+    };
+  }
   if (operator.renderMode >= 4) {
     return {
       nativeSpanKey: span.key,
@@ -249,6 +273,7 @@ export class DocumentTextCapabilityClassifier {
         "NATIVE_TEXT_WITH_FONT_LIMITATIONS",
         "COMPLEX_VECTOR_TEXT",
         "FORM_XOBJECT_TEXT",
+        "INVISIBLE_TEXT_LAYER",
         "VERTICAL_TEXT",
         "NATIVE_TEXT",
       ];
