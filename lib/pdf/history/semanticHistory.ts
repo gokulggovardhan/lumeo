@@ -26,6 +26,8 @@ export type PdfSemanticGeometry = {
 
 export type PdfSemanticTextStyle = {
   fontFamily?: string;
+  /** Stable local/session font identity; never contains font-program bytes. */
+  fontIdentity?: string;
   fontSizePt?: number;
   color?: string;
   bold?: boolean;
