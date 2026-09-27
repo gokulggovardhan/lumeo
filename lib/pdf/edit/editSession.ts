@@ -162,6 +162,7 @@ function geometryOf(element: EditElement): PdfEditGeometry {
 
 function styleOf(element: TextEditElement): PdfEditTextStyle {
   return {
+    fontFamily: element.fontFamily,
     fontSizePt: element.fontSizePt,
     color: element.color,
     bold: element.bold,
