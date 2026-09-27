@@ -230,6 +230,7 @@ export default function PageThumbnailSidebar({
     void (async () => {
       const doc = getDocument();
       if (!doc || pageCount === 0) return;
+      const activeDoc = doc;
 
       // Keep state writes out of the synchronous effect body while still
       // invalidating stale document generations deterministically.
@@ -262,7 +263,7 @@ export default function PageThumbnailSidebar({
       async function renderOne(pageIndex: number) {
         const performanceStartedAt = editPerformanceNow();
         try {
-          const page = await doc.getPage(pageIndex + 1);
+          const page = await activeDoc.getPage(pageIndex + 1);
           if (cancelled) return;
           const viewport = page.getViewport({ scale: THUMBNAIL_SCALE });
           const canvas = document.createElement("canvas");
