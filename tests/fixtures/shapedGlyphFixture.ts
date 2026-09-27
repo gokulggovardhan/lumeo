@@ -22,7 +22,7 @@ function cidHex(cid: number): string {
   return cid.toString(16).padStart(4, "0").toUpperCase();
 }
 
-async function ciTrueTypeFontBytes(): Promise<Uint8Array> {
+export async function readCiTrueTypeFontBytes(): Promise<Uint8Array> {
   const candidates = [
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
@@ -63,7 +63,7 @@ export const SHAPED_LTR_REPLACEMENT = "e\u0301";
  * be proven after the native shaped write.
  */
 export async function buildShapedLtrType0Pdf(): Promise<Uint8Array> {
-  const fontBytes = await ciTrueTypeFontBytes();
+  const fontBytes = await readCiTrueTypeFontBytes();
   const inspection = await inspectPdfFontProgram(fontBytes);
   if (inspection.kind !== "ok") {
     throw new Error(`Could not inspect shaped fixture font: ${inspection.reason}`);
