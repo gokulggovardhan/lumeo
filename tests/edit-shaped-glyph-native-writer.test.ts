@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   PDFDocument,
   PDFName,
-  type PDFDict,
+  PDFDict,
 } from "pdf-lib";
 import {
   applyShapedGlyphEditPlanToBytes,
