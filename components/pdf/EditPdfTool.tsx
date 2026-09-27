@@ -1752,6 +1752,9 @@ export default function EditPdfTool() {
     if (!pdf || !pdfJsDocRef.current) return;
     const doc = pdfJsDocRef.current;
     let cancelled = false;
+    const textDetectionPerformanceStartedAt = window.performance.now();
+    let detectedRunCountForPerformance = 0;
+    let textDetectionSucceeded = false;
 
     void (async () => {
       try {
@@ -1768,6 +1771,8 @@ export default function EditPdfTool() {
           pointViewport.height,
           content.styles as never,
         );
+        detectedRunCountForPerformance = runs.length;
+        textDetectionSucceeded = true;
         setPdfJsDetectedRunCount(runs.length);
         setDetectedTextRuns(runs);
       } catch {
@@ -1780,6 +1785,17 @@ export default function EditPdfTool() {
         // revision that produced the result. This stamp makes stale results
         // fail closed during history/document transitions.
         if (!cancelled) {
+          performanceDiagnosticsRef.current?.recordDuration(
+            "text-detection",
+            window.performance.now() - textDetectionPerformanceStartedAt,
+            {
+              pageNumber: pageIndex + 1,
+              detail: {
+                success: textDetectionSucceeded,
+                runCount: detectedRunCountForPerformance,
+              },
+            },
+          );
           setTextDetectionRevision({ bytes: pdf.bytes, pageIndex });
           setTextDetectionReady(true);
         }
