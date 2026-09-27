@@ -111,6 +111,7 @@ import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
 import type { EmbeddedGlyphEvidence, ResolvedFont } from "@/lib/pdf/edit/fontEncoding";
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
+import type { EditPdfPerformanceCollector } from "@/lib/pdf/edit/performanceDiagnostics";
 import {
   buildEditPlan,
   isValidatedEditPlan,
@@ -710,6 +711,7 @@ export default function EditPdfTool() {
   const inlineEditInputRef = useRef<HTMLInputElement | null>(null);
   const textSearchInputRef = useRef<HTMLInputElement | null>(null);
   const uploadClientReadyRef = useRef<HTMLElement | null>(null);
+  const performanceDiagnosticsRef = useRef<EditPdfPerformanceCollector | null>(null);
 
   useEffect(() => {
     // SSR can render the file input before React has attached its change
@@ -717,6 +719,80 @@ export default function EditPdfTool() {
     // browsers—and assistive automation using the raw file input—never race
     // a visually-present but not-yet-interactive control.
     uploadClientReadyRef.current?.setAttribute("data-edit-client-ready", "true");
+  }, []);
+
+  // Development-only, browser-local performance diagnostics. No PDF bytes,
+  // extracted text, font programs or measurements are transmitted anywhere.
+  // The collector exists only to measure before Phase 5 optimizes.
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+
+    let active = true;
+    let memoryTimer: number | null = null;
+    let scrollRaf: number | null = null;
+    let removeScrollListener: (() => void) | null = null;
+
+    void import("@/lib/pdf/edit/performanceDiagnostics").then((diagnostics) => {
+      if (!active) return;
+      const collector = new diagnostics.EditPdfPerformanceCollector();
+      performanceDiagnosticsRef.current = collector;
+
+      const host = window as typeof window & {
+        __LUMEO_EDIT_PDF_PERFORMANCE__?: {
+          report: () => unknown;
+          download: () => void;
+        };
+      };
+
+      const report = () =>
+        collector.report(new Date().toISOString());
+      host.__LUMEO_EDIT_PDF_PERFORMANCE__ = {
+        report,
+        download: () =>
+          diagnostics.downloadEditPdfPerformanceReport(report()),
+      };
+
+      const captureMemory = () => {
+        collector.recordMemory(
+          diagnostics.readBrowserMemorySample(window.performance),
+        );
+      };
+      captureMemory();
+      memoryTimer = window.setInterval(captureMemory, 2_000);
+
+      const handleScroll = () => {
+        if (scrollRaf !== null) return;
+        const startedAt = window.performance.now();
+        scrollRaf = window.requestAnimationFrame(() => {
+          scrollRaf = null;
+          collector.recordDuration(
+            "scroll-raf",
+            window.performance.now() - startedAt,
+            {
+              detail: {
+                scrollY: window.scrollY,
+                viewportHeight: window.innerHeight,
+              },
+            },
+          );
+        });
+      };
+      window.addEventListener("scroll", handleScroll, { passive: true });
+      removeScrollListener = () =>
+        window.removeEventListener("scroll", handleScroll);
+    });
+
+    return () => {
+      active = false;
+      if (memoryTimer !== null) window.clearInterval(memoryTimer);
+      if (scrollRaf !== null) window.cancelAnimationFrame(scrollRaf);
+      removeScrollListener?.();
+      performanceDiagnosticsRef.current = null;
+      const host = window as typeof window & {
+        __LUMEO_EDIT_PDF_PERFORMANCE__?: unknown;
+      };
+      delete host.__LUMEO_EDIT_PDF_PERFORMANCE__;
+    };
   }, []);
 
   const [activeTool, setActiveTool] = useState<ActiveTool>("select");
