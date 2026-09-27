@@ -691,3 +691,107 @@ export async function applyNativeTextStyleBatchToDocument(
     bytes,
   );
 }
+
+
+export type ValidatedEditPlanBatchEntry = Readonly<{
+  plan: ValidatedEditPlan;
+  bytesPerCode: 1 | 2;
+}>;
+
+/**
+ * Applies several already-validated native text plans against one PDFDocument.
+ *
+ * This is intentionally narrower than sequential applyEditPlanToDocument()
+ * calls. Every plan's byte offset was measured against the same original
+ * content stream, so entries targeting one stream are rewritten right-to-left
+ * in one decoded buffer before that stream is swapped back into the document.
+ *
+ * Callers that need transaction semantics should run this against a fresh
+ * PDFDocument clone and publish its bytes only after this function succeeds.
+ * Form-XObject targets and fallback-font insertion stay out of this batch
+ * path for now because both require resource/isolation decisions per target.
+ */
+export async function applyValidatedEditPlanBatchToDocument(
+  doc: PDFDocument,
+  entries: readonly ValidatedEditPlanBatchEntry[],
+): Promise<void> {
+  if (entries.length === 0) {
+    throw new EditPlanRejectedError(
+      "This native text batch contains no validated edit plans.",
+    );
+  }
+
+  const groups = new Map<string, ValidatedEditPlanBatchEntry[]>();
+
+  for (const entry of entries) {
+    const plan = entry.plan;
+    assertApplicable(plan);
+
+    if (plan.formPath) {
+      throw new EditPlanRejectedError(
+        "Structured Replace All does not rewrite text inside Form XObjects yet.",
+      );
+    }
+    if (plan.fallbackFont) {
+      throw new EditPlanRejectedError(
+        "Structured Replace All does not silently substitute fonts. Replace this match individually if a substitute is required.",
+      );
+    }
+    if (!doc.getPages()[plan.pageIndex]) {
+      throw new EditPlanRejectedError(
+        `Page ${plan.pageIndex} does not exist in this document.`,
+      );
+    }
+
+    const key = `${plan.pageIndex}:${plan.contentStreamIndex}`;
+    const group = groups.get(key);
+    if (group) group.push(entry);
+    else groups.set(key, [entry]);
+  }
+
+  for (const group of groups.values()) {
+    const first = group[0].plan;
+    const orderedAscending = [...group].sort(
+      (a, b) => a.plan.byteOffset - b.plan.byteOffset,
+    );
+
+    for (let index = 1; index < orderedAscending.length; index += 1) {
+      const previous = orderedAscending[index - 1].plan;
+      const current = orderedAscending[index].plan;
+      if (current.byteOffset < previous.byteOffset + previous.byteLength) {
+        throw new EditPlanRejectedError(
+          "Two Structured Replace All plans overlap in the same native PDF content stream.",
+        );
+      }
+    }
+
+    const page = doc.getPages()[first.pageIndex];
+    const located = locateContentStream(
+      doc,
+      first.pageIndex,
+      first.contentStreamIndex,
+    );
+
+    let bytes = located.decodedBytes;
+    const orderedDescending = [...group].sort(
+      (a, b) => b.plan.byteOffset - a.plan.byteOffset,
+    );
+
+    for (const entry of orderedDescending) {
+      bytes = await applyPlanToTargetBytes(
+        bytes,
+        entry.plan,
+        entry.bytesPerCode,
+        undefined,
+        undefined,
+      );
+    }
+
+    replaceContentStream(
+      page,
+      located,
+      first.contentStreamIndex,
+      bytes,
+    );
+  }
+}
