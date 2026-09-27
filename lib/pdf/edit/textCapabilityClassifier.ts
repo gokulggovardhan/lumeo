@@ -14,6 +14,7 @@ export type DocumentTextCapabilityCategory =
   | "TYPE3_TEXT"
   | "FORM_XOBJECT_TEXT"
   | "CLIPPED_TEXT"
+  | "INVISIBLE_TEXT_LAYER"
   | "VERTICAL_TEXT"
   | "UNKNOWN_OR_UNSAFE";
 
@@ -53,6 +54,16 @@ export function classifyNativeTextSpan(
   const operator = span.locatedOperator.operator;
   const profile = span.fontProfile;
 
+  if (operator.renderMode === 3) {
+    return {
+      nativeSpanKey: span.key,
+      category: "INVISIBLE_TEXT_LAYER",
+      safelyRewritable: false,
+      authorization: "blocked",
+      reason:
+        "The text uses PDF rendering mode 3 and is intentionally invisible; it may be a search/OCR/accessibility layer rather than visible page text.",
+    };
+  }
   if (operator.renderMode >= 4) {
     return {
       nativeSpanKey: span.key,
@@ -249,6 +260,7 @@ export class DocumentTextCapabilityClassifier {
         "NATIVE_TEXT_WITH_FONT_LIMITATIONS",
         "COMPLEX_VECTOR_TEXT",
         "FORM_XOBJECT_TEXT",
+        "INVISIBLE_TEXT_LAYER",
         "VERTICAL_TEXT",
         "NATIVE_TEXT",
       ];
