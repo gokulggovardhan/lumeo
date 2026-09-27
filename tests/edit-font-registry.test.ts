@@ -9,6 +9,10 @@ import {
 import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
 import { sha256Hex } from "../lib/pdf/edit/sha256.ts";
 
+const unexpectedShaper = async (): Promise<never> => {
+  throw new Error("shaper should not be invoked for unavailable font evidence");
+};
+
 function firstFontResource(page: ReturnType<PDFDocument["addPage"]>) {
   const resources = page.node.Resources();
   assert.ok(resources, "saved PDF page should contain a Resources dictionary");
@@ -498,6 +502,7 @@ test("PdfFontRegistry shaping inspection stays unavailable for non-embedded stan
     resourceName,
     "Simple text",
     { direction: "ltr", script: "Latn", language: "en" },
+    unexpectedShaper,
   );
 
   assert.equal(result.kind, "unavailable");
@@ -539,6 +544,7 @@ test("PdfFontRegistry shaping inspection fails closed when embedded bytes are no
     "FBrokenShape",
     "A",
     { direction: "ltr", script: "Latn", language: "en" },
+    unexpectedShaper,
   );
 
   assert.equal(result.kind, "unavailable");
