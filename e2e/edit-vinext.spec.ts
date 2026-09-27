@@ -1133,6 +1133,82 @@ test("vinext Edit PDF replaces all safe document matches in one undo step", asyn
   ).toBeVisible({ timeout: 90_000 });
 });
 
+test("vinext Edit PDF replaces only the current page when Replace All scope is This page", async ({ page }) => {
+  await uploadEditFixture(page, TWO_PAGE_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("record");
+
+  const scope = page.getByRole("combobox", { name: "Search scope" });
+  await scope.selectOption("page");
+  await expect(scope).toHaveValue("page");
+
+  const replacement = page.getByRole("textbox", {
+    name: "Replace search match with",
+  });
+  await replacement.fill("file");
+
+  const replaceAllOnPage = page.getByRole("button", {
+    name: "Replace all on page",
+  });
+  await expect(replaceAllOnPage).toBeEnabled({ timeout: 90_000 });
+
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toMatch(/Replace 1 safely editable match in page 1/i);
+    expect(dialog.message()).toMatch(/one Undo step/i);
+    await dialog.accept();
+  });
+  await replaceAllOnPage.click();
+
+  const status = page.locator("[data-edit-replace-all-status]");
+  await expect(status).toContainText(/Replaced 1 match in one native PDF transaction/i, {
+    timeout: 90_000,
+  });
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
+    timeout: 90_000,
+  });
+
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+
+  // Page-scoped replacement must not accidentally mutate later pages through
+  // the document-wide best-effort search index.
+  await page.getByRole("button", { name: "Open page 2" }).click();
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Second page record"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Second page file"]',
+    ),
+  ).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Open page 1" }).click();
+  await waitForStageReady(page);
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0", {
+    timeout: 90_000,
+  });
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+});
+
 test("vinext Edit PDF searches across pages, highlights matches, and prepares a partial replacement", async ({ page }) => {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
