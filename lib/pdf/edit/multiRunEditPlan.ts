@@ -225,17 +225,40 @@ export function buildMultiRunEditPlan({
     );
   }
 
-  const firstLineMatrix = spanOperators[0].textLineMatrix;
+  const firstTextObjectIndex = spanOperators[0].textObjectIndex;
   if (
-    !firstLineMatrix ||
-    spanOperators.some((operator) => !sameMatrix(operator.textLineMatrix, firstLineMatrix))
+    firstTextObjectIndex === null ||
+    firstTextObjectIndex === undefined ||
+    spanOperators.some(
+      (operator) => operator.textObjectIndex !== firstTextObjectIndex,
+    )
   ) {
     return rejected(
       pageIndex,
       contentStreamIndex,
       sortedIndices,
       replacementText,
-      "This selection crosses a PDF text-positioning boundary or line break, so one horizontal endpoint compensation cannot preserve it safely.",
+      "This selection crosses PDF text-object boundaries, so one native replacement cannot preserve its text state safely.",
+    );
+  }
+
+  const firstLineMatrix = spanOperators[0].textLineMatrix;
+  const firstCtm = spanOperators[0].ctm;
+  if (
+    !firstLineMatrix ||
+    !firstCtm ||
+    spanOperators.some(
+      (operator) =>
+        !sameMatrix(operator.textLineMatrix, firstLineMatrix) ||
+        !sameMatrix(operator.ctm, firstCtm),
+    )
+  ) {
+    return rejected(
+      pageIndex,
+      contentStreamIndex,
+      sortedIndices,
+      replacementText,
+      "This selection crosses a PDF text-positioning, transform, or line boundary, so one horizontal endpoint compensation cannot preserve it safely.",
     );
   }
 
