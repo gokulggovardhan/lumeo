@@ -4667,7 +4667,7 @@ export default function EditPdfTool() {
         storedBytes + (alreadyStored ? 0 : asset.descriptor.byteLength);
       if (nextBytes > MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES) {
         throw new Error(
-          "Local fonts in this PDF session would exceed Lumeo's 32 MB safety limit. Reset an existing font or start a new PDF session.",
+          "Local fonts in this PDF session would exceed Lumeo's 32 MB safety limit. Reuse a font already selected in this session or start a new PDF session.",
         );
       }
 
