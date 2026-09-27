@@ -276,3 +276,80 @@ test("shaping reconciliation fails closed when font engines disagree on units-pe
   assert.equal(result.kind, "unresolved");
   assert.match(result.reason, /units-per-em/i);
 });
+
+
+test("shaping reconciliation rejects empty shaping evidence for non-empty source text", () => {
+  const result = reconcileShapingWithPdfCharacterCodes({
+    text: "AB",
+    shaped: shapedAB({
+      glyphs: [],
+      clusterMap: [],
+      totalAdvance: 0,
+      totalAdvanceEm: 0,
+      totalXAdvance: 0,
+    }),
+    resolvedFont: resolved,
+    fontMetrics: metrics(),
+    intelligence: intelligence(),
+  });
+
+  assert.equal(result.kind, "unresolved");
+  assert.match(result.reason, /no shaping clusters or glyphs/i);
+});
+
+test("shaping reconciliation rejects gapped or mismatched cluster coverage", () => {
+  const result = reconcileShapingWithPdfCharacterCodes({
+    text: "AB",
+    shaped: shapedAB({
+      clusterMap: [
+        { startUtf16: 0, endUtf16: 1, text: "A", glyphIndices: [0] },
+        { startUtf16: 2, endUtf16: 2, text: "", glyphIndices: [1] },
+      ],
+    }),
+    resolvedFont: resolved,
+    fontMetrics: metrics(),
+    intelligence: intelligence(),
+  });
+
+  assert.equal(result.kind, "unresolved");
+  assert.match(result.reason, /cluster coverage/i);
+});
+
+test("shaping reconciliation rejects duplicated glyph ownership across clusters", () => {
+  const result = reconcileShapingWithPdfCharacterCodes({
+    text: "AB",
+    shaped: shapedAB({
+      clusterMap: [
+        { startUtf16: 0, endUtf16: 1, text: "A", glyphIndices: [0] },
+        { startUtf16: 1, endUtf16: 2, text: "B", glyphIndices: [0] },
+      ],
+    }),
+    resolvedFont: resolved,
+    fontMetrics: metrics(),
+    intelligence: intelligence(),
+  });
+
+  assert.equal(result.kind, "unresolved");
+  assert.match(result.reason, /invalid or duplicated shaped glyph/i);
+});
+
+test("shaping reconciliation rejects unowned shaped glyphs", () => {
+  const result = reconcileShapingWithPdfCharacterCodes({
+    text: "A",
+    shaped: shapedAB({
+      text: "A",
+      clusterMap: [
+        { startUtf16: 0, endUtf16: 1, text: "A", glyphIndices: [0] },
+      ],
+      totalAdvance: 600,
+      totalAdvanceEm: 0.6,
+      totalXAdvance: 600,
+    }),
+    resolvedFont: { unicodeToGlyphCode: new Map([["A", 65]]) },
+    fontMetrics: metrics(),
+    intelligence: intelligence(),
+  });
+
+  assert.equal(result.kind, "unresolved");
+  assert.match(result.reason, /exactly once/i);
+});
