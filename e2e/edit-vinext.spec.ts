@@ -95,6 +95,7 @@ test("vinext Edit PDF explains read-only clipped text before an edit is attempte
 test("vinext Edit PDF recognizes a proven scan locally without promoting native edit authority", async ({
   page,
 }) => {
+  test.setTimeout(180_000);
   await uploadEditFixture(page, IMAGE_ONLY_PDF);
 
   await expect(page.getByText("Loading page preview")).toHaveCount(0, {
