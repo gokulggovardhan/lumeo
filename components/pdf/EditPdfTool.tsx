@@ -37,6 +37,7 @@ import { FloatingIsland } from "@/components/pdf/edit/FloatingIsland";
 import { InkCanvas } from "@/components/pdf/edit/InkCanvas";
 import { MicroDock } from "@/components/pdf/edit/MicroDock";
 import { TextRunOverlay } from "@/components/pdf/edit/TextRunOverlay";
+import { OcrWordOverlay } from "@/components/pdf/edit/OcrWordOverlay";
 import { NativeTextFormatPanel, type NativeTextStyleDraft } from "@/components/pdf/edit/NativeTextFormatPanel";
 import { NativeTextMixedFormatPanel } from "@/components/pdf/edit/NativeTextMixedFormatPanel";
 import { useNativeTextSelectionState } from "@/components/pdf/edit/useNativeTextSelectionState";
@@ -106,6 +107,12 @@ import {
 } from "@/lib/pdf/edit/textSearch";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { detectRasterImageEvidence } from "@/lib/pdf/edit/rasterImageEvidence";
+import {
+  createLocalOcrEngine,
+  type LocalOcrEngine,
+  type OcrPageResult,
+  type OcrProgress,
+} from "@/lib/pdf/edit/localOcr";
 import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import { pickHorizontalAlign, pickVerticalPlacement } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
@@ -672,6 +679,31 @@ export default function EditPdfTool() {
     rasterImageEvidenceRevision?.pageIndex === pageIndex
       ? rasterImageEvidenceRevision.evidence
       : false;
+  // OCR is a separate, browser-local text source. Results are keyed to the
+  // exact live PDF ArrayBuffer so undo/redo/page mutations cannot leave stale
+  // recognized text attached to a different document revision.
+  const ocrEngineRef = useRef<LocalOcrEngine | null>(null);
+  const ocrJobRevisionRef = useRef<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+  } | null>(null);
+  const ocrContextRef = useRef<{ bytes: ArrayBuffer | null; pageIndex: number }>({
+    bytes: null,
+    pageIndex: 0,
+  });
+  ocrContextRef.current = { bytes: pdf?.bytes ?? null, pageIndex };
+  const [ocrResultsRevision, setOcrResultsRevision] = useState<{
+    bytes: ArrayBuffer;
+    pages: Map<number, OcrPageResult>;
+  } | null>(null);
+  const [ocrBusy, setOcrBusy] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState<OcrProgress | null>(null);
+  const [ocrError, setOcrError] = useState("");
+  const [ocrCopied, setOcrCopied] = useState(false);
+  const ocrPageResultCurrent =
+    ocrResultsRevision?.bytes === pdf?.bytes
+      ? ocrResultsRevision.pages.get(pageIndex) ?? null
+      : null;
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
   // runMatches was derived from), kept around so a multi-run selection can
   // reconstruct the FULL, in-order operator list one specific content
