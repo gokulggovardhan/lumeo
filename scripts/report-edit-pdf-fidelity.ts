@@ -10,7 +10,10 @@ import {
   type PDFPage,
 } from "pdf-lib";
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
-import { applyEditPlanToDocument } from "../lib/pdf/edit/applyEditPlan.ts";
+import {
+  applyEditPlanToDocument,
+  applyShapedGlyphEditPlanToDocument,
+} from "../lib/pdf/edit/applyEditPlan.ts";
 import {
   buildEditPlan,
   decodeTextShowOperator,
@@ -18,6 +21,12 @@ import {
 import { exportEditedPdf } from "../lib/pdf/edit/export.ts";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
+import { shapeEmbeddedFontText } from "../lib/pdf/edit/harfbuzzShaping.ts";
+import { buildShapedGlyphEditPlan } from "../lib/pdf/edit/shapedGlyphEditPlan.ts";
+import {
+  buildShapedLtrType0Pdf,
+  SHAPED_LTR_REPLACEMENT,
+} from "../tests/fixtures/shapedGlyphFixture.ts";
 import {
   buildOperatorSpatialIndex,
   matchDetectedRunToOperatorIndexed,
@@ -46,6 +55,7 @@ type Fixture = {
   editTarget: string;
   replacementText: string;
   bytes: Uint8Array;
+  editMode?: "ordinary" | "shaped-ltr";
 };
 
 type RenderedPage = {
@@ -506,34 +516,96 @@ async function measure(
   }
 
   if (target) {
-    const plan = buildEditPlan({
-      pageIndex: 0,
-      contentStreamIndex:
-        target.located.locator.kind === "page"
-          ? target.located.locator.contentStreamIndex
-          : 0,
-      formPath:
-        target.located.locator.kind === "xobject"
-          ? target.located.locator.formPath
-          : null,
-      operatorIndex: target.located.operatorIndex,
-      operator: target.located.operator,
-      replacementText: fixture.replacementText,
-      resolvedFont: target.profile.resolvedFont,
-      fontMetrics: target.profile.metrics,
-      embeddedGlyphEvidence:
-        target.profile.embeddedGlyphEvidence,
-    });
+    let writeApplied = false;
 
-    if (plan.editable) {
-      await applyEditPlanToDocument(
-        editableDoc,
-        plan,
-        target.profile.resolvedFont.bytesPerCode,
-        {
-          isolate: target.located.locator.kind === "xobject",
-        },
-      );
+    if (fixture.editMode === "shaped-ltr") {
+      const resourceName = target.located.operator.fontResourceName;
+      if (resourceName) {
+        const shapingInspection =
+          await editableRegistry.inspectShapingCompatibility(
+            target.located.resources,
+            resourceName,
+            fixture.replacementText,
+            {
+              direction: "ltr",
+              script: "Latn",
+              language: "en",
+            },
+            shapeEmbeddedFontText,
+          );
+        if (shapingInspection.kind === "reconciled") {
+          const addressability =
+            editableRegistry.inspectShapedGlyphAddressability(
+              target.located.resources,
+              resourceName,
+              shapingInspection.shaped,
+            );
+          const shapedPlan = buildShapedGlyphEditPlan({
+            pageIndex: 0,
+            contentStreamIndex:
+              target.located.locator.kind === "page"
+                ? target.located.locator.contentStreamIndex
+                : 0,
+            formPath:
+              target.located.locator.kind === "xobject"
+                ? target.located.locator.formPath
+                : null,
+            operatorIndex: target.located.operatorIndex,
+            operator: target.located.operator,
+            replacementText: fixture.replacementText,
+            resolvedFont: target.profile.resolvedFont,
+            fontMetrics: target.profile.metrics,
+            resourceIdentity: target.profile.resourceIdentity,
+            embeddedProgramSha256: target.profile.embeddedProgramSha256,
+            shapingInspection,
+            addressability,
+          });
+          if (shapedPlan.editable) {
+            await applyShapedGlyphEditPlanToDocument(
+              editableDoc,
+              shapedPlan,
+              {
+                isolate: target.located.locator.kind === "xobject",
+              },
+            );
+            writeApplied = true;
+          }
+        }
+      }
+    } else {
+      const plan = buildEditPlan({
+        pageIndex: 0,
+        contentStreamIndex:
+          target.located.locator.kind === "page"
+            ? target.located.locator.contentStreamIndex
+            : 0,
+        formPath:
+          target.located.locator.kind === "xobject"
+            ? target.located.locator.formPath
+            : null,
+        operatorIndex: target.located.operatorIndex,
+        operator: target.located.operator,
+        replacementText: fixture.replacementText,
+        resolvedFont: target.profile.resolvedFont,
+        fontMetrics: target.profile.metrics,
+        embeddedGlyphEvidence:
+          target.profile.embeddedGlyphEvidence,
+      });
+
+      if (plan.editable) {
+        await applyEditPlanToDocument(
+          editableDoc,
+          plan,
+          target.profile.resolvedFont.bytesPerCode,
+          {
+            isolate: target.located.locator.kind === "xobject",
+          },
+        );
+        writeApplied = true;
+      }
+    }
+
+    if (writeApplied) {
       const edited = await editableDoc.save();
       nativeEditSuccess = true;
 
@@ -643,7 +715,7 @@ async function measure(
 }
 
 async function buildFixtures(): Promise<Fixture[]> {
-  return Promise.all([
+  const fixtures = await Promise.all([
     makeSimpleFixture(
       "seed-standard-helvetica",
       "embedded-or-standard-font",
@@ -1107,6 +1179,16 @@ async function buildFixtures(): Promise<Fixture[]> {
     makeSimpleFixture("common-procurement-record", "procurement-record", "Bid status: Evaluating", "Bid status: Awarded", { font: StandardFonts.Helvetica }),
 
   ]);
+  fixtures.push({
+    id: "advanced-shaped-ltr-type0",
+    category: "shaped-glyph-ltr",
+    expectedRuns: ["AB"],
+    editTarget: "AB",
+    replacementText: SHAPED_LTR_REPLACEMENT,
+    bytes: await buildShapedLtrType0Pdf(),
+    editMode: "shaped-ltr",
+  });
+  return fixtures;
 }
 
 function assertCorpusGate(

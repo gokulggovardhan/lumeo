@@ -109,7 +109,7 @@ test("compatible local shaping mints the exact writer proof", async () => {
   assert.equal(result.evidence.embeddedProgramSha256, fingerprint);
 });
 
-test("true shaped-glyph requirements remain blocked", async () => {
+test("true shaped-glyph requirements are surfaced for the bounded shaped writer", async () => {
   const result = await resolveCompatibleShapingWriteEvidence({
     replacementText: "سلام",
     embeddedProgramSha256: "b".repeat(64),
@@ -130,10 +130,11 @@ test("true shaped-glyph requirements remain blocked", async () => {
     }),
     shapeText: noopShaper,
   });
-  assert.equal(result.kind, "blocked");
-  if (result.kind !== "blocked") return;
+  assert.equal(result.kind, "shaped-glyph-required");
+  if (result.kind !== "shaped-glyph-required") return;
   assert.equal(result.direction, "rtl");
-  assert.match(result.reason, /shaped-glyph writer/i);
+  assert.equal(result.inspection.reconciliation.kind, "requires-shaped-glyph-write");
+  assert.equal(result.inspection.shaped.requestedDirection, "rtl");
 });
 
 test("request keys bind selection, text, resource and embedded fingerprint", () => {

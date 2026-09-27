@@ -18,6 +18,11 @@ export type CompatibleShapingEvidenceResolution =
       direction: "ltr" | "rtl";
     }>
   | Readonly<{
+      kind: "shaped-glyph-required";
+      inspection: Extract<PdfFontShapingInspection, { kind: "reconciled" }>;
+      direction: "ltr" | "rtl";
+    }>
+  | Readonly<{
       kind: "blocked";
       reason: string;
       direction: "ltr" | "rtl";
@@ -61,9 +66,13 @@ export function shapingEvidenceRequestKey({
 }
 
 /**
- * Resolves only the additional shaping proof required by the existing native
- * character-code writer. The inspector/shaper are injected so this module
- * never loads HarfBuzz on the ordinary Latin/CJK fast path.
+ * Resolves the additional local shaping evidence required by native Edit PDF.
+ *
+ * Character-code-compatible results mint only the existing shaping proof.
+ * Results that genuinely require addressed shaped glyphs are surfaced to the
+ * separate bounded shaped-glyph planner; this resolver never authorizes that
+ * mutation itself. The inspector/shaper are injected so HarfBuzz still stays
+ * off the ordinary Latin/CJK fast path.
  */
 export async function resolveCompatibleShapingWriteEvidence({
   replacementText,
@@ -92,6 +101,14 @@ export async function resolveCompatibleShapingWriteEvidence({
   const inspection = await inspect({ direction }, shapeText);
   if (inspection.kind !== "reconciled") {
     return { kind: "blocked", direction, reason: inspection.reason };
+  }
+
+  if (inspection.reconciliation.kind === "requires-shaped-glyph-write") {
+    return {
+      kind: "shaped-glyph-required",
+      direction,
+      inspection,
+    };
   }
 
   const proof = validateShapingEvidenceForCharacterCodeWriter({
