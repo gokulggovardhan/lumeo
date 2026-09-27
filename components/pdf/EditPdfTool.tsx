@@ -4618,6 +4618,24 @@ export default function EditPdfTool() {
                             selectTextRun(null);
                           }
                         }}
+                        onKeyUp={(event) => {
+                          event.stopPropagation();
+                          // React's synthetic onSelect is not guaranteed to
+                          // observe every keyboard-driven caret/range mutation
+                          // before the controlled-input mirror effect runs.
+                          // Re-read the post-default browser selection for
+                          // navigation keys only. Ordinary text input remains
+                          // driven by onChange, which avoids interfering with
+                          // future IME/composition handling.
+                          if (
+                            event.key === "ArrowLeft" ||
+                            event.key === "ArrowRight" ||
+                            event.key === "Home" ||
+                            event.key === "End"
+                          ) {
+                            syncSingleSpanLogicalSelection(event.currentTarget);
+                          }
+                        }}
                         aria-label="Edit text"
                         data-logical-selection-start={logicalSelectionStart ?? undefined}
                         data-logical-selection-end={logicalSelectionEnd ?? undefined}

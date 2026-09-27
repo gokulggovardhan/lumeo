@@ -3,7 +3,7 @@
 // Shared driving for the redaction e2e tests. Kept separate so the specs
 // read as assertions rather than as plumbing.
 
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export const RUN_SELECTOR = 'div[role="button"][aria-label^="Editable text"]';
 
@@ -30,6 +30,41 @@ export const LAYER_SELECTOR = '[aria-label="Draw a box over text to redact it"]'
  */
 export function outcomePanel(page: Page) {
   return page.getByTestId("redaction-outcome");
+}
+
+async function waitForStableRunGeometry(
+  run: Locator,
+  label: string,
+): Promise<void> {
+  let previous = await run.boundingBox();
+  if (!previous) throw new Error(`${label} has no bounding box`);
+
+  let stableSamples = 0;
+  await expect
+    .poll(
+      async () => {
+        const next = await run.boundingBox();
+        if (!next) {
+          stableSamples = 0;
+          previous = next;
+          return stableSamples;
+        }
+        const stable =
+          previous !== null &&
+          Math.abs(next.x - previous.x) <= 0.5 &&
+          Math.abs(next.y - previous.y) <= 0.5 &&
+          Math.abs(next.width - previous.width) <= 0.5 &&
+          Math.abs(next.height - previous.height) <= 0.5;
+        stableSamples = stable ? stableSamples + 1 : 0;
+        previous = next;
+        return stableSamples;
+      },
+      {
+        timeout: 10_000,
+        message: `${label} should stop moving before interaction`,
+      },
+    )
+    .toBeGreaterThanOrEqual(2);
 }
 
 /** Individually-named runs that were masked but NOT removed. */
@@ -60,6 +95,10 @@ export async function waitForStageReady(page: Page): Promise<void> {
       message: "stage should have rendered detected text runs",
     })
     .toBeGreaterThan(0);
+  await waitForStableRunGeometry(
+    page.locator(RUN_SELECTOR).first(),
+    "first detected text run",
+  );
 }
 
 export async function openWithPdf(page: Page, pdfPath: string): Promise<void> {
@@ -83,8 +122,14 @@ export async function enterRedactMode(page: Page): Promise<void> {
  */
 export async function dragBoxOverRun(page: Page, needle: string): Promise<void> {
   const run = page.locator(runSelectorFor(needle)).first();
+
+  // A stage can still be settling after upload/reraster or a smooth focus
+  // scroll. Start the viewport-coordinate drag only after the target run's
+  // geometry is observably stable.
+  await waitForStableRunGeometry(run, `run containing "${needle}"`);
+
   const box = await run.boundingBox();
-  if (!box) throw new Error(`run containing "${needle}" has no box`);
+  if (!box) throw new Error(`run containing "${needle}" disappeared before the drag`);
 
   await page.mouse.move(box.x + 2, box.y + 1);
   await page.mouse.down();
@@ -95,6 +140,14 @@ export async function dragBoxOverRun(page: Page, needle: string): Promise<void> 
   await page.mouse.up();
 
   await expect(page.locator('[aria-label^="Remove redaction box"]')).toHaveCount(1);
+
+  // A visible box is not sufficient proof: if the page moved during the
+  // gesture the box can exist while intersecting zero detected runs. Guard
+  // the semantic condition the next action depends on so failures point at
+  // the drag itself instead of timing out later on a disabled modal button.
+  await expect(
+    page.getByRole("button", { name: /^Redact [1-9]\d* runs?$/ }),
+  ).toBeEnabled({ timeout: 10_000 });
 }
 
 export async function applyRedactionThroughModal(page: Page): Promise<void> {

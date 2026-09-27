@@ -11,6 +11,8 @@ on:
       - "components/pdf/edit/PageThumbnailSidebar.tsx"
       - "lib/pdf/edit/performanceDiagnostics.ts"
       - "lib/pdf/edit/fontRegistry.ts"
+      - "lib/pdf/edit/thumbnailVirtualization.ts"
+      - "lib/pdf/edit/boundedLruCache.ts"
       - "e2e/edit-performance.spec.ts"
       - "e2e/edit-performance-fixtures.ts"
       - "playwright.edit-performance.config.ts"

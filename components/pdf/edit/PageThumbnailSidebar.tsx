@@ -91,7 +91,7 @@ const Thumb = memo(function Thumb({
       // The drop indicator is a border on the neighbour rather than a
       // separate inserted node, so the list never reflows mid-drag -- a
       // shifting list makes the drop target move out from under the cursor.
-      className={`relative ${dropTarget ? "before:absolute before:-top-1 before:left-2 before:right-2 before:h-0.5 before:rounded before:bg-[var(--lumeo-gold)]" : ""}`}
+      className={`relative ${virtualized ? "overflow-hidden" : ""} ${dropTarget ? "before:absolute before:-top-1 before:left-2 before:right-2 before:h-0.5 before:rounded before:bg-[var(--lumeo-gold)]" : ""}`}
       style={virtualized ? { height: THUMBNAIL_ROW_HEIGHT_PX } : undefined}
     >
       <div
@@ -168,6 +168,7 @@ export default function PageThumbnailSidebar({
   const urlsRef = useRef<Map<number, string>>(new Map());
   const thumbnailGenerationRef = useRef(-1);
   const listRef = useRef<HTMLUListElement | null>(null);
+  const scrollMetricsFrameRef = useRef<number | null>(null);
   const [scrollMetrics, setScrollMetrics] = useState({
     top: 0,
     height: THUMBNAIL_ROW_HEIGHT_PX * 8,
@@ -230,6 +231,7 @@ export default function PageThumbnailSidebar({
   // pages are reused and URLs outside the window are revoked immediately.
   useEffect(() => {
     let cancelled = false;
+    const renderTasks = new Set<{ cancel: () => void }>();
     const thumbnailBatchStartedAt = window.performance.now();
     let renderedCount = 0;
     let failedCount = 0;
@@ -274,16 +276,26 @@ export default function PageThumbnailSidebar({
           const viewport = page.getViewport({ scale: THUMBNAIL_SCALE });
           const canvas = document.createElement("canvas");
           const context = canvas.getContext("2d", { alpha: false });
-          if (!context) return;
+          if (!context) {
+            failedCount += 1;
+            return;
+          }
           canvas.width = Math.max(1, Math.floor(viewport.width));
           canvas.height = Math.max(1, Math.floor(viewport.height));
           context.fillStyle = "#FFFFFF";
           context.fillRect(0, 0, canvas.width, canvas.height);
 
-          await renderPageWithTimeout(
-            page.render({ canvas, canvasContext: context, viewport }),
-            pageIndex + 1,
-          );
+          const renderTask = page.render({
+            canvas,
+            canvasContext: context,
+            viewport,
+          });
+          renderTasks.add(renderTask);
+          try {
+            await renderPageWithTimeout(renderTask, pageIndex + 1);
+          } finally {
+            renderTasks.delete(renderTask);
+          }
           if (cancelled) {
             canvas.width = 0;
             canvas.height = 0;
@@ -338,6 +350,13 @@ export default function PageThumbnailSidebar({
 
     return () => {
       cancelled = true;
+      for (const task of renderTasks) {
+        try {
+          task.cancel();
+        } catch {
+          // Best-effort: a render that already settled may reject cancellation.
+        }
+      }
     };
   }, [
     docReady,
@@ -354,6 +373,10 @@ export default function PageThumbnailSidebar({
     () => () => {
       for (const url of urlsRef.current.values()) URL.revokeObjectURL(url);
       urlsRef.current.clear();
+      if (scrollMetricsFrameRef.current !== null) {
+        cancelAnimationFrame(scrollMetricsFrameRef.current);
+        scrollMetricsFrameRef.current = null;
+      }
     },
     [],
   );
@@ -381,9 +404,13 @@ export default function PageThumbnailSidebar({
         data-thumbnail-window-size={thumbnailWindow.indices.length}
         onScroll={(event) => {
           const list = event.currentTarget;
-          setScrollMetrics({
-            top: list.scrollTop,
-            height: Math.max(1, list.clientHeight),
+          if (scrollMetricsFrameRef.current !== null) return;
+          scrollMetricsFrameRef.current = requestAnimationFrame(() => {
+            scrollMetricsFrameRef.current = null;
+            setScrollMetrics({
+              top: list.scrollTop,
+              height: Math.max(1, list.clientHeight),
+            });
           });
         }}
         className={`flex-1 overflow-y-auto overscroll-contain p-1.5 ${thumbnailWindow.virtualized ? "" : "space-y-1"}`}
