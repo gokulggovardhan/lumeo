@@ -116,9 +116,11 @@ export default function WordToPdfTool() {
   const [error, setError] = useState<ConversionUserError | null>(null);
   const [result, setResult] = useState<ConversionResult | null>(null);
   const [engineReady, setEngineReady] = useState(false);
+  const [clientReady, setClientReady] = useState(false);
 
   useEffect(() => {
-    ensureWordToPdfCrossOriginIsolation();
+    const reloadingForIsolation = ensureWordToPdfCrossOriginIsolation();
+    if (!reloadingForIsolation) setClientReady(true);
   }, []);
 
   useEffect(() => {
@@ -242,6 +244,7 @@ export default function WordToPdfTool() {
   }
 
   function handleFiles(files: FileList | File[]) {
+    if (!clientReady) return;
     const file = Array.from(files)[0];
     if (!file) return;
 
@@ -432,14 +435,17 @@ export default function WordToPdfTool() {
         icon={<WordIcon />}
         buttonLabel="Select Word document"
         onFilesSelected={handleFiles}
-        disabled={isBusy}
+        disabled={isBusy || !clientReady}
       />
     </div>
   );
 
   if (!selected) {
     return (
-      <section className="l2-workspace grid gap-5 pb-4 lg:pb-0">
+      <section
+        className="l2-workspace grid gap-5 pb-4 lg:pb-0"
+        data-word-to-pdf-client-ready={clientReady ? "true" : "false"}
+      >
         <div className="aura-glass-regular mx-auto w-full max-w-[720px] rounded-[var(--radius-2xl)] p-2 shadow-[var(--v2-elevation-3)]">
           {uploadArea}
         </div>
@@ -460,7 +466,10 @@ export default function WordToPdfTool() {
   }
 
   return (
-    <section className="l2-workspace-deep grid min-w-0 gap-4 pb-28 lg:pb-6">
+    <section
+      className="l2-workspace-deep grid min-w-0 gap-4 pb-28 lg:pb-6"
+      data-word-to-pdf-client-ready={clientReady ? "true" : "false"}
+    >
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {statusLabel}
       </p>
