@@ -20,7 +20,12 @@ import {
 import { pageNumber } from "@/lib/admin/pagination";
 import { canManageErrors, canViewErrors } from "@/lib/admin/permissions";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
-import type { ErrorSeverity, ErrorSource, ErrorStatus } from "@/lib/supabase/database.types";
+import type {
+  ErrorLog,
+  ErrorSeverity,
+  ErrorSource,
+  ErrorStatus,
+} from "@/lib/supabase/database.types";
 
 const PAGE_SIZE = 50;
 const statuses: ErrorStatus[] = [
@@ -49,9 +54,14 @@ const statusTone: Record<ErrorStatus, "success" | "warning" | "danger" | "neutra
   ignored: "neutral",
 };
 
-function statusLabel(status: ErrorStatus) {
-  if (status === "fixed_pending_verification") return "fixed · verifying";
-  return status;
+function statusLabel(log: ErrorLog) {
+  if (log.status === "fixed_pending_verification") return "fixed · verifying";
+  if (log.status === "resolved") {
+    return log.resolution_provenance === "legacy_manual"
+      ? "resolved · legacy"
+      : "resolved · verified";
+  }
+  return log.status;
 }
 
 function buildQuery(params: Record<string, string | undefined>) {
@@ -139,10 +149,12 @@ export default async function ErrorsPage({
         description="Client and server errors captured across the app, deduplicated by route and message."
       />
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <AdminMetricCard label="Open" value={summary.data.openCount} detail="Not yet resolved or ignored." tone="warning" />
-        <AdminMetricCard label="Critical (open)" value={summary.data.criticalOpenCount} detail="Highest severity, still open." tone="danger" />
-        <AdminMetricCard label="Resolved" value={summary.data.resolvedCount} detail="Fix deployed and verified without recurrence." tone="success" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <AdminMetricCard label="Open" value={summary.data.openCount} detail="Open, acknowledged, or still verifying." tone="warning" />
+        <AdminMetricCard label="Critical (open)" value={summary.data.criticalOpenCount} detail="Highest severity, not yet verified resolved." tone="danger" />
+        <AdminMetricCard label="Verifying" value={summary.data.verifyingCount} detail="Fix deployed; waiting for the recurrence-free window." tone="warning" />
+        <AdminMetricCard label="Verified resolved" value={summary.data.verifiedResolvedCount} detail="Fix passed the recurrence-free production window." tone="success" />
+        <AdminMetricCard label="Legacy resolved" value={summary.data.legacyResolvedCount} detail="Historical manual resolutions from before fix verification existed." tone="neutral" />
         <AdminMetricCard label="Total occurrences" value={summary.data.totalOccurrences} detail="Across all logged errors, all time." tone="neutral" />
       </div>
 
@@ -253,6 +265,8 @@ export default async function ErrorsPage({
                 <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/50">
                   Last build: {log.git_sha?.slice(0, 12) ?? "Unknown"}
                   {log.last_fix_sha ? ` · Fix: ${log.last_fix_sha.slice(0, 12)}` : ""}
+                  {log.verified_at ? ` · Verified: ${formatAdminDateTime(log.verified_at)}` : ""}
+                  {log.resolution_provenance === "legacy_manual" ? " · Legacy resolution" : ""}
                   {log.recurrence_after_fix ? " · Recurred after fix" : ""}
                 </p>
               </details>,
@@ -260,7 +274,7 @@ export default async function ErrorsPage({
               log.occurrence_count,
               formatAdminDateTime(log.first_seen_at),
               formatAdminDateTime(log.last_seen_at),
-              <AdminStatusBadge key="status" tone={statusTone[log.status]}>{statusLabel(log.status)}</AdminStatusBadge>,
+              <AdminStatusBadge key="status" tone={statusTone[log.status]}>{statusLabel(log)}</AdminStatusBadge>,
             ];
 
             if (canManage) {
