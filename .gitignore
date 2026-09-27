@@ -73,3 +73,6 @@ playwright-report/
 /dist/
 .vinext/
 .wrangler/
+
+# Generated from the exact installed pdfjs-dist package before app builds.
+/public/pdfjs-standard-fonts/
