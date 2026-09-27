@@ -315,6 +315,26 @@ test("shaping reconciliation rejects gapped or mismatched cluster coverage", () 
   assert.match(result.reason, /cluster coverage/i);
 });
 
+test("shaping reconciliation rejects glyph metadata owned by a different source cluster", () => {
+  const shaped = shapedAB({
+    glyphs: [
+      { ...shapedAB().glyphs[0], clusterUtf16: 1 },
+      shapedAB().glyphs[1],
+    ],
+  });
+
+  const result = reconcileShapingWithPdfCharacterCodes({
+    text: "AB",
+    shaped,
+    resolvedFont: resolved,
+    fontMetrics: metrics(),
+    intelligence: intelligence(),
+  });
+
+  assert.equal(result.kind, "unresolved");
+  assert.match(result.reason, /cluster metadata.*source cluster|does not agree/i);
+});
+
 test("shaping reconciliation rejects duplicated glyph ownership across clusters", () => {
   const result = reconcileShapingWithPdfCharacterCodes({
     text: "AB",
