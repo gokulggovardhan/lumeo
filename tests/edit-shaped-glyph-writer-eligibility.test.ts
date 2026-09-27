@@ -140,3 +140,33 @@ test("shaped writer candidate requires exact embedded-font identity", () => {
   assert.equal(result.kind, "blocked");
   assert.match(result.reason, /fingerprint/i);
 });
+
+
+test("shaped writer candidate blocks one source cluster expanding to multiple glyphs", () => {
+  const base = shaped();
+  const result = inspectShapedGlyphWriterEligibility({
+    shaped: shaped({
+      glyphs: [
+        base.glyphs[0],
+        { ...base.glyphs[0], glyphId: 8 },
+      ],
+      clusterMap: [
+        { startUtf16: 0, endUtf16: 2, text: "fi", glyphIndices: [0, 1] },
+      ],
+      totalXAdvance: 900,
+      totalAdvance: 900,
+      totalAdvanceEm: 0.9,
+    }),
+    resolvedFont: {
+      ...resolved,
+      glyphCodeToUnicode: new Map([
+        [7, "fi"],
+        [8, "fi"],
+      ]),
+    },
+    resourceIdentity: identityH,
+    embeddedProgramSha256: SHA,
+  });
+  assert.equal(result.kind, "blocked");
+  assert.match(result.reason, /multiple shaped glyphs|one-to-many/i);
+});
