@@ -1,0 +1,115 @@
+name: Edit PDF performance diagnostics
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "fix/**"
+      - "feature/**"
+    paths:
+      - "components/pdf/EditPdfTool.tsx"
+      - "components/pdf/edit/PageThumbnailSidebar.tsx"
+      - "lib/pdf/edit/performanceDiagnostics.ts"
+      - "lib/pdf/edit/fontRegistry.ts"
+      - "e2e/edit-performance.spec.ts"
+      - "e2e/edit-performance-fixtures.ts"
+      - "playwright.edit-performance.config.ts"
+      - ".github/workflows/edit-performance.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edit-performance-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  measure:
+    name: 120 / 320 page local performance profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      NEXT_PUBLIC_EDIT_PERFORMANCE_DIAGNOSTICS: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Initialize and start isolated Supabase catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+
+      - name: Configure public catalog environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/lumeo-edit-performance-supabase.env
+          set -a
+          source /tmp/lumeo-edit-performance-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Cloudflare Worker with local diagnostics enabled
+        run: npm run build:vinext
+
+      - name: Measure 120 and 320 page Edit PDF sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev             --config dist/server/wrangler.json             --port 8787             --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL"             --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"             > /tmp/lumeo-edit-performance.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/pdf/edit >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/lumeo-edit-performance.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat /tmp/lumeo-edit-performance.log
+            echo "Local performance Worker did not become ready." >&2
+            exit 1
+          fi
+
+          npx playwright test --config=playwright.edit-performance.config.ts
+
+      - name: Upload performance reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: edit-pdf-performance-reports
+          path: |
+            test-results/edit-performance/*.json
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
