@@ -537,6 +537,7 @@ export default function EditPdfTool() {
     set: setHistoryStateRaw,
     undo: undoRaw,
     redo: redoRaw,
+    getCurrent: getHistoryState,
     canUndo,
     canRedo,
     reset: resetHistory,
@@ -3069,6 +3070,11 @@ export default function EditPdfTool() {
       );
 
       const saved = await planningDoc.save();
+      if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
+        throw new Error(
+          "The PDF changed before Replace All could publish its validated batch. Nothing from this batch was applied; run Replace All again.",
+        );
+      }
       const nextBytes = saved.buffer.slice(
         saved.byteOffset,
         saved.byteOffset + saved.byteLength,
