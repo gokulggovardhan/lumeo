@@ -6,7 +6,7 @@
 
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { PDFDocument, PDFName, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, PDFName, StandardFonts, TextRenderingMode, beginText, endText, rgb, setTextRenderingMode } from "pdf-lib";
 import { createCanvas } from "@napi-rs/canvas";
 
 // Playwright transpiles specs to CJS, where import.meta is a syntax error --
@@ -15,6 +15,7 @@ export const TMP_DIR = path.join(process.cwd(), "e2e", ".tmp");
 export const TEXT_ONLY_PDF = path.join(TMP_DIR, "text-only.pdf");
 export const WITH_IMAGE_PDF = path.join(TMP_DIR, "with-image.pdf");
 export const IMAGE_ONLY_PDF = path.join(TMP_DIR, "image-only.pdf");
+export const SEARCHABLE_SCAN_PDF = path.join(TMP_DIR, "searchable-scan.pdf");
 export const SPLIT_RUN_PDF = path.join(TMP_DIR, "split-run.pdf");
 export const TWO_PAGE_PDF = path.join(TMP_DIR, "two-page.pdf");
 export const MIXED_STYLE_PDF = path.join(TMP_DIR, "mixed-style.pdf");
@@ -51,6 +52,53 @@ async function imageOnly(): Promise<Uint8Array> {
   context.fillText("This text exists only in image pixels.", 80, 220);
   const png = await doc.embedPng(canvas.toBuffer("image/png"));
   page.drawImage(png, { x: 0, y: 0, width: 595, height: 842 });
+
+  return doc.save();
+}
+
+async function searchableScan(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+
+  const canvas = createCanvas(595, 842);
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#f3f4f6";
+  context.fillRect(0, 0, 595, 842);
+  context.fillStyle = "#111111";
+  context.font = "30px sans-serif";
+  context.fillText("SEARCHABLE SCAN SAMPLE", 80, 160);
+  context.font = "22px sans-serif";
+  context.fillText("Hidden text layer must stay read-only.", 80, 220);
+  const png = await doc.embedPng(canvas.toBuffer("image/png"));
+  page.drawImage(png, { x: 0, y: 0, width: 595, height: 842 });
+
+  // The image above is the visible page. These matching strings are a true
+  // PDF invisible text layer (Tr=3), the pattern used by searchable scans.
+  // Text state survives BT/ET; pdf-lib's drawText does not override Tr, so
+  // both strings remain extractable while painting no glyphs.
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.pushOperators(
+    beginText(),
+    setTextRenderingMode(TextRenderingMode.Invisible),
+    endText(),
+  );
+  page.drawText("SEARCHABLE SCAN SAMPLE", {
+    x: 80,
+    y: 682,
+    size: 20,
+    font,
+  });
+  page.drawText("Hidden text layer must stay read-only.", {
+    x: 80,
+    y: 622,
+    size: 16,
+    font,
+  });
+  page.pushOperators(
+    beginText(),
+    setTextRenderingMode(TextRenderingMode.Fill),
+    endText(),
+  );
 
   return doc.save();
 }
@@ -257,6 +305,7 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(TEXT_ONLY_PDF, await textOnly());
   await writeFile(WITH_IMAGE_PDF, await withImage());
   await writeFile(IMAGE_ONLY_PDF, await imageOnly());
+  await writeFile(SEARCHABLE_SCAN_PDF, await searchableScan());
   const split = await splitRun();
   await assertGenuinelySplit(split);
   await writeFile(SPLIT_RUN_PDF, split);
