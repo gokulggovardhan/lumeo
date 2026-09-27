@@ -10,14 +10,26 @@ import { requireAdmin } from "@/lib/admin/auth";
 import { sanitizeErrorDiagnostic } from "@/lib/admin/error-display";
 import { getErrorLogPage, getErrorLogSummary } from "@/lib/admin/errors";
 import { asAdminFormAction } from "@/lib/admin/form-action";
-import { ignoreErrorLog, reopenErrorLog, resolveErrorLog } from "@/app/admin/(protected)/errors/actions";
+import {
+  acknowledgeErrorLog,
+  ignoreErrorLog,
+  markErrorFixDeployed,
+  reopenErrorLog,
+  resolveErrorLog,
+} from "@/app/admin/(protected)/errors/actions";
 import { pageNumber } from "@/lib/admin/pagination";
 import { canManageErrors, canViewErrors } from "@/lib/admin/permissions";
 import { formatAdminDateTime } from "@/lib/admin/timezone";
 import type { ErrorSeverity, ErrorSource, ErrorStatus } from "@/lib/supabase/database.types";
 
 const PAGE_SIZE = 50;
-const statuses: ErrorStatus[] = ["open", "resolved", "ignored"];
+const statuses: ErrorStatus[] = [
+  "open",
+  "acknowledged",
+  "fixed_pending_verification",
+  "resolved",
+  "ignored",
+];
 const severities: ErrorSeverity[] = ["low", "medium", "high", "critical"];
 const sources: ErrorSource[] = ["client", "server_action", "route_handler", "error_boundary", "unhandled_rejection"];
 const sorts = ["recent", "oldest", "occurrences"] as const;
@@ -31,9 +43,16 @@ const severityTone: Record<ErrorSeverity, "success" | "warning" | "danger" | "ne
 
 const statusTone: Record<ErrorStatus, "success" | "warning" | "danger" | "neutral"> = {
   open: "warning",
+  acknowledged: "neutral",
+  fixed_pending_verification: "warning",
   resolved: "success",
   ignored: "neutral",
 };
+
+function statusLabel(status: ErrorStatus) {
+  if (status === "fixed_pending_verification") return "fixed · verifying";
+  return status;
+}
 
 function buildQuery(params: Record<string, string | undefined>) {
   const search = new URLSearchParams();
@@ -123,7 +142,7 @@ export default async function ErrorsPage({
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <AdminMetricCard label="Open" value={summary.data.openCount} detail="Not yet resolved or ignored." tone="warning" />
         <AdminMetricCard label="Critical (open)" value={summary.data.criticalOpenCount} detail="Highest severity, still open." tone="danger" />
-        <AdminMetricCard label="Resolved" value={summary.data.resolvedCount} detail="Marked fixed." tone="success" />
+        <AdminMetricCard label="Resolved" value={summary.data.resolvedCount} detail="Fix deployed and verified without recurrence." tone="success" />
         <AdminMetricCard label="Total occurrences" value={summary.data.totalOccurrences} detail="Across all logged errors, all time." tone="neutral" />
       </div>
 
@@ -231,24 +250,41 @@ export default async function ErrorsPage({
                 <p className="mt-2 text-xs leading-5 text-[#F0EAD6]/50">
                   {log.source} · {log.browser_family ?? "Unknown browser"} · {log.operating_system ?? "Unknown OS"} · {log.device_class ?? "Unknown device"}
                 </p>
+                <p className="mt-1 text-xs leading-5 text-[#F0EAD6]/50">
+                  Last build: {log.git_sha?.slice(0, 12) ?? "Unknown"}
+                  {log.last_fix_sha ? ` · Fix: ${log.last_fix_sha.slice(0, 12)}` : ""}
+                  {log.recurrence_after_fix ? " · Recurred after fix" : ""}
+                </p>
               </details>,
               log.route ?? "—",
               log.occurrence_count,
               formatAdminDateTime(log.first_seen_at),
               formatAdminDateTime(log.last_seen_at),
-              <AdminStatusBadge key="status" tone={statusTone[log.status]}>{log.status}</AdminStatusBadge>,
+              <AdminStatusBadge key="status" tone={statusTone[log.status]}>{statusLabel(log.status)}</AdminStatusBadge>,
             ];
 
             if (canManage) {
               cells.push(
                 <div key="actions" className="flex flex-wrap gap-2">
-                  {log.status !== "resolved" && (
-                    <form action={asAdminFormAction(resolveErrorLog)}>
+                  {log.status === "open" && (
+                    <form action={asAdminFormAction(acknowledgeErrorLog)}>
                       <input type="hidden" name="id" value={log.id} />
-                      <AdminSubmitButton variant="primary" pendingLabel="...">Resolve</AdminSubmitButton>
+                      <AdminSubmitButton variant="secondary" pendingLabel="...">Acknowledge</AdminSubmitButton>
                     </form>
                   )}
-                  {log.status !== "ignored" && (
+                  {(log.status === "open" || log.status === "acknowledged") && (
+                    <form action={asAdminFormAction(markErrorFixDeployed)}>
+                      <input type="hidden" name="id" value={log.id} />
+                      <AdminSubmitButton variant="primary" pendingLabel="...">Fix deployed</AdminSubmitButton>
+                    </form>
+                  )}
+                  {log.status === "fixed_pending_verification" && (
+                    <form action={asAdminFormAction(resolveErrorLog)}>
+                      <input type="hidden" name="id" value={log.id} />
+                      <AdminSubmitButton variant="primary" pendingLabel="...">Resolve after 24h</AdminSubmitButton>
+                    </form>
+                  )}
+                  {log.status !== "ignored" && log.status !== "resolved" && (
                     <form action={asAdminFormAction(ignoreErrorLog)}>
                       <input type="hidden" name="id" value={log.id} />
                       <AdminSubmitButton variant="secondary" pendingLabel="...">Ignore</AdminSubmitButton>
