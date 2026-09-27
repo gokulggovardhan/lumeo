@@ -18,6 +18,11 @@ export type CompatibleShapingEvidenceResolution =
       direction: "ltr" | "rtl";
     }>
   | Readonly<{
+      kind: "shaped-glyph-required";
+      inspection: Extract<PdfFontShapingInspection, { kind: "reconciled" }>;
+      direction: "ltr" | "rtl";
+    }>
+  | Readonly<{
       kind: "blocked";
       reason: string;
       direction: "ltr" | "rtl";
@@ -92,6 +97,14 @@ export async function resolveCompatibleShapingWriteEvidence({
   const inspection = await inspect({ direction }, shapeText);
   if (inspection.kind !== "reconciled") {
     return { kind: "blocked", direction, reason: inspection.reason };
+  }
+
+  if (inspection.reconciliation.kind === "requires-shaped-glyph-write") {
+    return {
+      kind: "shaped-glyph-required",
+      direction,
+      inspection,
+    };
   }
 
   const proof = validateShapingEvidenceForCharacterCodeWriter({
