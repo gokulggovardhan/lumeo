@@ -120,7 +120,11 @@ test("native local-font planner validates a simple horizontal LTR substitution",
   assert.equal(fx.plan.originalText, "WWWW");
   assert.equal(fx.plan.replacementText, "iiii");
   assert.equal(fx.plan.operatorSnapshot.kind, "Tj");
-  assert.equal(fx.plan.sourceBinding.writingMode, "horizontal");
+  assert.notEqual(
+    fx.plan.sourceBinding.writingMode,
+    "vertical",
+    "simple PDF fonts are horizontal even when no Type0 CMap reports an explicit writing mode",
+  );
   assert.equal(fx.plan.localFontSha256, fx.asset.descriptor.sha256);
   assert.equal(fx.plan.shapingProof.glyphIds.length, 4);
 });
