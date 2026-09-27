@@ -228,7 +228,7 @@ try {
     "getUnreadInboxCount",
     "getFeedbackQueries",
     "getErrorLogSummary",
-    "getErrorLogs",
+    "getUnresolvedErrorLogs",
     "getAuditLogs",
     "getSiteSettings",
   ]) {
