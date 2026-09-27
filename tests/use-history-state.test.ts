@@ -180,6 +180,39 @@ test("an updater function in the same tick sees the previous call's value", asyn
   assert.equal(result.current.state.value, "xy", "the second updater must receive 'x', not ''");
 });
 
+test("getCurrent reads the synchronous ref-backed authority used by long-running local operations", async () => {
+  const { result } = renderHistory();
+
+  assert.equal(result.current.getCurrent().value, "a");
+
+  act(() => {
+    result.current.set({ value: "b" });
+    assert.equal(
+      result.current.getCurrent().value,
+      "b",
+      "getCurrent must observe set() synchronously",
+    );
+  });
+
+  act(() => {
+    result.current.undo();
+    assert.equal(
+      result.current.getCurrent().value,
+      "a",
+      "getCurrent must observe undo() synchronously",
+    );
+  });
+
+  act(() => {
+    result.current.redo();
+    assert.equal(
+      result.current.getCurrent().value,
+      "b",
+      "getCurrent must observe redo() synchronously",
+    );
+  });
+});
+
 test("reset clears both stacks and installs the new value", async () => {
   const { result } = renderHistory();
   act(() => result.current.set({ value: "b" }));

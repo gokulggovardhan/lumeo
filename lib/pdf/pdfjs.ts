@@ -65,30 +65,30 @@ export async function withPageTimeout<T>(
   timeoutMs: number,
   operation: string,
 ): Promise<T> {
-  let timeoutId: number | undefined;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     return await Promise.race([
       promise,
       new Promise<T>((_resolve, reject) => {
-        timeoutId = window.setTimeout(() => {
+        timeoutId = globalThis.setTimeout(() => {
           reject(new Error(`Page ${pageNumber} took too long to ${operation}.`));
         }, timeoutMs);
       }),
     ]);
   } finally {
-    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    if (timeoutId !== undefined) globalThis.clearTimeout(timeoutId);
   }
 }
 
 type MinimalRenderTask = { promise: Promise<void>; cancel: () => void };
 
 export async function renderPageWithTimeout(task: MinimalRenderTask, pageNumber: number) {
-  let timeoutId: number | undefined;
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     await Promise.race([
       task.promise,
       new Promise((_resolve, reject) => {
-        timeoutId = window.setTimeout(() => {
+        timeoutId = globalThis.setTimeout(() => {
           // Reject with the descriptive message before calling cancel() --
           // cancel() rejects task.promise too (with a generic
           // RenderingCancelledException), and since both are racing here,
@@ -107,7 +107,7 @@ export async function renderPageWithTimeout(task: MinimalRenderTask, pageNumber:
       }),
     ]);
   } finally {
-    if (timeoutId !== undefined) window.clearTimeout(timeoutId);
+    if (timeoutId !== undefined) globalThis.clearTimeout(timeoutId);
   }
 }
 

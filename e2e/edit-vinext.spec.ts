@@ -221,6 +221,138 @@ test("vinext Edit PDF keeps a 120-page thumbnail rail bounded and scrollable", a
   ).toBeLessThan(30);
 });
 
+test("vinext Edit PDF aborts Replace All when the native PDF revision changes during preflight", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, LARGE_DOCUMENT_PDF);
+  await waitForStageReady(page);
+
+  const firstRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large document page 1"]',
+    )
+    .first();
+  await firstRun.click();
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await editor.fill("Large dossier page 1");
+  await page.getByRole("button", { name: "Apply edit" }).click();
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large dossier page 1"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("page");
+  const replace = page.getByRole("textbox", {
+    name: "Replace search match with",
+  });
+  await replace.fill("sheet");
+
+  const replaceAll = page.getByRole("button", { name: "Replace all safely" });
+  await expect(replaceAll).toBeEnabled({ timeout: 90_000 });
+  await replaceAll.click();
+
+  const status = page.locator("[data-edit-replace-all-status]");
+  await expect(status).toContainText(/Checking every match against the native PDF locally/i, {
+    timeout: 30_000,
+  });
+
+  // Interrupt at the first observable preflight state. WebKit can scan this
+  // synthetic 120-page file quickly enough that several actionability
+  // assertions before Undo let preflight finish and open confirmation first.
+  // The lock contract is still read in one parallel snapshot so this remains
+  // proof that request controls freeze while history stays interactive.
+  const scope = page.getByRole("combobox", { name: "Search scope" });
+  const findButton = page.getByRole("button", { name: "Find", exact: true });
+  const undo = page.getByRole("button", { name: "Undo" });
+  const [findLocked, replaceLocked, scopeLocked, findButtonLocked, undoEnabled] =
+    await Promise.all([
+      find.isDisabled(),
+      replace.isDisabled(),
+      scope.isDisabled(),
+      findButton.isDisabled(),
+      undo.isEnabled(),
+    ]);
+  expect({ findLocked, replaceLocked, scopeLocked, findButtonLocked, undoEnabled }).toEqual({
+    findLocked: true,
+    replaceLocked: true,
+    scopeLocked: true,
+    findButtonLocked: true,
+    undoEnabled: true,
+  });
+
+  // Change the authoritative PDF revision while the 120-page preflight is
+  // still scanning. Replace All must discard its old clone rather than
+  // publishing stale bytes over this Undo result.
+  await undo.click({ force: true });
+
+  await expect(status).toContainText(/PDF changed while Replace All was checking matches/i, {
+    timeout: 90_000,
+  });
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large document page 1"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large dossier sheet 1"]',
+    ),
+  ).toHaveCount(0);
+});
+
+test("vinext Edit PDF cancels document Replace All without publishing partial changes", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, LARGE_DOCUMENT_PDF);
+  await waitForStageReady(page);
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("page");
+  const replace = page.getByRole("textbox", {
+    name: "Replace search match with",
+  });
+  await replace.fill("sheet");
+
+  const replaceAll = page.getByRole("button", { name: "Replace all safely" });
+  await expect(replaceAll).toBeEnabled({ timeout: 90_000 });
+  await replaceAll.click();
+
+  const status = page.locator("[data-edit-replace-all-status]");
+  await expect(status).toContainText(/Checking every match against the native PDF locally/i, {
+    timeout: 30_000,
+  });
+  const cancel = page.getByRole("button", { name: "Cancel Replace All" });
+  // Cancel is intentionally present only while preflight is active. Skip
+  // Playwright's stability wait so a fast WebKit preflight cannot detach the
+  // button between a visibility assertion and the click.
+  await cancel.click({ force: true });
+
+  await expect(status).toContainText(/Replace All cancelled\. Nothing was changed/i, {
+    timeout: 90_000,
+  });
+  await expect(cancel).toHaveCount(0);
+  await expect(replaceAll).toBeEnabled({ timeout: 30_000 });
+
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large document page 1"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Large document sheet 1"]',
+    ),
+  ).toHaveCount(0);
+});
+
 test("vinext Edit PDF shares one linear semantic undo history across native Edit and Redaction", async ({
   page,
 }) => {
@@ -617,9 +749,15 @@ test("vinext Edit PDF applies native formatting and colour with one native histo
     // must stay non-actionable through that gap rather than accepting a
     // click that silently does nothing (a WebKit race caught in PR #438).
     await expect(formatButton).toBeEnabled({ timeout: 90_000 });
-    await formatButton.click();
     const panel = page.locator("[data-native-text-formatting]");
-    await expect(panel).toBeVisible();
+    // Format is an intentional toggle. After Apply/Undo/Redo WebKit can keep
+    // the panel mounted for the same selected native span; blindly clicking
+    // the toggle here would close an already-open panel and turn a valid
+    // product state into a false test failure. Open only when needed.
+    if (!(await panel.isVisible())) {
+      await formatButton.click();
+    }
+    await expect(panel).toBeVisible({ timeout: 90_000 });
     return {
       run,
       panel,
@@ -921,6 +1059,80 @@ test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecuti
   expect(pageErrors).toEqual([]);
 });
 
+
+test("vinext Edit PDF replaces all safe document matches in one undo step", async ({ page }) => {
+  await uploadEditFixture(page, TWO_PAGE_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("record");
+  const count = page.locator("[data-edit-search-match-count]");
+  await expect(count).toHaveAttribute("data-edit-search-match-count", "2", {
+    timeout: 90_000,
+  });
+
+  const replacement = page.getByRole("textbox", {
+    name: "Replace search match with",
+  });
+  await replacement.fill("file");
+
+  const replaceAll = page.getByRole("button", { name: "Replace all safely" });
+  await expect(replaceAll).toBeEnabled({ timeout: 90_000 });
+  page.once("dialog", async (dialog) => {
+    expect(dialog.message()).toMatch(/Replace 2 safely editable matches/i);
+    expect(dialog.message()).toMatch(/one Undo step/i);
+    await dialog.accept();
+  });
+  await replaceAll.click();
+
+  const status = page.locator("[data-edit-replace-all-status]");
+  await expect(status).toContainText(/Replaced 2 matches in one native PDF transaction/i, {
+    timeout: 90_000,
+  });
+  // One history snapshot can carry two semantic native-text operations.
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "2", {
+    timeout: 90_000,
+  });
+
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Open page 2" }).click();
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Second page file"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0", {
+    timeout: 90_000,
+  });
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Second page record"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Open page 1" }).click();
+  await waitForStageReady(page);
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    ),
+  ).toBeVisible({ timeout: 90_000 });
+});
+
 test("vinext Edit PDF searches across pages, highlights matches, and prepares a partial replacement", async ({ page }) => {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
@@ -967,3 +1179,37 @@ test("vinext Edit PDF searches across pages, highlights matches, and prepares a 
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 });
+
+test("vinext Replace All does not depend on the best-effort Find index", async ({ page }) => {
+  await uploadEditFixture(page, TWO_PAGE_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("definitely-not-present-in-this-pdf");
+
+  // The navigation index truthfully has no matches, but exhaustive Replace
+  // All must still be available because it independently re-analyzes every
+  // requested page before deciding that there is nothing to change.
+  const count = page.locator("[data-edit-search-match-count]");
+  await expect(count).toHaveAttribute("data-edit-search-match-count", "0", {
+    timeout: 90_000,
+  });
+
+  const replaceAll = page.getByRole("button", { name: "Replace all safely" });
+  await expect(replaceAll).toBeEnabled();
+
+  await replaceAll.click();
+
+  const status = page.locator("[data-edit-replace-all-status]");
+  await expect(status).toContainText(
+    /No current matches for .*definitely-not-present-in-this-pdf.* were found in the document\. Nothing was changed\./i,
+    { timeout: 90_000 },
+  );
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+  await expect(page.getByRole("button", { name: "Undo" })).toBeDisabled();
+});
+

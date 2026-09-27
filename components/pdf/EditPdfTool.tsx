@@ -105,6 +105,9 @@ import {
   type PdfTextSearchPageIndex,
   type PdfTextSearchScope,
 } from "@/lib/pdf/edit/textSearch";
+import { analyzeNativeReplacePage } from "@/lib/pdf/edit/nativeReplacePageAnalysis";
+import { planStructuredReplaceAllPage } from "@/lib/pdf/edit/structuredReplaceAll";
+import { preflightStructuredReplacePageWrites } from "@/lib/pdf/edit/structuredReplaceWritePlan";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { detectRasterImageEvidence } from "@/lib/pdf/edit/rasterImageEvidence";
 import {
@@ -329,6 +332,7 @@ let editEngineModulePromise: Promise<{
   applyEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyEditPlanToDocument"];
   applyMultiRunEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyMultiRunEditPlanToDocument"];
   applyNativeTextStyleBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyNativeTextStyleBatchToDocument"];
+  applyValidatedEditPlanBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyValidatedEditPlanBatchToDocument"];
   verifyPostExportNativeEdits: (typeof import("@/lib/pdf/edit/postExportVerification"))["verifyPostExportNativeEdits"];
   PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
   PDFName: (typeof import("pdf-lib"))["PDFName"];
@@ -357,6 +361,7 @@ function loadEditEngine() {
       applyEditPlanToDocument: applyEditPlanMod.applyEditPlanToDocument,
       applyMultiRunEditPlanToDocument: applyEditPlanMod.applyMultiRunEditPlanToDocument,
       applyNativeTextStyleBatchToDocument: applyEditPlanMod.applyNativeTextStyleBatchToDocument,
+      applyValidatedEditPlanBatchToDocument: applyEditPlanMod.applyValidatedEditPlanBatchToDocument,
       verifyPostExportNativeEdits: postExportVerificationMod.verifyPostExportNativeEdits,
       PDFDocument: pdfLibMod.PDFDocument,
       PDFName: pdfLibMod.PDFName,
@@ -532,6 +537,7 @@ export default function EditPdfTool() {
     set: setHistoryStateRaw,
     undo: undoRaw,
     redo: redoRaw,
+    getCurrent: getHistoryState,
     canUndo,
     canRedo,
     reset: resetHistory,
@@ -804,6 +810,9 @@ export default function EditPdfTool() {
     () => new Map(),
   );
   const [textSearchIndexBusy, setTextSearchIndexBusy] = useState(false);
+  const [textSearchReplaceAllBusy, setTextSearchReplaceAllBusy] = useState(false);
+  const [textSearchReplaceAllStatus, setTextSearchReplaceAllStatus] = useState("");
+  const textSearchReplaceAllJobRef = useRef<{ cancelled: boolean } | null>(null);
   // True when the last Restyle could not blank the original glyphs from the
   // content stream, so the covered text is still in the exported file. Drives
   // the disclosure notice -- see restyleSelectedRun for when that happens.
@@ -958,6 +967,10 @@ export default function EditPdfTool() {
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
+  // Exact history ArrayBuffer revision that produced pdfJsDocRef.current.
+  // A non-null PDF.js document without this matching token is not valid
+  // evidence for native batch operations such as Structured Replace All.
+  const pdfJsDocBytesRef = useRef<ArrayBuffer | null>(null);
   const textSearchPageIndexesRef = useRef<Map<number, PdfTextSearchPageIndex>>(new Map());
   const textSearchBuildGenerationRef = useRef(0);
   // Phase 22: the render effect below already fetches this exact page and
@@ -1650,6 +1663,7 @@ export default function EditPdfTool() {
     setOcrCopiedRevision(null);
     void (pdfJsDocRef.current as (PDFDocumentProxy & { destroy?: () => Promise<void> | void }) | null)?.destroy?.();
     pdfJsDocRef.current = null;
+    pdfJsDocBytesRef.current = null;
     setDocReady(0);
     if (pendingInitialDocRef.current) {
       void (pendingInitialDocRef.current.doc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
@@ -1713,6 +1727,7 @@ export default function EditPdfTool() {
     void (async () => {
       const previousDoc = pdfJsDocRef.current;
       pdfJsDocRef.current = null;
+      pdfJsDocBytesRef.current = null;
       setDocReady(0);
       if (previousDoc) void (previousDoc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
 
@@ -1729,6 +1744,7 @@ export default function EditPdfTool() {
       // re-runs on every pdfBytes change.
       const adopt = (doc: PDFDocumentProxy) => {
         pdfJsDocRef.current = doc;
+        pdfJsDocBytesRef.current = pdf.bytes;
         setDocReady((current) => current + 1);
         setPdfMeta((current) => (current && current.pageCount !== doc.numPages ? { ...current, pageCount: doc.numPages } : current));
       };
@@ -2886,6 +2902,313 @@ export default function EditPdfTool() {
         inlineEditInputRef.current?.focus();
         inlineEditInputRef.current?.select();
       });
+    }
+  }
+
+  async function applyStructuredTextSearchReplacement() {
+    if (
+      !pdf ||
+      !pdfJsDocRef.current ||
+      !editEngineRef.current ||
+      !textSearchQuery.trim() ||
+      textSearchReplaceAllBusy
+    ) {
+      return;
+    }
+    // Document Replace All does its own complete native revalidation pass.
+    // The normal background Find index is deliberately best-effort and can
+    // skip a pathological page without blocking search elsewhere; that is
+    // acceptable for navigation but not for a command named "Replace All".
+    const requestedPageIndex = pageIndex;
+    const requestedScope = textSearchScope;
+    const candidatePages =
+      requestedScope === "page"
+        ? [requestedPageIndex]
+        : Array.from({ length: pdf.pageCount }, (_unused, index) => index);
+    if (candidatePages.length === 0) {
+      setTextSearchReplaceAllStatus("No search matches are available to replace.");
+      return;
+    }
+
+    const engine = editEngineRef.current;
+    const pdfJsDocument = pdfJsDocRef.current;
+    // Identity token for the exact native PDF snapshot being analyzed. The
+    // shared history hook updates its authoritative ref synchronously, so
+    // this remains reliable even if React has not re-rendered yet.
+    const replaceAllSourceBytes = getHistoryState().pdfBytes;
+    if (
+      !pdfJsDocument ||
+      pdfJsDocBytesRef.current !== replaceAllSourceBytes
+    ) {
+      setTextSearchReplaceAllStatus(
+        "The PDF preview is still synchronizing with the current document revision. Try Replace All again after the page is ready.",
+      );
+      return;
+    }
+    const query = textSearchQuery;
+    const replacement = textSearchReplacement;
+    const options = {
+      caseSensitive: textSearchCaseSensitive,
+      wholeWord: textSearchWholeWord,
+    };
+
+    const replaceAllJob = { cancelled: false };
+    textSearchReplaceAllJobRef.current = replaceAllJob;
+    const replaceAllCancelled = () =>
+      replaceAllJob.cancelled || textSearchReplaceAllJobRef.current !== replaceAllJob;
+    const reportReplaceAllCancelled = () => {
+      setTextSearchReplaceAllStatus("Replace All cancelled. Nothing was changed.");
+    };
+
+    setTextSearchReplaceAllBusy(true);
+    setTextSearchReplaceAllStatus("Checking every match against the native PDF locally…");
+    setEditApplyError("");
+
+    try {
+      // Preflight and mutation happen on a disposable clone of the exact
+      // current history bytes. Nothing in the live document/history changes
+      // unless every selected write below succeeds and this clone saves.
+      const planningDoc = await engine.PDFDocument.load(
+        copyArrayBuffer(replaceAllSourceBytes),
+      );
+      const planningRegistry = new engine.PdfFontRegistry(planningDoc);
+
+      let shapingModulePromise:
+        | Promise<typeof import("@/lib/pdf/edit/harfbuzzShaping")>
+        | null = null;
+      const shapeText: import("@/lib/pdf/edit/fontRegistry").PdfEmbeddedFontTextShaper =
+        async (fontBytes, text, shapingOptions) => {
+          if (!shapingModulePromise) {
+            shapingModulePromise = import("@/lib/pdf/edit/harfbuzzShaping");
+          }
+          const shapingModule = await shapingModulePromise;
+          return shapingModule.shapeEmbeddedFontText(
+            fontBytes,
+            text,
+            shapingOptions,
+          );
+        };
+
+      const validatedUnits: Array<
+        import("@/lib/pdf/edit/structuredReplaceWritePlan").StructuredReplaceWriteUnit
+      > = [];
+      let requestedMatchCount = 0;
+      let structurallySkippedCount = 0;
+      let writerSkippedCount = 0;
+      let firstSkipDetail = "";
+
+      for (const targetPageIndex of candidatePages) {
+        if (replaceAllCancelled()) {
+          reportReplaceAllCancelled();
+          return;
+        }
+        if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
+          setTextSearchReplaceAllStatus(
+            "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again.",
+          );
+          return;
+        }
+        const targetPage = await pdfJsDocument.getPage(targetPageIndex + 1);
+        try {
+          const analysis = await analyzeNativeReplacePage({
+            page: targetPage,
+            pdfDocument: planningDoc,
+            pageIndex: targetPageIndex,
+            dependencies: {
+              collectPageTextOperators: engine.collectPageTextOperators,
+              fontRegistry: planningRegistry,
+            },
+          });
+          const freshMatches = searchPdfPageText(
+            analysis.pageTextModel,
+            query,
+            options,
+          );
+          requestedMatchCount += freshMatches.length;
+          if (freshMatches.length === 0) continue;
+
+          const pagePlan = planStructuredReplaceAllPage({
+            page: analysis.pageTextModel,
+            matches: freshMatches,
+            replacement,
+          });
+          structurallySkippedCount += pagePlan.skipped.length;
+          if (!firstSkipDetail && pagePlan.skipped[0]?.detail) {
+            firstSkipDetail = pagePlan.skipped[0].detail;
+          }
+
+          const writePreflight = await preflightStructuredReplacePageWrites({
+            analysis,
+            pagePlan,
+            dependencies: {
+              fontRegistry: planningRegistry,
+              shapeText,
+            },
+          });
+          writerSkippedCount += writePreflight.skipped.length;
+          if (!firstSkipDetail && writePreflight.skipped[0]?.detail) {
+            firstSkipDetail = writePreflight.skipped[0].detail;
+          }
+          validatedUnits.push(...writePreflight.units);
+        } finally {
+          if (targetPageIndex !== pageIndex) targetPage.cleanup();
+        }
+      }
+
+      if (replaceAllCancelled()) {
+        reportReplaceAllCancelled();
+        return;
+      }
+
+      // A revision can change while the final page itself is being analyzed.
+      // Re-check before trusting even a no-match result so status text never
+      // describes a stale PDF snapshot as if it were current.
+      if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
+        setTextSearchReplaceAllStatus(
+          "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again.",
+        );
+        return;
+      }
+
+      const safeMatchCount = validatedUnits.reduce(
+        (total, unit) => total + unit.candidate.matchIds.length,
+        0,
+      );
+      const skippedMatchCount = Math.max(
+        requestedMatchCount - safeMatchCount,
+        structurallySkippedCount + writerSkippedCount,
+      );
+
+      if (requestedMatchCount === 0) {
+        const noMatchScope =
+          requestedScope === "document"
+            ? "the document"
+            : `page ${requestedPageIndex + 1}`;
+        setTextSearchReplaceAllStatus(
+          `No current matches for “${query}” were found in ${noMatchScope}. Nothing was changed.`,
+        );
+        return;
+      }
+      if (safeMatchCount === 0 || validatedUnits.length === 0) {
+        setTextSearchReplaceAllStatus(
+          firstSkipDetail ||
+            "None of these matches currently pass every native PDF rewrite check.",
+        );
+        return;
+      }
+
+      if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
+        setTextSearchReplaceAllStatus(
+          "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again.",
+        );
+        return;
+      }
+
+      if (replaceAllCancelled()) {
+        reportReplaceAllCancelled();
+        return;
+      }
+
+      const scopeLabel =
+        requestedScope === "document"
+          ? "the document"
+          : `page ${requestedPageIndex + 1}`;
+      const skippedText =
+        skippedMatchCount > 0
+          ? ` ${skippedMatchCount} match${skippedMatchCount === 1 ? "" : "es"} will stay unchanged because they did not pass every native rewrite check.`
+          : "";
+      const confirmed = window.confirm(
+        `Replace ${safeMatchCount} safely editable match${safeMatchCount === 1 ? "" : "es"} in ${scopeLabel}?${skippedText} This will be one Undo step.`,
+      );
+      if (!confirmed) {
+        setTextSearchReplaceAllStatus(
+          `Replace All cancelled. ${safeMatchCount} safe match${safeMatchCount === 1 ? "" : "es"} had been preflighted; no PDF bytes changed.`,
+        );
+        return;
+      }
+
+      if (replaceAllCancelled()) {
+        reportReplaceAllCancelled();
+        return;
+      }
+      if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
+        setTextSearchReplaceAllStatus(
+          "The PDF changed before Replace All could start its validated write. Nothing was changed; run Replace All again.",
+        );
+        return;
+      }
+
+      const batchEntries = validatedUnits.flatMap((unit) =>
+        unit.plans.map((plan) => ({
+          plan,
+          bytesPerCode: unit.bytesPerCode,
+        })),
+      );
+      await engine.applyValidatedEditPlanBatchToDocument(
+        planningDoc,
+        batchEntries,
+      );
+
+      const saved = await planningDoc.save();
+      const nextBytes = saved.buffer.slice(
+        saved.byteOffset,
+        saved.byteOffset + saved.byteLength,
+      ) as ArrayBuffer;
+      const semanticOperations: PdfEditOperationDraft[] = validatedUnits.map(
+        (unit) =>
+          nativeTextOperation({
+            pageIndex: unit.candidate.pageIndex,
+            spanIds: [...unit.candidate.spanIds],
+            contentStreamIndex: unit.contentStreamIndex,
+            formPath: null,
+            operatorIndices: [...unit.operatorIndices],
+            fontResourceName: unit.fontResourceName,
+            originalText: unit.candidate.originalText,
+            replacementText: unit.candidate.replacementText,
+          }),
+      );
+
+      if (replaceAllCancelled()) {
+        reportReplaceAllCancelled();
+        return;
+      }
+      if (getHistoryState().pdfBytes !== replaceAllSourceBytes) {
+        throw new Error(
+          "The PDF changed before Replace All could publish its validated batch. Nothing from this batch was applied; run Replace All again.",
+        );
+      }
+
+      setHistoryState((current) => ({
+        ...current,
+        pdfBytes: nextBytes,
+        session: appendPdfEditOperations(
+          current.session,
+          semanticOperations,
+        ),
+      }));
+      setTextSearchActiveIndex(-1);
+      setTextSearchReplaceAllStatus(
+        `Replaced ${safeMatchCount} match${safeMatchCount === 1 ? "" : "es"} in one native PDF transaction${skippedMatchCount > 0 ? `; ${skippedMatchCount} unsafe match${skippedMatchCount === 1 ? "" : "es"} stayed unchanged` : ""}.`,
+      );
+    } catch (replaceAllError) {
+      if (replaceAllCancelled()) {
+        reportReplaceAllCancelled();
+      } else {
+        const sourceRevisionChanged =
+          getHistoryState().pdfBytes !== replaceAllSourceBytes;
+        const message = sourceRevisionChanged
+          ? "The PDF changed while Replace All was checking matches. Nothing was changed; run Replace All again."
+          : replaceAllError instanceof Error
+            ? replaceAllError.message
+            : "Structured Replace All could not be completed.";
+        setTextSearchReplaceAllStatus(message);
+        if (!sourceRevisionChanged) setEditApplyError(message);
+      }
+    } finally {
+      if (textSearchReplaceAllJobRef.current === replaceAllJob) {
+        textSearchReplaceAllJobRef.current = null;
+        setTextSearchReplaceAllBusy(false);
+      }
     }
   }
 
@@ -4594,6 +4917,7 @@ export default function EditPdfTool() {
         <div className="mx-1 h-6 w-px shrink-0 bg-[var(--text-primary)]/10" />
 
         <L2ToolbarButton
+          disabled={textSearchReplaceAllBusy}
           onClick={() => {
             setTextSearchOpen((open) => {
               const next = !open;
@@ -4654,8 +4978,10 @@ export default function EditPdfTool() {
                 role="searchbox"
                 aria-label="Find text in PDF"
                 value={textSearchQuery}
+                disabled={textSearchReplaceAllBusy}
                 onChange={(event) => {
                   setTextSearchQuery(event.target.value);
+                  setTextSearchReplaceAllStatus("");
                   if (!event.target.value.trim()) setTextSearchIndexBusy(false);
                   setTextSearchActiveIndex(-1);
                 }}
@@ -4671,6 +4997,7 @@ export default function EditPdfTool() {
               <select
                 aria-label="Search scope"
                 value={textSearchScope}
+                disabled={textSearchReplaceAllBusy}
                 onChange={(event) => {
                   const nextScope = event.target.value as PdfTextSearchScope;
                   setTextSearchScope(nextScope);
@@ -4688,6 +5015,7 @@ export default function EditPdfTool() {
               <input
                 type="checkbox"
                 checked={textSearchCaseSensitive}
+                disabled={textSearchReplaceAllBusy}
                 onChange={(event) => {
                   setTextSearchCaseSensitive(event.target.checked);
                   setTextSearchActiveIndex(-1);
@@ -4699,6 +5027,7 @@ export default function EditPdfTool() {
               <input
                 type="checkbox"
                 checked={textSearchWholeWord}
+                disabled={textSearchReplaceAllBusy}
                 onChange={(event) => {
                   setTextSearchWholeWord(event.target.checked);
                   setTextSearchActiveIndex(-1);
@@ -4741,6 +5070,7 @@ export default function EditPdfTool() {
               <button
                 type="button"
                 aria-label="Close find"
+                disabled={textSearchReplaceAllBusy}
                 onClick={() => {
                   setTextSearchOpen(false);
                   setTextSearchIndexBusy(false);
@@ -4760,7 +5090,11 @@ export default function EditPdfTool() {
               <input
                 aria-label="Replace search match with"
                 value={textSearchReplacement}
-                onChange={(event) => setTextSearchReplacement(event.target.value)}
+                disabled={textSearchReplaceAllBusy}
+                onChange={(event) => {
+                  setTextSearchReplacement(event.target.value);
+                  setTextSearchReplaceAllStatus("");
+                }}
                 placeholder="Leave empty to delete the match"
                 className="h-10 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-input)] px-3 text-sm text-[var(--text-primary)] outline-none focus:border-[var(--lumeo-gold)] focus:ring-2 focus:ring-[var(--lumeo-gold)]/20"
               />
@@ -4768,11 +5102,43 @@ export default function EditPdfTool() {
             <button
               type="button"
               onClick={prepareActiveTextSearchReplacement}
-              disabled={!activeTextSearchReplacementPlan}
+              disabled={textSearchReplaceAllBusy || !activeTextSearchReplacementPlan}
               className="h-10 rounded-[var(--radius-md)] bg-[var(--lumeo-gold)] px-4 text-xs font-bold text-[var(--atelier-surface-0)] disabled:cursor-not-allowed disabled:opacity-40"
             >
               Replace this match
             </button>
+            <button
+              type="button"
+              onClick={() => void applyStructuredTextSearchReplacement()}
+              disabled={
+                textSearchReplaceAllBusy ||
+                !textSearchQuery.trim()
+              }
+              className="h-10 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/45 px-4 text-xs font-bold text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {textSearchReplaceAllBusy
+                ? "Checking all…"
+                : textSearchScope === "document"
+                  ? "Replace all safely"
+                  : "Replace all on page"}
+            </button>
+            {textSearchReplaceAllBusy ? (
+              <button
+                type="button"
+                aria-label="Cancel Replace All"
+                onClick={() => {
+                  const job = textSearchReplaceAllJobRef.current;
+                  if (!job || job.cancelled) return;
+                  job.cancelled = true;
+                  setTextSearchReplaceAllStatus(
+                    "Cancelling Replace All… no changes will be published.",
+                  );
+                }}
+                className="h-10 rounded-[var(--radius-md)] border border-[var(--text-primary)]/20 px-3 text-xs font-bold text-[var(--text-primary)]"
+              >
+                Cancel
+              </button>
+            ) : null}
             <span className="pb-2 text-[10px] leading-4 text-[var(--text-secondary)]">
               {activeTextSearchMatch?.pageIndex !== pageIndex
                 ? "Navigate to the match first."
@@ -4781,6 +5147,15 @@ export default function EditPdfTool() {
                   : activeTextSearchMatch?.capabilityReason ?? "Only safely editable native text can be replaced."}
             </span>
           </div>
+          {textSearchReplaceAllStatus ? (
+            <div
+              role="status"
+              data-edit-replace-all-status
+              className="rounded-[var(--radius-md)] border border-[var(--text-primary)]/10 bg-[var(--text-primary)]/[0.025] px-3 py-2 text-[10px] leading-4 text-[var(--text-secondary)]"
+            >
+              {textSearchReplaceAllStatus}
+            </div>
+          ) : null}
         </div>
       ) : null}
 
