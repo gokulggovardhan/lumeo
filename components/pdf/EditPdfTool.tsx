@@ -117,6 +117,7 @@ import {
   type OcrProgress,
 } from "@/lib/pdf/edit/localOcr";
 import {
+  MAX_LOCAL_CUSTOM_FONT_BYTES,
   MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES,
   createLocalCustomFontAsset,
   loadLocalCustomFontFace,
@@ -4600,6 +4601,143 @@ export default function EditPdfTool() {
     }
   }
   const selectedElement = useMemo(() => elements.find((item) => item.id === selectedId) ?? null, [elements, selectedId]);
+
+  const localCustomFontExportIssue = useMemo(() => {
+    for (const element of elements) {
+      if (element.type !== "text" || !element.fontAssetId || !element.text.trim()) continue;
+      const asset = localCustomFontAssets.get(element.fontAssetId);
+      if (!asset) {
+        return `The local font “${element.fontFamily ?? "Custom font"}” is no longer available in this browser session. Re-select it before exporting.`;
+      }
+      if (element.bold || element.italic) {
+        return `${asset.descriptor.familyName} is a single local font face. Choose the matching bold/italic font file instead of synthetic styling.`;
+      }
+      const issue = localCustomFontTextIssue(asset, element.text);
+      if (issue) return issue;
+    }
+    return null;
+  }, [elements, localCustomFontAssets]);
+
+  const selectedLocalCustomFontAsset =
+    selectedElement?.type === "text" && selectedElement.fontAssetId
+      ? localCustomFontAssets.get(selectedElement.fontAssetId) ?? null
+      : null;
+  const selectedLocalCustomFontIssue =
+    selectedElement?.type === "text" && selectedLocalCustomFontAsset
+      ? localCustomFontTextIssue(selectedLocalCustomFontAsset, selectedElement.text)
+      : selectedElement?.type === "text" && selectedElement.fontAssetId
+        ? "This local font is no longer available in this browser session. Re-select it before exporting."
+        : null;
+
+  async function handleLocalCustomFontFile(elementId: string, file: File) {
+    const requestId = localCustomFontRequestRef.current + 1;
+    localCustomFontRequestRef.current = requestId;
+    const sourceRevision = getHistoryState().pdfBytes;
+    setLocalCustomFontBusy(true);
+    setLocalCustomFontError("");
+
+    let loadedFace: FontFace | null = null;
+    let faceAdopted = false;
+    try {
+      if (file.size > MAX_LOCAL_CUSTOM_FONT_BYTES) {
+        throw new Error("This font is larger than Lumeo's 16 MB local-font safety limit.");
+      }
+      const result = await createLocalCustomFontAsset(
+        new Uint8Array(await file.arrayBuffer()),
+        file.name,
+      );
+      if (localCustomFontRequestRef.current !== requestId) return;
+      if (result.kind !== "ready") throw new Error(result.reason);
+
+      const asset = result.asset;
+      let snapshot = getHistoryState();
+      if (snapshot.pdfBytes !== sourceRevision) return;
+      let currentElement = snapshot.elements.find((item) => item.id === elementId);
+      if (!currentElement || currentElement.type !== "text") return;
+
+      const issue = localCustomFontTextIssue(asset, currentElement.text);
+      if (issue) throw new Error(issue);
+
+      const alreadyStored = localCustomFontAssets.get(asset.descriptor.id);
+      const storedBytes = Array.from(localCustomFontAssets.values()).reduce(
+        (sum, existing) => sum + existing.descriptor.byteLength,
+        0,
+      );
+      const nextBytes =
+        storedBytes + (alreadyStored ? 0 : asset.descriptor.byteLength);
+      if (nextBytes > MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES) {
+        throw new Error(
+          "Local fonts in this PDF session would exceed Lumeo's 32 MB safety limit. Reset an existing font or start a new PDF session.",
+        );
+      }
+
+      let face = localCustomFontFacesRef.current.get(asset.descriptor.id) ?? null;
+      if (!face) {
+        loadedFace = await loadLocalCustomFontFace(asset);
+        if (!loadedFace) {
+          throw new Error("This font could not be loaded for browser preview.");
+        }
+        face = loadedFace;
+      }
+
+      if (localCustomFontRequestRef.current !== requestId) return;
+      snapshot = getHistoryState();
+      if (snapshot.pdfBytes !== sourceRevision) return;
+      currentElement = snapshot.elements.find((item) => item.id === elementId);
+      if (!currentElement || currentElement.type !== "text") return;
+
+      const currentTextIssue = localCustomFontTextIssue(asset, currentElement.text);
+      if (currentTextIssue) throw new Error(currentTextIssue);
+
+      if (!alreadyStored) {
+        setLocalCustomFontAssets((current) => {
+          const next = new Map(current);
+          next.set(asset.descriptor.id, asset);
+          return next;
+        });
+      }
+      if (!localCustomFontFacesRef.current.has(asset.descriptor.id)) {
+        localCustomFontFacesRef.current.set(asset.descriptor.id, face);
+      }
+      faceAdopted = true;
+
+      setElements((current) =>
+        patchElement(current, elementId, {
+          fontAssetId: asset.descriptor.id,
+          fontFamily: asset.descriptor.familyName,
+          bold: false,
+          italic: false,
+        } as Partial<EditElement>),
+      );
+    } catch (fontError) {
+      if (localCustomFontRequestRef.current === requestId) {
+        setLocalCustomFontError(
+          fontError instanceof Error
+            ? fontError.message
+            : "This local font could not be used safely.",
+        );
+      }
+    } finally {
+      if (loadedFace && !faceAdopted) removeLocalCustomFontFace(loadedFace);
+      if (localCustomFontRequestRef.current === requestId) {
+        setLocalCustomFontBusy(false);
+      }
+    }
+  }
+
+  function handleUseStandardFont(elementId: string) {
+    localCustomFontRequestRef.current += 1;
+    setLocalCustomFontBusy(false);
+    setLocalCustomFontError("");
+    setElements((current) =>
+      patchElement(current, elementId, {
+        fontAssetId: undefined,
+        fontFamily: undefined,
+        bold: false,
+        italic: false,
+      } as Partial<EditElement>),
+    );
+  }
   // DISPLAYED CSS pixels per PDF point -- what EditElementView needs to size
   // a placed text element's glyphs to match the page under them
   // (`element.fontSizePt * pixelsPerPoint`).
