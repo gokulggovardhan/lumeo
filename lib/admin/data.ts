@@ -51,6 +51,7 @@ export type AnalyticsSummary = {
   processingStarted: number;
   processingSucceeded: number;
   processingFailed: number;
+  unreconciledStarts: number;
   downloadsStarted: number;
   successRate: number | null;
   averageDurationMs: number | null;
@@ -218,6 +219,7 @@ function unavailableAnalyticsSummary(): AnalyticsSummary {
     processingStarted: 0,
     processingSucceeded: 0,
     processingFailed: 0,
+    unreconciledStarts: 0,
     downloadsStarted: 0,
     successRate: null,
     averageDurationMs: null,
@@ -408,6 +410,10 @@ function parseAdminAnalyticsSummary(value: unknown): AnalyticsSummary | null {
     processingStarted,
     processingSucceeded,
     processingFailed,
+    unreconciledStarts: Math.max(
+      0,
+      processingStarted - processingSucceeded - processingFailed,
+    ),
     downloadsStarted,
     successRate: completed > 0 ? Math.round((processingSucceeded / completed) * 1000) / 10 : null,
     averageDurationMs: numberValue(averageDuration),
