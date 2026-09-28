@@ -32,6 +32,8 @@ import { tokenizeContentStream, type ContentStreamToken } from "./contentStream.
 
 export type FontKind = "Type1" | "TrueType" | "MMType1" | "Type3" | "Type0" | "Unknown";
 
+export type FontWritingMode = "horizontal" | "vertical" | "unknown";
+
 export type EncodingSource =
   | "WinAnsi"
   | "MacRoman"
@@ -48,6 +50,13 @@ export type ResolvedFont = {
   isSubset: boolean;
   bytesPerCode: 1 | 2;
   encodingSource: EncodingSource;
+  /**
+   * PDF text writing mode proven from the font's own resource encoding.
+   * Simple fonts are horizontal. Type0 fonts are horizontal/vertical only
+   * when a named CMap ending in -H/-V proves it; otherwise this is unknown
+   * and native writers must fail closed rather than assume a direction.
+   */
+  writingMode: FontWritingMode;
   glyphCodeToUnicode: Map<number, string>;
   /**
    * Only populated with codes this module can vouch for -- see
@@ -63,6 +72,13 @@ const SUBSET_PREFIX = /^[A-Z]{6}\+/;
 
 function nameString(obj: unknown): string | null {
   return obj instanceof PDFName ? obj.asString().replace(/^\//, "") : null;
+}
+
+function writingModeForType0Encoding(name: string | null): FontWritingMode {
+  if (!name) return "unknown";
+  if (/(?:^|-)V$/i.test(name)) return "vertical";
+  if (/(?:^|-)H$/i.test(name) || /^Identity-H$/i.test(name)) return "horizontal";
+  return "unknown";
 }
 
 // pdf-lib's context.lookupMaybe(ref, Type) throws UnexpectedObjectTypeError
@@ -337,6 +353,9 @@ export function resolveFont(fontDict: PDFDict, context: PDFContext): ResolvedFon
   const isSubset = SUBSET_PREFIX.test(baseFont);
 
   if (kind === "Type0") {
+    const writingMode = writingModeForType0Encoding(
+      nameString(fontDict.get(PDFName.of("Encoding"))),
+    );
     const descendantFonts = fontDict.get(PDFName.of("DescendantFonts"));
     const descendantDict =
       descendantFonts instanceof PDFArray && descendantFonts.size() > 0
@@ -354,6 +373,7 @@ export function resolveFont(fontDict: PDFDict, context: PDFContext): ResolvedFon
         isSubset,
         bytesPerCode: 2,
         encodingSource: "Unknown",
+        writingMode,
         glyphCodeToUnicode: new Map(),
         unicodeToGlyphCode: new Map(),
       };
@@ -375,6 +395,7 @@ export function resolveFont(fontDict: PDFDict, context: PDFContext): ResolvedFon
       isSubset,
       bytesPerCode: 2,
       encodingSource: "ToUnicode",
+      writingMode,
       glyphCodeToUnicode: toUnicode,
       unicodeToGlyphCode,
     };
@@ -400,6 +421,7 @@ export function resolveFont(fontDict: PDFDict, context: PDFContext): ResolvedFon
     isSubset,
     bytesPerCode: 1,
     encodingSource: source,
+    writingMode: "horizontal",
     glyphCodeToUnicode: codeToUnicode,
     unicodeToGlyphCode,
   };
