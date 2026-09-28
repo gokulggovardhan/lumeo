@@ -1790,7 +1790,8 @@ export default function EditPdfTool() {
     if (
       !pdf ||
       !ocrPageResultCurrent ||
-      pageTextCapability.category !== "SCANNED_IMAGE" ||
+      (pageTextCapability.category !== "SCANNED_IMAGE" &&
+        !ocrSearchablePublicationCurrent) ||
       !rasterImageEvidenceCurrent
     ) {
       setOcrErrorRevision({
@@ -1817,8 +1818,8 @@ export default function EditPdfTool() {
 
     const reviewCorrectionRevision =
       ocrReviewCorrectionRevisionRef.current;
-    const sourceBytes = getHistoryState().pdfBytes;
-    if (sourceBytes !== pdf.bytes) {
+    const currentBytes = getHistoryState().pdfBytes;
+    if (currentBytes !== pdf.bytes) {
       setOcrErrorRevision({
         bytes: pdf.bytes,
         pageIndex,
@@ -1828,7 +1829,12 @@ export default function EditPdfTool() {
       return;
     }
 
-    const request = { bytes: sourceBytes, pageIndex };
+    const publicationSource = resolveSearchableOcrPublicationSource({
+      currentBytes,
+      pageIndex,
+      publication: ocrSearchablePublicationCurrent,
+    });
+    const request = { bytes: currentBytes, pageIndex };
     setOcrSearchLayerActivity(request);
     setOcrErrorRevision(null);
     setOcrSearchLayerNoticeRevision(null);
@@ -1856,15 +1862,15 @@ export default function EditPdfTool() {
       }
 
       const outcome = await addSearchableOcrTextLayer(
-        sourceBytes,
+        publicationSource.writerSourceBytes,
         searchableInput,
       );
 
       const context = ocrContextRef.current;
       if (
-        getHistoryState().pdfBytes !== sourceBytes ||
+        getHistoryState().pdfBytes !== currentBytes ||
         ocrReviewCorrectionRevisionRef.current !== reviewCorrectionRevision ||
-        context.bytes !== sourceBytes ||
+        context.bytes !== currentBytes ||
         context.pageIndex !== request.pageIndex
       ) {
         throw new Error(
@@ -1902,9 +1908,9 @@ export default function EditPdfTool() {
       }
 
       if (
-        getHistoryState().pdfBytes !== sourceBytes ||
+        getHistoryState().pdfBytes !== currentBytes ||
         ocrReviewCorrectionRevisionRef.current !== reviewCorrectionRevision ||
-        ocrContextRef.current.bytes !== sourceBytes ||
+        ocrContextRef.current.bytes !== currentBytes ||
         ocrContextRef.current.pageIndex !== request.pageIndex
       ) {
         throw new Error(
@@ -1923,8 +1929,9 @@ export default function EditPdfTool() {
           reviewedCorrectionWordIndices,
           outcome.writtenWordIndices,
         ).length;
+      const regenerated = publicationSource.kind === "regenerate";
       const description =
-        `Added ${writtenCount} local OCR word${writtenCount === 1 ? "" : "s"} as an invisible searchable text layer on page ${pageIndex + 1}.` +
+        `${regenerated ? "Regenerated" : "Added"} ${writtenCount} local OCR word${writtenCount === 1 ? "" : "s"} ${regenerated ? "in" : "as"} the invisible searchable text layer on page ${pageIndex + 1}.` +
         (publishedReviewedCorrectionCount > 0
           ? ` Published ${publishedReviewedCorrectionCount} reviewed OCR correction${publishedReviewedCorrectionCount === 1 ? "" : "s"}.`
           : "");
@@ -1934,7 +1941,9 @@ export default function EditPdfTool() {
         pdfBytes: nextBytes,
         session: appendPdfEditOperations(current.session, [
           createPageEditOperation({
-            operation: "add-searchable-text-layer",
+            operation: regenerated
+              ? "replace-searchable-text-layer"
+              : "add-searchable-text-layer",
             beforePageCount: pdf.pageCount,
             afterPageCount: pdf.pageCount,
             affectedPageIndices: [pageIndex],
@@ -1942,18 +1951,45 @@ export default function EditPdfTool() {
           }),
         ]),
       }));
+
+      setOcrSearchablePublicationRevision({
+        ...bindSearchableOcrPublicationRevision({
+          source: publicationSource,
+          publishedBytes: nextBytes,
+          pageIndex,
+        }),
+        correctionRevision: reviewCorrectionRevision,
+      });
+
+      setOcrResultsRevision((current) => {
+        const pages =
+          current?.bytes === currentBytes
+            ? new Map(current.pages)
+            : new Map<number, OcrPageResult>();
+        pages.set(pageIndex, ocrPageResultCurrent);
+        return { bytes: nextBytes, pages };
+      });
+      setOcrReviewRevision((current) =>
+        current?.bytes === currentBytes &&
+        current.pageIndex === pageIndex &&
+        current.result === ocrPageResultCurrent
+          ? { ...current, bytes: nextBytes, error: "" }
+          : current,
+      );
+      ocrContextRef.current = { bytes: nextBytes, pageIndex };
+
       setOcrSearchLayerNoticeRevision({
         bytes: nextBytes,
         pageIndex,
         message:
-          `Searchable text added locally · ${writtenCount} word${writtenCount === 1 ? "" : "s"}` +
+          `Searchable text ${regenerated ? "regenerated" : "added"} locally · ${writtenCount} word${writtenCount === 1 ? "" : "s"}` +
           (publishedReviewedCorrectionCount > 0
             ? ` · ${publishedReviewedCorrectionCount} reviewed correction${publishedReviewedCorrectionCount === 1 ? "" : "s"}`
             : "") +
           (skippedCount > 0
             ? ` · ${skippedCount} unsupported or unsafe word${skippedCount === 1 ? "" : "s"} skipped`
             : "") +
-          ". The original scan pixels were not changed, and the new text layer stays read-only.",
+          ". The original scan pixels were not changed, and the searchable text layer stays read-only.",
       });
     } catch (layerError) {
       const currentBytes = getHistoryState().pdfBytes;
