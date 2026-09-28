@@ -282,8 +282,90 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
     { timeout: 90_000 },
   );
 
-  // One Undo removes the generated text layer and returns to the original
-  // image-only PDF revision.
+  // The verified publication keeps its browser-local review state available,
+  // but the action is disabled while the searchable layer already matches the
+  // reviewed OCR text.
+  const upToDate = page.getByRole("button", { name: "Searchable text up to date" });
+  await expect(upToDate).toBeVisible({ timeout: 30_000 });
+  await expect(upToDate).toBeDisabled();
+  await expect(page.locator("[data-edit-ocr-review-panel]")).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(correctionInput).toHaveValue("REVIEWEDSCAN");
+
+  // Correct the already-published OCR metadata again. Regeneration must start
+  // from the exact pre-layer PDF revision, not append another invisible copy.
+  await correctionInput.fill("FINALSCAN");
+  await page.getByRole("button", { name: "Apply correction" }).click();
+  const regenerate = page.getByRole("button", { name: "Regenerate searchable text" });
+  await expect(regenerate).toBeEnabled();
+  await regenerate.click();
+
+  await expect(searchableStatus).toContainText(/Searchable text regenerated locally/i, {
+    timeout: 90_000,
+  });
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "2", {
+    timeout: 90_000,
+  });
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
+
+  await find.fill("REVIEWEDSCAN");
+  await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
+    "data-edit-search-match-count",
+    "0",
+    { timeout: 90_000 },
+  );
+  await find.fill("FINALSCAN");
+  await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
+    "data-edit-search-match-count",
+    "1",
+    { timeout: 90_000 },
+  );
+  await expect(
+    page.locator(
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="FINALSCAN"]',
+    ).first(),
+  ).toBeVisible({ timeout: 90_000 });
+  await expect(searchableRun).toHaveCount(0);
+
+  // Undo once restores the previous verified searchable layer; Redo restores
+  // the regenerated correction. Both remain normal PDF-history snapshots.
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
+    timeout: 90_000,
+  });
+  await find.fill("REVIEWEDSCAN");
+  await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
+    "data-edit-search-match-count",
+    "1",
+    { timeout: 90_000 },
+  );
+
+  await page.getByRole("button", { name: "Redo" }).click();
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "2", {
+    timeout: 90_000,
+  });
+  await find.fill("FINALSCAN");
+  await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
+    "data-edit-search-match-count",
+    "1",
+    { timeout: 90_000 },
+  );
+
+  // Two Undo operations remove regeneration and then the original generated
+  // layer, returning to the image-only PDF revision.
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(page.getByText("Loading page preview")).toHaveCount(0, {
     timeout: 90_000,
@@ -292,16 +374,14 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
     timeout: 90_000,
   });
   await expect(searchableStatus).toHaveCount(0);
-  await expect(searchableRun).toHaveCount(0);
   await expect(pageCapability).toHaveAttribute(
     "data-edit-page-capability",
     "no-detected-text",
     { timeout: 90_000 },
   );
 
-  // Undo restores the exact scan revision that owns this OCR result, so the
-  // reviewed draft is safely available again instead of being retargeted to a
-  // different document/page/recognition result.
+  // Undo to the preserved pre-layer scan restores the original OCR review
+  // draft rather than retargeting the published-layer review to another PDF.
   await expect(page.locator("[data-edit-ocr-review-panel]")).toBeVisible({
     timeout: 30_000,
   });
@@ -489,6 +569,15 @@ test("vinext Edit PDF corrects sideways scan orientation locally and keeps revie
   await expect(page.getByText("Loading page preview")).toHaveCount(0, {
     timeout: 90_000,
   });
+
+  // OCR review deliberately owns pointer events while it is open. Exit
+  // review mode before probing the underlying invisible searchable layer;
+  // making the review overlay click-through would make word correction
+  // ambiguous and weaken its explicit interaction boundary.
+  const doneReviewing = page.getByRole("button", { name: "Done reviewing" });
+  await expect(doneReviewing).toBeVisible({ timeout: 30_000 });
+  await doneReviewing.click();
+  await expect(page.locator("[data-edit-ocr-overlay]")).toHaveCount(0);
 
   const searchableRun = page
     .locator(
