@@ -37,11 +37,6 @@ import {
   readCiTrueTypeFontBytes,
   SHAPED_LTR_REPLACEMENT,
 } from "../tests/fixtures/shapedGlyphFixture.ts";
-import { createLocalCustomFontAsset } from "../lib/pdf/edit/localCustomFont.ts";
-import {
-  applyLocalFontSubstitutionToBytes,
-  buildLocalFontSubstitutionPlan,
-} from "../lib/pdf/edit/localFontSubstitution.ts";
 import {
   buildPreservedLineParagraphPdf,
   PARAGRAPH_REPLACEMENT_LINES,
@@ -1356,17 +1351,6 @@ async function buildFixtures(): Promise<Fixture[]> {
     replacementText: PARAGRAPH_REPLACEMENT_LINES.join("\n"),
     bytes: await buildPreservedLineParagraphPdf(),
     editMode: "paragraph",
-  });
-  const nativeLocalFontFixture = await makeSimpleFixture(
-    "advanced-native-local-font-substitution",
-    "native-local-font-substitution",
-    "Native font source",
-    "iiii",
-    { font: StandardFonts.Helvetica, size: 18 },
-  );
-  fixtures.push({
-    ...nativeLocalFontFixture,
-    editMode: "native-local-font",
   });
   return fixtures;
 }
