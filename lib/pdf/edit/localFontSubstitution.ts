@@ -31,6 +31,7 @@ import {
 import { detectComplexShapingRequirement } from "./shapingWriteGuard.ts";
 import { resolveFallbackFontsDict } from "./fallbackFont.ts";
 import { sha256Hex } from "./sha256.ts";
+import { decideReplacementLayout } from "./replacementLayout.ts";
 
 const MATRIX_EPSILON = 1e-9;
 const ADVANCE_EPSILON_FONT_UNITS = 0.01;
@@ -75,6 +76,7 @@ type LocalFontSubstitutionPlanFields = Readonly<{
   replacementText: string;
   originalFontResourceName: string;
   originalEffectiveAdvancePt: number;
+  replacementEffectiveAdvancePt: number;
   fontSizePt: number;
   charSpacing: number;
   horizontalScalingPct: number;
@@ -592,6 +594,44 @@ export async function buildLocalFontSubstitutionPlan({
   });
   if (!simpleShaping.ok) return rejectHere(simpleShaping.reason);
 
+  const horizontalScale = operator.horizontalScalingPct / 100;
+  const characterCount = Array.from(replacementText).length;
+  if (horizontalScale <= 0 || operator.fontSizePt <= 0) {
+    return rejectHere(
+      "The native PDF text state is not valid for local-font geometry validation.",
+    );
+  }
+  const shapedAdvanceFontUnits = shaped.glyphs.reduce(
+    (sum, glyph) => sum + glyph.xAdvance,
+    0,
+  );
+  const replacementEffectiveAdvancePt =
+    ((shapedAdvanceFontUnits / simpleShaping.proof.unitsPerEm) *
+      operator.fontSizePt +
+      operator.charSpacing * characterCount) *
+    horizontalScale;
+  if (!Number.isFinite(replacementEffectiveAdvancePt)) {
+    return rejectHere(
+      "The local font replacement width could not be validated safely.",
+    );
+  }
+
+  const layoutDecision = decideReplacementLayout({
+    editable: true,
+    reason: null,
+    originalWidthPt: decodedOriginalPlan.originalWidthPt,
+    replacementWidthPt: replacementEffectiveAdvancePt,
+    fontSizePt: operator.fontSizePt,
+    replacementGlyphCodes: [...simpleShaping.proof.glyphIds],
+    replacementTextState: null,
+  });
+  if (!layoutDecision.safeToApplyWithCurrentWriter) {
+    return rejectHere(
+      layoutDecision.reason ??
+        "The selected local font would overflow the original native text box.",
+    );
+  }
+
   const snapshot = snapshotOperator(operator);
   if (!snapshot) {
     return rejectHere(
@@ -607,6 +647,7 @@ export async function buildLocalFontSubstitutionPlan({
     replacementText,
     originalFontResourceName: operator.fontResourceName,
     originalEffectiveAdvancePt: decodedOriginalPlan.originalWidthPt,
+    replacementEffectiveAdvancePt,
     fontSizePt: operator.fontSizePt,
     charSpacing: operator.charSpacing,
     horizontalScalingPct: operator.horizontalScalingPct,
@@ -841,6 +882,14 @@ export async function applyLocalFontSubstitutionToBytes({
     ) +
       plan.charSpacing * characterCount) *
     horizontalScale;
+  if (
+    !Number.isFinite(replacementAdvancePt) ||
+    Math.abs(replacementAdvancePt - plan.replacementEffectiveAdvancePt) > 0.01
+  ) {
+    throw new Error(
+      "The embedded local font width no longer matches the geometry validated before the native write.",
+    );
+  }
   const tjAdjustment =
     ((replacementAdvancePt - plan.originalEffectiveAdvancePt) /
       (plan.fontSizePt * horizontalScale)) *
