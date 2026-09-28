@@ -279,6 +279,23 @@ test("local OCR records orientation evidence and sends rotated dimensions to Tes
   await engine.terminate();
 });
 
+test("local OCR rejects unsupported runtime orientation values", async () => {
+  const engine = createLocalOcrEngine("https://lumeo.in", {
+    createCanvas: fakeOcrCanvas,
+    createWorker: async () => successfulWorker(),
+  });
+
+  await assert.rejects(
+    engine.recognizePage({
+      page: resolvedRenderPage() as never,
+      pageIndex: 0,
+      orientationCorrection: 45 as never,
+    }),
+    /0, 90, 180 or 270/i,
+  );
+  await engine.terminate();
+});
+
 test("local OCR retries cleanly after worker startup fails", async () => {
   let attempts = 0;
   const engine = createLocalOcrEngine("https://lumeo.in", {
