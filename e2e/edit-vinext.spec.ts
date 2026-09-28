@@ -217,6 +217,7 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   const originalConfidence = await scanWordButton.getAttribute(
     "data-edit-ocr-confidence",
   );
+  expect(originalConfidence).not.toBeNull();
   await scanWordButton.click();
 
   const correctionInput = page.getByRole("textbox", {
@@ -224,7 +225,13 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   });
   await expect(correctionInput).toHaveValue(/SCANNED/i);
   await correctionInput.fill("REVIEWEDSCAN");
+  await expect(
+    page.getByRole("button", { name: "Make page searchable" }),
+  ).toBeDisabled();
   await page.getByRole("button", { name: "Apply correction" }).click();
+  await expect(
+    page.getByRole("button", { name: "Make page searchable" }),
+  ).toBeEnabled();
   await expect(page.locator("[data-edit-ocr-correction-count]")).toHaveAttribute(
     "data-edit-ocr-correction-count",
     "1",
@@ -235,7 +242,7 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   await expect(correctedWord).toHaveAttribute("data-edit-ocr-corrected", "true");
   await expect(correctedWord).toHaveAttribute(
     "data-edit-ocr-confidence",
-    originalConfidence ?? "",
+    originalConfidence!,
   );
 
   await page.getByRole("button", { name: "Make page searchable" }).click();
