@@ -1553,7 +1553,7 @@ export default function EditPdfTool() {
 
     const revision = { bytes: pdf.bytes, pageIndex };
     ocrReviewCorrectionRevisionRef.current += 1;
-    setOcrReviewRevision(null);
+    clearCurrentOcrReviewRevision();
     ocrJobRevisionRef.current = revision;
     setOcrErrorRevision(null);
     setOcrCopiedRevision(null);
@@ -1593,7 +1593,7 @@ export default function EditPdfTool() {
       ) {
         return;
       }
-      setOcrResultsRevision((existing) => {
+      mutateCurrentOcrResultsRevision((existing) => {
         const pages =
           existing?.bytes === revision.bytes
             ? new Map(existing.pages)
@@ -1655,7 +1655,7 @@ export default function EditPdfTool() {
     if (!pdf || !ocrPageResultCurrent) return;
     const result = ocrPageResultCurrent;
     const bytes = pdf.bytes;
-    setOcrReviewRevision((current) => {
+    mutateCurrentOcrReviewRevision((current) => {
       const sameReview =
         current?.bytes === bytes &&
         current.pageIndex === pageIndex &&
@@ -1707,7 +1707,7 @@ export default function EditPdfTool() {
         ocrReviewCurrent.selectedWordIndex !== wordIndex &&
         ocrReviewHasUnappliedDraft
       ) {
-        setOcrReviewRevision((current) =>
+        mutateCurrentOcrReviewRevision((current) =>
           current === ocrReviewCurrent
             ? {
                 ...current,
@@ -1720,7 +1720,7 @@ export default function EditPdfTool() {
       }
       const result = ocrPageResultCurrent;
       const bytes = pdf.bytes;
-      setOcrReviewRevision((current) => {
+      mutateCurrentOcrReviewRevision((current) => {
         const corrections =
           current?.bytes === bytes &&
           current.pageIndex === pageIndex &&
@@ -1748,7 +1748,7 @@ export default function EditPdfTool() {
     if (!word) return;
     const validation = validateOcrWordCorrection(ocrReviewCurrent.draft);
     if (!validation.valid) {
-      setOcrReviewRevision((current) =>
+      mutateCurrentOcrReviewRevision((current) =>
         current === ocrReviewCurrent
           ? { ...current, error: validation.reason }
           : current,
@@ -1757,7 +1757,7 @@ export default function EditPdfTool() {
     }
 
     ocrReviewCorrectionRevisionRef.current += 1;
-    setOcrReviewRevision((current) => {
+    mutateCurrentOcrReviewRevision((current) => {
       if (current !== ocrReviewCurrent) return current;
       const corrections = new Map(current.corrections);
       if (validation.text === word.text) corrections.delete(index);
@@ -1778,7 +1778,7 @@ export default function EditPdfTool() {
     const word = ocrPageResultCurrent.words[index];
     if (!word) return;
     ocrReviewCorrectionRevisionRef.current += 1;
-    setOcrReviewRevision((current) => {
+    mutateCurrentOcrReviewRevision((current) => {
       if (current !== ocrReviewCurrent) return current;
       const corrections = new Map(current.corrections);
       corrections.delete(index);
@@ -1802,7 +1802,7 @@ export default function EditPdfTool() {
       return;
     }
     if (ocrReviewHasUnappliedDraft) {
-      setOcrReviewRevision((current) =>
+      mutateCurrentOcrReviewRevision((current) =>
         current === ocrReviewCurrent
           ? {
               ...current,
@@ -1859,7 +1859,7 @@ export default function EditPdfTool() {
     }
     if (ocrBusy || ocrSearchLayerBusy) return;
     if (ocrReviewHasUnappliedDraft) {
-      setOcrReviewRevision((current) =>
+      mutateCurrentOcrReviewRevision((current) =>
         current === ocrReviewCurrent
           ? {
               ...current,
@@ -2016,20 +2016,22 @@ export default function EditPdfTool() {
         correctionRevision: reviewCorrectionRevision,
       });
 
-      setOcrResultsRevision((current) => {
-        const pages =
-          current?.bytes === currentBytes
-            ? new Map(current.pages)
-            : new Map<number, OcrPageResult>();
-        pages.set(pageIndex, ocrPageResultCurrent);
-        return { bytes: nextBytes, pages };
+      const currentOcrResults = ocrSearchablePublicationCurrent
+        ? ocrPublishedResultsRevision
+        : ocrResultsRevision;
+      const publishedPages =
+        currentOcrResults?.bytes === currentBytes
+          ? new Map(currentOcrResults.pages)
+          : new Map<number, OcrPageResult>();
+      publishedPages.set(pageIndex, ocrPageResultCurrent);
+      setOcrPublishedResultsRevision({
+        bytes: nextBytes,
+        pages: publishedPages,
       });
-      setOcrReviewRevision((current) =>
-        current?.bytes === currentBytes &&
-        current.pageIndex === pageIndex &&
-        current.result === ocrPageResultCurrent
-          ? { ...current, bytes: nextBytes, error: "" }
-          : current,
+      setOcrPublishedReviewRevision(
+        ocrReviewCurrent
+          ? { ...ocrReviewCurrent, bytes: nextBytes, error: "" }
+          : null,
       );
       ocrContextRef.current = { bytes: nextBytes, pageIndex };
 
@@ -2344,6 +2346,10 @@ export default function EditPdfTool() {
     void ocrEngineRef.current?.terminate();
     ocrEngineRef.current = null;
     setOcrResultsRevision(null);
+    setOcrPublishedResultsRevision(null);
+    setOcrReviewRevision(null);
+    setOcrPublishedReviewRevision(null);
+    setOcrSearchablePublicationRevision(null);
     setOcrActivity(null);
     setOcrSearchLayerActivity(null);
     setOcrSearchLayerNoticeRevision(null);
@@ -7806,7 +7812,7 @@ export default function EditPdfTool() {
                                         disabled={ocrBusy || ocrSearchLayerBusy}
                                         onChange={(event) => {
                                           const value = event.currentTarget.value;
-                                          setOcrReviewRevision((current) =>
+                                          mutateCurrentOcrReviewRevision((current) =>
                                             current === ocrReviewCurrent
                                               ? { ...current, draft: value, error: "" }
                                               : current,
