@@ -747,7 +747,7 @@ test("vinext Edit PDF embeds a local font into one native text run with Undo and
 
   const editor = page.getByRole("textbox", { name: "Edit text" });
   await expect(editor).toBeVisible();
-  await editor.fill("Native local face");
+  await editor.fill("iiii");
 
   await page.getByRole("button", { name: "Format" }).click();
   const panel = page.locator("[data-native-text-formatting]");
@@ -775,7 +775,7 @@ test("vinext Edit PDF embeds a local font into one native text run with Undo and
   await expect(
     page
       .locator(
-        'div[role="button"][aria-label^="Editable text: "][aria-label*="Native local face"]',
+        'div[role="button"][aria-label^="Editable text: "][aria-label*="iiii"]',
       )
       .first(),
   ).toBeVisible({ timeout: 90_000 });
@@ -795,7 +795,7 @@ test("vinext Edit PDF embeds a local font into one native text run with Undo and
   await expect(
     page
       .locator(
-        'div[role="button"][aria-label^="Editable text: "][aria-label*="Native local face"]',
+        'div[role="button"][aria-label^="Editable text: "][aria-label*="iiii"]',
       )
       .first(),
   ).toBeVisible({ timeout: 90_000 });
@@ -829,7 +829,7 @@ test("vinext Edit PDF embeds a local font into one native text run with Undo and
       : null;
   });
   const nativeLocal = decoded.find(
-    (item) => item?.text === "Native local face",
+    (item) => item?.text === "iiii",
   );
   expect(nativeLocal).toBeTruthy();
   expect(nativeLocal!.resourceName).toMatch(/^LumeoNativeLocal\d+$/);
@@ -850,7 +850,7 @@ test("vinext Edit PDF embeds a local font into one native text run with Undo and
   await expect(
     page
       .locator(
-        'div[role="button"][aria-label^="Editable text: "][aria-label*="Native local face"]',
+        'div[role="button"][aria-label^="Editable text: "][aria-label*="iiii"]',
       )
       .first(),
   ).toBeVisible({ timeout: 90_000 });
