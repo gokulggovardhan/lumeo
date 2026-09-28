@@ -18,6 +18,7 @@ export const TMP_DIR = path.join(process.cwd(), "e2e", ".tmp");
 export const TEXT_ONLY_PDF = path.join(TMP_DIR, "text-only.pdf");
 export const WITH_IMAGE_PDF = path.join(TMP_DIR, "with-image.pdf");
 export const IMAGE_ONLY_PDF = path.join(TMP_DIR, "image-only.pdf");
+export const ROTATED_SCAN_PDF = path.join(TMP_DIR, "rotated-scan.pdf");
 export const SEARCHABLE_SCAN_PDF = path.join(TMP_DIR, "searchable-scan.pdf");
 export const SPLIT_RUN_PDF = path.join(TMP_DIR, "split-run.pdf");
 export const TWO_PAGE_PDF = path.join(TMP_DIR, "two-page.pdf");
@@ -58,6 +59,33 @@ async function imageOnly(): Promise<Uint8Array> {
   const png = await doc.embedPng(canvas.toBuffer("image/png"));
   page.drawImage(png, { x: 0, y: 0, width: 595, height: 842 });
 
+  return doc.save();
+}
+
+async function rotatedScan(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+
+  const canvas = createCanvas(595, 842);
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#f3f4f6";
+  context.fillRect(0, 0, 595, 842);
+  context.save();
+  // The pixels are intentionally rotated 90 degrees clockwise inside an
+  // otherwise normal portrait PDF page. OCR orientation correction must rotate
+  // the raster LEFT 90 degrees locally, then inverse-map recognized word boxes
+  // back to this unchanged page geometry.
+  context.translate(595, 0);
+  context.rotate(Math.PI / 2);
+  context.fillStyle = "#111111";
+  context.font = "30px sans-serif";
+  context.fillText("SIDEWAYS OCR SAMPLE", 80, 160);
+  context.font = "22px sans-serif";
+  context.fillText("Rotate locally before recognition.", 80, 220);
+  context.restore();
+
+  const png = await doc.embedPng(canvas.toBuffer("image/png"));
+  page.drawImage(png, { x: 0, y: 0, width: 595, height: 842 });
   return doc.save();
 }
 
@@ -515,6 +543,7 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(TEXT_ONLY_PDF, await textOnly());
   await writeFile(WITH_IMAGE_PDF, await withImage());
   await writeFile(IMAGE_ONLY_PDF, await imageOnly());
+  await writeFile(ROTATED_SCAN_PDF, await rotatedScan());
   await writeFile(SEARCHABLE_SCAN_PDF, await searchableScan());
   const split = await splitRun();
   await assertGenuinelySplit(split);
