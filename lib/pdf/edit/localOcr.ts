@@ -9,6 +9,29 @@ export const OCR_TARGET_DPI = 220;
 export const OCR_MAX_DIMENSION_PX = 4096;
 export const OCR_MAX_TOTAL_PIXELS = 12_000_000;
 
+export const LOCAL_OCR_LANGUAGES = Object.freeze([
+  { code: "eng", label: "English" },
+  { code: "spa", label: "Spanish" },
+  { code: "fra", label: "French" },
+  { code: "deu", label: "German" },
+  { code: "ita", label: "Italian" },
+  { code: "por", label: "Portuguese" },
+] as const);
+
+export type LocalOcrLanguage = (typeof LOCAL_OCR_LANGUAGES)[number]["code"];
+export const DEFAULT_LOCAL_OCR_LANGUAGE: LocalOcrLanguage = "eng";
+
+export function isLocalOcrLanguage(value: string): value is LocalOcrLanguage {
+  return LOCAL_OCR_LANGUAGES.some((language) => language.code === value);
+}
+
+export function localOcrLanguageLabel(language: LocalOcrLanguage): string {
+  return (
+    LOCAL_OCR_LANGUAGES.find((candidate) => candidate.code === language)?.label ??
+    language
+  );
+}
+
 export type OcrOrientationCorrection = 0 | 90 | 180 | 270;
 
 export function isOcrOrientationCorrection(
@@ -42,6 +65,7 @@ export type OcrPageResult = Readonly<{
   renderScale: number;
   imageWidthPx: number;
   imageHeightPx: number;
+  language: LocalOcrLanguage;
   orientationCorrection: OcrOrientationCorrection;
   words: readonly OcrWord[];
 }>;
@@ -307,6 +331,7 @@ export type LocalOcrEngine = Readonly<{
     page: Pick<PDFPageProxy, "getViewport" | "render">;
     pageIndex: number;
     onProgress?: (progress: OcrProgress) => void;
+    language?: LocalOcrLanguage;
     orientationCorrection?: OcrOrientationCorrection;
   }): Promise<OcrPageResult>;
   terminate(): Promise<void>;
@@ -317,7 +342,9 @@ export function createLocalOcrEngine(
   dependencies: LocalOcrEngineDependencies = {},
 ): LocalOcrEngine {
   let workerPromise: Promise<OcrWorker> | null = null;
+  let workerPromiseLanguage: LocalOcrLanguage | null = null;
   let worker: OcrWorker | null = null;
+  let workerLanguage: LocalOcrLanguage | null = null;
   let activeRenderTask: { cancel: () => void } | null = null;
   let recognitionActive = false;
   let terminated = false;
@@ -338,9 +365,24 @@ export function createLocalOcrEngine(
     return createWorker;
   };
 
-  const ensureWorker = async (): Promise<OcrWorker> => {
+  const ensureWorker = async (
+    language: LocalOcrLanguage,
+  ): Promise<OcrWorker> => {
     if (terminated) throw new Error("The OCR session has been terminated.");
-    if (worker) return worker;
+    if (worker && workerLanguage === language) return worker;
+
+    if (worker && workerLanguage !== language) {
+      const previousWorker = worker;
+      worker = null;
+      workerLanguage = null;
+      try {
+        await previousWorker.terminate();
+      } catch {
+        // Language switching never reuses the previous worker. Cleanup is
+        // best-effort and a failed terminate cannot authorize reuse.
+      }
+    }
+
     if (!workerPromise) {
       const applicationOrigin =
         origin ?? (typeof window !== "undefined" ? window.location.origin : "");
@@ -348,9 +390,10 @@ export function createLocalOcrEngine(
         throw new Error("OCR can only start in a browser application origin.");
       }
       const assets = localOcrAssetUrls(applicationOrigin);
+      workerPromiseLanguage = language;
       workerPromise = (async () => {
         const createWorker = await loadWorkerFactory();
-        return createWorker("eng", 1, {
+        return createWorker(language, 1, {
           ...assets,
           workerBlobURL: false,
           gzip: true,
@@ -374,6 +417,7 @@ export function createLocalOcrEngine(
     }
 
     const pending = workerPromise;
+    const pendingLanguage = workerPromiseLanguage;
     try {
       const resolved = await pending;
       if (terminated) {
@@ -382,18 +426,36 @@ export function createLocalOcrEngine(
         // guaranteed to make duplicate termination idempotent.
         throw new Error("The OCR session has been terminated.");
       }
+      if (pendingLanguage !== language) {
+        try {
+          await resolved.terminate();
+        } catch {
+          // A mismatched startup worker is never reused.
+        }
+        throw new Error("The OCR language changed while its worker was starting.");
+      }
       worker = resolved;
-      if (workerPromise === pending) workerPromise = null;
+      workerLanguage = language;
+      if (workerPromise === pending) {
+        workerPromise = null;
+        workerPromiseLanguage = null;
+      }
       return resolved;
     } catch (error) {
-      if (workerPromise === pending) workerPromise = null;
+      if (workerPromise === pending) {
+        workerPromise = null;
+        workerPromiseLanguage = null;
+      }
       throw error;
     }
   };
 
   const discardWorker = async (failedWorker: OcrWorker | null): Promise<void> => {
     if (!failedWorker) return;
-    if (worker === failedWorker) worker = null;
+    if (worker === failedWorker) {
+      worker = null;
+      workerLanguage = null;
+    }
     try {
       await failedWorker.terminate();
     } catch {
@@ -406,6 +468,7 @@ export function createLocalOcrEngine(
       page,
       pageIndex,
       onProgress,
+      language = DEFAULT_LOCAL_OCR_LANGUAGE,
       orientationCorrection = 0,
     }) {
       if (terminated) throw new Error("The OCR session has been terminated.");
@@ -414,6 +477,9 @@ export function createLocalOcrEngine(
       }
       if (!Number.isInteger(pageIndex) || pageIndex < 0) {
         throw new Error("OCR page index must be a non-negative integer.");
+      }
+      if (!isLocalOcrLanguage(language)) {
+        throw new Error("OCR language is not in Lumeo's self-hosted language set.");
       }
       if (!isOcrOrientationCorrection(orientationCorrection)) {
         throw new Error(
@@ -434,7 +500,7 @@ export function createLocalOcrEngine(
               activeRenderTask = task;
             },
           ),
-          ensureWorker(),
+          ensureWorker(language),
         ]);
         const { canvas, scale } = rendered;
         const recognitionCanvas = rotateOcrCanvas(
@@ -475,6 +541,7 @@ export function createLocalOcrEngine(
           renderScale: scale,
           imageWidthPx: canvas.width,
           imageHeightPx: canvas.height,
+          language,
           orientationCorrection,
           words,
         };
@@ -507,8 +574,10 @@ export function createLocalOcrEngine(
 
       const currentWorker = worker;
       worker = null;
+      workerLanguage = null;
       const pending = workerPromise;
       workerPromise = null;
+      workerPromiseLanguage = null;
 
       if (currentWorker) {
         try {
