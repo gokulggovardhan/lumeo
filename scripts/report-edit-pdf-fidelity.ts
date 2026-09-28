@@ -23,6 +23,11 @@ import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
 import { shapeEmbeddedFontText } from "../lib/pdf/edit/harfbuzzShaping.ts";
 import { buildShapedGlyphEditPlan } from "../lib/pdf/edit/shapedGlyphEditPlan.ts";
+import { createLocalCustomFontAsset } from "../lib/pdf/edit/localCustomFont.ts";
+import {
+  applyLocalFontSubstitutionToBytes,
+  buildLocalFontSubstitutionPlan,
+} from "../lib/pdf/edit/localFontSubstitution.ts";
 import {
   applyParagraphEditPlanToDocument,
   buildParagraphEditPlan,
@@ -1351,6 +1356,17 @@ async function buildFixtures(): Promise<Fixture[]> {
     replacementText: PARAGRAPH_REPLACEMENT_LINES.join("\n"),
     bytes: await buildPreservedLineParagraphPdf(),
     editMode: "paragraph",
+  });
+  const nativeLocalFontFixture = await makeSimpleFixture(
+    "advanced-native-local-font-substitution",
+    "native-local-font-substitution",
+    "Native font source",
+    "iiii",
+    { font: StandardFonts.Helvetica, size: 18 },
+  );
+  fixtures.push({
+    ...nativeLocalFontFixture,
+    editMode: "native-local-font",
   });
   return fixtures;
 }
