@@ -160,6 +160,16 @@ test("native local-font planner validates a simple horizontal LTR substitution",
   assert.equal(fx.plan.shapingProof.glyphIds.length, 4);
 });
 
+test("native local-font planner blocks a replacement font that would visibly overflow the original text box", async () => {
+  const source = await sourcePdf("iiii", "TAIL");
+  const fx = await planFixture("WWWW", source);
+  assert.equal(fx.plan.editable, false);
+  assert.match(
+    fx.plan.reason ?? "",
+    /wider|text box|horizontal scaling|character-spacing|overflow/i,
+  );
+});
+
 test("native local-font writer embeds a subset, preserves searchable text, restores the original font and endpoint", async () => {
   const fx = await planFixture();
   assert.ok(isValidatedLocalFontSubstitutionPlan(fx.plan));
