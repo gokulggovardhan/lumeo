@@ -748,8 +748,11 @@ export default function EditPdfTool() {
   // exact live PDF ArrayBuffer so undo/redo/page mutations cannot leave stale
   // recognized text attached to a different document revision.
   const ocrEngineRef = useRef<LocalOcrEngine | null>(null);
-  const [ocrOrientationCorrection, setOcrOrientationCorrection] =
-    useState<OcrOrientationCorrection>(0);
+  const [ocrOrientationRevision, setOcrOrientationRevision] = useState<{
+    bytes: ArrayBuffer | null;
+    pageIndex: number;
+    value: OcrOrientationCorrection;
+  } | null>(null);
   const ocrReviewCorrectionRevisionRef = useRef(0);
   const ocrJobRevisionRef = useRef<{
     bytes: ArrayBuffer;
@@ -805,6 +808,11 @@ export default function EditPdfTool() {
       : null;
   const ocrBusy = ocrActivityCurrent !== null;
   const ocrProgress = ocrActivityCurrent?.progress ?? null;
+  const ocrOrientationCorrection =
+    ocrOrientationRevision?.bytes === (pdf?.bytes ?? null) &&
+    ocrOrientationRevision.pageIndex === pageIndex
+      ? ocrOrientationRevision.value
+      : 0;
   const ocrError =
     ocrErrorRevision?.bytes === (pdf?.bytes ?? null) &&
     ocrErrorRevision.pageIndex === pageIndex
@@ -1417,7 +1425,6 @@ export default function EditPdfTool() {
 
   useEffect(() => {
     ocrContextRef.current = { bytes: pdf?.bytes ?? null, pageIndex };
-    setOcrOrientationCorrection(0);
     const active = ocrJobRevisionRef.current;
     if (
       active &&
@@ -7407,9 +7414,13 @@ export default function EditPdfTool() {
                               value={ocrOrientationCorrection}
                               disabled={ocrBusy || ocrSearchLayerBusy}
                               onChange={(event) =>
-                                setOcrOrientationCorrection(
-                                  Number(event.currentTarget.value) as OcrOrientationCorrection,
-                                )
+                                setOcrOrientationRevision({
+                                  bytes: pdf?.bytes ?? null,
+                                  pageIndex,
+                                  value: Number(
+                                    event.currentTarget.value,
+                                  ) as OcrOrientationCorrection,
+                                })
                               }
                               className="pointer-events-auto w-full rounded-md border border-[var(--text-primary)]/14 bg-white/75 px-2 py-1.5 text-[10px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55 disabled:cursor-not-allowed disabled:opacity-50"
                             >
