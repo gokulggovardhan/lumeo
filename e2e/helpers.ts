@@ -36,8 +36,19 @@ async function waitForStableRunGeometry(
   run: Locator,
   label: string,
 ): Promise<void> {
-  let previous = await run.boundingBox();
-  if (!previous) throw new Error(`${label} has no bounding box`);
+  let previous: Awaited<ReturnType<Locator["boundingBox"]>> = null;
+  await expect
+    .poll(
+      async () => {
+        previous = await run.boundingBox();
+        return previous !== null;
+      },
+      {
+        timeout: 10_000,
+        message: `${label} should expose geometry before interaction`,
+      },
+    )
+    .toBe(true);
 
   let stableSamples = 0;
   await expect
