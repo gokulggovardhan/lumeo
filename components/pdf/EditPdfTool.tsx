@@ -7374,7 +7374,7 @@ export default function EditPdfTool() {
                   ) : null}
 
                   {activeTool === "select" && textDetectionCurrent && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
-                    <div className="absolute left-3 top-3 z-20 max-w-[340px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/94 p-3 shadow-lg backdrop-blur-sm">
+                    <div className={`absolute left-3 top-3 z-20 max-w-[340px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/94 p-3 shadow-lg backdrop-blur-sm ${ocrReviewCurrent?.open ? "pointer-events-none" : ""}`}>
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
                         {pageTextCapability.nativeSpanCount > 0 || pageTextCapability.rasterImageEvidence
                           ? pageCapabilityMessage.title
@@ -7439,14 +7439,14 @@ export default function EditPdfTool() {
                                   onClick={handleToggleOcrReview}
                                   disabled={ocrBusy || ocrSearchLayerBusy}
                                   aria-expanded={ocrReviewCurrent?.open ?? false}
-                                  className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {ocrReviewCurrent?.open ? "Done reviewing" : "Review OCR"}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => void handleCopyOcrText()}
-                                  className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45"
+                                  className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45"
                                 >
                                   {ocrCopied ? "Copied" : "Copy text"}
                                 </button>
@@ -7458,7 +7458,7 @@ export default function EditPdfTool() {
                                     ocrSearchLayerBusy ||
                                     ocrReviewHasUnappliedDraft
                                   }
-                                  className="rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="pointer-events-auto rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {ocrSearchLayerBusy ? "Adding searchable text…" : "Make page searchable"}
                                 </button>
@@ -7474,7 +7474,7 @@ export default function EditPdfTool() {
                               {ocrReviewCurrent?.open ? (
                                 <div
                                   data-edit-ocr-review-panel
-                                  className="grid gap-2 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/24 bg-[var(--lumeo-gold)]/[0.045] p-2.5"
+                                  className="pointer-events-none grid gap-2 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/24 bg-[var(--lumeo-gold)]/[0.045] p-2.5"
                                 >
                                   <div className="grid gap-1.5">
                                     <div>
@@ -7495,7 +7495,7 @@ export default function EditPdfTool() {
                                           ocrReviewHasUnappliedDraft ||
                                           ocrPageResultCurrent.words.length === 0
                                         }
-                                        className="rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
                                       >
                                         Previous word
                                       </button>
@@ -7516,7 +7516,7 @@ export default function EditPdfTool() {
                                           ocrReviewHasUnappliedDraft ||
                                           ocrPageResultCurrent.words.length === 0
                                         }
-                                        className="rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
                                       >
                                         Next word
                                       </button>
@@ -7529,7 +7529,7 @@ export default function EditPdfTool() {
                                           ocrReviewHasUnappliedDraft ||
                                           ocrLowConfidenceWordIndices.length === 0
                                         }
-                                        className="rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
                                       >
                                         Next low-confidence
                                       </button>
@@ -7566,7 +7566,7 @@ export default function EditPdfTool() {
                                             handleApplyOcrWordCorrection();
                                           }
                                         }}
-                                        className="w-full rounded-md border border-[var(--text-primary)]/14 bg-white/78 px-2 py-1.5 text-[11px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55"
+                                        className="pointer-events-auto w-full rounded-md border border-[var(--text-primary)]/14 bg-white/78 px-2 py-1.5 text-[11px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55"
                                       />
                                       <div className="flex flex-wrap gap-1.5">
                                         <button
@@ -7577,7 +7577,7 @@ export default function EditPdfTool() {
                                             ocrSearchLayerBusy ||
                                             !ocrReviewDraftValidation?.valid
                                           }
-                                          className="rounded-full border border-[var(--lumeo-gold)]/45 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[9px] font-bold text-[var(--text-primary)]/72 disabled:cursor-not-allowed disabled:opacity-40"
+                                          className="pointer-events-auto rounded-full border border-[var(--lumeo-gold)]/45 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[9px] font-bold text-[var(--text-primary)]/72 disabled:cursor-not-allowed disabled:opacity-40"
                                         >
                                           Apply correction
                                         </button>
@@ -7591,7 +7591,7 @@ export default function EditPdfTool() {
                                               ocrReviewCurrent.selectedWordIndex,
                                             )
                                           }
-                                          className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[9px] font-semibold text-[var(--text-primary)]/62 disabled:cursor-not-allowed disabled:opacity-40"
+                                          className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[9px] font-semibold text-[var(--text-primary)]/62 disabled:cursor-not-allowed disabled:opacity-40"
                                         >
                                           Reset word
                                         </button>
