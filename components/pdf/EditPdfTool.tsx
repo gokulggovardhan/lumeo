@@ -352,6 +352,26 @@ const TOOL_SHORTCUT_KEYS: Record<string, ActiveTool> = {
 };
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 
+type OcrResultsRevisionState = {
+  bytes: ArrayBuffer;
+  pages: Map<number, OcrPageResult>;
+};
+
+type OcrReviewRevisionState = {
+  bytes: ArrayBuffer;
+  pageIndex: number;
+  result: OcrPageResult;
+  open: boolean;
+  selectedWordIndex: number | null;
+  draft: string;
+  corrections: Map<number, string>;
+  error: string;
+};
+
+type OcrSearchablePublicationState = SearchableOcrPublicationRevision & {
+  correctionRevision: number;
+};
+
 // Lazy-loads pdf-lib itself plus every lib/pdf/edit/*.ts module whose OWN
 // top-level imports touch it (export.ts, formXObjects.ts, fontEncoding.ts,
 // fontMetrics.ts, applyEditPlan.ts) -- all six only actually needed once a
@@ -776,20 +796,14 @@ export default function EditPdfTool() {
     bytes: null,
     pageIndex: 0,
   });
-  const [ocrResultsRevision, setOcrResultsRevision] = useState<{
-    bytes: ArrayBuffer;
-    pages: Map<number, OcrPageResult>;
-  } | null>(null);
-  const [ocrReviewRevision, setOcrReviewRevision] = useState<{
-    bytes: ArrayBuffer;
-    pageIndex: number;
-    result: OcrPageResult;
-    open: boolean;
-    selectedWordIndex: number | null;
-    draft: string;
-    corrections: Map<number, string>;
-    error: string;
-  } | null>(null);
+  const [ocrResultsRevision, setOcrResultsRevision] =
+    useState<OcrResultsRevisionState | null>(null);
+  const [ocrPublishedResultsRevision, setOcrPublishedResultsRevision] =
+    useState<OcrResultsRevisionState | null>(null);
+  const [ocrReviewRevision, setOcrReviewRevision] =
+    useState<OcrReviewRevisionState | null>(null);
+  const [ocrPublishedReviewRevision, setOcrPublishedReviewRevision] =
+    useState<OcrReviewRevisionState | null>(null);
   const [ocrActivity, setOcrActivity] = useState<{
     bytes: ArrayBuffer;
     pageIndex: number;
@@ -815,7 +829,7 @@ export default function EditPdfTool() {
       message: string;
     } | null>(null);
   const [ocrSearchablePublicationRevision, setOcrSearchablePublicationRevision] =
-    useState<(SearchableOcrPublicationRevision & { correctionRevision: number }) | null>(null);
+    useState<OcrSearchablePublicationState | null>(null);
   const ocrActivityCurrent =
     ocrActivity !== null &&
     ocrActivity.bytes === pdf?.bytes &&
@@ -844,9 +858,12 @@ export default function EditPdfTool() {
       ? ocrSearchablePublicationRevision
       : null;
   const ocrPageResultCurrent =
-    ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
-      ? ocrResultsRevision.pages.get(pageIndex) ?? null
-      : null;
+    ocrSearchablePublicationCurrent &&
+    ocrPublishedResultsRevision?.bytes === pdf?.bytes
+      ? ocrPublishedResultsRevision.pages.get(pageIndex) ?? null
+      : ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
+        ? ocrResultsRevision.pages.get(pageIndex) ?? null
+        : null;
   const ocrLayoutAnalysis = useMemo(
     () =>
       ocrPageResultCurrent
@@ -855,12 +872,18 @@ export default function EditPdfTool() {
     [ocrPageResultCurrent],
   );
   const ocrReviewCurrent =
-    ocrReviewRevision !== null &&
-    ocrReviewRevision.bytes === pdf?.bytes &&
-    ocrReviewRevision.pageIndex === pageIndex &&
-    ocrReviewRevision.result === ocrPageResultCurrent
-      ? ocrReviewRevision
-      : null;
+    ocrSearchablePublicationCurrent &&
+    ocrPublishedReviewRevision !== null &&
+    ocrPublishedReviewRevision.bytes === pdf?.bytes &&
+    ocrPublishedReviewRevision.pageIndex === pageIndex &&
+    ocrPublishedReviewRevision.result === ocrPageResultCurrent
+      ? ocrPublishedReviewRevision
+      : ocrReviewRevision !== null &&
+          ocrReviewRevision.bytes === pdf?.bytes &&
+          ocrReviewRevision.pageIndex === pageIndex &&
+          ocrReviewRevision.result === ocrPageResultCurrent
+        ? ocrReviewRevision
+        : null;
   const ocrLowConfidenceWordIndices = ocrPageResultCurrent
     ? lowConfidenceOcrWordIndices(ocrPageResultCurrent)
     : [];
@@ -898,6 +921,38 @@ export default function EditPdfTool() {
     ocrSearchLayerNoticeRevision.pageIndex === pageIndex
       ? ocrSearchLayerNoticeRevision.message
       : "";
+
+  function mutateCurrentOcrReviewRevision(
+    updater: (
+      current: OcrReviewRevisionState | null,
+    ) => OcrReviewRevisionState | null,
+  ) {
+    if (ocrSearchablePublicationCurrent) {
+      setOcrPublishedReviewRevision(updater);
+    } else {
+      setOcrReviewRevision(updater);
+    }
+  }
+
+  function clearCurrentOcrReviewRevision() {
+    if (ocrSearchablePublicationCurrent) {
+      setOcrPublishedReviewRevision(null);
+    } else {
+      setOcrReviewRevision(null);
+    }
+  }
+
+  function mutateCurrentOcrResultsRevision(
+    updater: (
+      current: OcrResultsRevisionState | null,
+    ) => OcrResultsRevisionState | null,
+  ) {
+    if (ocrSearchablePublicationCurrent) {
+      setOcrPublishedResultsRevision(updater);
+    } else {
+      setOcrResultsRevision(updater);
+    }
+  }
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
   // runMatches was derived from), kept around so a multi-run selection can
   // reconstruct the FULL, in-order operator list one specific content
