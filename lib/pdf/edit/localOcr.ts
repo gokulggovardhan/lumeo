@@ -9,6 +9,8 @@ export const OCR_TARGET_DPI = 220;
 export const OCR_MAX_DIMENSION_PX = 4096;
 export const OCR_MAX_TOTAL_PIXELS = 12_000_000;
 
+export type OcrOrientationCorrection = 0 | 90 | 180 | 270;
+
 export type OcrProgress = Readonly<{
   status: string;
   progress: number;
@@ -34,6 +36,7 @@ export type OcrPageResult = Readonly<{
   renderScale: number;
   imageWidthPx: number;
   imageHeightPx: number;
+  orientationCorrection: OcrOrientationCorrection;
   words: readonly OcrWord[];
 }>;
 
@@ -138,10 +141,61 @@ function clampPercent(value: number): number {
   return Math.max(0, Math.min(100, value));
 }
 
+function inverseRotatePercentPoint(
+  xPct: number,
+  yPct: number,
+  correction: OcrOrientationCorrection,
+): readonly [number, number] {
+  switch (correction) {
+    case 0:
+      return [xPct, yPct];
+    case 90:
+      return [yPct, 100 - xPct];
+    case 180:
+      return [100 - xPct, 100 - yPct];
+    case 270:
+      return [100 - yPct, xPct];
+  }
+}
+
+export function inverseMapOcrBoundsPct(
+  bounds: Readonly<{
+    xPct: number;
+    yPct: number;
+    widthPct: number;
+    heightPct: number;
+  }>,
+  correction: OcrOrientationCorrection,
+): OcrWord["boundsPct"] {
+  const left = bounds.xPct;
+  const top = bounds.yPct;
+  const right = bounds.xPct + bounds.widthPct;
+  const bottom = bounds.yPct + bounds.heightPct;
+  const points = [
+    inverseRotatePercentPoint(left, top, correction),
+    inverseRotatePercentPoint(right, top, correction),
+    inverseRotatePercentPoint(left, bottom, correction),
+    inverseRotatePercentPoint(right, bottom, correction),
+  ];
+  const xs = points.map(([x]) => clampPercent(x));
+  const ys = points.map(([, y]) => clampPercent(y));
+  const mappedLeft = Math.min(...xs);
+  const mappedTop = Math.min(...ys);
+  const mappedRight = Math.max(...xs);
+  const mappedBottom = Math.max(...ys);
+  return {
+    xPct: mappedLeft,
+    yPct: mappedTop,
+    widthPct: mappedRight - mappedLeft,
+    heightPct: mappedBottom - mappedTop,
+  };
+}
+
 export function ocrWordsFromBlocks(
   blocks: readonly TesseractBlock[] | null,
   imageWidthPx: number,
   imageHeightPx: number,
+  orientationCorrection: OcrOrientationCorrection = 0,
 ): OcrWord[] {
   if (imageWidthPx <= 0 || imageHeightPx <= 0) return [];
   const words: OcrWord[] = [];
@@ -163,18 +217,54 @@ export function ocrWordsFromBlocks(
               0,
               Math.min(100, Number.isFinite(word.confidence) ? word.confidence : 0),
             ),
-            boundsPct: {
-              xPct: left,
-              yPct: top,
-              widthPct: right - left,
-              heightPct: bottom - top,
-            },
+            boundsPct: inverseMapOcrBoundsPct(
+              {
+                xPct: left,
+                yPct: top,
+                widthPct: right - left,
+                heightPct: bottom - top,
+              },
+              orientationCorrection,
+            ),
           });
         }
       }
     }
   }
   return words;
+}
+
+export function rotateOcrCanvas(
+  source: HTMLCanvasElement,
+  correction: OcrOrientationCorrection,
+  createCanvas: () => HTMLCanvasElement,
+): HTMLCanvasElement {
+  if (correction === 0) return source;
+
+  const target = createCanvas();
+  const swapsAxes = correction === 90 || correction === 270;
+  target.width = swapsAxes ? source.height : source.width;
+  target.height = swapsAxes ? source.width : source.height;
+  const context = target.getContext("2d", { alpha: false });
+  if (!context) {
+    throw new Error("The browser could not create an OCR orientation canvas.");
+  }
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, target.width, target.height);
+  context.save();
+  if (correction === 90) {
+    context.translate(target.width, 0);
+    context.rotate(Math.PI / 2);
+  } else if (correction === 180) {
+    context.translate(target.width, target.height);
+    context.rotate(Math.PI);
+  } else {
+    context.translate(0, target.height);
+    context.rotate(-Math.PI / 2);
+  }
+  context.drawImage(source, 0, 0);
+  context.restore();
+  return target;
 }
 
 async function renderPageForOcr(
@@ -211,6 +301,7 @@ export type LocalOcrEngine = Readonly<{
     page: Pick<PDFPageProxy, "getViewport" | "render">;
     pageIndex: number;
     onProgress?: (progress: OcrProgress) => void;
+    orientationCorrection?: OcrOrientationCorrection;
   }): Promise<OcrPageResult>;
   terminate(): Promise<void>;
 }>;
@@ -305,7 +396,12 @@ export function createLocalOcrEngine(
   };
 
   return {
-    async recognizePage({ page, pageIndex, onProgress }) {
+    async recognizePage({
+      page,
+      pageIndex,
+      onProgress,
+      orientationCorrection = 0,
+    }) {
       if (terminated) throw new Error("The OCR session has been terminated.");
       if (recognitionActive) {
         throw new Error("Another local OCR recognition is already running.");
@@ -330,21 +426,27 @@ export function createLocalOcrEngine(
           ensureWorker(),
         ]);
         const { canvas, scale } = rendered;
+        const recognitionCanvas = rotateOcrCanvas(
+          canvas,
+          orientationCorrection,
+          createCanvas,
+        );
         activeWorker = readyWorker;
         if (terminated) throw new Error("The OCR session was cancelled.");
         await activeWorker.setParameters({
           user_defined_dpi: String(Math.max(72, Math.round(scale * 72))),
         });
         const recognition = await activeWorker.recognize(
-          canvas,
+          recognitionCanvas,
           {},
           { text: true, blocks: true },
         );
         if (terminated) throw new Error("The OCR session was cancelled.");
         const words = ocrWordsFromBlocks(
           recognition.data.blocks,
-          canvas.width,
-          canvas.height,
+          recognitionCanvas.width,
+          recognitionCanvas.height,
+          orientationCorrection,
         );
         return {
           textSource: "ocr",
@@ -362,6 +464,7 @@ export function createLocalOcrEngine(
           renderScale: scale,
           imageWidthPx: canvas.width,
           imageHeightPx: canvas.height,
+          orientationCorrection,
           words,
         };
       } catch (error) {
