@@ -881,6 +881,7 @@ export default function EditPdfTool() {
   const [nativeLocalFontChoice, setNativeLocalFontChoice] = useState<{
     selectionKey: string;
     assetId: string;
+    revision: ArrayBuffer;
   } | null>(null);
   const [nativeLocalFontBusy, setNativeLocalFontBusy] = useState(false);
   const [nativeLocalFontError, setNativeLocalFontError] = useState("");
@@ -888,7 +889,8 @@ export default function EditPdfTool() {
     useState<NativeLocalFontPlanState | null>(null);
   const [nativeLocalFontApplying, setNativeLocalFontApplying] = useState(false);
   const activeNativeLocalFontChoice =
-    nativeLocalFontChoice?.selectionKey === nativeTextSelectionKey
+    nativeLocalFontChoice?.selectionKey === nativeTextSelectionKey &&
+    nativeLocalFontChoice.revision === pdf?.bytes
       ? nativeLocalFontChoice
       : null;
   const selectedNativeLocalFontAsset = activeNativeLocalFontChoice
@@ -5371,6 +5373,7 @@ export default function EditPdfTool() {
       setNativeLocalFontChoice({
         selectionKey: sourceSelectionKey,
         assetId: asset.descriptor.id,
+        revision: sourceRevision,
       });
       setNativeLocalFontError("");
     } catch (fontError) {
