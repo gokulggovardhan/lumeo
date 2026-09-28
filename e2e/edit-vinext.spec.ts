@@ -368,6 +368,35 @@ test("vinext Edit PDF corrects sideways scan orientation locally and keeps revie
   // scan text into the native content-stream writer.
   await sidewaysWord.click();
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+
+  // The inverse-mapped page geometry must also remain valid when the OCR
+  // result is published as a verified invisible searchable layer. The
+  // original scan pixels stay untouched and the resulting text remains
+  // intentionally read-only to native Edit authority.
+  await page.getByRole("button", { name: "Make page searchable" }).click();
+  const searchableStatus = page.locator("[data-edit-ocr-searchable-status]");
+  await expect(searchableStatus).toContainText(/Searchable text added locally/i, {
+    timeout: 90_000,
+  });
+  await waitForStageReady(page);
+
+  const searchableRun = page
+    .locator(
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="SIDEWAYS"]',
+    )
+    .first();
+  await expect(searchableRun).toBeVisible({ timeout: 90_000 });
+  await searchableRun.click();
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("SIDEWAYS");
+  await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
+    "data-edit-search-match-count",
+    "1",
+    { timeout: 90_000 },
+  );
 });
 
 test("vinext Edit PDF keeps a 120-page thumbnail rail bounded and scrollable", async ({
