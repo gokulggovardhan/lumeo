@@ -7466,7 +7466,7 @@ export default function EditPdfTool() {
                                   type="button"
                                   onClick={() => void handleRecognizeScannedPage()}
                                   disabled={ocrBusy || ocrSearchLayerBusy}
-                                  className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   Recognize again
                                 </button>
