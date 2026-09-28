@@ -305,6 +305,7 @@ test("buildEditPlan: a CID (2-byte) font's replacement is planned in CID code un
     isSubset: false,
     bytesPerCode: 2,
     encodingSource: "ToUnicode",
+    writingMode: "horizontal",
     glyphCodeToUnicode: new Map([
       [3, "H"],
       [4, "e"],
@@ -661,6 +662,7 @@ function thaiType0Fixture(): {
     isSubset: true,
     bytesPerCode: 2,
     encodingSource: "ToUnicode",
+    writingMode: "horizontal",
     glyphCodeToUnicode: new Map([[3, "ก"]]),
     unicodeToGlyphCode: new Map([["ก", 3]]),
   };
@@ -826,4 +828,131 @@ test("buildEditPlan: exact compatible shaping proof closes only the shaping gap"
   assert.equal(plan.reason, null);
   assert.deepEqual(plan.replacementGlyphCodes, [3]);
   assert.equal(plan.fallbackFont, null);
+});
+
+
+test("buildEditPlan: Type3 text is blocked even when its simple encoding is fully decodable", () => {
+  const { resolvedFont: simple, fontMetrics } = fixedWidthsFont();
+  const resolvedFont: ResolvedFont = {
+    ...simple,
+    kind: "Type3",
+    writingMode: "horizontal",
+  };
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: fixedOperator(),
+    replacementText: "A",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /Type3.*not proven safe|Type3 fonts draw glyphs/i);
+});
+
+test("buildEditPlan: vertical Type0 text is blocked even with complete ToUnicode and width evidence", () => {
+  const resolvedFont: ResolvedFont = {
+    kind: "Type0",
+    baseFont: "ABCDEF+VerticalDemo",
+    isEmbedded: true,
+    isSubset: true,
+    bytesPerCode: 2,
+    encodingSource: "ToUnicode",
+    writingMode: "vertical",
+    glyphCodeToUnicode: new Map([[3, "H"]]),
+    unicodeToGlyphCode: new Map([["H", 3]]),
+  };
+  const fontMetrics: FontMetrics = {
+    bytesPerCode: 2,
+    defaultWidth: 1000,
+    glyphWidths: new Map([[3, 600]]),
+    source: "W",
+  };
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: fixedOperator({
+      strings: [Uint8Array.from([0x00, 0x03])],
+      fontSizePt: 12,
+    }),
+    replacementText: "H",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /vertical writing|vertical CID metrics/i);
+});
+
+test("buildEditPlan: Type0 text with unknown writing mode fails closed instead of assuming horizontal", () => {
+  const resolvedFont: ResolvedFont = {
+    kind: "Type0",
+    baseFont: "ABCDEF+CustomCMap",
+    isEmbedded: true,
+    isSubset: true,
+    bytesPerCode: 2,
+    encodingSource: "ToUnicode",
+    writingMode: "unknown",
+    glyphCodeToUnicode: new Map([[3, "H"]]),
+    unicodeToGlyphCode: new Map([["H", 3]]),
+  };
+  const fontMetrics: FontMetrics = {
+    bytesPerCode: 2,
+    defaultWidth: 1000,
+    glyphWidths: new Map([[3, 600]]),
+    source: "W",
+  };
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: fixedOperator({
+      strings: [Uint8Array.from([0x00, 0x03])],
+      fontSizePt: 12,
+    }),
+    replacementText: "H",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /cannot be proven horizontal|will not assume/i);
+});
+
+test("buildEditPlan: materially skewed native text is independently blocked", () => {
+  const { resolvedFont, fontMetrics } = fixedWidthsFont();
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: fixedOperator({
+      textRenderingMatrix: [10, 0, 2, 10, 50, 700],
+    }),
+    replacementText: "A",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, false);
+  assert.match(plan.reason ?? "", /materially skewed|skewed PDF transform/i);
+});
+
+test("buildEditPlan: ordinary rotation is not mistaken for skew", () => {
+  const { resolvedFont, fontMetrics } = fixedWidthsFont();
+  const plan = buildEditPlan({
+    pageIndex: 0,
+    contentStreamIndex: 0,
+    operatorIndex: 0,
+    operator: fixedOperator({
+      textRenderingMatrix: [0, 10, -10, 0, 50, 700],
+    }),
+    replacementText: "A",
+    resolvedFont,
+    fontMetrics,
+  });
+
+  assert.equal(plan.editable, true);
 });
