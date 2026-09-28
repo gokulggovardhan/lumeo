@@ -3849,49 +3849,55 @@ export default function EditPdfTool() {
       : null;
 
   useEffect(() => {
-    if (!activeNativeLocalFontChoice) {
-      setNativeLocalFontPlanState(null);
-      return;
-    }
-    if (!selectedNativeLocalFontAsset) {
-      setNativeLocalFontPlanState({
-        key: nativeLocalFontPlanKey ?? nativeTextSelectionKey,
-        status: "blocked",
-        reason:
-          "The selected local font is no longer available in this browser session. Choose it again.",
-      });
-      return;
-    }
-    if (!editEngine || !nativeLocalFontPlanKey) return;
+    if (!activeNativeLocalFontChoice) return;
 
-    const key = nativeLocalFontPlanKey;
-    if (resolvedEditContext.kind !== "single") {
-      setNativeLocalFontPlanState({
-        key,
-        status: "blocked",
-        reason:
-          "Native local-font substitution currently requires one proven native PDF text run.",
-      });
-      return;
-    }
-    if (resolvedEditContext.locatedOperator.locator.kind !== "page") {
-      setNativeLocalFontPlanState({
-        key,
-        status: "blocked",
-        reason:
-          "Native local-font substitution inside reusable Form XObjects is not yet supported. This text remains read-only for font-face replacement.",
-      });
-      return;
-    }
-
-    let cancelled = false;
-    setNativeLocalFontPlanState({ key, status: "loading" });
     const context = resolvedEditContext;
-    const pageContentStreamIndex =
-      resolvedEditContext.locatedOperator.locator.contentStreamIndex;
-    const asset = selectedNativeLocalFontAsset;
+    const key = nativeLocalFontPlanKey ?? nativeTextSelectionKey;
+    let cancelled = false;
 
     void (async () => {
+      // Keep every state publication on the asynchronous preflight path.
+      // The active selection/revision key already hides stale plan state, so
+      // an effect does not need to synchronously clear React state just
+      // because the selection moved.
+      await Promise.resolve();
+      if (cancelled) return;
+
+      if (!selectedNativeLocalFontAsset) {
+        setNativeLocalFontPlanState({
+          key,
+          status: "blocked",
+          reason:
+            "The selected local font is no longer available in this browser session. Choose it again.",
+        });
+        return;
+      }
+      if (!editEngine || !nativeLocalFontPlanKey) return;
+
+      if (context.kind !== "single") {
+        setNativeLocalFontPlanState({
+          key,
+          status: "blocked",
+          reason:
+            "Native local-font substitution currently requires one proven native PDF text run.",
+        });
+        return;
+      }
+      if (context.locatedOperator.locator.kind !== "page") {
+        setNativeLocalFontPlanState({
+          key,
+          status: "blocked",
+          reason:
+            "Native local-font substitution inside reusable Form XObjects is not yet supported. This text remains read-only for font-face replacement.",
+        });
+        return;
+      }
+
+      setNativeLocalFontPlanState({ key, status: "loading" });
+      const pageContentStreamIndex =
+        context.locatedOperator.locator.contentStreamIndex;
+      const asset = selectedNativeLocalFontAsset;
+
       const plan = await editEngine.buildLocalFontSubstitutionPlan({
         pageIndex,
         contentStreamIndex: pageContentStreamIndex,
@@ -5549,6 +5555,7 @@ export default function EditPdfTool() {
     pageTextModel,
     pageIndex,
     selectedNativeSpan,
+    getHistoryState,
     setHistoryState,
   ]);
 
