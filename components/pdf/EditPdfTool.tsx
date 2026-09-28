@@ -130,6 +130,11 @@ import {
   validateOcrWordCorrection,
 } from "@/lib/pdf/edit/ocrReview";
 import {
+  bindSearchableOcrPublicationRevision,
+  resolveSearchableOcrPublicationSource,
+  type SearchableOcrPublicationRevision,
+} from "@/lib/pdf/edit/searchableOcrPublication";
+import {
   MAX_LOCAL_CUSTOM_FONT_BYTES,
   MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES,
   createLocalCustomFontAsset,
@@ -809,6 +814,8 @@ export default function EditPdfTool() {
       pageIndex: number;
       message: string;
     } | null>(null);
+  const [ocrSearchablePublicationRevision, setOcrSearchablePublicationRevision] =
+    useState<(SearchableOcrPublicationRevision & { correctionRevision: number }) | null>(null);
   const ocrActivityCurrent =
     ocrActivity !== null &&
     ocrActivity.bytes === pdf?.bytes &&
@@ -830,6 +837,12 @@ export default function EditPdfTool() {
   const ocrCopied =
     ocrCopiedRevision?.bytes === (pdf?.bytes ?? null) &&
     ocrCopiedRevision.pageIndex === pageIndex;
+  const ocrSearchablePublicationCurrent =
+    ocrSearchablePublicationRevision !== null &&
+    ocrSearchablePublicationRevision.publishedBytes === pdf?.bytes &&
+    ocrSearchablePublicationRevision.pageIndex === pageIndex
+      ? ocrSearchablePublicationRevision
+      : null;
   const ocrPageResultCurrent =
     ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
       ? ocrResultsRevision.pages.get(pageIndex) ?? null
@@ -875,6 +888,10 @@ export default function EditPdfTool() {
     ocrSearchLayerActivity !== null &&
     ocrSearchLayerActivity.bytes === pdf?.bytes &&
     ocrSearchLayerActivity.pageIndex === pageIndex;
+  const ocrSearchableNeedsRegeneration =
+    ocrSearchablePublicationCurrent !== null &&
+    ocrSearchablePublicationCurrent.correctionRevision !==
+      ocrReviewCorrectionRevisionRef.current;
   const ocrSearchLayerNotice =
     ocrSearchLayerNoticeRevision !== null &&
     ocrSearchLayerNoticeRevision.bytes === pdf?.bytes &&
