@@ -129,6 +129,7 @@ import { planRunRestyle } from "@/lib/pdf/edit/restyleRun";
 import {
   pickHorizontalAlign,
   pickInlineTextToolbarPlacement,
+  pickVerticalPlacement,
 } from "@/lib/pdf/edit/floatingControlPlacement";
 import type { LocatedTextOperator } from "@/lib/pdf/edit/formXObjects";
 import { buildOperatorSpatialIndex, matchDetectedRunToOperatorIndexed, runSpansMultipleOperators } from "@/lib/pdf/edit/matchTextRun";
