@@ -58,7 +58,7 @@ export function NativeTextFormatPanel({
       data-native-text-formatting
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
-      className={`absolute z-40 w-[min(19rem,86vw)] rounded-xl border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/98 p-3 text-[11px] text-[var(--text-primary)] shadow-2xl ${panelPositionClass} ${horizontalClass}`}
+      className={`absolute z-40 max-h-[min(70vh,32rem)] w-[min(19rem,86vw)] scroll-mt-24 overflow-y-auto overscroll-contain rounded-xl border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/98 p-3 text-[11px] text-[var(--text-primary)] shadow-2xl ${panelPositionClass} ${horizontalClass}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
