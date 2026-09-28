@@ -5278,6 +5278,125 @@ export default function EditPdfTool() {
     }
   }
 
+  async function handleNativeLocalFontFile(file: File) {
+    const requestId = nativeLocalFontRequestRef.current + 1;
+    nativeLocalFontRequestRef.current = requestId;
+    const sourceSelectionKey = nativeTextSelectionKey;
+    const sourceHistorySnapshot = getHistoryState();
+    const sourceHistoryMutationRevision = historyMutationRevisionRef.current;
+    const sourceRevision = sourceHistorySnapshot.pdfBytes;
+    setNativeLocalFontBusy(true);
+    setNativeLocalFontError("");
+    setNativeLocalFontPlanState(null);
+
+    let loadedFace: FontFace | null = null;
+    let faceAdopted = false;
+    try {
+      if (selectedRunIndices.length !== 1 || !sourceSelectionKey) {
+        throw new Error(
+          "Select one editable native PDF text run before choosing a replacement font.",
+        );
+      }
+      if (file.size > MAX_LOCAL_CUSTOM_FONT_BYTES) {
+        throw new Error(
+          "This font is larger than Lumeo's 16 MB local-font safety limit.",
+        );
+      }
+
+      const result = await createLocalCustomFontAsset(
+        new Uint8Array(await file.arrayBuffer()),
+        file.name,
+      );
+      if (nativeLocalFontRequestRef.current !== requestId) return;
+      if (result.kind !== "ready") throw new Error(result.reason);
+
+      const asset = result.asset;
+      let snapshot = getHistoryState();
+      if (
+        nativeTextSelectionKey !== sourceSelectionKey ||
+        historyMutationRevisionRef.current !== sourceHistoryMutationRevision ||
+        snapshot !== sourceHistorySnapshot ||
+        snapshot.pdfBytes !== sourceRevision
+      ) {
+        return;
+      }
+
+      const alreadyStored = localCustomFontAssets.get(asset.descriptor.id);
+      const storedBytes = Array.from(localCustomFontAssets.values()).reduce(
+        (sum, existing) => sum + existing.descriptor.byteLength,
+        0,
+      );
+      const nextBytes =
+        storedBytes + (alreadyStored ? 0 : asset.descriptor.byteLength);
+      if (nextBytes > MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES) {
+        throw new Error(
+          "Local fonts in this PDF session would exceed Lumeo's 32 MB safety limit. Reuse a font already selected in this session or start a new PDF session.",
+        );
+      }
+
+      let face =
+        localCustomFontFacesRef.current.get(asset.descriptor.id) ?? null;
+      if (!face) {
+        loadedFace = await loadLocalCustomFontFace(asset);
+        if (!loadedFace) {
+          throw new Error(
+            "This font could not be loaded for exact browser preview.",
+          );
+        }
+        face = loadedFace;
+      }
+
+      if (nativeLocalFontRequestRef.current !== requestId) return;
+      snapshot = getHistoryState();
+      if (
+        nativeTextSelectionKey !== sourceSelectionKey ||
+        historyMutationRevisionRef.current !== sourceHistoryMutationRevision ||
+        snapshot !== sourceHistorySnapshot ||
+        snapshot.pdfBytes !== sourceRevision
+      ) {
+        return;
+      }
+
+      if (!alreadyStored) {
+        setLocalCustomFontAssets((current) => {
+          const next = new Map(current);
+          next.set(asset.descriptor.id, asset);
+          return next;
+        });
+      }
+      if (!localCustomFontFacesRef.current.has(asset.descriptor.id)) {
+        localCustomFontFacesRef.current.set(asset.descriptor.id, face);
+      }
+      faceAdopted = true;
+      setNativeLocalFontChoice({
+        selectionKey: sourceSelectionKey,
+        assetId: asset.descriptor.id,
+      });
+      setNativeLocalFontError("");
+    } catch (fontError) {
+      if (nativeLocalFontRequestRef.current === requestId) {
+        setNativeLocalFontError(
+          fontError instanceof Error
+            ? fontError.message
+            : "This local font could not be used safely for native PDF text.",
+        );
+      }
+    } finally {
+      if (loadedFace && !faceAdopted) removeLocalCustomFontFace(loadedFace);
+      if (nativeLocalFontRequestRef.current === requestId) {
+        setNativeLocalFontBusy(false);
+      }
+    }
+  }
+
+  function clearNativeLocalFontChoice() {
+    nativeLocalFontRequestRef.current += 1;
+    setNativeLocalFontBusy(false);
+    setNativeLocalFontError("");
+    setNativeLocalFontPlanState(null);
+    setNativeLocalFontChoice(null);
+  }
+
   function handleUseStandardFont(elementId: string) {
     localCustomFontRequestRef.current += 1;
     setLocalCustomFontBusy(false);
