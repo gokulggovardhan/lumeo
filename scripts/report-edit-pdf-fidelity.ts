@@ -25,6 +25,7 @@ import { shapeEmbeddedFontText } from "../lib/pdf/edit/harfbuzzShaping.ts";
 import { buildShapedGlyphEditPlan } from "../lib/pdf/edit/shapedGlyphEditPlan.ts";
 import { createLocalCustomFontAsset } from "../lib/pdf/edit/localCustomFont.ts";
 import { buildReviewedOcrSearchableInput } from "../lib/pdf/edit/ocrReview.ts";
+import { inverseMapOcrBoundsPct } from "../lib/pdf/edit/localOcr.ts";
 import {
   addSearchableOcrTextLayer,
   firstMissingSearchableOcrWord,
@@ -994,6 +995,118 @@ async function assertReviewedOcrFidelityGate(): Promise<void> {
   }
 }
 
+async function assertRotatedOcrFidelityGate(): Promise<void> {
+  const sourceDoc = await PDFDocument.create();
+  const sourcePage = sourceDoc.addPage([300, 200]);
+  const raster = createCanvas(600, 400);
+  const context = raster.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, raster.width, raster.height);
+  context.fillStyle = "#111111";
+  context.font = "44px sans-serif";
+  context.save();
+  context.translate(raster.width, 0);
+  context.rotate(Math.PI / 2);
+  context.fillText("SIDEWAYS", 90, 180);
+  context.restore();
+  const image = await sourceDoc.embedPng(raster.toBuffer("image/png"));
+  sourcePage.drawImage(image, { x: 0, y: 0, width: 300, height: 200 });
+  const sourceBytes = await sourceDoc.save();
+
+  const mapped = inverseMapOcrBoundsPct(
+    { xPct: 20, yPct: 10, widthPct: 30, heightPct: 20 },
+    270,
+  );
+  if (
+    mapped.xPct !== 70 ||
+    mapped.yPct !== 20 ||
+    mapped.widthPct !== 20 ||
+    mapped.heightPct !== 30
+  ) {
+    throw new Error(
+      "Rotated OCR fidelity gate failed: inverse-mapped word geometry was not deterministic.",
+    );
+  }
+
+  const searchable = await addSearchableOcrTextLayer(
+    asArrayBuffer(sourceBytes),
+    {
+      pageIndex: 0,
+      words: [
+        {
+          textSource: "ocr",
+          text: "SIDEWAYS",
+          confidence: 94,
+          boundsPct: mapped,
+        },
+      ],
+    },
+  );
+  if (
+    searchable.writtenWords.length !== 1 ||
+    searchable.writtenWords[0] !== "SIDEWAYS"
+  ) {
+    throw new Error(
+      "Rotated OCR fidelity gate failed: mapped searchable text was not written exactly.",
+    );
+  }
+
+  const exported = await exportEditedPdf(
+    asArrayBuffer(searchable.bytes),
+    [],
+  );
+  if (exported.skippedPages.length > 0 || exported.bytes.length <= 5) {
+    throw new Error(
+      "Rotated OCR fidelity gate failed: searchable PDF could not be exported.",
+    );
+  }
+
+  const reopenedPdfJs = await pdfjsLib.getDocument({
+    data: exported.bytes.slice(),
+    useWorkerFetch: false,
+  }).promise;
+  try {
+    const page = await reopenedPdfJs.getPage(1);
+    const content = await page.getTextContent();
+    const extractedItems = content.items
+      .map((item) => ("str" in item ? item.str : ""))
+      .filter((item) => item.trim().length > 0);
+    const missing = firstMissingSearchableOcrWord(
+      ["SIDEWAYS"],
+      extractedItems,
+    );
+    if (missing) {
+      throw new Error(
+        "Rotated OCR fidelity gate failed: PDF.js could not extract the mapped searchable word.",
+      );
+    }
+  } finally {
+    const destroy = (reopenedPdfJs as {
+      destroy?: () => Promise<void> | void;
+    }).destroy;
+    if (typeof destroy === "function") await destroy.call(reopenedPdfJs);
+  }
+
+  const before = await renderFirstPage(sourceBytes);
+  const after = await renderFirstPage(exported.bytes);
+  if (
+    before.width !== after.width ||
+    before.height !== after.height ||
+    before.rgba.length !== after.rgba.length
+  ) {
+    throw new Error(
+      "Rotated OCR fidelity gate failed: searchable metadata changed page dimensions.",
+    );
+  }
+  for (let index = 0; index < before.rgba.length; index += 1) {
+    if (before.rgba[index] !== after.rgba[index]) {
+      throw new Error(
+        "Rotated OCR fidelity gate failed: invisible searchable text changed scan pixels.",
+      );
+    }
+  }
+}
+
 async function buildFixtures(): Promise<Fixture[]> {
   const fixtures = await Promise.all([
     makeSimpleFixture(
@@ -1574,6 +1687,7 @@ function assertCorpusGate(
 
 async function main() {
   await assertReviewedOcrFidelityGate();
+  await assertRotatedOcrFidelityGate();
   const fixtures = await buildFixtures();
   const measurements: EditPdfFidelityFixtureMeasurement[] = [];
   for (const fixture of fixtures) {
