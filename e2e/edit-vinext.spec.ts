@@ -1120,6 +1120,35 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
 });
 
 
+test("vinext mobile-width Edit PDF keeps native Format controls above the tool dock", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await waitForStageReady(page);
+
+  const run = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    )
+    .first();
+  await expect(run).toBeVisible({ timeout: 90_000 });
+  await run.click();
+
+  const formatButton = page.getByRole("button", { name: "Format" });
+  await expect(formatButton).toBeEnabled({ timeout: 90_000 });
+  await expect(page.locator("[data-edit-micro-dock]")).toHaveAttribute(
+    "data-native-text-controls-open",
+    "true",
+  );
+
+  // Regression for production mobile WebKit: the top-centred MicroDock used
+  // to share z-30 with the inline native-text toolbar and, because it renders
+  // later, its Draw/Shape buttons intercepted this tap indefinitely.
+  await formatButton.click();
+  await expect(page.locator("[data-native-text-formatting]")).toBeVisible({
+    timeout: 30_000,
+  });
+});
+
 test("vinext Edit PDF applies native formatting and colour with one native history transaction", async ({ page }) => {
   const pageErrors: string[] = [];
   const consoleErrors: string[] = [];
