@@ -11,6 +11,12 @@ export const OCR_MAX_TOTAL_PIXELS = 12_000_000;
 
 export type OcrOrientationCorrection = 0 | 90 | 180 | 270;
 
+export function isOcrOrientationCorrection(
+  value: number,
+): value is OcrOrientationCorrection {
+  return value === 0 || value === 90 || value === 180 || value === 270;
+}
+
 export type OcrProgress = Readonly<{
   status: string;
   progress: number;
@@ -408,6 +414,11 @@ export function createLocalOcrEngine(
       }
       if (!Number.isInteger(pageIndex) || pageIndex < 0) {
         throw new Error("OCR page index must be a non-negative integer.");
+      }
+      if (!isOcrOrientationCorrection(orientationCorrection)) {
+        throw new Error(
+          "OCR orientation correction must be 0, 90, 180 or 270 degrees.",
+        );
       }
       recognitionActive = true;
       currentProgressListener = onProgress ?? null;
