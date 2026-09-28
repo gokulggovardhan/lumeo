@@ -570,6 +570,15 @@ test("vinext Edit PDF corrects sideways scan orientation locally and keeps revie
     timeout: 90_000,
   });
 
+  // OCR review deliberately owns pointer events while it is open. Exit
+  // review mode before probing the underlying invisible searchable layer;
+  // making the review overlay click-through would make word correction
+  // ambiguous and weaken its explicit interaction boundary.
+  const doneReviewing = page.getByRole("button", { name: "Done reviewing" });
+  await expect(doneReviewing).toBeVisible({ timeout: 30_000 });
+  await doneReviewing.click();
+  await expect(page.locator("[data-edit-ocr-overlay]")).toHaveCount(0);
+
   const searchableRun = page
     .locator(
       'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="SIDEWAYS"]',
