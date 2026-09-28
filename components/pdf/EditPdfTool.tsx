@@ -1528,7 +1528,7 @@ export default function EditPdfTool() {
     rasterImageEvidenceCurrent,
   ]);
 
-  const handleCopyOcrText = useCallback(async () => {
+  async function handleCopyOcrText() {
     const text = ocrPageResultCurrent?.text.trim() ?? "";
     if (!text) return;
     const revision = { bytes: pdf?.bytes ?? null, pageIndex };
@@ -1543,9 +1543,9 @@ export default function EditPdfTool() {
         message: "The browser did not allow copying recognized text.",
       });
     }
-  }, [ocrPageResultCurrent, pageIndex, pdf?.bytes]);
+  }
 
-  const handleToggleOcrReview = useCallback(() => {
+  function handleToggleOcrReview() {
     if (!pdf || !ocrPageResultCurrent) return;
     const result = ocrPageResultCurrent;
     const bytes = pdf.bytes;
@@ -1589,10 +1589,9 @@ export default function EditPdfTool() {
         error: "",
       };
     });
-  }, [ocrPageResultCurrent, pageIndex, pdf]);
+  }
 
-  const handleSelectOcrReviewWord = useCallback(
-    (wordIndex: number) => {
+  function handleSelectOcrReviewWord(wordIndex: number) {
       if (!pdf || !ocrPageResultCurrent) return;
       const word = ocrPageResultCurrent.words[wordIndex];
       if (!word) return;
@@ -1616,11 +1615,9 @@ export default function EditPdfTool() {
           error: "",
         };
       });
-    },
-    [ocrPageResultCurrent, pageIndex, pdf],
-  );
+  }
 
-  const handleApplyOcrWordCorrection = useCallback(() => {
+  function handleApplyOcrWordCorrection() {
     if (!ocrReviewCurrent || !ocrPageResultCurrent) return;
     const index = ocrReviewCurrent.selectedWordIndex;
     if (index === null) return;
@@ -1649,9 +1646,9 @@ export default function EditPdfTool() {
         error: "",
       };
     });
-  }, [ocrPageResultCurrent, ocrReviewCurrent]);
+  }
 
-  const handleResetOcrWordCorrection = useCallback(() => {
+  function handleResetOcrWordCorrection() {
     if (!ocrReviewCurrent || !ocrPageResultCurrent) return;
     const index = ocrReviewCurrent.selectedWordIndex;
     if (index === null) return;
@@ -1669,9 +1666,9 @@ export default function EditPdfTool() {
         error: "",
       };
     });
-  }, [ocrPageResultCurrent, ocrReviewCurrent]);
+  }
 
-  const handleNextLowConfidenceOcrWord = useCallback(() => {
+  function handleNextLowConfidenceOcrWord() {
     if (!ocrReviewCurrent || !ocrPageResultCurrent) return;
     const lowConfidence = lowConfidenceOcrWordIndices(ocrPageResultCurrent);
     if (lowConfidence.length === 0) return;
@@ -1685,13 +1682,9 @@ export default function EditPdfTool() {
           : currentPosition + 1
       ];
     handleSelectOcrReviewWord(nextIndex);
-  }, [
-    handleSelectOcrReviewWord,
-    ocrPageResultCurrent,
-    ocrReviewCurrent,
-  ]);
+  }
 
-  const handleAddSearchableOcrLayer = useCallback(async () => {
+  async function handleAddSearchableOcrLayer() {
     if (
       !pdf ||
       !ocrPageResultCurrent ||
@@ -1874,19 +1867,7 @@ export default function EditPdfTool() {
           : current,
       );
     }
-  }, [
-    getHistoryState,
-    ocrBusy,
-    ocrPageResultCurrent,
-    ocrReviewCurrent,
-    ocrReviewHasUnappliedDraft,
-    ocrSearchLayerBusy,
-    pageIndex,
-    pageTextCapability.category,
-    pdf,
-    rasterImageEvidenceCurrent,
-    setHistoryState,
-  ]);
+  }
 
   // Development-only fidelity diagnostics. This deliberately never renders
   // debug noise in the normal product and is compiled behind NODE_ENV.
