@@ -7957,6 +7957,9 @@ export default function EditPdfTool() {
           onInkStrokeWidthChange={setInkStrokeWidth}
           onPrivacyShieldClick={handlePrivacyShieldScan}
           privacyShieldMatchCount={privacyShieldMatches.length}
+          nativeTextControlsOpen={
+            activeTool === "select" && selectedRunIndices.length > 0
+          }
         />
 
         {selectedElement && selectedElement.type === "text" ? (
