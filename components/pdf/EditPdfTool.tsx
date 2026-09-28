@@ -3836,6 +3836,104 @@ export default function EditPdfTool() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- validateMultiRunSelection closes over the explicitly listed page/write evidence below.
   }, [fontRegistry, selectedRunIndices, editableRunMatches, runMatches, pageOperators, pageIndex, fragmentedRunReconstructions, pageTextModel, logicalSelection]);
 
+  const nativeLocalFontPlanKey =
+    activeNativeLocalFontChoice && selectedNativeLocalFontAsset
+      ? [
+          pageIndex,
+          nativeTextSelectionKey,
+          selectedNativeLocalFontAsset.descriptor.id,
+          editDraftText,
+        ].join("|")
+      : null;
+
+  useEffect(() => {
+    if (!activeNativeLocalFontChoice) {
+      setNativeLocalFontPlanState(null);
+      return;
+    }
+    if (!selectedNativeLocalFontAsset) {
+      setNativeLocalFontPlanState({
+        key: nativeLocalFontPlanKey ?? nativeTextSelectionKey,
+        status: "blocked",
+        reason:
+          "The selected local font is no longer available in this browser session. Choose it again.",
+      });
+      return;
+    }
+    if (!editEngine || !nativeLocalFontPlanKey) return;
+
+    const key = nativeLocalFontPlanKey;
+    if (resolvedEditContext.kind !== "single") {
+      setNativeLocalFontPlanState({
+        key,
+        status: "blocked",
+        reason:
+          "Native local-font substitution currently requires one proven native PDF text run.",
+      });
+      return;
+    }
+    if (resolvedEditContext.locatedOperator.locator.kind !== "page") {
+      setNativeLocalFontPlanState({
+        key,
+        status: "blocked",
+        reason:
+          "Native local-font substitution inside reusable Form XObjects is not yet supported. This text remains read-only for font-face replacement.",
+      });
+      return;
+    }
+
+    let cancelled = false;
+    setNativeLocalFontPlanState({ key, status: "loading" });
+    const context = resolvedEditContext;
+    const asset = selectedNativeLocalFontAsset;
+
+    void (async () => {
+      const plan = await editEngine.buildLocalFontSubstitutionPlan({
+        pageIndex,
+        contentStreamIndex: context.locatedOperator.locator.contentStreamIndex,
+        operatorIndex: context.locatedOperator.operatorIndex,
+        operator: context.operator,
+        replacementText: editDraftText,
+        resolvedFont: context.resolvedFont,
+        fontMetrics: context.fontMetrics,
+        sourceResourceIdentity: context.resourceIdentity,
+        sourceEmbeddedProgramSha256: context.embeddedProgramSha256,
+        embeddedGlyphEvidence: context.embeddedGlyphEvidence,
+        asset,
+      });
+      if (cancelled) return;
+      setNativeLocalFontPlanState(
+        plan.editable
+          ? { key, status: "ready", plan }
+          : { key, status: "blocked", reason: plan.reason },
+      );
+    })().catch((error) => {
+      if (cancelled) return;
+      setNativeLocalFontPlanState({
+        key,
+        status: "blocked",
+        reason:
+          error instanceof Error
+            ? error.message
+            : "This local font could not be validated for native substitution.",
+      });
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    activeNativeLocalFontChoice,
+    selectedNativeLocalFontAsset,
+    nativeLocalFontPlanKey,
+    editEngine,
+    resolvedEditContext,
+    pageIndex,
+    editDraftText,
+    nativeTextSelectionKey,
+    pdf?.bytes,
+  ]);
+
   const paragraphSelectionTemplate = useMemo(() => {
     if (
       !editEngine ||
