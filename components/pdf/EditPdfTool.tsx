@@ -3887,13 +3887,14 @@ export default function EditPdfTool() {
     let cancelled = false;
     setNativeLocalFontPlanState({ key, status: "loading" });
     const context = resolvedEditContext;
-    const pageLocator = resolvedEditContext.locatedOperator.locator;
+    const pageContentStreamIndex =
+      resolvedEditContext.locatedOperator.locator.contentStreamIndex;
     const asset = selectedNativeLocalFontAsset;
 
     void (async () => {
       const plan = await editEngine.buildLocalFontSubstitutionPlan({
         pageIndex,
-        contentStreamIndex: pageLocator.contentStreamIndex,
+        contentStreamIndex: pageContentStreamIndex,
         operatorIndex: context.locatedOperator.operatorIndex,
         operator: context.operator,
         replacementText: editDraftText,
