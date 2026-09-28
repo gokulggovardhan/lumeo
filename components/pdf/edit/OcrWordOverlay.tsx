@@ -9,12 +9,14 @@ export function OcrWordOverlay({
   selectedWordIndex = null,
   corrections,
   onSelectWord,
+  disabled = false,
 }: {
   result: OcrPageResult;
   reviewMode?: boolean;
   selectedWordIndex?: number | null;
   corrections?: ReadonlyMap<number, string>;
   onSelectWord?: (index: number) => void;
+  disabled?: boolean;
 }) {
   return (
     <div
@@ -65,13 +67,14 @@ export function OcrWordOverlay({
             data-edit-ocr-low-confidence={lowConfidence ? "true" : "false"}
             data-edit-ocr-corrected={corrected ? "true" : "false"}
             aria-pressed={selected}
+            disabled={disabled}
             aria-label={`Review OCR word: ${displayText}, ${Math.round(word.confidence)}% confidence${corrected ? ", corrected" : ""}`}
             title={`${word.text} · ${Math.round(word.confidence)}% confidence`}
             onClick={(event) => {
               event.stopPropagation();
-              onSelectWord?.(index);
+              if (!disabled) onSelectWord?.(index);
             }}
-            className={`pointer-events-auto absolute rounded-[2px] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${
+            className={`${disabled ? "pointer-events-none" : "pointer-events-auto"} absolute rounded-[2px] outline-none transition focus-visible:ring-2 focus-visible:ring-[var(--lumeo-gold)] ${
               selected
                 ? "border-2 border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/24"
                 : corrected
