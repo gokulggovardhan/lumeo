@@ -7,6 +7,7 @@ import {
   OcrReviewCorrectionError,
   buildReviewedOcrSearchableInput,
   lowConfidenceOcrWordIndices,
+  publishedReviewedOcrCorrectionIndices,
   validateOcrWordCorrection,
 } from "../lib/pdf/edit/ocrReview.ts";
 
@@ -139,4 +140,16 @@ test("OCR review requires a valid page binding", () => {
   assert.equal(reviewed.kind, "rejected");
   if (reviewed.kind !== "rejected") return;
   assert.match(reviewed.reason, /valid PDF page/i);
+});
+
+
+test("OCR review counts publication by exact word index, not duplicate text", () => {
+  assert.deepEqual(
+    publishedReviewedOcrCorrectionIndices([1, 2], [0, 2, 3]),
+    [2],
+  );
+  assert.deepEqual(
+    publishedReviewedOcrCorrectionIndices([2, 2, -1, 7], [2, 7]),
+    [2, 7],
+  );
 });
