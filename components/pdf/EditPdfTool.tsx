@@ -6542,7 +6542,13 @@ export default function EditPdfTool() {
                   <img src={pageImageUrl} alt={`Page ${pageIndex + 1} preview`} className="pointer-events-none block h-full w-full select-none" />
 
                   {ocrPageResultCurrent ? (
-                    <OcrWordOverlay result={ocrPageResultCurrent} />
+                    <OcrWordOverlay
+                      result={ocrPageResultCurrent}
+                      reviewMode={ocrReviewCurrent?.open ?? false}
+                      selectedWordIndex={ocrReviewCurrent?.selectedWordIndex ?? null}
+                      corrections={ocrReviewCurrent?.corrections}
+                      onSelectWord={handleSelectOcrReviewWord}
+                    />
                   ) : null}
 
                   {whiteoutDraft ? (
@@ -7328,6 +7334,24 @@ export default function EditPdfTool() {
                                 <span data-edit-ocr-word-summary>
                                   {ocrPageResultCurrent.words.length} word{ocrPageResultCurrent.words.length === 1 ? "" : "s"}
                                 </span>
+                                <span>·</span>
+                                <span
+                                  data-edit-ocr-low-confidence-count={ocrLowConfidenceWordIndices.length}
+                                  className={ocrLowConfidenceWordIndices.length > 0 ? "font-semibold text-[var(--text-primary)]/70" : undefined}
+                                >
+                                  {ocrLowConfidenceWordIndices.length} below 80%
+                                </span>
+                                {ocrReviewCurrent && ocrReviewCurrent.corrections.size > 0 ? (
+                                  <>
+                                    <span>·</span>
+                                    <span
+                                      data-edit-ocr-correction-count={ocrReviewCurrent.corrections.size}
+                                      className="font-semibold text-[var(--text-primary)]/70"
+                                    >
+                                      {ocrReviewCurrent.corrections.size} corrected
+                                    </span>
+                                  </>
+                                ) : null}
                               </div>
                               <textarea
                                 readOnly
@@ -7338,6 +7362,15 @@ export default function EditPdfTool() {
                                 className="w-full resize-y rounded-[var(--radius-md)] border border-[var(--text-primary)]/12 bg-white/70 px-2.5 py-2 text-[11px] leading-5 text-[#242833] outline-none"
                               />
                               <div className="flex flex-wrap gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={handleToggleOcrReview}
+                                  disabled={ocrBusy || ocrSearchLayerBusy}
+                                  aria-expanded={ocrReviewCurrent?.open ?? false}
+                                  className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {ocrReviewCurrent?.open ? "Done reviewing" : "Review OCR"}
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() => void handleCopyOcrText()}
@@ -7362,6 +7395,92 @@ export default function EditPdfTool() {
                                   Recognize again
                                 </button>
                               </div>
+                              {ocrReviewCurrent?.open ? (
+                                <div
+                                  data-edit-ocr-review-panel
+                                  className="grid gap-2 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/24 bg-[var(--lumeo-gold)]/[0.045] p-2.5"
+                                >
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div>
+                                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/65">
+                                        OCR confidence review
+                                      </p>
+                                      <p className="mt-0.5 text-[9px] leading-4 text-[var(--text-primary)]/48">
+                                        Click a word box on the page. Corrections change searchable text only; OCR confidence and geometry remain the original recognition evidence.
+                                      </p>
+                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={handleNextLowConfidenceOcrWord}
+                                      disabled={ocrLowConfidenceWordIndices.length === 0}
+                                      className="rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
+                                    >
+                                      Next low-confidence
+                                    </button>
+                                  </div>
+                                  {ocrReviewSelectedWord && ocrReviewCurrent.selectedWordIndex !== null ? (
+                                    <div className="grid gap-1.5" data-edit-ocr-review-selected-word={ocrReviewCurrent.selectedWordIndex}>
+                                      <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-[var(--text-primary)]/52">
+                                        <span>
+                                          Recognized: <strong className="text-[var(--text-primary)]/72">{ocrReviewSelectedWord.text}</strong>
+                                        </span>
+                                        <span>·</span>
+                                        <span data-edit-ocr-review-confidence>
+                                          {Math.round(ocrReviewSelectedWord.confidence)}% confidence
+                                        </span>
+                                      </div>
+                                      <input
+                                        aria-label="Correct OCR word"
+                                        data-edit-ocr-review-input
+                                        value={ocrReviewCurrent.draft}
+                                        onChange={(event) => {
+                                          const value = event.currentTarget.value;
+                                          setOcrReviewRevision((current) =>
+                                            current === ocrReviewCurrent
+                                              ? { ...current, draft: value, error: "" }
+                                              : current,
+                                          );
+                                        }}
+                                        onKeyDown={(event) => {
+                                          event.stopPropagation();
+                                          if (event.key === "Enter" && ocrReviewDraftValidation?.valid) {
+                                            event.preventDefault();
+                                            handleApplyOcrWordCorrection();
+                                          }
+                                        }}
+                                        className="w-full rounded-md border border-[var(--text-primary)]/14 bg-white/78 px-2 py-1.5 text-[11px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55"
+                                      />
+                                      <div className="flex flex-wrap gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={handleApplyOcrWordCorrection}
+                                          disabled={!ocrReviewDraftValidation?.valid}
+                                          className="rounded-full border border-[var(--lumeo-gold)]/45 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[9px] font-bold text-[var(--text-primary)]/72 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                          Apply correction
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={handleResetOcrWordCorrection}
+                                          disabled={!ocrReviewCurrent.corrections.has(ocrReviewCurrent.selectedWordIndex)}
+                                          className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[9px] font-semibold text-[var(--text-primary)]/62 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                          Reset word
+                                        </button>
+                                      </div>
+                                      {ocrReviewCurrent.error ? (
+                                        <p role="alert" className="text-[9px] leading-4 text-[var(--text-danger)]">
+                                          {ocrReviewCurrent.error}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  ) : (
+                                    <p className="text-[9px] leading-4 text-[var(--text-primary)]/48">
+                                      No OCR word is selected.
+                                    </p>
+                                  )}
+                                </div>
+                              ) : null}
                             </>
                           ) : (
                             <button
