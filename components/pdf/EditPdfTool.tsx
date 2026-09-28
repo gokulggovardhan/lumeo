@@ -6847,7 +6847,7 @@ export default function EditPdfTool() {
                     // inline here.
                     <div
                       data-edit-inline-panel
-                      className="absolute z-30"
+                      className="absolute z-40"
                       style={{
                         left: `${singleSelectedRun.xPct}%`,
                         top: `${singleSelectedRun.yPct}%`,
@@ -7247,7 +7247,7 @@ export default function EditPdfTool() {
                     // to never activate for existing-PDF-text-run selections.
                     <div
                       data-edit-multi-run-panel
-                      className="absolute z-30"
+                      className="absolute z-40"
                       style={{
                         left: `${detectedTextRuns[selectedRunIndices[0]].xPct}%`,
                         top: `${detectedTextRuns[selectedRunIndices[0]].yPct}%`,
