@@ -887,6 +887,13 @@ export default function EditPdfTool() {
   const [nativeLocalFontPlanState, setNativeLocalFontPlanState] =
     useState<NativeLocalFontPlanState | null>(null);
   const [nativeLocalFontApplying, setNativeLocalFontApplying] = useState(false);
+  const activeNativeLocalFontChoice =
+    nativeLocalFontChoice?.selectionKey === nativeTextSelectionKey
+      ? nativeLocalFontChoice
+      : null;
+  const selectedNativeLocalFontAsset = activeNativeLocalFontChoice
+    ? localCustomFontAssets.get(activeNativeLocalFontChoice.assetId) ?? null
+    : null;
   const [shapingEvidenceState, setShapingEvidenceState] =
     useState<ShapingEvidenceState | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
