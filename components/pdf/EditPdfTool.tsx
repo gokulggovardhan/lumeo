@@ -286,6 +286,11 @@ type ShapingEvidenceState =
   | { key: string; status: "shaped"; plan: ValidatedShapedGlyphEditPlan }
   | { key: string; status: "blocked"; reason: string };
 
+type NativeLocalFontPlanState =
+  | { key: string; status: "loading" }
+  | { key: string; status: "ready"; plan: ValidatedLocalFontSubstitutionPlan }
+  | { key: string; status: "blocked"; reason: string };
+
 // Phase 11 UX audit -- Shape tool's place in Edit PDF, decided: KEEP.
 // Rect/ellipse/line are genuine freeform annotation shapes with no other
 // path to create them in this tool, so they're clearly justified. The one
@@ -872,6 +877,16 @@ export default function EditPdfTool() {
   const localCustomFontRequestRef = useRef(0);
   const [localCustomFontBusy, setLocalCustomFontBusy] = useState(false);
   const [localCustomFontError, setLocalCustomFontError] = useState("");
+  const nativeLocalFontRequestRef = useRef(0);
+  const [nativeLocalFontChoice, setNativeLocalFontChoice] = useState<{
+    selectionKey: string;
+    assetId: string;
+  } | null>(null);
+  const [nativeLocalFontBusy, setNativeLocalFontBusy] = useState(false);
+  const [nativeLocalFontError, setNativeLocalFontError] = useState("");
+  const [nativeLocalFontPlanState, setNativeLocalFontPlanState] =
+    useState<NativeLocalFontPlanState | null>(null);
+  const [nativeLocalFontApplying, setNativeLocalFontApplying] = useState(false);
   const [shapingEvidenceState, setShapingEvidenceState] =
     useState<ShapingEvidenceState | null>(null);
   const [nativeStyleDraft, setNativeStyleDraft] = useState<NativeTextStyleDraft | null>(null);
