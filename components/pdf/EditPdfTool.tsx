@@ -5671,9 +5671,14 @@ export default function EditPdfTool() {
       browserFontPreview.embeddedProgramSha256.toLowerCase() ===
         selectedSpanEmbeddedProgramSha.toLowerCase(),
   );
-  const inlineEditorFontFamily = browserFontPreviewMatchesSelectedSpan
-    ? browserFontPreview?.family
-    : singleSelectedSpan?.fontProfile?.cssFallbackFamily;
+  const nativeLocalFontPreviewFamily = selectedNativeLocalFontAsset
+    ? `"${selectedNativeLocalFontAsset.descriptor.browserFamilyName}", ${singleSelectedSpan?.fontProfile?.cssFallbackFamily ?? "sans-serif"}`
+    : null;
+  const inlineEditorFontFamily =
+    nativeLocalFontPreviewFamily ??
+    (browserFontPreviewMatchesSelectedSpan
+      ? browserFontPreview?.family
+      : singleSelectedSpan?.fontProfile?.cssFallbackFamily);
   const fontPreviewFidelity = describeFontPreviewFidelity({
     profile: singleSelectedSpan?.fontProfile ?? null,
     loadedEmbeddedProgramSha256: browserFontPreviewMatchesSelectedSpan
@@ -6791,6 +6796,36 @@ export default function EditPdfTool() {
                             });
                           }}
                           onClearApplyError={() => setEditApplyError("")}
+                          nativeLocalFontLabel={
+                            selectedNativeLocalFontAsset?.descriptor.familyName ?? null
+                          }
+                          nativeLocalFontBusy={nativeLocalFontBusy}
+                          nativeLocalFontApplying={nativeLocalFontApplying}
+                          nativeLocalFontReady={
+                            Boolean(
+                              nativeLocalFontPlanKey &&
+                                nativeLocalFontPlanState?.key === nativeLocalFontPlanKey &&
+                                nativeLocalFontPlanState.status === "ready",
+                            )
+                          }
+                          nativeLocalFontIssue={
+                            nativeLocalFontError ||
+                            (nativeLocalFontPlanKey &&
+                            nativeLocalFontPlanState?.key === nativeLocalFontPlanKey
+                              ? nativeLocalFontPlanState.status === "loading"
+                                ? "Validating this exact text, local font and PDF resource…"
+                                : nativeLocalFontPlanState.status === "blocked"
+                                  ? nativeLocalFontPlanState.reason
+                                  : null
+                              : null)
+                          }
+                          onNativeLocalFontFile={(file) =>
+                            void handleNativeLocalFontFile(file)
+                          }
+                          onClearNativeLocalFont={clearNativeLocalFontChoice}
+                          onApplyNativeLocalFont={() =>
+                            void applyNativeLocalFontSubstitution()
+                          }
                         />
                       ) : null}
 
