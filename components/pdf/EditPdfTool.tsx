@@ -1596,6 +1596,23 @@ export default function EditPdfTool() {
       if (!pdf || !ocrPageResultCurrent) return;
       const word = ocrPageResultCurrent.words[wordIndex];
       if (!word) return;
+      if (
+        ocrReviewCurrent?.open &&
+        ocrReviewCurrent.selectedWordIndex !== null &&
+        ocrReviewCurrent.selectedWordIndex !== wordIndex &&
+        ocrReviewHasUnappliedDraft
+      ) {
+        setOcrReviewRevision((current) =>
+          current === ocrReviewCurrent
+            ? {
+                ...current,
+                error:
+                  "Apply or reset the current OCR correction before selecting another word.",
+              }
+            : current,
+        );
+        return;
+      }
       const result = ocrPageResultCurrent;
       const bytes = pdf.bytes;
       setOcrReviewRevision((current) => {
@@ -1667,6 +1684,40 @@ export default function EditPdfTool() {
         error: "",
       };
     });
+  }
+
+  function handleStepOcrReviewWord(direction: -1 | 1) {
+    if (
+      !ocrReviewCurrent ||
+      !ocrPageResultCurrent ||
+      ocrBusy ||
+      ocrSearchLayerBusy ||
+      ocrPageResultCurrent.words.length === 0
+    ) {
+      return;
+    }
+    if (ocrReviewHasUnappliedDraft) {
+      setOcrReviewRevision((current) =>
+        current === ocrReviewCurrent
+          ? {
+              ...current,
+              error:
+                "Apply or reset the current OCR correction before selecting another word.",
+            }
+          : current,
+      );
+      return;
+    }
+
+    const count = ocrPageResultCurrent.words.length;
+    const currentIndex = ocrReviewCurrent.selectedWordIndex;
+    const nextIndex =
+      currentIndex === null
+        ? direction > 0
+          ? 0
+          : count - 1
+        : (currentIndex + direction + count) % count;
+    handleSelectOcrReviewWord(nextIndex);
   }
 
   function handleNextLowConfidenceOcrWord() {
@@ -7425,27 +7476,64 @@ export default function EditPdfTool() {
                                   data-edit-ocr-review-panel
                                   className="grid gap-2 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/24 bg-[var(--lumeo-gold)]/[0.045] p-2.5"
                                 >
-                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div className="grid gap-1.5">
                                     <div>
                                       <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/65">
                                         OCR confidence review
                                       </p>
                                       <p className="mt-0.5 text-[9px] leading-4 text-[var(--text-primary)]/48">
-                                        Click a word box on the page. Corrections change searchable text only; OCR confidence and geometry remain the original recognition evidence.
+                                        Click a visible word box on the page or use Previous/Next word. Corrections change searchable text only; OCR confidence and geometry remain the original recognition evidence.
                                       </p>
                                     </div>
-                                    <button
-                                      type="button"
-                                      onClick={handleNextLowConfidenceOcrWord}
-                                      disabled={
-                                        ocrBusy ||
-                                        ocrSearchLayerBusy ||
-                                        ocrLowConfidenceWordIndices.length === 0
-                                      }
-                                      className="rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
-                                    >
-                                      Next low-confidence
-                                    </button>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStepOcrReviewWord(-1)}
+                                        disabled={
+                                          ocrBusy ||
+                                          ocrSearchLayerBusy ||
+                                          ocrReviewHasUnappliedDraft ||
+                                          ocrPageResultCurrent.words.length === 0
+                                        }
+                                        className="rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
+                                      >
+                                        Previous word
+                                      </button>
+                                      <span
+                                        data-edit-ocr-review-position
+                                        className="text-[9px] font-semibold tabular-nums text-[var(--text-primary)]/52"
+                                      >
+                                        {ocrReviewCurrent.selectedWordIndex === null
+                                          ? `0 of ${ocrPageResultCurrent.words.length}`
+                                          : `${ocrReviewCurrent.selectedWordIndex + 1} of ${ocrPageResultCurrent.words.length}`}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStepOcrReviewWord(1)}
+                                        disabled={
+                                          ocrBusy ||
+                                          ocrSearchLayerBusy ||
+                                          ocrReviewHasUnappliedDraft ||
+                                          ocrPageResultCurrent.words.length === 0
+                                        }
+                                        className="rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
+                                      >
+                                        Next word
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={handleNextLowConfidenceOcrWord}
+                                        disabled={
+                                          ocrBusy ||
+                                          ocrSearchLayerBusy ||
+                                          ocrReviewHasUnappliedDraft ||
+                                          ocrLowConfidenceWordIndices.length === 0
+                                        }
+                                        className="rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
+                                      >
+                                        Next low-confidence
+                                      </button>
+                                    </div>
                                   </div>
                                   {ocrReviewSelectedWord && ocrReviewCurrent.selectedWordIndex !== null ? (
                                     <div className="grid gap-1.5" data-edit-ocr-review-selected-word={ocrReviewCurrent.selectedWordIndex}>
