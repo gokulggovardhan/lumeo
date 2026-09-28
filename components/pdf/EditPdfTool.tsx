@@ -130,6 +130,11 @@ import {
   validateOcrWordCorrection,
 } from "@/lib/pdf/edit/ocrReview";
 import {
+  bindSearchableOcrPublicationRevision,
+  resolveSearchableOcrPublicationSource,
+  type SearchableOcrPublicationRevision,
+} from "@/lib/pdf/edit/searchableOcrPublication";
+import {
   MAX_LOCAL_CUSTOM_FONT_BYTES,
   MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES,
   createLocalCustomFontAsset,
@@ -346,6 +351,26 @@ const TOOL_SHORTCUT_KEYS: Record<string, ActiveTool> = {
   "5": "whiteout",
 };
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
+
+type OcrResultsRevisionState = {
+  bytes: ArrayBuffer;
+  pages: Map<number, OcrPageResult>;
+};
+
+type OcrReviewRevisionState = {
+  bytes: ArrayBuffer;
+  pageIndex: number;
+  result: OcrPageResult;
+  open: boolean;
+  selectedWordIndex: number | null;
+  draft: string;
+  corrections: Map<number, string>;
+  error: string;
+};
+
+type OcrSearchablePublicationState = SearchableOcrPublicationRevision & {
+  correctionRevision: number;
+};
 
 // Lazy-loads pdf-lib itself plus every lib/pdf/edit/*.ts module whose OWN
 // top-level imports touch it (export.ts, formXObjects.ts, fontEncoding.ts,
@@ -763,6 +788,14 @@ export default function EditPdfTool() {
     value: OcrOrientationCorrection;
   } | null>(null);
   const ocrReviewCorrectionRevisionRef = useRef(0);
+  const [ocrReviewCorrectionRevision, setOcrReviewCorrectionRevision] =
+    useState(0);
+  const markOcrReviewCorrectionChanged = useCallback(() => {
+    const nextRevision = ocrReviewCorrectionRevisionRef.current + 1;
+    ocrReviewCorrectionRevisionRef.current = nextRevision;
+    setOcrReviewCorrectionRevision(nextRevision);
+    return nextRevision;
+  }, []);
   const ocrJobRevisionRef = useRef<{
     bytes: ArrayBuffer;
     pageIndex: number;
@@ -771,20 +804,14 @@ export default function EditPdfTool() {
     bytes: null,
     pageIndex: 0,
   });
-  const [ocrResultsRevision, setOcrResultsRevision] = useState<{
-    bytes: ArrayBuffer;
-    pages: Map<number, OcrPageResult>;
-  } | null>(null);
-  const [ocrReviewRevision, setOcrReviewRevision] = useState<{
-    bytes: ArrayBuffer;
-    pageIndex: number;
-    result: OcrPageResult;
-    open: boolean;
-    selectedWordIndex: number | null;
-    draft: string;
-    corrections: Map<number, string>;
-    error: string;
-  } | null>(null);
+  const [ocrResultsRevision, setOcrResultsRevision] =
+    useState<OcrResultsRevisionState | null>(null);
+  const [ocrPublishedResultsRevision, setOcrPublishedResultsRevision] =
+    useState<OcrResultsRevisionState | null>(null);
+  const [ocrReviewRevision, setOcrReviewRevision] =
+    useState<OcrReviewRevisionState | null>(null);
+  const [ocrPublishedReviewRevision, setOcrPublishedReviewRevision] =
+    useState<OcrReviewRevisionState | null>(null);
   const [ocrActivity, setOcrActivity] = useState<{
     bytes: ArrayBuffer;
     pageIndex: number;
@@ -809,6 +836,8 @@ export default function EditPdfTool() {
       pageIndex: number;
       message: string;
     } | null>(null);
+  const [ocrSearchablePublicationRevision, setOcrSearchablePublicationRevision] =
+    useState<OcrSearchablePublicationState | null>(null);
   const ocrActivityCurrent =
     ocrActivity !== null &&
     ocrActivity.bytes === pdf?.bytes &&
@@ -830,10 +859,20 @@ export default function EditPdfTool() {
   const ocrCopied =
     ocrCopiedRevision?.bytes === (pdf?.bytes ?? null) &&
     ocrCopiedRevision.pageIndex === pageIndex;
-  const ocrPageResultCurrent =
-    ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
-      ? ocrResultsRevision.pages.get(pageIndex) ?? null
+  const ocrSearchablePublicationCurrent =
+    ocrSearchablePublicationRevision !== null &&
+    ocrSearchablePublicationRevision.publishedBytes === pdf?.bytes &&
+    ocrSearchablePublicationRevision.pageIndex === pageIndex
+      ? ocrSearchablePublicationRevision
       : null;
+  const ocrPageResultCurrent =
+    ocrSearchablePublicationCurrent &&
+    ocrPublishedResultsRevision !== null &&
+    ocrPublishedResultsRevision.bytes === pdf?.bytes
+      ? ocrPublishedResultsRevision.pages.get(pageIndex) ?? null
+      : ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
+        ? ocrResultsRevision.pages.get(pageIndex) ?? null
+        : null;
   const ocrLayoutAnalysis = useMemo(
     () =>
       ocrPageResultCurrent
@@ -842,12 +881,18 @@ export default function EditPdfTool() {
     [ocrPageResultCurrent],
   );
   const ocrReviewCurrent =
-    ocrReviewRevision !== null &&
-    ocrReviewRevision.bytes === pdf?.bytes &&
-    ocrReviewRevision.pageIndex === pageIndex &&
-    ocrReviewRevision.result === ocrPageResultCurrent
-      ? ocrReviewRevision
-      : null;
+    ocrSearchablePublicationCurrent &&
+    ocrPublishedReviewRevision !== null &&
+    ocrPublishedReviewRevision.bytes === pdf?.bytes &&
+    ocrPublishedReviewRevision.pageIndex === pageIndex &&
+    ocrPublishedReviewRevision.result === ocrPageResultCurrent
+      ? ocrPublishedReviewRevision
+      : ocrReviewRevision !== null &&
+          ocrReviewRevision.bytes === pdf?.bytes &&
+          ocrReviewRevision.pageIndex === pageIndex &&
+          ocrReviewRevision.result === ocrPageResultCurrent
+        ? ocrReviewRevision
+        : null;
   const ocrLowConfidenceWordIndices = ocrPageResultCurrent
     ? lowConfidenceOcrWordIndices(ocrPageResultCurrent)
     : [];
@@ -875,12 +920,29 @@ export default function EditPdfTool() {
     ocrSearchLayerActivity !== null &&
     ocrSearchLayerActivity.bytes === pdf?.bytes &&
     ocrSearchLayerActivity.pageIndex === pageIndex;
+  const ocrSearchableNeedsRegeneration =
+    ocrSearchablePublicationCurrent !== null &&
+    ocrSearchablePublicationCurrent.correctionRevision !==
+      ocrReviewCorrectionRevision;
   const ocrSearchLayerNotice =
     ocrSearchLayerNoticeRevision !== null &&
     ocrSearchLayerNoticeRevision.bytes === pdf?.bytes &&
     ocrSearchLayerNoticeRevision.pageIndex === pageIndex
       ? ocrSearchLayerNoticeRevision.message
       : "";
+
+  function mutateCurrentOcrReviewRevision(
+    updater: (
+      current: OcrReviewRevisionState | null,
+    ) => OcrReviewRevisionState | null,
+  ) {
+    if (ocrSearchablePublicationCurrent) {
+      setOcrPublishedReviewRevision(updater);
+    } else {
+      setOcrReviewRevision(updater);
+    }
+  }
+
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
   // runMatches was derived from), kept around so a multi-run selection can
   // reconstruct the FULL, in-order operator list one specific content
@@ -1456,7 +1518,8 @@ export default function EditPdfTool() {
   const handleRecognizeScannedPage = useCallback(async () => {
     if (
       !pdf ||
-      pageTextCapability.category !== "SCANNED_IMAGE" ||
+      (pageTextCapability.category !== "SCANNED_IMAGE" &&
+        !ocrSearchablePublicationCurrent) ||
       !rasterImageEvidenceCurrent
     ) {
       setOcrErrorRevision({
@@ -1479,8 +1542,12 @@ export default function EditPdfTool() {
     }
 
     const revision = { bytes: pdf.bytes, pageIndex };
-    ocrReviewCorrectionRevisionRef.current += 1;
-    setOcrReviewRevision(null);
+    markOcrReviewCorrectionChanged();
+    if (ocrSearchablePublicationCurrent) {
+      setOcrPublishedReviewRevision(null);
+    } else {
+      setOcrReviewRevision(null);
+    }
     ocrJobRevisionRef.current = revision;
     setOcrErrorRevision(null);
     setOcrCopiedRevision(null);
@@ -1520,7 +1587,10 @@ export default function EditPdfTool() {
       ) {
         return;
       }
-      setOcrResultsRevision((existing) => {
+      const setActiveOcrResultsRevision = ocrSearchablePublicationCurrent
+        ? setOcrPublishedResultsRevision
+        : setOcrResultsRevision;
+      setActiveOcrResultsRevision((existing) => {
         const pages =
           existing?.bytes === revision.bytes
             ? new Map(existing.pages)
@@ -1556,8 +1626,10 @@ export default function EditPdfTool() {
     pageTextCapability.category,
     pdf,
     rasterImageEvidenceCurrent,
+    ocrSearchablePublicationCurrent,
     ocrLanguage,
     ocrOrientationCorrection,
+    markOcrReviewCorrectionChanged,
   ]);
 
   async function handleCopyOcrText() {
@@ -1581,7 +1653,7 @@ export default function EditPdfTool() {
     if (!pdf || !ocrPageResultCurrent) return;
     const result = ocrPageResultCurrent;
     const bytes = pdf.bytes;
-    setOcrReviewRevision((current) => {
+    mutateCurrentOcrReviewRevision((current) => {
       const sameReview =
         current?.bytes === bytes &&
         current.pageIndex === pageIndex &&
@@ -1633,7 +1705,7 @@ export default function EditPdfTool() {
         ocrReviewCurrent.selectedWordIndex !== wordIndex &&
         ocrReviewHasUnappliedDraft
       ) {
-        setOcrReviewRevision((current) =>
+        mutateCurrentOcrReviewRevision((current) =>
           current === ocrReviewCurrent
             ? {
                 ...current,
@@ -1646,7 +1718,7 @@ export default function EditPdfTool() {
       }
       const result = ocrPageResultCurrent;
       const bytes = pdf.bytes;
-      setOcrReviewRevision((current) => {
+      mutateCurrentOcrReviewRevision((current) => {
         const corrections =
           current?.bytes === bytes &&
           current.pageIndex === pageIndex &&
@@ -1674,7 +1746,7 @@ export default function EditPdfTool() {
     if (!word) return;
     const validation = validateOcrWordCorrection(ocrReviewCurrent.draft);
     if (!validation.valid) {
-      setOcrReviewRevision((current) =>
+      mutateCurrentOcrReviewRevision((current) =>
         current === ocrReviewCurrent
           ? { ...current, error: validation.reason }
           : current,
@@ -1682,8 +1754,8 @@ export default function EditPdfTool() {
       return;
     }
 
-    ocrReviewCorrectionRevisionRef.current += 1;
-    setOcrReviewRevision((current) => {
+    markOcrReviewCorrectionChanged();
+    mutateCurrentOcrReviewRevision((current) => {
       if (current !== ocrReviewCurrent) return current;
       const corrections = new Map(current.corrections);
       if (validation.text === word.text) corrections.delete(index);
@@ -1703,8 +1775,8 @@ export default function EditPdfTool() {
     if (index === null) return;
     const word = ocrPageResultCurrent.words[index];
     if (!word) return;
-    ocrReviewCorrectionRevisionRef.current += 1;
-    setOcrReviewRevision((current) => {
+    markOcrReviewCorrectionChanged();
+    mutateCurrentOcrReviewRevision((current) => {
       if (current !== ocrReviewCurrent) return current;
       const corrections = new Map(current.corrections);
       corrections.delete(index);
@@ -1728,7 +1800,7 @@ export default function EditPdfTool() {
       return;
     }
     if (ocrReviewHasUnappliedDraft) {
-      setOcrReviewRevision((current) =>
+      mutateCurrentOcrReviewRevision((current) =>
         current === ocrReviewCurrent
           ? {
               ...current,
@@ -1771,7 +1843,8 @@ export default function EditPdfTool() {
     if (
       !pdf ||
       !ocrPageResultCurrent ||
-      pageTextCapability.category !== "SCANNED_IMAGE" ||
+      (pageTextCapability.category !== "SCANNED_IMAGE" &&
+        !ocrSearchablePublicationCurrent) ||
       !rasterImageEvidenceCurrent
     ) {
       setOcrErrorRevision({
@@ -1784,7 +1857,7 @@ export default function EditPdfTool() {
     }
     if (ocrBusy || ocrSearchLayerBusy) return;
     if (ocrReviewHasUnappliedDraft) {
-      setOcrReviewRevision((current) =>
+      mutateCurrentOcrReviewRevision((current) =>
         current === ocrReviewCurrent
           ? {
               ...current,
@@ -1798,8 +1871,8 @@ export default function EditPdfTool() {
 
     const reviewCorrectionRevision =
       ocrReviewCorrectionRevisionRef.current;
-    const sourceBytes = getHistoryState().pdfBytes;
-    if (sourceBytes !== pdf.bytes) {
+    const currentBytes = getHistoryState().pdfBytes;
+    if (currentBytes !== pdf.bytes) {
       setOcrErrorRevision({
         bytes: pdf.bytes,
         pageIndex,
@@ -1809,7 +1882,12 @@ export default function EditPdfTool() {
       return;
     }
 
-    const request = { bytes: sourceBytes, pageIndex };
+    const publicationSource = resolveSearchableOcrPublicationSource({
+      currentBytes,
+      pageIndex,
+      publication: ocrSearchablePublicationCurrent,
+    });
+    const request = { bytes: currentBytes, pageIndex };
     setOcrSearchLayerActivity(request);
     setOcrErrorRevision(null);
     setOcrSearchLayerNoticeRevision(null);
@@ -1837,15 +1915,15 @@ export default function EditPdfTool() {
       }
 
       const outcome = await addSearchableOcrTextLayer(
-        sourceBytes,
+        publicationSource.writerSourceBytes,
         searchableInput,
       );
 
       const context = ocrContextRef.current;
       if (
-        getHistoryState().pdfBytes !== sourceBytes ||
+        getHistoryState().pdfBytes !== currentBytes ||
         ocrReviewCorrectionRevisionRef.current !== reviewCorrectionRevision ||
-        context.bytes !== sourceBytes ||
+        context.bytes !== currentBytes ||
         context.pageIndex !== request.pageIndex
       ) {
         throw new Error(
@@ -1883,9 +1961,9 @@ export default function EditPdfTool() {
       }
 
       if (
-        getHistoryState().pdfBytes !== sourceBytes ||
+        getHistoryState().pdfBytes !== currentBytes ||
         ocrReviewCorrectionRevisionRef.current !== reviewCorrectionRevision ||
-        ocrContextRef.current.bytes !== sourceBytes ||
+        ocrContextRef.current.bytes !== currentBytes ||
         ocrContextRef.current.pageIndex !== request.pageIndex
       ) {
         throw new Error(
@@ -1904,8 +1982,9 @@ export default function EditPdfTool() {
           reviewedCorrectionWordIndices,
           outcome.writtenWordIndices,
         ).length;
+      const regenerated = publicationSource.kind === "regenerate";
       const description =
-        `Added ${writtenCount} local OCR word${writtenCount === 1 ? "" : "s"} as an invisible searchable text layer on page ${pageIndex + 1}.` +
+        `${regenerated ? "Regenerated" : "Added"} ${writtenCount} local OCR word${writtenCount === 1 ? "" : "s"} ${regenerated ? "in" : "as"} the invisible searchable text layer on page ${pageIndex + 1}.` +
         (publishedReviewedCorrectionCount > 0
           ? ` Published ${publishedReviewedCorrectionCount} reviewed OCR correction${publishedReviewedCorrectionCount === 1 ? "" : "s"}.`
           : "");
@@ -1915,7 +1994,9 @@ export default function EditPdfTool() {
         pdfBytes: nextBytes,
         session: appendPdfEditOperations(current.session, [
           createPageEditOperation({
-            operation: "add-searchable-text-layer",
+            operation: regenerated
+              ? "replace-searchable-text-layer"
+              : "add-searchable-text-layer",
             beforePageCount: pdf.pageCount,
             afterPageCount: pdf.pageCount,
             affectedPageIndices: [pageIndex],
@@ -1923,18 +2004,47 @@ export default function EditPdfTool() {
           }),
         ]),
       }));
+
+      setOcrSearchablePublicationRevision({
+        ...bindSearchableOcrPublicationRevision({
+          source: publicationSource,
+          publishedBytes: nextBytes,
+          pageIndex,
+        }),
+        correctionRevision: reviewCorrectionRevision,
+      });
+
+      const currentOcrResults = ocrSearchablePublicationCurrent
+        ? ocrPublishedResultsRevision
+        : ocrResultsRevision;
+      const publishedPages =
+        currentOcrResults?.bytes === currentBytes
+          ? new Map(currentOcrResults.pages)
+          : new Map<number, OcrPageResult>();
+      publishedPages.set(pageIndex, ocrPageResultCurrent);
+      setOcrPublishedResultsRevision({
+        bytes: nextBytes,
+        pages: publishedPages,
+      });
+      setOcrPublishedReviewRevision(
+        ocrReviewCurrent
+          ? { ...ocrReviewCurrent, bytes: nextBytes, error: "" }
+          : null,
+      );
+      ocrContextRef.current = { bytes: nextBytes, pageIndex };
+
       setOcrSearchLayerNoticeRevision({
         bytes: nextBytes,
         pageIndex,
         message:
-          `Searchable text added locally · ${writtenCount} word${writtenCount === 1 ? "" : "s"}` +
+          `Searchable text ${regenerated ? "regenerated" : "added"} locally · ${writtenCount} word${writtenCount === 1 ? "" : "s"}` +
           (publishedReviewedCorrectionCount > 0
             ? ` · ${publishedReviewedCorrectionCount} reviewed correction${publishedReviewedCorrectionCount === 1 ? "" : "s"}`
             : "") +
           (skippedCount > 0
             ? ` · ${skippedCount} unsupported or unsafe word${skippedCount === 1 ? "" : "s"} skipped`
             : "") +
-          ". The original scan pixels were not changed, and the new text layer stays read-only.",
+          ". The original scan pixels were not changed, and the searchable text layer stays read-only.",
       });
     } catch (layerError) {
       const currentBytes = getHistoryState().pdfBytes;
@@ -2231,9 +2341,15 @@ export default function EditPdfTool() {
     pageImageUrlRef.current = "";
     downloadUrlRef.current = "";
     ocrJobRevisionRef.current = null;
+    ocrReviewCorrectionRevisionRef.current = 0;
+    setOcrReviewCorrectionRevision(0);
     void ocrEngineRef.current?.terminate();
     ocrEngineRef.current = null;
     setOcrResultsRevision(null);
+    setOcrPublishedResultsRevision(null);
+    setOcrReviewRevision(null);
+    setOcrPublishedReviewRevision(null);
+    setOcrSearchablePublicationRevision(null);
     setOcrActivity(null);
     setOcrSearchLayerActivity(null);
     setOcrSearchLayerNoticeRevision(null);
@@ -7404,7 +7520,10 @@ export default function EditPdfTool() {
                     </p>
                   ) : null}
 
-                  {activeTool === "select" && textDetectionCurrent && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
+                  {activeTool === "select" &&
+                    textDetectionCurrent &&
+                    (detectedTextRuns.length === 0 || ocrSearchablePublicationCurrent !== null) &&
+                    (selectedRunIndices.length === 0 || ocrSearchablePublicationCurrent !== null) ? (
                     <div className={`absolute left-3 top-3 z-20 max-w-[340px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/94 p-3 shadow-lg backdrop-blur-sm ${ocrReviewCurrent?.open ? "pointer-events-none" : ""}`}>
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
                         {pageTextCapability.nativeSpanCount > 0 || pageTextCapability.rasterImageEvidence
@@ -7422,7 +7541,7 @@ export default function EditPdfTool() {
                             : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
                       </p>
 
-                      {pageTextCapability.category === "SCANNED_IMAGE" ? (
+                      {pageTextCapability.category === "SCANNED_IMAGE" || ocrSearchablePublicationCurrent ? (
                         <div data-edit-ocr-panel data-edit-ocr-source="ocr" onClick={(event) => event.stopPropagation()} className="mt-2.5 grid gap-2">
                           <label className="grid gap-1 text-[9px] font-semibold text-[var(--text-primary)]/52">
                             <span>Recognition language</span>
@@ -7574,11 +7693,21 @@ export default function EditPdfTool() {
                                   disabled={
                                     ocrBusy ||
                                     ocrSearchLayerBusy ||
-                                    ocrReviewHasUnappliedDraft
+                                    ocrReviewHasUnappliedDraft ||
+                                    (ocrSearchablePublicationCurrent !== null &&
+                                      !ocrSearchableNeedsRegeneration)
                                   }
                                   className="pointer-events-auto rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                  {ocrSearchLayerBusy ? "Adding searchable text…" : "Make page searchable"}
+                                  {ocrSearchLayerBusy
+                                    ? ocrSearchablePublicationCurrent
+                                      ? "Regenerating searchable text…"
+                                      : "Adding searchable text…"
+                                    : ocrSearchablePublicationCurrent
+                                      ? ocrSearchableNeedsRegeneration
+                                        ? "Regenerate searchable text"
+                                        : "Searchable text up to date"
+                                      : "Make page searchable"}
                                 </button>
                                 <button
                                   type="button"
@@ -7683,7 +7812,7 @@ export default function EditPdfTool() {
                                         disabled={ocrBusy || ocrSearchLayerBusy}
                                         onChange={(event) => {
                                           const value = event.currentTarget.value;
-                                          setOcrReviewRevision((current) =>
+                                          mutateCurrentOcrReviewRevision((current) =>
                                             current === ocrReviewCurrent
                                               ? { ...current, draft: value, error: "" }
                                               : current,
