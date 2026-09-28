@@ -5819,7 +5819,24 @@ export default function EditPdfTool() {
     ? pickHorizontalAlign(singleSelectedRun.xPct, singleSelectedRun.xPct + singleSelectedRun.widthPct)
     : "start";
   const inlineEditorToolbarPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-1" : "bottom-full mb-1";
-  const nativeFormatPanelPositionClass = inlineEditorVerticalPlacement === "below" ? "top-full mt-12" : "bottom-full mb-12";
+  // The compact Apply/Cancel toolbar may flip above specifically to keep a
+  // neighbouring editable run reachable for Shift+click paragraph selection.
+  // The much taller Format panel has different geometry and must not inherit
+  // that obstacle-driven flip: doing so can place its upper controls beneath
+  // the sticky public header. Give it its own edge-aware decision and a larger
+  // clearance budget; the panel itself also scrolls internally.
+  const nativeFormatPanelVerticalPlacement = singleSelectedRun
+    ? pickVerticalPlacement(
+        singleSelectedRun.yPct,
+        singleSelectedRun.yPct + singleSelectedRun.heightPct,
+        38,
+        true,
+      )
+    : "below";
+  const nativeFormatPanelPositionClass =
+    nativeFormatPanelVerticalPlacement === "below"
+      ? "top-full mt-12"
+      : "bottom-full mb-12";
   const inlineEditorTooltipPositionClass = nativeFormatOpen
     ? inlineEditorVerticalPlacement === "below"
       ? "top-full mt-[12rem]"
