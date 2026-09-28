@@ -13,6 +13,7 @@ import type { OcrPageResult, OcrWord } from "./localOcr.ts";
 export const MAX_SEARCHABLE_OCR_WORDS = 5_000;
 
 export type SearchableOcrSkippedWord = Readonly<{
+  wordIndex: number;
   text: string;
   reason:
     | "empty"
@@ -26,12 +27,14 @@ export type SearchableOcrLayerOutcome = Readonly<{
   bytes: Uint8Array;
   pageIndex: number;
   writtenWords: readonly string[];
+  writtenWordIndices: readonly number[];
   skippedWords: readonly SearchableOcrSkippedWord[];
 }>;
 
 type PageRotation = 0 | 90 | 180 | 270;
 
 type PreparedWord = Readonly<{
+  wordIndex: number;
   text: string;
   boundsPct: OcrWord["boundsPct"];
 }>;
@@ -128,10 +131,10 @@ function prepareWords(
   const prepared: PreparedWord[] = [];
   const skipped: SearchableOcrSkippedWord[] = [];
 
-  for (const word of words) {
+  for (const [wordIndex, word] of words.entries()) {
     const text = word.text.replace(/\s+/g, " ").trim();
     if (!text) {
-      skipped.push({ text: "", reason: "empty" });
+      skipped.push({ wordIndex, text: "", reason: "empty" });
       continue;
     }
     const { xPct, yPct, widthPct, heightPct } = word.boundsPct;
@@ -145,7 +148,7 @@ function prepareWords(
       xPct + widthPct > 100.001 ||
       yPct + heightPct > 100.001
     ) {
-      skipped.push({ text, reason: "invalid-geometry" });
+      skipped.push({ wordIndex, text, reason: "invalid-geometry" });
       continue;
     }
 
@@ -154,11 +157,11 @@ function prepareWords(
     // substitute-font feature. Never corrupt unsupported Unicode and never
     // claim it was written.
     if (!encodeWithFallbackFont(text)) {
-      skipped.push({ text, reason: "unsupported-text" });
+      skipped.push({ wordIndex, text, reason: "unsupported-text" });
       continue;
     }
 
-    prepared.push({ text, boundsPct: { ...word.boundsPct } });
+    prepared.push({ wordIndex, text, boundsPct: { ...word.boundsPct } });
   }
 
   return { prepared, skipped };
@@ -213,6 +216,7 @@ export async function addSearchableOcrTextLayer(
   );
 
   const placements: Array<{
+    wordIndex: number;
     text: string;
     x: number;
     y: number;
@@ -230,11 +234,19 @@ export async function addSearchableOcrTextLayer(
     try {
       unitWidth = font.widthOfTextAtSize(word.text, 1);
     } catch {
-      skipped.push({ text: word.text, reason: "unsupported-text" });
+      skipped.push({
+        wordIndex: word.wordIndex,
+        text: word.text,
+        reason: "unsupported-text",
+      });
       continue;
     }
     if (!finitePositive(unitWidth) || !finitePositive(visualWordWidth)) {
-      skipped.push({ text: word.text, reason: "too-small" });
+      skipped.push({
+        wordIndex: word.wordIndex,
+        text: word.text,
+        reason: "too-small",
+      });
       continue;
     }
 
@@ -244,7 +256,11 @@ export async function addSearchableOcrTextLayer(
     const widthSize = visualWordWidth / unitWidth;
     const size = Math.max(0.5, Math.min(heightSize, widthSize));
     if (!finitePositive(size) || size < 0.5) {
-      skipped.push({ text: word.text, reason: "too-small" });
+      skipped.push({
+        wordIndex: word.wordIndex,
+        text: word.text,
+        reason: "too-small",
+      });
       continue;
     }
 
@@ -258,6 +274,7 @@ export async function addSearchableOcrTextLayer(
       baselineVisualY,
     );
     placements.push({
+      wordIndex: word.wordIndex,
       text: word.text,
       x: anchor.x,
       y: anchor.y,
@@ -272,6 +289,7 @@ export async function addSearchableOcrTextLayer(
   }
 
   const writtenWords: string[] = [];
+  const writtenWordIndices: number[] = [];
   page.pushOperators(
     beginText(),
     setTextRenderingMode(TextRenderingMode.Invisible),
@@ -288,8 +306,13 @@ export async function addSearchableOcrTextLayer(
           rotate: degrees(rotation),
         });
         writtenWords.push(placement.text);
+        writtenWordIndices.push(placement.wordIndex);
       } catch {
-        skipped.push({ text: placement.text, reason: "draw-failed" });
+        skipped.push({
+          wordIndex: placement.wordIndex,
+          text: placement.text,
+          reason: "draw-failed",
+        });
       }
     }
   } finally {
@@ -309,7 +332,8 @@ export async function addSearchableOcrTextLayer(
   return {
     bytes: await doc.save(),
     pageIndex: ocrResult.pageIndex,
-    writtenWords,
-    skippedWords: skipped,
+    writtenWords: Object.freeze(writtenWords),
+    writtenWordIndices: Object.freeze(writtenWordIndices),
+    skippedWords: Object.freeze(skipped),
   };
 }

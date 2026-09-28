@@ -117,6 +117,12 @@ import {
   type OcrProgress,
 } from "@/lib/pdf/edit/localOcr";
 import {
+  buildReviewedOcrSearchableInput,
+  lowConfidenceOcrWordIndices,
+  publishedReviewedOcrCorrectionIndices,
+  validateOcrWordCorrection,
+} from "@/lib/pdf/edit/ocrReview";
+import {
   MAX_LOCAL_CUSTOM_FONT_BYTES,
   MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES,
   createLocalCustomFontAsset,
@@ -741,6 +747,7 @@ export default function EditPdfTool() {
   // exact live PDF ArrayBuffer so undo/redo/page mutations cannot leave stale
   // recognized text attached to a different document revision.
   const ocrEngineRef = useRef<LocalOcrEngine | null>(null);
+  const ocrReviewCorrectionRevisionRef = useRef(0);
   const ocrJobRevisionRef = useRef<{
     bytes: ArrayBuffer;
     pageIndex: number;
@@ -752,6 +759,16 @@ export default function EditPdfTool() {
   const [ocrResultsRevision, setOcrResultsRevision] = useState<{
     bytes: ArrayBuffer;
     pages: Map<number, OcrPageResult>;
+  } | null>(null);
+  const [ocrReviewRevision, setOcrReviewRevision] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+    result: OcrPageResult;
+    open: boolean;
+    selectedWordIndex: number | null;
+    draft: string;
+    corrections: Map<number, string>;
+    error: string;
   } | null>(null);
   const [ocrActivity, setOcrActivity] = useState<{
     bytes: ArrayBuffer;
@@ -797,6 +814,36 @@ export default function EditPdfTool() {
     ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
       ? ocrResultsRevision.pages.get(pageIndex) ?? null
       : null;
+  const ocrReviewCurrent =
+    ocrReviewRevision !== null &&
+    ocrReviewRevision.bytes === pdf?.bytes &&
+    ocrReviewRevision.pageIndex === pageIndex &&
+    ocrReviewRevision.result === ocrPageResultCurrent
+      ? ocrReviewRevision
+      : null;
+  const ocrLowConfidenceWordIndices = ocrPageResultCurrent
+    ? lowConfidenceOcrWordIndices(ocrPageResultCurrent)
+    : [];
+  const ocrReviewSelectedWord =
+    ocrReviewCurrent?.selectedWordIndex !== null &&
+    ocrReviewCurrent?.selectedWordIndex !== undefined &&
+    ocrPageResultCurrent
+      ? ocrPageResultCurrent.words[ocrReviewCurrent.selectedWordIndex] ?? null
+      : null;
+  const ocrReviewDraftValidation = ocrReviewSelectedWord
+    ? validateOcrWordCorrection(ocrReviewCurrent?.draft ?? "")
+    : null;
+  const ocrReviewAppliedText =
+    ocrReviewCurrent?.selectedWordIndex !== null &&
+    ocrReviewCurrent?.selectedWordIndex !== undefined &&
+    ocrReviewSelectedWord
+      ? ocrReviewCurrent.corrections.get(ocrReviewCurrent.selectedWordIndex) ??
+        ocrReviewSelectedWord.text
+      : null;
+  const ocrReviewHasUnappliedDraft =
+    ocrReviewCurrent?.open === true &&
+    ocrReviewAppliedText !== null &&
+    ocrReviewCurrent.draft !== ocrReviewAppliedText;
   const ocrSearchLayerBusy =
     ocrSearchLayerActivity !== null &&
     ocrSearchLayerActivity.bytes === pdf?.bytes &&
@@ -1405,6 +1452,8 @@ export default function EditPdfTool() {
     }
 
     const revision = { bytes: pdf.bytes, pageIndex };
+    ocrReviewCorrectionRevisionRef.current += 1;
+    setOcrReviewRevision(null);
     ocrJobRevisionRef.current = revision;
     setOcrErrorRevision(null);
     setOcrCopiedRevision(null);
@@ -1480,7 +1529,7 @@ export default function EditPdfTool() {
     rasterImageEvidenceCurrent,
   ]);
 
-  const handleCopyOcrText = useCallback(async () => {
+  async function handleCopyOcrText() {
     const text = ocrPageResultCurrent?.text.trim() ?? "";
     if (!text) return;
     const revision = { bytes: pdf?.bytes ?? null, pageIndex };
@@ -1495,9 +1544,199 @@ export default function EditPdfTool() {
         message: "The browser did not allow copying recognized text.",
       });
     }
-  }, [ocrPageResultCurrent, pageIndex, pdf?.bytes]);
+  }
 
-  const handleAddSearchableOcrLayer = useCallback(async () => {
+  function handleToggleOcrReview() {
+    if (!pdf || !ocrPageResultCurrent) return;
+    const result = ocrPageResultCurrent;
+    const bytes = pdf.bytes;
+    setOcrReviewRevision((current) => {
+      const sameReview =
+        current?.bytes === bytes &&
+        current.pageIndex === pageIndex &&
+        current.result === result;
+      if (sameReview) {
+        const opening = !current.open;
+        if (!opening) {
+          return { ...current, open: false, selectedWordIndex: null, draft: "", error: "" };
+        }
+        const preferred =
+          current.selectedWordIndex ??
+          lowConfidenceOcrWordIndices(result)[0] ??
+          (result.words.length > 0 ? 0 : null);
+        return {
+          ...current,
+          open: true,
+          selectedWordIndex: preferred,
+          draft:
+            preferred === null
+              ? ""
+              : current.corrections.get(preferred) ?? result.words[preferred]?.text ?? "",
+          error: "",
+        };
+      }
+
+      const preferred =
+        lowConfidenceOcrWordIndices(result)[0] ??
+        (result.words.length > 0 ? 0 : null);
+      return {
+        bytes,
+        pageIndex,
+        result,
+        open: true,
+        selectedWordIndex: preferred,
+        draft: preferred === null ? "" : result.words[preferred]?.text ?? "",
+        corrections: new Map<number, string>(),
+        error: "",
+      };
+    });
+  }
+
+  function handleSelectOcrReviewWord(wordIndex: number) {
+      if (!pdf || !ocrPageResultCurrent) return;
+      const word = ocrPageResultCurrent.words[wordIndex];
+      if (!word) return;
+      if (
+        ocrReviewCurrent?.open &&
+        ocrReviewCurrent.selectedWordIndex !== null &&
+        ocrReviewCurrent.selectedWordIndex !== wordIndex &&
+        ocrReviewHasUnappliedDraft
+      ) {
+        setOcrReviewRevision((current) =>
+          current === ocrReviewCurrent
+            ? {
+                ...current,
+                error:
+                  "Apply or reset the current OCR correction before selecting another word.",
+              }
+            : current,
+        );
+        return;
+      }
+      const result = ocrPageResultCurrent;
+      const bytes = pdf.bytes;
+      setOcrReviewRevision((current) => {
+        const corrections =
+          current?.bytes === bytes &&
+          current.pageIndex === pageIndex &&
+          current.result === result
+            ? new Map(current.corrections)
+            : new Map<number, string>();
+        return {
+          bytes,
+          pageIndex,
+          result,
+          open: true,
+          selectedWordIndex: wordIndex,
+          draft: corrections.get(wordIndex) ?? word.text,
+          corrections,
+          error: "",
+        };
+      });
+  }
+
+  function handleApplyOcrWordCorrection() {
+    if (!ocrReviewCurrent || !ocrPageResultCurrent) return;
+    const index = ocrReviewCurrent.selectedWordIndex;
+    if (index === null) return;
+    const word = ocrPageResultCurrent.words[index];
+    if (!word) return;
+    const validation = validateOcrWordCorrection(ocrReviewCurrent.draft);
+    if (!validation.valid) {
+      setOcrReviewRevision((current) =>
+        current === ocrReviewCurrent
+          ? { ...current, error: validation.reason }
+          : current,
+      );
+      return;
+    }
+
+    ocrReviewCorrectionRevisionRef.current += 1;
+    setOcrReviewRevision((current) => {
+      if (current !== ocrReviewCurrent) return current;
+      const corrections = new Map(current.corrections);
+      if (validation.text === word.text) corrections.delete(index);
+      else corrections.set(index, validation.text);
+      return {
+        ...current,
+        draft: validation.text,
+        corrections,
+        error: "",
+      };
+    });
+  }
+
+  function handleResetOcrWordCorrection() {
+    if (!ocrReviewCurrent || !ocrPageResultCurrent) return;
+    const index = ocrReviewCurrent.selectedWordIndex;
+    if (index === null) return;
+    const word = ocrPageResultCurrent.words[index];
+    if (!word) return;
+    ocrReviewCorrectionRevisionRef.current += 1;
+    setOcrReviewRevision((current) => {
+      if (current !== ocrReviewCurrent) return current;
+      const corrections = new Map(current.corrections);
+      corrections.delete(index);
+      return {
+        ...current,
+        draft: word.text,
+        corrections,
+        error: "",
+      };
+    });
+  }
+
+  function handleStepOcrReviewWord(direction: -1 | 1) {
+    if (
+      !ocrReviewCurrent ||
+      !ocrPageResultCurrent ||
+      ocrBusy ||
+      ocrSearchLayerBusy ||
+      ocrPageResultCurrent.words.length === 0
+    ) {
+      return;
+    }
+    if (ocrReviewHasUnappliedDraft) {
+      setOcrReviewRevision((current) =>
+        current === ocrReviewCurrent
+          ? {
+              ...current,
+              error:
+                "Apply or reset the current OCR correction before selecting another word.",
+            }
+          : current,
+      );
+      return;
+    }
+
+    const count = ocrPageResultCurrent.words.length;
+    const currentIndex = ocrReviewCurrent.selectedWordIndex;
+    const nextIndex =
+      currentIndex === null
+        ? direction > 0
+          ? 0
+          : count - 1
+        : (currentIndex + direction + count) % count;
+    handleSelectOcrReviewWord(nextIndex);
+  }
+
+  function handleNextLowConfidenceOcrWord() {
+    if (!ocrReviewCurrent || !ocrPageResultCurrent) return;
+    const lowConfidence = lowConfidenceOcrWordIndices(ocrPageResultCurrent);
+    if (lowConfidence.length === 0) return;
+    const currentPosition = lowConfidence.indexOf(
+      ocrReviewCurrent.selectedWordIndex ?? -1,
+    );
+    const nextIndex =
+      lowConfidence[
+        currentPosition < 0 || currentPosition === lowConfidence.length - 1
+          ? 0
+          : currentPosition + 1
+      ];
+    handleSelectOcrReviewWord(nextIndex);
+  }
+
+  async function handleAddSearchableOcrLayer() {
     if (
       !pdf ||
       !ocrPageResultCurrent ||
@@ -1513,7 +1752,21 @@ export default function EditPdfTool() {
       return;
     }
     if (ocrBusy || ocrSearchLayerBusy) return;
+    if (ocrReviewHasUnappliedDraft) {
+      setOcrReviewRevision((current) =>
+        current === ocrReviewCurrent
+          ? {
+              ...current,
+              error:
+                "Apply or reset the current OCR word correction before making the page searchable.",
+            }
+          : current,
+      );
+      return;
+    }
 
+    const reviewCorrectionRevision =
+      ocrReviewCorrectionRevisionRef.current;
     const sourceBytes = getHistoryState().pdfBytes;
     if (sourceBytes !== pdf.bytes) {
       setOcrErrorRevision({
@@ -1534,14 +1787,33 @@ export default function EditPdfTool() {
       const { addSearchableOcrTextLayer, firstMissingSearchableOcrWord } = await import(
         "@/lib/pdf/edit/searchableOcrLayer"
       );
+      let searchableInput: Pick<OcrPageResult, "pageIndex" | "words"> =
+        ocrPageResultCurrent;
+      let reviewedCorrectionWordIndices: readonly number[] = [];
+      if (ocrReviewCurrent) {
+        const reviewed = buildReviewedOcrSearchableInput(
+          ocrPageResultCurrent,
+          ocrReviewCurrent.corrections,
+        );
+        if (reviewed.kind !== "ready") {
+          throw new Error(reviewed.reason);
+        }
+        searchableInput = {
+          pageIndex: reviewed.pageIndex,
+          words: reviewed.words,
+        };
+        reviewedCorrectionWordIndices = reviewed.correctedWordIndices;
+      }
+
       const outcome = await addSearchableOcrTextLayer(
         sourceBytes,
-        ocrPageResultCurrent,
+        searchableInput,
       );
 
       const context = ocrContextRef.current;
       if (
         getHistoryState().pdfBytes !== sourceBytes ||
+        ocrReviewCorrectionRevisionRef.current !== reviewCorrectionRevision ||
         context.bytes !== sourceBytes ||
         context.pageIndex !== request.pageIndex
       ) {
@@ -1581,6 +1853,7 @@ export default function EditPdfTool() {
 
       if (
         getHistoryState().pdfBytes !== sourceBytes ||
+        ocrReviewCorrectionRevisionRef.current !== reviewCorrectionRevision ||
         ocrContextRef.current.bytes !== sourceBytes ||
         ocrContextRef.current.pageIndex !== request.pageIndex
       ) {
@@ -1595,8 +1868,16 @@ export default function EditPdfTool() {
       ) as ArrayBuffer;
       const writtenCount = outcome.writtenWords.length;
       const skippedCount = outcome.skippedWords.length;
+      const publishedReviewedCorrectionCount =
+        publishedReviewedOcrCorrectionIndices(
+          reviewedCorrectionWordIndices,
+          outcome.writtenWordIndices,
+        ).length;
       const description =
-        `Added ${writtenCount} local OCR word${writtenCount === 1 ? "" : "s"} as an invisible searchable text layer on page ${pageIndex + 1}.`;
+        `Added ${writtenCount} local OCR word${writtenCount === 1 ? "" : "s"} as an invisible searchable text layer on page ${pageIndex + 1}.` +
+        (publishedReviewedCorrectionCount > 0
+          ? ` Published ${publishedReviewedCorrectionCount} reviewed OCR correction${publishedReviewedCorrectionCount === 1 ? "" : "s"}.`
+          : "");
 
       setHistoryState((current) => ({
         ...current,
@@ -1616,6 +1897,9 @@ export default function EditPdfTool() {
         pageIndex,
         message:
           `Searchable text added locally · ${writtenCount} word${writtenCount === 1 ? "" : "s"}` +
+          (publishedReviewedCorrectionCount > 0
+            ? ` · ${publishedReviewedCorrectionCount} reviewed correction${publishedReviewedCorrectionCount === 1 ? "" : "s"}`
+            : "") +
           (skippedCount > 0
             ? ` · ${skippedCount} unsupported or unsafe word${skippedCount === 1 ? "" : "s"} skipped`
             : "") +
@@ -1640,17 +1924,7 @@ export default function EditPdfTool() {
           : current,
       );
     }
-  }, [
-    getHistoryState,
-    ocrBusy,
-    ocrPageResultCurrent,
-    ocrSearchLayerBusy,
-    pageIndex,
-    pageTextCapability.category,
-    pdf,
-    rasterImageEvidenceCurrent,
-    setHistoryState,
-  ]);
+  }
 
   // Development-only fidelity diagnostics. This deliberately never renders
   // debug noise in the normal product and is compiled behind NODE_ENV.
@@ -6339,7 +6613,14 @@ export default function EditPdfTool() {
                   <img src={pageImageUrl} alt={`Page ${pageIndex + 1} preview`} className="pointer-events-none block h-full w-full select-none" />
 
                   {ocrPageResultCurrent ? (
-                    <OcrWordOverlay result={ocrPageResultCurrent} />
+                    <OcrWordOverlay
+                      result={ocrPageResultCurrent}
+                      reviewMode={ocrReviewCurrent?.open ?? false}
+                      selectedWordIndex={ocrReviewCurrent?.selectedWordIndex ?? null}
+                      corrections={ocrReviewCurrent?.corrections}
+                      onSelectWord={handleSelectOcrReviewWord}
+                      disabled={ocrBusy || ocrSearchLayerBusy}
+                    />
                   ) : null}
 
                   {whiteoutDraft ? (
@@ -7093,7 +7374,7 @@ export default function EditPdfTool() {
                   ) : null}
 
                   {activeTool === "select" && textDetectionCurrent && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
-                    <div className="absolute left-3 top-3 z-20 max-w-[340px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/94 p-3 shadow-lg backdrop-blur-sm">
+                    <div className={`absolute left-3 top-3 z-20 max-w-[340px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/94 p-3 shadow-lg backdrop-blur-sm ${ocrReviewCurrent?.open ? "pointer-events-none" : ""}`}>
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
                         {pageTextCapability.nativeSpanCount > 0 || pageTextCapability.rasterImageEvidence
                           ? pageCapabilityMessage.title
@@ -7125,6 +7406,24 @@ export default function EditPdfTool() {
                                 <span data-edit-ocr-word-summary>
                                   {ocrPageResultCurrent.words.length} word{ocrPageResultCurrent.words.length === 1 ? "" : "s"}
                                 </span>
+                                <span>·</span>
+                                <span
+                                  data-edit-ocr-low-confidence-count={ocrLowConfidenceWordIndices.length}
+                                  className={ocrLowConfidenceWordIndices.length > 0 ? "font-semibold text-[var(--text-primary)]/70" : undefined}
+                                >
+                                  {ocrLowConfidenceWordIndices.length} below 80%
+                                </span>
+                                {ocrReviewCurrent && ocrReviewCurrent.corrections.size > 0 ? (
+                                  <>
+                                    <span>·</span>
+                                    <span
+                                      data-edit-ocr-correction-count={ocrReviewCurrent.corrections.size}
+                                      className="font-semibold text-[var(--text-primary)]/70"
+                                    >
+                                      {ocrReviewCurrent.corrections.size} corrected
+                                    </span>
+                                  </>
+                                ) : null}
                               </div>
                               <textarea
                                 readOnly
@@ -7137,16 +7436,29 @@ export default function EditPdfTool() {
                               <div className="flex flex-wrap gap-1.5">
                                 <button
                                   type="button"
+                                  onClick={handleToggleOcrReview}
+                                  disabled={ocrBusy || ocrSearchLayerBusy}
+                                  aria-expanded={ocrReviewCurrent?.open ?? false}
+                                  className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {ocrReviewCurrent?.open ? "Done reviewing" : "Review OCR"}
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => void handleCopyOcrText()}
-                                  className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45"
+                                  className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45"
                                 >
                                   {ocrCopied ? "Copied" : "Copy text"}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => void handleAddSearchableOcrLayer()}
-                                  disabled={ocrBusy || ocrSearchLayerBusy}
-                                  className="rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-50"
+                                  disabled={
+                                    ocrBusy ||
+                                    ocrSearchLayerBusy ||
+                                    ocrReviewHasUnappliedDraft
+                                  }
+                                  className="pointer-events-auto rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   {ocrSearchLayerBusy ? "Adding searchable text…" : "Make page searchable"}
                                 </button>
@@ -7154,11 +7466,149 @@ export default function EditPdfTool() {
                                   type="button"
                                   onClick={() => void handleRecognizeScannedPage()}
                                   disabled={ocrBusy || ocrSearchLayerBusy}
-                                  className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[10px] font-semibold text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   Recognize again
                                 </button>
                               </div>
+                              {ocrReviewCurrent?.open ? (
+                                <div
+                                  data-edit-ocr-review-panel
+                                  className="pointer-events-none grid gap-2 rounded-[var(--radius-md)] border border-[var(--lumeo-gold)]/24 bg-[var(--lumeo-gold)]/[0.045] p-2.5"
+                                >
+                                  <div className="grid gap-1.5">
+                                    <div>
+                                      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/65">
+                                        OCR confidence review
+                                      </p>
+                                      <p className="mt-0.5 text-[9px] leading-4 text-[var(--text-primary)]/48">
+                                        Click a visible word box on the page or use Previous/Next word. Corrections change searchable text only; OCR confidence and geometry remain the original recognition evidence.
+                                      </p>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStepOcrReviewWord(-1)}
+                                        disabled={
+                                          ocrBusy ||
+                                          ocrSearchLayerBusy ||
+                                          ocrReviewHasUnappliedDraft ||
+                                          ocrPageResultCurrent.words.length === 0
+                                        }
+                                        className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
+                                      >
+                                        Previous word
+                                      </button>
+                                      <span
+                                        data-edit-ocr-review-position
+                                        className="text-[9px] font-semibold tabular-nums text-[var(--text-primary)]/52"
+                                      >
+                                        {ocrReviewCurrent.selectedWordIndex === null
+                                          ? `0 of ${ocrPageResultCurrent.words.length}`
+                                          : `${ocrReviewCurrent.selectedWordIndex + 1} of ${ocrPageResultCurrent.words.length}`}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleStepOcrReviewWord(1)}
+                                        disabled={
+                                          ocrBusy ||
+                                          ocrSearchLayerBusy ||
+                                          ocrReviewHasUnappliedDraft ||
+                                          ocrPageResultCurrent.words.length === 0
+                                        }
+                                        className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
+                                      >
+                                        Next word
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={handleNextLowConfidenceOcrWord}
+                                        disabled={
+                                          ocrBusy ||
+                                          ocrSearchLayerBusy ||
+                                          ocrReviewHasUnappliedDraft ||
+                                          ocrLowConfidenceWordIndices.length === 0
+                                        }
+                                        className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-semibold text-[var(--text-primary)]/65 disabled:cursor-not-allowed disabled:opacity-40"
+                                      >
+                                        Next low-confidence
+                                      </button>
+                                    </div>
+                                  </div>
+                                  {ocrReviewSelectedWord && ocrReviewCurrent.selectedWordIndex !== null ? (
+                                    <div className="grid gap-1.5" data-edit-ocr-review-selected-word={ocrReviewCurrent.selectedWordIndex}>
+                                      <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-[var(--text-primary)]/52">
+                                        <span>
+                                          Recognized: <strong className="text-[var(--text-primary)]/72">{ocrReviewSelectedWord.text}</strong>
+                                        </span>
+                                        <span>·</span>
+                                        <span data-edit-ocr-review-confidence>
+                                          {Math.round(ocrReviewSelectedWord.confidence)}% confidence
+                                        </span>
+                                      </div>
+                                      <input
+                                        aria-label="Correct OCR word"
+                                        data-edit-ocr-review-input
+                                        value={ocrReviewCurrent.draft}
+                                        disabled={ocrBusy || ocrSearchLayerBusy}
+                                        onChange={(event) => {
+                                          const value = event.currentTarget.value;
+                                          setOcrReviewRevision((current) =>
+                                            current === ocrReviewCurrent
+                                              ? { ...current, draft: value, error: "" }
+                                              : current,
+                                          );
+                                        }}
+                                        onKeyDown={(event) => {
+                                          event.stopPropagation();
+                                          if (event.key === "Enter" && ocrReviewDraftValidation?.valid) {
+                                            event.preventDefault();
+                                            handleApplyOcrWordCorrection();
+                                          }
+                                        }}
+                                        className="pointer-events-auto w-full rounded-md border border-[var(--text-primary)]/14 bg-white/78 px-2 py-1.5 text-[11px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55"
+                                      />
+                                      <div className="flex flex-wrap gap-1.5">
+                                        <button
+                                          type="button"
+                                          onClick={handleApplyOcrWordCorrection}
+                                          disabled={
+                                            ocrBusy ||
+                                            ocrSearchLayerBusy ||
+                                            !ocrReviewDraftValidation?.valid
+                                          }
+                                          className="pointer-events-auto rounded-full border border-[var(--lumeo-gold)]/45 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[9px] font-bold text-[var(--text-primary)]/72 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                          Apply correction
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={handleResetOcrWordCorrection}
+                                          disabled={
+                                            ocrBusy ||
+                                            ocrSearchLayerBusy ||
+                                            !ocrReviewCurrent.corrections.has(
+                                              ocrReviewCurrent.selectedWordIndex,
+                                            )
+                                          }
+                                          className="pointer-events-auto rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-[9px] font-semibold text-[var(--text-primary)]/62 disabled:cursor-not-allowed disabled:opacity-40"
+                                        >
+                                          Reset word
+                                        </button>
+                                      </div>
+                                      {ocrReviewCurrent.error ? (
+                                        <p role="alert" className="text-[9px] leading-4 text-[var(--text-danger)]">
+                                          {ocrReviewCurrent.error}
+                                        </p>
+                                      ) : null}
+                                    </div>
+                                  ) : (
+                                    <p className="text-[9px] leading-4 text-[var(--text-primary)]/48">
+                                      No OCR word is selected.
+                                    </p>
+                                  )}
+                                </div>
+                              ) : null}
                             </>
                           ) : (
                             <button

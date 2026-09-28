@@ -102,6 +102,7 @@ test("searchable OCR layer writes extractable text with native rendering mode 3"
   );
 
   assert.deepEqual(outcome.writtenWords, ["SCANNED", "PAGE", "SAMPLE"]);
+  assert.deepEqual(outcome.writtenWordIndices, [0, 1, 2]);
   assert.equal(outcome.skippedWords.length, 0);
 
   const text = await extractedText(outcome.bytes);
@@ -129,9 +130,13 @@ test("searchable OCR layer skips unsupported Unicode instead of corrupting or su
   );
 
   assert.deepEqual(outcome.writtenWords, ["Readable"]);
+  assert.deepEqual(outcome.writtenWordIndices, [0]);
   assert.ok(
     outcome.skippedWords.some(
-      (entry) => entry.text === "😀" && entry.reason === "unsupported-text",
+      (entry) =>
+        entry.wordIndex === 1 &&
+        entry.text === "😀" &&
+        entry.reason === "unsupported-text",
     ),
   );
 
@@ -181,5 +186,28 @@ test("searchable OCR layer rejects OCR results bound to a page that does not exi
         result([word("orphan", 10, 10, 20, 5)], 4),
       ),
     /does not exist/i,
+  );
+});
+
+
+test("searchable OCR outcome preserves exact source indices across duplicate text and skips", async () => {
+  const source = await blankPdf();
+  const outcome = await addSearchableOcrTextLayer(
+    source,
+    result([
+      word("same", 10, 30, 15, 5),
+      word("😀", 30, 30, 8, 5),
+      word("same", 45, 30, 15, 5),
+    ]),
+  );
+
+  assert.deepEqual(outcome.writtenWords, ["same", "same"]);
+  assert.deepEqual(outcome.writtenWordIndices, [0, 2]);
+  assert.deepEqual(
+    outcome.skippedWords.map((entry) => ({
+      wordIndex: entry.wordIndex,
+      reason: entry.reason,
+    })),
+    [{ wordIndex: 1, reason: "unsupported-text" }],
   );
 });
