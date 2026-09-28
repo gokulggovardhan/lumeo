@@ -56,7 +56,7 @@ export type ResolvedFont = {
    * when a named CMap ending in -H/-V proves it; otherwise this is unknown
    * and native writers must fail closed rather than assume a direction.
    */
-  writingMode: FontWritingMode;
+  writingMode?: FontWritingMode;
   glyphCodeToUnicode: Map<number, string>;
   /**
    * Only populated with codes this module can vouch for -- see
