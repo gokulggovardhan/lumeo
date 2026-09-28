@@ -7512,7 +7512,7 @@ export default function EditPdfTool() {
                   {activeTool === "select" &&
                     textDetectionCurrent &&
                     (detectedTextRuns.length === 0 || ocrSearchablePublicationCurrent !== null) &&
-                    selectedRunIndices.length === 0 ? (
+                    (selectedRunIndices.length === 0 || ocrSearchablePublicationCurrent !== null) ? (
                     <div className={`absolute left-3 top-3 z-20 max-w-[340px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/94 p-3 shadow-lg backdrop-blur-sm ${ocrReviewCurrent?.open ? "pointer-events-none" : ""}`}>
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
                         {pageTextCapability.nativeSpanCount > 0 || pageTextCapability.rasterImageEvidence
