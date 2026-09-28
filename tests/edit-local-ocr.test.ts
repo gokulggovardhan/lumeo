@@ -6,8 +6,10 @@ import {
   OCR_TARGET_DPI,
   computeOcrRenderScale,
   createLocalOcrEngine,
+  inverseMapOcrBoundsPct,
   localOcrAssetUrls,
   ocrWordsFromBlocks,
+  rotateOcrCanvas,
 } from "../lib/pdf/edit/localOcr.ts";
 
 test("local OCR assets stay on the application origin", () => {
@@ -80,6 +82,87 @@ test("OCR word geometry is normalized to percent space and tagged as OCR", () =>
   ]);
 });
 
+test("OCR orientation maps rotated recognition boxes back to original page percent space", () => {
+  const rotatedBox = {
+    xPct: 20,
+    yPct: 10,
+    widthPct: 30,
+    heightPct: 20,
+  };
+
+  assert.deepEqual(inverseMapOcrBoundsPct(rotatedBox, 0), rotatedBox);
+  assert.deepEqual(inverseMapOcrBoundsPct(rotatedBox, 90), {
+    xPct: 10,
+    yPct: 50,
+    widthPct: 20,
+    heightPct: 30,
+  });
+  assert.deepEqual(inverseMapOcrBoundsPct(rotatedBox, 180), {
+    xPct: 50,
+    yPct: 70,
+    widthPct: 30,
+    heightPct: 20,
+  });
+  assert.deepEqual(inverseMapOcrBoundsPct(rotatedBox, 270), {
+    xPct: 70,
+    yPct: 20,
+    widthPct: 20,
+    heightPct: 30,
+  });
+});
+
+test("OCR word geometry inverse-maps a 90-degree local recognition correction", () => {
+  const [word] = ocrWordsFromBlocks(
+    [
+      {
+        paragraphs: [
+          {
+            lines: [
+              {
+                words: [
+                  {
+                    text: "Sideways",
+                    confidence: 91,
+                    bbox: { x0: 20, y0: 10, x1: 50, y1: 30 },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ],
+    100,
+    100,
+    90,
+  );
+
+  assert.deepEqual(word.boundsPct, {
+    xPct: 10,
+    yPct: 50,
+    widthPct: 20,
+    heightPct: 30,
+  });
+});
+
+test("OCR canvas rotation swaps dimensions only for quarter turns", () => {
+  const source = fakeOcrCanvas();
+  source.width = 120;
+  source.height = 80;
+
+  const right = rotateOcrCanvas(source, 90, fakeOcrCanvas);
+  assert.equal(right.width, 80);
+  assert.equal(right.height, 120);
+
+  const upsideDown = rotateOcrCanvas(source, 180, fakeOcrCanvas);
+  assert.equal(upsideDown.width, 120);
+  assert.equal(upsideDown.height, 80);
+
+  const left = rotateOcrCanvas(source, 270, fakeOcrCanvas);
+  assert.equal(left.width, 80);
+  assert.equal(left.height, 120);
+});
+
 test("OCR geometry clamps hostile or out-of-range boxes", () => {
   const [word] = ocrWordsFromBlocks(
     [
@@ -119,6 +202,11 @@ function fakeOcrCanvas(): HTMLCanvasElement {
   const context = {
     fillStyle: "",
     fillRect() {},
+    save() {},
+    restore() {},
+    translate() {},
+    rotate() {},
+    drawImage() {},
   };
   return {
     width: 0,
@@ -155,6 +243,41 @@ function successfulWorker(text = "Recovered text") {
     async terminate() {},
   };
 }
+
+test("local OCR records orientation evidence and sends rotated dimensions to Tesseract", async () => {
+  let recognizedWidth = 0;
+  let recognizedHeight = 0;
+  const engine = createLocalOcrEngine("https://lumeo.in", {
+    createCanvas: fakeOcrCanvas,
+    createWorker: async () => ({
+      async setParameters() {},
+      async recognize(image: HTMLCanvasElement) {
+        recognizedWidth = image.width;
+        recognizedHeight = image.height;
+        return {
+          data: {
+            text: "Rotated text",
+            confidence: 93,
+            blocks: [],
+          },
+        };
+      },
+      async terminate() {},
+    }),
+  });
+
+  const result = await engine.recognizePage({
+    page: resolvedRenderPage() as never,
+    pageIndex: 0,
+    orientationCorrection: 90,
+  });
+
+  assert.equal(result.orientationCorrection, 90);
+  assert.equal(result.imageWidthPx > result.imageHeightPx, true);
+  assert.equal(recognizedWidth, result.imageHeightPx);
+  assert.equal(recognizedHeight, result.imageWidthPx);
+  await engine.terminate();
+});
 
 test("local OCR retries cleanly after worker startup fails", async () => {
   let attempts = 0;
