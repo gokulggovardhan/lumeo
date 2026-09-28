@@ -34,6 +34,7 @@ function result(words: readonly OcrWord[], pageIndex = 0): OcrPageResult {
     renderScale: 1,
     imageWidthPx: 600,
     imageHeightPx: 800,
+    orientationCorrection: 0,
     words,
   };
 }
