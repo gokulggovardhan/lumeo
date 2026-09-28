@@ -50,6 +50,10 @@ export function OcrWordOverlay({
               key={`${index}:${word.text}:${word.boundsPct.xPct}:${word.boundsPct.yPct}`}
               data-edit-ocr-word
               data-edit-ocr-confidence={word.confidence}
+              data-edit-ocr-block={word.layout?.blockIndex}
+              data-edit-ocr-paragraph={word.layout?.paragraphIndex}
+              data-edit-ocr-line={word.layout?.lineIndex}
+              data-edit-ocr-word-in-line={word.layout?.wordIndex}
               className="absolute rounded-[2px] border border-[var(--lumeo-gold)]/32 bg-[var(--lumeo-gold)]/[0.055]"
               style={baseStyle}
             />
@@ -64,6 +68,10 @@ export function OcrWordOverlay({
             data-edit-ocr-review-word
             data-edit-ocr-word-index={index}
             data-edit-ocr-confidence={word.confidence}
+            data-edit-ocr-block={word.layout?.blockIndex}
+            data-edit-ocr-paragraph={word.layout?.paragraphIndex}
+            data-edit-ocr-line={word.layout?.lineIndex}
+            data-edit-ocr-word-in-line={word.layout?.wordIndex}
             data-edit-ocr-low-confidence={lowConfidence ? "true" : "false"}
             data-edit-ocr-corrected={corrected ? "true" : "false"}
             aria-pressed={selected}

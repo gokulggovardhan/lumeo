@@ -45,10 +45,24 @@ export type OcrProgress = Readonly<{
   progress: number;
 }>;
 
+export type OcrWordLayoutRef = Readonly<{
+  blockIndex: number;
+  paragraphIndex: number;
+  lineIndex: number;
+  wordIndex: number;
+}>;
+
 export type OcrWord = Readonly<{
   textSource: "ocr";
   text: string;
   confidence: number;
+  /**
+   * Structural provenance supplied by Tesseract. Advisory only: layout
+   * grouping may use it for review/reading order, but it never authorizes a
+   * native PDF mutation and searchable publication still validates each word
+   * independently.
+   */
+  layout?: OcrWordLayoutRef;
   boundsPct: Readonly<{
     xPct: number;
     yPct: number;
@@ -229,10 +243,10 @@ export function ocrWordsFromBlocks(
 ): OcrWord[] {
   if (imageWidthPx <= 0 || imageHeightPx <= 0) return [];
   const words: OcrWord[] = [];
-  for (const block of blocks ?? []) {
-    for (const paragraph of block.paragraphs ?? []) {
-      for (const line of paragraph.lines ?? []) {
-        for (const word of line.words ?? []) {
+  for (const [blockIndex, block] of (blocks ?? []).entries()) {
+    for (const [paragraphIndex, paragraph] of (block.paragraphs ?? []).entries()) {
+      for (const [lineIndex, line] of (paragraph.lines ?? []).entries()) {
+        for (const [wordIndex, word] of (line.words ?? []).entries()) {
           const text = word.text.trim();
           if (!text) continue;
           const left = clampPercent((word.bbox.x0 / imageWidthPx) * 100);
@@ -243,6 +257,12 @@ export function ocrWordsFromBlocks(
           words.push({
             textSource: "ocr",
             text,
+            layout: Object.freeze({
+              blockIndex,
+              paragraphIndex,
+              lineIndex,
+              wordIndex,
+            }),
             confidence: Math.max(
               0,
               Math.min(100, Number.isFinite(word.confidence) ? word.confidence : 0),
