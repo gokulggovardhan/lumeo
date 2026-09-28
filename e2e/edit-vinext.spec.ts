@@ -365,6 +365,25 @@ test("vinext Edit PDF recognizes Spanish with the self-hosted local model and pu
   await expect(
     page.locator("[data-edit-ocr-result-language='spa']"),
   ).toContainText("Spanish");
+  const layoutSummary = page.locator("[data-edit-ocr-layout-summary]");
+  await expect(layoutSummary).toBeVisible();
+  const recognizedBlockCount = Number(
+    await layoutSummary.getAttribute("data-edit-ocr-block-count"),
+  );
+  const recognizedLineCount = Number(
+    await layoutSummary.getAttribute("data-edit-ocr-line-count"),
+  );
+  expect(recognizedBlockCount).toBeGreaterThanOrEqual(1);
+  expect(recognizedLineCount).toBeGreaterThanOrEqual(1);
+  const firstOcrWord = page.locator("[data-edit-ocr-word]").first();
+  await expect(firstOcrWord).toHaveAttribute("data-edit-ocr-block", /\d+/);
+  await expect(firstOcrWord).toHaveAttribute("data-edit-ocr-line", /\d+/);
+
+  await page.getByRole("button", { name: "Review OCR" }).click();
+  const reviewLayout = page.locator("[data-edit-ocr-review-layout]");
+  await expect(reviewLayout).toContainText(/Block \d+, line \d+/i);
+  await page.getByRole("button", { name: "Done reviewing" }).click();
+
   expect(modelRequests.some((value) => /spa\.traineddata\.gz$/i.test(value))).toBe(
     true,
   );
