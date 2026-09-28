@@ -935,25 +935,6 @@ export default function EditPdfTool() {
     }
   }
 
-  function clearCurrentOcrReviewRevision() {
-    if (ocrSearchablePublicationCurrent) {
-      setOcrPublishedReviewRevision(null);
-    } else {
-      setOcrReviewRevision(null);
-    }
-  }
-
-  function mutateCurrentOcrResultsRevision(
-    updater: (
-      current: OcrResultsRevisionState | null,
-    ) => OcrResultsRevisionState | null,
-  ) {
-    if (ocrSearchablePublicationCurrent) {
-      setOcrPublishedResultsRevision(updater);
-    } else {
-      setOcrResultsRevision(updater);
-    }
-  }
   // Phase 9.2: the raw per-page LocatedTextOperator list (the same one
   // runMatches was derived from), kept around so a multi-run selection can
   // reconstruct the FULL, in-order operator list one specific content
@@ -1554,7 +1535,11 @@ export default function EditPdfTool() {
 
     const revision = { bytes: pdf.bytes, pageIndex };
     ocrReviewCorrectionRevisionRef.current += 1;
-    clearCurrentOcrReviewRevision();
+    if (ocrSearchablePublicationCurrent) {
+      setOcrPublishedReviewRevision(null);
+    } else {
+      setOcrReviewRevision(null);
+    }
     ocrJobRevisionRef.current = revision;
     setOcrErrorRevision(null);
     setOcrCopiedRevision(null);
@@ -1594,7 +1579,10 @@ export default function EditPdfTool() {
       ) {
         return;
       }
-      mutateCurrentOcrResultsRevision((existing) => {
+      const setActiveOcrResultsRevision = ocrSearchablePublicationCurrent
+        ? setOcrPublishedResultsRevision
+        : setOcrResultsRevision;
+      setActiveOcrResultsRevision((existing) => {
         const pages =
           existing?.bytes === revision.bytes
             ? new Map(existing.pages)
