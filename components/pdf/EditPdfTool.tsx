@@ -117,6 +117,11 @@ import {
   type OcrProgress,
 } from "@/lib/pdf/edit/localOcr";
 import {
+  buildReviewedOcrSearchableInput,
+  lowConfidenceOcrWordIndices,
+  validateOcrWordCorrection,
+} from "@/lib/pdf/edit/ocrReview";
+import {
   MAX_LOCAL_CUSTOM_FONT_BYTES,
   MAX_LOCAL_CUSTOM_FONT_SESSION_BYTES,
   createLocalCustomFontAsset,
@@ -753,6 +758,16 @@ export default function EditPdfTool() {
     bytes: ArrayBuffer;
     pages: Map<number, OcrPageResult>;
   } | null>(null);
+  const [ocrReviewRevision, setOcrReviewRevision] = useState<{
+    bytes: ArrayBuffer;
+    pageIndex: number;
+    result: OcrPageResult;
+    open: boolean;
+    selectedWordIndex: number | null;
+    draft: string;
+    corrections: Map<number, string>;
+    error: string;
+  } | null>(null);
   const [ocrActivity, setOcrActivity] = useState<{
     bytes: ArrayBuffer;
     pageIndex: number;
@@ -797,6 +812,25 @@ export default function EditPdfTool() {
     ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
       ? ocrResultsRevision.pages.get(pageIndex) ?? null
       : null;
+  const ocrReviewCurrent =
+    ocrReviewRevision !== null &&
+    ocrReviewRevision.bytes === pdf?.bytes &&
+    ocrReviewRevision.pageIndex === pageIndex &&
+    ocrReviewRevision.result === ocrPageResultCurrent
+      ? ocrReviewRevision
+      : null;
+  const ocrLowConfidenceWordIndices = ocrPageResultCurrent
+    ? lowConfidenceOcrWordIndices(ocrPageResultCurrent)
+    : [];
+  const ocrReviewSelectedWord =
+    ocrReviewCurrent?.selectedWordIndex !== null &&
+    ocrReviewCurrent?.selectedWordIndex !== undefined &&
+    ocrPageResultCurrent
+      ? ocrPageResultCurrent.words[ocrReviewCurrent.selectedWordIndex] ?? null
+      : null;
+  const ocrReviewDraftValidation = ocrReviewSelectedWord
+    ? validateOcrWordCorrection(ocrReviewCurrent?.draft ?? "")
+    : null;
   const ocrSearchLayerBusy =
     ocrSearchLayerActivity !== null &&
     ocrSearchLayerActivity.bytes === pdf?.bytes &&
