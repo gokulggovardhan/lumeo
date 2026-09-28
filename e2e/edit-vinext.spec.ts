@@ -731,6 +731,131 @@ test("vinext Edit PDF embeds a selected local font for added text", async ({
   expect(hasEmbeddedFontProgram).toBe(true);
 });
 
+test("vinext Edit PDF embeds a local font into one native text run with Undo and reopen proof", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await waitForStageReady(page);
+
+  const employeeRun = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+    )
+    .first();
+  await expect(employeeRun).toBeVisible({ timeout: 90_000 });
+  await employeeRun.click();
+
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toBeVisible();
+  await editor.fill("iiii");
+
+  await page.getByRole("button", { name: "Format" }).click();
+  const panel = page.locator("[data-native-text-formatting]");
+  await expect(panel).toBeVisible();
+
+  const fontPath = await findCiTrueTypeFont();
+  await panel.locator("[data-native-local-font-input]").setInputFiles(fontPath);
+  const fontLabel = panel.locator("[data-native-local-font-label]");
+  await expect(fontLabel).not.toHaveText("Inspecting local font…", {
+    timeout: 30_000,
+  });
+  await expect(fontLabel).not.toHaveText("Use current PDF font");
+
+  const status = panel.locator("[data-native-local-font-status]");
+  await expect(status).toContainText(
+    /Ready for this exact text and native PDF target/i,
+    { timeout: 90_000 },
+  );
+
+  const localApply = panel.locator("[data-native-local-font-apply]");
+  await expect(localApply).toBeEnabled();
+  await localApply.click();
+  await waitForStageReady(page);
+
+  await expect(
+    page
+      .locator(
+        'div[role="button"][aria-label^="Editable text: "][aria-label*="iiii"]',
+      )
+      .first(),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await expect(
+    page
+      .locator(
+        'div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]',
+      )
+      .first(),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Redo" }).click();
+  await waitForStageReady(page);
+  await expect(
+    page
+      .locator(
+        'div[role="button"][aria-label^="Editable text: "][aria-label*="iiii"]',
+      )
+      .first(),
+  ).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", {
+    name: "Download edited PDF",
+  });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const download = await downloadPromise;
+  const outputPath = await download.path();
+  expect(outputPath).not.toBeNull();
+  const bytes = await readFile(outputPath!);
+
+  const exported = await PDFDocument.load(bytes.slice());
+  const registry = new PdfFontRegistry(exported);
+  const entries = collectPageTextOperators(exported, 0);
+  const decoded = entries.map((entry) => {
+    const resourceName = entry.operator.fontResourceName;
+    if (!resourceName) return null;
+    const profile = registry.resolve(entry.resources, resourceName);
+    if (!profile) return null;
+    const text = decodeTextShowOperator(
+      entry.operator,
+      profile.resolvedFont,
+    );
+    return text.allDecoded
+      ? { entry, profile, text: text.text, resourceName }
+      : null;
+  });
+  const nativeLocal = decoded.find(
+    (item) => item?.text === "iiii",
+  );
+  expect(nativeLocal).toBeTruthy();
+  expect(nativeLocal!.resourceName).toMatch(/^LumeoNativeLocal\d+$/);
+  expect(nativeLocal!.profile.isEmbedded).toBe(true);
+  expect(nativeLocal!.profile.resourceIdentity.fontProgramObjectRef).toBeTruthy();
+  expect(nativeLocal!.profile.embeddedProgramSha256).toMatch(/^[a-f0-9]{64}$/i);
+
+  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+  await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({
+    timeout: 30_000,
+  });
+  await page.locator('input[type="file"]').first().setInputFiles({
+    name: "native-local-font-output.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from(bytes),
+  });
+  await waitForStageReady(page);
+  await expect(
+    page
+      .locator(
+        'div[role="button"][aria-label^="Editable text: "][aria-label*="iiii"]',
+      )
+      .first(),
+  ).toBeVisible({ timeout: 90_000 });
+});
+
 test("vinext Edit PDF supports text matching, editing, and export", async ({
   page,
 }) => {

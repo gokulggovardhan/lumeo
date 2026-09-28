@@ -23,12 +23,18 @@ import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
 import { shapeEmbeddedFontText } from "../lib/pdf/edit/harfbuzzShaping.ts";
 import { buildShapedGlyphEditPlan } from "../lib/pdf/edit/shapedGlyphEditPlan.ts";
+import { createLocalCustomFontAsset } from "../lib/pdf/edit/localCustomFont.ts";
+import {
+  applyLocalFontSubstitutionToBytes,
+  buildLocalFontSubstitutionPlan,
+} from "../lib/pdf/edit/localFontSubstitution.ts";
 import {
   applyParagraphEditPlanToDocument,
   buildParagraphEditPlan,
 } from "../lib/pdf/edit/paragraphEditPlan.ts";
 import {
   buildShapedLtrType0Pdf,
+  readCiTrueTypeFontBytes,
   SHAPED_LTR_REPLACEMENT,
 } from "../tests/fixtures/shapedGlyphFixture.ts";
 import {
@@ -64,7 +70,7 @@ type Fixture = {
   editTarget: string;
   replacementText: string;
   bytes: Uint8Array;
-  editMode?: "ordinary" | "shaped-ltr" | "paragraph";
+  editMode?: "ordinary" | "shaped-ltr" | "paragraph" | "native-local-font";
 };
 
 type RenderedPage = {
@@ -548,6 +554,7 @@ async function measure(
 
   if (target) {
     let writeApplied = false;
+    let editedOverride: Uint8Array | null = null;
 
     if (fixture.editMode === "paragraph") {
       const targetStreamIndex =
@@ -589,6 +596,41 @@ async function measure(
               editableDoc,
               paragraphPlan,
             );
+            writeApplied = true;
+          }
+        }
+      }
+    } else if (fixture.editMode === "native-local-font") {
+      if (target.located.locator.kind === "page") {
+        const fontBytes = await readCiTrueTypeFontBytes();
+        const assetResult = await createLocalCustomFontAsset(
+          fontBytes,
+          "fidelity-native-local.ttf",
+        );
+        if (assetResult.kind === "ready") {
+          const localPlan = await buildLocalFontSubstitutionPlan({
+            pageIndex: 0,
+            contentStreamIndex:
+              target.located.locator.contentStreamIndex,
+            operatorIndex: target.located.operatorIndex,
+            operator: target.located.operator,
+            replacementText: fixture.replacementText,
+            resolvedFont: target.profile.resolvedFont,
+            fontMetrics: target.profile.metrics,
+            sourceResourceIdentity: target.profile.resourceIdentity,
+            sourceEmbeddedProgramSha256:
+              target.profile.embeddedProgramSha256,
+            embeddedGlyphEvidence:
+              target.profile.embeddedGlyphEvidence,
+            asset: assetResult.asset,
+          });
+          if (localPlan.editable) {
+            const localResult = await applyLocalFontSubstitutionToBytes({
+              sourceBytes: fixture.bytes,
+              plan: localPlan,
+              asset: assetResult.asset,
+            });
+            editedOverride = localResult.bytes;
             writeApplied = true;
           }
         }
@@ -681,7 +723,7 @@ async function measure(
     }
 
     if (writeApplied) {
-      const edited = await editableDoc.save();
+      const edited = editedOverride ?? (await editableDoc.save());
       nativeEditSuccess = true;
 
       const exported = await exportEditedPdf(
@@ -1281,6 +1323,26 @@ async function buildFixtures(): Promise<Fixture[]> {
     bytes: await buildShapedLtrType0Pdf(),
     editMode: "shaped-ltr",
   });
+  fixtures.push(
+    await structuredFixture({
+      id: "advanced-native-local-font-substitution",
+      category: "native-local-font-substitution",
+      expectedRuns: ["WWWW"],
+      editTarget: "WWWW",
+      replacementText: "iiii",
+      draw: (page, fonts) => {
+        drawLine(page, "WWWW", {
+          x: 72,
+          y: 700,
+          size: 20,
+          font: fonts.helvetica,
+        });
+      },
+    }).then((fixture) => ({
+      ...fixture,
+      editMode: "native-local-font" as const,
+    })),
+  );
   fixtures.push({
     id: "advanced-preserved-line-paragraph",
     category: "native-paragraph-preserved-lines",

@@ -23,6 +23,14 @@ type NativeTextFormatPanelProps = {
   onPatchDraft: (patch: Partial<Omit<NativeTextStyleDraft, "spanId">>) => void;
   onResetDraft: () => void;
   onClearApplyError: () => void;
+  nativeLocalFontLabel?: string | null;
+  nativeLocalFontBusy?: boolean;
+  nativeLocalFontApplying?: boolean;
+  nativeLocalFontIssue?: string | null;
+  nativeLocalFontReady?: boolean;
+  onNativeLocalFontFile?: (file: File) => void;
+  onClearNativeLocalFont?: () => void;
+  onApplyNativeLocalFont?: () => void;
 };
 
 export function NativeTextFormatPanel({
@@ -35,6 +43,14 @@ export function NativeTextFormatPanel({
   onPatchDraft,
   onResetDraft,
   onClearApplyError,
+  nativeLocalFontLabel = null,
+  nativeLocalFontBusy = false,
+  nativeLocalFontApplying = false,
+  nativeLocalFontIssue = null,
+  nativeLocalFontReady = false,
+  onNativeLocalFontFile,
+  onClearNativeLocalFont,
+  onApplyNativeLocalFont,
 }: NativeTextFormatPanelProps) {
   return (
     <div
@@ -42,7 +58,7 @@ export function NativeTextFormatPanel({
       data-native-text-formatting
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => event.stopPropagation()}
-      className={`absolute z-40 w-[min(19rem,86vw)] rounded-xl border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/98 p-3 text-[11px] text-[var(--text-primary)] shadow-2xl ${panelPositionClass} ${horizontalClass}`}
+      className={`absolute z-40 max-h-[min(70vh,32rem)] w-[min(19rem,86vw)] scroll-mt-24 overflow-y-auto overscroll-contain rounded-xl border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/98 p-3 text-[11px] text-[var(--text-primary)] shadow-2xl ${panelPositionClass} ${horizontalClass}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -63,6 +79,88 @@ export function NativeTextFormatPanel({
             </span>
           ) : null}
         </div>
+      </div>
+
+      <div className="mt-3 rounded-lg border border-[var(--text-primary)]/10 p-2.5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="text-[9px] font-bold uppercase tracking-[0.12em] text-[var(--text-primary)]/45">
+              Local replacement face
+            </div>
+            <div
+              data-native-local-font-label
+              className="mt-0.5 truncate text-[10px] font-semibold text-[var(--text-primary)]/72"
+            >
+              {nativeLocalFontBusy
+                ? "Inspecting local font…"
+                : nativeLocalFontLabel ?? "Use current PDF font"}
+            </div>
+          </div>
+          {nativeLocalFontLabel ? (
+            <button
+              type="button"
+              onClick={onClearNativeLocalFont}
+              disabled={nativeLocalFontBusy || nativeLocalFontApplying}
+              className="shrink-0 rounded-full border border-[var(--text-primary)]/14 px-2 py-1 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/65 disabled:opacity-40"
+            >
+              Reset
+            </button>
+          ) : null}
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-2">
+          <label className="inline-flex min-h-9 cursor-pointer items-center rounded-full border border-[var(--text-primary)]/14 px-3 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/70 transition hover:border-[var(--lumeo-gold)]/45 focus-within:ring-2 focus-within:ring-[var(--lumeo-gold)]">
+            {nativeLocalFontBusy ? "Loading…" : "Choose .ttf/.otf"}
+            <input
+              data-native-local-font-input
+              type="file"
+              accept=".ttf,.otf,font/ttf,font/otf"
+              className="sr-only"
+              disabled={nativeLocalFontBusy || nativeLocalFontApplying}
+              onChange={(event) => {
+                const file = event.currentTarget.files?.[0];
+                event.currentTarget.value = "";
+                if (file) onNativeLocalFontFile?.(file);
+              }}
+            />
+          </label>
+          {nativeLocalFontLabel ? (
+            <button
+              type="button"
+              data-native-local-font-apply
+              onClick={onApplyNativeLocalFont}
+              disabled={
+                nativeLocalFontBusy ||
+                nativeLocalFontApplying ||
+                !nativeLocalFontReady
+              }
+              className="inline-flex min-h-9 items-center rounded-full border border-[var(--lumeo-gold)]/50 bg-[var(--lumeo-gold)]/10 px-3 text-[9px] font-bold uppercase tracking-[0.1em] text-[var(--text-primary)] transition hover:bg-[var(--lumeo-gold)]/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {nativeLocalFontApplying ? "Applying…" : "Apply local font"}
+            </button>
+          ) : null}
+        </div>
+
+        <p className="mt-2 text-[9px] leading-4 text-[var(--text-primary)]/50">
+          Native font replacement embeds the exact local face into this PDF run only. It is enabled only when glyph mapping, shaping, resource updates, endpoint advance and reopened search text can all be proven locally.
+        </p>
+        {nativeLocalFontIssue ? (
+          <p
+            role="status"
+            data-native-local-font-status
+            className="mt-1.5 text-[9px] font-semibold leading-4 text-[var(--text-primary)]/70"
+          >
+            {nativeLocalFontIssue}
+          </p>
+        ) : nativeLocalFontLabel && nativeLocalFontReady ? (
+          <p
+            role="status"
+            data-native-local-font-status
+            className="mt-1.5 text-[9px] font-semibold leading-4 text-[var(--text-primary)]/70"
+          >
+            Ready for this exact text and native PDF target.
+          </p>
+        ) : null}
       </div>
 
       <div
@@ -189,7 +287,7 @@ export function NativeTextFormatPanel({
 
       <div className="mt-3 flex items-center justify-between gap-3">
         <p className="text-[9px] leading-4 text-[var(--text-primary)]/48">
-          Font face, weight, italic and alignment stay inherited. Fill colour is editable only when the native PDF paint state can be restored exactly.
+          Size, spacing and fill use the existing native writer. Font face changes use the separate validated local-font resource path above; weight, italic and alignment remain inherited.
         </p>
         <button
           type="button"
