@@ -113,6 +113,7 @@ import { detectRasterImageEvidence } from "@/lib/pdf/edit/rasterImageEvidence";
 import {
   createLocalOcrEngine,
   type LocalOcrEngine,
+  type OcrOrientationCorrection,
   type OcrPageResult,
   type OcrProgress,
 } from "@/lib/pdf/edit/localOcr";
@@ -747,6 +748,11 @@ export default function EditPdfTool() {
   // exact live PDF ArrayBuffer so undo/redo/page mutations cannot leave stale
   // recognized text attached to a different document revision.
   const ocrEngineRef = useRef<LocalOcrEngine | null>(null);
+  const [ocrOrientationRevision, setOcrOrientationRevision] = useState<{
+    bytes: ArrayBuffer | null;
+    pageIndex: number;
+    value: OcrOrientationCorrection;
+  } | null>(null);
   const ocrReviewCorrectionRevisionRef = useRef(0);
   const ocrJobRevisionRef = useRef<{
     bytes: ArrayBuffer;
@@ -802,6 +808,11 @@ export default function EditPdfTool() {
       : null;
   const ocrBusy = ocrActivityCurrent !== null;
   const ocrProgress = ocrActivityCurrent?.progress ?? null;
+  const ocrOrientationCorrection =
+    ocrOrientationRevision?.bytes === (pdf?.bytes ?? null) &&
+    ocrOrientationRevision.pageIndex === pageIndex
+      ? ocrOrientationRevision.value
+      : 0;
   const ocrError =
     ocrErrorRevision?.bytes === (pdf?.bytes ?? null) &&
     ocrErrorRevision.pageIndex === pageIndex
@@ -1473,6 +1484,7 @@ export default function EditPdfTool() {
       const result = await engine.recognizePage({
         page,
         pageIndex,
+        orientationCorrection: ocrOrientationCorrection,
         onProgress: (progress) => {
           if (ocrJobRevisionRef.current !== revision) return;
           setOcrActivity((current) =>
@@ -1527,6 +1539,7 @@ export default function EditPdfTool() {
     pageTextCapability.category,
     pdf,
     rasterImageEvidenceCurrent,
+    ocrOrientationCorrection,
   ]);
 
   async function handleCopyOcrText() {
@@ -7393,6 +7406,30 @@ export default function EditPdfTool() {
 
                       {pageTextCapability.category === "SCANNED_IMAGE" ? (
                         <div data-edit-ocr-panel data-edit-ocr-source="ocr" onClick={(event) => event.stopPropagation()} className="mt-2.5 grid gap-2">
+                          <label className="grid gap-1 text-[9px] font-semibold text-[var(--text-primary)]/52">
+                            <span>Scan orientation for next recognition</span>
+                            <select
+                              aria-label="OCR scan orientation"
+                              data-edit-ocr-orientation-select
+                              value={ocrOrientationCorrection}
+                              disabled={ocrBusy || ocrSearchLayerBusy}
+                              onChange={(event) =>
+                                setOcrOrientationRevision({
+                                  bytes: pdf?.bytes ?? null,
+                                  pageIndex,
+                                  value: Number(
+                                    event.currentTarget.value,
+                                  ) as OcrOrientationCorrection,
+                                })
+                              }
+                              className="pointer-events-auto w-full rounded-md border border-[var(--text-primary)]/14 bg-white/75 px-2 py-1.5 text-[10px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              <option value={0}>As shown</option>
+                              <option value={90}>Rotate right 90°</option>
+                              <option value={180}>Rotate 180°</option>
+                              <option value={270}>Rotate left 90°</option>
+                            </select>
+                          </label>
                           {ocrPageResultCurrent ? (
                             <>
                               <div className="flex flex-wrap items-center gap-1.5 text-[10px] text-[var(--text-primary)]/55">
@@ -7401,6 +7438,16 @@ export default function EditPdfTool() {
                                 </span>
                                 <span data-edit-ocr-confidence>
                                   {Math.round(ocrPageResultCurrent.confidence)}% confidence
+                                </span>
+                                <span>·</span>
+                                <span data-edit-ocr-result-orientation={ocrPageResultCurrent.orientationCorrection}>
+                                  {ocrPageResultCurrent.orientationCorrection === 0
+                                    ? "as shown"
+                                    : ocrPageResultCurrent.orientationCorrection === 90
+                                      ? "rotated right 90°"
+                                      : ocrPageResultCurrent.orientationCorrection === 180
+                                        ? "rotated 180°"
+                                        : "rotated left 90°"}
                                 </span>
                                 <span>·</span>
                                 <span data-edit-ocr-word-summary>
