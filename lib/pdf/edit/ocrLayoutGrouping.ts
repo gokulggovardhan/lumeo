@@ -216,6 +216,7 @@ function inferTableLikeBlock(
   const tolerancePct = 3;
   const anchorCandidates: Array<{
     xPct: number;
+    sampleCount: number;
     lineKeys: Set<string>;
   }> = [];
 
@@ -228,12 +229,15 @@ function inferTableLikeBlock(
         (candidate) => Math.abs(candidate.xPct - xPct) <= tolerancePct,
       );
       if (existing) {
-        const count = existing.lineKeys.size;
-        existing.xPct = (existing.xPct * count + xPct) / (count + 1);
+        existing.xPct =
+          (existing.xPct * existing.sampleCount + xPct) /
+          (existing.sampleCount + 1);
+        existing.sampleCount += 1;
         existing.lineKeys.add(line.key);
       } else {
         anchorCandidates.push({
           xPct,
+          sampleCount: 1,
           lineKeys: new Set([line.key]),
         });
       }
@@ -251,7 +255,10 @@ function inferTableLikeBlock(
   for (const line of lines) {
     const lineXs = line.wordIndices
       .map((wordIndex) => words[wordIndex]?.boundsPct.xPct)
-      .filter((value): value is number => Number.isFinite(value));
+      .filter(
+        (value): value is number =>
+          typeof value === "number" && Number.isFinite(value),
+      );
     const matchedAnchors = anchors.filter((anchor) =>
       lineXs.some((xPct) => Math.abs(xPct - anchor.xPct) <= tolerancePct),
     ).length;
