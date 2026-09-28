@@ -7459,7 +7459,10 @@ export default function EditPdfTool() {
                     </p>
                   ) : null}
 
-                  {activeTool === "select" && textDetectionCurrent && detectedTextRuns.length === 0 && selectedRunIndices.length === 0 ? (
+                  {activeTool === "select" &&
+                    textDetectionCurrent &&
+                    (detectedTextRuns.length === 0 || ocrSearchablePublicationCurrent !== null) &&
+                    selectedRunIndices.length === 0 ? (
                     <div className={`absolute left-3 top-3 z-20 max-w-[340px] rounded-[var(--radius-lg)] border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)]/94 p-3 shadow-lg backdrop-blur-sm ${ocrReviewCurrent?.open ? "pointer-events-none" : ""}`}>
                       <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-primary)]/40">
                         {pageTextCapability.nativeSpanCount > 0 || pageTextCapability.rasterImageEvidence
@@ -7477,7 +7480,7 @@ export default function EditPdfTool() {
                             : "Lumeo could not prove editable native text on this page. Use Text to add new text."}
                       </p>
 
-                      {pageTextCapability.category === "SCANNED_IMAGE" ? (
+                      {pageTextCapability.category === "SCANNED_IMAGE" || ocrSearchablePublicationCurrent ? (
                         <div data-edit-ocr-panel data-edit-ocr-source="ocr" onClick={(event) => event.stopPropagation()} className="mt-2.5 grid gap-2">
                           <label className="grid gap-1 text-[9px] font-semibold text-[var(--text-primary)]/52">
                             <span>Recognition language</span>
@@ -7629,11 +7632,21 @@ export default function EditPdfTool() {
                                   disabled={
                                     ocrBusy ||
                                     ocrSearchLayerBusy ||
-                                    ocrReviewHasUnappliedDraft
+                                    ocrReviewHasUnappliedDraft ||
+                                    (ocrSearchablePublicationCurrent !== null &&
+                                      !ocrSearchableNeedsRegeneration)
                                   }
                                   className="pointer-events-auto rounded-full border border-[var(--lumeo-gold)]/40 bg-[var(--lumeo-gold)]/10 px-2.5 py-1 text-[10px] font-bold text-[var(--text-primary)]/72 transition hover:border-[var(--lumeo-gold)]/65 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                  {ocrSearchLayerBusy ? "Adding searchable text…" : "Make page searchable"}
+                                  {ocrSearchLayerBusy
+                                    ? ocrSearchablePublicationCurrent
+                                      ? "Regenerating searchable text…"
+                                      : "Adding searchable text…"
+                                    : ocrSearchablePublicationCurrent
+                                      ? ocrSearchableNeedsRegeneration
+                                        ? "Regenerate searchable text"
+                                        : "Searchable text up to date"
+                                      : "Make page searchable"}
                                 </button>
                                 <button
                                   type="button"
