@@ -114,6 +114,7 @@ import {
   createLocalOcrEngine,
   DEFAULT_LOCAL_OCR_LANGUAGE,
   LOCAL_OCR_LANGUAGES,
+  isLocalOcrLanguage,
   localOcrLanguageLabel,
   type LocalOcrEngine,
   type LocalOcrLanguage,
@@ -7422,10 +7423,10 @@ export default function EditPdfTool() {
                               data-edit-ocr-language-select
                               value={ocrLanguage}
                               disabled={ocrBusy || ocrSearchLayerBusy}
-                              onChange={(event) =>
-                                setOcrLanguage(
-                                  event.currentTarget.value as LocalOcrLanguage,
-                                )
+                              onChange={(event) => {
+                                const value = event.currentTarget.value;
+                                if (!isLocalOcrLanguage(value)) return;
+                                setOcrLanguage(value);
                               }
                               className="pointer-events-auto w-full rounded-md border border-[var(--text-primary)]/14 bg-white/75 px-2 py-1.5 text-[10px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55 disabled:cursor-not-allowed disabled:opacity-50"
                             >
