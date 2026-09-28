@@ -1473,7 +1473,8 @@ export default function EditPdfTool() {
   const handleRecognizeScannedPage = useCallback(async () => {
     if (
       !pdf ||
-      pageTextCapability.category !== "SCANNED_IMAGE" ||
+      (pageTextCapability.category !== "SCANNED_IMAGE" &&
+        !ocrSearchablePublicationCurrent) ||
       !rasterImageEvidenceCurrent
     ) {
       setOcrErrorRevision({
@@ -1573,6 +1574,7 @@ export default function EditPdfTool() {
     pageTextCapability.category,
     pdf,
     rasterImageEvidenceCurrent,
+    ocrSearchablePublicationCurrent,
     ocrLanguage,
     ocrOrientationCorrection,
   ]);
