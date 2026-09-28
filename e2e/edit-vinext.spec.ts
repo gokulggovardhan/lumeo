@@ -378,7 +378,9 @@ test("vinext Edit PDF corrects sideways scan orientation locally and keeps revie
   await expect(searchableStatus).toContainText(/Searchable text added locally/i, {
     timeout: 90_000,
   });
-  await waitForStageReady(page);
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
 
   const searchableRun = page
     .locator(
