@@ -256,7 +256,11 @@ export async function addSearchableOcrTextLayer(
     const widthSize = visualWordWidth / unitWidth;
     const size = Math.max(0.5, Math.min(heightSize, widthSize));
     if (!finitePositive(size) || size < 0.5) {
-      skipped.push({ text: word.text, reason: "too-small" });
+      skipped.push({
+        wordIndex: word.wordIndex,
+        text: word.text,
+        reason: "too-small",
+      });
       continue;
     }
 
