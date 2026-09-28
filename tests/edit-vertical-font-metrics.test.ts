@@ -36,8 +36,8 @@ async function verticalFixture({
   w2,
 }: {
   encoding?: "Identity-H" | "Identity-V";
-  dw2?: readonly number[] | "malformed";
-  w2?: readonly unknown[] | "malformed";
+  dw2?: number[] | "malformed";
+  w2?: (number | number[])[] | "malformed";
 } = {}) {
   const doc = await PDFDocument.create();
   const context = doc.context;
@@ -60,7 +60,7 @@ async function verticalFixture({
     }),
   );
 
-  const descendantValues: Record<string, unknown> = {
+  const descendant = context.obj({
     Type: "Font",
     Subtype: "CIDFontType2",
     BaseFont: "ABCDEF+VerticalEvidence",
@@ -73,19 +73,19 @@ async function verticalFixture({
     DW: 1000,
     W: [3, [600, 700, 800], 10, 12, 900],
     CIDToGIDMap: "Identity",
-  };
+  }) as PDFDict;
   if (dw2 === "malformed") {
-    descendantValues.DW2 = context.obj([880]);
+    descendant.set(PDFName.of("DW2"), context.obj([880]));
   } else if (dw2) {
-    descendantValues.DW2 = [...dw2];
+    descendant.set(PDFName.of("DW2"), context.obj(dw2));
   }
   if (w2 === "malformed") {
-    descendantValues.W2 = context.obj([3, [-1200, 300]]);
+    descendant.set(PDFName.of("W2"), context.obj([3, [-1200, 300]]));
   } else if (w2) {
-    descendantValues.W2 = [...w2];
+    descendant.set(PDFName.of("W2"), context.obj(w2));
   }
 
-  const descendantRef = context.register(context.obj(descendantValues));
+  const descendantRef = context.register(descendant);
   const toUnicodeEntries = new Map<number, string>([
     [3, "A"],
     [4, "B"],
