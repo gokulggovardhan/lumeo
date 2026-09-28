@@ -5400,6 +5400,154 @@ export default function EditPdfTool() {
     setNativeLocalFontChoice(null);
   }
 
+  const applyNativeLocalFontSubstitution = useCallback(async () => {
+    const engine = editEngineRef.current;
+    const asset = selectedNativeLocalFontAsset;
+    const state = nativeLocalFontPlanState;
+    if (
+      !engine ||
+      !asset ||
+      !nativeLocalFontPlanKey ||
+      !state ||
+      state.key !== nativeLocalFontPlanKey ||
+      state.status !== "ready"
+    ) {
+      setNativeLocalFontError(
+        state?.status === "blocked"
+          ? state.reason
+          : "This local font is not yet validated for the exact selected text.",
+      );
+      return;
+    }
+    if (!engine.isValidatedLocalFontSubstitutionPlan(state.plan)) {
+      setNativeLocalFontError(
+        "The local-font substitution proof is stale. Reselect the text and choose the font again.",
+      );
+      return;
+    }
+
+    const sourceHistorySnapshot = getHistoryState();
+    const sourceMutationRevision = historyMutationRevisionRef.current;
+    if (
+      activeNativeLocalFontChoice?.revision !== sourceHistorySnapshot.pdfBytes ||
+      activeNativeLocalFontChoice.selectionKey !== nativeTextSelectionKey
+    ) {
+      setNativeLocalFontError(
+        "The PDF or native selection changed. Choose the local font again for the current text.",
+      );
+      return;
+    }
+
+    setNativeLocalFontApplying(true);
+    setNativeLocalFontError("");
+    try {
+      const result = await engine.applyLocalFontSubstitutionToBytes({
+        sourceBytes: sourceHistorySnapshot.pdfBytes,
+        plan: state.plan,
+        asset,
+      });
+
+      if (
+        historyMutationRevisionRef.current !== sourceMutationRevision ||
+        getHistoryState() !== sourceHistorySnapshot ||
+        nativeTextSelectionKey !== activeNativeLocalFontChoice.selectionKey
+      ) {
+        throw new Error(
+          "The PDF changed while the local font was being embedded. No font change was published.",
+        );
+      }
+
+      const newBytes = result.bytes;
+      const buffer = newBytes.buffer.slice(
+        newBytes.byteOffset,
+        newBytes.byteOffset + newBytes.byteLength,
+      ) as ArrayBuffer;
+      const spanIds = selectedRunIndices.map(
+        (index) =>
+          pageTextModel?.spans[index]?.id ??
+          `p${pageIndex}-span-${index}`,
+      );
+      const target: NativeTextTarget = {
+        kind: "native-text",
+        pageIndex,
+        spanIds,
+        contentStreamIndex: state.plan.contentStreamIndex,
+        formPath: null,
+        operatorIndices: [state.plan.operatorIndex],
+        fontResourceName: result.resourceName,
+      };
+
+      const semanticOperations: PdfEditOperationDraft[] = [];
+      if (state.plan.originalText !== state.plan.replacementText) {
+        semanticOperations.push(
+          nativeTextOperation({
+            pageIndex,
+            spanIds,
+            contentStreamIndex: target.contentStreamIndex,
+            formPath: null,
+            operatorIndices: target.operatorIndices,
+            fontResourceName: result.resourceName,
+            originalText: state.plan.originalText,
+            replacementText: state.plan.replacementText,
+          }),
+        );
+      }
+
+      const beforeStyle: PdfEditTextStyle = {
+        fontFamily: selectedNativeSpan?.style.fontFamily,
+        fontSizePt: state.plan.fontSizePt,
+        bold: (selectedNativeSpan?.style.weight ?? 400) >= 600,
+        italic: selectedNativeSpan?.style.italic ?? false,
+        charSpacingPt: state.plan.charSpacing,
+        wordSpacingPt: 0,
+        horizontalScalingPct: state.plan.horizontalScalingPct,
+        color: selectedNativeSpan?.style.fillColor?.cssHex ?? undefined,
+      };
+      const afterStyle: PdfEditTextStyle = {
+        ...beforeStyle,
+        fontFamily: asset.descriptor.familyName,
+        fontIdentity: asset.descriptor.id,
+      };
+      semanticOperations.push(
+        nativeTextStyleOperation({
+          target,
+          before: beforeStyle,
+          after: afterStyle,
+        }),
+      );
+
+      setNativeLocalFontChoice(null);
+      setNativeLocalFontPlanState(null);
+      setHistoryState((current) => ({
+        ...current,
+        pdfBytes: buffer,
+        session: appendPdfEditOperations(
+          current.session,
+          semanticOperations,
+        ),
+      }));
+    } catch (error) {
+      setNativeLocalFontError(
+        error instanceof Error
+          ? error.message
+          : "The local font could not be applied safely to this native PDF text.",
+      );
+    } finally {
+      setNativeLocalFontApplying(false);
+    }
+  }, [
+    selectedNativeLocalFontAsset,
+    nativeLocalFontPlanState,
+    nativeLocalFontPlanKey,
+    activeNativeLocalFontChoice,
+    nativeTextSelectionKey,
+    selectedRunIndices,
+    pageTextModel,
+    pageIndex,
+    selectedNativeSpan,
+    setHistoryState,
+  ]);
+
   function handleUseStandardFont(elementId: string) {
     localCustomFontRequestRef.current += 1;
     setLocalCustomFontBusy(false);
