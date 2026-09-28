@@ -788,6 +788,14 @@ export default function EditPdfTool() {
     value: OcrOrientationCorrection;
   } | null>(null);
   const ocrReviewCorrectionRevisionRef = useRef(0);
+  const [ocrReviewCorrectionRevision, setOcrReviewCorrectionRevision] =
+    useState(0);
+  const markOcrReviewCorrectionChanged = useCallback(() => {
+    const nextRevision = ocrReviewCorrectionRevisionRef.current + 1;
+    ocrReviewCorrectionRevisionRef.current = nextRevision;
+    setOcrReviewCorrectionRevision(nextRevision);
+    return nextRevision;
+  }, []);
   const ocrJobRevisionRef = useRef<{
     bytes: ArrayBuffer;
     pageIndex: number;
@@ -915,7 +923,7 @@ export default function EditPdfTool() {
   const ocrSearchableNeedsRegeneration =
     ocrSearchablePublicationCurrent !== null &&
     ocrSearchablePublicationCurrent.correctionRevision !==
-      ocrReviewCorrectionRevisionRef.current;
+      ocrReviewCorrectionRevision;
   const ocrSearchLayerNotice =
     ocrSearchLayerNoticeRevision !== null &&
     ocrSearchLayerNoticeRevision.bytes === pdf?.bytes &&
@@ -1534,7 +1542,7 @@ export default function EditPdfTool() {
     }
 
     const revision = { bytes: pdf.bytes, pageIndex };
-    ocrReviewCorrectionRevisionRef.current += 1;
+    markOcrReviewCorrectionChanged();
     if (ocrSearchablePublicationCurrent) {
       setOcrPublishedReviewRevision(null);
     } else {
@@ -1621,6 +1629,7 @@ export default function EditPdfTool() {
     ocrSearchablePublicationCurrent,
     ocrLanguage,
     ocrOrientationCorrection,
+    markOcrReviewCorrectionChanged,
   ]);
 
   async function handleCopyOcrText() {
@@ -1745,7 +1754,7 @@ export default function EditPdfTool() {
       return;
     }
 
-    ocrReviewCorrectionRevisionRef.current += 1;
+    markOcrReviewCorrectionChanged();
     mutateCurrentOcrReviewRevision((current) => {
       if (current !== ocrReviewCurrent) return current;
       const corrections = new Map(current.corrections);
@@ -1766,7 +1775,7 @@ export default function EditPdfTool() {
     if (index === null) return;
     const word = ocrPageResultCurrent.words[index];
     if (!word) return;
-    ocrReviewCorrectionRevisionRef.current += 1;
+    markOcrReviewCorrectionChanged();
     mutateCurrentOcrReviewRevision((current) => {
       if (current !== ocrReviewCurrent) return current;
       const corrections = new Map(current.corrections);
@@ -2332,6 +2341,8 @@ export default function EditPdfTool() {
     pageImageUrlRef.current = "";
     downloadUrlRef.current = "";
     ocrJobRevisionRef.current = null;
+    ocrReviewCorrectionRevisionRef.current = 0;
+    setOcrReviewCorrectionRevision(0);
     void ocrEngineRef.current?.terminate();
     ocrEngineRef.current = null;
     setOcrResultsRevision(null);
