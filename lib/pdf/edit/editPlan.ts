@@ -29,6 +29,7 @@ import {
   shapingEvidenceMatchesReplacement,
   type ValidatedShapingWriteEvidence,
 } from "./shapingWriteGuard.ts";
+import { nativeTextTransformIsMateriallySkewed } from "./textGeometrySafety.ts";
 
 // All four PDF text-showing operators are in scope for in-place editing:
 // Tj, TJ (#197, #198), and ' and " (this slice). ' and " each also
@@ -528,6 +529,54 @@ export function buildEditPlan({
       tjSpacingDelta: 0,
       editable: false,
       reason: `Operator "${operator.kind}" is not supported for in-place editing.`,
+    };
+  }
+
+  // Capability arbitration normally blocks these structures before a caller
+  // reaches the planner, but validated EditPlan authority must fail closed on
+  // its own as well. A future UI or batch path must not be able to bypass the
+  // structural safety boundary merely by calling buildEditPlan directly.
+  if (resolvedFont.kind === "Type3") {
+    return {
+      ...base,
+      originalWidthPt: 0,
+      replacementGlyphCodes: [],
+      replacementWidthPt: 0,
+      tjSpacingDelta: 0,
+      editable: false,
+      reason:
+        "Type3 fonts draw glyphs with PDF content programs; direct native text rewriting is not proven safe for this font class.",
+    };
+  }
+
+  if (
+    resolvedFont.kind === "Type0" &&
+    resolvedFont.writingMode !== "horizontal"
+  ) {
+    return {
+      ...base,
+      originalWidthPt: 0,
+      replacementGlyphCodes: [],
+      replacementWidthPt: 0,
+      tjSpacingDelta: 0,
+      editable: false,
+      reason:
+        resolvedFont.writingMode === "vertical"
+          ? "This Type0 font uses vertical writing; the ordinary native writer does not model vertical CID metrics or positioning safely."
+          : "This Type0 font's writing mode cannot be proven horizontal, so the ordinary native writer will not assume horizontal CID geometry.",
+    };
+  }
+
+  if (nativeTextTransformIsMateriallySkewed(operator.textRenderingMatrix)) {
+    return {
+      ...base,
+      originalWidthPt: 0,
+      replacementGlyphCodes: [],
+      replacementWidthPt: 0,
+      tjSpacingDelta: 0,
+      editable: false,
+      reason:
+        "This text uses a materially skewed PDF transform; direct rewriting is kept read-only until skewed native geometry is independently proven.",
     };
   }
 
