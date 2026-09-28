@@ -119,6 +119,7 @@ import {
 import {
   buildReviewedOcrSearchableInput,
   lowConfidenceOcrWordIndices,
+  publishedReviewedOcrCorrectionIndices,
   validateOcrWordCorrection,
 } from "@/lib/pdf/edit/ocrReview";
 import {
@@ -1737,7 +1738,7 @@ export default function EditPdfTool() {
       );
       let searchableInput: Pick<OcrPageResult, "pageIndex" | "words"> =
         ocrPageResultCurrent;
-      let reviewedCorrectionCount = 0;
+      let reviewedCorrectionWordIndices: readonly number[] = [];
       if (ocrReviewCurrent) {
         const reviewed = buildReviewedOcrSearchableInput(
           ocrPageResultCurrent,
@@ -1750,7 +1751,7 @@ export default function EditPdfTool() {
           pageIndex: reviewed.pageIndex,
           words: reviewed.words,
         };
-        reviewedCorrectionCount = reviewed.correctionCount;
+        reviewedCorrectionWordIndices = reviewed.correctedWordIndices;
       }
 
       const outcome = await addSearchableOcrTextLayer(
@@ -1816,10 +1817,15 @@ export default function EditPdfTool() {
       ) as ArrayBuffer;
       const writtenCount = outcome.writtenWords.length;
       const skippedCount = outcome.skippedWords.length;
+      const publishedReviewedCorrectionCount =
+        publishedReviewedOcrCorrectionIndices(
+          reviewedCorrectionWordIndices,
+          outcome.writtenWordIndices,
+        ).length;
       const description =
         `Added ${writtenCount} local OCR word${writtenCount === 1 ? "" : "s"} as an invisible searchable text layer on page ${pageIndex + 1}.` +
-        (reviewedCorrectionCount > 0
-          ? ` Published ${reviewedCorrectionCount} reviewed OCR correction${reviewedCorrectionCount === 1 ? "" : "s"}.`
+        (publishedReviewedCorrectionCount > 0
+          ? ` Published ${publishedReviewedCorrectionCount} reviewed OCR correction${publishedReviewedCorrectionCount === 1 ? "" : "s"}.`
           : "");
 
       setHistoryState((current) => ({
@@ -1840,8 +1846,8 @@ export default function EditPdfTool() {
         pageIndex,
         message:
           `Searchable text added locally · ${writtenCount} word${writtenCount === 1 ? "" : "s"}` +
-          (reviewedCorrectionCount > 0
-            ? ` · ${reviewedCorrectionCount} reviewed correction${reviewedCorrectionCount === 1 ? "" : "s"}`
+          (publishedReviewedCorrectionCount > 0
+            ? ` · ${publishedReviewedCorrectionCount} reviewed correction${publishedReviewedCorrectionCount === 1 ? "" : "s"}`
             : "") +
           (skippedCount > 0
             ? ` · ${skippedCount} unsupported or unsafe word${skippedCount === 1 ? "" : "s"} skipped`
