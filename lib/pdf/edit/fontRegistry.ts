@@ -48,6 +48,10 @@ import {
   type CidToGidAddressingSource,
   type ShapedGlyphAddressabilityResult,
 } from "./shapedGlyphAddressability.ts";
+import {
+  resolveVerticalFontMetricsEvidence,
+  type PdfVerticalFontMetricsEvidence,
+} from "./verticalFontMetrics.ts";
 
 const SUBSET_PREFIX = /^[A-Z]{6}\+/;
 const BOLD_NAME = /bold|black|heavy|semib|demib?|ultra/i;
@@ -782,6 +786,45 @@ export class PdfFontRegistry {
       glyphWidths: profile.metrics.glyphWidths,
       defaultWidth: profile.metrics.defaultWidth,
       shaped,
+    });
+  }
+
+  /**
+   * Resolves vertical CIDFont DW2/W2 geometry as advisory evidence only.
+   * Existing VERTICAL_TEXT classification remains read-only; this method is
+   * intentionally not consumed by EditPlan or any native writer.
+   */
+  inspectVerticalFontMetrics(
+    resources: PDFDict,
+    resourceName: string,
+  ): PdfVerticalFontMetricsEvidence {
+    const fontResource = resolveFontResource(
+      resources,
+      resourceName,
+      this.context,
+    );
+    if (!fontResource) {
+      return Object.freeze({
+        kind: "blocked",
+        advisoryOnly: true,
+        reason: "The PDF font resource could not be resolved.",
+      });
+    }
+
+    const profile = this.resolve(resources, resourceName);
+    if (!profile) {
+      return Object.freeze({
+        kind: "blocked",
+        advisoryOnly: true,
+        reason: "The PDF font profile could not be resolved.",
+      });
+    }
+
+    return resolveVerticalFontMetricsEvidence({
+      fontDict: fontResource.dict,
+      context: this.context,
+      fontKind: profile.kind,
+      writingMode: profile.resourceIdentity.writingMode,
     });
   }
 
