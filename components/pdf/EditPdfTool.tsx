@@ -112,7 +112,12 @@ import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/pr
 import { detectRasterImageEvidence } from "@/lib/pdf/edit/rasterImageEvidence";
 import {
   createLocalOcrEngine,
+  DEFAULT_LOCAL_OCR_LANGUAGE,
+  LOCAL_OCR_LANGUAGES,
+  isLocalOcrLanguage,
+  localOcrLanguageLabel,
   type LocalOcrEngine,
+  type LocalOcrLanguage,
   type OcrOrientationCorrection,
   type OcrPageResult,
   type OcrProgress,
@@ -748,6 +753,9 @@ export default function EditPdfTool() {
   // exact live PDF ArrayBuffer so undo/redo/page mutations cannot leave stale
   // recognized text attached to a different document revision.
   const ocrEngineRef = useRef<LocalOcrEngine | null>(null);
+  const [ocrLanguage, setOcrLanguage] = useState<LocalOcrLanguage>(
+    DEFAULT_LOCAL_OCR_LANGUAGE,
+  );
   const [ocrOrientationRevision, setOcrOrientationRevision] = useState<{
     bytes: ArrayBuffer | null;
     pageIndex: number;
@@ -1484,6 +1492,7 @@ export default function EditPdfTool() {
       const result = await engine.recognizePage({
         page,
         pageIndex,
+        language: ocrLanguage,
         orientationCorrection: ocrOrientationCorrection,
         onProgress: (progress) => {
           if (ocrJobRevisionRef.current !== revision) return;
@@ -1539,6 +1548,7 @@ export default function EditPdfTool() {
     pageTextCapability.category,
     pdf,
     rasterImageEvidenceCurrent,
+    ocrLanguage,
     ocrOrientationCorrection,
   ]);
 
@@ -7407,6 +7417,30 @@ export default function EditPdfTool() {
                       {pageTextCapability.category === "SCANNED_IMAGE" ? (
                         <div data-edit-ocr-panel data-edit-ocr-source="ocr" onClick={(event) => event.stopPropagation()} className="mt-2.5 grid gap-2">
                           <label className="grid gap-1 text-[9px] font-semibold text-[var(--text-primary)]/52">
+                            <span>Recognition language</span>
+                            <select
+                              aria-label="OCR language"
+                              data-edit-ocr-language-select
+                              value={ocrLanguage}
+                              disabled={ocrBusy || ocrSearchLayerBusy}
+                              onChange={(event) => {
+                                const value = event.currentTarget.value;
+                                if (!isLocalOcrLanguage(value)) return;
+                                setOcrLanguage(value);
+                              }}
+                              className={`${ocrReviewCurrent?.open ? "pointer-events-none" : "pointer-events-auto"} w-full rounded-md border border-[var(--text-primary)]/14 bg-white/75 px-2 py-1.5 text-[10px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55 disabled:cursor-not-allowed disabled:opacity-50`}
+                            >
+                              {LOCAL_OCR_LANGUAGES.map((language) => (
+                                <option key={language.code} value={language.code}>
+                                  {language.label}
+                                </option>
+                              ))}
+                            </select>
+                            <span className="text-[8px] font-medium leading-3.5 text-[var(--text-primary)]/38">
+                              Models are bundled with Lumeo and loaded locally. Non-Latin scripts stay unavailable until the searchable Unicode layer is proven safe.
+                            </span>
+                          </label>
+                          <label className="grid gap-1 text-[9px] font-semibold text-[var(--text-primary)]/52">
                             <span>Scan orientation for next recognition</span>
                             <select
                               aria-label="OCR scan orientation"
@@ -7422,7 +7456,7 @@ export default function EditPdfTool() {
                                   ) as OcrOrientationCorrection,
                                 })
                               }
-                              className="pointer-events-auto w-full rounded-md border border-[var(--text-primary)]/14 bg-white/75 px-2 py-1.5 text-[10px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55 disabled:cursor-not-allowed disabled:opacity-50"
+                              className={`${ocrReviewCurrent?.open ? "pointer-events-none" : "pointer-events-auto"} w-full rounded-md border border-[var(--text-primary)]/14 bg-white/75 px-2 py-1.5 text-[10px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55 disabled:cursor-not-allowed disabled:opacity-50`}
                             >
                               <option value={0}>As shown</option>
                               <option value={90}>Rotate right 90°</option>
@@ -7436,6 +7470,13 @@ export default function EditPdfTool() {
                                 <span className="rounded-full border border-[var(--lumeo-gold)]/30 bg-[var(--lumeo-gold)]/10 px-2 py-0.5 font-bold uppercase tracking-[0.1em] text-[var(--text-primary)]/65">
                                   OCR · local
                                 </span>
+                                <span
+                                  data-edit-ocr-result-language={ocrPageResultCurrent.language}
+                                  className="font-semibold"
+                                >
+                                  {localOcrLanguageLabel(ocrPageResultCurrent.language)}
+                                </span>
+                                <span>·</span>
                                 <span data-edit-ocr-confidence>
                                   {Math.round(ocrPageResultCurrent.confidence)}% confidence
                                 </span>

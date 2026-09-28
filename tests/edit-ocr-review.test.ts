@@ -38,6 +38,7 @@ function result(): OcrPageResult {
     renderScale: 2,
     imageWidthPx: 1200,
     imageHeightPx: 1600,
+    language: "eng",
     orientationCorrection: 0,
     words: Object.freeze([
       word("Invoice", 94.5, 10),

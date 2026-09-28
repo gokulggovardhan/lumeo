@@ -7,6 +7,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DEST = path.join(ROOT, "public", "ocr");
 const NODE_MODULES = path.join(ROOT, "node_modules");
 
+const languageModels = [
+  { code: "eng", packageName: "@tesseract.js-data/eng" },
+  { code: "spa", packageName: "@tesseract.js-data/spa" },
+  { code: "fra", packageName: "@tesseract.js-data/fra" },
+  { code: "deu", packageName: "@tesseract.js-data/deu" },
+  { code: "ita", packageName: "@tesseract.js-data/ita" },
+  { code: "por", packageName: "@tesseract.js-data/por" },
+];
+
 const assets = [
   {
     source: path.join(NODE_MODULES, "tesseract.js", "dist", "worker.min.js"),
@@ -36,16 +45,16 @@ const assets = [
     source: path.join(NODE_MODULES, "tesseract.js-core", "tesseract-core-relaxedsimd-lstm.wasm"),
     target: path.join("tesseract-core", "tesseract-core-relaxedsimd-lstm.wasm"),
   },
-  {
+  ...languageModels.map(({ code }) => ({
     source: path.join(
       NODE_MODULES,
       "@tesseract.js-data",
-      "eng",
+      code,
       "4.0.0_best_int",
-      "eng.traineddata.gz",
+      `${code}.traineddata.gz`,
     ),
-    target: path.join("tessdata", "eng.traineddata.gz"),
-  },
+    target: path.join("tessdata", `${code}.traineddata.gz`),
+  })),
 ];
 
 async function sha256(file) {
@@ -57,9 +66,12 @@ await rm(DEST, { recursive: true, force: true });
 await mkdir(DEST, { recursive: true });
 
 const manifest = {
-  version: 1,
+  version: 2,
   tesseractJs: "7.0.0",
-  englishModel: "@tesseract.js-data/eng@1.0.0/4.0.0_best_int",
+  languages: languageModels.map(({ code, packageName }) => ({
+    code,
+    model: `${packageName}@1.0.0/4.0.0_best_int`,
+  })),
   engine: "LSTM_ONLY",
   assets: [],
 };

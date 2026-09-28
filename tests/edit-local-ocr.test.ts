@@ -4,9 +4,12 @@ import {
   OCR_MAX_DIMENSION_PX,
   OCR_MAX_TOTAL_PIXELS,
   OCR_TARGET_DPI,
+  DEFAULT_LOCAL_OCR_LANGUAGE,
+  LOCAL_OCR_LANGUAGES,
   computeOcrRenderScale,
   createLocalOcrEngine,
   inverseMapOcrBoundsPct,
+  isLocalOcrLanguage,
   localOcrAssetUrls,
   ocrWordsFromBlocks,
   rotateOcrCanvas,
@@ -272,6 +275,7 @@ test("local OCR records orientation evidence and sends rotated dimensions to Tes
     orientationCorrection: 90,
   });
 
+  assert.equal(result.language, DEFAULT_LOCAL_OCR_LANGUAGE);
   assert.equal(result.orientationCorrection, 90);
   assert.equal(result.imageWidthPx > result.imageHeightPx, true);
   assert.equal(recognizedWidth, result.imageHeightPx);
@@ -418,4 +422,100 @@ test("terminating local OCR cancels an in-progress page raster", async () => {
 
   assert.equal(renderCancelled, true);
   await assert.rejects(pending);
+});
+
+
+test("local OCR exposes only the curated self-hosted language set", () => {
+  assert.deepEqual(
+    LOCAL_OCR_LANGUAGES.map((language) => language.code),
+    ["eng", "spa", "fra", "deu", "ita", "por"],
+  );
+  for (const language of LOCAL_OCR_LANGUAGES) {
+    assert.equal(isLocalOcrLanguage(language.code), true);
+  }
+  assert.equal(isLocalOcrLanguage("hin"), false);
+  assert.equal(isLocalOcrLanguage("ara"), false);
+});
+
+test("local OCR passes the explicit language to Tesseract and records it in the result", async () => {
+  const workerLanguages: string[] = [];
+  const engine = createLocalOcrEngine("https://lumeo.in", {
+    createCanvas: fakeOcrCanvas,
+    createWorker: async (language) => {
+      workerLanguages.push(language);
+      return successfulWorker("Texto reconocido");
+    },
+  });
+
+  const result = await engine.recognizePage({
+    page: resolvedRenderPage() as never,
+    pageIndex: 0,
+    language: "spa",
+  });
+
+  assert.deepEqual(workerLanguages, ["spa"]);
+  assert.equal(result.language, "spa");
+  assert.equal(result.text, "Texto reconocido");
+  await engine.terminate();
+});
+
+test("local OCR language switching terminates the previous worker before creating the next one", async () => {
+  const events: string[] = [];
+  const engine = createLocalOcrEngine("https://lumeo.in", {
+    createCanvas: fakeOcrCanvas,
+    createWorker: async (language) => ({
+      async setParameters() {},
+      async recognize() {
+        return {
+          data: {
+            text: language,
+            confidence: 95,
+            blocks: [],
+          },
+        };
+      },
+      async terminate() {
+        events.push(`terminate:${language}`);
+      },
+    }),
+  });
+
+  const english = await engine.recognizePage({
+    page: resolvedRenderPage() as never,
+    pageIndex: 0,
+    language: "eng",
+  });
+  const french = await engine.recognizePage({
+    page: resolvedRenderPage() as never,
+    pageIndex: 0,
+    language: "fra",
+  });
+
+  assert.equal(english.language, "eng");
+  assert.equal(french.language, "fra");
+  assert.deepEqual(events, ["terminate:eng"]);
+  await engine.terminate();
+  assert.deepEqual(events, ["terminate:eng", "terminate:fra"]);
+});
+
+test("local OCR rejects languages outside the self-hosted set", async () => {
+  let workersCreated = 0;
+  const engine = createLocalOcrEngine("https://lumeo.in", {
+    createCanvas: fakeOcrCanvas,
+    createWorker: async () => {
+      workersCreated += 1;
+      return successfulWorker();
+    },
+  });
+
+  await assert.rejects(
+    engine.recognizePage({
+      page: resolvedRenderPage() as never,
+      pageIndex: 0,
+      language: "hin" as never,
+    }),
+    /self-hosted language set/i,
+  );
+  assert.equal(workersCreated, 0);
+  await engine.terminate();
 });

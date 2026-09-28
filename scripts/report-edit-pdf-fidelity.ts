@@ -1107,6 +1107,123 @@ async function assertRotatedOcrFidelityGate(): Promise<void> {
   }
 }
 
+async function assertLatinOcrLanguageFidelityGate(): Promise<void> {
+  const sourceDoc = await PDFDocument.create();
+  const sourcePage = sourceDoc.addPage([300, 200]);
+  const raster = createCanvas(600, 400);
+  const context = raster.getContext("2d");
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, raster.width, raster.height);
+  context.fillStyle = "#111111";
+  context.font = "44px sans-serif";
+  context.fillText("ESPANOLA CAFE", 70, 190);
+  const image = await sourceDoc.embedPng(raster.toBuffer("image/png"));
+  sourcePage.drawImage(image, { x: 0, y: 0, width: 300, height: 200 });
+  const sourceBytes = await sourceDoc.save();
+
+  const expectedWords = ["ESPAÑOLA", "CAFÉ"];
+  const searchable = await addSearchableOcrTextLayer(
+    asArrayBuffer(sourceBytes),
+    {
+      pageIndex: 0,
+      words: [
+        {
+          textSource: "ocr",
+          text: expectedWords[0],
+          confidence: 96,
+          boundsPct: { xPct: 12, yPct: 38, widthPct: 36, heightPct: 15 },
+        },
+        {
+          textSource: "ocr",
+          text: expectedWords[1],
+          confidence: 96,
+          boundsPct: { xPct: 52, yPct: 38, widthPct: 20, heightPct: 15 },
+        },
+      ],
+    },
+  );
+  if (
+    searchable.skippedWords.length !== 0 ||
+    searchable.writtenWords.length !== expectedWords.length
+  ) {
+    throw new Error(
+      "Latin OCR language fidelity gate failed: safe WinAnsi Spanish words were unexpectedly skipped.",
+    );
+  }
+
+  const exported = await exportEditedPdf(
+    asArrayBuffer(searchable.bytes),
+    [],
+  );
+  if (exported.skippedPages.length > 0 || exported.bytes.length <= 5) {
+    throw new Error(
+      "Latin OCR language fidelity gate failed: searchable PDF could not be exported.",
+    );
+  }
+
+  const reopenedPdfJs = await pdfjsLib.getDocument({
+    data: exported.bytes.slice(),
+    useWorkerFetch: false,
+  }).promise;
+  try {
+    const page = await reopenedPdfJs.getPage(1);
+    const content = await page.getTextContent();
+    const extractedItems = content.items
+      .map((item) => ("str" in item ? item.str : ""))
+      .filter((item) => item.trim().length > 0);
+    const missing = firstMissingSearchableOcrWord(
+      expectedWords,
+      extractedItems,
+    );
+    if (missing) {
+      throw new Error(
+        `Latin OCR language fidelity gate failed: PDF.js could not extract “${missing}”.`,
+      );
+    }
+  } finally {
+    const destroy = (reopenedPdfJs as {
+      destroy?: () => Promise<void> | void;
+    }).destroy;
+    if (typeof destroy === "function") await destroy.call(reopenedPdfJs);
+  }
+
+  // Unicode truth for the generated OCR metadata is proven above by an
+  // independent PDF.js reopen. The native Edit decoder is intentionally not
+  // authority for this layer (it remains INVISIBLE_TEXT_LAYER/read-only), and
+  // Standard-14 byte decoding is not a substitute for the viewer's Unicode
+  // extraction. Separately prove that every text-show operator on this
+  // image-only source is still PDF rendering mode 3.
+  const reopened = await PDFDocument.load(exported.bytes.slice());
+  const entries = collectPageTextOperators(reopened, 0);
+  if (
+    entries.length !== expectedWords.length ||
+    entries.some((entry) => entry.operator.renderMode !== 3)
+  ) {
+    throw new Error(
+      "Latin OCR language fidelity gate failed: reopened OCR text was not exclusively invisible PDF text.",
+    );
+  }
+
+  const before = await renderFirstPage(sourceBytes);
+  const after = await renderFirstPage(exported.bytes);
+  if (
+    before.width !== after.width ||
+    before.height !== after.height ||
+    before.rgba.length !== after.rgba.length
+  ) {
+    throw new Error(
+      "Latin OCR language fidelity gate failed: searchable metadata changed page dimensions.",
+    );
+  }
+  for (let index = 0; index < before.rgba.length; index += 1) {
+    if (before.rgba[index] !== after.rgba[index]) {
+      throw new Error(
+        "Latin OCR language fidelity gate failed: invisible multilingual text changed scan pixels.",
+      );
+    }
+  }
+}
+
 async function buildFixtures(): Promise<Fixture[]> {
   const fixtures = await Promise.all([
     makeSimpleFixture(
@@ -1688,6 +1805,7 @@ function assertCorpusGate(
 async function main() {
   await assertReviewedOcrFidelityGate();
   await assertRotatedOcrFidelityGate();
+  await assertLatinOcrLanguageFidelityGate();
   const fixtures = await buildFixtures();
   const measurements: EditPdfFidelityFixtureMeasurement[] = [];
   for (const fixture of fixtures) {
@@ -1711,6 +1829,7 @@ async function main() {
     [
       `Edit PDF fidelity corpus report: ${report.fixtureCount} fixtures`,
       "reviewed OCR searchable fidelity: pass",
+      "Latin OCR language searchable fidelity: pass",
       `text recall: ${report.aggregate.textRecall === null ? "n/a" : (report.aggregate.textRecall * 100).toFixed(2) + "%"}`,
       `source span coverage: ${report.totals.matchedSpans}/${report.totals.matchedSpans + report.totals.unmatchedSpans}`,
       `extra PDF.js fragments (diagnostic): ${report.totals.unsupportedRuns}`,
