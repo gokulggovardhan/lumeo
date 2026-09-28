@@ -3,6 +3,7 @@ import type {
   TextEditArbitration,
   TextSignalReconciliation,
 } from "./textReconciliation.ts";
+import { nativeTextTransformIsMateriallySkewed } from "./textGeometrySafety.ts";
 
 export type DocumentTextCapabilityCategory =
   | "NATIVE_TEXT"
@@ -40,13 +41,6 @@ export type PageTextCapabilityClassification = {
   rasterImageEvidence: boolean;
   reasons: readonly string[];
 };
-
-function matrixSkewMagnitudeDeg(matrix: readonly number[]): number {
-  const x = (Math.atan2(matrix[1], matrix[0]) * 180) / Math.PI;
-  const y = (Math.atan2(-matrix[2], matrix[3]) * 180) / Math.PI;
-  const delta = Math.abs(y - x) % 180;
-  return Math.min(delta, 180 - delta);
-}
 
 function textPaintIsFullyTransparent(
   operator: NativeContentStreamSpan["locatedOperator"]["operator"],
@@ -132,7 +126,7 @@ export function classifyNativeTextSpan(
       reason: "The source font exists, but deterministic glyph metrics are unavailable.",
     };
   }
-  if (matrixSkewMagnitudeDeg(operator.textRenderingMatrix) > 4) {
+  if (nativeTextTransformIsMateriallySkewed(operator.textRenderingMatrix)) {
     return {
       nativeSpanKey: span.key,
       category: "COMPLEX_VECTOR_TEXT",
