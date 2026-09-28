@@ -206,11 +206,44 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   // native content-stream writer.
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
 
+  // Review is browser-local draft state. Correct one real recognized word,
+  // preserving the OCR box/confidence while changing only the text that will
+  // be published into the separately verified searchable layer.
+  await page.getByRole("button", { name: "Review OCR" }).click();
+  const scanWordButton = page.locator(
+    '[data-edit-ocr-review-word][aria-label*="SCANNED"]',
+  ).first();
+  await expect(scanWordButton).toBeVisible({ timeout: 30_000 });
+  const originalConfidence = await scanWordButton.getAttribute(
+    "data-edit-ocr-confidence",
+  );
+  await scanWordButton.click();
+
+  const correctionInput = page.getByRole("textbox", {
+    name: "Correct OCR word",
+  });
+  await expect(correctionInput).toHaveValue(/SCANNED/i);
+  await correctionInput.fill("REVIEWEDSCAN");
+  await page.getByRole("button", { name: "Apply correction" }).click();
+  await expect(page.locator("[data-edit-ocr-correction-count]")).toHaveAttribute(
+    "data-edit-ocr-correction-count",
+    "1",
+  );
+  const correctedWord = page.locator(
+    '[data-edit-ocr-review-word][aria-label*="REVIEWEDSCAN"]',
+  ).first();
+  await expect(correctedWord).toHaveAttribute("data-edit-ocr-corrected", "true");
+  await expect(correctedWord).toHaveAttribute(
+    "data-edit-ocr-confidence",
+    originalConfidence ?? "",
+  );
+
   await page.getByRole("button", { name: "Make page searchable" }).click();
   const searchableStatus = page.locator("[data-edit-ocr-searchable-status]");
   await expect(searchableStatus).toContainText(/Searchable text added locally/i, {
     timeout: 90_000,
   });
+  await expect(searchableStatus).toContainText(/1 reviewed correction/i);
   await expect(searchableStatus).toContainText(/scan pixels were not changed/i);
   await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
     timeout: 90_000,
@@ -223,7 +256,7 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   });
   const searchableRun = page
     .locator(
-      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="SCANNED"]',
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="REVIEWEDSCAN"]',
     )
     .first();
   await expect(searchableRun).toBeVisible({ timeout: 90_000 });
@@ -233,7 +266,7 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
 
   await page.getByRole("button", { name: "Find" }).click();
   const find = page.getByRole("searchbox", { name: "Find text in PDF" });
-  await find.fill("SCANNED");
+  await find.fill("REVIEWEDSCAN");
   await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
     "data-edit-search-match-count",
     "1",
@@ -256,6 +289,20 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
     "no-detected-text",
     { timeout: 90_000 },
   );
+
+  // Undo restores the exact scan revision that owns this OCR result, so the
+  // reviewed draft is safely available again instead of being retargeted to a
+  // different document/page/recognition result.
+  await expect(page.locator("[data-edit-ocr-review-panel]")).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.locator("[data-edit-ocr-correction-count]")).toHaveAttribute(
+    "data-edit-ocr-correction-count",
+    "1",
+  );
+  await expect(
+    page.locator('[data-edit-ocr-review-word][aria-label*="REVIEWEDSCAN"]').first(),
+  ).toBeVisible();
 
   page.off("request", recordOcrRequest);
 });
