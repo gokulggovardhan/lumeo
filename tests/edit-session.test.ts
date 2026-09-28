@@ -251,3 +251,23 @@ test("searchable OCR layer is one edit semantic operation on the affected page",
   assert.deepEqual(semantic.after, { pageCount: 2 });
   assert.match(semantic.description ?? "", /invisible searchable text layer/i);
 });
+
+
+test("searchable OCR regeneration is a distinct edit semantic operation", () => {
+  const operation = pageOperation({
+    operation: "replace-searchable-text-layer",
+    beforePageCount: 3,
+    afterPageCount: 3,
+    affectedPageIndices: [1],
+    description: "Regenerated 9 local OCR words in the invisible searchable text layer.",
+  });
+
+  const next = appendPdfEditOperations(createPdfEditSession(8192), [operation]);
+  assert.equal(next.operations.length, 1);
+  assert.equal(next.operations[0].kind, "pageOperation");
+  const semantic = next.semanticHistory.entries[0];
+  assert.equal(semantic.tool, "edit");
+  assert.equal(semantic.type, "replace-searchable-text-layer");
+  assert.deepEqual(semantic.target, { kind: "pages", pageIndices: [1] });
+  assert.match(semantic.description ?? "", /regenerated/i);
+});

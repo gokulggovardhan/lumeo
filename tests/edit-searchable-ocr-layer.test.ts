@@ -9,6 +9,10 @@ import {
   MAX_SEARCHABLE_OCR_WORDS,
 } from "../lib/pdf/edit/searchableOcrLayer.ts";
 import type { OcrPageResult, OcrWord } from "../lib/pdf/edit/localOcr.ts";
+import {
+  bindSearchableOcrPublicationRevision,
+  resolveSearchableOcrPublicationSource,
+} from "../lib/pdf/edit/searchableOcrPublication.ts";
 
 function word(
   text: string,
@@ -212,4 +216,46 @@ test("searchable OCR outcome preserves exact source indices across duplicate tex
     })),
     [{ wordIndex: 1, reason: "unsupported-text" }],
   );
+});
+
+
+test("searchable OCR regeneration rebuilds from the preserved base instead of stacking duplicate invisible text", async () => {
+  const base = await blankPdf();
+  const first = await addSearchableOcrTextLayer(
+    base,
+    result([word("ORIGINAL", 10, 40, 24, 5)]),
+  );
+  const firstBytes = first.bytes.buffer.slice(
+    first.bytes.byteOffset,
+    first.bytes.byteOffset + first.bytes.byteLength,
+  ) as ArrayBuffer;
+  const firstPublication = bindSearchableOcrPublicationRevision({
+    source: resolveSearchableOcrPublicationSource({
+      currentBytes: base,
+      pageIndex: 0,
+      publication: null,
+    }),
+    publishedBytes: firstBytes,
+    pageIndex: 0,
+  });
+
+  const regenerationSource = resolveSearchableOcrPublicationSource({
+    currentBytes: firstBytes,
+    pageIndex: 0,
+    publication: firstPublication,
+  });
+  assert.equal(regenerationSource.kind, "regenerate");
+
+  const regenerated = await addSearchableOcrTextLayer(
+    regenerationSource.writerSourceBytes,
+    result([word("CORRECTED", 10, 40, 24, 5)]),
+  );
+  const text = await extractedText(regenerated.bytes);
+  assert.match(text, /CORRECTED/);
+  assert.doesNotMatch(text, /ORIGINAL/);
+
+  const reopened = await PDFDocument.load(regenerated.bytes);
+  const located = collectPageTextOperators(reopened, 0);
+  assert.equal(located.length, 1);
+  assert.equal(located[0]?.operator.renderMode, 3);
 });
