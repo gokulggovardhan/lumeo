@@ -577,7 +577,12 @@ test("vinext Edit PDF corrects sideways scan orientation locally and keeps revie
   const doneReviewing = page.getByRole("button", { name: "Done reviewing" });
   await expect(doneReviewing).toBeVisible({ timeout: 30_000 });
   await doneReviewing.click();
-  await expect(page.locator("[data-edit-ocr-overlay]")).toHaveCount(0);
+  const passiveOcrOverlay = page.locator("[data-edit-ocr-overlay]");
+  await expect(passiveOcrOverlay).toHaveAttribute(
+    "data-edit-ocr-review-mode",
+    "false",
+  );
+  await expect(page.locator("[data-edit-ocr-review-word]")).toHaveCount(0);
 
   const searchableRun = page
     .locator(
