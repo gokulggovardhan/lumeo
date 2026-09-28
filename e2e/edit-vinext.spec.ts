@@ -8,6 +8,7 @@ import {
   CLIPPED_TEXT_PDF,
   IMAGE_ONLY_PDF,
   ROTATED_SCAN_PDF,
+  SPANISH_SCAN_PDF,
   SEARCHABLE_SCAN_PDF,
   SHAPED_LTR_PDF,
   PARAGRAPH_PDF,
@@ -311,6 +312,94 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   await expect(
     page.locator('[data-edit-ocr-review-word][aria-label*="REVIEWEDSCAN"]').first(),
   ).toBeVisible();
+
+  page.off("request", recordOcrRequest);
+});
+
+test("vinext Edit PDF recognizes Spanish with the self-hosted local model and publishes searchable text", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, SPANISH_SCAN_PDF);
+
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
+  const pageCapability = page.locator("[data-edit-page-capability]");
+  await expect(pageCapability).toHaveAttribute(
+    "data-edit-page-capability",
+    "no-detected-text",
+    { timeout: 90_000 },
+  );
+  await expect(pageCapability).toHaveAttribute("title", /appears to be a scan/i);
+
+  const applicationOrigin = new URL(page.url()).origin;
+  const modelRequests: string[] = [];
+  const externalOcrRequests: string[] = [];
+  const recordOcrRequest = (request: { url(): string }) => {
+    const value = request.url();
+    if (!/worker\.min\.js|tesseract-core|\.traineddata(?:\.gz)?/i.test(value)) {
+      return;
+    }
+    const url = new URL(value);
+    if (url.origin !== applicationOrigin) {
+      externalOcrRequests.push(value);
+      return;
+    }
+    if (/\/ocr\/tessdata\//i.test(url.pathname)) {
+      modelRequests.push(url.pathname);
+    }
+  };
+  page.on("request", recordOcrRequest);
+
+  const language = page.getByRole("combobox", { name: "OCR language" });
+  await expect(language).toHaveValue("eng");
+  await language.selectOption("spa");
+  await expect(language).toHaveValue("spa");
+
+  await page.getByRole("button", { name: "Recognize text locally" }).click();
+  const recognizedText = page.getByRole("textbox", {
+    name: "Recognized text (OCR)",
+  });
+  await expect(recognizedText).toHaveValue(/FACTURA/i, { timeout: 90_000 });
+  await expect(recognizedText).toHaveValue(/TOTAL PAGADO/i);
+  await expect(
+    page.locator("[data-edit-ocr-result-language='spa']"),
+  ).toContainText("Spanish");
+  expect(modelRequests.some((value) => /spa\.traineddata\.gz$/i.test(value))).toBe(
+    true,
+  );
+  expect(externalOcrRequests).toEqual([]);
+
+  await page.getByRole("button", { name: "Make page searchable" }).click();
+  const searchableStatus = page.locator("[data-edit-ocr-searchable-status]");
+  await expect(searchableStatus).toContainText(/Searchable text added locally/i, {
+    timeout: 90_000,
+  });
+  await expect(searchableStatus).toContainText(/scan pixels were not changed/i);
+
+  // Publication independently reopens the PDF with PDF.js before this state
+  // becomes visible. The inserted metadata remains deliberately read-only.
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
+  const searchableRun = page
+    .locator(
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="FACTURA"]',
+    )
+    .first();
+  await expect(searchableRun).toBeVisible({ timeout: 90_000 });
+  await searchableRun.focus();
+  await searchableRun.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Find" }).click();
+  const find = page.getByRole("searchbox", { name: "Find text in PDF" });
+  await find.fill("FACTURA");
+  await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
+    "data-edit-search-match-count",
+    "1",
+    { timeout: 90_000 },
+  );
 
   page.off("request", recordOcrRequest);
 });
