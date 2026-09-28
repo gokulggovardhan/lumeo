@@ -74,6 +74,12 @@ test("OCR word geometry is normalized to percent space and tagged as OCR", () =>
     {
       textSource: "ocr",
       text: "Invoice",
+      layout: {
+        blockIndex: 0,
+        paragraphIndex: 0,
+        lineIndex: 0,
+        wordIndex: 0,
+      },
       confidence: 94.5,
       boundsPct: {
         xPct: 10,
