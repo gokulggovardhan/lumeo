@@ -859,7 +859,8 @@ export default function EditPdfTool() {
       : null;
   const ocrPageResultCurrent =
     ocrSearchablePublicationCurrent &&
-    ocrPublishedResultsRevision?.bytes === pdf?.bytes
+    ocrPublishedResultsRevision !== null &&
+    ocrPublishedResultsRevision.bytes === pdf?.bytes
       ? ocrPublishedResultsRevision.pages.get(pageIndex) ?? null
       : ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
         ? ocrResultsRevision.pages.get(pageIndex) ?? null
