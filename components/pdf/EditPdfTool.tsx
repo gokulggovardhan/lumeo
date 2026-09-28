@@ -1531,6 +1531,150 @@ export default function EditPdfTool() {
     }
   }, [ocrPageResultCurrent, pageIndex, pdf?.bytes]);
 
+  const handleToggleOcrReview = useCallback(() => {
+    if (!pdf || !ocrPageResultCurrent) return;
+    const result = ocrPageResultCurrent;
+    const bytes = pdf.bytes;
+    setOcrReviewRevision((current) => {
+      const sameReview =
+        current?.bytes === bytes &&
+        current.pageIndex === pageIndex &&
+        current.result === result;
+      if (sameReview) {
+        const opening = !current.open;
+        if (!opening) {
+          return { ...current, open: false, selectedWordIndex: null, draft: "", error: "" };
+        }
+        const preferred =
+          current.selectedWordIndex ??
+          lowConfidenceOcrWordIndices(result)[0] ??
+          (result.words.length > 0 ? 0 : null);
+        return {
+          ...current,
+          open: true,
+          selectedWordIndex: preferred,
+          draft:
+            preferred === null
+              ? ""
+              : current.corrections.get(preferred) ?? result.words[preferred]?.text ?? "",
+          error: "",
+        };
+      }
+
+      const preferred =
+        lowConfidenceOcrWordIndices(result)[0] ??
+        (result.words.length > 0 ? 0 : null);
+      return {
+        bytes,
+        pageIndex,
+        result,
+        open: true,
+        selectedWordIndex: preferred,
+        draft: preferred === null ? "" : result.words[preferred]?.text ?? "",
+        corrections: new Map<number, string>(),
+        error: "",
+      };
+    });
+  }, [ocrPageResultCurrent, pageIndex, pdf]);
+
+  const handleSelectOcrReviewWord = useCallback(
+    (wordIndex: number) => {
+      if (!pdf || !ocrPageResultCurrent) return;
+      const word = ocrPageResultCurrent.words[wordIndex];
+      if (!word) return;
+      const result = ocrPageResultCurrent;
+      const bytes = pdf.bytes;
+      setOcrReviewRevision((current) => {
+        const corrections =
+          current?.bytes === bytes &&
+          current.pageIndex === pageIndex &&
+          current.result === result
+            ? new Map(current.corrections)
+            : new Map<number, string>();
+        return {
+          bytes,
+          pageIndex,
+          result,
+          open: true,
+          selectedWordIndex: wordIndex,
+          draft: corrections.get(wordIndex) ?? word.text,
+          corrections,
+          error: "",
+        };
+      });
+    },
+    [ocrPageResultCurrent, pageIndex, pdf],
+  );
+
+  const handleApplyOcrWordCorrection = useCallback(() => {
+    if (!ocrReviewCurrent || !ocrPageResultCurrent) return;
+    const index = ocrReviewCurrent.selectedWordIndex;
+    if (index === null) return;
+    const word = ocrPageResultCurrent.words[index];
+    if (!word) return;
+    const validation = validateOcrWordCorrection(ocrReviewCurrent.draft);
+    if (!validation.valid) {
+      setOcrReviewRevision((current) =>
+        current === ocrReviewCurrent
+          ? { ...current, error: validation.reason }
+          : current,
+      );
+      return;
+    }
+
+    setOcrReviewRevision((current) => {
+      if (current !== ocrReviewCurrent) return current;
+      const corrections = new Map(current.corrections);
+      if (validation.text === word.text) corrections.delete(index);
+      else corrections.set(index, validation.text);
+      return {
+        ...current,
+        draft: validation.text,
+        corrections,
+        error: "",
+      };
+    });
+  }, [ocrPageResultCurrent, ocrReviewCurrent]);
+
+  const handleResetOcrWordCorrection = useCallback(() => {
+    if (!ocrReviewCurrent || !ocrPageResultCurrent) return;
+    const index = ocrReviewCurrent.selectedWordIndex;
+    if (index === null) return;
+    const word = ocrPageResultCurrent.words[index];
+    if (!word) return;
+    setOcrReviewRevision((current) => {
+      if (current !== ocrReviewCurrent) return current;
+      const corrections = new Map(current.corrections);
+      corrections.delete(index);
+      return {
+        ...current,
+        draft: word.text,
+        corrections,
+        error: "",
+      };
+    });
+  }, [ocrPageResultCurrent, ocrReviewCurrent]);
+
+  const handleNextLowConfidenceOcrWord = useCallback(() => {
+    if (!ocrReviewCurrent || !ocrPageResultCurrent) return;
+    const lowConfidence = lowConfidenceOcrWordIndices(ocrPageResultCurrent);
+    if (lowConfidence.length === 0) return;
+    const currentPosition = lowConfidence.indexOf(
+      ocrReviewCurrent.selectedWordIndex ?? -1,
+    );
+    const nextIndex =
+      lowConfidence[
+        currentPosition < 0 || currentPosition === lowConfidence.length - 1
+          ? 0
+          : currentPosition + 1
+      ];
+    handleSelectOcrReviewWord(nextIndex);
+  }, [
+    handleSelectOcrReviewWord,
+    ocrPageResultCurrent,
+    ocrReviewCurrent,
+  ]);
+
   const handleAddSearchableOcrLayer = useCallback(async () => {
     if (
       !pdf ||
@@ -1568,9 +1712,27 @@ export default function EditPdfTool() {
       const { addSearchableOcrTextLayer, firstMissingSearchableOcrWord } = await import(
         "@/lib/pdf/edit/searchableOcrLayer"
       );
+      let searchableInput: Pick<OcrPageResult, "pageIndex" | "words"> =
+        ocrPageResultCurrent;
+      let reviewedCorrectionCount = 0;
+      if (ocrReviewCurrent) {
+        const reviewed = buildReviewedOcrSearchableInput(
+          ocrPageResultCurrent,
+          ocrReviewCurrent.corrections,
+        );
+        if (reviewed.kind !== "ready") {
+          throw new Error(reviewed.reason);
+        }
+        searchableInput = {
+          pageIndex: reviewed.pageIndex,
+          words: reviewed.words,
+        };
+        reviewedCorrectionCount = reviewed.correctionCount;
+      }
+
       const outcome = await addSearchableOcrTextLayer(
         sourceBytes,
-        ocrPageResultCurrent,
+        searchableInput,
       );
 
       const context = ocrContextRef.current;
@@ -1630,7 +1792,10 @@ export default function EditPdfTool() {
       const writtenCount = outcome.writtenWords.length;
       const skippedCount = outcome.skippedWords.length;
       const description =
-        `Added ${writtenCount} local OCR word${writtenCount === 1 ? "" : "s"} as an invisible searchable text layer on page ${pageIndex + 1}.`;
+        `Added ${writtenCount} local OCR word${writtenCount === 1 ? "" : "s"} as an invisible searchable text layer on page ${pageIndex + 1}.` +
+        (reviewedCorrectionCount > 0
+          ? ` Published ${reviewedCorrectionCount} reviewed OCR correction${reviewedCorrectionCount === 1 ? "" : "s"}.`
+          : "");
 
       setHistoryState((current) => ({
         ...current,
@@ -1650,6 +1815,9 @@ export default function EditPdfTool() {
         pageIndex,
         message:
           `Searchable text added locally · ${writtenCount} word${writtenCount === 1 ? "" : "s"}` +
+          (reviewedCorrectionCount > 0
+            ? ` · ${reviewedCorrectionCount} reviewed correction${reviewedCorrectionCount === 1 ? "" : "s"}`
+            : "") +
           (skippedCount > 0
             ? ` · ${skippedCount} unsupported or unsafe word${skippedCount === 1 ? "" : "s"} skipped`
             : "") +
@@ -1678,6 +1846,7 @@ export default function EditPdfTool() {
     getHistoryState,
     ocrBusy,
     ocrPageResultCurrent,
+    ocrReviewCurrent,
     ocrSearchLayerBusy,
     pageIndex,
     pageTextCapability.category,
