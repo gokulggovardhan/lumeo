@@ -153,3 +153,36 @@ export function buildReviewedOcrSearchableInput(
     correctedWordIndices: Object.freeze(correctedWordIndices),
   };
 }
+
+
+/**
+ * Returns only reviewed OCR word indices that the searchable-layer writer
+ * actually wrote. Text is deliberately not used as identity: duplicate OCR
+ * words are common, and a skipped corrected word must never be counted merely
+ * because an identical uncorrected word was written elsewhere on the page.
+ */
+export function publishedReviewedOcrCorrectionIndices(
+  correctedWordIndices: readonly number[],
+  writtenWordIndices: readonly number[],
+): number[] {
+  const written = new Set(
+    writtenWordIndices.filter(
+      (index) => Number.isInteger(index) && index >= 0,
+    ),
+  );
+  const published: number[] = [];
+  const seen = new Set<number>();
+  for (const index of correctedWordIndices) {
+    if (
+      !Number.isInteger(index) ||
+      index < 0 ||
+      seen.has(index) ||
+      !written.has(index)
+    ) {
+      continue;
+    }
+    seen.add(index);
+    published.push(index);
+  }
+  return published;
+}
