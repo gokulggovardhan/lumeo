@@ -7428,7 +7428,7 @@ export default function EditPdfTool() {
                                 if (!isLocalOcrLanguage(value)) return;
                                 setOcrLanguage(value);
                               }}
-                              className="pointer-events-auto w-full rounded-md border border-[var(--text-primary)]/14 bg-white/75 px-2 py-1.5 text-[10px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55 disabled:cursor-not-allowed disabled:opacity-50"
+                              className={`${ocrReviewCurrent?.open ? "pointer-events-none" : "pointer-events-auto"} w-full rounded-md border border-[var(--text-primary)]/14 bg-white/75 px-2 py-1.5 text-[10px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55 disabled:cursor-not-allowed disabled:opacity-50`}
                             >
                               {LOCAL_OCR_LANGUAGES.map((language) => (
                                 <option key={language.code} value={language.code}>
@@ -7456,7 +7456,7 @@ export default function EditPdfTool() {
                                   ) as OcrOrientationCorrection,
                                 })
                               }
-                              className="pointer-events-auto w-full rounded-md border border-[var(--text-primary)]/14 bg-white/75 px-2 py-1.5 text-[10px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55 disabled:cursor-not-allowed disabled:opacity-50"
+                              className={`${ocrReviewCurrent?.open ? "pointer-events-none" : "pointer-events-auto"} w-full rounded-md border border-[var(--text-primary)]/14 bg-white/75 px-2 py-1.5 text-[10px] font-semibold text-[#242833] outline-none focus:border-[var(--lumeo-gold)]/55 disabled:cursor-not-allowed disabled:opacity-50`}
                             >
                               <option value={0}>As shown</option>
                               <option value={90}>Rotate right 90°</option>
