@@ -95,6 +95,36 @@ test("OCR review applies corrected text only and preserves confidence and geomet
   assert.equal(source.text, "Invoice total");
 });
 
+test("OCR review corrections preserve exact structural provenance", () => {
+  const source = result();
+  const layout = Object.freeze({
+    blockIndex: 2,
+    paragraphIndex: 1,
+    lineIndex: 3,
+    wordIndex: 4,
+  });
+  const structuredWord = Object.freeze({
+    ...source.words[1],
+    layout,
+  });
+  const structured = Object.freeze({
+    ...source,
+    words: Object.freeze([source.words[0], structuredWord]),
+  });
+
+  const reviewed = buildReviewedOcrSearchableInput(
+    structured,
+    new Map([[1, "total"]]),
+  );
+  assert.equal(reviewed.kind, "ready");
+  if (reviewed.kind !== "ready") return;
+
+  assert.equal(reviewed.words[1].text, "total");
+  assert.equal(reviewed.words[1].layout, layout);
+  assert.equal(reviewed.words[1].boundsPct, structuredWord.boundsPct);
+  assert.equal(reviewed.words[1].confidence, structuredWord.confidence);
+});
+
 test("OCR review ignores a no-op correction without manufacturing review evidence", () => {
   const source = result();
   const reviewed = buildReviewedOcrSearchableInput(
