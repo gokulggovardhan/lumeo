@@ -136,6 +136,7 @@ import type { EmbeddedGlyphEvidence, ResolvedFont } from "@/lib/pdf/edit/fontEnc
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import type { PdfFontResourceIdentity } from "@/lib/pdf/edit/fontRegistry";
 import type { ValidatedShapedGlyphEditPlan } from "@/lib/pdf/edit/shapedGlyphEditPlan";
+import type { ValidatedLocalFontSubstitutionPlan } from "@/lib/pdf/edit/localFontSubstitution";
 import type { EditPdfPerformanceCollector } from "@/lib/pdf/edit/performanceDiagnostics";
 import {
   buildEditPlan,
@@ -357,6 +358,9 @@ let editEngineModulePromise: Promise<{
   buildParagraphEditPlan: (typeof import("@/lib/pdf/edit/paragraphEditPlan"))["buildParagraphEditPlan"];
   isValidatedParagraphEditPlan: (typeof import("@/lib/pdf/edit/paragraphEditPlan"))["isValidatedParagraphEditPlan"];
   applyParagraphEditPlanToDocument: (typeof import("@/lib/pdf/edit/paragraphEditPlan"))["applyParagraphEditPlanToDocument"];
+  buildLocalFontSubstitutionPlan: (typeof import("@/lib/pdf/edit/localFontSubstitution"))["buildLocalFontSubstitutionPlan"];
+  isValidatedLocalFontSubstitutionPlan: (typeof import("@/lib/pdf/edit/localFontSubstitution"))["isValidatedLocalFontSubstitutionPlan"];
+  applyLocalFontSubstitutionToBytes: (typeof import("@/lib/pdf/edit/localFontSubstitution"))["applyLocalFontSubstitutionToBytes"];
   verifyPostExportNativeEdits: (typeof import("@/lib/pdf/edit/postExportVerification"))["verifyPostExportNativeEdits"];
   PDFDocument: (typeof import("pdf-lib"))["PDFDocument"];
   PDFName: (typeof import("pdf-lib"))["PDFName"];
@@ -378,7 +382,8 @@ function loadEditEngine() {
       import("@/lib/pdf/edit/postExportVerification"),
       import("@/lib/pdf/edit/shapedGlyphEditPlan"),
       import("@/lib/pdf/edit/paragraphEditPlan"),
-    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod, postExportVerificationMod, shapedGlyphEditPlanMod, paragraphEditPlanMod]) => ({
+      import("@/lib/pdf/edit/localFontSubstitution"),
+    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod, postExportVerificationMod, shapedGlyphEditPlanMod, paragraphEditPlanMod, localFontSubstitutionMod]) => ({
       exportEditedPdf: exportMod.exportEditedPdf,
       collectPageTextOperators: formXObjectsMod.collectPageTextOperators,
       resolveFont: fontEncodingMod.resolveFont,
@@ -393,6 +398,9 @@ function loadEditEngine() {
       buildParagraphEditPlan: paragraphEditPlanMod.buildParagraphEditPlan,
       isValidatedParagraphEditPlan: paragraphEditPlanMod.isValidatedParagraphEditPlan,
       applyParagraphEditPlanToDocument: paragraphEditPlanMod.applyParagraphEditPlanToDocument,
+      buildLocalFontSubstitutionPlan: localFontSubstitutionMod.buildLocalFontSubstitutionPlan,
+      isValidatedLocalFontSubstitutionPlan: localFontSubstitutionMod.isValidatedLocalFontSubstitutionPlan,
+      applyLocalFontSubstitutionToBytes: localFontSubstitutionMod.applyLocalFontSubstitutionToBytes,
       verifyPostExportNativeEdits: postExportVerificationMod.verifyPostExportNativeEdits,
       PDFDocument: pdfLibMod.PDFDocument,
       PDFName: pdfLibMod.PDFName,
