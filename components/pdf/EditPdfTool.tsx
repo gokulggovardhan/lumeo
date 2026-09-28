@@ -5426,11 +5426,13 @@ export default function EditPdfTool() {
       return;
     }
 
+    const choice = activeNativeLocalFontChoice;
     const sourceHistorySnapshot = getHistoryState();
     const sourceMutationRevision = historyMutationRevisionRef.current;
     if (
-      activeNativeLocalFontChoice?.revision !== sourceHistorySnapshot.pdfBytes ||
-      activeNativeLocalFontChoice.selectionKey !== nativeTextSelectionKey
+      !choice ||
+      choice.revision !== sourceHistorySnapshot.pdfBytes ||
+      choice.selectionKey !== nativeTextSelectionKey
     ) {
       setNativeLocalFontError(
         "The PDF or native selection changed. Choose the local font again for the current text.",
@@ -5450,7 +5452,7 @@ export default function EditPdfTool() {
       if (
         historyMutationRevisionRef.current !== sourceMutationRevision ||
         getHistoryState() !== sourceHistorySnapshot ||
-        nativeTextSelectionKey !== activeNativeLocalFontChoice.selectionKey
+        nativeTextSelectionKey !== choice.selectionKey
       ) {
         throw new Error(
           "The PDF changed while the local font was being embedded. No font change was published.",
