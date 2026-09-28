@@ -7,6 +7,7 @@ import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
 import {
   CLIPPED_TEXT_PDF,
   IMAGE_ONLY_PDF,
+  ROTATED_SCAN_PDF,
   SEARCHABLE_SCAN_PDF,
   SHAPED_LTR_PDF,
   PARAGRAPH_PDF,
@@ -312,6 +313,61 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   ).toBeVisible();
 
   page.off("request", recordOcrRequest);
+});
+
+test("vinext Edit PDF corrects sideways scan orientation locally and keeps review geometry page-aligned", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, ROTATED_SCAN_PDF);
+
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
+  const pageCapability = page.locator("[data-edit-page-capability]");
+  await expect(pageCapability).toHaveAttribute(
+    "data-edit-page-capability",
+    "no-detected-text",
+    { timeout: 90_000 },
+  );
+  await expect(pageCapability).toHaveAttribute("title", /appears to be a scan/i);
+
+  const orientation = page.getByRole("combobox", {
+    name: "OCR scan orientation",
+  });
+  await expect(orientation).toHaveValue("0");
+  await orientation.selectOption("270");
+  await expect(orientation).toHaveValue("270");
+
+  await page.getByRole("button", { name: "Recognize text locally" }).click();
+  const recognizedText = page.getByRole("textbox", {
+    name: "Recognized text (OCR)",
+  });
+  await expect(recognizedText).toHaveValue(/SIDEWAYS OCR SAMPLE/i, {
+    timeout: 90_000,
+  });
+  await expect(recognizedText).toHaveValue(/Rotate locally before recognition/i);
+  await expect(page.locator("[data-edit-ocr-result-orientation]")).toHaveAttribute(
+    "data-edit-ocr-result-orientation",
+    "270",
+  );
+  await expect(page.locator("[data-edit-ocr-result-orientation]")).toContainText(
+    /rotated left 90/i,
+  );
+
+  await page.getByRole("button", { name: "Review OCR" }).click();
+  const sidewaysWord = page
+    .locator('[data-edit-ocr-review-word][aria-label*="SIDEWAYS"]')
+    .first();
+  await expect(sidewaysWord).toBeVisible({ timeout: 30_000 });
+  const box = await sidewaysWord.boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.width).toBeGreaterThan(0);
+  expect(box!.height).toBeGreaterThan(0);
+
+  // Review remains OCR metadata only; orientation correction never promotes
+  // scan text into the native content-stream writer.
+  await sidewaysWord.click();
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
 });
 
 test("vinext Edit PDF keeps a 120-page thumbnail rail bounded and scrollable", async ({
