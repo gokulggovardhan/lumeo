@@ -1187,28 +1187,21 @@ async function assertLatinOcrLanguageFidelityGate(): Promise<void> {
     if (typeof destroy === "function") await destroy.call(reopenedPdfJs);
   }
 
+  // Unicode truth for the generated OCR metadata is proven above by an
+  // independent PDF.js reopen. The native Edit decoder is intentionally not
+  // authority for this layer (it remains INVISIBLE_TEXT_LAYER/read-only), and
+  // Standard-14 byte decoding is not a substitute for the viewer's Unicode
+  // extraction. Separately prove that every text-show operator on this
+  // image-only source is still PDF rendering mode 3.
   const reopened = await PDFDocument.load(exported.bytes.slice());
   const entries = collectPageTextOperators(reopened, 0);
-  const registry = new PdfFontRegistry(reopened);
-  const decodedInvisible = new Set<string>();
-  for (const entry of entries) {
-    if (entry.operator.renderMode !== 3) continue;
-    const resourceName = entry.operator.fontResourceName;
-    if (!resourceName) continue;
-    const profile = registry.resolve(entry.resources, resourceName);
-    if (!profile) continue;
-    const decoded = decodeTextShowOperator(
-      entry.operator,
-      profile.resolvedFont,
+  if (
+    entries.length !== expectedWords.length ||
+    entries.some((entry) => entry.operator.renderMode !== 3)
+  ) {
+    throw new Error(
+      "Latin OCR language fidelity gate failed: reopened OCR text was not exclusively invisible PDF text.",
     );
-    if (decoded.allDecoded) decodedInvisible.add(decoded.text);
-  }
-  for (const expected of expectedWords) {
-    if (!decodedInvisible.has(expected)) {
-      throw new Error(
-        `Latin OCR language fidelity gate failed: “${expected}” did not reopen as invisible PDF text.`,
-      );
-    }
   }
 
   const before = await renderFirstPage(sourceBytes);
