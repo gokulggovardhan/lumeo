@@ -19,6 +19,7 @@ export const TEXT_ONLY_PDF = path.join(TMP_DIR, "text-only.pdf");
 export const WITH_IMAGE_PDF = path.join(TMP_DIR, "with-image.pdf");
 export const IMAGE_ONLY_PDF = path.join(TMP_DIR, "image-only.pdf");
 export const ROTATED_SCAN_PDF = path.join(TMP_DIR, "rotated-scan.pdf");
+export const SPANISH_SCAN_PDF = path.join(TMP_DIR, "spanish-scan.pdf");
 export const SEARCHABLE_SCAN_PDF = path.join(TMP_DIR, "searchable-scan.pdf");
 export const SPLIT_RUN_PDF = path.join(TMP_DIR, "split-run.pdf");
 export const TWO_PAGE_PDF = path.join(TMP_DIR, "two-page.pdf");
@@ -59,6 +60,26 @@ async function imageOnly(): Promise<Uint8Array> {
   const png = await doc.embedPng(canvas.toBuffer("image/png"));
   page.drawImage(png, { x: 0, y: 0, width: 595, height: 842 });
 
+  return doc.save();
+}
+
+async function spanishScan(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+
+  const canvas = createCanvas(595, 842);
+  const context = canvas.getContext("2d");
+  context.fillStyle = "#f3f4f6";
+  context.fillRect(0, 0, 595, 842);
+  context.fillStyle = "#111111";
+  context.font = "bold 34px sans-serif";
+  context.fillText("FACTURA ESPANOLA", 70, 155);
+  context.font = "26px sans-serif";
+  context.fillText("TOTAL PAGADO 12345", 70, 220);
+  context.fillText("DOCUMENTO LOCAL", 70, 275);
+
+  const png = await doc.embedPng(canvas.toBuffer("image/png"));
+  page.drawImage(png, { x: 0, y: 0, width: 595, height: 842 });
   return doc.save();
 }
 
@@ -544,6 +565,7 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(WITH_IMAGE_PDF, await withImage());
   await writeFile(IMAGE_ONLY_PDF, await imageOnly());
   await writeFile(ROTATED_SCAN_PDF, await rotatedScan());
+  await writeFile(SPANISH_SCAN_PDF, await spanishScan());
   await writeFile(SEARCHABLE_SCAN_PDF, await searchableScan());
   const split = await splitRun();
   await assertGenuinelySplit(split);
