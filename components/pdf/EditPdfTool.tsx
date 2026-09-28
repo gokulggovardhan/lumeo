@@ -110,6 +110,7 @@ import { planStructuredReplaceAllPage } from "@/lib/pdf/edit/structuredReplaceAl
 import { preflightStructuredReplacePageWrites } from "@/lib/pdf/edit/structuredReplaceWritePlan";
 import { scanForSensitiveInfo, type PrivacyShieldMatch } from "@/lib/pdf/edit/privacyShield";
 import { detectRasterImageEvidence } from "@/lib/pdf/edit/rasterImageEvidence";
+import { analyzeOcrLayout } from "@/lib/pdf/edit/ocrLayoutGrouping";
 import {
   createLocalOcrEngine,
   DEFAULT_LOCAL_OCR_LANGUAGE,
@@ -833,6 +834,13 @@ export default function EditPdfTool() {
     ocrResultsRevision && ocrResultsRevision.bytes === pdf?.bytes
       ? ocrResultsRevision.pages.get(pageIndex) ?? null
       : null;
+  const ocrLayoutAnalysis = useMemo(
+    () =>
+      ocrPageResultCurrent
+        ? analyzeOcrLayout(ocrPageResultCurrent.words)
+        : null,
+    [ocrPageResultCurrent],
+  );
   const ocrReviewCurrent =
     ocrReviewRevision !== null &&
     ocrReviewRevision.bytes === pdf?.bytes &&
@@ -7494,6 +7502,28 @@ export default function EditPdfTool() {
                                 <span data-edit-ocr-word-summary>
                                   {ocrPageResultCurrent.words.length} word{ocrPageResultCurrent.words.length === 1 ? "" : "s"}
                                 </span>
+                                {ocrLayoutAnalysis && ocrLayoutAnalysis.lineGroups.length > 0 ? (
+                                  <>
+                                    <span>·</span>
+                                    <span
+                                      data-edit-ocr-layout-summary
+                                      data-edit-ocr-block-count={ocrLayoutAnalysis.blockGroups.length}
+                                      data-edit-ocr-line-count={ocrLayoutAnalysis.lineGroups.length}
+                                      data-edit-ocr-column-count={ocrLayoutAnalysis.columnBands.length}
+                                      data-edit-ocr-table-block-count={ocrLayoutAnalysis.tableLikeBlocks.length}
+                                    >
+                                      {ocrLayoutAnalysis.blockGroups.length} block{ocrLayoutAnalysis.blockGroups.length === 1 ? "" : "s"}
+                                      {" · "}
+                                      {ocrLayoutAnalysis.lineGroups.length} line{ocrLayoutAnalysis.lineGroups.length === 1 ? "" : "s"}
+                                      {ocrLayoutAnalysis.columnBands.length >= 2
+                                        ? ` · ${ocrLayoutAnalysis.columnBands.length}-column layout`
+                                        : ""}
+                                      {ocrLayoutAnalysis.tableLikeBlocks.length > 0
+                                        ? ` · ${ocrLayoutAnalysis.tableLikeBlocks.length} table-like group${ocrLayoutAnalysis.tableLikeBlocks.length === 1 ? "" : "s"}`
+                                        : ""}
+                                    </span>
+                                  </>
+                                ) : null}
                                 <span>·</span>
                                 <span
                                   data-edit-ocr-low-confidence-count={ocrLowConfidenceWordIndices.length}
@@ -7633,6 +7663,18 @@ export default function EditPdfTool() {
                                         <span data-edit-ocr-review-confidence>
                                           {Math.round(ocrReviewSelectedWord.confidence)}% confidence
                                         </span>
+                                        {ocrReviewSelectedWord.layout ? (
+                                          <>
+                                            <span>·</span>
+                                            <span
+                                              data-edit-ocr-review-layout
+                                              data-edit-ocr-review-block={ocrReviewSelectedWord.layout.blockIndex}
+                                              data-edit-ocr-review-line={ocrReviewSelectedWord.layout.lineIndex}
+                                            >
+                                              Block {ocrReviewSelectedWord.layout.blockIndex + 1}, line {ocrReviewSelectedWord.layout.lineIndex + 1}
+                                            </span>
+                                          </>
+                                        ) : null}
                                       </div>
                                       <input
                                         aria-label="Correct OCR word"
