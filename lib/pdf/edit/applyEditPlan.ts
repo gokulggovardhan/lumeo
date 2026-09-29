@@ -46,6 +46,7 @@ import {
   type ValidatedVerticalShapedGlyphEditPlan,
 } from "./verticalShapedGlyphEditPlan.ts";
 import { metricForVerticalCid } from "./verticalFontMetrics.ts";
+import type { ShapedRun } from "./harfbuzzShaping.ts";
 import { ensureFallbackFontResource, resolveFallbackFontsDict } from "./fallbackFont.ts";
 import {
   isValidatedMultiRunEditPlan,
@@ -854,6 +855,58 @@ function sameMatrix6(
   );
 }
 
+function shapedRunFromVerticalPlan(
+  plan: ValidatedVerticalShapedGlyphEditPlan,
+): ShapedRun {
+  const clusterMap: ShapedRun["clusterMap"][number][] = [];
+  let utf16Offset = 0;
+  const glyphs = plan.glyphs.map((glyph, glyphIndex) => {
+    const startUtf16 = utf16Offset;
+    utf16Offset += glyph.clusterText.length;
+    clusterMap.push({
+      startUtf16,
+      endUtf16: utf16Offset,
+      text: glyph.clusterText,
+      glyphIndices: [glyphIndex],
+    });
+    return {
+      glyphId: glyph.glyphId,
+      clusterUtf16: startUtf16,
+      flags: 0,
+      xAdvance: glyph.xAdvanceFontUnits,
+      yAdvance: glyph.yAdvanceFontUnits,
+      xOffset: glyph.xOffsetFontUnits,
+      yOffset: glyph.yOffsetFontUnits,
+      xAdvanceEm: glyph.xAdvanceFontUnits / plan.unitsPerEm,
+      yAdvanceEm: glyph.yAdvanceFontUnits / plan.unitsPerEm,
+      xOffsetEm: glyph.xOffsetFontUnits / plan.unitsPerEm,
+      yOffsetEm: glyph.yOffsetFontUnits / plan.unitsPerEm,
+    };
+  });
+  const totalXAdvance = glyphs.reduce(
+    (sum, glyph) => sum + glyph.xAdvance,
+    0,
+  );
+  const totalYAdvance = glyphs.reduce(
+    (sum, glyph) => sum + glyph.yAdvance,
+    0,
+  );
+  return {
+    text: plan.replacementText,
+    glyphs,
+    clusterMap,
+    unitsPerEm: plan.unitsPerEm,
+    totalAdvance: totalYAdvance,
+    totalAdvanceEm: totalYAdvance / plan.unitsPerEm,
+    totalXAdvance,
+    totalYAdvance,
+    requestedDirection: "ttb",
+    directionWasExplicit: true,
+    engine: "harfbuzz",
+    engineVersion: plan.shapingEngineVersion,
+  };
+}
+
 function verticalResourceAndMetricsMatchCurrent(
   doc: PDFDocument,
   resources: PDFDict,
@@ -900,6 +953,42 @@ function verticalResourceAndMetricsMatchCurrent(
     plan.fontResourceName,
   );
   if (vertical.kind !== "resolved") return false;
+
+  // Re-prove the current resource contents, not just their object refs.
+  // A ToUnicode or CIDToGIDMap stream can be replaced at the same indirect
+  // reference, so object identity alone is insufficient writer authority.
+  const currentEvidence = registry.inspectVerticalShapedGlyphEvidence(
+    resources,
+    plan.fontResourceName,
+    shapedRunFromVerticalPlan(plan),
+  );
+  if (
+    currentEvidence.kind !== "resolved" ||
+    currentEvidence.embeddedProgramSha256 !==
+      plan.embeddedProgramSha256.toLowerCase() ||
+    currentEvidence.addresses.length !== plan.glyphs.length
+  ) {
+    return false;
+  }
+
+  for (let index = 0; index < plan.glyphs.length; index += 1) {
+    const expected = plan.glyphs[index];
+    const current = currentEvidence.addresses[index];
+    if (
+      !current ||
+      current.glyphIndex !== expected.glyphIndex ||
+      current.glyphId !== expected.glyphId ||
+      current.cid !== expected.cid ||
+      current.pdfCode !== expected.pdfCode ||
+      current.clusterText !== expected.clusterText ||
+      current.verticalMetric.displacementY !==
+        expected.pdfDisplacementY1000 ||
+      current.verticalMetric.positionX !== expected.pdfPositionX1000 ||
+      current.verticalMetric.positionY !== expected.pdfPositionY1000
+    ) {
+      return false;
+    }
+  }
 
   for (const expected of plan.originalGlyphMetrics) {
     const current = metricForVerticalCid({
