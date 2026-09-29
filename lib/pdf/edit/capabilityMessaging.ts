@@ -40,9 +40,9 @@ const CATEGORY_MESSAGES: Record<
       "Lumeo found the native text, but the PDF does not expose deterministic font measurements needed to keep replacement text in the same position.",
   },
   COMPLEX_VECTOR_TEXT: {
-    title: "This text uses complex positioning",
+    title: "This text needs exact geometry proof",
     detail:
-      "The text is transformed or skewed in a way that Lumeo cannot yet reproduce safely during an in-place rewrite.",
+      "Lumeo can edit skewed native text only when the visible page text matches one exact original text operation. The original transform is preserved; text without that proof stays read-only.",
   },
   TYPE3_TEXT: {
     title: "This text uses a special PDF-drawn font",

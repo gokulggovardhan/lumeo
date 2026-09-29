@@ -152,8 +152,9 @@ export function classifyNativeTextSpan(
       nativeSpanKey: span.key,
       category: "COMPLEX_VECTOR_TEXT",
       safelyRewritable: false,
-      authorization: "blocked",
-      reason: "The text transform is materially skewed and is kept read-only.",
+      authorization: "needs-measured-reconciliation",
+      reason:
+        "The text transform is materially skewed and requires independent PDF.js/native geometry agreement before its source bytes can be rewritten.",
     };
   }
 
@@ -221,12 +222,12 @@ export function enforceSpanCapabilityOnArbitration({
     return arbitration;
   }
 
-  // A fallback native-only box is presentation evidence only. It can never
-  // authorize a write. However, the Phase 1 arbitration already has a separate
-  // measured-geometry proof for reconciled PDF.js runs and for exact
+  // Fallback or complex native-only geometry is presentation evidence only.
+  // It can never authorize a write. However, arbitration already has a
+  // separate measured-geometry proof for reconciled PDF.js runs and exact
   // fragmented reconstruction. Preserve that stronger authority instead of
-  // downgrading otherwise-safe standard-font text merely because its PDF font
-  // dictionary omits ascent/descent.
+  // downgrading otherwise-safe text merely because descriptor geometry is
+  // incomplete or its unchanged text matrix is skewed.
   if (
     spanClassification.authorization === "needs-measured-reconciliation" &&
     (arbitration.source === "reconciled" ||
