@@ -526,7 +526,7 @@ test("Form XObject classification still fails closed for missing metrics and com
 
 test("classifier detects vertical Type0 text from retained font CMap evidence", () => {
   const [span] = buildNativeContentStreamSpans({
-    operators: [located()],
+    operators: [located({ bytes: new Uint8Array([0, 3]) })],
     viewportTransform: viewport,
     pageWidthPt: 612,
     pageHeightPt: 792,
@@ -534,6 +534,21 @@ test("classifier detects vertical Type0 text from retained font CMap evidence", 
       profile({
         kind: "Type0",
         bytesPerCode: 2,
+        embeddedProgramByteLength: 4096,
+        embeddedProgramSha256: "a".repeat(64),
+        resolvedFont: {
+          ...profile().resolvedFont,
+          kind: "Type0",
+          bytesPerCode: 2,
+          glyphCodeToUnicode: new Map([[3, "Hi"]]),
+          unicodeToGlyphCode: new Map([["Hi", 3]]),
+        },
+        metrics: {
+          bytesPerCode: 2,
+          defaultWidth: 1000,
+          glyphWidths: new Map([[3, 1000]]),
+          source: "Widths",
+        },
         resourceIdentity: {
           ...profile().resourceIdentity,
           type0Encoding: "Identity-V",
@@ -546,6 +561,34 @@ test("classifier detects vertical Type0 text from retained font CMap evidence", 
   const classification = classifyNativeTextSpan(span);
   assert.equal(classification.category, "VERTICAL_TEXT");
   assert.equal(classification.safelyRewritable, false);
+  assert.equal(
+    classification.authorization,
+    "needs-vertical-writer-proof",
+  );
+
+  const reconciled = enforceSpanCapabilityOnArbitration({
+    arbitration: {
+      pdfJsRunIndex: 0,
+      decision: "editable",
+      nativeSpanKey: span.key,
+      source: "reconciled",
+      reason: "Exact text and measured geometry agree.",
+    },
+    spanClassification: classification,
+  });
+  assert.equal(reconciled.decision, "editable");
+
+  const unmeasured = enforceSpanCapabilityOnArbitration({
+    arbitration: {
+      pdfJsRunIndex: 0,
+      decision: "editable",
+      nativeSpanKey: span.key,
+      source: "native-only-safe-synthesis",
+      reason: "Native-only geometry is not independent proof.",
+    },
+    spanClassification: classification,
+  });
+  assert.equal(unmeasured.decision, "view-only");
 });
 
 test("classifier refuses unknown encoding and clipping instead of claiming safe editability", () => {

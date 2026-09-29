@@ -174,21 +174,47 @@ export function textRunsFromContent(
   // 124.008pt) came out as widthPct 486% (the whole page many times over)
   // instead of the correct ~20%.
   const viewportScaleX = Math.hypot(viewportTransform[0], viewportTransform[1]);
+  const viewportScaleY = Math.hypot(viewportTransform[2], viewportTransform[3]);
 
   for (const item of items) {
     if (!isTextItem(item) || !item.str.trim()) continue;
 
     const tx = transformPoint2x3(viewportTransform, item.transform);
     const style = styles[item.fontName];
+    const verticalWriting = style?.vertical === true || item.dir === "ttb" || item.dir === "btt";
     const ascentRatio = safeMetricRatio(style?.ascent);
     const descentRatio = safeMetricRatio(style?.descent);
-    const { left, top, fontHeight, rotated } = boxOriginFromTransform(
+    const { left: horizontalLeft, top: horizontalTop, fontHeight, rotated } = boxOriginFromTransform(
       tx,
       ascentRatio ?? DEFAULT_ASCENT_RATIO,
     );
 
     const widthPx = item.width * viewportScaleX;
-    const heightPx = fontHeight;
+    // For horizontal text, TextItem.height is one font height and the run's
+    // advance is TextItem.width. For vertical text PDF.js swaps those
+    // semantics: width is the cross-axis glyph box while height is the full
+    // top-to-bottom run advance. Using one fontHeight truncated multi-glyph
+    // vertical hit regions and fidelity masks to the first glyph.
+    const heightPx =
+      verticalWriting &&
+      typeof item.height === "number" &&
+      Number.isFinite(item.height) &&
+      item.height > 0
+        ? item.height * viewportScaleY
+        : fontHeight;
+    // PDF.js exposes a vertical TextItem transform at the text baseline,
+    // while width is the cross-axis glyph box and height is the advance-axis
+    // run length. Center the box on that baseline in x; TTB extends downward
+    // in viewport coordinates and BTT extends upward. Horizontal text keeps
+    // the TextLayer-compatible ascent origin above.
+    const left = verticalWriting
+      ? tx[4] - widthPx / 2
+      : horizontalLeft;
+    const top = verticalWriting
+      ? item.dir === "btt"
+        ? tx[5] - heightPx
+        : tx[5]
+      : horizontalTop;
 
     runs.push({
       str: item.str,
@@ -205,7 +231,7 @@ export function textRunsFromContent(
       baselineYPct: (tx[5] / pageHeightPx) * 100,
       ascentRatio,
       descentRatio,
-      verticalWriting: style?.vertical ?? null,
+      verticalWriting,
       pdfJsTransform: [...item.transform],
       pdfJsWidth: item.width,
       pdfJsHeight: item.height ?? null,

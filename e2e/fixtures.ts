@@ -28,6 +28,7 @@ export const MIXED_STYLE_PDF = path.join(TMP_DIR, "mixed-style.pdf");
 export const CLIPPED_TEXT_PDF = path.join(TMP_DIR, "clipped-text.pdf");
 export const LARGE_DOCUMENT_PDF = path.join(TMP_DIR, "large-document-120-pages.pdf");
 export const SHAPED_LTR_PDF = path.join(TMP_DIR, "shaped-ltr-type0.pdf");
+export const SHAPED_VERTICAL_PDF = path.join(TMP_DIR, "shaped-vertical-identity-v.pdf");
 export const PARAGRAPH_PDF = path.join(TMP_DIR, "paragraph-native-lines.pdf");
 
 /** Widely spaced so each line is its own detected run and boxes cannot straddle two. */
@@ -540,6 +541,152 @@ async function shapedLtrType0(): Promise<Uint8Array> {
   return doc.save();
 }
 
+/**
+ * Real embedded Identity-V fixture for the bounded vertical shaped writer.
+ * W2 is derived from the same explicit TTB HarfBuzz evidence the planner
+ * later verifies, while CID/GID identity and ToUnicode remain independently
+ * encoded in the PDF resource.
+ */
+export async function buildShapedVerticalType0Pdf(): Promise<Uint8Array> {
+  const fontBytes = await ciTrueTypeFontBytes();
+  const inspection = await inspectPdfFontProgram(fontBytes);
+  if (inspection.kind !== "ok") {
+    throw new Error(`Could not inspect vertical fixture font: ${inspection.reason}`);
+  }
+  const intelligence = inspection.intelligence;
+  const unitsPerEm = intelligence.metadata.unitsPerEm;
+  if (!unitsPerEm || unitsPerEm <= 0) {
+    throw new Error("Vertical fixture font has no valid units-per-em.");
+  }
+
+  const entries = ["A", "B"].map((text) => {
+    const gid = intelligence.glyphIdForCodePoint(text.codePointAt(0)!);
+    if (!gid) throw new Error(`Vertical fixture font does not contain ${text}.`);
+    return { text, gid };
+  });
+  const replacement = "BA";
+  const shaped = await shapeEmbeddedFontText(fontBytes, replacement, {
+    direction: "ttb",
+    script: "Latn",
+    language: "en",
+  });
+  if (
+    shaped.glyphs.length !== 2 ||
+    shaped.clusterMap.length !== 2 ||
+    shaped.glyphs.some(
+      (glyph) => glyph.xAdvance !== 0 || glyph.yAdvance >= 0,
+    )
+  ) {
+    throw new Error(
+      "The fixture font does not produce the bounded two-glyph vertical run required by the writer.",
+    );
+  }
+
+  const shapedByGlyphId = new Map(
+    shaped.glyphs.map((glyph) => [glyph.glyphId, glyph] as const),
+  );
+  const widthEntries: (number | number[])[] = [];
+  const w2Entries: (number | number[])[] = [];
+  for (const { gid } of [...entries].sort((a, b) => a.gid - b.gid)) {
+    const width = intelligence.advanceWidthForGlyphId(gid);
+    const glyph = shapedByGlyphId.get(gid);
+    if (width === null || !glyph) {
+      throw new Error(`Vertical fixture metrics are unavailable for glyph ${gid}.`);
+    }
+    widthEntries.push(gid, [Math.round((width / unitsPerEm) * 1000)]);
+    w2Entries.push(gid, [
+      Number(((glyph.yAdvance / unitsPerEm) * 1000).toFixed(6)),
+      Number(((-glyph.xOffset / unitsPerEm) * 1000).toFixed(6)),
+      Number(((-glyph.yOffset / unitsPerEm) * 1000).toFixed(6)),
+    ]);
+  }
+
+  const cmap = [
+    "/CIDInit /ProcSet findresource begin",
+    "12 dict begin",
+    "begincmap",
+    "1 begincodespacerange",
+    "<0000> <FFFF>",
+    "endcodespacerange",
+    `${entries.length} beginbfchar`,
+    ...entries.map(({ gid, text }) =>
+      `<${cidHex(gid)}> <${utf16BeHex(text)}>`
+    ),
+    "endbfchar",
+    "endcmap",
+    "end",
+    "end",
+  ].join("\n");
+
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+  const context = doc.context;
+  const fontName =
+    intelligence.metadata.postScriptName?.replace(/[^A-Za-z0-9_.-]/g, "") ||
+    "LumeoVerticalFixture";
+  const fontFileRef = context.register(context.flateStream(fontBytes));
+  const descriptorRef = context.register(
+    context.obj({
+      Type: "FontDescriptor",
+      FontName: fontName,
+      Flags: 32,
+      ItalicAngle: intelligence.metadata.italicAngle ?? 0,
+      Ascent: metric1000(intelligence.metadata.ascent, unitsPerEm, 800),
+      Descent: metric1000(intelligence.metadata.descent, unitsPerEm, -200),
+      CapHeight: metric1000(intelligence.metadata.capHeight, unitsPerEm, 700),
+      FontBBox: [0, -250, 1100, 1000],
+      StemV: 80,
+      FontFile2: fontFileRef,
+    }),
+  );
+  const descendantRef = context.register(
+    context.obj({
+      Type: "Font",
+      Subtype: "CIDFontType2",
+      BaseFont: fontName,
+      CIDSystemInfo: {
+        Registry: "Adobe",
+        Ordering: "Identity",
+        Supplement: 0,
+      },
+      FontDescriptor: descriptorRef,
+      DW: 1000,
+      W: widthEntries,
+      DW2: [880, -1000],
+      W2: w2Entries,
+      CIDToGIDMap: "Identity",
+    }),
+  );
+  const toUnicodeRef = context.register(context.stream(cmap));
+  const fontRef = context.register(
+    context.obj({
+      Type: "Font",
+      Subtype: "Type0",
+      BaseFont: fontName,
+      Encoding: "Identity-V",
+      DescendantFonts: [descendantRef],
+      ToUnicode: toUnicodeRef,
+    }),
+  );
+  page.node.set(
+    PDFName.of("Resources"),
+    context.obj({ Font: context.obj({ FVertical: fontRef }) }),
+  );
+  const [a, b] = entries;
+  const content = [
+    "BT",
+    "/FVertical 20 Tf",
+    "1 0 0 1 300 740 Tm",
+    `<${cidHex(a.gid)}${cidHex(b.gid)}> Tj`,
+    "ET",
+  ].join("\n");
+  page.node.set(
+    PDFName.of("Contents"),
+    context.register(context.flateStream(new TextEncoder().encode(content))),
+  );
+  return doc.save();
+}
+
 /** Large but lightweight document for page-rail virtualization regressions. */
 async function largeDocument(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -585,5 +732,6 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(CLIPPED_TEXT_PDF, await clippedText());
   await writeFile(LARGE_DOCUMENT_PDF, await largeDocument());
   await writeFile(SHAPED_LTR_PDF, await shapedLtrType0());
+  await writeFile(SHAPED_VERTICAL_PDF, await buildShapedVerticalType0Pdf());
   await writeFile(PARAGRAPH_PDF, await buildPreservedLineParagraphPdf());
 }

@@ -13,6 +13,7 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
 import {
   applyEditPlanToDocument,
   applyShapedGlyphEditPlanToDocument,
+  applyVerticalShapedGlyphEditPlanToDocument,
 } from "../lib/pdf/edit/applyEditPlan.ts";
 import {
   buildEditPlan,
@@ -23,6 +24,7 @@ import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
 import { shapeEmbeddedFontText } from "../lib/pdf/edit/harfbuzzShaping.ts";
 import { buildShapedGlyphEditPlan } from "../lib/pdf/edit/shapedGlyphEditPlan.ts";
+import { buildVerticalShapedGlyphEditPlan } from "../lib/pdf/edit/verticalShapedGlyphEditPlan.ts";
 import { createLocalCustomFontAsset } from "../lib/pdf/edit/localCustomFont.ts";
 import { buildReviewedOcrSearchableInput } from "../lib/pdf/edit/ocrReview.ts";
 import { inverseMapOcrBoundsPct } from "../lib/pdf/edit/localOcr.ts";
@@ -48,6 +50,7 @@ import {
   PARAGRAPH_REPLACEMENT_LINES,
   PARAGRAPH_SOURCE_LINES,
 } from "../tests/fixtures/paragraphFixture.ts";
+import { buildShapedVerticalType0Pdf } from "../e2e/fixtures.ts";
 import {
   buildOperatorSpatialIndex,
   matchDetectedRunToOperatorIndexed,
@@ -76,7 +79,12 @@ type Fixture = {
   editTarget: string;
   replacementText: string;
   bytes: Uint8Array;
-  editMode?: "ordinary" | "shaped-ltr" | "paragraph" | "native-local-font";
+  editMode?:
+    | "ordinary"
+    | "shaped-ltr"
+    | "shaped-vertical"
+    | "paragraph"
+    | "native-local-font";
 };
 
 type RenderedPage = {
@@ -641,57 +649,101 @@ async function measure(
           }
         }
       }
-    } else if (fixture.editMode === "shaped-ltr") {
+    } else if (
+      fixture.editMode === "shaped-ltr" ||
+      fixture.editMode === "shaped-vertical"
+    ) {
       const resourceName = target.located.operator.fontResourceName;
       if (resourceName) {
+        const vertical = fixture.editMode === "shaped-vertical";
         const shapingInspection =
           await editableRegistry.inspectShapingCompatibility(
             target.located.resources,
             resourceName,
             fixture.replacementText,
             {
-              direction: "ltr",
+              direction: vertical ? "ttb" : "ltr",
               script: "Latn",
               language: "en",
             },
             shapeEmbeddedFontText,
           );
         if (shapingInspection.kind === "reconciled") {
-          const addressability =
-            editableRegistry.inspectShapedGlyphAddressability(
+          if (vertical) {
+            const verticalMetrics = editableRegistry.inspectVerticalFontMetrics(
               target.located.resources,
               resourceName,
-              shapingInspection.shaped,
             );
-          const shapedPlan = buildShapedGlyphEditPlan({
-            pageIndex: 0,
-            contentStreamIndex:
-              target.located.locator.kind === "page"
-                ? target.located.locator.contentStreamIndex
-                : 0,
-            formPath:
-              target.located.locator.kind === "xobject"
-                ? target.located.locator.formPath
-                : null,
-            operatorIndex: target.located.operatorIndex,
-            operator: target.located.operator,
-            replacementText: fixture.replacementText,
-            resolvedFont: target.profile.resolvedFont,
-            fontMetrics: target.profile.metrics,
-            resourceIdentity: target.profile.resourceIdentity,
-            embeddedProgramSha256: target.profile.embeddedProgramSha256,
-            shapingInspection,
-            addressability,
-          });
-          if (shapedPlan.editable) {
-            await applyShapedGlyphEditPlanToDocument(
-              editableDoc,
-              shapedPlan,
-              {
-                isolate: target.located.locator.kind === "xobject",
-              },
-            );
-            writeApplied = true;
+            const verticalEvidence =
+              editableRegistry.inspectVerticalShapedGlyphEvidence(
+                target.located.resources,
+                resourceName,
+                shapingInspection.shaped,
+              );
+            const verticalPlan = buildVerticalShapedGlyphEditPlan({
+              pageIndex: 0,
+              contentStreamIndex:
+                target.located.locator.kind === "page"
+                  ? target.located.locator.contentStreamIndex
+                  : 0,
+              formPath:
+                target.located.locator.kind === "xobject"
+                  ? target.located.locator.formPath
+                  : null,
+              operatorIndex: target.located.operatorIndex,
+              operator: target.located.operator,
+              replacementText: fixture.replacementText,
+              resolvedFont: target.profile.resolvedFont,
+              fontMetrics: target.profile.metrics,
+              verticalMetrics,
+              resourceIdentity: target.profile.resourceIdentity,
+              embeddedProgramSha256: target.profile.embeddedProgramSha256,
+              shapingInspection,
+              verticalEvidence,
+            });
+            if (verticalPlan.editable) {
+              await applyVerticalShapedGlyphEditPlanToDocument(
+                editableDoc,
+                verticalPlan,
+                { isolate: target.located.locator.kind === "xobject" },
+              );
+              writeApplied = true;
+            }
+          } else {
+            const addressability =
+              editableRegistry.inspectShapedGlyphAddressability(
+                target.located.resources,
+                resourceName,
+                shapingInspection.shaped,
+              );
+            const shapedPlan = buildShapedGlyphEditPlan({
+              pageIndex: 0,
+              contentStreamIndex:
+                target.located.locator.kind === "page"
+                  ? target.located.locator.contentStreamIndex
+                  : 0,
+              formPath:
+                target.located.locator.kind === "xobject"
+                  ? target.located.locator.formPath
+                  : null,
+              operatorIndex: target.located.operatorIndex,
+              operator: target.located.operator,
+              replacementText: fixture.replacementText,
+              resolvedFont: target.profile.resolvedFont,
+              fontMetrics: target.profile.metrics,
+              resourceIdentity: target.profile.resourceIdentity,
+              embeddedProgramSha256: target.profile.embeddedProgramSha256,
+              shapingInspection,
+              addressability,
+            });
+            if (shapedPlan.editable) {
+              await applyShapedGlyphEditPlanToDocument(
+                editableDoc,
+                shapedPlan,
+                { isolate: target.located.locator.kind === "xobject" },
+              );
+              writeApplied = true;
+            }
           }
         }
       }
@@ -1697,6 +1749,15 @@ async function buildFixtures(): Promise<Fixture[]> {
     replacementText: SHAPED_LTR_REPLACEMENT,
     bytes: await buildShapedLtrType0Pdf(),
     editMode: "shaped-ltr",
+  });
+  fixtures.push({
+    id: "advanced-shaped-vertical-identity-v",
+    category: "shaped-glyph-vertical",
+    expectedRuns: ["AB"],
+    editTarget: "AB",
+    replacementText: "BA",
+    bytes: await buildShapedVerticalType0Pdf(),
+    editMode: "shaped-vertical",
   });
   fixtures.push(
     await structuredFixture({

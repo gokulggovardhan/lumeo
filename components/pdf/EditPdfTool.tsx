@@ -155,6 +155,7 @@ import type { EmbeddedGlyphEvidence, ResolvedFont } from "@/lib/pdf/edit/fontEnc
 import type { FontMetrics } from "@/lib/pdf/edit/fontMetrics";
 import type { PdfFontResourceIdentity } from "@/lib/pdf/edit/fontRegistry";
 import type { ValidatedShapedGlyphEditPlan } from "@/lib/pdf/edit/shapedGlyphEditPlan";
+import type { ValidatedVerticalShapedGlyphEditPlan } from "@/lib/pdf/edit/verticalShapedGlyphEditPlan";
 import type { ValidatedLocalFontSubstitutionPlan } from "@/lib/pdf/edit/localFontSubstitution";
 import type { EditPdfPerformanceCollector } from "@/lib/pdf/edit/performanceDiagnostics";
 import {
@@ -176,6 +177,7 @@ import type { ParagraphEditPlan } from "@/lib/pdf/edit/paragraphEditPlan";
 import {
   resolveCompatibleShapingWriteEvidence,
   shapingEvidenceRequestKey,
+  shouldRequestShapingEvidence,
 } from "@/lib/pdf/edit/compatibleShapingEvidence";
 import {
   detectComplexShapingRequirement,
@@ -296,6 +298,7 @@ type EditPreview =
       locatedOperator: LocatedTextOperator;
       substituteFont: string | null;
       shapedGlyphPlan?: ValidatedShapedGlyphEditPlan | null;
+      verticalShapedGlyphPlan?: ValidatedVerticalShapedGlyphEditPlan | null;
     }
   | { kind: "multi"; editable: boolean; reason: string | null; plan: MultiRunEditPlan; resolvedFont: ResolvedFont }
   | { kind: "paragraph"; editable: boolean; reason: string | null; plan: ParagraphEditPlan; resolvedFont: ResolvedFont };
@@ -303,6 +306,7 @@ type EditPreview =
 type ShapingEvidenceState =
   | { key: string; status: "validated"; evidence: ValidatedShapingWriteEvidence }
   | { key: string; status: "shaped"; plan: ValidatedShapedGlyphEditPlan }
+  | { key: string; status: "vertical-shaped"; plan: ValidatedVerticalShapedGlyphEditPlan }
   | { key: string; status: "blocked"; reason: string };
 
 type NativeLocalFontPlanState =
@@ -395,7 +399,9 @@ let editEngineModulePromise: Promise<{
   readFallbackStyleHints: (typeof import("@/lib/pdf/edit/fallbackFont"))["readFallbackStyleHints"];
   applyEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyEditPlanToDocument"];
   applyShapedGlyphEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyShapedGlyphEditPlanToDocument"];
+  applyVerticalShapedGlyphEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyVerticalShapedGlyphEditPlanToDocument"];
   buildShapedGlyphEditPlan: (typeof import("@/lib/pdf/edit/shapedGlyphEditPlan"))["buildShapedGlyphEditPlan"];
+  buildVerticalShapedGlyphEditPlan: (typeof import("@/lib/pdf/edit/verticalShapedGlyphEditPlan"))["buildVerticalShapedGlyphEditPlan"];
   applyMultiRunEditPlanToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyMultiRunEditPlanToDocument"];
   applyNativeTextStyleBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyNativeTextStyleBatchToDocument"];
   applyValidatedEditPlanBatchToDocument: (typeof import("@/lib/pdf/edit/applyEditPlan"))["applyValidatedEditPlanBatchToDocument"];
@@ -427,7 +433,8 @@ function loadEditEngine() {
       import("@/lib/pdf/edit/shapedGlyphEditPlan"),
       import("@/lib/pdf/edit/paragraphEditPlan"),
       import("@/lib/pdf/edit/localFontSubstitution"),
-    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod, postExportVerificationMod, shapedGlyphEditPlanMod, paragraphEditPlanMod, localFontSubstitutionMod]) => ({
+      import("@/lib/pdf/edit/verticalShapedGlyphEditPlan"),
+    ]).then(([exportMod, formXObjectsMod, fontEncodingMod, fontMetricsMod, applyEditPlanMod, pdfLibMod, fallbackFontMod, fontRegistryMod, postExportVerificationMod, shapedGlyphEditPlanMod, paragraphEditPlanMod, localFontSubstitutionMod, verticalShapedGlyphEditPlanMod]) => ({
       exportEditedPdf: exportMod.exportEditedPdf,
       collectPageTextOperators: formXObjectsMod.collectPageTextOperators,
       resolveFont: fontEncodingMod.resolveFont,
@@ -435,7 +442,9 @@ function loadEditEngine() {
       readFallbackStyleHints: fallbackFontMod.readFallbackStyleHints,
       applyEditPlanToDocument: applyEditPlanMod.applyEditPlanToDocument,
       applyShapedGlyphEditPlanToDocument: applyEditPlanMod.applyShapedGlyphEditPlanToDocument,
+      applyVerticalShapedGlyphEditPlanToDocument: applyEditPlanMod.applyVerticalShapedGlyphEditPlanToDocument,
       buildShapedGlyphEditPlan: shapedGlyphEditPlanMod.buildShapedGlyphEditPlan,
+      buildVerticalShapedGlyphEditPlan: verticalShapedGlyphEditPlanMod.buildVerticalShapedGlyphEditPlan,
       applyMultiRunEditPlanToDocument: applyEditPlanMod.applyMultiRunEditPlanToDocument,
       applyNativeTextStyleBatchToDocument: applyEditPlanMod.applyNativeTextStyleBatchToDocument,
       applyValidatedEditPlanBatchToDocument: applyEditPlanMod.applyValidatedEditPlanBatchToDocument,
@@ -1359,9 +1368,9 @@ export default function EditPdfTool() {
 
   // Final write authority requires BOTH signal agreement and structural PDF
   // capability safety. Exact fragmented-run reconstruction can resolve the
-  // established multi-operator provenance case, but a matched run still stays
-  // read-only when its native source is clipping text, Type3, vertical,
-  // metric/encoding-limited or otherwise classified unsafe.
+  // established multi-operator provenance case. Clipping, Type3 and unknown
+  // structures stay read-only; one reconciled Identity-V class may proceed
+  // only to the separate asynchronous vertical-writer proof below.
   const effectiveTextArbitrations = useMemo(() => {
     const nativeCapabilityByKey = new Map(
       nativeTextSpans.map((span) => [
@@ -4427,9 +4436,25 @@ export default function EditPdfTool() {
     [editDraftText],
   );
 
+  const selectedNativeSourceText = useMemo(
+    () =>
+      selectedRunIndices
+        .map((index) => detectedTextRuns[index]?.str ?? "")
+        .join(""),
+    [selectedRunIndices, detectedTextRuns],
+  );
+
   const shapingEvidenceRequest = useMemo(() => {
+    const verticalWriterCandidate =
+      resolvedEditContext.kind === "single" &&
+      resolvedEditContext.resourceIdentity.writingMode === "vertical";
     if (
-      !shapingRequirement.required ||
+      !shouldRequestShapingEvidence({
+        sourceText: selectedNativeSourceText,
+        replacementText: editDraftText,
+        complexShapingRequired: shapingRequirement.required,
+        verticalWriterCandidate,
+      }) ||
       paragraphSelectionTemplate ||
       (resolvedEditContext.kind !== "single" &&
         resolvedEditContext.kind !== "multi")
@@ -4438,15 +4463,16 @@ export default function EditPdfTool() {
     }
 
     return {
-      key: shapingEvidenceRequestKey({
+      key: `${shapingEvidenceRequestKey({
         pageIndex,
         selectionKey: nativeTextSelectionKey,
         resourceName: resolvedEditContext.fontResourceName,
         embeddedProgramSha256: resolvedEditContext.embeddedProgramSha256,
         replacementText: editDraftText,
-      }),
+      })}|${verticalWriterCandidate ? "ttb" : "horizontal"}`,
       pageIndex,
       replacementText: editDraftText,
+      verticalWriterCandidate,
       embeddedProgramSha256: resolvedEditContext.embeddedProgramSha256,
       resources: resolvedEditContext.resources,
       resourceName: resolvedEditContext.fontResourceName,
@@ -4476,7 +4502,10 @@ export default function EditPdfTool() {
     pageIndex,
     nativeTextSelectionKey,
     editDraftText,
+    selectedNativeSourceText,
   ]);
+
+  const shapingEvidenceRequestIdentity = shapingEvidenceRequest?.key ?? null;
 
   useEffect(() => {
     if (!fontRegistry || !shapingEvidenceRequest) return;
@@ -4492,6 +4521,74 @@ export default function EditPdfTool() {
         const { shapeEmbeddedFontText } = await import(
           "@/lib/pdf/edit/harfbuzzShaping"
         );
+        if (request.verticalWriterCandidate) {
+          if (!request.singleContext || !editEngine) {
+            setShapingEvidenceState({
+              key: request.key,
+              status: "blocked",
+              reason:
+                "Vertical native editing requires one proven PDF text operator.",
+            });
+            return;
+          }
+          const inspection = await fontRegistry.inspectShapingCompatibility(
+            request.resources,
+            request.resourceName,
+            request.replacementText,
+            { direction: "ttb", script: null, language: null },
+            shapeEmbeddedFontText,
+          );
+          if (cancelled) return;
+          const verticalMetrics = fontRegistry.inspectVerticalFontMetrics(
+            request.resources,
+            request.resourceName,
+          );
+          const verticalEvidence =
+            inspection.kind === "reconciled"
+              ? fontRegistry.inspectVerticalShapedGlyphEvidence(
+                  request.resources,
+                  request.resourceName,
+                  inspection.shaped,
+                )
+              : null;
+          const verticalPlan = editEngine.buildVerticalShapedGlyphEditPlan({
+            pageIndex: request.pageIndex,
+            contentStreamIndex: request.singleContext.contentStreamIndex,
+            formPath: request.singleContext.formPath,
+            operatorIndex: request.singleContext.operatorIndex,
+            operator: request.singleContext.operator,
+            replacementText: request.replacementText,
+            resolvedFont: request.singleContext.resolvedFont,
+            fontMetrics: request.singleContext.fontMetrics,
+            verticalMetrics,
+            resourceIdentity: request.singleContext.resourceIdentity,
+            embeddedProgramSha256: request.embeddedProgramSha256,
+            shapingInspection: inspection,
+            verticalEvidence:
+              verticalEvidence ?? {
+                kind: "blocked",
+                advisoryOnly: true,
+                reason:
+                  inspection.kind === "unavailable"
+                    ? inspection.reason
+                    : "Vertical glyph evidence is unavailable.",
+              },
+          });
+          setShapingEvidenceState(
+            verticalPlan.editable
+              ? {
+                  key: request.key,
+                  status: "vertical-shaped",
+                  plan: verticalPlan,
+                }
+              : {
+                  key: request.key,
+                  status: "blocked",
+                  reason: verticalPlan.reason,
+                },
+          );
+          return;
+        }
         const result = await resolveCompatibleShapingWriteEvidence({
           replacementText: request.replacementText,
           embeddedProgramSha256: request.embeddedProgramSha256,
@@ -4580,7 +4677,12 @@ export default function EditPdfTool() {
     return () => {
       cancelled = true;
     };
-  }, [fontRegistry, shapingEvidenceRequest, editEngine]);
+    // The request payload contains PDF objects whose identity may be rebuilt
+    // while matching settles. Its key binds the stable selection, font
+    // fingerprint, direction and replacement. Restart only when that semantic
+    // authority changes; same-key object churn must not starve local shaping.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fontRegistry, shapingEvidenceRequestIdentity, editEngine]);
 
   const currentShapingEvidence =
     shapingEvidenceRequest &&
@@ -4592,6 +4694,12 @@ export default function EditPdfTool() {
     shapingEvidenceRequest &&
     shapingEvidenceState?.key === shapingEvidenceRequest.key &&
     shapingEvidenceState.status === "shaped"
+      ? shapingEvidenceState.plan
+      : null;
+  const currentVerticalShapedGlyphPlan =
+    shapingEvidenceRequest &&
+    shapingEvidenceState?.key === shapingEvidenceRequest.key &&
+    shapingEvidenceState.status === "vertical-shaped"
       ? shapingEvidenceState.plan
       : null;
   const currentShapingBlockReason =
@@ -4646,6 +4754,8 @@ export default function EditPdfTool() {
         shapingWriteEvidence: currentShapingEvidence,
         replacementTextState: nativeStyleOverride,
       };
+      const verticalWriterCandidate =
+        resolvedEditContext.resourceIdentity.writingMode === "vertical";
 
       // Once a single native span has transitioned through an empty draft,
       // retyping is validated against its persistent style/resource snapshot
@@ -4717,7 +4827,7 @@ export default function EditPdfTool() {
       const substituteAvailable = substitutePlan?.editable ? substitutePlan : null;
       const plan = useSubstituteFont && substituteAvailable ? substituteAvailable : strictPlan;
 
-      if (shapingRequirement.required && shapingEvidencePending) {
+      if ((shapingRequirement.required || verticalWriterCandidate) && shapingEvidencePending) {
         return {
           kind: "single",
           editable: false,
@@ -4728,7 +4838,7 @@ export default function EditPdfTool() {
           substituteFont: null,
         };
       }
-      if (shapingRequirement.required && currentShapingBlockReason) {
+      if ((shapingRequirement.required || verticalWriterCandidate) && currentShapingBlockReason) {
         return {
           kind: "single",
           editable: false,
@@ -4780,6 +4890,30 @@ export default function EditPdfTool() {
           locatedOperator,
           substituteFont: null,
           shapedGlyphPlan: currentShapedGlyphPlan,
+        };
+      }
+      if (verticalWriterCandidate && currentVerticalShapedGlyphPlan) {
+        if (nativeStyleOverride || nativePaintPlan?.editable) {
+          return {
+            kind: "single",
+            editable: false,
+            reason:
+              "Vertical shaped-glyph replacement cannot yet be combined with formatting or colour changes. Apply the text change first.",
+            plan,
+            resolvedFont,
+            locatedOperator,
+            substituteFont: null,
+          };
+        }
+        return {
+          kind: "single",
+          editable: true,
+          reason: null,
+          plan,
+          resolvedFont,
+          locatedOperator,
+          substituteFont: null,
+          verticalShapedGlyphPlan: currentVerticalShapedGlyphPlan,
         };
       }
       return {
@@ -4879,6 +5013,7 @@ export default function EditPdfTool() {
     shapingEvidencePending,
     currentShapingEvidence,
     currentShapedGlyphPlan,
+    currentVerticalShapedGlyphPlan,
     currentShapingBlockReason,
     nativePaintPlan,
     paragraphSelectionTemplate,
@@ -4887,7 +5022,10 @@ export default function EditPdfTool() {
 
   const replacementLayoutDecision = useMemo(() => {
     if (editPreview.kind === "empty" || !editPreview.editable) return null;
-    if (editPreview.kind === "single" && editPreview.shapedGlyphPlan) return null;
+    if (
+      editPreview.kind === "single" &&
+      (editPreview.shapedGlyphPlan || editPreview.verticalShapedGlyphPlan)
+    ) return null;
     const plans =
       editPreview.kind === "single"
         ? [editPreview.plan]
@@ -4950,8 +5088,20 @@ export default function EditPdfTool() {
     setEditApplyError("");
     try {
       if (editPreview.kind === "single") {
-        const { plan, resolvedFont, locatedOperator, shapedGlyphPlan } = editPreview;
-        if (shapedGlyphPlan) {
+        const {
+          plan,
+          resolvedFont,
+          locatedOperator,
+          shapedGlyphPlan,
+          verticalShapedGlyphPlan,
+        } = editPreview;
+        if (verticalShapedGlyphPlan) {
+          await engine.applyVerticalShapedGlyphEditPlanToDocument(
+            doc,
+            verticalShapedGlyphPlan,
+            { isolate: locatedOperator.locator.kind === "xobject" },
+          );
+        } else if (shapedGlyphPlan) {
           await engine.applyShapedGlyphEditPlanToDocument(doc, shapedGlyphPlan, {
             isolate: locatedOperator.locator.kind === "xobject",
           });
@@ -4994,7 +5144,10 @@ export default function EditPdfTool() {
       );
       const semanticOperations: PdfEditOperationDraft[] = [];
       if (editPreview.kind === "single") {
-        const textPlan = editPreview.shapedGlyphPlan ?? editPreview.plan;
+        const textPlan =
+          editPreview.verticalShapedGlyphPlan ??
+          editPreview.shapedGlyphPlan ??
+          editPreview.plan;
         const target: NativeTextTarget = {
           kind: "native-text",
           pageIndex,
@@ -5020,7 +5173,10 @@ export default function EditPdfTool() {
           );
         }
 
-        const ordinaryPlan = editPreview.shapedGlyphPlan ? null : editPreview.plan;
+        const ordinaryPlan =
+          editPreview.shapedGlyphPlan || editPreview.verticalShapedGlyphPlan
+            ? null
+            : editPreview.plan;
         if (ordinaryPlan && (ordinaryPlan.replacementTextState || nativePaintPlan?.editable)) {
           const beforeStyle: PdfEditTextStyle = {
             fontFamily: selectedNativeSpan?.style.fontFamily,
