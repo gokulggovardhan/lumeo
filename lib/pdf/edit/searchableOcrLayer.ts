@@ -2,8 +2,10 @@ import {
   PDFDocument,
   StandardFonts,
   TextRenderingMode,
+  beginMarkedContent,
   beginText,
   degrees,
+  endMarkedContent,
   endText,
   setTextRenderingMode,
 } from "pdf-lib";
@@ -297,6 +299,10 @@ export async function addSearchableOcrTextLayer(
   );
   try {
     for (const placement of placements) {
+      // PDF.js may otherwise merge adjacent positioned words into one text
+      // item. A marked-content boundary keeps the independent extraction
+      // evidence aligned with the writer's per-word publication claims.
+      page.pushOperators(beginMarkedContent("Span"));
       try {
         page.drawText(placement.text, {
           x: placement.x,
@@ -313,6 +319,8 @@ export async function addSearchableOcrTextLayer(
           text: placement.text,
           reason: "draw-failed",
         });
+      } finally {
+        page.pushOperators(endMarkedContent());
       }
     }
   } finally {

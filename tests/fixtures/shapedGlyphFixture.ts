@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { PDFDocument, PDFName } from "pdf-lib";
 import { inspectPdfFontProgram } from "../../lib/pdf/edit/fontProgramIntelligence.ts";
 import { shapeEmbeddedFontText } from "../../lib/pdf/edit/harfbuzzShaping.ts";
@@ -24,6 +25,13 @@ function cidHex(cid: number): string {
 
 export async function readCiTrueTypeFontBytes(): Promise<Uint8Array> {
   const candidates = [
+    path.join(
+      process.cwd(),
+      "node_modules",
+      "pdfjs-dist",
+      "standard_fonts",
+      "LiberationSans-Regular.ttf",
+    ),
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
@@ -33,7 +41,7 @@ export async function readCiTrueTypeFontBytes(): Promise<Uint8Array> {
       const bytes = await readFile(candidate);
       if (bytes.byteLength > 1_000) return new Uint8Array(bytes);
     } catch {
-      // Try the next deterministic Linux CI font.
+      // Try the next deterministic repository or CI font.
     }
   }
   throw new Error("No deterministic TrueType font was found for the shaped-text fixture.");
@@ -57,7 +65,7 @@ export const SHAPED_LTR_REPLACEMENT = "e\u0301";
  * Source text: AB
  * Replacement: decomposed e + combining acute.
  *
- * The Linux CI fonts used here canonically compose that cluster into one LTR
+ * The deterministic repository/CI fonts used here compose that cluster into one LTR
  * glyph with no x/y offsets. The PDF's exact ToUnicode map binds that glyph's
  * CID back to the decomposed source cluster, so browser search/extraction can
  * be proven after the native shaped write.
