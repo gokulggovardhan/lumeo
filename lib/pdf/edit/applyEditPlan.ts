@@ -1049,6 +1049,49 @@ export async function applyShapedGlyphEditPlanToDocument(
   target.writeBack(target.context.register(newStream));
 }
 
+/**
+ * Applies one validated vertical shaped-glyph plan to the exact page/Form
+ * stream. The existing Identity-V font resource performs vertical-origin
+ * placement; the rewritten TJ array carries only proven CID bytes and bounded
+ * y-advance/endpoint adjustments.
+ */
+export async function applyVerticalShapedGlyphEditPlanToDocument(
+  doc: PDFDocument,
+  plan: ValidatedVerticalShapedGlyphEditPlan,
+  options: { isolate?: boolean } = {},
+): Promise<void> {
+  assertVerticalShapedApplicable(plan);
+  assertVerticalShapedTargetStillCurrent(doc, plan);
+
+  const target =
+    plan.formPath && options.isolate
+      ? resolveIsolatedStreamTarget(
+          doc,
+          plan.pageIndex,
+          plan.contentStreamIndex,
+          [...plan.formPath],
+        )
+      : resolveStreamTarget(
+          doc,
+          plan.pageIndex,
+          plan.contentStreamIndex,
+          plan.formPath ? [...plan.formPath] : null,
+        );
+
+  const newBytes = applyVerticalShapedGlyphEditPlanToBytes(
+    target.decodedBytes,
+    plan,
+  );
+  const newStream = isFlateEncoded(target.originalStream)
+    ? target.context.flateStream(newBytes)
+    : target.context.stream(newBytes);
+  copyStreamDictExceptLengthAndFilter(
+    target.originalStream,
+    newStream,
+  );
+  target.writeBack(target.context.register(newStream));
+}
+
 // Embeds and registers the substitute font a plan asks for, returning the
 // resource name to write into its Tf -- or undefined for the ordinary
 // same-font plan, which needs nothing. Split out so both the page-content
