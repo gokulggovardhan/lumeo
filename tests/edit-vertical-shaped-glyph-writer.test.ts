@@ -307,6 +307,7 @@ test("vertical shaped document writer rejects stale W2 metrics atomically", asyn
   const fx = await planned();
   assert.ok(isValidatedVerticalShapedGlyphEditPlan(fx.plan));
   if (!isValidatedVerticalShapedGlyphEditPlan(fx.plan)) return;
+  const plan = fx.plan;
 
   fx.descendant.set(
     PDFName.of("W2"),
@@ -314,7 +315,7 @@ test("vertical shaped document writer rejects stale W2 metrics atomically", asyn
   );
 
   await assert.rejects(
-    () => applyVerticalShapedGlyphEditPlanToDocument(fx.doc, fx.plan),
+    () => applyVerticalShapedGlyphEditPlanToDocument(fx.doc, plan),
     (error: unknown) =>
       error instanceof EditPlanRejectedError &&
       /W2|DW2|metrics changed/i.test(error.message),
@@ -325,6 +326,7 @@ test("vertical shaped document writer rejects stale text geometry", async () => 
   const fx = await planned();
   assert.ok(isValidatedVerticalShapedGlyphEditPlan(fx.plan));
   if (!isValidatedVerticalShapedGlyphEditPlan(fx.plan)) return;
+  const plan = fx.plan;
 
   const page = fx.doc.getPages()[0];
   const replacement = [
@@ -342,7 +344,7 @@ test("vertical shaped document writer rejects stale text geometry", async () => 
   );
 
   await assert.rejects(
-    () => applyVerticalShapedGlyphEditPlanToDocument(fx.doc, fx.plan),
+    () => applyVerticalShapedGlyphEditPlanToDocument(fx.doc, plan),
     (error: unknown) =>
       error instanceof EditPlanRejectedError &&
       /text operator|geometry changed/i.test(error.message),
