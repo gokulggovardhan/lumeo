@@ -119,7 +119,7 @@ async function fixture() {
     ),
   );
 
-  return { doc, page, resources, descendant, contentBytes };
+  return { doc, page, resources, descendant, toUnicodeRef, contentBytes };
 }
 
 function verticalReplacement(): ShapedRun {
@@ -319,6 +319,40 @@ test("vertical shaped document writer rejects stale W2 metrics atomically", asyn
     (error: unknown) =>
       error instanceof EditPlanRejectedError &&
       /W2|DW2|metrics changed/i.test(error.message),
+  );
+});
+
+test("vertical shaped document writer rejects same-ref stale ToUnicode content", async () => {
+  const fx = await planned();
+  assert.ok(isValidatedVerticalShapedGlyphEditPlan(fx.plan));
+  if (!isValidatedVerticalShapedGlyphEditPlan(fx.plan)) return;
+  const plan = fx.plan;
+
+  const staleCmap = [
+    "/CIDInit /ProcSet findresource begin",
+    "12 dict begin",
+    "begincmap",
+    "1 begincodespacerange",
+    "<0000> <FFFF>",
+    "endcodespacerange",
+    "2 beginbfchar",
+    `<0003> <${utf16Hex("A")}>`,
+    `<0004> <${utf16Hex("C")}>`,
+    "endbfchar",
+    "endcmap",
+    "end",
+    "end",
+  ].join("\n");
+  fx.doc.context.assign(
+    fx.toUnicodeRef,
+    fx.doc.context.stream(new TextEncoder().encode(staleCmap)),
+  );
+
+  await assert.rejects(
+    () => applyVerticalShapedGlyphEditPlanToDocument(fx.doc, plan),
+    (error: unknown) =>
+      error instanceof EditPlanRejectedError &&
+      /font resource|W2|DW2|metrics changed/i.test(error.message),
   );
 });
 
