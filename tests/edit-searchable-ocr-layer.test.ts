@@ -74,6 +74,23 @@ async function extractedText(bytes: Uint8Array): Promise<string> {
   }
 }
 
+async function extractedTextItems(bytes: Uint8Array): Promise<string[]> {
+  const doc = await pdfjsLib.getDocument({
+    data: bytes.slice(),
+    useWorkerFetch: false,
+  }).promise;
+  try {
+    const page = await doc.getPage(1);
+    const content = await page.getTextContent();
+    return content.items
+      .map((item) => ("str" in item ? item.str.trim() : ""))
+      .filter(Boolean);
+  } finally {
+    const destroy = (doc as { destroy?: () => Promise<void> | void }).destroy;
+    if (destroy) await destroy.call(doc);
+  }
+}
+
 test("searchable OCR verification requires one extracted occurrence per claimed word", () => {
   assert.equal(
     firstMissingSearchableOcrWord(["scan", "scan"], ["SCAN"]),
@@ -122,6 +139,31 @@ test("searchable OCR layer writes extractable text with native rendering mode 3"
   assert.ok(
     located.every((entry) => entry.operator.renderMode === 3),
     "every OCR text-showing operator must remain intentionally invisible",
+  );
+});
+
+test("searchable OCR layer preserves per-word PDF.js extraction boundaries", async () => {
+  const source = await blankPdf();
+  const outcome = await addSearchableOcrTextLayer(
+    source,
+    result([
+      word("FACTURA", 10, 15, 18, 5),
+      word("TOTAL", 28.2, 15, 14, 5),
+      word("PAGADO", 42.4, 15, 18, 5),
+    ]),
+  );
+
+  assert.deepEqual(await extractedTextItems(outcome.bytes), [
+    "FACTURA",
+    "TOTAL",
+    "PAGADO",
+  ]);
+  assert.equal(
+    firstMissingSearchableOcrWord(
+      outcome.writtenWords,
+      await extractedTextItems(outcome.bytes),
+    ),
+    null,
   );
 });
 

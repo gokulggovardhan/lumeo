@@ -6,6 +6,7 @@
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { PDFDocument, PDFName, StandardFonts, TextRenderingMode, beginText, endText, rgb, setTextRenderingMode } from "pdf-lib";
 import { createCanvas } from "@napi-rs/canvas";
 import { inspectPdfFontProgram } from "../lib/pdf/edit/fontProgramIntelligence.ts";
@@ -240,8 +241,10 @@ async function splitRun(): Promise<Uint8Array> {
 async function assertGenuinelySplit(bytes: Uint8Array): Promise<void> {
   const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
   const standardFontDataUrl =
-    path.join(process.cwd(), "node_modules", "pdfjs-dist", "standard_fonts") +
-    path.sep;
+    pathToFileURL(
+      path.join(process.cwd(), "node_modules", "pdfjs-dist", "standard_fonts") +
+        path.sep,
+    ).href;
   const doc = await pdfjsLib.getDocument({
     data: bytes.slice(),
     useWorkerFetch: false,
@@ -354,6 +357,13 @@ function cidHex(cid: number): string {
 
 async function ciTrueTypeFontBytes(): Promise<Uint8Array> {
   const candidates = [
+    path.join(
+      process.cwd(),
+      "node_modules",
+      "pdfjs-dist",
+      "standard_fonts",
+      "LiberationSans-Regular.ttf",
+    ),
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
