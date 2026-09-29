@@ -65,9 +65,9 @@ const CATEGORY_MESSAGES: Record<
       "The text is hidden from the page view and may exist only for search, OCR or accessibility. Lumeo keeps it read-only instead of treating hidden text as visible native content.",
   },
   VERTICAL_TEXT: {
-    title: "Vertical text is not yet safe to rewrite",
+    title: "Vertical text requires exact local proof",
     detail:
-      "Lumeo detected the vertical writing mode, but vertical glyph placement and rewrite geometry are not yet proven well enough for direct editing.",
+      "Lumeo can edit a bounded Identity-V run only when its embedded font, character mapping, vertical metrics and top-to-bottom glyph placement all match exactly. Other vertical text stays read-only.",
   },
   UNKNOWN_OR_UNSAFE: {
     title: "This text cannot yet be edited safely",

@@ -1,5 +1,6 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import { decodeTextShowOperator } from "../lib/pdf/edit/editPlan.ts";
@@ -11,6 +12,7 @@ import {
   SPANISH_SCAN_PDF,
   SEARCHABLE_SCAN_PDF,
   SHAPED_LTR_PDF,
+  SHAPED_VERTICAL_PDF,
   PARAGRAPH_PDF,
   LARGE_DOCUMENT_PDF,
   MIXED_STYLE_PDF,
@@ -40,6 +42,13 @@ async function uploadEditFixture(page: Page, fixturePath: string) {
 
 async function findCiTrueTypeFont(): Promise<string> {
   const candidates = [
+    path.join(
+      process.cwd(),
+      "node_modules",
+      "pdfjs-dist",
+      "standard_fonts",
+      "LiberationSans-Regular.ttf",
+    ),
     "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
     "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
     "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
@@ -49,11 +58,11 @@ async function findCiTrueTypeFont(): Promise<string> {
       const bytes = await readFile(candidate);
       if (bytes.byteLength > 1_000) return candidate;
     } catch {
-      // Try the next font installed by the Linux runner image.
+      // Try the next deterministic repository or runner font.
     }
   }
   throw new Error(
-    "No deterministic TrueType font was found on the Linux CI runner.",
+    "No deterministic TrueType font was found for the browser fixture.",
   );
 }
 
@@ -1758,6 +1767,69 @@ test("vinext Edit PDF applies a proven LTR shaped-glyph replacement as one nativ
   expect(decoded.allDecoded).toBe(true);
   expect(decoded.text).toBe(replacement);
 
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
+});
+
+test("vinext Edit PDF applies a proven Identity-V replacement and preserves searchable text", async ({ page }) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
+  await uploadEditFixture(page, SHAPED_VERTICAL_PDF);
+  await waitForStageReady(page);
+
+  const workspace = page.locator("[data-edit-semantic-history-count]");
+  const source = page
+    .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="AB"]')
+    .first();
+  await expect(source).toBeVisible({ timeout: 90_000 });
+  await source.click();
+
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toHaveValue("AB");
+  await editor.fill("BA");
+  const apply = page.locator("[data-edit-inline-apply]");
+  await expect(apply).toBeEnabled({ timeout: 90_000 });
+  await apply.click();
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
+    timeout: 90_000,
+  });
+  await waitForStageReady(page);
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
+  await page.getByRole("button", { name: "Redo" }).click();
+  await waitForStageReady(page);
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", { name: "Download edited PDF" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const outputPath = await (await downloadPromise).path();
+  expect(outputPath).not.toBeNull();
+
+  const exported = await PDFDocument.load(await readFile(outputPath!));
+  const operators = collectPageTextOperators(exported, 0);
+  expect(operators).toHaveLength(1);
+  expect(operators[0]?.operator.kind).toBe("TJ");
+  const registry = new PdfFontRegistry(exported);
+  const resourceName = operators[0]?.operator.fontResourceName;
+  expect(resourceName).toBeTruthy();
+  const profile = registry.resolve(operators[0]!.resources, resourceName!);
+  expect(profile).not.toBeNull();
+  const decoded = decodeTextShowOperator(
+    operators[0]!.operator,
+    profile!.resolvedFont,
+  );
+  expect(decoded.allDecoded).toBe(true);
+  expect(decoded.text).toBe("BA");
+  expect(profile!.resourceIdentity.writingMode).toBe("vertical");
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
 });

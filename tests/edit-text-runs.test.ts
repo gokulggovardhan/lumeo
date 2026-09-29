@@ -92,6 +92,40 @@ test("textRunsFromContent uses PDF.js ascent for visual bounds while retaining t
   );
 });
 
+test("textRunsFromContent preserves the full top-to-bottom advance for vertical runs", () => {
+  const viewportTransform = [2, 0, 0, -2, 0, 1584];
+  const [run] = textRunsFromContent(
+    [
+      {
+        str: "AB",
+        fontName: "FVertical",
+        transform: [20, 0, 0, 20, 300, 740],
+        width: 20,
+        height: 40,
+        dir: "ttb",
+      },
+    ] as never,
+    viewportTransform,
+    1224,
+    1584,
+    {
+      FVertical: {
+        ascent: 0.9,
+        descent: -0.2,
+        vertical: true,
+      },
+    },
+  );
+
+  assert.ok(run);
+  assert.equal(run.verticalWriting, true);
+  assert.ok(Math.abs((run.widthPct / 100) * 1224 - 40) < 1e-9);
+  assert.ok(Math.abs((run.heightPct / 100) * 1584 - 80) < 1e-9);
+  assert.ok(Math.abs((run.xPct / 100) * 1224 - 580) < 1e-9);
+  assert.ok(Math.abs((run.yPct / 100) * 1584 - 104) < 1e-9);
+  assert.equal(run.pdfJsDirection, "ttb");
+});
+
 // Regression for a real, proven bug (Phase 9.1 of true PDF text editing):
 // widthPx used to be computed as `item.width * Math.hypot(tx[0], tx[1])`,
 // where tx is the item's own FULL combined transform (viewport . item's

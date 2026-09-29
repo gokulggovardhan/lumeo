@@ -65,6 +65,23 @@ export function shapingEvidenceRequestKey({
   ]);
 }
 
+export function shouldRequestShapingEvidence({
+  sourceText,
+  replacementText,
+  complexShapingRequired,
+  verticalWriterCandidate,
+}: {
+  sourceText: string;
+  replacementText: string;
+  complexShapingRequired: boolean;
+  verticalWriterCandidate: boolean;
+}): boolean {
+  return (
+    replacementText !== sourceText &&
+    (complexShapingRequired || verticalWriterCandidate)
+  );
+}
+
 /**
  * Resolves the additional local shaping evidence required by native Edit PDF.
  *

@@ -7,6 +7,7 @@ import {
   explicitDirectionForShapingRequirement,
   resolveCompatibleShapingWriteEvidence,
   shapingEvidenceRequestKey,
+  shouldRequestShapingEvidence,
 } from "../lib/pdf/edit/compatibleShapingEvidence.ts";
 import { detectComplexShapingRequirement } from "../lib/pdf/edit/shapingWriteGuard.ts";
 
@@ -152,5 +153,44 @@ test("request keys bind selection, text, resource and embedded fingerprint", () 
   assert.notEqual(
     key,
     shapingEvidenceRequestKey({ ...base, embeddedProgramSha256: "b".repeat(64) }),
+  );
+});
+
+test("shaping requests skip unchanged source text and start for supported edits", () => {
+  assert.equal(
+    shouldRequestShapingEvidence({
+      sourceText: "AB",
+      replacementText: "AB",
+      complexShapingRequired: false,
+      verticalWriterCandidate: true,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldRequestShapingEvidence({
+      sourceText: "AB",
+      replacementText: "BA",
+      complexShapingRequired: false,
+      verticalWriterCandidate: true,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldRequestShapingEvidence({
+      sourceText: "AB",
+      replacementText: "plain",
+      complexShapingRequired: false,
+      verticalWriterCandidate: false,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldRequestShapingEvidence({
+      sourceText: "AB",
+      replacementText: "e\u0301",
+      complexShapingRequired: true,
+      verticalWriterCandidate: false,
+    }),
+    true,
   );
 });

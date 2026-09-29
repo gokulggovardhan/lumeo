@@ -793,11 +793,7 @@ export class PdfFontRegistry {
     });
   }
 
-  /**
-   * Resolves vertical CIDFont DW2/W2 geometry as advisory evidence only.
-   * Existing VERTICAL_TEXT classification remains read-only; this method is
-   * intentionally not consumed by EditPlan or any native writer.
-   */
+  /** Resolves exact vertical CIDFont DW2/W2 geometry for bounded proof. */
   inspectVerticalFontMetrics(
     resources: PDFDict,
     resourceName: string,
@@ -835,7 +831,8 @@ export class PdfFontRegistry {
   /**
    * Combines exact Identity-V CID/GID/ToUnicode addressability with the
    * independently resolved DW2/W2 vertical metrics for one explicitly TTB
-   * HarfBuzz run. The result remains advisory and cannot authorize a write.
+   * HarfBuzz run. The result is evidence only; only the validated vertical
+   * planner can convert it into writer authority.
    */
   inspectVerticalShapedGlyphEvidence(
     resources: PDFDict,

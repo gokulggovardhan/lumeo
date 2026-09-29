@@ -25,6 +25,7 @@ export type SpanTextCapabilityClassification = {
   authorization:
     | "span-safe"
     | "needs-measured-reconciliation"
+    | "needs-vertical-writer-proof"
     | "blocked";
   reason: string;
 };
@@ -96,12 +97,26 @@ export function classifyNativeTextSpan(
     };
   }
   if (profile?.resourceIdentity.writingMode === "vertical") {
+    const identityVWriterCandidate =
+      profile.kind === "Type0" &&
+      profile.bytesPerCode === 2 &&
+      profile.resourceIdentity.type0Encoding === "Identity-V" &&
+      profile.resourceIdentity.descendantSubtype === "CIDFontType2" &&
+      profile.isEmbedded &&
+      Boolean(profile.embeddedProgramSha256) &&
+      profile.encodingSource !== "Unknown" &&
+      profile.metricsSource !== "Unknown" &&
+      span.decodeComplete;
     return {
       nativeSpanKey: span.key,
       category: "VERTICAL_TEXT",
       safelyRewritable: false,
-      authorization: "blocked",
-      reason: "The Type0 font uses a vertical CMap; vertical native rewrite is not yet proven safe.",
+      authorization: identityVWriterCandidate
+        ? "needs-vertical-writer-proof"
+        : "blocked",
+      reason: identityVWriterCandidate
+        ? "This Identity-V run can be edited only after its exact embedded font, vertical metrics, glyph addresses and top-to-bottom shaping pass the bounded vertical writer proof."
+        : "This vertical font structure is outside the bounded Identity-V native writer and remains read-only.",
     };
   }
   if (span.geometryConfidence === "fallback-box") {
@@ -216,6 +231,19 @@ export function enforceSpanCapabilityOnArbitration({
     spanClassification.authorization === "needs-measured-reconciliation" &&
     (arbitration.source === "reconciled" ||
       arbitration.source === "fragmented-reconstruction")
+  ) {
+    return arbitration;
+  }
+
+  // A narrowly structured Identity-V candidate may enter the editor only
+  // after PDF.js/native signal reconciliation. This does not authorize a
+  // write: the asynchronous vertical planner must still issue its own
+  // unforgeable plan after proving embedded-font identity, explicit TTB
+  // shaping, CID/GID/ToUnicode addressability and W2/DW2 geometry. Every
+  // failure remains read-only and the writer revalidates the live document.
+  if (
+    spanClassification.authorization === "needs-vertical-writer-proof" &&
+    arbitration.source === "reconciled"
   ) {
     return arbitration;
   }
