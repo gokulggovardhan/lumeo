@@ -41,6 +41,11 @@ import {
   isValidatedShapedGlyphEditPlan,
   type ValidatedShapedGlyphEditPlan,
 } from "./shapedGlyphEditPlan.ts";
+import {
+  isValidatedVerticalShapedGlyphEditPlan,
+  type ValidatedVerticalShapedGlyphEditPlan,
+} from "./verticalShapedGlyphEditPlan.ts";
+import { metricForVerticalCid } from "./verticalFontMetrics.ts";
 import { ensureFallbackFontResource, resolveFallbackFontsDict } from "./fallbackFont.ts";
 import {
   isValidatedMultiRunEditPlan,
