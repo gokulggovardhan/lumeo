@@ -843,6 +843,171 @@ function assertShapedTargetStillCurrent(
   }
 }
 
+function sameMatrix6(
+  a: readonly number[],
+  b: readonly number[],
+): boolean {
+  return (
+    a.length === 6 &&
+    b.length === 6 &&
+    a.every((value, index) => value === b[index])
+  );
+}
+
+function verticalResourceAndMetricsMatchCurrent(
+  doc: PDFDocument,
+  resources: PDFDict,
+  plan: ValidatedVerticalShapedGlyphEditPlan,
+): boolean {
+  const registry = new PdfFontRegistry(doc);
+  const profile = registry.resolve(resources, plan.fontResourceName);
+  if (!profile) return false;
+
+  const identity = profile.resourceIdentity;
+  const binding = plan.resourceBinding;
+  if (
+    profile.embeddedProgramSha256?.toLowerCase() !==
+      plan.embeddedProgramSha256.toLowerCase() ||
+    identity.type0Encoding !== "Identity-V" ||
+    identity.writingMode !== "vertical" ||
+    identity.descendantSubtype !== "CIDFontType2" ||
+    binding.resourceName !== plan.fontResourceName ||
+    binding.fontObjectRef !== identity.fontObjectRef ||
+    binding.descendantObjectRef !== identity.descendantObjectRef ||
+    binding.fontProgramObjectRef !== identity.fontProgramObjectRef ||
+    binding.toUnicodeObjectRef !== identity.toUnicodeObjectRef ||
+    binding.encodingObjectRef !== identity.encodingObjectRef
+  ) {
+    return false;
+  }
+
+  if (binding.cidToGidMapKind === "identity") {
+    if (
+      identity.cidToGidMap?.kind !== "name" ||
+      identity.cidToGidMap.name !== "Identity"
+    ) {
+      return false;
+    }
+  } else if (
+    identity.cidToGidMap?.kind !== "stream" ||
+    identity.cidToGidMap.objectRef !== binding.cidToGidMapObjectRef
+  ) {
+    return false;
+  }
+
+  const vertical = registry.inspectVerticalFontMetrics(
+    resources,
+    plan.fontResourceName,
+  );
+  if (vertical.kind !== "resolved") return false;
+
+  for (const expected of plan.originalGlyphMetrics) {
+    const current = metricForVerticalCid({
+      cid: expected.cid,
+      vertical,
+      horizontal: profile.metrics,
+    });
+    if (
+      !current ||
+      current.displacementY !== expected.displacementY1000 ||
+      current.positionX !== expected.positionX1000 ||
+      current.positionY !== expected.positionY1000
+    ) {
+      return false;
+    }
+  }
+
+  for (const glyph of plan.glyphs) {
+    const current = metricForVerticalCid({
+      cid: glyph.pdfCode,
+      vertical,
+      horizontal: profile.metrics,
+    });
+    if (
+      !current ||
+      current.displacementY !== glyph.pdfDisplacementY1000 ||
+      current.positionX !== glyph.pdfPositionX1000 ||
+      current.positionY !== glyph.pdfPositionY1000
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+/**
+ * Vertical shaping can finish asynchronously just like horizontal shaping.
+ * Re-resolve the exact operator, resource identity and every planned vertical
+ * metric immediately before mutation so stale /W2, /DW2 or upstream text-state
+ * changes can never cross the writer boundary.
+ */
+function assertVerticalShapedTargetStillCurrent(
+  doc: PDFDocument,
+  plan: ValidatedVerticalShapedGlyphEditPlan,
+): void {
+  const located = collectPageTextOperators(doc, plan.pageIndex);
+  const candidate = located.find((item) => {
+    if (item.operatorIndex !== plan.operatorIndex) return false;
+    if (plan.formPath) {
+      return (
+        item.locator.kind === "xobject" &&
+        sameStringArray(item.locator.formPath, plan.formPath)
+      );
+    }
+    return (
+      item.locator.kind === "page" &&
+      item.locator.contentStreamIndex === plan.contentStreamIndex
+    );
+  });
+
+  if (!candidate) {
+    throw new EditPlanRejectedError(
+      "The vertical shaped-glyph target no longer resolves to the planned PDF operator.",
+    );
+  }
+
+  if (
+    !verticalResourceAndMetricsMatchCurrent(
+      doc,
+      candidate.resources,
+      plan,
+    )
+  ) {
+    throw new EditPlanRejectedError(
+      "The vertical PDF font resource or its /W2 /DW2 metrics changed after validation; build a fresh plan.",
+    );
+  }
+
+  const current = candidate.operator;
+  const currentCodes = twoByteCodesFromStrings(current.strings);
+  const currentTjTotal = originalTjTotalForCurrentOperator(
+    current.tjAdjustments,
+  );
+  const sameTarget =
+    current.kind === plan.operatorType &&
+    current.start === plan.byteOffset &&
+    current.end - current.start === plan.byteLength &&
+    current.fontResourceName === plan.fontResourceName &&
+    current.fontSizePt === plan.fontSizePt &&
+    current.charSpacing === plan.charSpacing &&
+    current.wordSpacing === plan.wordSpacing &&
+    current.horizontalScalingPct === plan.horizontalScalingPct &&
+    current.leading === plan.leading &&
+    current.textRise === plan.textRise &&
+    current.renderMode === plan.renderMode &&
+    sameMatrix6(current.textRenderingMatrix, plan.textRenderingMatrix) &&
+    currentCodes !== null &&
+    sameNumbers(currentCodes, plan.originalGlyphCodes) &&
+    currentTjTotal === plan.originalTjAdjustmentTotal;
+
+  if (!sameTarget) {
+    throw new EditPlanRejectedError(
+      "The vertical PDF text operator or its text geometry changed after validation; build a fresh plan.",
+    );
+  }
+}
+
 /**
  * Applies one nominal shaped-glyph plan to the exact page/Form stream while
  * preserving the original stream encoding and Form dictionary identity.
