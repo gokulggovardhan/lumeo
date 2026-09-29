@@ -76,6 +76,7 @@ export type VerticalShapedGlyphEditPlanFields = Readonly<{
   endpointTjAdjustment: number;
   embeddedProgramSha256: string;
   shapingEngineVersion: string;
+  unitsPerEm: number;
   resourceBinding: ShapedGlyphResourceBinding;
   glyphs: readonly VerticalShapedGlyphEditGlyph[];
 }>;
@@ -592,6 +593,7 @@ export function buildVerticalShapedGlyphEditPlan({
     endpointTjAdjustment,
     embeddedProgramSha256: embeddedProgramSha256.toLowerCase(),
     shapingEngineVersion: shaped.engineVersion,
+    unitsPerEm: shaped.unitsPerEm,
     resourceBinding: verticalEvidence.binding,
     glyphs,
   });
