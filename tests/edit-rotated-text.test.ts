@@ -139,6 +139,41 @@ test("arbitrary-angle (37 degree) rotated text: edited text survives save + relo
   assert.deepEqual(await extractPageStrings(editedBytes), ["Still at 37 degrees"]);
 });
 
+test("measured skewed text: edit preserves the affine basis and searchable text after reopen", async () => {
+  const skewed: [number, number, number, number, number, number] = [
+    1,
+    0.35,
+    0,
+    1,
+    250,
+    350,
+  ];
+  const doc = await buildDoc([{ text: "Skewed source", matrix: skewed }]);
+  const original = await doc.save();
+  assert.deepEqual(await extractPageStrings(original), ["Skewed source"]);
+
+  const loaded = await PDFDocument.load(original.slice());
+  const [located] = collectPageTextOperators(loaded, 0);
+  assert.ok(located);
+  const originalBasis = located.operator.textRenderingMatrix.slice(0, 4);
+  assert.ok(
+    Math.abs(originalBasis[1] + originalBasis[2]) > 0.01,
+    "fixture must contain a materially skewed, non-rotational basis",
+  );
+
+  const editedBytes = await editFirstOperator(original, "Skewed replacement");
+  assert.deepEqual(await extractPageStrings(editedBytes), ["Skewed replacement"]);
+
+  const reopened = await PDFDocument.load(editedBytes.slice());
+  const [reopenedOperator] = collectPageTextOperators(reopened, 0);
+  assert.ok(reopenedOperator);
+  assert.deepEqual(
+    reopenedOperator.operator.textRenderingMatrix.slice(0, 4),
+    originalBasis,
+    "native editing must preserve the exact skewed text basis",
+  );
+});
+
 test("mixed rotated and non-rotated text on the same page: editing one leaves the other's rotation/content untouched", async () => {
   const identity: [number, number, number, number, number, number] = [1, 0, 0, 1, 100, 100];
   const rotated90 = rotationMatrix(90, 300, 400);

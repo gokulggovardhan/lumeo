@@ -26,6 +26,7 @@ export const SPLIT_RUN_PDF = path.join(TMP_DIR, "split-run.pdf");
 export const TWO_PAGE_PDF = path.join(TMP_DIR, "two-page.pdf");
 export const MIXED_STYLE_PDF = path.join(TMP_DIR, "mixed-style.pdf");
 export const CLIPPED_TEXT_PDF = path.join(TMP_DIR, "clipped-text.pdf");
+export const SKEWED_TEXT_PDF = path.join(TMP_DIR, "skewed-text.pdf");
 export const LARGE_DOCUMENT_PDF = path.join(TMP_DIR, "large-document-120-pages.pdf");
 export const SHAPED_LTR_PDF = path.join(TMP_DIR, "shaped-ltr-type0.pdf");
 export const SHAPED_VERTICAL_PDF = path.join(TMP_DIR, "shaped-vertical-identity-v.pdf");
@@ -704,6 +705,25 @@ async function largeDocument(): Promise<Uint8Array> {
   return doc.save();
 }
 
+async function skewedText(): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([595, 842]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.node.Resources()!.set(
+    PDFName.of("Font"),
+    doc.context.obj({ FSkew: font.ref }),
+  );
+  page.node.set(
+    PDFName.of("Contents"),
+    doc.context.register(
+      doc.context.stream(
+        "BT /FSkew 20 Tf 1 0.35 0 1 90 700 Tm (Skewed sample) Tj ET",
+      ),
+    ),
+  );
+  return doc.save();
+}
+
 /** Two pages, so the PAGES rail renders -- it is hidden for a single page. */
 async function twoPage(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -730,6 +750,7 @@ export async function writeFixtures(): Promise<void> {
   await writeFile(TWO_PAGE_PDF, await twoPage());
   await writeFile(MIXED_STYLE_PDF, await mixedStyle());
   await writeFile(CLIPPED_TEXT_PDF, await clippedText());
+  await writeFile(SKEWED_TEXT_PDF, await skewedText());
   await writeFile(LARGE_DOCUMENT_PDF, await largeDocument());
   await writeFile(SHAPED_LTR_PDF, await shapedLtrType0());
   await writeFile(SHAPED_VERTICAL_PDF, await buildShapedVerticalType0Pdf());

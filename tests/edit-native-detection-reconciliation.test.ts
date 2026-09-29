@@ -522,6 +522,62 @@ test("Form XObject classification still fails closed for missing metrics and com
   const skewClassification = classifyNativeTextSpan(skewed);
   assert.equal(skewClassification.category, "COMPLEX_VECTOR_TEXT");
   assert.equal(skewClassification.safelyRewritable, false);
+  assert.equal(
+    skewClassification.authorization,
+    "needs-measured-reconciliation",
+  );
+
+  const skewRun = {
+    str: "Hi",
+    fontName: "g_d0_f1",
+    xPct: 10,
+    yPct: 10,
+    widthPct: 2,
+    heightPct: 2,
+    fontSizePt: 12,
+    rotated: true,
+    baselineXPct: 10,
+    baselineYPct: 11.5,
+    ascentRatio: 0.8,
+    descentRatio: -0.2,
+    pdfJsTransform: [12, 3, 0, 12, 72, 700],
+    detectionSource: "pdfjs" as const,
+  };
+  const [skewReconciliation] = reconcileTextSignals({
+    runs: [skewRun],
+    legacyMatches: [{
+      locatedOperator: skewed.locatedOperator,
+      operator: skewed.locatedOperator.operator,
+    }],
+    nativeSpans: [skewed],
+    viewportTransform: viewport,
+  });
+  const [skewArbitration] = buildTextEditArbitrations({
+    runs: [skewRun],
+    reconciliations: [skewReconciliation],
+    nativeSpans: [skewed],
+  });
+  assert.equal(skewReconciliation.confidence, "high");
+  assert.equal(skewArbitration.source, "reconciled");
+  assert.equal(
+    enforceSpanCapabilityOnArbitration({
+      arbitration: skewArbitration,
+      spanClassification: skewClassification,
+    }).decision,
+    "editable",
+  );
+
+  const nativeOnlySkew = enforceSpanCapabilityOnArbitration({
+    arbitration: {
+      pdfJsRunIndex: 0,
+      decision: "editable",
+      nativeSpanKey: skewed.key,
+      source: "native-only-safe-synthesis",
+      reason: "Native-only geometry is not independent proof.",
+    },
+    spanClassification: skewClassification,
+  });
+  assert.equal(nativeOnlySkew.decision, "view-only");
 });
 
 test("classifier detects vertical Type0 text from retained font CMap evidence", () => {

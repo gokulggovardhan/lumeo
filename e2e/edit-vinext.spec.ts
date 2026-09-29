@@ -13,6 +13,7 @@ import {
   SEARCHABLE_SCAN_PDF,
   SHAPED_LTR_PDF,
   SHAPED_VERTICAL_PDF,
+  SKEWED_TEXT_PDF,
   PARAGRAPH_PDF,
   LARGE_DOCUMENT_PDF,
   MIXED_STYLE_PDF,
@@ -1328,6 +1329,76 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
   expect(consoleErrors).toEqual([]);
   expect(pageErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
+});
+
+test("vinext Edit PDF edits measured skewed text while preserving its affine basis", async ({
+  page,
+}) => {
+  const pageErrors: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  page.on("console", (message) => {
+    if (message.type() === "error") consoleErrors.push(message.text());
+  });
+
+  await uploadEditFixture(page, SKEWED_TEXT_PDF);
+  await waitForStageReady(page);
+
+  const source = page
+    .locator(
+      'div[role="button"][aria-label^="Editable text: "][aria-label*="Skewed sample"]',
+    )
+    .first();
+  await expect(source).toBeVisible({ timeout: 90_000 });
+  await source.click();
+
+  const editor = page.getByRole("textbox", { name: "Edit text" });
+  await expect(editor).toHaveValue("Skewed sample");
+  await editor.fill("Skewed proof");
+  await page.getByRole("button", { name: "Apply edit" }).click();
+  await waitForStageReady(page);
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await waitForStageReady(page);
+  await page.getByRole("button", { name: "Redo" }).click();
+  await waitForStageReady(page);
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", {
+    name: "Download edited PDF",
+  });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  const downloadPromise = page.waitForEvent("download");
+  await downloadButton.click();
+  const outputPath = await (await downloadPromise).path();
+  expect(outputPath).not.toBeNull();
+
+  const original = await PDFDocument.load(await readFile(SKEWED_TEXT_PDF));
+  const exported = await PDFDocument.load(await readFile(outputPath!));
+  const originalOperators = collectPageTextOperators(original, 0);
+  const exportedOperators = collectPageTextOperators(exported, 0);
+  expect(originalOperators).toHaveLength(1);
+  expect(exportedOperators).toHaveLength(1);
+  expect(exportedOperators[0]!.operator.textRenderingMatrix.slice(0, 4)).toEqual(
+    originalOperators[0]!.operator.textRenderingMatrix.slice(0, 4),
+  );
+
+  const registry = new PdfFontRegistry(exported);
+  const resourceName = exportedOperators[0]!.operator.fontResourceName;
+  expect(resourceName).toBeTruthy();
+  const profile = registry.resolve(
+    exportedOperators[0]!.resources,
+    resourceName!,
+  );
+  expect(profile).not.toBeNull();
+  expect(
+    decodeTextShowOperator(
+      exportedOperators[0]!.operator,
+      profile!.resolvedFont,
+    ).text,
+  ).toBe("Skewed proof");
+  expect(consoleErrors).toEqual([]);
+  expect(pageErrors).toEqual([]);
 });
 
 
