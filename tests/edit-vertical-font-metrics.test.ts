@@ -6,6 +6,7 @@ import {
   type PDFDict,
 } from "pdf-lib";
 import { PdfFontRegistry } from "../lib/pdf/edit/fontRegistry.ts";
+import type { ShapedRun } from "../lib/pdf/edit/harfbuzzShaping.ts";
 import {
   metricForVerticalCid,
   resolveVerticalFontMetricsEvidence,
@@ -308,5 +309,194 @@ test("direct resolver remains advisory and rejects non-Type0 fonts", async () =>
   assert.equal(evidence.advisoryOnly, true);
   if (evidence.kind === "blocked") {
     assert.match(evidence.reason, /Type0/i);
+  }
+});
+
+
+function verticalShaped(
+  text = "AB",
+  direction: ShapedRun["requestedDirection"] = "ttb",
+): ShapedRun {
+  return {
+    text,
+    glyphs: [
+      {
+        glyphId: 3,
+        clusterUtf16: 0,
+        flags: 0,
+        xAdvance: 0,
+        yAdvance: -1000,
+        xOffset: 0,
+        yOffset: 0,
+        xAdvanceEm: 0,
+        yAdvanceEm: -1,
+        xOffsetEm: 0,
+        yOffsetEm: 0,
+      },
+      {
+        glyphId: 4,
+        clusterUtf16: 1,
+        flags: 0,
+        xAdvance: 0,
+        yAdvance: -1000,
+        xOffset: 0,
+        yOffset: 0,
+        xAdvanceEm: 0,
+        yAdvanceEm: -1,
+        xOffsetEm: 0,
+        yOffsetEm: 0,
+      },
+    ],
+    clusterMap: [
+      { startUtf16: 0, endUtf16: 1, text: "A", glyphIndices: [0] },
+      { startUtf16: 1, endUtf16: 2, text: "B", glyphIndices: [1] },
+    ],
+    unitsPerEm: 1000,
+    totalAdvance: -2000,
+    totalAdvanceEm: -2,
+    totalXAdvance: 0,
+    totalYAdvance: -2000,
+    requestedDirection: direction,
+    directionWasExplicit: direction !== "auto",
+    engine: "harfbuzz",
+    engineVersion: "14.5.0",
+  };
+}
+
+test("vertical shaped evidence binds Identity-V glyphs to exact ToUnicode CIDs and DW2/W2 metrics", async () => {
+  const fixture = await verticalFixture({
+    dw2: [910, -1110],
+    w2: [3, [-1200, 320, 930]],
+  });
+  const registry = new PdfFontRegistry(fixture.doc);
+  const evidence = registry.inspectVerticalShapedGlyphEvidence(
+    fixture.resources,
+    "FVertical",
+    verticalShaped(),
+  );
+
+  assert.equal(evidence.kind, "resolved");
+  if (evidence.kind !== "resolved") return;
+  assert.equal(evidence.advisoryOnly, true);
+  assert.equal(evidence.direction, "ttb");
+  assert.equal(evidence.addresses.length, 2);
+  assert.deepEqual(evidence.addresses[0], {
+    glyphIndex: 0,
+    glyphId: 3,
+    clusterText: "A",
+    cid: 3,
+    pdfCode: 3,
+    verticalMetric: {
+      displacementY: -1200,
+      positionX: 320,
+      positionY: 930,
+      source: "W2",
+    },
+  });
+  assert.deepEqual(evidence.addresses[1], {
+    glyphIndex: 1,
+    glyphId: 4,
+    clusterText: "B",
+    cid: 4,
+    pdfCode: 4,
+    verticalMetric: {
+      displacementY: -1110,
+      positionX: 350,
+      positionY: 910,
+      source: "DW2",
+    },
+  });
+  assert.equal(evidence.binding.resourceName, "FVertical");
+  assert.equal(evidence.binding.cidToGidMapKind, "identity");
+});
+
+test("vertical shaped evidence keeps Identity-H resources blocked", async () => {
+  const fixture = await verticalFixture({ encoding: "Identity-H" });
+  const evidence = new PdfFontRegistry(
+    fixture.doc,
+  ).inspectVerticalShapedGlyphEvidence(
+    fixture.resources,
+    "FVertical",
+    verticalShaped(),
+  );
+  assert.equal(evidence.kind, "blocked");
+  if (evidence.kind === "blocked") {
+    assert.match(evidence.reason, /Identity-V/i);
+  }
+});
+
+test("vertical shaped evidence requires explicit top-to-bottom shaping", async () => {
+  const fixture = await verticalFixture();
+  const evidence = new PdfFontRegistry(
+    fixture.doc,
+  ).inspectVerticalShapedGlyphEvidence(
+    fixture.resources,
+    "FVertical",
+    verticalShaped("AB", "ltr"),
+  );
+  assert.equal(evidence.kind, "blocked");
+  if (evidence.kind === "blocked") {
+    assert.match(evidence.reason, /top-to-bottom|ttb/i);
+  }
+});
+
+test("vertical shaped evidence rejects a ToUnicode mismatch instead of guessing a CID", async () => {
+  const fixture = await verticalFixture();
+  const shaped = verticalShaped();
+  const mismatched: ShapedRun = {
+    ...shaped,
+    clusterMap: [
+      { startUtf16: 0, endUtf16: 1, text: "Q", glyphIndices: [0] },
+      shaped.clusterMap[1],
+    ],
+  };
+  const evidence = new PdfFontRegistry(
+    fixture.doc,
+  ).inspectVerticalShapedGlyphEvidence(
+    fixture.resources,
+    "FVertical",
+    mismatched,
+  );
+  assert.equal(evidence.kind, "blocked");
+  if (evidence.kind === "blocked") {
+    assert.match(evidence.reason, /ToUnicode/i);
+  }
+});
+
+test("vertical shaped evidence rejects one logical cluster expanding to multiple glyphs", async () => {
+  const fixture = await verticalFixture();
+  const shaped = verticalShaped();
+  const oneToMany: ShapedRun = {
+    ...shaped,
+    text: "A",
+    clusterMap: [
+      { startUtf16: 0, endUtf16: 1, text: "A", glyphIndices: [0, 1] },
+    ],
+  };
+  const evidence = new PdfFontRegistry(
+    fixture.doc,
+  ).inspectVerticalShapedGlyphEvidence(
+    fixture.resources,
+    "FVertical",
+    oneToMany,
+  );
+  assert.equal(evidence.kind, "blocked");
+  if (evidence.kind === "blocked") {
+    assert.match(evidence.reason, /exactly one addressed PDF glyph/i);
+  }
+});
+
+test("vertical shaped evidence inherits fail-closed malformed W2 handling", async () => {
+  const fixture = await verticalFixture({ w2: "malformed" });
+  const evidence = new PdfFontRegistry(
+    fixture.doc,
+  ).inspectVerticalShapedGlyphEvidence(
+    fixture.resources,
+    "FVertical",
+    verticalShaped(),
+  );
+  assert.equal(evidence.kind, "blocked");
+  if (evidence.kind === "blocked") {
+    assert.match(evidence.reason, /W2/i);
   }
 });

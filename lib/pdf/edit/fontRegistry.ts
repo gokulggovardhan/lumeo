@@ -52,6 +52,10 @@ import {
   resolveVerticalFontMetricsEvidence,
   type PdfVerticalFontMetricsEvidence,
 } from "./verticalFontMetrics.ts";
+import {
+  proveVerticalShapedGlyphEvidence,
+  type VerticalShapedGlyphEvidence,
+} from "./verticalShapedGlyphEvidence.ts";
 
 const SUBSET_PREFIX = /^[A-Z]{6}\+/;
 const BOLD_NAME = /bold|black|heavy|semib|demib?|ultra/i;
@@ -825,6 +829,73 @@ export class PdfFontRegistry {
       context: this.context,
       fontKind: profile.kind,
       writingMode: profile.resourceIdentity.writingMode,
+    });
+  }
+
+  /**
+   * Combines exact Identity-V CID/GID/ToUnicode addressability with the
+   * independently resolved DW2/W2 vertical metrics for one explicitly TTB
+   * HarfBuzz run. The result remains advisory and cannot authorize a write.
+   */
+  inspectVerticalShapedGlyphEvidence(
+    resources: PDFDict,
+    resourceName: string,
+    shaped: ShapedRun,
+  ): VerticalShapedGlyphEvidence {
+    const fontResource = resolveFontResource(
+      resources,
+      resourceName,
+      this.context,
+    );
+    if (!fontResource) {
+      return Object.freeze({
+        kind: "blocked",
+        advisoryOnly: true,
+        reason: "The PDF font resource could not be resolved.",
+      });
+    }
+
+    const profile = this.resolve(resources, resourceName);
+    if (!profile) {
+      return Object.freeze({
+        kind: "blocked",
+        advisoryOnly: true,
+        reason: "The PDF font profile could not be resolved.",
+      });
+    }
+
+    const structure = structureForFont(fontResource.dict, this.context);
+    const verticalMetrics = resolveVerticalFontMetricsEvidence({
+      fontDict: fontResource.dict,
+      context: this.context,
+      fontKind: profile.kind,
+      writingMode: profile.resourceIdentity.writingMode,
+    });
+
+    return proveVerticalShapedGlyphEvidence({
+      binding: {
+        resourceName,
+        fontObjectRef: profile.resourceIdentity.fontObjectRef,
+        descendantObjectRef: profile.resourceIdentity.descendantObjectRef,
+        fontProgramObjectRef: profile.resourceIdentity.fontProgramObjectRef,
+        toUnicodeObjectRef: profile.resourceIdentity.toUnicodeObjectRef,
+        encodingObjectRef: profile.resourceIdentity.encodingObjectRef,
+        cidToGidMapObjectRef:
+          profile.resourceIdentity.cidToGidMap?.objectRef ?? null,
+      },
+      fontKind: profile.kind,
+      descendantSubtype: profile.resourceIdentity.descendantSubtype,
+      type0Encoding: profile.resourceIdentity.type0Encoding,
+      writingMode: profile.resourceIdentity.writingMode,
+      embeddedProgramSha256: profile.embeddedProgramSha256,
+      cidToGidMap: cidToGidAddressingSourceFor(
+        structure.descendant,
+        this.context,
+      ),
+      glyphCodeToUnicode: profile.resolvedFont.glyphCodeToUnicode,
+      horizontalMetrics: profile.metrics,
+      verticalMetrics,
+      shaped,
     });
   }
 
