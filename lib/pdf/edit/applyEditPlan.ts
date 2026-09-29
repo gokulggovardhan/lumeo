@@ -618,6 +618,78 @@ export function applyShapedGlyphEditPlanToBytes(
   return result;
 }
 
+function assertVerticalShapedApplicable(
+  plan: ValidatedVerticalShapedGlyphEditPlan,
+): void {
+  if (!isValidatedVerticalShapedGlyphEditPlan(plan)) {
+    throw new EditPlanRejectedError(
+      "This vertical shaped-glyph edit plan was not issued by the validated vertical planner.",
+    );
+  }
+  if (plan.operatorType !== "Tj" && plan.operatorType !== "TJ") {
+    throw new EditPlanRejectedError(
+      "The vertical shaped-glyph writer supports only Tj/TJ operators.",
+    );
+  }
+  if (plan.glyphs.length === 0) {
+    throw new EditPlanRejectedError(
+      "A vertical shaped-glyph write must contain at least one proven PDF glyph.",
+    );
+  }
+}
+
+function buildVerticalShapedGlyphOperatorText(
+  plan: ValidatedVerticalShapedGlyphEditPlan,
+): string {
+  const parts: string[] = [];
+  for (const glyph of plan.glyphs) {
+    parts.push(`<${encodeGlyphCodesToHex([glyph.pdfCode], 2)}>`);
+    if (Math.abs(glyph.tjAdjustment) >= TJ_DELTA_EPSILON) {
+      parts.push(formatPdfNumber(glyph.tjAdjustment));
+    }
+  }
+  return `[${parts.join(" ")}] TJ`;
+}
+
+/**
+ * Pure vertical shaped-glyph byte writer.
+ *
+ * PDF's Identity-V resource remains responsible for each glyph's vertical
+ * origin (/W2 or /DW2). Numeric TJ entries only reconcile the proven
+ * HarfBuzz y-advance and preserve the original operator endpoint.
+ */
+export function applyVerticalShapedGlyphEditPlanToBytes(
+  contentStreamBytes: Uint8Array,
+  plan: ValidatedVerticalShapedGlyphEditPlan,
+): Uint8Array {
+  assertVerticalShapedApplicable(plan);
+
+  if (
+    plan.byteOffset < 0 ||
+    plan.byteLength <= 0 ||
+    plan.byteOffset + plan.byteLength > contentStreamBytes.byteLength
+  ) {
+    throw new EditPlanRejectedError(
+      "The vertical shaped-glyph plan targets a byte range outside the current content stream.",
+    );
+  }
+
+  const newOperatorBytes = new TextEncoder().encode(
+    buildVerticalShapedGlyphOperatorText(plan),
+  );
+  const before = contentStreamBytes.subarray(0, plan.byteOffset);
+  const after = contentStreamBytes.subarray(
+    plan.byteOffset + plan.byteLength,
+  );
+  const result = new Uint8Array(
+    before.length + newOperatorBytes.length + after.length,
+  );
+  result.set(before, 0);
+  result.set(newOperatorBytes, before.length);
+  result.set(after, before.length + newOperatorBytes.length);
+  return result;
+}
+
 function sameStringArray(
   a: readonly string[],
   b: readonly string[],
