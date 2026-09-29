@@ -648,6 +648,33 @@ test("classifier detects vertical Type0 text from retained font CMap evidence", 
 });
 
 test("classifier refuses unknown encoding and clipping instead of claiming safe editability", () => {
+  const type3 = buildNativeContentStreamSpans({
+    operators: [located()],
+    viewportTransform: viewport,
+    pageWidthPt: 612,
+    pageHeightPt: 792,
+    resolveFontProfile: () => profile({ kind: "Type3" }),
+  })[0];
+  const type3Classification = classifyNativeTextSpan(type3);
+  assert.equal(type3Classification.category, "TYPE3_TEXT");
+  assert.equal(type3Classification.safelyRewritable, false);
+  assert.equal(type3Classification.authorization, "blocked");
+  assert.equal(type3.detectedRun, null);
+  assert.match(type3.limitationReason ?? "", /geometry is not yet proven/i);
+
+  const type3Guard = enforceSpanCapabilityOnArbitration({
+    arbitration: {
+      pdfJsRunIndex: 0,
+      decision: "editable",
+      nativeSpanKey: type3.key,
+      source: "reconciled",
+      reason: "Visible text and native source agree.",
+    },
+    spanClassification: type3Classification,
+  });
+  assert.equal(type3Guard.decision, "view-only");
+  assert.match(type3Guard.reason, /Type3 glyph programs/i);
+
   const encodingLimited = buildNativeContentStreamSpans({
     operators: [located()],
     viewportTransform: viewport,

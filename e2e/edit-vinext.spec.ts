@@ -19,6 +19,7 @@ import {
   MIXED_STYLE_PDF,
   SPLIT_RUN_PDF,
   TEXT_ONLY_PDF,
+  TYPE3_TEXT_PDF,
   TWO_PAGE_PDF,
   writeFixtures,
 } from "./fixtures.ts";
@@ -126,6 +127,43 @@ test("vinext Edit PDF explains read-only clipped text before an edit is attempte
   await limitedRun.press("Enter");
   await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
   await expect(explanation).toBeVisible();
+});
+
+test("vinext Edit PDF keeps Type3 glyph-program text read-only", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TYPE3_TEXT_PDF);
+
+  const limitedRun = page
+    .locator(
+      'div[role="button"][aria-label^="Not yet editable text: "][aria-label*="ABCD"]',
+    )
+    .first();
+  await expect(limitedRun).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText("Loading page preview")).toHaveCount(0, {
+    timeout: 90_000,
+  });
+
+  const pageCapability = page.locator("[data-edit-page-capability]");
+  await expect(pageCapability).toHaveAttribute(
+    "data-edit-page-capability",
+    "view-only",
+  );
+  await expect(pageCapability).toHaveAttribute("title", /PDF-drawn font/i);
+
+  await limitedRun.hover();
+  const explanation = page.locator("[data-edit-capability-explanation]");
+  await expect(explanation).toContainText(/PDF-drawn font/i);
+  await expect(explanation).toContainText(/read-only/i);
+
+  await limitedRun.focus();
+  await limitedRun.press("Enter");
+  await expect(page.getByRole("textbox", { name: "Edit text" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Apply edit" })).toHaveCount(0);
+  await expect(page.locator("[data-edit-semantic-history-count]")).toHaveAttribute(
+    "data-edit-semantic-history-count",
+    "0",
+  );
 });
 
 test("vinext Edit PDF keeps invisible searchable-scan text read-only", async ({
