@@ -111,14 +111,15 @@ async function fixture() {
     "<00030004> Tj",
     "ET",
   ].join("\n");
+  const contentBytes = new TextEncoder().encode(content);
   page.node.set(
     PDFName.of("Contents"),
     context.register(
-      context.flateStream(new TextEncoder().encode(content)),
+      context.flateStream(contentBytes),
     ),
   );
 
-  return { doc, page, resources, descendant };
+  return { doc, page, resources, descendant, contentBytes };
 }
 
 function verticalReplacement(): ShapedRun {
@@ -260,9 +261,8 @@ test("vertical shaped byte writer emits proven CIDs and preserves the original e
   assert.ok(isValidatedVerticalShapedGlyphEditPlan(fx.plan));
   if (!isValidatedVerticalShapedGlyphEditPlan(fx.plan)) return;
 
-  const originalBytes = fx.target.decodedBytes;
   const rewritten = applyVerticalShapedGlyphEditPlanToBytes(
-    originalBytes,
+    fx.contentBytes,
     fx.plan,
   );
   const source = new TextDecoder().decode(rewritten);
@@ -358,7 +358,7 @@ test("plain-object vertical shaped plan copies cannot cross writer authority", a
   assert.throws(
     () =>
       applyVerticalShapedGlyphEditPlanToBytes(
-        fx.target.decodedBytes,
+        fx.contentBytes,
         forged as typeof fx.plan,
       ),
     (error: unknown) =>
