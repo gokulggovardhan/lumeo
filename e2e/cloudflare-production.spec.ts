@@ -66,9 +66,12 @@ async function openEditPdfReady(page: import("@playwright/test").Page) {
   });
 }
 
-async function openHeicToJpegReady(page: import("@playwright/test").Page) {
-  await page.goto("/heic-to-jpeg", { waitUntil: "domcontentloaded" });
-  await expect(page.locator('input[type="file"]')).toHaveAttribute(
+async function openUploadWorkspaceReady(
+  page: import("@playwright/test").Page,
+  pathname: string,
+) {
+  await page.goto(pathname, { waitUntil: "domcontentloaded" });
+  await expect(page.locator('input[type="file"]').first()).toHaveAttribute(
     "data-upload-client-ready",
     "true",
     { timeout: 30_000 },
@@ -170,7 +173,7 @@ test("production HEIC/HEIF worker preserves full-resolution output and download"
   const name = useHeifName ? "CLOUDFLARE-PROD.HEIF" : "CLOUDFLARE-PROD.HEIC";
   const mimeType = useHeifName ? "image/heif" : "image/heic";
 
-  await openHeicToJpegReady(page);
+  await openUploadWorkspaceReady(page, "/heic-to-jpeg");
   await page.locator('input[type="file"]').setInputFiles({
     name,
     mimeType,
@@ -217,7 +220,7 @@ test("production HEIC batch isolates corrupt input, recovers, and ZIP preserves 
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   const heic = await readFile(fixturePath!);
-  await openHeicToJpegReady(page);
+  await openUploadWorkspaceReady(page, "/heic-to-jpeg");
   await page.locator('input[type="file"]').setInputFiles([
     { name: "VALID-BEFORE.HEIC", mimeType: "image/heic", buffer: heic },
     { name: "BROKEN.HEIC", mimeType: "image/heic", buffer: Buffer.from("corrupt input") },
@@ -281,7 +284,7 @@ test("production HEIC workspace remains usable on a narrow mobile viewport", asy
   );
 
   await page.setViewportSize({ width: 375, height: 812 });
-  await openHeicToJpegReady(page);
+  await openUploadWorkspaceReady(page, "/heic-to-jpeg");
 
   await expect(page.getByText("Choose photos", { exact: true })).toBeVisible();
   await expect(
@@ -331,7 +334,7 @@ test("production Merge PDF processes and downloads a real two-page result", asyn
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   const fixture = await readFile(TEXT_ONLY_PDF);
-  await page.goto("/pdf/merge", { waitUntil: "domcontentloaded" });
+  await openUploadWorkspaceReady(page, "/pdf/merge");
   await page.locator('input[type="file"]').first().setInputFiles([
     { name: "merge-a.pdf", mimeType: "application/pdf", buffer: fixture },
     { name: "merge-b.pdf", mimeType: "application/pdf", buffer: fixture },
@@ -359,7 +362,7 @@ test("production Crop PDF exports a valid PDF", async ({ page }, testInfo) => {
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto("/pdf/crop", { waitUntil: "domcontentloaded" });
+  await openUploadWorkspaceReady(page, "/pdf/crop");
   await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
 
   const apply = page.getByRole("button", { name: "Apply Crop" });
@@ -386,7 +389,7 @@ test("production Watermark PDF exports a valid text-watermarked PDF", async ({
   const pageErrors: string[] = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto("/pdf/watermark", { waitUntil: "domcontentloaded" });
+  await openUploadWorkspaceReady(page, "/pdf/watermark");
   await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
 
   const watermarkText = page.getByLabel("Text", { exact: true });
