@@ -3,6 +3,7 @@ import { dirname, resolve } from "node:path";
 import { createCanvas } from "@napi-rs/canvas";
 import {
   PDFDocument,
+  PDFName,
   StandardFonts,
   degrees,
   rgb,
@@ -216,6 +217,33 @@ async function makeSimpleFixture(
     expectedRuns: [text],
     editTarget: text,
     replacementText,
+    bytes: await doc.save(),
+  };
+}
+
+async function makeSkewedFixture(): Promise<Fixture> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  page.node.Resources()!.set(
+    PDFName.of("Font"),
+    doc.context.obj({ F1: font.ref }),
+  );
+  page.node.set(
+    PDFName.of("Contents"),
+    doc.context.register(
+      doc.context.stream(
+        "BT /F1 20 Tf 1 0.35 0 1 250 350 Tm (Skewed source) Tj ET",
+      ),
+    ),
+  );
+
+  return {
+    id: "advanced-measured-skew",
+    category: "unusual-ctm-skew",
+    expectedRuns: ["Skewed source"],
+    editTarget: "Skewed source",
+    replacementText: "Skewed target",
     bytes: await doc.save(),
   };
 }
@@ -1304,6 +1332,7 @@ async function buildFixtures(): Promise<Fixture[]> {
         size: 13,
       },
     ),
+    makeSkewedFixture(),
     structuredFixture({
       id: "common-business-invoice",
       category: "business-invoice",
