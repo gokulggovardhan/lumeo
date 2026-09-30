@@ -2973,7 +2973,16 @@ export default function EditPdfTool() {
   // only disables in-place editing, never the read-only preview/highlight
   // this depends on.
   useEffect(() => {
-    if (!pdf || !pdfJsDocRef.current || !pdfLibDoc || !pagePointSize || !fontRegistry) return;
+    if (
+      !pdf ||
+      !pdfJsDocRef.current ||
+      !pdfLibDoc ||
+      !editEngine ||
+      !pagePointSize ||
+      !fontRegistry
+    ) {
+      return;
+    }
     const doc = pdfJsDocRef.current;
     const runs = detectedTextRuns;
     let cancelled = false;
@@ -3003,8 +3012,13 @@ export default function EditPdfTool() {
         const page =
           cached && cached.pageIndex === pageIndex ? cached.page : await doc.getPage(pageIndex + 1);
         const viewport = page.getViewport({ scale: 1 });
-        if (cancelled || !pdfLibDocRef.current || !editEngineRef.current) return;
-        const located = editEngineRef.current.collectPageTextOperators(pdfLibDocRef.current, pageIndex);
+        if (cancelled) return;
+        // Keep operator collection and font resolution on the same captured
+        // pdf-lib revision. Reading the mutable refs here could pair a newly
+        // loaded document with the previous revision's PdfFontRegistry while
+        // the awaited PDF.js page lookup was in flight, leaving otherwise
+        // editable standard-font text permanently classified as view-only.
+        const located = editEngine.collectPageTextOperators(pdfLibDoc, pageIndex);
         if (cancelled) return;
         operatorCountForPerformance = located.length;
         setPageOperators(located);
@@ -3174,7 +3188,7 @@ export default function EditPdfTool() {
     // on the raster size would re-run this whole match (and reset every
     // RunMatch the UI relies on) on every future zoom-driven re-render, for
     // a result that is by construction identical.
-  }, [pdf, pdfLibDoc, pageIndex, detectedTextRuns, pagePointSize, fontRegistry]);
+  }, [pdf, pdfLibDoc, editEngine, pageIndex, detectedTextRuns, pagePointSize, fontRegistry]);
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
