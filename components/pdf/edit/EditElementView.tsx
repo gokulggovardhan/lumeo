@@ -220,6 +220,26 @@ function EditElementViewImpl({
   const deletePillVerticalPlacement = pickVerticalPlacement(element.yPct, element.yPct + element.heightPct);
   const deletePillHorizontalAlign = pickHorizontalAlign(element.xPct, element.xPct + element.widthPct);
 
+  function handleTextStyleShortcut(event: React.KeyboardEvent<HTMLElement>): boolean {
+    if (element.type !== "text" || (!event.ctrlKey && !event.metaKey) || event.altKey) return false;
+    const key = event.key.toLowerCase();
+    if (key !== "b" && key !== "i" && key !== "u") return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.repeat) return true;
+
+    // A local font is an exact uploaded face. Synthesizing bold or italic
+    // would break that fidelity contract, so keyboard commands obey the same
+    // guard as the disabled inspector buttons. Underline is independent of
+    // font identity and remains safe.
+    if (element.fontAssetId && (key === "b" || key === "i")) return true;
+    if (key === "b") onChange({ bold: !element.bold });
+    else if (key === "i") onChange({ italic: !element.italic });
+    else onChange({ underline: !element.underline });
+    return true;
+  }
+
   // Arrow keys move; Shift+Arrow resizes (only when this element supports
   // resizing at all -- see canResizeElement, false for ink). Delete/
   // Backspace is unchanged. Both move and resize commit immediately (via
@@ -227,6 +247,7 @@ function EditElementViewImpl({
   // gesture end -- a single keypress IS the whole gesture here, so there's
   // no live-drag frame to batch.
   function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (handleTextStyleShortcut(event)) return;
     if (event.key === "Delete" || event.key === "Backspace") {
       event.preventDefault();
       event.stopPropagation();
@@ -255,7 +276,7 @@ function EditElementViewImpl({
       ref={nodeRef}
       role="button"
       tabIndex={0}
-      aria-label={`${element.type} element. Arrow keys move${resizable ? ", Shift+Arrow resizes" : ""}, Delete removes.`}
+      aria-label={`${element.type} element. Arrow keys move${resizable ? ", Shift+Arrow resizes" : ""}, Delete removes${element.type === "text" ? ", Ctrl or Command plus B, I, or U formats" : ""}.`}
       onFocus={onSelect}
       onPointerDown={handleBodyPointerDown}
       onPointerMove={(event) => {
@@ -279,7 +300,9 @@ function EditElementViewImpl({
           value={element.text}
           onChange={(event) => onTextChange(event.target.value)}
           onPointerDown={(event) => event.stopPropagation()}
-          onKeyDown={(event) => event.stopPropagation()}
+          onKeyDown={(event) => {
+            if (!handleTextStyleShortcut(event)) event.stopPropagation();
+          }}
           placeholder="Type here"
           aria-invalid={customFontIssue ? true : undefined}
           title={customFontIssue ?? undefined}

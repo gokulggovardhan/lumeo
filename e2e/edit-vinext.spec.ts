@@ -1074,7 +1074,7 @@ test("vinext Edit PDF embeds a selected local font for added text", async ({
   page,
 }) => {
   await uploadEditFixture(page, TEXT_ONLY_PDF);
-  await waitForStageReady(page);
+  await expect(page.getByAltText("Page 1 preview")).toBeVisible({ timeout: 90_000 });
 
   await page.getByRole("button", { name: "Text", exact: true }).click();
   const stage = page.getByAltText("Page 1 preview").locator("..");
@@ -1094,6 +1094,15 @@ test("vinext Edit PDF embeds a selected local font for added text", async ({
   const fontLabel = page.locator("[data-edit-local-font-label]");
   await expect(fontLabel).not.toHaveText("Loading font…");
   await expect(fontLabel).not.toHaveText("Helvetica");
+
+  await placedText.press("Control+b");
+  await placedText.press("Control+i");
+  const guardedStyle = await placedText.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { fontStyle: style.fontStyle, fontWeight: style.fontWeight };
+  });
+  expect(guardedStyle.fontStyle).toBe("normal");
+  expect(Number(guardedStyle.fontWeight)).toBeLessThan(700);
 
   await page.getByRole("button", { name: "Export PDF" }).click();
   const downloadButton = page.getByRole("button", {
@@ -1120,6 +1129,36 @@ test("vinext Edit PDF embeds a selected local font for added text", async ({
         (object.has(fontFile2) || object.has(fontFile3)),
     );
   expect(hasEmbeddedFontProgram).toBe(true);
+});
+
+test("vinext Edit PDF applies placed-text formatting shortcuts while typing and supports Undo", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await expect(page.getByAltText("Page 1 preview")).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Text", exact: true }).click();
+  const stage = page.getByAltText("Page 1 preview").locator("..");
+  await stage.click({ position: { x: 180, y: 180 } });
+
+  const placedText = page.locator('textarea[placeholder="Type here"]').last();
+  await expect(placedText).toBeVisible();
+  await placedText.fill("Shortcut text");
+
+  await placedText.press("Control+b");
+  await placedText.press("Control+i");
+  await placedText.press("Control+u");
+  await expect(placedText).toHaveCSS("font-weight", "700");
+  await expect(placedText).toHaveCSS("font-style", "italic");
+  await expect(placedText).toHaveCSS("text-decoration-line", "underline");
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(placedText).toHaveCSS("text-decoration-line", "none");
+  await expect(placedText).toHaveCSS("font-style", "italic");
+
+  await placedText.locator("..").focus();
+  await page.keyboard.press("Control+i");
+  await expect(placedText).toHaveCSS("font-style", "normal");
 });
 
 test("vinext Edit PDF embeds a local font into one native text run with Undo and reopen proof", async ({

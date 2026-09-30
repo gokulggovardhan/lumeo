@@ -170,7 +170,7 @@ export function FloatingIsland(props: FloatingIslandProps) {
             disabled={props.customFontActive}
             onClick={() => props.onPatch({ bold: !props.element.bold })}
             aria-label="Bold"
-            title={props.customFontActive ? "Choose a bold font file instead of synthetic bold." : "Bold"}
+            title={props.customFontActive ? "Choose a bold font file instead of synthetic bold." : "Bold (Ctrl/Cmd+B)"}
             className={toggleClass(props.element.bold)}
           >
             B
@@ -181,7 +181,7 @@ export function FloatingIsland(props: FloatingIslandProps) {
             disabled={props.customFontActive}
             onClick={() => props.onPatch({ italic: !props.element.italic })}
             aria-label="Italic"
-            title={props.customFontActive ? "Choose an italic font file instead of synthetic italic." : "Italic"}
+            title={props.customFontActive ? "Choose an italic font file instead of synthetic italic." : "Italic (Ctrl/Cmd+I)"}
             className={`${toggleClass(props.element.italic)} italic`}
           >
             I
@@ -201,7 +201,7 @@ export function FloatingIsland(props: FloatingIslandProps) {
             aria-pressed={props.element.underline}
             onClick={() => props.onPatch({ underline: !props.element.underline })}
             aria-label="Underline"
-            title="Underline"
+            title="Underline (Ctrl/Cmd+U)"
             className={`${toggleClass(props.element.underline)} underline`}
           >
             U
