@@ -6,8 +6,15 @@ import type {
   WorkspaceOperation,
   WorkspacePage,
   WorkspacePageId,
+  WorkspaceSource,
 } from "./model.ts";
-import { pageIdAtIndex } from "./session.ts";
+import { createWorkspaceDocument } from "./model.ts";
+import {
+  createDocumentSession,
+  pageIdAtIndex,
+  recordWorkspaceOperation,
+  type DocumentSession,
+} from "./session.ts";
 
 export type PdfEditWorkspaceProjectionFailure =
   | "page-topology-changed"
@@ -25,6 +32,13 @@ export type PdfEditWorkspaceProjection =
       reason: PdfEditWorkspaceProjectionFailure;
       operationId: string;
     };
+
+export type PdfEditDocumentSessionProjection =
+  | {
+      compatible: true;
+      session: DocumentSession;
+    }
+  | Extract<PdfEditWorkspaceProjection, { compatible: false }>;
 
 type OperationProjection =
   | { ok: true; operation: WorkspaceOperation }
@@ -194,4 +208,38 @@ export function projectPdfEditSessionToWorkspace(
     operations.push(projected.operation);
   }
   return { compatible: true, operations };
+}
+
+/**
+ * Builds the Workspace view of an Edit session without creating a second
+ * mutation or undo authority. Callers derive this from the current Edit
+ * snapshot; any unsafe page mapping leaves the whole bridge unavailable.
+ */
+export function createPdfEditWorkspaceSession({
+  editSession,
+  sessionId,
+  documentId,
+  source,
+}: {
+  editSession: PdfEditSessionState;
+  sessionId: string;
+  documentId: string;
+  source: WorkspaceSource;
+}): PdfEditDocumentSessionProjection {
+  const document = createWorkspaceDocument(documentId, source);
+  const projection = projectPdfEditSessionToWorkspace(
+    editSession,
+    document.pages,
+  );
+  if (!projection.compatible) return projection;
+
+  let session = createDocumentSession({
+    id: sessionId,
+    document,
+    initialArea: "edit",
+  });
+  for (const operation of projection.operations) {
+    session = recordWorkspaceOperation(session, operation);
+  }
+  return { compatible: true, session };
 }
