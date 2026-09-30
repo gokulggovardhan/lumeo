@@ -1,19 +1,22 @@
 import type {
   PdfEditOperation,
+  PdfEditOperationDraft,
   PdfEditSessionState,
 } from "../edit/editSession.ts";
 import type {
+  WorkspaceDocument,
   WorkspaceOperation,
   WorkspacePage,
   WorkspacePageId,
   WorkspaceSource,
 } from "./model.ts";
-import { createWorkspaceDocument } from "./model.ts";
+import { assertUniquePageIds, createSourcePages } from "./model.ts";
 import {
   createDocumentSession,
   pageIdAtIndex,
   recordWorkspaceOperation,
   type DocumentSession,
+  visibleWorkspacePages,
 } from "./session.ts";
 
 export type PdfEditWorkspaceProjectionFailure =
@@ -91,7 +94,9 @@ function operationDescription(operation: PdfEditOperation): string {
   }
 }
 
-function pageIndices(operation: PdfEditOperation): readonly number[] {
+function pageIndices(
+  operation: PdfEditOperation | PdfEditOperationDraft,
+): readonly number[] {
   switch (operation.kind) {
     case "replaceText":
     case "insertText":
@@ -114,6 +119,16 @@ function stablePageIds(
 ):
   | { ok: true; pageIds: readonly WorkspacePageId[] }
   | { ok: false; reason: "missing-page" | "empty-page-scope" } {
+  if (operation.workspacePageIds) {
+    const pageIds = [...new Set(operation.workspacePageIds)];
+    if (pageIds.length === 0) return { ok: false, reason: "empty-page-scope" };
+    const knownIds = new Set(pages.map((page) => page.id));
+    if (pageIds.some((pageId) => !knownIds.has(pageId))) {
+      return { ok: false, reason: "missing-page" };
+    }
+    return { ok: true, pageIds };
+  }
+
   const indices = [...new Set(pageIndices(operation))];
   if (indices.length === 0) return { ok: false, reason: "empty-page-scope" };
 
@@ -132,7 +147,8 @@ function projectOperation(
 ): OperationProjection {
   if (
     operation.kind === "pageOperation" &&
-    TOPOLOGY_OPERATIONS.has(operation.operation)
+    TOPOLOGY_OPERATIONS.has(operation.operation) &&
+    !operation.workspacePageIds
   ) {
     return {
       ok: false,
@@ -162,6 +178,9 @@ function projectOperation(
         (operation.operation === "add-searchable-text-layer" ||
           operation.operation === "replace-searchable-text-layer")
           ? "enhance"
+          : operation.kind === "pageOperation" &&
+              TOPOLOGY_OPERATIONS.has(operation.operation)
+            ? "pages"
           : "edit",
       description: operationDescription(operation),
       scope: { kind: "pages", pageIds: targetPages.pageIds },
@@ -176,7 +195,12 @@ function projectOperation(
       affectsExport: true,
       flow: {
         eligible: false,
-        reason: sensitive ? "sensitive" : "content-specific",
+        reason: sensitive
+          ? "sensitive"
+          : operation.kind === "pageOperation" &&
+              TOPOLOGY_OPERATIONS.has(operation.operation)
+            ? "page-specific"
+            : "content-specific",
       },
     },
   };
@@ -218,15 +242,12 @@ export function projectPdfEditSessionToWorkspace(
 export function createPdfEditWorkspaceSession({
   editSession,
   sessionId,
-  documentId,
-  source,
+  document,
 }: {
   editSession: PdfEditSessionState;
   sessionId: string;
-  documentId: string;
-  source: WorkspaceSource;
+  document: WorkspaceDocument;
 }): PdfEditDocumentSessionProjection {
-  const document = createWorkspaceDocument(documentId, source);
   const projection = projectPdfEditSessionToWorkspace(
     editSession,
     document.pages,
@@ -242,4 +263,94 @@ export function createPdfEditWorkspaceSession({
     session = recordWorkspaceOperation(session, operation);
   }
   return { compatible: true, session };
+}
+
+export function bindPdfEditOperationsToWorkspacePages(
+  drafts: readonly PdfEditOperationDraft[],
+  pages: readonly WorkspacePage[],
+): PdfEditOperationDraft[] {
+  return drafts.map((draft) => {
+    if (draft.workspacePageIds) return draft;
+    const indices = [...new Set(pageIndices(draft))];
+    if (indices.length === 0) {
+      throw new RangeError("Edit operation has no Workspace page scope.");
+    }
+    const pageIds = indices.map((index) => {
+      const pageId = pageIdAtIndex(pages, index);
+      if (!pageId) {
+        throw new RangeError(`Edit operation references missing page index ${index}.`);
+      }
+      return pageId;
+    });
+    return { ...draft, workspacePageIds: pageIds };
+  });
+}
+
+export function workspacePageIdsAtIndices(
+  pages: readonly WorkspacePage[],
+  indices: readonly number[],
+): WorkspacePageId[] {
+  return [...new Set(indices)].map((index) => {
+    const pageId = pageIdAtIndex(pages, index);
+    if (!pageId) throw new RangeError(`Workspace page ${index} does not exist.`);
+    return pageId;
+  });
+}
+
+export function remapEditWorkspaceDocument({
+  document,
+  pageMap,
+  pageCount,
+  addedSource,
+}: {
+  document: WorkspaceDocument;
+  pageMap: readonly (number | null)[];
+  pageCount: number;
+  addedSource?: WorkspaceSource;
+}): WorkspaceDocument {
+  const visible = visibleWorkspacePages(document.pages);
+  if (pageMap.length !== visible.length) {
+    throw new RangeError("Workspace page map does not match the current document.");
+  }
+
+  const nextVisible: Array<WorkspacePage | undefined> = new Array(pageCount);
+  const newlyDeleted: WorkspacePage[] = [];
+  pageMap.forEach((nextIndex, oldIndex) => {
+    const page = visible[oldIndex];
+    if (!page) throw new RangeError(`Workspace page ${oldIndex} does not exist.`);
+    if (nextIndex === null) {
+      newlyDeleted.push({ ...page, deleted: true });
+      return;
+    }
+    if (nextIndex < 0 || nextIndex >= pageCount || nextVisible[nextIndex]) {
+      throw new RangeError("Workspace page map contains an invalid destination.");
+    }
+    nextVisible[nextIndex] = page;
+  });
+
+  const sources = addedSource
+    ? [...document.sources, addedSource]
+    : [...document.sources];
+  if (addedSource) {
+    const addedPages = createSourcePages(addedSource.id, addedSource.pageCount);
+    let addedIndex = 0;
+    for (let index = 0; index < nextVisible.length; index += 1) {
+      if (!nextVisible[index]) nextVisible[index] = addedPages[addedIndex++];
+    }
+    if (addedIndex !== addedPages.length) {
+      throw new RangeError("Workspace added-page count does not match the page map.");
+    }
+  }
+
+  if (nextVisible.some((page) => !page)) {
+    throw new RangeError("Workspace page map leaves an unresolved page.");
+  }
+  const priorDeleted = document.pages.filter((page) => page.deleted);
+  const pages = [
+    ...(nextVisible as WorkspacePage[]),
+    ...priorDeleted,
+    ...newlyDeleted,
+  ];
+  assertUniquePageIds(pages);
+  return { ...document, sources, pages };
 }

@@ -7,10 +7,15 @@ import {
   nativeTextOperation,
   pageOperation,
 } from "../lib/pdf/edit/editSession.ts";
-import { createSourcePages } from "../lib/pdf/workspace/model.ts";
 import {
+  createSourcePages,
+  createWorkspaceDocument,
+} from "../lib/pdf/workspace/model.ts";
+import {
+  bindPdfEditOperationsToWorkspacePages,
   createPdfEditWorkspaceSession,
   projectPdfEditSessionToWorkspace,
+  remapEditWorkspaceDocument,
 } from "../lib/pdf/workspace/editAdapter.ts";
 
 test("Edit text operations project to stable page ids without text payloads", () => {
@@ -188,13 +193,12 @@ test("Edit operations derive a local modified Workspace session", () => {
   const projection = createPdfEditWorkspaceSession({
     editSession,
     sessionId: "session-a",
-    documentId: "document-a",
-    source: {
+    document: createWorkspaceDocument("document-a", {
       id: "source-a",
       name: "private.pdf",
       byteLength: 4096,
       pageCount: 3,
-    },
+    }),
   });
 
   assert.equal(projection.compatible, true);
@@ -230,13 +234,12 @@ test("an incompatible Edit history does not create a partial Workspace session",
     createPdfEditWorkspaceSession({
       editSession,
       sessionId: "session-a",
-      documentId: "document-a",
-      source: {
+      document: createWorkspaceDocument("document-a", {
         id: "source-a",
         name: "private.pdf",
         byteLength: 4096,
         pageCount: 3,
-      },
+      }),
     }),
     {
       compatible: false,
@@ -253,4 +256,134 @@ test("Edit PDF derives and exposes its Workspace compatibility state", async () 
   assert.match(source, /data-workspace-projection-compatible=/);
   assert.match(source, /data-workspace-operation-count=/);
   assert.match(source, /data-workspace-projection-reason=/);
+  assert.match(source, /workspaceDocument: nextWorkspaceDocument/);
+});
+
+test("bound text scope follows its stable page through a reorder", () => {
+  const source = {
+    id: "source-a",
+    name: "private.pdf",
+    byteLength: 4096,
+    pageCount: 3,
+  };
+  const document = createWorkspaceDocument("document-a", source);
+  const [draft] = bindPdfEditOperationsToWorkspacePages(
+    [
+      nativeTextOperation({
+        pageIndex: 1,
+        spanIds: ["span-a"],
+        contentStreamIndex: 0,
+        formPath: null,
+        operatorIndices: [4],
+        fontResourceName: "F1",
+        originalText: "A",
+        replacementText: "B",
+      }),
+    ],
+    document.pages,
+  );
+  const session = appendPdfEditOperations(createPdfEditSession(4096), [
+    draft,
+    pageOperation({
+      operation: "reorder",
+      beforePageCount: 3,
+      afterPageCount: 3,
+      affectedPageIndices: [0, 1],
+      description: "Reorder pages",
+      workspacePageIds: ["source-a:page:1", "source-a:page:2"],
+    }),
+  ]);
+  const reordered = remapEditWorkspaceDocument({
+    document,
+    pageMap: [1, 0, 2],
+    pageCount: 3,
+  });
+
+  const projection = projectPdfEditSessionToWorkspace(
+    session,
+    reordered.pages,
+  );
+  assert.equal(projection.compatible, true);
+  if (!projection.compatible) return;
+  assert.deepEqual(
+    reordered.pages.filter((page) => !page.deleted).map((page) => page.id),
+    ["source-a:page:2", "source-a:page:1", "source-a:page:3"],
+  );
+  assert.deepEqual(projection.operations[0]?.scope, {
+    kind: "pages",
+    pageIds: ["source-a:page:2"],
+  });
+  assert.equal(projection.operations[1]?.area, "pages");
+  assert.deepEqual(projection.operations[1]?.flow, {
+    eligible: false,
+    reason: "page-specific",
+  });
+});
+
+test("deleted pages remain stable tombstones for bound history", () => {
+  const document = createWorkspaceDocument("document-a", {
+    id: "source-a",
+    name: "private.pdf",
+    byteLength: 4096,
+    pageCount: 3,
+  });
+  const next = remapEditWorkspaceDocument({
+    document,
+    pageMap: [null, 0, 1],
+    pageCount: 2,
+  });
+
+  assert.deepEqual(
+    next.pages.filter((page) => !page.deleted).map((page) => page.id),
+    ["source-a:page:2", "source-a:page:3"],
+  );
+  assert.deepEqual(
+    next.pages.filter((page) => page.deleted).map((page) => page.id),
+    ["source-a:page:1"],
+  );
+  const session = appendPdfEditOperations(createPdfEditSession(4096), [
+    pageOperation({
+      operation: "delete",
+      beforePageCount: 3,
+      afterPageCount: 2,
+      affectedPageIndices: [0],
+      description: "Delete page",
+      workspacePageIds: ["source-a:page:1"],
+    }),
+  ]);
+  assert.equal(projectPdfEditSessionToWorkspace(session, next.pages).compatible, true);
+});
+
+test("merged pages receive distinct source provenance and fill the page-map gap", () => {
+  const document = createWorkspaceDocument("document-a", {
+    id: "source-a",
+    name: "private.pdf",
+    byteLength: 4096,
+    pageCount: 2,
+  });
+  const next = remapEditWorkspaceDocument({
+    document,
+    pageMap: [0, 3],
+    pageCount: 4,
+    addedSource: {
+      id: "source-b",
+      name: "added.pdf",
+      byteLength: 2048,
+      pageCount: 2,
+    },
+  });
+
+  assert.deepEqual(
+    next.pages.filter((page) => !page.deleted).map((page) => page.id),
+    [
+      "source-a:page:1",
+      "source-b:page:1",
+      "source-b:page:2",
+      "source-a:page:2",
+    ],
+  );
+  assert.deepEqual(next.sources.map((source) => source.id), [
+    "source-a",
+    "source-b",
+  ]);
 });

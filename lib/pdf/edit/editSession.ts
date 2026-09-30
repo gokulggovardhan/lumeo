@@ -51,6 +51,7 @@ export type PdfTextTarget = NativeTextTarget | ElementTextTarget;
 type OperationBase = {
   id: string;
   sequence: number;
+  workspacePageIds?: string[];
 };
 
 export type PdfEditOperation =
@@ -109,7 +110,7 @@ export type PdfEditOperation =
 
 export type PdfEditOperationDraft = PdfEditOperation extends infer Operation
   ? Operation extends OperationBase
-    ? Omit<Operation, keyof OperationBase>
+    ? Omit<Operation, "id" | "sequence">
     : never
   : never;
 
@@ -139,6 +140,9 @@ export function appendPdfEditOperations(
   const appended = drafts.map((draft) => {
     const operation = {
       ...draft,
+      ...(draft.workspacePageIds
+        ? { workspacePageIds: [...draft.workspacePageIds] }
+        : {}),
       id: `edit-op-${sequence}`,
       sequence,
     } as PdfEditOperation;
@@ -506,12 +510,14 @@ export function pageOperation({
   afterPageCount,
   affectedPageIndices,
   description,
+  workspacePageIds,
 }: {
   operation: Extract<PdfEditOperation, { kind: "pageOperation" }>["operation"];
   beforePageCount: number;
   afterPageCount: number;
   affectedPageIndices: number[];
   description: string;
+  workspacePageIds?: string[];
 }): PdfEditOperationDraft {
   return {
     kind: "pageOperation",
@@ -520,5 +526,6 @@ export function pageOperation({
     afterPageCount,
     affectedPageIndices: [...affectedPageIndices],
     description,
+    ...(workspacePageIds ? { workspacePageIds: [...workspacePageIds] } : {}),
   };
 }
