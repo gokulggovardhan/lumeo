@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { degrees, PDFDocument } from "pdf-lib";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
@@ -21,20 +21,26 @@ import { shouldAttemptOnce } from "@/lib/analytics/state";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { formatBytes } from "@/lib/pdf/formatBytes";
 import {
-  createInitialItems,
-  duplicateItem,
-  moveItem,
-  removeItem,
-  removeItems,
-  rotateItem,
-  rotateItems,
   validateOrganizeItems,
   type OrganizerItem,
 } from "@/lib/pdf/pageOrganizer";
+import { organizerItemsFromWorkspacePages } from "@/lib/pdf/workspace/adapters";
+import { createWorkspaceDocument } from "@/lib/pdf/workspace/model";
+import {
+  createOrganizerWorkspaceSession,
+  createOrganizerWorkspaceSnapshot,
+  deleteOrganizerWorkspacePages,
+  duplicateOrganizerWorkspacePage,
+  moveOrganizerWorkspacePage,
+  projectOrganizerExportState,
+  rotateOrganizerWorkspacePages,
+  type OrganizerWorkspaceSnapshot,
+} from "@/lib/pdf/workspace/pagesAdapter";
 import { openPdfJsDocument, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { checkPdfFileSize, hasPdfMagicBytes, isPdfNamedFile } from "@/lib/pdf/uploadValidation";
+import { useHistoryState } from "@/lib/sign/useHistoryState";
 
 const THUMBNAIL_CONCURRENCY = 3;
 const THUMBNAIL_SCALE = 0.32;
@@ -185,15 +191,44 @@ export default function OrganizePdfTool() {
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const thumbnailUrlsRef = useRef<Map<string, string>>(new Map());
   const sessionRef = useRef(0);
+  const sourceSequenceRef = useRef(1);
+  const duplicateSequenceRef = useRef(1);
+  const exportRevisionRef = useRef(0);
 
   const [document_, setDocument] = useState<LoadedDocument | null>(null);
-  const [items, setItems] = useState<OrganizerItem[]>([]);
+  const {
+    state: organizerState,
+    set: setOrganizerState,
+    undo,
+    redo,
+    reset: resetOrganizerState,
+    getCurrent: getCurrentOrganizerState,
+    canUndo,
+    canRedo,
+  } = useHistoryState<OrganizerWorkspaceSnapshot | null>(null);
+  const items = useMemo(
+    () =>
+      organizerState
+        ? organizerItemsFromWorkspacePages(organizerState.document.pages)
+        : [],
+    [organizerState],
+  );
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [result, setResult] = useState<OrganizeResult | null>(null);
+  const [workspaceExportState, setWorkspaceExportState] = useState<
+    "idle" | "exporting" | "exported" | "error"
+  >("idle");
+  const workspaceSession = useMemo(() => {
+    if (!organizerState) return null;
+    return projectOrganizerExportState(
+      createOrganizerWorkspaceSession(organizerState),
+      workspaceExportState,
+    );
+  }, [organizerState, workspaceExportState]);
 
   async function destroyPdfJsDocument() {
     const doc = pdfJsDocRef.current;
@@ -235,17 +270,19 @@ export default function OrganizePdfTool() {
   // returns to the upload screen ready for a different file immediately.
   function resetTool() {
     sessionRef.current += 1;
+    exportRevisionRef.current += 1;
     if (result?.url) URL.revokeObjectURL(result.url);
     thumbnailUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     thumbnailUrlsRef.current.clear();
     void destroyPdfJsDocument();
     setDocument(null);
-    setItems([]);
+    resetOrganizerState(null);
     setThumbnails({});
     setSelected(new Set());
     setDragIndex(null);
     setError("");
     setResult(null);
+    setWorkspaceExportState("idle");
   }
 
   async function renderThumbnails(doc: PDFDocumentProxy, pageCount: number, session: number) {
@@ -329,8 +366,21 @@ export default function OrganizePdfTool() {
       }
       pdfJsDocRef.current = pdfJsDoc;
 
+      const sourceId = `organize-source-${sourceSequenceRef.current++}`;
       setDocument({ name: file.name, size: file.size, bytes, pageCount });
-      setItems(createInitialItems(pageCount));
+      resetOrganizerState(
+        createOrganizerWorkspaceSnapshot(
+          createWorkspaceDocument(`organize-document-${sourceId}`, {
+            id: sourceId,
+            name: file.name,
+            byteLength: file.size,
+            pageCount,
+          }),
+        ),
+      );
+      duplicateSequenceRef.current = 1;
+      exportRevisionRef.current += 1;
+      setWorkspaceExportState("idle");
       setSelected(new Set());
       void renderThumbnails(pdfJsDoc, pageCount, nextSession);
     } catch (readError) {
@@ -355,43 +405,77 @@ export default function OrganizePdfTool() {
     setSelected(new Set(next.flatMap((item, index) => (previousSelectedIds.has(item.id) ? [index] : []))));
   }
 
+  function publishOrganizerState(next: OrganizerWorkspaceSnapshot) {
+    if (next === getCurrentOrganizerState()) return;
+    exportRevisionRef.current += 1;
+    setOrganizerState(next);
+    setResult(null);
+    setWorkspaceExportState("idle");
+  }
+
+  function handleUndo() {
+    exportRevisionRef.current += 1;
+    undo();
+    setSelected(new Set());
+    setResult(null);
+    setWorkspaceExportState("idle");
+  }
+
+  function handleRedo() {
+    exportRevisionRef.current += 1;
+    redo();
+    setSelected(new Set());
+    setResult(null);
+    setWorkspaceExportState("idle");
+  }
+
   function handleDrop(targetIndex: number) {
     if (dragIndex === null) return;
+    const current = getCurrentOrganizerState();
+    if (!current) return;
     const selectedIds = new Set(Array.from(selected).map((index) => items[index]?.id).filter(Boolean) as string[]);
-    const next = moveItem(items, dragIndex, targetIndex);
-    setItems(next);
-    reindexSelection(next, selectedIds);
+    const next = moveOrganizerWorkspacePage(current, dragIndex, targetIndex);
+    publishOrganizerState(next);
+    reindexSelection(organizerItemsFromWorkspacePages(next.document.pages), selectedIds);
     setDragIndex(null);
-    setResult(null);
   }
 
   function handleRotate(direction: "left" | "right") {
+    const current = getCurrentOrganizerState();
+    if (!current) return;
     const selectedIds = new Set(Array.from(selected).map((index) => items[index]?.id).filter(Boolean) as string[]);
-    const next = selected.size ? rotateItems(items, selected, direction) : items;
-    setItems(next);
-    reindexSelection(next, selectedIds);
-    setResult(null);
+    const next = rotateOrganizerWorkspacePages(current, selected, direction);
+    publishOrganizerState(next);
+    reindexSelection(organizerItemsFromWorkspacePages(next.document.pages), selectedIds);
   }
 
   function handleRotateOne(index: number, direction: "left" | "right") {
-    setItems(rotateItem(items, index, direction));
-    setResult(null);
+    const current = getCurrentOrganizerState();
+    if (!current) return;
+    publishOrganizerState(
+      rotateOrganizerWorkspacePages(current, new Set([index]), direction),
+    );
   }
 
   function handleDuplicate(index: number) {
+    const current = getCurrentOrganizerState();
     const item = items[index];
-    if (!item) return;
-    const next = duplicateItem(items, index, `${item.id}-dup-${Date.now()}`);
-    setItems(next);
+    if (!current || !item) return;
+    const next = duplicateOrganizerWorkspacePage(
+      current,
+      index,
+      `${item.id}:copy:${duplicateSequenceRef.current++}`,
+    );
+    publishOrganizerState(next);
     setSelected(new Set());
-    setResult(null);
   }
 
   function handleDelete(index: number) {
-    const next = selected.has(index) ? removeItems(items, selected) : removeItem(items, index);
-    setItems(next);
+    const current = getCurrentOrganizerState();
+    if (!current) return;
+    const indices = selected.has(index) ? selected : new Set([index]);
+    publishOrganizerState(deleteOrganizerWorkspacePages(current, indices));
     setSelected(new Set());
-    setResult(null);
   }
 
   async function handleExport() {
@@ -403,16 +487,26 @@ export default function OrganizePdfTool() {
     }
 
     setIsExporting(true);
+    setWorkspaceExportState("exporting");
     setError("");
+    const exportRevision = exportRevisionRef.current;
+    const exportSnapshot = getCurrentOrganizerState();
     const startedAt = performance.now();
     track({ eventName: "processing_started", toolSlug: "organize" });
 
     try {
       const bytes = await buildOrganizedPdf(document_.bytes, items);
       const blob = new Blob([toArrayBuffer(bytes)], { type: "application/pdf" });
+      if (
+        exportRevision !== exportRevisionRef.current ||
+        exportSnapshot !== getCurrentOrganizerState()
+      ) {
+        return;
+      }
       const url = URL.createObjectURL(blob);
       const fileName = `${sanitizeFileStem(document_.name, "lumeo-organize")}.pdf`;
       setResult({ url, fileName, size: blob.size, pageCount: items.length });
+      setWorkspaceExportState("exported");
       track({
         eventName: "processing_succeeded",
         toolSlug: "organize",
@@ -421,6 +515,7 @@ export default function OrganizePdfTool() {
       });
       recordRecentFile({ tool: "organize", filename: fileName, fileSize: blob.size, pageCount: items.length });
     } catch (exportError) {
+      if (exportRevision !== exportRevisionRef.current) return;
       setError(
         exportError instanceof Error
           ? exportError.message
@@ -433,6 +528,7 @@ export default function OrganizePdfTool() {
         success: false,
         errorCode: "processing_error",
       });
+      setWorkspaceExportState("error");
     } finally {
       setIsExporting(false);
     }
@@ -473,10 +569,18 @@ export default function OrganizePdfTool() {
   const summaryLine = `${items.length} page${items.length === 1 ? "" : "s"} · ${formatBytes(document_.size)}`;
 
   return (
-    <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+    <section
+      className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6"
+      data-workspace-operation-count={workspaceSession?.state.operationCount ?? 0}
+      data-workspace-lifecycle={workspaceSession?.state.lifecycle}
+      data-workspace-active-area={workspaceSession?.state.activeArea}
+      data-workspace-has-unsaved-changes={workspaceSession?.state.hasUnsavedChanges}
+    >
       <L2WorkspaceHeader title="Organize PDF" description={summaryLine} />
 
       <L2WorkspaceToolbar>
+        <L2ToolbarButton onClick={handleUndo} disabled={!canUndo || isExporting}>Undo</L2ToolbarButton>
+        <L2ToolbarButton onClick={handleRedo} disabled={!canRedo || isExporting}>Redo</L2ToolbarButton>
         {selected.size > 0 ? (
           <>
             <L2ToolbarButton onClick={() => handleRotate("left")}>Rotate selected left</L2ToolbarButton>
