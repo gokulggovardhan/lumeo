@@ -235,7 +235,18 @@ import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
-import { createPdfEditWorkspaceSession } from "@/lib/pdf/workspace/editAdapter";
+import {
+  bindPdfEditOperationsToWorkspacePages,
+  createPdfEditWorkspaceSession,
+  remapEditWorkspaceDocument,
+  workspacePageIdsAtIndices,
+} from "@/lib/pdf/workspace/editAdapter";
+import {
+  createSourcePages,
+  createWorkspaceDocument,
+  type WorkspaceDocument,
+  type WorkspaceSource,
+} from "@/lib/pdf/workspace/model";
 
 // A detected run matched to the content-stream operator that produced it
 // (lib/pdf/edit/matchTextRun.ts), paired with the LocatedTextOperator that
@@ -265,7 +276,25 @@ type EditHistorySnapshot = {
    */
   pdfBytes: ArrayBuffer;
   session: PdfEditSessionState;
+  workspaceDocument: WorkspaceDocument;
 };
+
+function createEmptyEditWorkspaceDocument(): WorkspaceDocument {
+  return { id: "edit-pdf-document", sources: [], pages: [] };
+}
+
+function appendWorkspaceBoundOperations(
+  snapshot: EditHistorySnapshot,
+  drafts: readonly PdfEditOperationDraft[],
+): PdfEditSessionState {
+  return appendPdfEditOperations(
+    snapshot.session,
+    bindPdfEditOperationsToWorkspacePages(
+      drafts,
+      snapshot.workspaceDocument.pages,
+    ),
+  );
+}
 
 // Phase 9.2: a live, dry-run preview of what "Apply edit" would do for the
 // CURRENT selection + draft text -- computed synchronously (buildEditPlan/
@@ -596,6 +625,7 @@ function RedoIcon() {
 export default function EditPdfTool() {
   const { availability, track } = useAnalytics();
   const openedTrackedRef = useRef(false);
+  const workspaceSourceSequenceRef = useRef(1);
 
   // Phase 9.2: split from a single `pdf` state so its `.bytes` can be a pure
   // DERIVED value (see the `pdf` useMemo below, after historyState) instead
@@ -635,7 +665,12 @@ export default function EditPdfTool() {
     canRedo,
     reset: resetHistory,
   } = useHistoryState<EditHistorySnapshot>(
-    { elements: [], pdfBytes: new ArrayBuffer(0), session: createPdfEditSession(0) },
+    {
+      elements: [],
+      pdfBytes: new ArrayBuffer(0),
+      session: createPdfEditSession(0),
+      workspaceDocument: createEmptyEditWorkspaceDocument(),
+    },
     { maxTotalSize: EDIT_HISTORY_MAX_BYTES, sizeOf: (snapshot) => snapshot.pdfBytes.byteLength },
   );
   // Monotonic local mutation epoch for long-running browser-only work.
@@ -685,7 +720,7 @@ export default function EditPdfTool() {
       return {
         ...current,
         elements: nextElements,
-        session: appendPdfEditOperations(current.session, operations),
+        session: appendWorkspaceBoundOperations(current, operations),
       };
     });
   }, [setHistoryState]);
@@ -715,16 +750,10 @@ export default function EditPdfTool() {
         ? createPdfEditWorkspaceSession({
             editSession: historyState.session,
             sessionId: "edit-pdf-session",
-            documentId: "edit-pdf-document",
-            source: {
-              id: "edit-pdf-source",
-              name: pdfMeta.file.name,
-              byteLength: pdfMeta.file.size,
-              pageCount: pdfMeta.pageCount,
-            },
+            document: historyState.workspaceDocument,
           })
         : null,
-    [historyState.session, pdfMeta],
+    [historyState.session, historyState.workspaceDocument, pdfMeta],
   );
   const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -2019,7 +2048,7 @@ export default function EditPdfTool() {
       setHistoryState((current) => ({
         ...current,
         pdfBytes: nextBytes,
-        session: appendPdfEditOperations(current.session, [
+        session: appendWorkspaceBoundOperations(current, [
           createPageEditOperation({
             operation: regenerated
               ? "replace-searchable-text-layer"
@@ -2400,7 +2429,12 @@ export default function EditPdfTool() {
     setPagePointSize(null);
     setError("");
     setOriginalBytes(null);
-    resetHistory({ elements: [], pdfBytes: new ArrayBuffer(0), session: createPdfEditSession(0) });
+    resetHistory({
+      elements: [],
+      pdfBytes: new ArrayBuffer(0),
+      session: createPdfEditSession(0),
+      workspaceDocument: createEmptyEditWorkspaceDocument(),
+    });
     setSelectedId(null);
     setDetectedTextRuns([]);
     setRunMatches([]);
@@ -3307,10 +3341,24 @@ export default function EditPdfTool() {
       // current document session.
       resetLocalCustomFonts();
       pendingInitialDocRef.current = { bytes, doc };
+      const source: WorkspaceSource = {
+        id: `edit-source-${workspaceSourceSequenceRef.current++}`,
+        name: file.name,
+        byteLength: file.size,
+        pageCount,
+      };
       setPdfMeta({ file, pageCount });
       setPageIndex(0);
       setOriginalBytes(bytes);
-      resetHistory({ elements: [], pdfBytes: bytes, session: createPdfEditSession(bytes.byteLength) });
+      resetHistory({
+        elements: [],
+        pdfBytes: bytes,
+        session: createPdfEditSession(bytes.byteLength),
+        workspaceDocument: createWorkspaceDocument(
+          "edit-pdf-document",
+          source,
+        ),
+      });
       setSelectedId(null);
       setDownloadUrl("");
     } catch (uploadError) {
@@ -3908,10 +3956,7 @@ export default function EditPdfTool() {
       setHistoryState((current) => ({
         ...current,
         pdfBytes: nextBytes,
-        session: appendPdfEditOperations(
-          current.session,
-          semanticOperations,
-        ),
+        session: appendWorkspaceBoundOperations(current, semanticOperations),
       }));
       setTextSearchActiveIndex(-1);
       setTextSearchReplaceAllStatus(
@@ -5236,7 +5281,7 @@ export default function EditPdfTool() {
       setHistoryState((current) => ({
         ...current,
         pdfBytes: buffer,
-        session: appendPdfEditOperations(current.session, semanticOperations),
+        session: appendWorkspaceBoundOperations(current, semanticOperations),
       }));
       // The page-render effect (triggered by pdf.bytes changing, via the
       // sync effect above) will reset selection/hover/focus/draft state
@@ -5360,10 +5405,7 @@ export default function EditPdfTool() {
       setHistoryState((current) => ({
         ...current,
         pdfBytes: buffer,
-        session: appendPdfEditOperations(
-          current.session,
-          semanticOperations,
-        ),
+        session: appendWorkspaceBoundOperations(current, semanticOperations),
       }));
     } catch (applyError) {
       setEditApplyError(
@@ -5489,7 +5531,7 @@ export default function EditPdfTool() {
         ...current,
         elements: nextElements,
         pdfBytes: blankedBytes ?? current.pdfBytes,
-        session: appendPdfEditOperations(current.session, operations),
+        session: appendWorkspaceBoundOperations(current, operations),
       };
     });
     setRestyleKeptOriginalText(blankedBytes === null);
@@ -5524,6 +5566,7 @@ export default function EditPdfTool() {
     semantic: {
       operation: "reorder" | "delete" | "merge";
       affectedPageIndices: number[];
+      incomingSource?: Omit<WorkspaceSource, "pageCount">;
     },
   ) {
     if (pageOpBusy) return;
@@ -5539,18 +5582,59 @@ export default function EditPdfTool() {
       setHistoryState((current) => {
         const nextElements = remapElements(current.elements, pageMap);
         const elementOperations = deriveElementOperations(current.elements, nextElements);
+        const addedSource = semantic.incomingSource
+          ? {
+              ...semantic.incomingSource,
+              pageCount: pageCount - pageMap.length,
+            }
+          : undefined;
+        const nextWorkspaceDocument = remapEditWorkspaceDocument({
+          document: current.workspaceDocument,
+          pageMap,
+          pageCount,
+          addedSource,
+        });
+        const pageOperationIds = addedSource
+          ? createSourcePages(addedSource.id, addedSource.pageCount).map(
+              (page) => page.id,
+            )
+          : workspacePageIdsAtIndices(
+              current.workspaceDocument.pages,
+              semantic.affectedPageIndices,
+            );
         const pageEdit = createPageEditOperation({
           operation: semantic.operation,
           beforePageCount,
           afterPageCount: pageCount,
           affectedPageIndices: semantic.affectedPageIndices,
           description,
+          workspacePageIds: pageOperationIds,
         });
+        const removedElementOperations = elementOperations.filter(
+          (operation) => operation.kind === "deleteElement",
+        );
+        const retainedElementOperations = elementOperations.filter(
+          (operation) => operation.kind !== "deleteElement",
+        );
+        const boundElementOperations = [
+          ...bindPdfEditOperationsToWorkspacePages(
+            removedElementOperations,
+            current.workspaceDocument.pages,
+          ),
+          ...bindPdfEditOperationsToWorkspacePages(
+            retainedElementOperations,
+            nextWorkspaceDocument.pages,
+          ),
+        ];
         return {
           ...current,
           elements: nextElements,
           pdfBytes: bytes,
-          session: appendPdfEditOperations(current.session, [pageEdit, ...elementOperations]),
+          session: appendPdfEditOperations(current.session, [
+            pageEdit,
+            ...boundElementOperations,
+          ]),
+          workspaceDocument: nextWorkspaceDocument,
         };
       });
       setPageIndex((current) => remapPageIndex(current, pageMap, pageCount));
@@ -5599,7 +5683,15 @@ export default function EditPdfTool() {
     void runPageOperation(
       () => mergePdf(historyState.pdfBytes, incoming, insertAt),
       () => `Added ${sanitizePdfFileName(file.name)} after page ${pageIndex + 1}.`,
-      { operation: "merge", affectedPageIndices: [insertAt] },
+      {
+        operation: "merge",
+        affectedPageIndices: [insertAt],
+        incomingSource: {
+          id: `edit-source-${workspaceSourceSequenceRef.current++}`,
+          name: file.name,
+          byteLength: file.size,
+        },
+      },
     );
   }
 
@@ -5728,7 +5820,7 @@ export default function EditPdfTool() {
           ...current,
           elements: nextElements,
           pdfBytes: outcome.bytes,
-          session: appendPdfEditOperations(current.session, [redactionEdit, ...elementOperations]),
+          session: appendWorkspaceBoundOperations(current, [redactionEdit, ...elementOperations]),
         };
       });
       setRedactionOutcome(outcome);
@@ -6127,10 +6219,7 @@ export default function EditPdfTool() {
       setHistoryState((current) => ({
         ...current,
         pdfBytes: buffer,
-        session: appendPdfEditOperations(
-          current.session,
-          semanticOperations,
-        ),
+        session: appendWorkspaceBoundOperations(current, semanticOperations),
       }));
     } catch (error) {
       setNativeLocalFontError(

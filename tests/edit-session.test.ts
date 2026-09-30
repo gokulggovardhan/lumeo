@@ -122,6 +122,24 @@ test("page operations retain page counts and affected indices for deterministic 
   });
 });
 
+test("Workspace page identity is cloned at the Edit session boundary", () => {
+  const workspacePageIds = ["source-a:page:2"];
+  const operation = pageOperation({
+    operation: "delete",
+    beforePageCount: 2,
+    afterPageCount: 1,
+    affectedPageIndices: [1],
+    description: "Removed page 2.",
+    workspacePageIds,
+  });
+  const next = appendPdfEditOperations(createPdfEditSession(2048), [operation]);
+
+  workspacePageIds[0] = "mutated";
+  if (operation.workspacePageIds) operation.workspacePageIds[0] = "also-mutated";
+
+  assert.deepEqual(next.operations[0]?.workspacePageIds, ["source-a:page:2"]);
+});
+
 
 test("page and redaction operations use the shared pages vocabulary without storing redacted text", () => {
   const pageDelete = pageOperation({
