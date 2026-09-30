@@ -66,6 +66,15 @@ async function openEditPdfReady(page: import("@playwright/test").Page) {
   });
 }
 
+async function openHeicToJpegReady(page: import("@playwright/test").Page) {
+  await page.goto("/heic-to-jpeg", { waitUntil: "domcontentloaded" });
+  await expect(page.locator('input[type="file"]')).toHaveAttribute(
+    "data-upload-client-ready",
+    "true",
+    { timeout: 30_000 },
+  );
+}
+
 test("production Edit PDF loads the deployed pdf.js worker and detects text", async ({
   page,
 }) => {
@@ -161,7 +170,7 @@ test("production HEIC/HEIF worker preserves full-resolution output and download"
   const name = useHeifName ? "CLOUDFLARE-PROD.HEIF" : "CLOUDFLARE-PROD.HEIC";
   const mimeType = useHeifName ? "image/heif" : "image/heic";
 
-  await page.goto("/heic-to-jpeg", { waitUntil: "domcontentloaded" });
+  await openHeicToJpegReady(page);
   await page.locator('input[type="file"]').setInputFiles({
     name,
     mimeType,
@@ -208,7 +217,7 @@ test("production HEIC batch isolates corrupt input, recovers, and ZIP preserves 
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
   const heic = await readFile(fixturePath!);
-  await page.goto("/heic-to-jpeg", { waitUntil: "domcontentloaded" });
+  await openHeicToJpegReady(page);
   await page.locator('input[type="file"]').setInputFiles([
     { name: "VALID-BEFORE.HEIC", mimeType: "image/heic", buffer: heic },
     { name: "BROKEN.HEIC", mimeType: "image/heic", buffer: Buffer.from("corrupt input") },
@@ -272,7 +281,7 @@ test("production HEIC workspace remains usable on a narrow mobile viewport", asy
   );
 
   await page.setViewportSize({ width: 375, height: 812 });
-  await page.goto("/heic-to-jpeg", { waitUntil: "domcontentloaded" });
+  await openHeicToJpegReady(page);
 
   await expect(page.getByText("Choose photos", { exact: true })).toBeVisible();
   await expect(
