@@ -58,6 +58,9 @@ function metric1000(
 }
 
 export const SHAPED_LTR_REPLACEMENT = "e\u0301";
+export const SHAPED_KERNING_REPLACEMENT = "AV";
+
+type ShapedLtrFixtureKind = "composition" | "kerning";
 
 /**
  * Real embedded Type0/CIDFontType2 fixture for the first bounded shaped writer.
@@ -70,7 +73,13 @@ export const SHAPED_LTR_REPLACEMENT = "e\u0301";
  * CID back to the decomposed source cluster, so browser search/extraction can
  * be proven after the native shaped write.
  */
-export async function buildShapedLtrType0Pdf(): Promise<Uint8Array> {
+async function buildShapedLtrType0PdfFor({
+  replacementText,
+  kind,
+}: {
+  replacementText: string;
+  kind: ShapedLtrFixtureKind;
+}): Promise<Uint8Array> {
   const fontBytes = await readCiTrueTypeFontBytes();
   const inspection = await inspectPdfFontProgram(fontBytes);
   if (inspection.kind !== "ok") {
@@ -90,28 +99,42 @@ export async function buildShapedLtrType0Pdf(): Promise<Uint8Array> {
 
   const shaped = await shapeEmbeddedFontText(
     fontBytes,
-    SHAPED_LTR_REPLACEMENT,
+    replacementText,
     {
       direction: "ltr",
       script: "Latn",
       language: "en",
     },
   );
-  if (
-    shaped.glyphs.length !== 1 ||
-    shaped.clusterMap.length !== 1 ||
-    shaped.clusterMap[0]?.text !== SHAPED_LTR_REPLACEMENT ||
-    shaped.clusterMap[0]?.glyphIndices.length !== 1 ||
-    shaped.glyphs[0]?.xOffset !== 0 ||
-    shaped.glyphs[0]?.yOffset !== 0 ||
-    shaped.glyphs[0]?.yAdvance !== 0 ||
-    shaped.glyphs[0]?.xAdvance <= 0
-  ) {
+  const invalidCommonShape = shaped.glyphs.some(
+    (glyph) =>
+      glyph.xOffset !== 0 ||
+      glyph.yOffset !== 0 ||
+      glyph.yAdvance !== 0 ||
+      glyph.xAdvance <= 0,
+  );
+  const invalidComposition =
+    kind === "composition" &&
+    (shaped.glyphs.length !== 1 ||
+      shaped.clusterMap.length !== 1 ||
+      shaped.clusterMap[0]?.text !== replacementText ||
+      shaped.clusterMap[0]?.glyphIndices.length !== 1);
+  const invalidKerning =
+    kind === "kerning" &&
+    (shaped.glyphs.length !== 2 ||
+      shaped.clusterMap.length !== 2 ||
+      shaped.clusterMap[0]?.text !== "A" ||
+      shaped.clusterMap[1]?.text !== "V" ||
+      shaped.clusterMap.some((cluster) => cluster.glyphIndices.length !== 1) ||
+      !shaped.glyphs.some((glyph) => {
+        const naturalAdvance = intelligence.advanceWidthForGlyphId(glyph.glyphId);
+        return naturalAdvance !== null && naturalAdvance !== glyph.xAdvance;
+      }));
+  if (invalidCommonShape || invalidComposition || invalidKerning) {
     throw new Error(
-      "The CI font does not produce the bounded one-glyph LTR composition required by the shaped fixture.",
+      `The CI font does not produce the bounded ${kind} evidence required by the shaped fixture.`,
     );
   }
-  const gidShaped = shaped.glyphs[0].glyphId;
 
   const widthFor = (gid: number) => {
     const width = intelligence.advanceWidthForGlyphId(gid);
@@ -122,15 +145,28 @@ export async function buildShapedLtrType0Pdf(): Promise<Uint8Array> {
   };
 
   const widthEntries: (number | number[])[] = [];
-  for (const gid of [...new Set([gidA, gidB, gidShaped])].sort((a, b) => a - b)) {
+  const fixtureGlyphIds = [
+    gidA,
+    gidB,
+    ...shaped.glyphs.map((glyph) => glyph.glyphId),
+  ];
+  for (const gid of [...new Set(fixtureGlyphIds)].sort((a, b) => a - b)) {
     widthEntries.push(gid, [widthFor(gid)]);
   }
 
-  const cmapEntries: Array<[number, string]> = [
+  const cmapByGlyphId = new Map<number, string>([
     [gidA, "A"],
     [gidB, "B"],
-    [gidShaped, SHAPED_LTR_REPLACEMENT],
-  ];
+  ]);
+  for (const cluster of shaped.clusterMap) {
+    const glyphIndex = cluster.glyphIndices[0];
+    const glyph = shaped.glyphs[glyphIndex];
+    if (!glyph || cluster.glyphIndices.length !== 1) {
+      throw new Error("Shaped fixture clusters must map to one exact glyph.");
+    }
+    cmapByGlyphId.set(glyph.glyphId, cluster.text);
+  }
+  const cmapEntries = [...cmapByGlyphId.entries()];
   const cmap = [
     "/CIDInit /ProcSet findresource begin",
     "12 dict begin",
@@ -221,4 +257,22 @@ export async function buildShapedLtrType0Pdf(): Promise<Uint8Array> {
   );
 
   return doc.save();
+}
+
+export async function buildShapedLtrType0Pdf(): Promise<Uint8Array> {
+  return buildShapedLtrType0PdfFor({
+    replacementText: SHAPED_LTR_REPLACEMENT,
+    kind: "composition",
+  });
+}
+
+/**
+ * Real two-glyph LTR fixture whose first glyph has a HarfBuzz kerning/GPOS
+ * advance distinct from the embedded font's nominal width.
+ */
+export async function buildShapedKerningType0Pdf(): Promise<Uint8Array> {
+  return buildShapedLtrType0PdfFor({
+    replacementText: SHAPED_KERNING_REPLACEMENT,
+    kind: "kerning",
+  });
 }

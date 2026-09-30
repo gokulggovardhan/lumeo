@@ -42,8 +42,10 @@ import {
   buildParagraphEditPlan,
 } from "../lib/pdf/edit/paragraphEditPlan.ts";
 import {
+  buildShapedKerningType0Pdf,
   buildShapedLtrType0Pdf,
   readCiTrueTypeFontBytes,
+  SHAPED_KERNING_REPLACEMENT,
   SHAPED_LTR_REPLACEMENT,
 } from "../tests/fixtures/shapedGlyphFixture.ts";
 import {
@@ -1846,6 +1848,15 @@ async function buildFixtures(): Promise<Fixture[]> {
     editTarget: "AB",
     replacementText: SHAPED_LTR_REPLACEMENT,
     bytes: await buildShapedLtrType0Pdf(),
+    editMode: "shaped-ltr",
+  });
+  fixtures.push({
+    id: "advanced-shaped-kerning-gpos",
+    category: "shaped-glyph-kerning-gpos",
+    expectedRuns: ["AB"],
+    editTarget: "AB",
+    replacementText: SHAPED_KERNING_REPLACEMENT,
+    bytes: await buildShapedKerningType0Pdf(),
     editMode: "shaped-ltr",
   });
   fixtures.push({
