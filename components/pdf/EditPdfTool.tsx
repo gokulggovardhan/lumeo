@@ -247,6 +247,11 @@ import {
   type WorkspaceDocument,
   type WorkspaceSource,
 } from "@/lib/pdf/workspace/model";
+import {
+  beginWorkspaceExport,
+  completeWorkspaceExport,
+  failWorkspaceExport,
+} from "@/lib/pdf/workspace/session";
 
 // A detected run matched to the content-stream operator that produced it
 // (lib/pdf/edit/matchTextRun.ts), paired with the LocatedTextOperator that
@@ -651,9 +656,13 @@ export default function EditPdfTool() {
   const [error, setError] = useState("");
 
   // Declared up here, ahead of the history hook, because the wrappers just
-  // below close over setDownloadUrl -- the rest of the export state
-  // (isExporting/downloadName/outputName) stays grouped further down.
+  // below close over the URL and lifecycle setters; names stay grouped with
+  // the remaining toolbar state further down.
   const [downloadUrl, setDownloadUrl] = useState("");
+  const [workspaceExportState, setWorkspaceExportState] = useState<
+    "idle" | "exporting" | "exported" | "error"
+  >("idle");
+  const [isExporting, setIsExporting] = useState(false);
 
   const {
     state: historyState,
@@ -677,6 +686,7 @@ export default function EditPdfTool() {
   // Snapshot identity alone is insufficient because Undo can return to the
   // exact same snapshot object after an intervening change.
   const historyMutationRevisionRef = useRef(0);
+  const exportRequestRevisionRef = useRef(0);
   // Every document mutation -- placing, moving, restyling or deleting an
   // element, applying a text edit, or undoing/redoing any of those -- makes
   // an already-exported PDF stale. These three wrappers are the single choke
@@ -691,17 +701,26 @@ export default function EditPdfTool() {
   const setHistoryState = useCallback((updater: EditHistorySnapshot | ((current: EditHistorySnapshot) => EditHistorySnapshot)) => {
     historyMutationRevisionRef.current += 1;
     setHistoryStateRaw(updater);
+    exportRequestRevisionRef.current += 1;
     setDownloadUrl("");
+    setWorkspaceExportState("idle");
+    setIsExporting(false);
   }, [setHistoryStateRaw]);
   const undo = useCallback(() => {
     historyMutationRevisionRef.current += 1;
     undoRaw();
+    exportRequestRevisionRef.current += 1;
     setDownloadUrl("");
+    setWorkspaceExportState("idle");
+    setIsExporting(false);
   }, [undoRaw]);
   const redo = useCallback(() => {
     historyMutationRevisionRef.current += 1;
     redoRaw();
+    exportRequestRevisionRef.current += 1;
     setDownloadUrl("");
+    setWorkspaceExportState("idle");
+    setIsExporting(false);
   }, [redoRaw]);
   const elements = historyState.elements;
   // Adapter preserving setElements' EXACT prior call signature (a bare
@@ -744,17 +763,32 @@ export default function EditPdfTool() {
     () => (pdfMeta ? { file: pdfMeta.file, pageCount: pdfMeta.pageCount, bytes: historyState.pdfBytes } : null),
     [pdfMeta, historyState.pdfBytes],
   );
-  const workspaceProjection = useMemo(
-    () =>
-      pdfMeta
-        ? createPdfEditWorkspaceSession({
-            editSession: historyState.session,
-            sessionId: "edit-pdf-session",
-            document: historyState.workspaceDocument,
-          })
-        : null,
-    [historyState.session, historyState.workspaceDocument, pdfMeta],
-  );
+  const workspaceProjection = useMemo(() => {
+    if (!pdfMeta) return null;
+    const projection = createPdfEditWorkspaceSession({
+      editSession: historyState.session,
+      sessionId: "edit-pdf-session",
+      document: historyState.workspaceDocument,
+    });
+    if (!projection.compatible || workspaceExportState === "idle") {
+      return projection;
+    }
+    const exporting = beginWorkspaceExport(projection.session);
+    return {
+      ...projection,
+      session:
+        workspaceExportState === "exporting"
+          ? exporting
+          : workspaceExportState === "exported"
+            ? completeWorkspaceExport(exporting)
+            : failWorkspaceExport(exporting),
+    };
+  }, [
+    historyState.session,
+    historyState.workspaceDocument,
+    pdfMeta,
+    workspaceExportState,
+  ]);
   const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -1231,7 +1265,6 @@ export default function EditPdfTool() {
   const [inkStrokeWidth, setInkStrokeWidth] = useState(3);
   const [zoom, setZoom] = useState(1);
 
-  const [isExporting, setIsExporting] = useState(false);
   const [downloadName, setDownloadName] = useState("lumeo-edited.pdf");
   const [outputName, setOutputName] = useState("lumeo-edited.pdf");
 
@@ -2377,6 +2410,7 @@ export default function EditPdfTool() {
 
   useEffect(() => {
     return () => {
+      exportRequestRevisionRef.current += 1;
       if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       ocrJobRevisionRef.current = null;
@@ -2392,6 +2426,7 @@ export default function EditPdfTool() {
   // of state a new upload doesn't already reinitialize -- returns to the
   // upload screen ready for a different file immediately.
   function resetTool() {
+    exportRequestRevisionRef.current += 1;
     if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
     if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
     pageImageUrlRef.current = "";
@@ -2465,6 +2500,8 @@ export default function EditPdfTool() {
     setActiveTool("select");
     setZoom(1);
     setDownloadUrl("");
+    setWorkspaceExportState("idle");
+    setIsExporting(false);
     setOutputName("lumeo-edited.pdf");
   }
 
@@ -3374,7 +3411,10 @@ export default function EditPdfTool() {
         ),
       });
       setSelectedId(null);
+      exportRequestRevisionRef.current += 1;
       setDownloadUrl("");
+      setWorkspaceExportState("idle");
+      setIsExporting(false);
     } catch (uploadError) {
       const message =
         uploadError instanceof Error && /password|encrypt/i.test(uploadError.message)
@@ -6547,7 +6587,9 @@ export default function EditPdfTool() {
 
   const generateEditedPdf = useCallback(async () => {
     if (!pdf) return;
+    const exportRequestRevision = ++exportRequestRevisionRef.current;
     setIsExporting(true);
+    setWorkspaceExportState("exporting");
     setError("");
     const startedAt = performance.now();
     track({ eventName: "processing_started", toolSlug: "edit" });
@@ -6591,20 +6633,30 @@ export default function EditPdfTool() {
         );
       }
 
+      // Export and independent verification are intentionally asynchronous.
+      // A mutation, Undo/Redo, reset, filename change, or newer export request
+      // invalidates this result before it can recreate a stale Blob URL.
+      if (exportRequestRevisionRef.current !== exportRequestRevision) return;
+
       const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
       const blob = new Blob([buffer], { type: "application/pdf" });
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
       downloadUrlRef.current = url;
       setDownloadUrl(url);
+      setWorkspaceExportState("exported");
       setDownloadName(sanitizePdfFileName(outputName));
       track({ eventName: "processing_succeeded", toolSlug: "edit", durationMs: performance.now() - startedAt, success: true });
       recordRecentFile({ tool: "edit", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
     } catch (exportError) {
+      if (exportRequestRevisionRef.current !== exportRequestRevision) return;
+      setWorkspaceExportState("error");
       setError(exportError instanceof Error ? exportError.message : "Could not export the PDF. Please try again.");
       track({ eventName: "processing_failed", toolSlug: "edit", durationMs: performance.now() - startedAt, success: false, errorCode: "processing_error" });
     } finally {
-      setIsExporting(false);
+      if (exportRequestRevisionRef.current === exportRequestRevision) {
+        setIsExporting(false);
+      }
     }
   }, [pdf, elements, outputName, track, historyState.session, localCustomFontAssets]);
 
@@ -6654,6 +6706,9 @@ export default function EditPdfTool() {
       data-edit-semantic-history-next-sequence={historyState.session.semanticHistory.nextSequence}
       data-workspace-projection-compatible={workspaceProjection?.compatible ?? false}
       data-workspace-operation-count={workspaceProjection?.compatible ? workspaceProjection.session.state.operationCount : 0}
+      data-workspace-lifecycle={workspaceProjection?.compatible ? workspaceProjection.session.state.lifecycle : undefined}
+      data-workspace-active-area={workspaceProjection?.compatible ? workspaceProjection.session.state.activeArea : undefined}
+      data-workspace-has-unsaved-changes={workspaceProjection?.compatible ? workspaceProjection.session.state.hasUnsavedChanges : undefined}
       data-workspace-projection-reason={workspaceProjection && !workspaceProjection.compatible ? workspaceProjection.reason : undefined}
     >
       <L2WorkspaceHeader
@@ -6699,7 +6754,10 @@ export default function EditPdfTool() {
             value={outputName}
             onChange={(e) => {
               setOutputName(e.target.value);
+              exportRequestRevisionRef.current += 1;
               setDownloadUrl("");
+              setWorkspaceExportState("idle");
+              setIsExporting(false);
             }}
             className="w-36 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-right text-xs font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-primary)]/26 focus:border-b-[var(--lumeo-gold)]/45 sm:w-48"
             placeholder="lumeo-edited.pdf"

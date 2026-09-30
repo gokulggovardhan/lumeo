@@ -255,7 +255,11 @@ test("Edit PDF derives and exposes its Workspace compatibility state", async () 
   assert.match(source, /createPdfEditWorkspaceSession\(\{/);
   assert.match(source, /data-workspace-projection-compatible=/);
   assert.match(source, /data-workspace-operation-count=/);
+  assert.match(source, /data-workspace-lifecycle=/);
+  assert.match(source, /data-workspace-active-area=/);
+  assert.match(source, /data-workspace-has-unsaved-changes=/);
   assert.match(source, /data-workspace-projection-reason=/);
+  assert.match(source, /exportRequestRevisionRef\.current !== exportRequestRevision/);
   assert.match(source, /workspaceDocument: nextWorkspaceDocument/);
 });
 

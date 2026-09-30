@@ -77,6 +77,47 @@ export function redoWorkspaceOperation(session: DocumentSession): DocumentSessio
   return withHistory(session, redo(session.history));
 }
 
+export function beginWorkspaceExport(session: DocumentSession): DocumentSession {
+  if (session.state.lifecycle === "empty" || session.state.lifecycle === "loading") {
+    throw new Error("Workspace export requires a ready document.");
+  }
+  return {
+    ...session,
+    state: {
+      ...session.state,
+      lifecycle: "exporting",
+      activeArea: "export",
+    },
+  };
+}
+
+function finishWorkspaceExport(
+  session: DocumentSession,
+  lifecycle: "exported" | "error",
+): DocumentSession {
+  if (session.state.lifecycle !== "exporting") {
+    throw new Error("Workspace export must begin before it can finish.");
+  }
+  return {
+    ...session,
+    state: {
+      ...session.state,
+      lifecycle,
+      activeArea: "export",
+      hasUnsavedChanges:
+        lifecycle === "exported" ? false : session.state.hasUnsavedChanges,
+    },
+  };
+}
+
+export function completeWorkspaceExport(session: DocumentSession): DocumentSession {
+  return finishWorkspaceExport(session, "exported");
+}
+
+export function failWorkspaceExport(session: DocumentSession): DocumentSession {
+  return finishWorkspaceExport(session, "error");
+}
+
 export function setWorkspaceArea(
   session: DocumentSession,
   activeArea: WorkspaceArea,

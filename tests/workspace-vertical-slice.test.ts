@@ -13,7 +13,10 @@ import {
 } from "../lib/pdf/workspace/model.ts";
 import {
   appendSourcePages,
+  beginWorkspaceExport,
+  completeWorkspaceExport,
   createDocumentSession,
+  failWorkspaceExport,
   pageIdAtIndex,
   pageIndexForId,
   recordWorkspaceOperation,
@@ -74,6 +77,50 @@ test("one local session records operations across workspace areas", () => {
   assert.equal(session.state.historyCursor, 3);
   session = redoWorkspaceOperation(session);
   assert.equal(session.state.historyCursor, 4);
+});
+
+test("verified export lifecycle is explicit and does not add undo history", () => {
+  let session = createDocumentSession({
+    id: "session-a",
+    document,
+    initialArea: "edit",
+  });
+  session = recordWorkspaceOperation(session, operation("edit-text", "edit"));
+  const exporting = beginWorkspaceExport(session);
+
+  assert.equal(exporting.state.lifecycle, "exporting");
+  assert.equal(exporting.state.activeArea, "export");
+  assert.equal(exporting.state.hasUnsavedChanges, true);
+  assert.equal(exporting.state.operationCount, 1);
+
+  const exported = completeWorkspaceExport(exporting);
+  assert.equal(exported.state.lifecycle, "exported");
+  assert.equal(exported.state.hasUnsavedChanges, false);
+  assert.equal(exported.state.operationCount, 1);
+  assert.equal(exported.state.historyCursor, 1);
+
+  const modifiedAgain = recordWorkspaceOperation(
+    exported,
+    operation("edit-again", "edit"),
+  );
+  assert.equal(modifiedAgain.state.lifecycle, "modified");
+  assert.equal(modifiedAgain.state.hasUnsavedChanges, true);
+});
+
+test("failed export preserves pending changes and requires a begun export", () => {
+  let session = createDocumentSession({
+    id: "session-a",
+    document,
+    initialArea: "edit",
+  });
+  session = recordWorkspaceOperation(session, operation("edit-text", "edit"));
+
+  const failed = failWorkspaceExport(beginWorkspaceExport(session));
+  assert.equal(failed.state.lifecycle, "error");
+  assert.equal(failed.state.activeArea, "export");
+  assert.equal(failed.state.hasUnsavedChanges, true);
+  assert.equal(failed.state.operationCount, 1);
+  assert.throws(() => completeWorkspaceExport(session), /must begin/);
 });
 
 test("selection keeps unique visible stable page ids", () => {
