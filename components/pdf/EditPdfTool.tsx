@@ -235,6 +235,7 @@ import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
+import { createPdfEditWorkspaceSession } from "@/lib/pdf/workspace/editAdapter";
 
 // A detected run matched to the content-stream operator that produced it
 // (lib/pdf/edit/matchTextRun.ts), paired with the LocatedTextOperator that
@@ -707,6 +708,23 @@ export default function EditPdfTool() {
   const pdf = useMemo<LoadedPdf | null>(
     () => (pdfMeta ? { file: pdfMeta.file, pageCount: pdfMeta.pageCount, bytes: historyState.pdfBytes } : null),
     [pdfMeta, historyState.pdfBytes],
+  );
+  const workspaceProjection = useMemo(
+    () =>
+      pdfMeta
+        ? createPdfEditWorkspaceSession({
+            editSession: historyState.session,
+            sessionId: "edit-pdf-session",
+            documentId: "edit-pdf-document",
+            source: {
+              id: "edit-pdf-source",
+              name: pdfMeta.file.name,
+              byteLength: pdfMeta.file.size,
+              pageCount: pdfMeta.pageCount,
+            },
+          })
+        : null,
+    [historyState.session, pdfMeta],
   );
   const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -6531,6 +6549,9 @@ export default function EditPdfTool() {
       data-edit-session-next-sequence={historyState.session.nextSequence}
       data-edit-semantic-history-count={historyState.session.semanticHistory.entries.length}
       data-edit-semantic-history-next-sequence={historyState.session.semanticHistory.nextSequence}
+      data-workspace-projection-compatible={workspaceProjection?.compatible ?? false}
+      data-workspace-operation-count={workspaceProjection?.compatible ? workspaceProjection.session.state.operationCount : 0}
+      data-workspace-projection-reason={workspaceProjection && !workspaceProjection.compatible ? workspaceProjection.reason : undefined}
     >
       <L2WorkspaceHeader
         title="Edit PDF"

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
   appendPdfEditOperations,
@@ -7,7 +8,10 @@ import {
   pageOperation,
 } from "../lib/pdf/edit/editSession.ts";
 import { createSourcePages } from "../lib/pdf/workspace/model.ts";
-import { projectPdfEditSessionToWorkspace } from "../lib/pdf/workspace/editAdapter.ts";
+import {
+  createPdfEditWorkspaceSession,
+  projectPdfEditSessionToWorkspace,
+} from "../lib/pdf/workspace/editAdapter.ts";
 
 test("Edit text operations project to stable page ids without text payloads", () => {
   const pages = createSourcePages("source-a", 3);
@@ -165,4 +169,88 @@ test("an empty page scope fails closed", () => {
     reason: "empty-page-scope",
     operationId: "edit-op-1",
   });
+});
+
+test("Edit operations derive a local modified Workspace session", () => {
+  const editSession = appendPdfEditOperations(createPdfEditSession(4096), [
+    nativeTextOperation({
+      pageIndex: 1,
+      spanIds: ["span-a"],
+      contentStreamIndex: 0,
+      formPath: null,
+      operatorIndices: [4],
+      fontResourceName: "F1",
+      originalText: "Private original",
+      replacementText: "Private replacement",
+    }),
+  ]);
+
+  const projection = createPdfEditWorkspaceSession({
+    editSession,
+    sessionId: "session-a",
+    documentId: "document-a",
+    source: {
+      id: "source-a",
+      name: "private.pdf",
+      byteLength: 4096,
+      pageCount: 3,
+    },
+  });
+
+  assert.equal(projection.compatible, true);
+  if (!projection.compatible) return;
+  assert.equal(projection.session.state.id, "session-a");
+  assert.equal(projection.session.state.lifecycle, "modified");
+  assert.equal(projection.session.state.privacy, "local");
+  assert.equal(projection.session.state.operationCount, 1);
+  assert.equal(projection.session.state.historyCursor, 1);
+  assert.equal(projection.session.state.document.id, "document-a");
+  assert.deepEqual(projection.session.history.operations[0]?.scope, {
+    kind: "pages",
+    pageIds: ["source-a:page:2"],
+  });
+  assert.equal(
+    JSON.stringify(projection.session.history).includes("Private replacement"),
+    false,
+  );
+});
+
+test("an incompatible Edit history does not create a partial Workspace session", () => {
+  const editSession = appendPdfEditOperations(createPdfEditSession(4096), [
+    pageOperation({
+      operation: "reorder",
+      beforePageCount: 3,
+      afterPageCount: 3,
+      affectedPageIndices: [0, 1],
+      description: "Reorder pages",
+    }),
+  ]);
+
+  assert.deepEqual(
+    createPdfEditWorkspaceSession({
+      editSession,
+      sessionId: "session-a",
+      documentId: "document-a",
+      source: {
+        id: "source-a",
+        name: "private.pdf",
+        byteLength: 4096,
+        pageCount: 3,
+      },
+    }),
+    {
+      compatible: false,
+      operations: [],
+      reason: "page-topology-changed",
+      operationId: "edit-op-1",
+    },
+  );
+});
+
+test("Edit PDF derives and exposes its Workspace compatibility state", async () => {
+  const source = await readFile("components/pdf/EditPdfTool.tsx", "utf8");
+  assert.match(source, /createPdfEditWorkspaceSession\(\{/);
+  assert.match(source, /data-workspace-projection-compatible=/);
+  assert.match(source, /data-workspace-operation-count=/);
+  assert.match(source, /data-workspace-projection-reason=/);
 });
