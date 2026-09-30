@@ -923,6 +923,38 @@ test("vinext Edit PDF shares one linear semantic undo history across native Edit
     .toEqual({ employeeEdited: true, ssnRemoved: true, hasMask: true });
 });
 
+test("Organize projects page history and verified export into Workspace state", async ({
+  page,
+}) => {
+  await page.goto("/pdf/organize", { waitUntil: "domcontentloaded" });
+  await page.locator('input[type="file"]').first().setInputFiles(TWO_PAGE_PDF);
+
+  const workspace = page.locator("[data-workspace-lifecycle]");
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready");
+  await expect(workspace).toHaveAttribute(
+    "data-workspace-has-unsaved-changes",
+    "false",
+  );
+
+  await page.getByRole("button", { name: "Rotate right" }).first().click();
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "modified");
+  await expect(workspace).toHaveAttribute("data-workspace-operation-count", "1");
+
+  await page.getByRole("button", { name: "Undo" }).click();
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready");
+  await page.getByRole("button", { name: "Redo" }).click();
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "modified");
+
+  await page.getByRole("button", { name: "Save organized PDF" }).click();
+  await expect(page.getByText("Organized PDF ready")).toBeVisible();
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "exported");
+  await expect(workspace).toHaveAttribute("data-workspace-active-area", "export");
+  await expect(workspace).toHaveAttribute(
+    "data-workspace-has-unsaved-changes",
+    "false",
+  );
+});
+
 test("vinext Edit PDF keeps IME composition isolated until the candidate is committed", async ({
   page,
 }) => {

@@ -10,6 +10,8 @@ export type PdfSemanticHistoryType =
   | "replace-text"
   | "change-style"
   | "change-geometry"
+  | "rotate-pages"
+  | "duplicate-pages"
   | "reorder-pages"
   | "delete-pages"
   | "merge-pages"
@@ -56,6 +58,7 @@ export type PdfSemanticTarget =
   | {
       kind: "pages";
       pageIndices: number[];
+      pageIds?: string[];
     };
 
 export type PdfSemanticState = {
@@ -64,6 +67,8 @@ export type PdfSemanticState = {
   geometry?: PdfSemanticGeometry;
   style?: PdfSemanticTextStyle;
   pageCount?: number;
+  pageIds?: string[];
+  pageRotations?: Record<string, 0 | 90 | 180 | 270>;
 };
 
 export type PdfSemanticHistoryDraft = {
@@ -103,6 +108,7 @@ function cloneTarget(target: PdfSemanticTarget): PdfSemanticTarget {
     return {
       ...target,
       pageIndices: [...target.pageIndices],
+      ...(target.pageIds ? { pageIds: [...target.pageIds] } : {}),
     };
   }
   return { ...target };
@@ -114,6 +120,10 @@ function cloneState(state: PdfSemanticState | null): PdfSemanticState | null {
     ...state,
     ...(state.geometry ? { geometry: { ...state.geometry } } : {}),
     ...(state.style ? { style: { ...state.style } } : {}),
+    ...(state.pageIds ? { pageIds: [...state.pageIds] } : {}),
+    ...(state.pageRotations
+      ? { pageRotations: { ...state.pageRotations } }
+      : {}),
   };
 }
 
