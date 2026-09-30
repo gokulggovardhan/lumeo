@@ -248,6 +248,74 @@ async function makeSkewedFixture(): Promise<Fixture> {
   };
 }
 
+async function makeNestedFormFixture(): Promise<Fixture> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([612, 792]);
+  const innerFontRef = doc.context.register(
+    doc.context.obj({
+      Type: "Font",
+      Subtype: "Type1",
+      BaseFont: "Helvetica",
+      Encoding: "WinAnsiEncoding",
+    }),
+  );
+  const innerFormRef = doc.context.register(
+    doc.context.stream(
+      "BT /FF1 16 Tf 10 10 Td (Inner form source) Tj ET",
+      {
+        Type: "XObject",
+        Subtype: "Form",
+        BBox: [0, 0, 220, 80],
+        Resources: doc.context.obj({ Font: { FF1: innerFontRef } }),
+      },
+    ),
+  );
+  const outerFontRef = doc.context.register(
+    doc.context.obj({
+      Type: "Font",
+      Subtype: "Type1",
+      BaseFont: "Helvetica",
+      Encoding: "WinAnsiEncoding",
+    }),
+  );
+  const outerFormRef = doc.context.register(
+    doc.context.stream(
+      [
+        "BT /FF1 16 Tf 10 10 Td (Outer form text) Tj ET",
+        "q 1 0 0 1 5 40 cm /Fm2 Do Q",
+      ].join("\n"),
+      {
+        Type: "XObject",
+        Subtype: "Form",
+        BBox: [0, 0, 220, 120],
+        Resources: doc.context.obj({
+          Font: { FF1: outerFontRef },
+          XObject: { Fm2: innerFormRef },
+        }),
+      },
+    ),
+  );
+  page.node.Resources()!.set(
+    PDFName.of("XObject"),
+    doc.context.obj({ Fm1: outerFormRef }),
+  );
+  page.node.set(
+    PDFName.of("Contents"),
+    doc.context.register(
+      doc.context.stream("q 1 0 0 1 60 600 cm /Fm1 Do Q"),
+    ),
+  );
+
+  return {
+    id: "advanced-nested-form-xobject",
+    category: "nested-form-xobject",
+    expectedRuns: ["Outer form text", "Inner form source"],
+    editTarget: "Inner form source",
+    replacementText: "Inner form edited",
+    bytes: await doc.save(),
+  };
+}
+
 function measurableTextCharacters(value: string): number {
   // textRunsFromContent intentionally discards whitespace-only PDF.js items:
   // they are not useful interactive/editable runs. Counting those separator
@@ -1333,6 +1401,7 @@ async function buildFixtures(): Promise<Fixture[]> {
       },
     ),
     makeSkewedFixture(),
+    makeNestedFormFixture(),
     structuredFixture({
       id: "common-business-invoice",
       category: "business-invoice",
