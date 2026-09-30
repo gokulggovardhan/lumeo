@@ -931,6 +931,11 @@ test("vinext Edit PDF keeps IME composition isolated until the candidate is comm
 
   const workspace = page.locator("[data-edit-operation-count]");
   await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready");
+  await expect(workspace).toHaveAttribute(
+    "data-workspace-has-unsaved-changes",
+    "false",
+  );
 
   const employeeRun = page
     .locator(
@@ -1371,6 +1376,11 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
   await expect(layoutWarning).toHaveCount(0);
   await page.getByRole("button", { name: "Apply edit" }).click();
   await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "modified");
+  await expect(workspace).toHaveAttribute(
+    "data-workspace-has-unsaved-changes",
+    "true",
+  );
 
   await page.getByRole("button", { name: "Undo" }).click();
   await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
@@ -1389,6 +1399,12 @@ test("vinext Edit PDF supports text matching, editing, and export", async ({
     name: "Download edited PDF",
   });
   await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "exported");
+  await expect(workspace).toHaveAttribute("data-workspace-active-area", "export");
+  await expect(workspace).toHaveAttribute(
+    "data-workspace-has-unsaved-changes",
+    "false",
+  );
 
   const downloadPromise = page.waitForEvent("download");
   await downloadButton.click();
