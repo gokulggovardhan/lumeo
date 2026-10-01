@@ -50,6 +50,7 @@ import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
+import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 import { resetPdfPreviewState } from "@/lib/pdf/resetPreviewState";
@@ -98,6 +99,12 @@ function CropIcon() {
 
 export default function CropPdfTool() {
   const { availability, track } = useAnalytics();
+  const {
+    openDocument: openWorkspaceDocument,
+    commitRevision: commitWorkspaceRevision,
+    markDirty: markWorkspaceDirty,
+    clearSession: clearWorkspaceSession,
+  } = useWorkspaceSession();
   const openedTrackedRef = useRef(false);
 
   const [pdf, setPdf] = useState<LoadedPdf | null>(null);
@@ -154,16 +161,23 @@ export default function CropPdfTool() {
     setLockAspectRatio(false);
     setDownloadUrl("");
     setOutputName("lumeo-cropped.pdf");
+    clearWorkspaceSession();
   }
 
   // Any config change invalidates the previous export -- same
   // stale-download-reset pattern WatermarkTool.tsx established.
   useEffect(() => {
+    if (pdf) {
+      markWorkspaceDirty(
+        JSON.stringify(config) !== JSON.stringify(createDefaultCropConfig()),
+        "pages",
+      );
+    }
     if (!downloadUrlRef.current) return;
     URL.revokeObjectURL(downloadUrlRef.current);
     downloadUrlRef.current = "";
     setDownloadUrl("");
-  }, [config]);
+  }, [config, pdf, markWorkspaceDirty]);
 
   useEffect(() => {
     let cancelled = false;
@@ -261,6 +275,7 @@ export default function CropPdfTool() {
       }
 
       setPdf({ file, bytes, pageCount });
+      openWorkspaceDocument({ file, pageCount, area: "pages" });
       setPageIndex(0);
       resetConfig(createDefaultCropConfig());
       setScopeInput("");
@@ -359,18 +374,26 @@ export default function CropPdfTool() {
       const blob = new Blob([buffer], { type: "application/pdf" });
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
+      const croppedFileName = sanitizePdfFileName(outputName);
       downloadUrlRef.current = url;
       setDownloadUrl(url);
-      setDownloadName(sanitizePdfFileName(outputName));
+      setDownloadName(croppedFileName);
+      commitWorkspaceRevision({
+        blob,
+        filename: croppedFileName,
+        pageCount: pdf.pageCount,
+        area: "pages",
+        description: "Cropped pages",
+      });
       track({ eventName: "processing_succeeded", toolSlug: "crop", durationMs: performance.now() - startedAt, success: true });
-      recordRecentFile({ tool: "crop", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
+      recordRecentFile({ tool: "crop", filename: croppedFileName, fileSize: blob.size, pageCount: pdf.pageCount });
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Could not crop the PDF. Please try again.");
       track({ eventName: "processing_failed", toolSlug: "crop", durationMs: performance.now() - startedAt, success: false, errorCode: "processing_error" });
     } finally {
       setIsExporting(false);
     }
-  }, [pdf, config, outputName, track]);
+  }, [pdf, config, outputName, track, commitWorkspaceRevision]);
 
   function downloadCroppedPdf() {
     if (!downloadUrl) return;
