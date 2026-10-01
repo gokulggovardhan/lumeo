@@ -42,6 +42,7 @@ import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { checkPdfFileSize, hasPdfMagicBytes, isPdfNamedFile } from "@/lib/pdf/uploadValidation";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
+import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
 
 const THUMBNAIL_CONCURRENCY = 3;
 const THUMBNAIL_SCALE = 0.32;
@@ -188,6 +189,12 @@ function downloadUrl(url: string, fileName: string) {
 
 export default function OrganizePdfTool() {
   const { availability, track } = useAnalytics();
+  const {
+    openDocument: openWorkspaceDocument,
+    commitRevision: commitWorkspaceRevision,
+    markDirty: markWorkspaceDirty,
+    clearSession: clearWorkspaceSession,
+  } = useWorkspaceSession();
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const thumbnailUrlsRef = useRef<Map<string, string>>(new Map());
@@ -230,6 +237,11 @@ export default function OrganizePdfTool() {
       workspaceExportState,
     );
   }, [organizerState, workspaceExportState]);
+
+  useEffect(() => {
+    if (!document_) return;
+    markWorkspaceDirty(Boolean(workspaceSession?.state.hasUnsavedChanges), "pages");
+  }, [document_, markWorkspaceDirty, workspaceSession?.state.hasUnsavedChanges]);
 
   async function destroyPdfJsDocument() {
     const doc = pdfJsDocRef.current;
@@ -284,6 +296,7 @@ export default function OrganizePdfTool() {
     setError("");
     setResult(null);
     setWorkspaceExportState("idle");
+    clearWorkspaceSession();
   }
 
   async function renderThumbnails(doc: PDFDocumentProxy, pageCount: number, session: number) {
@@ -383,6 +396,7 @@ export default function OrganizePdfTool() {
       exportRevisionRef.current += 1;
       setWorkspaceExportState("idle");
       setSelected(new Set());
+      openWorkspaceDocument({ file, pageCount, area: "pages" });
       void renderThumbnails(pdfJsDoc, pageCount, nextSession);
     } catch (readError) {
       const message =
@@ -507,6 +521,13 @@ export default function OrganizePdfTool() {
       const url = URL.createObjectURL(blob);
       const fileName = `${sanitizeFileStem(document_.name, "lumeo-organize")}.pdf`;
       setResult({ url, fileName, size: blob.size, pageCount: items.length });
+      commitWorkspaceRevision({
+        blob,
+        filename: fileName,
+        pageCount: items.length,
+        area: "pages",
+        description: "Organized pages",
+      });
       setWorkspaceExportState("exported");
       track({
         eventName: "processing_succeeded",
