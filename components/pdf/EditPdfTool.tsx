@@ -659,6 +659,7 @@ export default function EditPdfTool() {
   // below close over the URL and lifecycle setters; names stay grouped with
   // the remaining toolbar state further down.
   const [downloadUrl, setDownloadUrl] = useState("");
+  const downloadUrlRef = useRef("");
   const [workspaceExportState, setWorkspaceExportState] = useState<
     "idle" | "exporting" | "exported" | "error"
   >("idle");
@@ -687,6 +688,16 @@ export default function EditPdfTool() {
   // exact same snapshot object after an intervening change.
   const historyMutationRevisionRef = useRef(0);
   const exportRequestRevisionRef = useRef(0);
+  const invalidatePublishedExport = useCallback(() => {
+    exportRequestRevisionRef.current += 1;
+    setWorkspaceExportState("idle");
+    setIsExporting(false);
+    if (downloadUrlRef.current) {
+      URL.revokeObjectURL(downloadUrlRef.current);
+      downloadUrlRef.current = "";
+    }
+    setDownloadUrl("");
+  }, []);
   // Every document mutation -- placing, moving, restyling or deleting an
   // element, applying a text edit, or undoing/redoing any of those -- makes
   // an already-exported PDF stale. These three wrappers are the single choke
@@ -701,27 +712,20 @@ export default function EditPdfTool() {
   const setHistoryState = useCallback((updater: EditHistorySnapshot | ((current: EditHistorySnapshot) => EditHistorySnapshot)) => {
     historyMutationRevisionRef.current += 1;
     setHistoryStateRaw(updater);
-    exportRequestRevisionRef.current += 1;
-    setDownloadUrl("");
-    setWorkspaceExportState("idle");
-    setIsExporting(false);
-  }, [setHistoryStateRaw]);
+    invalidatePublishedExport();
+  }, [invalidatePublishedExport, setHistoryStateRaw]);
   const undo = useCallback(() => {
+    if (!canUndo) return;
     historyMutationRevisionRef.current += 1;
     undoRaw();
-    exportRequestRevisionRef.current += 1;
-    setDownloadUrl("");
-    setWorkspaceExportState("idle");
-    setIsExporting(false);
-  }, [undoRaw]);
+    invalidatePublishedExport();
+  }, [canUndo, invalidatePublishedExport, undoRaw]);
   const redo = useCallback(() => {
+    if (!canRedo) return;
     historyMutationRevisionRef.current += 1;
     redoRaw();
-    exportRequestRevisionRef.current += 1;
-    setDownloadUrl("");
-    setWorkspaceExportState("idle");
-    setIsExporting(false);
-  }, [redoRaw]);
+    invalidatePublishedExport();
+  }, [canRedo, invalidatePublishedExport, redoRaw]);
   const elements = historyState.elements;
   // Adapter preserving setElements' EXACT prior call signature (a bare
   // EditElement[] array or updater over one) -- every existing overlay-
@@ -1290,7 +1294,6 @@ export default function EditPdfTool() {
   // failure as an error -- see the raster effect's catch.
   const renderedPageRef = useRef<number | null>(null);
   const pageImageUrlRef = useRef("");
-  const downloadUrlRef = useRef("");
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   // Exact history ArrayBuffer revision that produced pdfJsDocRef.current.
   // A non-null PDF.js document without this matching token is not valid
@@ -2425,11 +2428,9 @@ export default function EditPdfTool() {
   // of state a new upload doesn't already reinitialize -- returns to the
   // upload screen ready for a different file immediately.
   function resetTool() {
-    exportRequestRevisionRef.current += 1;
+    invalidatePublishedExport();
     if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
-    if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
     pageImageUrlRef.current = "";
-    downloadUrlRef.current = "";
     ocrJobRevisionRef.current = null;
     ocrReviewCorrectionRevisionRef.current = 0;
     setOcrReviewCorrectionRevision(0);
@@ -2498,9 +2499,6 @@ export default function EditPdfTool() {
     runOverlayNodesRef.current.clear();
     setActiveTool("select");
     setZoom(1);
-    setDownloadUrl("");
-    setWorkspaceExportState("idle");
-    setIsExporting(false);
     setOutputName("lumeo-edited.pdf");
   }
 
@@ -3410,10 +3408,7 @@ export default function EditPdfTool() {
         ),
       });
       setSelectedId(null);
-      exportRequestRevisionRef.current += 1;
-      setDownloadUrl("");
-      setWorkspaceExportState("idle");
-      setIsExporting(false);
+      invalidatePublishedExport();
     } catch (uploadError) {
       const message =
         uploadError instanceof Error && /password|encrypt/i.test(uploadError.message)
@@ -6757,10 +6752,7 @@ export default function EditPdfTool() {
             value={outputName}
             onChange={(e) => {
               setOutputName(e.target.value);
-              exportRequestRevisionRef.current += 1;
-              setDownloadUrl("");
-              setWorkspaceExportState("idle");
-              setIsExporting(false);
+              invalidatePublishedExport();
             }}
             className="w-36 rounded-md border border-transparent bg-transparent px-1.5 py-1 text-right text-xs font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-primary)]/26 focus:border-b-[var(--lumeo-gold)]/45 sm:w-48"
             placeholder="lumeo-edited.pdf"
