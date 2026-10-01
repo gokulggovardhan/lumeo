@@ -42,7 +42,10 @@ import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { checkPdfFileSize, hasPdfMagicBytes, isPdfNamedFile } from "@/lib/pdf/uploadValidation";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
-import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
+import {
+  useWorkspaceRestore,
+  useWorkspaceSession,
+} from "@/components/pdf/workspace/WorkspaceSessionProvider";
 
 const THUMBNAIL_CONCURRENCY = 3;
 const THUMBNAIL_SCALE = 0.32;
@@ -341,7 +344,7 @@ export default function OrganizePdfTool() {
     await Promise.all(Array.from({ length: THUMBNAIL_CONCURRENCY }, worker));
   }
 
-  async function handleFiles(files: FileList) {
+  async function handleFiles(files: FileList | File[]) {
     const file = Array.from(files)[0];
     if (!file) return;
 
@@ -406,6 +409,8 @@ export default function OrganizePdfTool() {
       setError(message);
     }
   }
+
+  useWorkspaceRestore((file) => handleFiles([file]));
 
   function toggleSelected(index: number) {
     setSelected((current) => {
