@@ -57,13 +57,13 @@ function CompactToolCard({
     <>
       <span
         aria-hidden="true"
-        className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)] shadow-[inset_0_1px_0_rgba(var(--paper-rgb),0.05)] transition duration-200 group-hover:-translate-y-0.5 group-hover:scale-[1.03] motion-reduce:transform-none"
+        className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] max-[380px]:h-9 max-[380px]:w-9 border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)] shadow-[inset_0_1px_0_rgba(var(--paper-rgb),0.05)] transition duration-200 group-hover:-translate-y-0.5 group-hover:scale-[1.03] motion-reduce:transform-none"
       >
         <ToolGlyph name={tile.glyph} className="h-[19px] w-[19px]" />
       </span>
 
       <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-bold leading-tight text-[var(--text-primary)] sm:text-sm">
+        <span className="block break-words text-[13px] font-bold leading-[1.15] text-[var(--text-primary)] sm:text-sm">
           {tile.label}
         </span>
         {emphasis ? (
@@ -75,7 +75,7 @@ function CompactToolCard({
 
       <span
         aria-hidden="true"
-        className="shrink-0 text-sm text-[var(--text-muted)] transition duration-200 group-hover:translate-x-0.5 group-hover:text-[var(--atelier-sage-300)] motion-reduce:transform-none"
+        className="shrink-0 text-sm text-[var(--text-muted)] transition duration-200 group-hover:translate-x-0.5 group-hover:text-[var(--atelier-sage-300)] motion-reduce:transform-none max-[380px]:hidden"
       >
         →
       </span>
@@ -83,7 +83,7 @@ function CompactToolCard({
   );
 
   const classes =
-    "group flex min-h-[4.75rem] w-full items-center gap-3 rounded-[15px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-3.5 py-3 text-left shadow-[var(--shadow-sm)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none";
+    "group flex min-h-[4.75rem] w-full items-center gap-3 rounded-[15px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-3.5 py-3 text-left max-[380px]:gap-2.5 max-[380px]:px-3 shadow-[var(--shadow-sm)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none";
 
   return (
     <li className="min-w-0">
@@ -119,12 +119,12 @@ function AllToolsTile({ label }: { label: string }) {
     <li className="min-w-0">
       <Link
         href="/pdf-tools"
-        className="group flex min-h-[4.75rem] w-full items-center gap-3 rounded-[15px] border border-dashed border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.018)] px-3.5 py-3 text-left transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--atelier-sage-300)] hover:bg-[var(--surface-raised)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
+        className="group flex min-h-[4.75rem] w-full items-center gap-3 rounded-[15px] border border-dashed max-[380px]:gap-2.5 border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.018)] px-3.5 py-3 text-left max-[380px]:px-3 transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--atelier-sage-300)] hover:bg-[var(--surface-raised)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
         aria-label={label}
       >
         <span
           aria-hidden="true"
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)]"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)] max-[380px]:h-9 max-[380px]:w-9"
         >
           <svg
             viewBox="0 0 24 24"
@@ -144,7 +144,7 @@ function AllToolsTile({ label }: { label: string }) {
         </span>
         <span
           aria-hidden="true"
-          className="shrink-0 text-sm text-[var(--atelier-sage-300)] transition duration-200 group-hover:translate-x-0.5 motion-reduce:transform-none"
+          className="shrink-0 text-sm text-[var(--atelier-sage-300)] transition duration-200 group-hover:translate-x-0.5 motion-reduce:transform-none max-[380px]:hidden"
         >
           →
         </span>
@@ -201,7 +201,7 @@ export async function PdfToolLauncher({
           </p>
         </div>
 
-        <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        <ul className="grid grid-cols-2 gap-2.5 max-[340px]:grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
           {curated.map((tile, index) => (
             <CompactToolCard key={tile.route} tile={tile} index={index} />
           ))}
