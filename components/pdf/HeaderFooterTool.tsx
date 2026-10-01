@@ -44,6 +44,7 @@ import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
+import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 import { resetPdfPreviewState } from "@/lib/pdf/resetPreviewState";
@@ -153,6 +154,12 @@ function ZoneEditor({
 
 export default function HeaderFooterTool() {
   const { availability, track } = useAnalytics();
+  const {
+    openDocument: openWorkspaceDocument,
+    commitRevision: commitWorkspaceRevision,
+    markDirty: markWorkspaceDirty,
+    clearSession: clearWorkspaceSession,
+  } = useWorkspaceSession();
   const openedTrackedRef = useRef(false);
 
   const [pdf, setPdf] = useState<LoadedPdf | null>(null);
@@ -205,14 +212,21 @@ export default function HeaderFooterTool() {
     setPageRangeError("");
     setDownloadUrl("");
     setOutputName("lumeo-header-footer.pdf");
+    clearWorkspaceSession();
   }
 
   useEffect(() => {
+    if (pdf) {
+      markWorkspaceDirty(
+        JSON.stringify(config) !== JSON.stringify(createDefaultHeaderFooterConfig()),
+        "enhance",
+      );
+    }
     if (!downloadUrlRef.current) return;
     URL.revokeObjectURL(downloadUrlRef.current);
     downloadUrlRef.current = "";
     setDownloadUrl("");
-  }, [config]);
+  }, [config, pdf, markWorkspaceDirty]);
 
   useEffect(() => {
     let cancelled = false;
@@ -310,6 +324,7 @@ export default function HeaderFooterTool() {
       }
 
       setPdf({ file, bytes, pageCount });
+      openWorkspaceDocument({ file, pageCount, area: "enhance" });
       setPageIndex(0);
       setConfig(createDefaultHeaderFooterConfig());
       setPageRangeInput("");
@@ -362,18 +377,26 @@ export default function HeaderFooterTool() {
       const blob = new Blob([buffer], { type: "application/pdf" });
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
+      const workspaceOutputFileName = sanitizePdfFileName(outputName);
       downloadUrlRef.current = url;
       setDownloadUrl(url);
-      setDownloadName(sanitizePdfFileName(outputName));
+      setDownloadName(workspaceOutputFileName);
+      commitWorkspaceRevision({
+        blob,
+        filename: workspaceOutputFileName,
+        pageCount: pdf.pageCount,
+        area: "enhance",
+        description: "Added header and footer",
+      });
       track({ eventName: "processing_succeeded", toolSlug: "header-footer", durationMs: performance.now() - startedAt, success: true });
-      recordRecentFile({ tool: "header-footer", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
+      recordRecentFile({ tool: "header-footer", filename: workspaceOutputFileName, fileSize: blob.size, pageCount: pdf.pageCount });
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Could not add the header/footer. Please try again.");
       track({ eventName: "processing_failed", toolSlug: "header-footer", durationMs: performance.now() - startedAt, success: false, errorCode: "processing_error" });
     } finally {
       setIsExporting(false);
     }
-  }, [pdf, config, outputName, track]);
+  }, [pdf, config, outputName, track, commitWorkspaceRevision]);
 
   function downloadHeaderFooterPdf() {
     if (!downloadUrl) return;
