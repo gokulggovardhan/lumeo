@@ -42,7 +42,10 @@ import { OcrWordOverlay } from "@/components/pdf/edit/OcrWordOverlay";
 import { NativeTextFormatPanel, type NativeTextStyleDraft } from "@/components/pdf/edit/NativeTextFormatPanel";
 import { NativeTextMixedFormatPanel } from "@/components/pdf/edit/NativeTextMixedFormatPanel";
 import { useNativeTextSelectionState } from "@/components/pdf/edit/useNativeTextSelectionState";
-import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
+import {
+  useWorkspaceRestore,
+  useWorkspaceSession,
+} from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
   createInkElement,
@@ -3445,6 +3448,8 @@ export default function EditPdfTool() {
   }
 
   function nextElementId() {
+  useWorkspaceRestore((file) => addFile([file]));
+
     elementIdCounterRef.current += 1;
     return `el-${elementIdCounterRef.current}`;
   }
