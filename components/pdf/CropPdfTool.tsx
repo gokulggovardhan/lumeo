@@ -50,7 +50,10 @@ import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
-import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
+import {
+  useWorkspaceRestore,
+  useWorkspaceSession,
+} from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 import { resetPdfPreviewState } from "@/lib/pdf/resetPreviewState";
@@ -291,6 +294,8 @@ export default function CropPdfTool() {
       setError(message);
     }
   }
+
+  useWorkspaceRestore((file) => addFile([file]));
 
   function applyPreset(preset: CropAspectPreset) {
     if (!pageDisplaySize) return;
