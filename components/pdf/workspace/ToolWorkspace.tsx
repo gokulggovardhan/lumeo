@@ -3,6 +3,7 @@
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { LOCAL_FIRST_SHORT } from "@/lib/public-site/copy";
+import { useOptionalWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import type { WorkspaceArea, WorkspaceOperation } from "@/lib/pdf/workspace/model";
 import {
   workspaceAreaDescription,
@@ -501,6 +502,7 @@ export function L2UploadStage({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const dragDepthRef = useRef(0);
   const [internalDragActive, setInternalDragActive] = useState(false);
+  const workspaceSession = useOptionalWorkspaceSession();
 
   useEffect(() => {
     // The hidden input is server-rendered before React has necessarily
@@ -512,6 +514,23 @@ export function L2UploadStage({
   }, []);
   const canSelect = Boolean(onFilesSelected) && !disabled && !loading;
   const isDragActive = dragActive || internalDragActive;
+  const acceptsPdf = /application\/pdf|\.pdf/i.test(accept);
+  const canContinueWorkspacePdf = Boolean(
+    canSelect &&
+      !multiple &&
+      acceptsPdf &&
+      workspaceSession?.currentRevision &&
+      !workspaceSession.state?.dirty,
+  );
+
+  function continueWithWorkspacePdf() {
+    if (!canContinueWorkspacePdf || !onFilesSelected || !workspaceSession) return;
+    const file = workspaceSession.getCurrentFile();
+    if (!file) return;
+    const transfer = new DataTransfer();
+    transfer.items.add(file);
+    onFilesSelected(transfer.files);
+  }
 
   function openFileChooser() {
     if (!canSelect) return;
@@ -579,6 +598,24 @@ export function L2UploadStage({
     </button>
   );
 
+  const workspaceAction = canContinueWorkspacePdf ? (
+    <div className="flex w-full flex-col items-center gap-2 sm:w-auto">
+      {action ?? defaultAction}
+      <button
+        type="button"
+        onClick={continueWithWorkspacePdf}
+        className="lumeo-focus-ring inline-flex min-h-11 w-full max-w-[320px] items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-base)] px-5 py-2.5 text-sm font-extrabold text-[var(--text-primary)] transition hover:border-[var(--border-selected)] hover:bg-[var(--surface-raised)] sm:w-auto"
+      >
+        Continue with current PDF
+      </button>
+      <span className="max-w-[18rem] truncate text-[11px] font-semibold text-[var(--text-muted)]">
+        {workspaceSession?.currentRevision?.filename}
+      </span>
+    </div>
+  ) : (
+    action ?? defaultAction
+  );
+
   return (
     <div
       className="l2-upload-stage"
@@ -605,7 +642,7 @@ export function L2UploadStage({
         supportedTypes={acceptedNote}
         privacyNote={privacyNote}
         icon={icon}
-        action={action ?? defaultAction}
+        action={workspaceAction}
         multiple={multiple}
         dragActive={isDragActive}
         loading={loading}
