@@ -6,6 +6,7 @@ import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
 import { resolveLumeoTools } from "@/lib/tools/resolve";
 import { buildDiscoveryTiles } from "@/lib/tools/tiles";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import styles from "./directory.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf-tools", {
@@ -44,26 +45,30 @@ export default async function PdfToolsPage() {
   return (
     <PublicCatalogPageShell
       maxWidth="max-w-[1160px]"
-      contentClassName="px-5 pb-10 pt-7 sm:px-8 sm:pb-12 sm:pt-9"
+      contentClassName="px-5 pb-10 pt-5 sm:px-8 sm:pb-12 sm:pt-6"
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--lumeo-paper-100)]"
     >
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-      <section className="lumeo-fade-up mb-6 max-w-3xl sm:mb-8">
+
+      <section className="lumeo-fade-up mb-5 max-w-3xl">
         <p className="aura-text-label text-[var(--text-premium)]">All PDF tools</p>
-        <h1 className="mt-3 font-serif font-medium text-[length:var(--text-heading-xl)] leading-[var(--leading-heading)] tracking-[var(--tracking-display)] text-[color:var(--text-primary)]">
+        <h1 className="mt-1.5 font-serif text-[clamp(2rem,4vw,2.85rem)] font-semibold leading-[1.05] tracking-[var(--tracking-display)] text-[color:var(--text-primary)]">
           Find the right tool
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-base">
-          Search or filter the complete directory. Popular workflows stay easy to spot, while specialist tools remain one step away.
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:text-[15px]">
+          Search, filter, and open the exact workflow you need. The directory
+          stays focused on actions rather than marketing.
         </p>
       </section>
 
-      <ToolsExplorer tools={discoveryTools} />
+      <div className={styles.directoryStage}>
+        <ToolsExplorer tools={discoveryTools} />
+      </div>
 
-      <div className="mt-10">
+      <div className="mt-8">
         <PublicFooter />
       </div>
     </PublicCatalogPageShell>
