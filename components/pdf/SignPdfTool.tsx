@@ -78,7 +78,10 @@ import {
   checkPdfFileSize,
 } from "@/lib/pdf/uploadValidation";
 import { createLatestRequestAuthority } from "@/lib/pdf/latestRequestAuthority";
-import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
+import {
+  useWorkspaceRestore,
+  useWorkspaceSession,
+} from "@/components/pdf/workspace/WorkspaceSessionProvider";
 
 type PageSize = { width: number; height: number };
 
@@ -504,6 +507,8 @@ export default function SignPdfTool() {
   };
 
   const startNew = () => {
+  useWorkspaceRestore((file) => addFile([file]));
+
     fileLoadAuthorityRef.current.invalidate();
     if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
     if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
