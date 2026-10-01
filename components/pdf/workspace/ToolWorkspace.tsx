@@ -3,6 +3,12 @@
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { LOCAL_FIRST_SHORT } from "@/lib/public-site/copy";
+import type { WorkspaceArea, WorkspaceOperation } from "@/lib/pdf/workspace/model";
+import {
+  workspaceAreaDescription,
+  workspaceAreaLabel,
+  visibleWorkspaceHistory,
+} from "@/lib/pdf/workspace/presentation";
 import {
   AuraButton,
   AuraCard,
@@ -226,6 +232,48 @@ export function L2WorkspaceToolbar({ children }: { children: ReactNode }) {
   return (
     <div className="l2-workspace-toolbar aura-glass-thin sticky top-[5.75rem] z-10 flex flex-wrap items-center gap-2.5 rounded-[var(--radius-xl)] px-3.5 py-2.5 shadow-[var(--v2-elevation-1)]">
       {children}
+    </div>
+  );
+}
+
+export function L2WorkspaceStatus({
+  activeArea,
+  operationCount = 0,
+  operations = [],
+  historyCursor = operationCount,
+}: {
+  activeArea: WorkspaceArea;
+  operationCount?: number;
+  operations?: readonly WorkspaceOperation[];
+  historyCursor?: number;
+}) {
+  const recent = visibleWorkspaceHistory(operations, historyCursor, 1)[0];
+  const label = workspaceAreaLabel(activeArea);
+  const description = workspaceAreaDescription(activeArea);
+
+  return (
+    <div
+      className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 rounded-[var(--radius-lg)] border border-[var(--border-hairline)] bg-[rgba(var(--paper-rgb),0.025)] px-3.5 py-2 text-xs"
+      aria-label="Workspace status"
+    >
+      <span className="font-extrabold text-[var(--atelier-sage-300)]">
+        {label}
+      </span>
+      <span className="text-[var(--text-secondary)]">{description}</span>
+      {operationCount > 0 ? (
+        <span className="rounded-full bg-[rgba(var(--paper-rgb),0.05)] px-2 py-0.5 font-bold text-[var(--text-muted)]">
+          {operationCount} {operationCount === 1 ? "change" : "changes"}
+        </span>
+      ) : null}
+      {recent ? (
+        <span className="min-w-0 truncate text-[var(--text-subtle)] sm:ml-auto">
+          Last change: {recent.description}
+        </span>
+      ) : activeArea !== "export" ? (
+        <span className="text-[var(--text-subtle)] sm:ml-auto">
+          Finish when you&apos;re ready to export.
+        </span>
+      ) : null}
     </div>
   );
 }
