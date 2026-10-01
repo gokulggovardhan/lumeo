@@ -53,7 +53,10 @@ import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { recordRecentFile } from "@/lib/recent-files";
-import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
+import {
+  useWorkspaceRestore,
+  useWorkspaceSession,
+} from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import {
   hasPdfMagicBytes,
   isPdfNamedFile,
@@ -625,6 +628,8 @@ export default function CompressPdfTool() {
     if (!file) return;
     void readPdfFile(file);
   }
+
+  useWorkspaceRestore((file) => readPdfFile(file));
 
   async function copyMetadata(source: PDFDocument, output: PDFDocument) {
     try {
