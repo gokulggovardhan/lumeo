@@ -76,6 +76,7 @@ import {
   isPdfNamedFile,
   checkPdfFileSize,
 } from "@/lib/pdf/uploadValidation";
+import { createLatestRequestAuthority } from "@/lib/pdf/latestRequestAuthority";
 
 type PageSize = { width: number; height: number };
 
@@ -133,6 +134,7 @@ export default function SignPdfTool() {
   const sourceSequenceRef = useRef(1);
   const exportRevisionRef = useRef(0);
   const downloadUrlRef = useRef("");
+  const fileLoadAuthorityRef = useRef(createLatestRequestAuthority());
 
   const [pdf, setPdf] = useState<LoadedPdf | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -281,7 +283,9 @@ export default function SignPdfTool() {
 
   useEffect(() => {
     const toastTimers = toastTimersRef.current;
+    const fileLoadAuthority = fileLoadAuthorityRef.current;
     return () => {
+      fileLoadAuthority.invalidate();
       if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       Object.values(thumbnailUrlsRef.current).forEach((url) => URL.revokeObjectURL(url));
@@ -416,9 +420,10 @@ export default function SignPdfTool() {
   }, [redo, undo, selectedId, setElements]);
 
   const addFile = async (files: FileList | File[]) => {
-    setError("");
     const file = Array.from(files)[0];
     if (!file) return;
+    const loadToken = fileLoadAuthorityRef.current.begin();
+    setError("");
 
     if (!isPdfNamedFile(file)) {
       setError("Please choose a PDF file.");
@@ -433,6 +438,7 @@ export default function SignPdfTool() {
 
     try {
       const bytes = await file.arrayBuffer();
+      if (!fileLoadAuthorityRef.current.isCurrent(loadToken)) return;
 
       if (!hasPdfMagicBytes(bytes)) {
         setError("This doesn't look like a valid PDF file.");
@@ -440,6 +446,7 @@ export default function SignPdfTool() {
       }
 
       const doc = await PDFDocument.load(copyArrayBuffer(bytes), { ignoreEncryption: false });
+      if (!fileLoadAuthorityRef.current.isCurrent(loadToken)) return;
       const pageSizes = doc.getPages().map((page) => {
         const { width, height } = page.getSize();
         return { width, height };
@@ -466,11 +473,13 @@ export default function SignPdfTool() {
       setSelectedId(null);
       setDownloadUrl("");
     } catch {
+      if (!fileLoadAuthorityRef.current.isCurrent(loadToken)) return;
       setError("This file could not be read. It may be damaged or password-protected.");
     }
   };
 
   const startNew = () => {
+    fileLoadAuthorityRef.current.invalidate();
     if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
     if (pageImageUrlRef.current) URL.revokeObjectURL(pageImageUrlRef.current);
     downloadUrlRef.current = "";

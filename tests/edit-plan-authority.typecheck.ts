@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars -- This file consists of compile-time-only authority assertions. */
+
 import type {
   EditPlan,
   EditPlanFields,

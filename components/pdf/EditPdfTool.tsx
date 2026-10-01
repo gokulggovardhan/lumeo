@@ -1046,7 +1046,6 @@ export default function EditPdfTool() {
   // in lib/pdf/edit; Phase 2.3 can now replace the run-index selection model
   // behind one boundary instead of another monolithic component rewrite.
   const {
-    selectionAnchorIndex,
     selectedRunIndices,
     hoveredRunIndex,
     setHoveredRunIndex,
@@ -4269,6 +4268,9 @@ export default function EditPdfTool() {
       fragmentedRunReconstructions,
       editDraftText,
       caretTextStyleSnapshot,
+      setCaretTextStyleSnapshot,
+      setEditDraftText,
+      setEditApplyError,
     ],
   );
 
@@ -5350,7 +5352,7 @@ export default function EditPdfTool() {
     } finally {
       setIsApplyingEdit(false);
     }
-  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan, nativePaintPlan, textCompositionActive, nativeTextSelectionKey]);
+  }, [editPreview, setHistoryState, selectedRunIndices, pageTextModel, pageIndex, selectedNativeSpan, nativePaintPlan, textCompositionActive, nativeTextSelectionKey, setEditApplyError]);
 
   // Phase 2.4B: formatting a logical multi-span selection is a DIFFERENT
   // transaction from multi-run text replacement. Each selected span keeps its
@@ -5481,6 +5483,7 @@ export default function EditPdfTool() {
     pageIndex,
     selectedNativeSpans,
     setHistoryState,
+    setEditApplyError,
   ]);
 
   // Restyle covers a run with a whiteout and drops an editable text box in

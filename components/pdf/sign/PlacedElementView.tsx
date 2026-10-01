@@ -108,6 +108,13 @@ export function PlacedElementView({
     onChange(live);
   }
 
+  function releasePointer(event: React.PointerEvent<HTMLDivElement>) {
+    const target = event.target as HTMLElement;
+    if (target.hasPointerCapture(event.pointerId)) {
+      target.releasePointerCapture(event.pointerId);
+    }
+  }
+
   function handleBodyPointerDown(event: React.PointerEvent<HTMLDivElement>) {
     if ((event.target as HTMLElement).dataset.handle) return;
     onSelect();
@@ -137,7 +144,7 @@ export function PlacedElementView({
       dragRef.current = null;
       commitLive();
     }
-    (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+    releasePointer(event);
   }
 
   function handleResizeStart(event: React.PointerEvent<HTMLDivElement>) {
@@ -179,7 +186,7 @@ export function PlacedElementView({
       resizeRef.current = null;
       commitLive();
     }
-    (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+    releasePointer(event);
   }
 
   function handleRotateStart(event: React.PointerEvent<HTMLDivElement>) {
@@ -212,7 +219,7 @@ export function PlacedElementView({
       rotateRef.current = null;
       commitLive();
     }
-    (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+    releasePointer(event);
   }
 
   const canRotate = element.type === "signature";

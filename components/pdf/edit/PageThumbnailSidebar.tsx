@@ -364,7 +364,7 @@ export default function PageThumbnailSidebar({
     getDocument,
     thumbnailWindow.endIndexExclusive,
     thumbnailWindow.startIndex,
-    thumbnailWindow.indices.length,
+    thumbnailWindow.indices,
     thumbnailWindow.virtualized,
     onPerformanceSample,
   ]);
