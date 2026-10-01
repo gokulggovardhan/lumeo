@@ -29,3 +29,15 @@ export function visibleWorkspaceHistory(
   if (safeLimit === 0 || cursor <= 0) return [];
   return operations.slice(0, cursor).slice(-safeLimit).reverse();
 }
+
+export const WORKSPACE_AREA_ROUTE: Partial<Record<WorkspaceArea, string>> = {
+  edit: "/pdf/edit",
+  pages: "/pdf/organize",
+  sign: "/pdf/sign",
+  enhance: "/pdf/watermark",
+  optimize: "/pdf/compress",
+};
+
+export function workspaceAreaRoute(area: WorkspaceArea): string | null {
+  return WORKSPACE_AREA_ROUTE[area] ?? null;
+}
