@@ -6,6 +6,7 @@ import {
   visibleWorkspaceHistory,
   workspaceAreaDescription,
   workspaceAreaLabel,
+  workspaceAreaRoute,
 } from "../lib/pdf/workspace/presentation.ts";
 
 function op(id: string, description: string): WorkspaceOperation {
@@ -31,6 +32,12 @@ test("workspace areas use short, understandable product language", () => {
   assert.equal(workspaceAreaLabel("enhance"), "Add");
   assert.equal(workspaceAreaDescription("optimize"), "Reduce file size");
   assert.equal(workspaceAreaDescription("export"), "Review & export");
+  assert.equal(workspaceAreaRoute("edit"), "/pdf/edit");
+  assert.equal(workspaceAreaRoute("pages"), "/pdf/organize");
+  assert.equal(workspaceAreaRoute("sign"), "/pdf/sign");
+  assert.equal(workspaceAreaRoute("enhance"), "/pdf/watermark");
+  assert.equal(workspaceAreaRoute("optimize"), "/pdf/compress");
+  assert.equal(workspaceAreaRoute("export"), null);
 });
 
 test("visible history respects the active cursor and newest-first presentation", () => {
