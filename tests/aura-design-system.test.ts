@@ -345,7 +345,7 @@ test("live PDF tool pages use the Aura visual layer without algorithm assertions
   assert.ok(css.includes(".l2-tool-settings-panel"));
   assert.ok(css.includes("@media (max-width: 1023px)"));
   assert.ok(workspace.includes("LOCAL_FIRST_SHORT"));
-  const copy = await readFile("lib/public-site/copy.ts", "utf8");
+  const copy = read("lib/public-site/copy.ts");
   assert.ok(copy.includes("Files stay on your device · Local processing where supported"));
   assert.doesNotMatch([mergePage, splitPage, compressPage].join("\n"), /processing_started|processing_succeeded|processing_failed|download_started/);
 });
