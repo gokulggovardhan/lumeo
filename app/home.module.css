@@ -5,9 +5,9 @@
 }
 
 .heroTitle {
-  font-size: clamp(2.25rem, 4.6vw, 3.75rem);
-  line-height: 0.99;
-  letter-spacing: -0.035em;
+  font-size: clamp(2.25rem, 4.6vw, 3.75rem) !important;
+  line-height: 0.99 !important;
+  letter-spacing: -0.035em !important;
 }
 
 .heroTrust {
@@ -138,8 +138,8 @@
   }
 
   .heroTitle {
-    font-size: clamp(2.15rem, 12vw, 3rem);
-    line-height: 1;
+    font-size: clamp(2.15rem, 12vw, 3rem) !important;
+    line-height: 1 !important;
   }
 
   .heroTrust {
