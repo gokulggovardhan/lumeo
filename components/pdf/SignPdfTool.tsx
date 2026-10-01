@@ -78,6 +78,7 @@ import {
   checkPdfFileSize,
 } from "@/lib/pdf/uploadValidation";
 import { createLatestRequestAuthority } from "@/lib/pdf/latestRequestAuthority";
+import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
 
 type PageSize = { width: number; height: number };
 
@@ -131,6 +132,12 @@ function SignIcon() {
 
 export default function SignPdfTool() {
   const { availability, track } = useAnalytics();
+  const {
+    openDocument: openWorkspaceDocument,
+    commitRevision: commitWorkspaceRevision,
+    markDirty: markWorkspaceDirty,
+    clearSession: clearWorkspaceSession,
+  } = useWorkspaceSession();
   const openedTrackedRef = useRef(false);
   const sourceSequenceRef = useRef(1);
   const exportRevisionRef = useRef(0);
@@ -244,6 +251,22 @@ export default function SignPdfTool() {
       ),
     };
   }, [pdf, signHistoryState.semanticHistory, workspaceExportState]);
+
+  useEffect(() => {
+    if (!pdf || !workspaceProjection?.compatible) return;
+    markWorkspaceDirty(
+      workspaceProjection.session.state.hasUnsavedChanges,
+      "sign",
+    );
+  }, [
+    pdf,
+    markWorkspaceDirty,
+    workspaceProjection?.compatible,
+    workspaceProjection?.compatible
+      ? workspaceProjection.session.state.hasUnsavedChanges
+      : false,
+  ]);
+
   const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [armedSignature, setArmedSignature] = useState<CreatedSignature | SavedSignature | null>(null);
@@ -473,6 +496,7 @@ export default function SignPdfTool() {
       resetElements([]);
       setSelectedId(null);
       setDownloadUrl("");
+      openWorkspaceDocument({ file, pageCount, area: "sign" });
     } catch {
       if (!fileLoadAuthorityRef.current.isCurrent(loadToken)) return;
       setError("This file could not be read. It may be damaged or password-protected.");
@@ -493,6 +517,7 @@ export default function SignPdfTool() {
     setError("");
     setOutputName("lumeo-signed.pdf");
     setArmedSignature(null);
+    clearWorkspaceSession();
   };
 
   function refreshLibrary() {
@@ -698,12 +723,20 @@ export default function SignPdfTool() {
       }
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
+      const signedFileName = sanitizePdfFileName(outputName);
       downloadUrlRef.current = url;
       setDownloadUrl(url);
-      setDownloadName(sanitizePdfFileName(outputName));
+      setDownloadName(signedFileName);
+      commitWorkspaceRevision({
+        blob,
+        filename: signedFileName,
+        pageCount: pdf.pageCount,
+        area: "sign",
+        description: "Added signature",
+      });
       setWorkspaceExportState("exported");
       track({ eventName: "processing_succeeded", toolSlug: "sign", durationMs: performance.now() - startedAt, success: true });
-      recordRecentFile({ tool: "sign", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
+      recordRecentFile({ tool: "sign", filename: signedFileName, fileSize: blob.size, pageCount: pdf.pageCount });
     } catch {
       if (
         exportRevision !== exportRevisionRef.current ||
