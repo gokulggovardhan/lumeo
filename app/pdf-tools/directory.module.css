@@ -1,0 +1,70 @@
+.directoryStage > div > section[aria-label="Find a PDF tool"] {
+  padding: 0.9rem !important;
+  border-radius: 15px !important;
+  box-shadow: none !important;
+}
+
+.directoryStage > div > section[aria-label="Find a PDF tool"] > div:first-child {
+  margin-bottom: 0.5rem !important;
+}
+
+.directoryStage > div > section[aria-label="Find a PDF tool"] > div:first-child p {
+  margin-top: 0.15rem !important;
+}
+
+.directoryStage > div > nav[aria-label="Popular PDF tools"] {
+  display: none;
+}
+
+.directoryStage > div > div:nth-of-type(1) {
+  margin-top: 1rem !important;
+  margin-bottom: 0.65rem !important;
+}
+
+.directoryStage > div > div.grid {
+  gap: 0.75rem !important;
+}
+
+.directoryStage :global(.lumeo-tool-card) {
+  min-height: 10.75rem !important;
+  gap: 0.75rem !important;
+  padding: 1rem !important;
+  border-radius: 15px !important;
+}
+
+.directoryStage :global(.lumeo-tool-card) h3 {
+  font-size: 1rem !important;
+}
+
+.directoryStage :global(.lumeo-tool-card) p {
+  margin-top: 0.35rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1.15rem !important;
+}
+
+.directoryStage :global(.lumeo-tool-card) > div:first-child > span:first-child {
+  width: 2.35rem !important;
+  height: 2.35rem !important;
+}
+
+.directoryStage aside[aria-label="Processing information"] {
+  margin-top: 1.5rem !important;
+  padding: 0.85rem 1rem !important;
+  border-radius: 14px !important;
+}
+
+@media (min-width: 1280px) {
+  .directoryStage > div > div.grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+
+  .directoryStage > div > section[aria-labelledby="unavailable-tools-heading"] > div.grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .directoryStage > div > section[aria-label="Find a PDF tool"] {
+    padding: 0.75rem !important;
+  }
+}
