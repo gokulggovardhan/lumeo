@@ -25,5 +25,7 @@ export function visibleWorkspaceHistory(
   cursor: number,
   limit = 4,
 ): readonly WorkspaceOperation[] {
-  return operations.slice(0, cursor).slice(-Math.max(0, limit)).reverse();
+  const safeLimit = Math.max(0, Math.floor(limit));
+  if (safeLimit === 0 || cursor <= 0) return [];
+  return operations.slice(0, cursor).slice(-safeLimit).reverse();
 }
