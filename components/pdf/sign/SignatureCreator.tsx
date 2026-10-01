@@ -324,7 +324,7 @@ function UploadTab({ onCreate }: { onCreate: (signature: CreatedSignature) => vo
     <div>
       {!imageUrl ? (
         <label className="flex h-36 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-[var(--text-primary)]/20 text-sm text-[var(--text-primary)]/50 transition hover:border-[var(--lumeo-gold)]/40 hover:text-[var(--text-primary)]/70">
-          <span>Upload a signature image</span>
+          <span>Choose a signature image</span>
           <span className="text-xs text-[var(--text-primary)]/34">PNG, JPG, or WEBP</span>
           <input
             type="file"
@@ -348,7 +348,7 @@ function UploadTab({ onCreate }: { onCreate: (signature: CreatedSignature) => vo
             style={{ height: CANVAS_HEIGHT + 20 }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img ref={imgElRef} src={imageUrl} alt="Uploaded signature" className="h-full w-full select-none object-contain" draggable={false} />
+            <img ref={imgElRef} src={imageUrl} alt="Selected signature image" className="h-full w-full select-none object-contain" draggable={false} />
             {crop && crop.width > 2 ? (
               <div
                 className="pointer-events-none absolute border-2 border-[var(--lumeo-gold)] bg-[var(--lumeo-gold)]/10"
@@ -389,7 +389,7 @@ export function SignatureCreator({ onCreate }: { onCreate: (signature: CreatedSi
     () => [
       { value: "draw" as const, label: "Draw" },
       { value: "type" as const, label: "Type" },
-      { value: "upload" as const, label: "Upload" },
+      { value: "upload" as const, label: "Image" },
     ],
     [],
   );
