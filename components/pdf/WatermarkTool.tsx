@@ -59,6 +59,7 @@ import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
+import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 import { resetPdfPreviewState } from "@/lib/pdf/resetPreviewState";
@@ -127,6 +128,12 @@ function WatermarkIcon() {
 
 export default function WatermarkTool() {
   const { availability, track } = useAnalytics();
+  const {
+    openDocument: openWorkspaceDocument,
+    commitRevision: commitWorkspaceRevision,
+    markDirty: markWorkspaceDirty,
+    clearSession: clearWorkspaceSession,
+  } = useWorkspaceSession();
   const openedTrackedRef = useRef(false);
 
   const [pdf, setPdf] = useState<LoadedPdf | null>(null);
@@ -186,6 +193,7 @@ export default function WatermarkTool() {
     setPageRangeError("");
     setDownloadUrl("");
     setOutputName("lumeo-watermarked.pdf");
+    clearWorkspaceSession();
   }
 
   // Any export-affecting config change (text, image, opacity, rotation,
@@ -195,11 +203,18 @@ export default function WatermarkTool() {
   // blob URL is revoked and the primary button reverts to "Add Watermark"
   // until the user exports again.
   useEffect(() => {
+    if (pdf) {
+      const defaultConfig = createDefaultTextWatermarkConfig();
+      markWorkspaceDirty(
+        JSON.stringify(config) !== JSON.stringify(defaultConfig),
+        "enhance",
+      );
+    }
     if (!downloadUrlRef.current) return;
     URL.revokeObjectURL(downloadUrlRef.current);
     downloadUrlRef.current = "";
     setDownloadUrl("");
-  }, [config]);
+  }, [config, pdf, markWorkspaceDirty]);
 
   useEffect(() => {
     let cancelled = false;
@@ -297,6 +312,7 @@ export default function WatermarkTool() {
       }
 
       setPdf({ file, bytes, pageCount });
+      openWorkspaceDocument({ file, pageCount, area: "enhance" });
       setPageIndex(0);
       resetConfig(createDefaultTextWatermarkConfig());
       setContentMode("text");
@@ -437,18 +453,26 @@ export default function WatermarkTool() {
       const blob = new Blob([buffer], { type: "application/pdf" });
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
+      const watermarkedFileName = sanitizePdfFileName(outputName);
       downloadUrlRef.current = url;
       setDownloadUrl(url);
-      setDownloadName(sanitizePdfFileName(outputName));
+      setDownloadName(watermarkedFileName);
+      commitWorkspaceRevision({
+        blob,
+        filename: watermarkedFileName,
+        pageCount: pdf.pageCount,
+        area: "enhance",
+        description: "Added watermark",
+      });
       track({ eventName: "processing_succeeded", toolSlug: "watermark", durationMs: performance.now() - startedAt, success: true });
-      recordRecentFile({ tool: "watermark", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
+      recordRecentFile({ tool: "watermark", filename: watermarkedFileName, fileSize: blob.size, pageCount: pdf.pageCount });
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Could not add the watermark. Please try again.");
       track({ eventName: "processing_failed", toolSlug: "watermark", durationMs: performance.now() - startedAt, success: false, errorCode: "processing_error" });
     } finally {
       setIsExporting(false);
     }
-  }, [pdf, config, outputName, track]);
+  }, [pdf, config, outputName, track, commitWorkspaceRevision]);
 
   function downloadWatermarkedPdf() {
     if (!downloadUrl) return;
