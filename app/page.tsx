@@ -10,6 +10,10 @@ import { withSeoOverride } from "@/lib/public-site/seo";
 import { getPublicPdfCatalog } from "@/lib/public-catalog/data";
 import { resolveLumeoTools } from "@/lib/tools/resolve";
 import { buildTiles } from "@/lib/tools/tiles";
+import {
+  LOCAL_FIRST_DISCLOSURE,
+  LOCAL_FIRST_MESSAGE,
+} from "@/lib/public-site/copy";
 import styles from "./home.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -107,24 +111,6 @@ const trustRail = [
   "No installation",
 ];
 
-const privacyItems = [
-  {
-    title: "Files stay local where supported",
-    description:
-      "Supported workflows are designed to process documents in your browser instead of sending them away for routine PDF work.",
-  },
-  {
-    title: "Clear file handling",
-    description:
-      "Each tool explains how it handles files and any browser requirements before you begin.",
-  },
-  {
-    title: "No unnecessary storage",
-    description:
-      "Current public tools do not require a Lumeo account or cloud document library to complete everyday tasks.",
-  },
-];
-
 export default async function Home() {
   const catalog = await getPublicPdfCatalog();
   const tiles = buildTiles(resolveLumeoTools(catalog.tools));
@@ -210,41 +196,28 @@ export default async function Home() {
           <ContinueWorking tiles={tiles} />
 
           <section
-            className="mt-11 border-y border-[var(--border-hairline)] py-9 sm:mt-12 sm:py-10"
+            className="mt-10 border-y border-[var(--border-hairline)] py-6 sm:mt-11"
             aria-labelledby="privacy-heading"
           >
-            <div className="grid gap-6 lg:grid-cols-[0.78fr_1.3fr] lg:items-start">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="aura-text-label text-[var(--atelier-sage-300)]">
-                  Privacy, without the fine print
+                  Local-first privacy
                 </p>
                 <h2
                   id="privacy-heading"
-                  className="mt-2 font-serif text-[1.8rem] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]"
+                  className="mt-1.5 font-serif text-xl font-semibold tracking-[-0.015em] text-[var(--text-primary)]"
                 >
                   Private by design. Clear by default.
                 </h2>
-                <p className="mt-3 max-w-md text-sm leading-6 text-[var(--text-secondary)]">
-                  Lumeo keeps the privacy message simple: explain where work
-                  happens, avoid unnecessary storage, and tell you what a tool
-                  needs before it starts.
-                </p>
               </div>
-
-              <div className="grid gap-3 sm:grid-cols-3">
-                {privacyItems.map((item) => (
-                  <div
-                    key={item.title}
-                    className="rounded-[15px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-4"
-                  >
-                    <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
-                      {item.title}
-                    </h3>
-                    <p className="mt-1.5 text-[12.5px] leading-5 text-[var(--text-secondary)]">
-                      {item.description}
-                    </p>
-                  </div>
-                ))}
+              <div className="max-w-2xl sm:text-right">
+                <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                  {LOCAL_FIRST_MESSAGE}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                  {LOCAL_FIRST_DISCLOSURE}
+                </p>
               </div>
             </div>
           </section>
