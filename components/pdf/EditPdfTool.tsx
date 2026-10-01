@@ -42,6 +42,7 @@ import { OcrWordOverlay } from "@/components/pdf/edit/OcrWordOverlay";
 import { NativeTextFormatPanel, type NativeTextStyleDraft } from "@/components/pdf/edit/NativeTextFormatPanel";
 import { NativeTextMixedFormatPanel } from "@/components/pdf/edit/NativeTextMixedFormatPanel";
 import { useNativeTextSelectionState } from "@/components/pdf/edit/useNativeTextSelectionState";
+import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 import {
   createInkElement,
@@ -630,6 +631,12 @@ function RedoIcon() {
 
 export default function EditPdfTool() {
   const { availability, track } = useAnalytics();
+  const {
+    openDocument: openWorkspaceDocument,
+    commitRevision: commitWorkspaceRevision,
+    markDirty: markWorkspaceDirty,
+    clearSession: clearWorkspaceSession,
+  } = useWorkspaceSession();
   const openedTrackedRef = useRef(false);
   const workspaceSourceSequenceRef = useRef(1);
 
@@ -794,6 +801,22 @@ export default function EditPdfTool() {
     pdfMeta,
     workspaceExportState,
   ]);
+
+  useEffect(() => {
+    if (!pdfMeta || !workspaceProjection?.compatible) return;
+    markWorkspaceDirty(
+      workspaceProjection.session.state.hasUnsavedChanges,
+      "edit",
+    );
+  }, [
+    pdfMeta,
+    markWorkspaceDirty,
+    workspaceProjection?.compatible,
+    workspaceProjection?.compatible
+      ? workspaceProjection.session.state.hasUnsavedChanges
+      : false,
+  ]);
+
   const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -2501,6 +2524,7 @@ export default function EditPdfTool() {
     setActiveTool("select");
     setZoom(1);
     setOutputName("lumeo-edited.pdf");
+    clearWorkspaceSession();
   }
 
   // Opens the source PDF via pdfjs once per uploaded file, kept open for the
@@ -3410,6 +3434,7 @@ export default function EditPdfTool() {
       });
       setSelectedId(null);
       invalidatePublishedExport();
+      openWorkspaceDocument({ file, pageCount, area: "edit" });
     } catch (uploadError) {
       const message =
         uploadError instanceof Error && /password|encrypt/i.test(uploadError.message)
@@ -6641,12 +6666,20 @@ export default function EditPdfTool() {
       const blob = new Blob([buffer], { type: "application/pdf" });
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
+      const editedFileName = sanitizePdfFileName(outputName);
       downloadUrlRef.current = url;
       setDownloadUrl(url);
+      commitWorkspaceRevision({
+        blob,
+        filename: editedFileName,
+        pageCount: pdf.pageCount,
+        area: "edit",
+        description: "Edited PDF",
+      });
       setWorkspaceExportState("exported");
-      setDownloadName(sanitizePdfFileName(outputName));
+      setDownloadName(editedFileName);
       track({ eventName: "processing_succeeded", toolSlug: "edit", durationMs: performance.now() - startedAt, success: true });
-      recordRecentFile({ tool: "edit", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
+      recordRecentFile({ tool: "edit", filename: editedFileName, fileSize: blob.size, pageCount: pdf.pageCount });
     } catch (exportError) {
       if (exportRequestRevisionRef.current !== exportRequestRevision) return;
       setWorkspaceExportState("error");
@@ -6657,7 +6690,7 @@ export default function EditPdfTool() {
         setIsExporting(false);
       }
     }
-  }, [pdf, elements, outputName, track, historyState.session, localCustomFontAssets]);
+  }, [pdf, elements, outputName, track, historyState.session, localCustomFontAssets, commitWorkspaceRevision]);
 
   function downloadEditedPdf() {
     if (!downloadUrl) return;
