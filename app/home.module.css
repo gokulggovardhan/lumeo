@@ -1,0 +1,154 @@
+.heroGrid {
+  display: grid;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.heroTitle {
+  font-size: clamp(2.25rem, 4.6vw, 3.75rem) !important;
+  line-height: 0.99 !important;
+  letter-spacing: -0.035em !important;
+}
+
+.heroTrust {
+  align-self: end;
+  border: 1px solid var(--border-hairline);
+  border-radius: 16px;
+  background: rgba(var(--paper-rgb), 0.025);
+  padding: 0.9rem 1rem;
+  box-shadow: inset 0 1px 0 rgba(var(--paper-rgb), 0.035);
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > div:first-child {
+  margin-bottom: 1rem !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > div:first-child h2 {
+  margin-top: 0.3rem !important;
+  font-size: 1.6rem !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > div:first-child p:last-child {
+  margin-top: 0.3rem !important;
+  max-width: 42rem;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul {
+  gap: 0.8rem !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul > li > div > a,
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul > li > div > article {
+  min-height: 9.9rem !important;
+  padding: 1rem !important;
+  border-radius: 15px !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul > li > div > a > div:first-child > span:first-child,
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul > li > div > article > div:first-child > span:first-child {
+  width: 2.55rem !important;
+  height: 2.55rem !important;
+  border-radius: 12px !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul h3 {
+  font-size: 1.03rem !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul p {
+  margin-top: 0.35rem !important;
+  font-size: 0.77rem !important;
+  line-height: 1.15rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"],
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] {
+  margin-top: 2rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > div:first-child,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > div:first-child {
+  margin-bottom: 0.8rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > div:first-child h2,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > div:first-child h2 {
+  margin-top: 0.25rem !important;
+  font-size: 1.25rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > ul,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul {
+  gap: 0.75rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > ul > li > div > a,
+.toolStage section[aria-labelledby="more-tools-heading"] > ul > li > div > article,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul > li > div > a,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul > li > div > article {
+  min-height: 8.6rem !important;
+  padding: 0.95rem !important;
+  border-radius: 15px !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > ul > li > div > a > div:first-child > span:first-child,
+.toolStage section[aria-labelledby="more-tools-heading"] > ul > li > div > article > div:first-child > span:first-child,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul > li > div > a > div:first-child > span:first-child,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul > li > div > article > div:first-child > span:first-child {
+  width: 2.35rem !important;
+  height: 2.35rem !important;
+  border-radius: 11px !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > ul h3,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul h3 {
+  font-size: 0.95rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > ul p,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul p {
+  margin-top: 0.3rem !important;
+  font-size: 0.74rem !important;
+  line-height: 1.1rem !important;
+}
+
+@media (min-width: 900px) {
+  .heroGrid {
+    grid-template-columns: minmax(0, 1.45fr) minmax(17rem, 0.55fr);
+    gap: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .toolStage section[aria-labelledby="popular-tools-heading"] > ul {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (min-width: 1280px) {
+  .toolStage section[aria-labelledby="more-tools-heading"] > ul,
+  .toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .heroGrid {
+    gap: 0.85rem;
+  }
+
+  .heroTitle {
+    font-size: clamp(2.15rem, 12vw, 3rem) !important;
+    line-height: 1 !important;
+  }
+
+  .heroTrust {
+    padding: 0.8rem 0.85rem;
+  }
+
+  .toolStage section[aria-labelledby="popular-tools-heading"] > ul,
+  .toolStage section[aria-labelledby="more-tools-heading"] > ul,
+  .toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul {
+    gap: 0.65rem !important;
+  }
+}
