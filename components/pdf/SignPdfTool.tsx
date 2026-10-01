@@ -57,6 +57,14 @@ import {
   createPdfSemanticHistory,
   type PdfSemanticHistoryJournal,
 } from "@/lib/pdf/history/semanticHistory";
+import {
+  createWorkspaceDocument,
+  type WorkspaceDocument,
+} from "@/lib/pdf/workspace/model";
+import {
+  createSignWorkspaceSession,
+  projectSignExportState,
+} from "@/lib/pdf/workspace/signAdapter";
 import { useHistoryState } from "@/lib/sign/useHistoryState";
 import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
@@ -76,6 +84,7 @@ type LoadedPdf = {
   bytes: ArrayBuffer;
   pageCount: number;
   pageSizes: PageSize[];
+  workspaceDocument: WorkspaceDocument;
 };
 
 // pdfjs's viewport scale maps PDF points to render pixels 1:1 at this
@@ -121,6 +130,9 @@ function SignIcon() {
 export default function SignPdfTool() {
   const { availability, track } = useAnalytics();
   const openedTrackedRef = useRef(false);
+  const sourceSequenceRef = useRef(1);
+  const exportRevisionRef = useRef(0);
+  const downloadUrlRef = useRef("");
 
   const [pdf, setPdf] = useState<LoadedPdf | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
@@ -128,20 +140,37 @@ export default function SignPdfTool() {
   const [pageDisplaySize, setPageDisplaySize] = useState<{ width: number; height: number } | null>(null);
   const [error, setError] = useState("");
   const [pageLoading, setPageLoading] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [downloadUrl, setDownloadUrl] = useState("");
+  const [downloadName, setDownloadName] = useState("lumeo-signed.pdf");
+  const [outputName, setOutputName] = useState("lumeo-signed.pdf");
+  const [workspaceExportState, setWorkspaceExportState] = useState<
+    "idle" | "exporting" | "exported" | "error"
+  >("idle");
 
   const {
     state: signHistoryState,
     set: setSignHistoryState,
-    undo,
-    redo,
+    undo: undoSignHistory,
+    redo: redoSignHistory,
     canUndo,
     canRedo,
     reset: resetSignHistory,
+    getCurrent: getCurrentSignHistoryState,
   } = useHistoryState<SignHistorySnapshot>({
     elements: [],
     semanticHistory: createPdfSemanticHistory(),
   });
   const elements = signHistoryState.elements;
+  const invalidatePublishedExport = useCallback(() => {
+    exportRevisionRef.current += 1;
+    setWorkspaceExportState("idle");
+    if (downloadUrlRef.current) {
+      URL.revokeObjectURL(downloadUrlRef.current);
+      downloadUrlRef.current = "";
+    }
+    setDownloadUrl("");
+  }, []);
   // Preserve Sign's exact existing setElements contract and ref-backed
   // useHistoryState authority. The semantic journal travels inside the same
   // snapshot, so one placement/drag/edit is still one undo step.
@@ -151,6 +180,7 @@ export default function SignPdfTool() {
         | PlacedElement[]
         | ((current: PlacedElement[]) => PlacedElement[]),
     ) => {
+      invalidatePublishedExport();
       setSignHistoryState((current) => {
         const nextElements =
           typeof updater === "function"
@@ -171,17 +201,46 @@ export default function SignPdfTool() {
         };
       });
     },
-    [setSignHistoryState],
+    [invalidatePublishedExport, setSignHistoryState],
   );
   const resetElements = useCallback(
     (nextElements: PlacedElement[]) => {
+      invalidatePublishedExport();
       resetSignHistory({
         elements: nextElements,
         semanticHistory: createPdfSemanticHistory(),
       });
     },
-    [resetSignHistory],
+    [invalidatePublishedExport, resetSignHistory],
   );
+  const undo = useCallback(() => {
+    if (!canUndo) return;
+    invalidatePublishedExport();
+    undoSignHistory();
+  }, [canUndo, invalidatePublishedExport, undoSignHistory]);
+  const redo = useCallback(() => {
+    if (!canRedo) return;
+    invalidatePublishedExport();
+    redoSignHistory();
+  }, [canRedo, invalidatePublishedExport, redoSignHistory]);
+  const workspaceProjection = useMemo(() => {
+    if (!pdf) return null;
+    const projection = createSignWorkspaceSession({
+      history: signHistoryState.semanticHistory,
+      sessionId: `sign-${pdf.workspaceDocument.id}`,
+      document: pdf.workspaceDocument,
+    });
+    if (!projection.compatible || workspaceExportState === "idle") {
+      return projection;
+    }
+    return {
+      ...projection,
+      session: projectSignExportState(
+        projection.session,
+        workspaceExportState,
+      ),
+    };
+  }, [pdf, signHistoryState.semanticHistory, workspaceExportState]);
   const elementIdCounterRef = useRef(0);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [armedSignature, setArmedSignature] = useState<CreatedSignature | SavedSignature | null>(null);
@@ -189,17 +248,12 @@ export default function SignPdfTool() {
   const [signatures, setSignatures] = useState<SavedSignature[]>(() => listSignatures());
   const [showCreator, setShowCreator] = useState(false);
 
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [downloadUrl, setDownloadUrl] = useState("");
-  const [downloadName, setDownloadName] = useState("lumeo-signed.pdf");
-  const [outputName, setOutputName] = useState("lumeo-signed.pdf");
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const [thumbnails, setThumbnails] = useState<Record<number, string>>({});
 
   const stageRef = useRef<HTMLDivElement | null>(null);
   const pageImageUrlRef = useRef("");
-  const downloadUrlRef = useRef("");
   const thumbnailUrlsRef = useRef<Record<number, string>>({});
   // The source PDF is decoded via pdfjs once per uploaded file and kept open
   // here -- both the thumbnail rail and the current-page preview reuse this
@@ -390,7 +444,23 @@ export default function SignPdfTool() {
         const { width, height } = page.getSize();
         return { width, height };
       });
-      setPdf({ file, bytes, pageCount: doc.getPageCount(), pageSizes });
+      const pageCount = doc.getPageCount();
+      const sourceId = `sign-source-${sourceSequenceRef.current++}`;
+      setPdf({
+        file,
+        bytes,
+        pageCount,
+        pageSizes,
+        workspaceDocument: createWorkspaceDocument(
+          `sign-document-${sourceId}`,
+          {
+            id: sourceId,
+            name: file.name,
+            byteLength: file.size,
+            pageCount,
+          },
+        ),
+      });
       setPageIndex(0);
       resetElements([]);
       setSelectedId(null);
@@ -519,7 +589,10 @@ export default function SignPdfTool() {
   async function generateSignedPdf() {
     if (!pdf || elements.length === 0) return;
     setIsGenerating(true);
+    setWorkspaceExportState("exporting");
     setError("");
+    const exportRevision = exportRevisionRef.current;
+    const exportSnapshot = getCurrentSignHistoryState();
     const startedAt = performance.now();
     track({ eventName: "processing_started", toolSlug: "sign" });
 
@@ -600,22 +673,37 @@ export default function SignPdfTool() {
         // filled anything in yet").
         setError("Every text, date, or initials box is empty. Fill one in, or add a signature, before signing.");
         pushToast("Nothing to sign yet -- fill in your text boxes first", "error");
+        setWorkspaceExportState("idle");
         return;
       }
 
       const bytes = await doc.save();
       const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
       const blob = new Blob([buffer], { type: "application/pdf" });
+      if (
+        exportRevision !== exportRevisionRef.current ||
+        exportSnapshot !== getCurrentSignHistoryState()
+      ) {
+        return;
+      }
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
       downloadUrlRef.current = url;
       setDownloadUrl(url);
       setDownloadName(sanitizePdfFileName(outputName));
+      setWorkspaceExportState("exported");
       track({ eventName: "processing_succeeded", toolSlug: "sign", durationMs: performance.now() - startedAt, success: true });
       recordRecentFile({ tool: "sign", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
     } catch {
+      if (
+        exportRevision !== exportRevisionRef.current ||
+        exportSnapshot !== getCurrentSignHistoryState()
+      ) {
+        return;
+      }
       setError("Signing failed. Try a smaller file or fewer elements.");
       pushToast("Could not sign the PDF. Please try again.", "error");
+      setWorkspaceExportState("error");
       track({ eventName: "processing_failed", toolSlug: "sign", durationMs: performance.now() - startedAt, success: false, errorCode: "processing_error" });
     } finally {
       setIsGenerating(false);
@@ -667,6 +755,12 @@ export default function SignPdfTool() {
       className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6"
       data-sign-semantic-history-count={signHistoryState.semanticHistory.entries.length}
       data-sign-semantic-history-next-sequence={signHistoryState.semanticHistory.nextSequence}
+      data-workspace-projection-compatible={workspaceProjection?.compatible ?? false}
+      data-workspace-operation-count={workspaceProjection?.compatible ? workspaceProjection.session.state.operationCount : 0}
+      data-workspace-lifecycle={workspaceProjection?.compatible ? workspaceProjection.session.state.lifecycle : undefined}
+      data-workspace-active-area={workspaceProjection?.compatible ? workspaceProjection.session.state.activeArea : undefined}
+      data-workspace-has-unsaved-changes={workspaceProjection?.compatible ? workspaceProjection.session.state.hasUnsavedChanges : undefined}
+      data-workspace-projection-reason={workspaceProjection && !workspaceProjection.compatible ? workspaceProjection.reason : undefined}
     >
       <L2WorkspaceHeader
         title="Sign PDF"
@@ -870,7 +964,7 @@ export default function SignPdfTool() {
                   value={outputName}
                   onChange={(event) => {
                     setOutputName(event.target.value);
-                    setDownloadUrl("");
+                    invalidatePublishedExport();
                   }}
                   className="mt-1.5 w-full rounded-md border border-transparent bg-transparent px-0 py-1 text-sm font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-primary)]/26 focus:border-b-[var(--lumeo-gold)]/45"
                   placeholder="lumeo-signed.pdf"

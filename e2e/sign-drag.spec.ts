@@ -30,8 +30,22 @@ async function openSignWithPlacedText(page: Page) {
   // "+ Text" places an element without needing a drawn signature first.
   const addText = page.getByRole("button", { name: "+ Text", exact: true });
   await expect(addText).toBeVisible({ timeout: 90_000 });
+  const workspace = page.locator("[data-workspace-lifecycle]");
+  await expect(workspace).toHaveAttribute(
+    "data-workspace-projection-compatible",
+    "true",
+  );
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready");
+  await expect(workspace).toHaveAttribute("data-workspace-operation-count", "0");
   await addText.click();
   await expect(page.locator(PLACED)).toHaveCount(1, { timeout: 30_000 });
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "modified");
+  await expect(workspace).toHaveAttribute("data-workspace-active-area", "sign");
+  await expect(workspace).toHaveAttribute("data-workspace-operation-count", "1");
+  await expect(workspace).toHaveAttribute(
+    "data-workspace-has-unsaved-changes",
+    "true",
+  );
   await expect
     .poll(() => semanticHistoryCount(page), {
       timeout: 30_000,
@@ -144,4 +158,37 @@ test("N pointermove events do NOT produce N history entries", async ({ page }) =
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(page.locator(PLACED), "12 pointermoves must collapse to ONE history entry")
     .toHaveCount(0, { timeout: 30_000 });
+});
+
+test("Sign export lifecycle is truthful and undo invalidates the published result", async ({ page }) => {
+  await openSignWithPlacedText(page);
+  const workspace = page.locator("[data-workspace-lifecycle]");
+
+  // Date has a real nonempty value immediately, so this exercises export
+  // without relying on browser-specific prompt/double-click behavior.
+  await page.getByRole("button", { name: "+ Date", exact: true }).click();
+  await expect(page.locator(PLACED)).toHaveCount(2);
+  await expect(workspace).toHaveAttribute("data-workspace-operation-count", "2");
+
+  await page.getByRole("button", { name: "Sign PDF", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Download signed PDF", exact: true }),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "exported");
+  await expect(workspace).toHaveAttribute("data-workspace-active-area", "export");
+  await expect(workspace).toHaveAttribute(
+    "data-workspace-has-unsaved-changes",
+    "false",
+  );
+
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Download signed PDF", exact: true }),
+  ).toHaveCount(0);
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "modified");
+  await expect(workspace).toHaveAttribute("data-workspace-active-area", "sign");
+  await expect(workspace).toHaveAttribute(
+    "data-workspace-has-unsaved-changes",
+    "true",
+  );
 });
