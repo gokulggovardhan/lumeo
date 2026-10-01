@@ -1,0 +1,118 @@
+.heroGrid {
+  display: grid;
+  gap: 1.25rem;
+  align-items: end;
+}
+
+.heroTitle {
+  font-size: clamp(2.05rem, 4vw, 3.45rem) !important;
+  line-height: 1.02 !important;
+  letter-spacing: -0.03em !important;
+}
+
+.heroTrust {
+  border: 1px solid var(--border-hairline);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-raised) 88%, transparent);
+  padding: 0.85rem 1rem;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > div:first-child {
+  margin-bottom: 1rem !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > div:first-child h2 {
+  font-size: 1.55rem !important;
+  margin-top: 0.35rem !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > div:first-child p:last-child {
+  margin-top: 0.3rem !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul {
+  gap: 0.75rem !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul > li > div > a,
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul > li > div > article {
+  min-height: 9.6rem !important;
+  padding: 1rem !important;
+  border-radius: 15px !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul h3 {
+  font-size: 1rem !important;
+}
+
+.toolStage section[aria-labelledby="popular-tools-heading"] > ul p {
+  margin-top: 0.35rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1.15rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"],
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] {
+  margin-top: 2rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > div:first-child,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > div:first-child {
+  margin-bottom: 0.8rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > div:first-child h2,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > div:first-child h2 {
+  margin-top: 0.25rem !important;
+  font-size: 1.25rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > ul,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul {
+  gap: 0.75rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > ul > li > div > a,
+.toolStage section[aria-labelledby="more-tools-heading"] > ul > li > div > article,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul > li > div > a,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul > li > div > article {
+  min-height: 8.7rem !important;
+  padding: 0.95rem !important;
+  border-radius: 15px !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > ul h3,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul h3 {
+  font-size: 0.95rem !important;
+}
+
+.toolStage section[aria-labelledby="more-tools-heading"] > ul p,
+.toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul p {
+  margin-top: 0.35rem !important;
+  font-size: 0.74rem !important;
+  line-height: 1.1rem !important;
+}
+
+@media (min-width: 900px) {
+  .heroGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+    gap: 2rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .toolStage section[aria-labelledby="popular-tools-heading"] > ul {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+  }
+
+  .toolStage section[aria-labelledby="more-tools-heading"] > ul,
+  .toolStage section[aria-labelledby="coming-soon-tools-heading"] > ul {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+}
+
+@media (max-width: 639px) {
+  .heroTrust {
+    padding: 0.75rem 0.85rem;
+  }
+}
