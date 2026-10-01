@@ -223,7 +223,7 @@ export async function PdfToolLauncher({
               Published previews
             </h2>
           </div>
-          <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          <ul className="grid grid-cols-2 gap-2.5 max-[340px]:grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             {additionalComingSoon.map((tile, index) => (
               <CompactToolCard
                 key={tile.route}
