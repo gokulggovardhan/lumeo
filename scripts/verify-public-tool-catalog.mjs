@@ -118,13 +118,13 @@ try {
   assert(directory.includes("buildDiscoveryTiles") && directory.includes("ToolsExplorer"), "Directory must render resolved direct-action tools.");
   assert(directory.includes("Find the right tool"), "Directory must use a clear complete-directory introduction.");
   assert(explorer.includes('type="search"') && explorer.includes('aria-live="polite"'), "Directory search and live result count are missing.");
-  for (const filter of ["All tools", "Organize", "Edit", "Convert", "Sign & Fill", "Optimize", "Recognize", "Image Tools"]) {
+  for (const filter of ["All", "Pages", "Edit", "Convert", "Sign", "Compress", "OCR & Text", "Images"]) {
     assert(explorer.includes(filter), `Directory filter missing: ${filter}`);
   }
   assert(explorer.includes("aria-pressed={category === filter.id}"), "Directory filters must expose pressed state.");
   assert(explorer.includes("href={tool.route}"), "Available directory cards must link directly to tool routes.");
   assert(explorer.includes("Temporarily unavailable") && !explorer.includes("Notify me"), "Unavailable tools must be explicit and non-misleading.");
-  assert(explorer.includes("Current live tools are browser-based"), "Directory browser-first processing guidance is missing.");
+  assert(explorer.includes("Local-first by default"), "Directory local-first processing guidance is missing.");
   assert(toolCatalog.includes("searchAliases") && toolCatalog.includes('processing: "browser"'), "Canonical tool actions must own aliases and action-level processing overrides.");
   assert(tiles.includes("action.dbStatus") && tiles.includes("buildDiscoveryTiles"), "Discovery availability must derive from resolved catalog status.");
   const publicState = read("lib/tools/public-state.ts");
