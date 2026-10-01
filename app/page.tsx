@@ -205,6 +205,15 @@ export default async function Home() {
 
           <div className={`${styles.toolStage} mt-7 sm:mt-8`}>
             <PdfToolLauncher />
+            <div className="mt-4 flex justify-end">
+              <Link
+                href="/pdf-tools"
+                className="inline-flex min-h-10 items-center gap-2 rounded-[var(--radius-md)] px-1 text-sm font-bold text-[var(--atelier-sage-300)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
+              >
+                View all tools
+                <span aria-hidden="true">→</span>
+              </Link>
+            </div>
           </div>
 
           <ContinueWorking tiles={tiles} />
