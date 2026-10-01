@@ -162,7 +162,7 @@ export default async function Home() {
               </p>
 
               <h1
-                className={`${styles.heroTitle} mt-2.5 font-serif font-semibold text-[var(--text-primary)]`}
+                className={`${styles.heroTitle} mt-2.5 font-serif text-[clamp(2.45rem,6vw,4.6rem)] font-semibold leading-[0.98] tracking-[-0.035em] text-[var(--text-primary)]`}
               >
                 Your PDFs stay yours.
               </h1>
