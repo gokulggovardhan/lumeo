@@ -1,13 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import type { ChangeEvent, DragEvent, ReactNode } from "react";
 import { useEffect, useId, useRef, useState } from "react";
 import { LOCAL_FIRST_SHORT } from "@/lib/public-site/copy";
 import { useOptionalWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import type { WorkspaceArea, WorkspaceOperation } from "@/lib/pdf/workspace/model";
 import {
+  WORKSPACE_AREA_PRESENTATION,
   workspaceAreaDescription,
   workspaceAreaLabel,
+  workspaceAreaRoute,
   visibleWorkspaceHistory,
 } from "@/lib/pdf/workspace/presentation";
 import {
@@ -204,6 +207,124 @@ export function L2ToolPageHeader({
 // redesigns in this series reuse it rather than each hand-rolling their own
 // sticky/glass chrome.
 
+function WorkspaceSessionBar() {
+  const workspace = useOptionalWorkspaceSession();
+  const areas: WorkspaceArea[] = ["edit", "pages", "sign", "enhance", "optimize"];
+
+  if (!workspace?.state || !workspace.currentRevision) return null;
+
+  const { state, currentRevision } = workspace;
+  const locked = state.dirty;
+
+  function finishCurrentPdf() {
+    if (locked) return;
+    const url = URL.createObjectURL(currentRevision.blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = currentRevision.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  return (
+    <div
+      className="border-t border-[var(--border-hairline)] pt-3"
+      aria-label="PDF workspace"
+      data-workspace-session-id={state.sessionId}
+      data-workspace-revision-count={state.history.revisions.length}
+      data-workspace-revision-cursor={state.history.cursor}
+      data-workspace-dirty={state.dirty}
+    >
+      <div className="aura-scrollbar -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-1">
+        {areas.map((area) => {
+          const route = workspaceAreaRoute(area);
+          const active = state.activeArea === area;
+          const item = WORKSPACE_AREA_PRESENTATION[area];
+          const className = cx(
+            "lumeo-focus-ring inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border px-3.5 text-xs font-extrabold transition",
+            active
+              ? "border-[var(--border-selected)] bg-[var(--surface-selected)] text-[var(--text-primary)]"
+              : "border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--border-default)] hover:text-[var(--text-primary)]",
+            locked && !active && "cursor-not-allowed opacity-45",
+          );
+
+          if (!route || (locked && !active)) {
+            return (
+              <span key={area} className={className} aria-disabled="true">
+                {item.label}
+              </span>
+            );
+          }
+
+          return (
+            <Link
+              key={area}
+              href={route}
+              className={className}
+              aria-current={active ? "page" : undefined}
+              onClick={() => workspace.setActiveArea(area)}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+
+        <span className="mx-0.5 h-6 w-px shrink-0 bg-[var(--border-hairline)]" aria-hidden="true" />
+
+        <button
+          type="button"
+          onClick={workspace.undoRevision}
+          disabled={!workspace.canUndoRevision}
+          className="lumeo-focus-ring inline-flex min-h-11 shrink-0 items-center rounded-full border border-[var(--border-hairline)] bg-[var(--surface-base)] px-3 text-xs font-bold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-35"
+          title={locked ? "Apply or undo this tool's current changes first." : "Undo the last applied Workspace step"}
+        >
+          Undo step
+        </button>
+        <button
+          type="button"
+          onClick={workspace.redoRevision}
+          disabled={!workspace.canRedoRevision}
+          className="lumeo-focus-ring inline-flex min-h-11 shrink-0 items-center rounded-full border border-[var(--border-hairline)] bg-[var(--surface-base)] px-3 text-xs font-bold text-[var(--text-secondary)] disabled:cursor-not-allowed disabled:opacity-35"
+          title={locked ? "Apply or undo this tool's current changes first." : "Redo the next applied Workspace step"}
+        >
+          Redo step
+        </button>
+
+        <button
+          type="button"
+          onClick={finishCurrentPdf}
+          disabled={locked}
+          className="lumeo-focus-ring inline-flex min-h-11 shrink-0 items-center rounded-full bg-[var(--action-primary)] px-4 text-xs font-extrabold text-[var(--text-on-accent)] transition hover:bg-[var(--action-primary-hover)] disabled:cursor-not-allowed disabled:opacity-45"
+          title={locked ? "Apply this tool's current changes before finishing." : "Download the current finished PDF"}
+        >
+          Finish
+        </button>
+      </div>
+
+      <div className="mt-1.5 flex min-w-0 items-center gap-2 text-[11px] text-[var(--text-muted)]">
+        <span className="min-w-0 truncate">{currentRevision.filename}</span>
+        {locked ? (
+          <span className="shrink-0 font-bold text-[var(--atelier-warning)]">
+            Apply current changes to switch tools
+          </span>
+        ) : state.history.historyLimited ? (
+          <span className="shrink-0" title="Older revision snapshots were cleared to protect browser memory.">
+            Undo history trimmed for memory
+          </span>
+        ) : state.history.revisions.length > 1 ? (
+          <span className="shrink-0">
+            {state.history.cursor} applied {state.history.cursor === 1 ? "step" : "steps"}
+          </span>
+        ) : (
+          <span className="shrink-0">Local session</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function L2WorkspaceHeader({
   title,
   description,
@@ -216,15 +337,18 @@ export function L2WorkspaceHeader({
   action?: ReactNode;
 }) {
   return (
-    <header className="l2-workspace-header aura-glass-thin sticky top-3 z-20 flex flex-col justify-between gap-4 rounded-[var(--radius-2xl)] px-5 py-4 shadow-[var(--v2-elevation-2)] md:flex-row md:items-center">
-      <div className="min-w-0">
-        <p className="aura-text-label text-[var(--text-accent)]">{categoryLabel}</p>
-        <h1 className="mt-1.5 truncate font-serif text-[clamp(1.25rem,2vw,1.5rem)] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]">
-          {title}
-        </h1>
-        <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">{description}</p>
+    <header className="l2-workspace-header aura-glass-thin sticky top-3 z-20 rounded-[var(--radius-2xl)] px-5 py-4 shadow-[var(--v2-elevation-2)]">
+      <div className="flex flex-col justify-between gap-4 md:flex-row md:items-center">
+        <div className="min-w-0">
+          <p className="aura-text-label text-[var(--text-accent)]">{categoryLabel}</p>
+          <h1 className="mt-1.5 truncate font-serif text-[clamp(1.25rem,2vw,1.5rem)] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]">
+            {title}
+          </h1>
+          <p className="mt-1 truncate text-sm text-[var(--text-secondary)]">{description}</p>
+        </div>
+        {action ? <div className="shrink-0">{action}</div> : null}
       </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
+      <WorkspaceSessionBar />
     </header>
   );
 }
