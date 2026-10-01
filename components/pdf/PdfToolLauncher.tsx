@@ -27,7 +27,6 @@ const SECONDARY_TOOL_SLUGS = [
   "jpg-to-pdf",
   "pdf-to-jpg",
   "watermark",
-  "crop",
 ] as const;
 
 const CURATED_TOOL_SLUGS = new Set<string>([
@@ -174,7 +173,7 @@ export async function PdfToolLauncher({
   const curated = [...primary, ...secondary];
 
   // Admin-controlled coming-soon publishing remains truthful: every enabled
-  // coming-soon tool can still surface even when it is outside the 12 compact
+  // coming-soon tool can still surface even when it is outside the 11 compact
   // homepage launch tiles. CompactToolCard keeps those entries non-actionable.
   const additionalComingSoon = tiles.filter(
     (tile) =>
