@@ -52,6 +52,7 @@ import { openPdfJsDocument } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
+import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 import { resetPdfPreviewState } from "@/lib/pdf/resetPreviewState";
@@ -125,6 +126,12 @@ function PageNumbersIcon() {
 
 export default function PageNumbersTool() {
   const { availability, track } = useAnalytics();
+  const {
+    openDocument: openWorkspaceDocument,
+    commitRevision: commitWorkspaceRevision,
+    markDirty: markWorkspaceDirty,
+    clearSession: clearWorkspaceSession,
+  } = useWorkspaceSession();
   const openedTrackedRef = useRef(false);
 
   const [pdf, setPdf] = useState<LoadedPdf | null>(null);
@@ -177,16 +184,23 @@ export default function PageNumbersTool() {
     setPageRangeError("");
     setDownloadUrl("");
     setOutputName("lumeo-page-numbers.pdf");
+    clearWorkspaceSession();
   }
 
   // Any export-affecting config change invalidates the previous export --
   // the downloaded file no longer matches the current settings.
   useEffect(() => {
+    if (pdf) {
+      markWorkspaceDirty(
+        JSON.stringify(config) !== JSON.stringify(createDefaultPageNumbersConfig()),
+        "enhance",
+      );
+    }
     if (!downloadUrlRef.current) return;
     URL.revokeObjectURL(downloadUrlRef.current);
     downloadUrlRef.current = "";
     setDownloadUrl("");
-  }, [config]);
+  }, [config, pdf, markWorkspaceDirty]);
 
   useEffect(() => {
     let cancelled = false;
@@ -284,6 +298,7 @@ export default function PageNumbersTool() {
       }
 
       setPdf({ file, bytes, pageCount });
+      openWorkspaceDocument({ file, pageCount, area: "enhance" });
       setPageIndex(0);
       setConfig(createDefaultPageNumbersConfig());
       setPageRangeInput("");
@@ -355,18 +370,26 @@ export default function PageNumbersTool() {
       const blob = new Blob([buffer], { type: "application/pdf" });
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
+      const workspaceOutputFileName = sanitizePdfFileName(outputName);
       downloadUrlRef.current = url;
       setDownloadUrl(url);
-      setDownloadName(sanitizePdfFileName(outputName));
+      setDownloadName(workspaceOutputFileName);
+      commitWorkspaceRevision({
+        blob,
+        filename: workspaceOutputFileName,
+        pageCount: pdf.pageCount,
+        area: "enhance",
+        description: "Added page numbers",
+      });
       track({ eventName: "processing_succeeded", toolSlug: "page-numbers", durationMs: performance.now() - startedAt, success: true });
-      recordRecentFile({ tool: "page-numbers", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
+      recordRecentFile({ tool: "page-numbers", filename: workspaceOutputFileName, fileSize: blob.size, pageCount: pdf.pageCount });
     } catch (exportError) {
       setError(exportError instanceof Error ? exportError.message : "Could not add page numbers. Please try again.");
       track({ eventName: "processing_failed", toolSlug: "page-numbers", durationMs: performance.now() - startedAt, success: false, errorCode: "processing_error" });
     } finally {
       setIsExporting(false);
     }
-  }, [pdf, config, outputName, track]);
+  }, [pdf, config, outputName, track, commitWorkspaceRevision]);
 
   function downloadPageNumberedPdf() {
     if (!downloadUrl) return;
