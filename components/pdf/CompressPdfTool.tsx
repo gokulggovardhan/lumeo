@@ -53,6 +53,7 @@ import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { recordRecentFile } from "@/lib/recent-files";
+import { useWorkspaceSession } from "@/components/pdf/workspace/WorkspaceSessionProvider";
 import {
   hasPdfMagicBytes,
   isPdfNamedFile,
@@ -273,6 +274,11 @@ function CompressIcon() {
 
 export default function CompressPdfTool() {
   const { availability, track } = useAnalytics();
+  const {
+    openDocument: openWorkspaceDocument,
+    commitRevision: commitWorkspaceRevision,
+    clearSession: clearWorkspaceSession,
+  } = useWorkspaceSession();
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
@@ -463,6 +469,7 @@ export default function CompressPdfTool() {
     setBlockingError("");
     setStatus("Ready");
     setProgressDetail("");
+    clearWorkspaceSession();
   }
 
   // Renders one representative page for the sidebar preview, then destroys
@@ -591,6 +598,11 @@ export default function CompressPdfTool() {
       };
 
       setAnalysis(nextAnalysis);
+      openWorkspaceDocument({
+        file,
+        pageCount: nextAnalysis.pageCount,
+        area: "optimize",
+      });
       resetSettings(recommendation);
       setOutputName(sourceOutputName(file.name));
       setStatus("Ready");
@@ -1186,6 +1198,13 @@ export default function CompressPdfTool() {
         grayscale: colour === "grayscale",
         tone,
         target: targetResult,
+      });
+      commitWorkspaceRevision({
+        blob,
+        filename: outputFileName,
+        pageCount: analysis.pageCount,
+        area: "optimize",
+        description: "Compressed PDF",
       });
       setStatus("Download ready");
       setProgressDetail(
