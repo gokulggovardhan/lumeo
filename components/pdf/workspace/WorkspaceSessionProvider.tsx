@@ -267,8 +267,12 @@ export function WorkspaceSessionProvider({
   );
 }
 
+export function useOptionalWorkspaceSession(): WorkspaceSessionContextValue | null {
+  return useContext(WorkspaceSessionContext);
+}
+
 export function useWorkspaceSession(): WorkspaceSessionContextValue {
-  const value = useContext(WorkspaceSessionContext);
+  const value = useOptionalWorkspaceSession();
   if (!value) {
     throw new Error(
       "useWorkspaceSession must be used inside WorkspaceSessionProvider.",
