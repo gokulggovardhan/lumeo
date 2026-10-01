@@ -171,7 +171,7 @@ export const watermarkFaqs: FaqItem[] = [
   },
   {
     question: "Can I use an image as a watermark, not just text?",
-    answer: "Yes. Upload a PNG or JPG. PNG transparency is preserved in the exported PDF; JPG watermarks are always opaque, since the JPG format itself has no transparency channel.",
+    answer: "Yes. Choose a PNG or JPG from your device. PNG transparency is preserved in the exported PDF; JPG watermarks are always opaque, since the JPG format itself has no transparency channel.",
   },
   {
     question: "Can I apply the watermark to only some pages?",
