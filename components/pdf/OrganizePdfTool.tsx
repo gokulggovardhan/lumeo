@@ -14,6 +14,7 @@ import {
   L2WorkspaceHeader,
   L2WorkspaceInspector,
   L2WorkspacePanel,
+  L2WorkspaceStatus,
   L2WorkspaceToolbar,
   ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
@@ -577,6 +578,15 @@ export default function OrganizePdfTool() {
       data-workspace-has-unsaved-changes={workspaceSession?.state.hasUnsavedChanges}
     >
       <L2WorkspaceHeader title="Organize PDF" description={summaryLine} />
+
+      {workspaceSession ? (
+        <L2WorkspaceStatus
+          activeArea={workspaceSession.state.activeArea}
+          operationCount={workspaceSession.state.operationCount}
+          operations={workspaceSession.history.operations}
+          historyCursor={workspaceSession.state.historyCursor}
+        />
+      ) : null}
 
       <L2WorkspaceToolbar>
         <L2ToolbarButton onClick={handleUndo} disabled={!canUndo || isExporting}>Undo</L2ToolbarButton>
