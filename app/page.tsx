@@ -18,21 +18,21 @@ export async function generateMetadata(): Promise<Metadata> {
       absolute: "Lumeo PDF - Private Browser-First PDF Tools",
     },
     description:
-      "Merge, compress, edit, sign, and convert PDFs and documents in a focused browser-first workspace. No account or installation required for current public tools.",
+      "Merge, compress, edit, sign, and convert PDFs and documents in a focused browser-first experience. No account or installation required for current public tools.",
     alternates: { canonical: "/" },
     openGraph: {
       title: "Lumeo PDF - Private Browser-First PDF Tools",
       description:
-        "A focused PDF and document workspace with clear browser-first processing.",
+        "Private, browser-first PDF tools with clear file handling and no installation required.",
       url: "https://lumeo.in",
       siteName: "Lumeo PDF",
       type: "website",
     },
     twitter: {
       card: "summary_large_image",
-      title: "Lumeo PDF Workspace",
+      title: "Lumeo PDF",
       description:
-        "Private, browser-first PDF tools with clear processing details.",
+        "Private, browser-first PDF tools with clear file handling.",
     },
   });
 }
@@ -42,18 +42,18 @@ const structuredData = [
     "@context": "https://schema.org",
     "@type": "WebSite",
     name: "Lumeo PDF",
-    alternateName: ["Lumeo", "Lumeo PDF Workspace", "lumeo.in"],
+    alternateName: ["Lumeo", "Lumeo PDF Tools", "lumeo.in"],
     url: "https://lumeo.in",
   },
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
-    name: "Lumeo PDF Workspace",
+    name: "Lumeo PDF",
     url: "https://lumeo.in",
     applicationCategory: "BusinessApplication",
     operatingSystem: "Any modern browser",
     description:
-      "A browser-first PDF workspace for organizing, optimizing, editing, signing, converting, and extracting document content.",
+      "Browser-first PDF tools for organizing, optimizing, editing, signing, converting, and extracting document content.",
     featureList: [
       "Merge PDF",
       "Split PDF",
@@ -109,19 +109,19 @@ const trustRail = [
 
 const privacyItems = [
   {
-    title: "Open locally",
+    title: "Files stay local where supported",
     description:
-      "Current supported document workflows open files in your browser and explain their handling before you begin.",
+      "Supported workflows are designed to process documents in your browser instead of sending them away for routine PDF work.",
   },
   {
-    title: "Work locally",
+    title: "Clear file handling",
     description:
-      "Current public PDF tools are designed around browser-first processing rather than a required cloud document library.",
+      "Each tool explains how it handles files and any browser requirements before you begin.",
   },
   {
-    title: "Export locally",
+    title: "No unnecessary storage",
     description:
-      "Finish the task in the workspace and export the result without creating an account for current public tools.",
+      "Current public tools do not require a Lumeo account or cloud document library to complete everyday tasks.",
   },
 ];
 
@@ -150,25 +150,28 @@ export default async function Home() {
       <PublicNav />
 
       <section className="relative z-10 flex-1">
-        <div className="mx-auto w-full max-w-[1160px] px-5 pb-14 pt-5 sm:px-8 sm:pt-7 lg:pt-8">
+        <div className="mx-auto w-full max-w-[1160px] px-5 pb-12 pt-5 sm:px-8 sm:pt-7 lg:pt-8">
           <header className={`lumeo-fade-up ${styles.heroGrid}`}>
-            <div className="max-w-[50rem]">
+            <div className="max-w-[48rem]">
               <p className="aura-text-label inline-flex items-center gap-2 text-[var(--text-accent)]">
                 <span
                   aria-hidden="true"
                   className="h-1.5 w-1.5 rounded-full bg-[var(--text-accent)]"
                 />
-                Lumeo PDF Workspace
+                Private, browser-first PDF tools
               </p>
+
               <h1
-                className={`${styles.heroTitle} mt-2.5 font-serif text-[clamp(2.45rem,6vw,4.6rem)] font-semibold leading-[0.98] tracking-[-0.035em] text-[var(--text-primary)]`}
+                className={`${styles.heroTitle} mt-2.5 font-serif font-semibold text-[var(--text-primary)]`}
               >
-                One PDF. One private workspace.
+                Your PDFs stay yours.
               </h1>
+
               <p className="mt-3 max-w-[43rem] text-[15px] leading-6 text-[var(--text-secondary)] sm:text-base">
-                Open once · Work locally · Undo anything · Finish once.
-                Start with the tool you need and keep your document work focused.
+                Merge, edit, sign, compress, and convert documents directly in
+                your browser, with file handling explained before you begin.
               </p>
+
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Link
                   href="/pdf-tools"
@@ -177,14 +180,14 @@ export default async function Home() {
                   Explore PDF tools
                 </Link>
                 <span className="text-xs font-semibold text-[var(--text-muted)]">
-                  No installation · Public tools need no account
+                  Fast to open · Simple to use
                 </span>
               </div>
             </div>
 
-            <div className={styles.heroTrust} aria-label="Lumeo trust principles">
+            <aside className={styles.heroTrust} aria-label="Lumeo trust principles">
               <p className="aura-text-label text-[var(--atelier-sage-300)]">
-                Local-first by default
+                Designed for private document work
               </p>
               <div className="mt-3 grid gap-2.5">
                 {trustRail.map((item) => (
@@ -197,67 +200,34 @@ export default async function Home() {
                   </div>
                 ))}
               </div>
-            </div>
+            </aside>
           </header>
 
-          <div className={`${styles.toolStage} mt-8 sm:mt-9`}>
+          <div className={`${styles.toolStage} mt-7 sm:mt-8`}>
             <PdfToolLauncher />
           </div>
 
           <ContinueWorking tiles={tiles} />
 
           <section
-            className="mt-12 rounded-[18px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-5 py-6 sm:mt-14 sm:px-7 sm:py-7"
-            aria-labelledby="workspace-heading"
-          >
-            <div className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-              <div>
-                <p className="aura-text-label text-[var(--text-premium)]">
-                  PDF Workspace
-                </p>
-                <h2
-                  id="workspace-heading"
-                  className="mt-1.5 font-serif text-[1.7rem] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]"
-                >
-                  Less tool-hopping. More continuous work.
-                </h2>
-              </div>
-              <div>
-                <p className="text-sm leading-6 text-[var(--text-secondary)] sm:text-[15px]">
-                  The directory remains the discovery layer. Lumeo is evolving
-                  toward a persistent workspace where compatible document tasks
-                  can stay connected after you open a PDF, while standalone tool
-                  pages continue to work as they do today.
-                </p>
-                <Link
-                  href="/pdf-tools"
-                  className="mt-3 inline-flex min-h-10 items-center gap-2 text-sm font-bold text-[var(--atelier-sage-300)] transition hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)]"
-                >
-                  View all tools
-                  <span aria-hidden="true">→</span>
-                </Link>
-              </div>
-            </div>
-          </section>
-
-          <section
-            className="mt-10 border-y border-[var(--border-hairline)] py-10 sm:mt-12 sm:py-11"
+            className="mt-11 border-y border-[var(--border-hairline)] py-9 sm:mt-12 sm:py-10"
             aria-labelledby="privacy-heading"
           >
-            <div className="grid gap-7 lg:grid-cols-[0.8fr_1.3fr] lg:items-start">
+            <div className="grid gap-6 lg:grid-cols-[0.78fr_1.3fr] lg:items-start">
               <div>
                 <p className="aura-text-label text-[var(--atelier-sage-300)]">
-                  Privacy & local-first
+                  Privacy, without the fine print
                 </p>
                 <h2
                   id="privacy-heading"
-                  className="mt-2 font-serif text-[1.85rem] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]"
+                  className="mt-2 font-serif text-[1.8rem] font-semibold leading-tight tracking-[-0.02em] text-[var(--text-primary)]"
                 >
-                  Your PDFs stay yours.
+                  Private by design. Clear by default.
                 </h2>
                 <p className="mt-3 max-w-md text-sm leading-6 text-[var(--text-secondary)]">
-                  Lumeo keeps file handling visible and describes browser
-                  requirements before supported workflows begin.
+                  Lumeo keeps the privacy message simple: explain where work
+                  happens, avoid unnecessary storage, and tell you what a tool
+                  needs before it starts.
                 </p>
               </div>
 
@@ -265,7 +235,7 @@ export default async function Home() {
                 {privacyItems.map((item) => (
                   <div
                     key={item.title}
-                    className="rounded-[15px] border border-[var(--border-hairline)] bg-[var(--surface-base)] p-4"
+                    className="rounded-[15px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-4"
                   >
                     <h3 className="font-serif text-base font-semibold text-[var(--text-primary)]">
                       {item.title}
