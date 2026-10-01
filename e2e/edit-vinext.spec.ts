@@ -1198,6 +1198,68 @@ test("vinext Edit PDF applies placed-text formatting shortcuts while typing and 
   await expect(placedText).toHaveCSS("font-style", "normal");
 });
 
+test("vinext Edit PDF releases stale export blobs without invalidating a current no-op Redo", async ({
+  page,
+}) => {
+  await uploadEditFixture(page, TEXT_ONLY_PDF);
+  await expect(page.getByAltText("Page 1 preview")).toBeVisible({ timeout: 90_000 });
+
+  await page.getByRole("button", { name: "Text", exact: true }).click();
+  await page.getByAltText("Page 1 preview").locator("..").click({
+    position: { x: 180, y: 180 },
+  });
+
+  await page.evaluate(() => {
+    const createdPdfUrls: string[] = [];
+    const revokedUrls: string[] = [];
+    Reflect.set(window, "__LUMEO_EDIT_CREATED_PDF_URLS__", createdPdfUrls);
+    Reflect.set(window, "__LUMEO_EDIT_REVOKED_URLS__", revokedUrls);
+
+    const createObjectUrl = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = (object: Blob | MediaSource) => {
+      const url = createObjectUrl(object);
+      if (object instanceof Blob && object.type === "application/pdf") {
+        createdPdfUrls.push(url);
+      }
+      return url;
+    };
+
+    const revokeObjectUrl = URL.revokeObjectURL.bind(URL);
+    URL.revokeObjectURL = (url: string) => {
+      revokedUrls.push(url);
+      revokeObjectUrl(url);
+    };
+  });
+
+  await page.getByRole("button", { name: "Export PDF" }).click();
+  const downloadButton = page.getByRole("button", { name: "Download edited PDF" });
+  await expect(downloadButton).toBeVisible({ timeout: 90_000 });
+
+  const exportUrl = await page.evaluate(
+    () =>
+      (Reflect.get(window, "__LUMEO_EDIT_CREATED_PDF_URLS__") as string[]).at(-1) ??
+      "",
+  );
+  expect(exportUrl).toMatch(/^blob:/);
+
+  await page.keyboard.press("Control+y");
+  await expect(downloadButton).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => Reflect.get(window, "__LUMEO_EDIT_REVOKED_URLS__") as string[],
+    ),
+  ).not.toContain(exportUrl);
+
+  await page.getByRole("button", { name: "Undo" }).click();
+
+  await expect(downloadButton).toHaveCount(0);
+  expect(
+    await page.evaluate(
+      () => Reflect.get(window, "__LUMEO_EDIT_REVOKED_URLS__") as string[],
+    ),
+  ).toContain(exportUrl);
+});
+
 test("vinext Edit PDF embeds a local font into one native text run with Undo and reopen proof", async ({
   page,
 }) => {

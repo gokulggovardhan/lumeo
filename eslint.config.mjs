@@ -49,6 +49,10 @@ const eslintConfig = defineConfig([
     // produces it, not minified bundles generated during release checks.
     "dist/**",
     "next-env.d.ts",
+    // Build scripts copy pinned third-party browser runtimes into public/.
+    // Keep post-build lint deterministic without linting vendored bundles.
+    "public/pdfjs-standard-fonts/**",
+    "public/ocr/**",
     // Agent tooling, skills, and any git worktrees checked out beneath it.
     // A worktree here holds a FULL second copy of the repo, so linting it
     // reported ~46,500 problems and made `npm run lint` unusable as a
