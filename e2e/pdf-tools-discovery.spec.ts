@@ -6,6 +6,8 @@ test.describe("PDF Tools discovery", () => {
     for (const viewport of [
       { width: 1280, height: 900 },
       { width: 768, height: 900 },
+      { width: 430, height: 820 },
+      { width: 390, height: 844 },
       { width: 320, height: 760 },
     ]) {
       await page.setViewportSize(viewport);
@@ -25,13 +27,27 @@ test.describe("PDF Tools discovery", () => {
         await expect(page.getByRole("link", { name: new RegExp(`^Open ${tool}`) })).toBeVisible();
       }
 
-      await expect(page.getByRole("heading", { name: "Useful next steps, without the clutter" })).toBeVisible();
+      await expect(page.getByRole("heading", { name: "Choose what you want to do." })).toBeVisible();
+      await expect(page.getByRole("link", { name: "View all tools" })).toBeVisible();
 
+      const launcherLinks = page.getByRole("link", { name: /^(Open .*|View all tools)$/ });
       const dimensions = await page.evaluate(() => ({
         viewport: document.documentElement.clientWidth,
         page: document.documentElement.scrollWidth,
       }));
       expect(dimensions.page).toBeLessThanOrEqual(dimensions.viewport);
+
+      const launcherBoxes = await launcherLinks.evaluateAll((links) =>
+        links
+          .map((link) => link.getBoundingClientRect())
+          .filter((rect) => rect.top > 0 && rect.top < window.innerHeight * 2)
+          .map((rect) => ({ width: rect.width, height: rect.height })),
+      );
+      expect(launcherBoxes.length).toBeGreaterThan(0);
+      for (const box of launcherBoxes) {
+        expect(box.width).toBeGreaterThanOrEqual(44);
+        expect(box.height).toBeGreaterThanOrEqual(44);
+      }
     }
   });
 
