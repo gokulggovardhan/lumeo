@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -21,6 +22,7 @@ import {
 } from "@/lib/pdf/workspace/revisionHistory";
 
 const REVISION_FILE_MARKER = Symbol.for("lumeo.workspace.revision");
+export const WORKSPACE_RESTORE_EVENT = "lumeo:workspace-restore";
 
 type WorkspaceTaggedFile = File & {
   [REVISION_FILE_MARKER]?: string;
@@ -84,6 +86,25 @@ function revisionIdFromFile(file: File): string | undefined {
   return (file as WorkspaceTaggedFile)[REVISION_FILE_MARKER];
 }
 
+function fileFromRevision(revision: WorkspaceRevision): File {
+  return tagWorkspaceFile(
+    new File([revision.blob], revision.filename, {
+      type: "application/pdf",
+      lastModified: Date.now(),
+    }),
+    revision.id,
+  );
+}
+
+function dispatchWorkspaceRestore(revision: WorkspaceRevision) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(
+    new CustomEvent(WORKSPACE_RESTORE_EVENT, {
+      detail: { file: fileFromRevision(revision) },
+    }),
+  );
+}
+
 export function WorkspaceSessionProvider({
   children,
 }: {
@@ -91,6 +112,11 @@ export function WorkspaceSessionProvider({
 }) {
   const sequenceRef = useRef(1);
   const [state, setState] = useState<WorkspaceRuntimeState | null>(null);
+  const stateRef = useRef<WorkspaceRuntimeState | null>(null);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
 
   const currentRevision = useMemo(
     () => (state ? currentWorkspaceRevision(state.history) : null),
@@ -194,21 +220,31 @@ export function WorkspaceSessionProvider({
   }, []);
 
   const undoRevision = useCallback(() => {
-    setState((current) => {
-      if (!current || current.dirty) return current;
-      const history = undoWorkspaceRevision(current.history);
-      const active = currentWorkspaceRevision(history);
-      return { ...current, history, activeArea: active.area };
-    });
+    const current = stateRef.current;
+    if (!current || current.dirty || current.history.cursor <= 0) return;
+    const history = undoWorkspaceRevision(current.history);
+    const active = currentWorkspaceRevision(history);
+    const next = { ...current, history, activeArea: active.area };
+    stateRef.current = next;
+    setState(next);
+    dispatchWorkspaceRestore(active);
   }, []);
 
   const redoRevision = useCallback(() => {
-    setState((current) => {
-      if (!current || current.dirty) return current;
-      const history = redoWorkspaceRevision(current.history);
-      const active = currentWorkspaceRevision(history);
-      return { ...current, history, activeArea: active.area };
-    });
+    const current = stateRef.current;
+    if (
+      !current ||
+      current.dirty ||
+      current.history.cursor >= current.history.revisions.length - 1
+    ) {
+      return;
+    }
+    const history = redoWorkspaceRevision(current.history);
+    const active = currentWorkspaceRevision(history);
+    const next = { ...current, history, activeArea: active.area };
+    stateRef.current = next;
+    setState(next);
+    dispatchWorkspaceRestore(active);
   }, []);
 
   const clearSession = useCallback(() => {
@@ -217,14 +253,7 @@ export function WorkspaceSessionProvider({
 
   const getCurrentFile = useCallback(() => {
     if (!state) return null;
-    const revision = currentWorkspaceRevision(state.history);
-    return tagWorkspaceFile(
-      new File([revision.blob], revision.filename, {
-        type: "application/pdf",
-        lastModified: Date.now(),
-      }),
-      revision.id,
-    );
+    return fileFromRevision(currentWorkspaceRevision(state.history));
   }, [state]);
 
   const value = useMemo<WorkspaceSessionContextValue>(
@@ -279,4 +308,23 @@ export function useWorkspaceSession(): WorkspaceSessionContextValue {
     );
   }
   return value;
+}
+
+export function useWorkspaceRestore(
+  onRestore: (file: File) => void | Promise<void>,
+) {
+  const handlerRef = useRef(onRestore);
+  handlerRef.current = onRestore;
+
+  useEffect(() => {
+    function handleRestore(event: Event) {
+      const detail = (event as CustomEvent<{ file?: File }>).detail;
+      if (!detail?.file) return;
+      void handlerRef.current(detail.file);
+    }
+
+    window.addEventListener(WORKSPACE_RESTORE_EVENT, handleRestore);
+    return () =>
+      window.removeEventListener(WORKSPACE_RESTORE_EVENT, handleRestore);
+  }, []);
 }
