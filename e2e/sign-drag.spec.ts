@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { TEXT_ONLY_PDF, writeFixtures } from "./fixtures.ts";
+import { TEXT_ONLY_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures.ts";
 
 // The one invariant Sign's drag depends on, and the only place it can
 // actually be tested.
@@ -20,6 +20,31 @@ const PLACED = '[role="button"][aria-label*="element, use arrow keys"]';
 
 test.beforeAll(async () => {
   await writeFixtures();
+});
+
+test("a slower earlier upload cannot replace the latest selected PDF", async ({ page }) => {
+  await page.addInitScript(() => {
+    const originalArrayBuffer = File.prototype.arrayBuffer;
+    File.prototype.arrayBuffer = async function arrayBuffer() {
+      if (this.name === "text-only.pdf") {
+        await new Promise((resolve) => window.setTimeout(resolve, 500));
+      }
+      return originalArrayBuffer.call(this);
+    };
+  });
+  await page.goto("/pdf/sign");
+  const input = page.locator('input[type="file"]').first();
+
+  await input.setInputFiles(TEXT_ONLY_PDF);
+  await input.setInputFiles(TWO_PAGE_PDF);
+
+  await expect(page.getByText("two-page.pdf", { exact: true }).first()).toBeVisible({
+    timeout: 90_000,
+  });
+  await expect(page.getByText("Page 1 of 2", { exact: true })).toBeVisible();
+  await page.waitForTimeout(700);
+  await expect(page.getByText("two-page.pdf", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText("text-only.pdf", { exact: true })).toHaveCount(0);
 });
 
 async function openSignWithPlacedText(page: Page) {

@@ -23,7 +23,6 @@ import type {
 } from "./verticalShapedGlyphEvidence.ts";
 
 const MAX_ABS_TJ_ADJUSTMENT = 1_000_000;
-const MATRIX_TOLERANCE = 1e-9;
 
 export type VerticalShapedGlyphEditGlyph = Readonly<{
   glyphIndex: number;

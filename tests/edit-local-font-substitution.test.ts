@@ -4,7 +4,6 @@ import {
   PDFDict,
   PDFDocument,
   PDFArray,
-  PDFHexString,
   PDFName,
   PDFNumber,
   PDFOperator,
