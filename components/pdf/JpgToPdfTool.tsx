@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { PDFDocument, rgb } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
 import {
   L2FileCard,
   L2PanelLabel,
@@ -23,6 +24,7 @@ import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { normalizeRotation } from "@/lib/pdf/rotation";
+import { createFreshPdfContinuation } from "@/lib/pdf/workspace/standaloneContinuation";
 import {
   hasImageMagicBytes,
   checkImageFileSize,
@@ -367,6 +369,12 @@ export default function JpgToPdfTool() {
   const [downloadUrl, setDownloadUrl] = useState("");
   const [downloadName, setDownloadName] = useState("lumeo-images.pdf");
   const [outputName, setOutputName] = useState("lumeo-images.pdf");
+  const [continuation, setContinuation] = useState<{
+    bytes: ArrayBuffer;
+    fileName: string;
+    pageCount: number;
+    session: ReturnType<typeof createFreshPdfContinuation>["session"];
+  } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggingFileId, setDraggingFileId] = useState("");
   const [dragOverFileId, setDragOverFileId] = useState("");
@@ -484,6 +492,7 @@ export default function JpgToPdfTool() {
   const clearDownload = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl("");
+    setContinuation(null);
     setDownloadName(sanitizePdfFileName(outputName));
   };
 
@@ -763,6 +772,19 @@ export default function JpgToPdfTool() {
       const safeName = sanitizePdfFileName(outputName);
       setDownloadUrl(url);
       setDownloadName(safeName);
+      const fresh = createFreshPdfContinuation({
+        kind: "jpg-to-pdf",
+        fileName: safeName,
+        byteLength: pdfBuffer.byteLength,
+        pageCount: files.length,
+        initialArea: "edit",
+      });
+      setContinuation({
+        bytes: pdfBuffer.slice(0),
+        fileName: safeName,
+        pageCount: files.length,
+        session: fresh.session,
+      });
       setCleanupMessage("");
       setStatus("Download ready");
       track({
@@ -1219,6 +1241,18 @@ export default function JpgToPdfTool() {
           </>
         )}
       </ToolActionBar>
+
+      {continuation ? (
+        <ContinueWithPdf
+          sourceArea="edit"
+          includeSourceArea
+          fileName={continuation.fileName}
+          bytes={continuation.bytes}
+          pageCount={continuation.pageCount}
+          session={continuation.session}
+          identityNote="This generated PDF starts a fresh Workspace history."
+        />
+      ) : null}
 
       {previewFile ? (
         <div
