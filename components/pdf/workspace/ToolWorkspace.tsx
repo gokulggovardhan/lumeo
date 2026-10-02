@@ -99,7 +99,10 @@ export function ToolActionBar({ children }: { children: ReactNode }) {
     // surfaces that use the unmodified glass-regular shadow.
     <div
       className="aura-glass-regular sticky z-10 rounded-[var(--radius-2xl)] p-3 shadow-[var(--v2-elevation-4)]"
-      style={{ bottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}
+      style={{
+        bottom:
+          "calc(0.75rem + env(safe-area-inset-bottom) + var(--workspace-mobile-nav-offset, 0px))",
+      }}
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">{children}</div>
     </div>
