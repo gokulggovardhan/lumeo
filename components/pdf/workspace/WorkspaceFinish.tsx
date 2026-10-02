@@ -44,7 +44,7 @@ export function WorkspaceFinish() {
 
   useEffect(() => {
     if (!document) return;
-    setName(outputName(document.revision.fileName));
+    setName(outputName(currentDocument.revision.fileName));
     setError("");
     setDownloaded(false);
   }, [document?.id, document?.revision.number, document?.revision.fileName]);
@@ -53,8 +53,8 @@ export function WorkspaceFinish() {
     if (!document) return [];
     return changeSummaries(
       visibleWorkspaceHistory(
-        document.session.history.operations,
-        document.session.state.historyCursor,
+        currentDocument.session.history.operations,
+        currentDocument.session.state.historyCursor,
         12,
       ),
     );
@@ -80,8 +80,9 @@ export function WorkspaceFinish() {
     );
   }
 
+  const currentDocument = document;
   const safeName = outputName(name);
-  const pageLabel = `${document.revision.pageCount} ${document.revision.pageCount === 1 ? "page" : "pages"}`;
+  const pageLabel = `${currentDocument.revision.pageCount} ${currentDocument.revision.pageCount === 1 ? "page" : "pages"}`;
 
   function moveToCompress() {
     if (!continueCurrent("optimize")) return;
@@ -90,13 +91,13 @@ export function WorkspaceFinish() {
 
   function downloadPdf() {
     setError("");
-    let exporting = document.session;
+    let exporting = currentDocument.session;
 
     try {
       const file = fileForCurrentRevision();
       if (!file) throw new Error("The current PDF is unavailable.");
 
-      exporting = beginWorkspaceExport(document.session);
+      exporting = beginWorkspaceExport(currentDocument.session);
       replaceSession(exporting);
 
       const url = URL.createObjectURL(file);
@@ -130,11 +131,11 @@ export function WorkspaceFinish() {
               Review your PDF
             </h2>
             <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
-              {pageLabel} · {formatBytes(document.revision.byteLength)}
+              {pageLabel} · {formatBytes(currentDocument.revision.byteLength)}
             </p>
           </div>
           <span className="rounded-full border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.04)] px-3 py-1.5 text-xs font-bold text-[var(--text-muted)]">
-            Revision {document.revision.number}
+            Revision {currentDocument.revision.number}
           </span>
         </div>
 
