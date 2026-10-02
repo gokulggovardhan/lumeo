@@ -68,7 +68,7 @@ export function ContinueWithPdf({
   return (
     <section
       aria-label="Continue with this PDF"
-      className="rounded-[var(--radius-xl)] border border-[var(--border-hairline)] bg-[rgba(var(--paper-rgb),0.025)] px-3.5 py-3 sm:flex sm:items-center sm:justify-between sm:gap-4"
+      className="rounded-[var(--radius-xl)] border border-[var(--border-hairline)] bg-[rgba(var(--paper-rgb),0.025)] px-3.5 py-3 sm:flex sm:flex-wrap sm:items-center sm:justify-between sm:gap-4"
     >
       <div className="min-w-0">
         <p className="text-sm font-bold text-[var(--text-primary)]">
