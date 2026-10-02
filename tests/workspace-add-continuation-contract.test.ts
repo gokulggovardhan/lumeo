@@ -8,9 +8,10 @@ function read(path: string): string {
 
 test("Continue with this PDF exposes Add without technical language", () => {
   const continuation = read("components/pdf/workspace/ContinueWithPdf.tsx");
+  const targets = read("lib/pdf/workspace/continuation.ts");
 
-  assert.match(continuation, /label: "Add"/);
-  assert.match(continuation, /route: "\/pdf\/add"/);
+  assert.match(targets, /label: "Add"/);
+  assert.match(targets, /route: "\/pdf\/add"/);
   assert.match(continuation, /Keep working without opening the file again/);
 
   for (const phrase of [
