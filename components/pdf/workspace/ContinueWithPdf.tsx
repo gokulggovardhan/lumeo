@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { AuraButton } from "@/components/ui/Aura";
 import {
   continuationTargetsFor,
   type ContinuationArea,
@@ -93,15 +94,18 @@ export function ContinueWithPdf({
 
           return (
             <div key={target.area} className="min-w-0">
-              <button
+              <AuraButton
                 type="button"
+                variant="secondary"
+                size="md"
+                loading={busyTarget === target.area}
                 disabled={Boolean(busyTarget) || Boolean(disabledReason)}
                 aria-describedby={disabledReason ? reasonId : undefined}
                 onClick={() => continueTo(target)}
-                className="lumeo-focus-ring inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-raised)] px-4 text-sm font-bold text-[var(--text-primary)] transition hover:border-[var(--border-selected)] hover:bg-[var(--surface-selected)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full"
               >
                 {busyTarget === target.area ? "Opening…" : target.label}
-              </button>
+              </AuraButton>
               {disabledReason ? (
                 <p
                   id={reasonId}

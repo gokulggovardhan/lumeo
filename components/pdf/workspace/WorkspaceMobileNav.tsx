@@ -118,7 +118,7 @@ export function WorkspaceMobileNav() {
       ref={wrapperRef}
       aria-label="PDF Workspace mobile navigation"
       data-workspace-mobile-nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--border-default)] bg-[rgba(18,20,17,0.96)] px-2 pt-2 shadow-[0_-14px_34px_rgba(0,0,0,0.24)] backdrop-blur-xl lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--border-default)] bg-[var(--surface-overlay)] px-2 pt-2 shadow-[var(--v2-elevation-4)] backdrop-blur-xl lg:hidden"
       style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
     >
       {moreOpen ? (
@@ -168,7 +168,7 @@ export function WorkspaceMobileNav() {
                 "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-extrabold transition " +
                 (active
                   ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
-                  : "text-[var(--text-muted)] hover:bg-[rgba(var(--paper-rgb),0.04)] hover:text-[var(--text-primary)]")
+                  : "text-[var(--text-muted)] hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)]")
               }
             >
               {item.label}
@@ -187,7 +187,7 @@ export function WorkspaceMobileNav() {
             "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-extrabold transition " +
             (isMoreArea(activeArea)
               ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
-              : "text-[var(--text-muted)] hover:bg-[rgba(var(--paper-rgb),0.04)] hover:text-[var(--text-primary)]")
+              : "text-[var(--text-muted)] hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)]")
           }
         >
           More
@@ -201,7 +201,7 @@ export function WorkspaceMobileNav() {
             "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-black transition " +
             (activeArea === "export"
               ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
-              : "bg-[rgba(var(--emerald-rgb),0.14)] text-[var(--atelier-sage-300)] hover:bg-[rgba(var(--emerald-rgb),0.2)]")
+              : "bg-[var(--surface-success)] text-[var(--text-success)] hover:bg-[var(--surface-selected)]")
           }
         >
           Finish
