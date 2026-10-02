@@ -139,6 +139,56 @@ test("runtime manifest requires every expected Office payload file", () => {
 });
 
 
+test("production runtime preflight validates the immutable manifest without probing payloads", async (t) => {
+  const originalFetch = globalThis.fetch;
+  const calls: Array<{
+    url: string;
+    method: string;
+    cache: RequestCache | undefined;
+  }> = [];
+  const manifest = validManifest("release-2026-09-21");
+
+  globalThis.fetch = (async (
+    input: RequestInfo | URL,
+    init?: RequestInit,
+  ) => {
+    calls.push({
+      url: String(input),
+      method: init?.method ?? "GET",
+      cache: init?.cache,
+    });
+    return new Response(JSON.stringify(manifest), {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "public, max-age=31536000, immutable",
+      },
+    });
+  }) as typeof fetch;
+
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const result = await preflightOfficeAssetOrigin(
+    resolveOfficeAssetConfig(
+      "production",
+      "https://assets.example.test/office/release-2026-09-21/",
+    ),
+  );
+
+  assert.equal(result?.releaseId, "release-2026-09-21");
+  assert.deepEqual(calls, [
+    {
+      url:
+        "https://assets.example.test/office/release-2026-09-21/" +
+        OFFICE_RUNTIME_MANIFEST_FILE,
+      method: "GET",
+      cache: "force-cache",
+    },
+  ]);
+});
+
 test("runtime preflight never caches a partial soffice.js response", async (t) => {
   const originalFetch = globalThis.fetch;
   const calls: Array<{ method: string; cache: RequestCache | undefined; range: string | null }> = [];
