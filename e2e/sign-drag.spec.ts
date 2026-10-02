@@ -289,7 +289,7 @@ test("signed PDF can continue directly into Pages without reopening the file", a
     .getByRole("button", { name: "Pages", exact: true })
     .click();
 
-  await expect(page).toHaveURL(/\\/pdf\\/organize$/);
+  await expect(page).toHaveURL(/\/pdf\/organize$/);
   await expect(
     page.locator('[data-workspace-active-area="pages"]'),
   ).toBeVisible({ timeout: 30_000 });
