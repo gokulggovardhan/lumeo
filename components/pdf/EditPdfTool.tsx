@@ -3438,12 +3438,19 @@ export default function EditPdfTool() {
 
   useEffect(() => {
     if (pdfMeta || continuationTarget !== "edit") return;
-    const payload = takeContinuation("edit");
-    if (!payload) return;
-    void addFile(
-      [payload.file],
-      payload.runtime.session.state.document,
-    );
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      const payload = takeContinuation("edit");
+      if (!payload || cancelled) return;
+      void addFile(
+        [payload.file],
+        payload.runtime.session.state.document,
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [addFile, continuationTarget, pdfMeta, takeContinuation]);
 
   function nextElementId() {
