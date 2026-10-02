@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { AuraButton, AuraInput, AuraStatus } from "@/components/ui/Aura";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import {
   beginWorkspaceExport,
@@ -64,13 +65,15 @@ export function WorkspaceFinish() {
         <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[var(--text-secondary)]">
           Finish appears after you continue a PDF between Lumeo tools.
         </p>
-        <button
+        <AuraButton
           type="button"
+          variant="secondary"
+          size="md"
           onClick={() => router.push("/pdf-tools")}
-          className="lumeo-focus-ring mt-5 inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-raised)] px-5 text-sm font-bold text-[var(--text-primary)] hover:border-[var(--border-selected)]"
+          className="mt-5"
         >
           Browse PDF tools
-        </button>
+        </AuraButton>
       </section>
     );
   }
@@ -129,9 +132,10 @@ export function WorkspaceFinish() {
               {pageLabel} · {formatBytes(currentDocument.revision.byteLength)}
             </p>
           </div>
-          <span className="rounded-full border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.04)] px-3 py-1.5 text-xs font-bold text-[var(--text-muted)]">
-            Revision {currentDocument.revision.number}
-          </span>
+          <AuraStatus
+            tone="neutral"
+            label={`Revision ${currentDocument.revision.number}`}
+          />
         </div>
 
         <div className="grid gap-5 pt-5 md:grid-cols-[minmax(0,1fr)_minmax(260px,0.75fr)]">
@@ -165,25 +169,27 @@ export function WorkspaceFinish() {
           <div className="rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.025)] p-4">
             <label className="block text-xs font-extrabold uppercase tracking-[0.12em] text-[var(--text-subtle)]">
               File name
-              <input
+              <AuraInput
                 value={name}
                 onChange={(event) => {
                   setName(event.target.value);
                   setDownloaded(false);
                 }}
                 onBlur={() => setName(safeName)}
-                className="lumeo-focus-ring mt-2 min-h-11 w-full rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-canvas)] px-3 text-sm font-bold normal-case tracking-normal text-[var(--text-primary)]"
+                className="mt-2 font-bold normal-case tracking-normal"
                 inputMode="text"
               />
             </label>
 
-            <button
+            <AuraButton
               type="button"
+              variant="secondary"
+              size="md"
               onClick={moveToCompress}
-              className="lumeo-focus-ring mt-4 inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-transparent px-4 text-sm font-bold text-[var(--text-secondary)] transition hover:border-[var(--border-selected)] hover:text-[var(--text-primary)]"
+              className="mt-4 w-full"
             >
               Reduce size first
-            </button>
+            </AuraButton>
             <p className="mt-2 text-xs leading-5 text-[var(--text-subtle)]">
               Optional. This opens the existing Compress tool with the same PDF.
             </p>
@@ -192,13 +198,15 @@ export function WorkspaceFinish() {
       </div>
 
       <div className="sticky bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 rounded-[var(--radius-2xl)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3 shadow-[var(--v2-elevation-4)] backdrop-blur-xl">
-        <button
+        <AuraButton
           type="button"
+          variant="primary"
+          size="lg"
           onClick={downloadPdf}
-          className="lumeo-primary-action lumeo-focus-ring inline-flex min-h-12 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-6 text-sm font-black text-[var(--text-on-accent)] transition hover:bg-[var(--emerald-500)] active:scale-[0.99]"
+          className="w-full"
         >
           Download PDF
-        </button>
+        </AuraButton>
         {downloaded ? (
           <p className="mt-2 text-center text-xs font-semibold text-[var(--atelier-sage-300)]">
             Download prepared. Your workspace stays open.
