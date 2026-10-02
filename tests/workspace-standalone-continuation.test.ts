@@ -51,8 +51,9 @@ test("PDF-producing standalone tools continue only PDF results", () => {
     assert.match(source, /fresh Workspace history/);
   }
 
-  assert.match(split, /result\?\.kind === "pdf"/);
-  assert.doesNotMatch(split, /result\?\.kind === "zip"\s*&&\s*continuation/);
+  assert.match(split, /if \(resultType === "pdf"\)/);
+  assert.match(split, /continuationBytes = pdfBuffer\.slice\(0\)/);
+  assert.doesNotMatch(split, /resultType === "zip"[\s\S]{0,240}createFreshPdfContinuation/);
 });
 
 test("non-PDF standalone outputs are not forced into the PDF Workspace", () => {
