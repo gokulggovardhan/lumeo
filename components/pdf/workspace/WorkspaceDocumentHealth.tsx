@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { AuraButton } from "@/components/ui/Aura";
 import { continuationRouteForArea, type ContinuationArea } from "@/lib/pdf/workspace/continuation";
 import { getDocumentHealthSuggestions } from "@/lib/pdf/workspace/documentHealth";
 import type { WorkspaceArea } from "@/lib/pdf/workspace/model";
@@ -81,17 +82,19 @@ export function WorkspaceDocumentHealth() {
                   Available here
                 </span>
               ) : (
-                <button
+                <AuraButton
                   type="button"
+                  variant="secondary"
+                  size="md"
                   onClick={() => openArea(suggestion.area)}
-                  className="lumeo-focus-ring inline-flex min-h-10 shrink-0 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-raised)] px-3 text-xs font-bold text-[var(--text-primary)] transition hover:border-[var(--border-selected)] hover:bg-[var(--surface-selected)]"
+                  className="shrink-0 text-xs"
                 >
                   {suggestion.id === "ocr"
                     ? "Recognize text"
                     : suggestion.area === "pages"
                       ? "Fix rotation"
                       : "Reduce size"}
-                </button>
+                </AuraButton>
               )}
             </div>
           );
