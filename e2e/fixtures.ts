@@ -24,6 +24,7 @@ export const SPANISH_SCAN_PDF = path.join(TMP_DIR, "spanish-scan.pdf");
 export const SEARCHABLE_SCAN_PDF = path.join(TMP_DIR, "searchable-scan.pdf");
 export const SPLIT_RUN_PDF = path.join(TMP_DIR, "split-run.pdf");
 export const TWO_PAGE_PDF = path.join(TMP_DIR, "two-page.pdf");
+export const EDITABLE_TWO_PAGE_PDF = path.join(TMP_DIR, "editable-two-page.pdf");
 export const MIXED_STYLE_PDF = path.join(TMP_DIR, "mixed-style.pdf");
 export const CLIPPED_TEXT_PDF = path.join(TMP_DIR, "clipped-text.pdf");
 export const TYPE3_TEXT_PDF = path.join(TMP_DIR, "type3-text.pdf");
@@ -787,6 +788,46 @@ async function type3Text(): Promise<Uint8Array> {
   return doc.save();
 }
 
+/**
+ * Two-page fixture with a real embedded TrueType font.
+ *
+ * Native search/replace tests need deterministic font program + metric
+ * evidence in every browser. Standard-14 Helvetica is intentionally retained
+ * by TWO_PAGE_PDF for capability coverage, but WebKit may correctly classify
+ * it as detected/read-only when Standard-14 placement evidence is incomplete.
+ */
+async function editableTwoPage(): Promise<Uint8Array> {
+  const fontkitModule = await import("@pdf-lib/fontkit");
+  const fontkit = fontkitModule.default ?? fontkitModule;
+  const doc = await PDFDocument.create();
+  doc.registerFontkit(
+    fontkit as unknown as Parameters<PDFDocument["registerFontkit"]>[0],
+  );
+  const font = await doc.embedFont(await ciTrueTypeFontBytes(), {
+    subset: false,
+  });
+
+  for (const label of ["Employee record", "Second page record"]) {
+    const page = doc.addPage([595, 842]);
+    page.drawText(label, {
+      x: 60,
+      y: 740,
+      size: 18,
+      font,
+      color: rgb(0, 0, 0),
+    });
+    page.drawText("SSN 123-45-6789", {
+      x: 60,
+      y: 680,
+      size: 16,
+      font,
+      color: rgb(0, 0, 0),
+    });
+  }
+
+  return doc.save();
+}
+
 /** Two pages, so the PAGES rail renders -- it is hidden for a single page. */
 async function twoPage(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -811,6 +852,7 @@ export async function writeFixtures(): Promise<void> {
   await assertGenuinelySplit(split);
   await writeFile(SPLIT_RUN_PDF, split);
   await writeFile(TWO_PAGE_PDF, await twoPage());
+  await writeFile(EDITABLE_TWO_PAGE_PDF, await editableTwoPage());
   await writeFile(MIXED_STYLE_PDF, await mixedStyle());
   await writeFile(CLIPPED_TEXT_PDF, await clippedText());
   await writeFile(TYPE3_TEXT_PDF, await type3Text());

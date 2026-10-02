@@ -21,6 +21,7 @@ import {
   TEXT_ONLY_PDF,
   TYPE3_TEXT_PDF,
   TWO_PAGE_PDF,
+  EDITABLE_TWO_PAGE_PDF,
   writeFixtures,
 } from "./fixtures.ts";
 import {
@@ -2204,7 +2205,7 @@ test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecuti
 
 
 test("vinext Edit PDF replaces all safe document matches in one undo step", async ({ page }) => {
-  await uploadEditFixture(page, TWO_PAGE_PDF);
+  await uploadEditFixture(page, EDITABLE_TWO_PAGE_PDF);
   await waitForStageReady(page);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
@@ -2281,7 +2282,7 @@ test("vinext Edit PDF replaces all safe document matches in one undo step", asyn
 });
 
 test("vinext Edit PDF replaces only the current page when Replace All scope is This page", async ({ page }) => {
-  await uploadEditFixture(page, TWO_PAGE_PDF);
+  await uploadEditFixture(page, EDITABLE_TWO_PAGE_PDF);
   await waitForStageReady(page);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
@@ -2364,7 +2365,7 @@ test("vinext Edit PDF searches across pages, highlights matches, and prepares a 
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await uploadEditFixture(page, TWO_PAGE_PDF);
+  await uploadEditFixture(page, EDITABLE_TWO_PAGE_PDF);
   await waitForStageReady(page);
 
   await page.getByRole("button", { name: "Find" }).click();
@@ -2404,7 +2405,7 @@ test("vinext Edit PDF searches across pages, highlights matches, and prepares a 
 });
 
 test("vinext Replace All does not depend on the best-effort Find index", async ({ page }) => {
-  await uploadEditFixture(page, TWO_PAGE_PDF);
+  await uploadEditFixture(page, EDITABLE_TWO_PAGE_PDF);
   await waitForStageReady(page);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
