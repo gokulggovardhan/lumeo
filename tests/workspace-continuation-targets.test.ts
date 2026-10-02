@@ -18,6 +18,7 @@ test("continuation keeps one canonical destination list", () => {
       ["sign", "Sign", "/pdf/sign"],
       ["enhance", "Add", "/pdf/add"],
       ["optimize", "Compress", "/pdf/compress"],
+      ["export", "Finish", "/pdf/finish"],
     ],
   );
 });
@@ -25,11 +26,11 @@ test("continuation keeps one canonical destination list", () => {
 test("continuation hides the current single-purpose area", () => {
   assert.deepEqual(
     continuationTargetsFor("edit").map((target) => target.area),
-    ["pages", "sign", "enhance", "optimize"],
+    ["pages", "sign", "enhance", "optimize", "export"],
   );
   assert.deepEqual(
     continuationTargetsFor("pages").map((target) => target.area),
-    ["edit", "sign", "enhance", "optimize"],
+    ["edit", "sign", "enhance", "optimize", "export"],
   );
 });
 
@@ -45,6 +46,6 @@ test("known incompatible destinations are hidden before rendering", () => {
     continuationTargetsFor("sign", ["edit", "optimize"]).map(
       (target) => target.area,
     ),
-    ["pages", "enhance"],
+    ["pages", "enhance", "export"],
   );
 });
