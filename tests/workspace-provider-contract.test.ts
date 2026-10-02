@@ -47,15 +47,16 @@ test("continuation UI stays user-facing and secondary to existing tool downloads
   const continuation = read(
     "components/pdf/workspace/ContinueWithPdf.tsx",
   );
+  const targets = read("lib/pdf/workspace/continuation.ts");
   const edit = read("components/pdf/EditPdfTool.tsx");
   const pages = read("components/pdf/OrganizePdfTool.tsx");
   const sign = read("components/pdf/SignPdfTool.tsx");
 
   assert.match(continuation, /Continue with this PDF/);
   assert.match(continuation, /Keep working without opening the file again/);
-  assert.match(continuation, /Edit/);
-  assert.match(continuation, /Pages/);
-  assert.match(continuation, /Sign/);
+  assert.match(targets, /label: "Edit"/);
+  assert.match(targets, /label: "Pages"/);
+  assert.match(targets, /label: "Sign"/);
 
   for (const source of [continuation, edit, pages, sign]) {
     for (const phrase of [
