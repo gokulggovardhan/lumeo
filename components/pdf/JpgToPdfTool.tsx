@@ -1242,7 +1242,7 @@ export default function JpgToPdfTool() {
         )}
       </ToolActionBar>
 
-      {downloadUrl && continuation ? (
+      {continuation ? (
         <ContinueWithPdf
           sourceArea="edit"
           includeSourceArea
