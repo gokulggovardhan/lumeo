@@ -10,6 +10,17 @@ import {
   type ReactNode,
 } from "react";
 import type { WorkspaceArea } from "@/lib/pdf/workspace/model";
+import {
+  appendWorkspaceCheckpoint,
+  canRedoWorkspaceCheckpoint,
+  canUndoWorkspaceCheckpoint,
+  createWorkspaceRevisionHistory,
+  currentWorkspaceCheckpoint,
+  redoWorkspaceCheckpoint,
+  replaceCurrentWorkspaceCheckpoint,
+  undoWorkspaceCheckpoint,
+  type WorkspaceRevisionHistory,
+} from "@/lib/pdf/workspace/revisionHistory";
 import type { DocumentSession } from "@/lib/pdf/workspace/session";
 import {
   createWorkspaceRuntime,
@@ -49,9 +60,28 @@ export type WorkspaceContinuationPayload = {
   runtime: WorkspaceDocumentRuntime;
 };
 
+export type WorkspaceGlobalHistoryState = {
+  connected: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  checkpointCount: number;
+  cursor: number;
+};
+
+const EMPTY_GLOBAL_HISTORY: WorkspaceGlobalHistoryState = {
+  connected: false,
+  canUndo: false,
+  canRedo: false,
+  checkpointCount: 0,
+  cursor: 0,
+};
+
 type WorkspaceDocumentContextValue = {
   document: WorkspaceDocumentRuntime | null;
   continuationTarget: WorkspaceArea | null;
+  globalHistory: WorkspaceGlobalHistoryState;
+  undoWorkspace: () => WorkspaceDocumentRuntime | null;
+  redoWorkspace: () => WorkspaceDocumentRuntime | null;
   startDocument: (
     input: StartWorkspaceDocumentInput,
   ) => WorkspaceDocumentRuntime;
@@ -121,6 +151,9 @@ export function WorkspaceDocumentProvider({
   const [continuationTarget, setContinuationTarget] =
     useState<WorkspaceArea | null>(null);
   const continuationTargetRef = useRef<WorkspaceArea | null>(null);
+  const historyRef = useRef<WorkspaceRevisionHistory | null>(null);
+  const [globalHistory, setGlobalHistory] =
+    useState<WorkspaceGlobalHistoryState>(EMPTY_GLOBAL_HISTORY);
 
   const commit = useCallback((next: WorkspaceDocumentRuntime | null) => {
     documentRef.current = next;
@@ -128,9 +161,31 @@ export function WorkspaceDocumentProvider({
     return next;
   }, []);
 
+  const syncHistory = useCallback((history: WorkspaceRevisionHistory | null) => {
+    historyRef.current = history;
+    if (!history) {
+      setGlobalHistory(EMPTY_GLOBAL_HISTORY);
+      return;
+    }
+    setGlobalHistory({
+      connected: true,
+      canUndo: canUndoWorkspaceCheckpoint(history),
+      canRedo: canRedoWorkspaceCheckpoint(history),
+      checkpointCount: history.checkpoints.length,
+      cursor: history.cursor,
+    });
+  }, []);
+
+  const setContinuationTargetSafely = useCallback((area: WorkspaceArea | null) => {
+    continuationTargetRef.current = area;
+    setContinuationTarget(area);
+  }, []);
+
   const startDocument = useCallback(
     (input: StartWorkspaceDocumentInput) => {
       const id = createId("workspace");
+      syncHistory(null);
+      setContinuationTargetSafely(null);
       return commit(
         createWorkspaceRuntime({
           id,
@@ -142,7 +197,7 @@ export function WorkspaceDocumentProvider({
         }),
       )!;
     },
-    [commit],
+    [commit, setContinuationTargetSafely, syncHistory],
   );
 
   const publishRevision = useCallback(
@@ -155,18 +210,27 @@ export function WorkspaceDocumentProvider({
         expectedRevision:
           input.expectedRevision ?? current.revision.number,
       });
+      const history = historyRef.current;
+      if (history) {
+        syncHistory(appendWorkspaceCheckpoint(history, next));
+      }
       return commit(next);
     },
-    [commit],
+    [commit, syncHistory],
   );
 
   const replaceSession = useCallback(
     (session: DocumentSession) => {
       const current = documentRef.current;
       if (!current) return null;
-      return commit(updateWorkspaceRuntimeSession(current, session));
+      const next = updateWorkspaceRuntimeSession(current, session);
+      const history = historyRef.current;
+      if (history) {
+        syncHistory(replaceCurrentWorkspaceCheckpoint(history, next));
+      }
+      return commit(next);
     },
-    [commit],
+    [commit, syncHistory],
   );
 
   const stageContinuation = useCallback(
@@ -204,20 +268,38 @@ export function WorkspaceDocumentProvider({
       }
 
       assertContinuationTransfer(current, input, next);
+      const history = historyRef.current;
+      if (
+        history &&
+        current &&
+        current.session.state.document.id === next.session.state.document.id
+      ) {
+        syncHistory(appendWorkspaceCheckpoint(history, next));
+      } else if (
+        current &&
+        current.session.state.document.id === next.session.state.document.id
+      ) {
+        syncHistory(
+          appendWorkspaceCheckpoint(
+            createWorkspaceRevisionHistory(current),
+            next,
+          ),
+        );
+      } else {
+        syncHistory(createWorkspaceRevisionHistory(next));
+      }
       commit(next);
-      continuationTargetRef.current = input.target;
-      setContinuationTarget(input.target);
+      setContinuationTargetSafely(input.target);
       return next;
     },
-    [commit],
+    [commit, setContinuationTargetSafely, syncHistory],
   );
 
   const takeContinuation = useCallback((target: WorkspaceArea) => {
     const current = documentRef.current;
     if (!current || continuationTargetRef.current !== target) return null;
 
-    continuationTargetRef.current = null;
-    setContinuationTarget(null);
+    setContinuationTargetSafely(null);
     return {
       file: new File(
         [workspaceRuntimeBytes(current)],
@@ -226,7 +308,29 @@ export function WorkspaceDocumentProvider({
       ),
       runtime: current,
     };
-  }, []);
+  }, [setContinuationTargetSafely]);
+
+  const undoWorkspace = useCallback(() => {
+    const history = historyRef.current;
+    if (!history || !canUndoWorkspaceCheckpoint(history)) return null;
+    const nextHistory = undoWorkspaceCheckpoint(history);
+    const restored = currentWorkspaceCheckpoint(nextHistory);
+    syncHistory(nextHistory);
+    commit(restored);
+    setContinuationTargetSafely(restored.session.state.activeArea);
+    return restored;
+  }, [commit, setContinuationTargetSafely, syncHistory]);
+
+  const redoWorkspace = useCallback(() => {
+    const history = historyRef.current;
+    if (!history || !canRedoWorkspaceCheckpoint(history)) return null;
+    const nextHistory = redoWorkspaceCheckpoint(history);
+    const restored = currentWorkspaceCheckpoint(nextHistory);
+    syncHistory(nextHistory);
+    commit(restored);
+    setContinuationTargetSafely(restored.session.state.activeArea);
+    return restored;
+  }, [commit, setContinuationTargetSafely, syncHistory]);
 
   const fileForCurrentRevision = useCallback(() => {
     const current = documentRef.current;
@@ -239,15 +343,18 @@ export function WorkspaceDocumentProvider({
   }, []);
 
   const clearDocument = useCallback(() => {
-    continuationTargetRef.current = null;
-    setContinuationTarget(null);
+    setContinuationTargetSafely(null);
+    syncHistory(null);
     commit(null);
-  }, [commit]);
+  }, [commit, setContinuationTargetSafely, syncHistory]);
 
   const value = useMemo<WorkspaceDocumentContextValue>(
     () => ({
       document,
       continuationTarget,
+      globalHistory,
+      undoWorkspace,
+      redoWorkspace,
       startDocument,
       publishRevision,
       replaceSession,
@@ -261,11 +368,14 @@ export function WorkspaceDocumentProvider({
       continuationTarget,
       document,
       fileForCurrentRevision,
+      globalHistory,
+      redoWorkspace,
       publishRevision,
       replaceSession,
       stageContinuation,
       startDocument,
       takeContinuation,
+      undoWorkspace,
     ],
   );
 
