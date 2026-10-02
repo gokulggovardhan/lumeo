@@ -44,7 +44,7 @@ export function WorkspaceFinish() {
 
   useEffect(() => {
     if (!document) return;
-    setName(outputName(currentDocument.revision.fileName));
+    setName(outputName(document.revision.fileName));
     setError("");
     setDownloaded(false);
   }, [document?.id, document?.revision.number, document?.revision.fileName]);
@@ -53,8 +53,8 @@ export function WorkspaceFinish() {
     if (!document) return [];
     return changeSummaries(
       visibleWorkspaceHistory(
-        currentDocument.session.history.operations,
-        currentDocument.session.state.historyCursor,
+        document.session.history.operations,
+        document.session.state.historyCursor,
         12,
       ),
     );
