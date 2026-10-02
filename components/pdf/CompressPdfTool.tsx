@@ -282,7 +282,11 @@ function CompressIcon() {
 
 export default function CompressPdfTool() {
   const { availability, track } = useAnalytics();
-  const { continuationTarget, takeContinuation } = useWorkspaceDocument();
+  const {
+    continuationTarget,
+    takeContinuation,
+    reportDocumentHealth,
+  } = useWorkspaceDocument();
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
@@ -616,15 +620,21 @@ export default function CompressPdfTool() {
         samplePage,
       };
 
-      setAnalysis(nextAnalysis);
-      setWorkspaceDocument(
+      const nextWorkspaceDocument =
         continuation?.document ??
-          createStandaloneCompressWorkspaceDocument({
-            fileName: file.name,
-            byteLength: bytes.byteLength,
-            pageCount: sourcePdf.getPageCount(),
-          }),
+        createStandaloneCompressWorkspaceDocument({
+          fileName: file.name,
+          byteLength: bytes.byteLength,
+          pageCount: sourcePdf.getPageCount(),
+        });
+      setAnalysis(nextAnalysis);
+      reportDocumentHealth(
+        {
+          imageHeavy: nextAnalysis.estimatedImageHeavyRatio >= 0.7,
+        },
+        nextWorkspaceDocument.id,
       );
+      setWorkspaceDocument(nextWorkspaceDocument);
       setWorkspaceBaseSession(continuation?.session ?? null);
       resetSettings(recommendation);
       setOutputName(sourceOutputName(file.name));
@@ -641,7 +651,14 @@ export default function CompressPdfTool() {
       setBlockingError(message);
       setAnalysis(null);
     }
-  }, [cleanupTasks, clearPreview, clearResult, renderPreview, resetSettings]);
+  }, [
+    cleanupTasks,
+    clearPreview,
+    clearResult,
+    renderPreview,
+    reportDocumentHealth,
+    resetSettings,
+  ]);
 
   useEffect(() => {
     if (analysis || continuationTarget !== "optimize") return;

@@ -635,6 +635,7 @@ export default function EditPdfTool() {
   const {
     continuationTarget,
     takeContinuation,
+    reportDocumentHealth,
   } = useWorkspaceDocument();
   const openedTrackedRef = useRef(false);
   const workspaceSourceSequenceRef = useRef(1);
@@ -1550,6 +1551,48 @@ export default function EditPdfTool() {
     pdfJsDetectedRunCount,
     textReconciliations,
     rasterImageEvidenceCurrent,
+  ]);
+
+  useEffect(() => {
+    if (!pdfMeta) return;
+    if (ocrSearchablePublicationCurrent) {
+      reportDocumentHealth(
+        {
+          hasSearchableText: true,
+          scannedPageCount: 0,
+        },
+        historyState.workspaceDocument.id,
+      );
+      return;
+    }
+    if (pageTextCapability.category === "SCANNED_IMAGE") {
+      reportDocumentHealth(
+        {
+          hasSearchableText: false,
+          scannedPageCount: 1,
+        },
+        historyState.workspaceDocument.id,
+      );
+      return;
+    }
+    if (
+      pageTextCapability.category === "NATIVE_TEXT" ||
+      pageTextCapability.category === "HYBRID_TEXT_AND_IMAGE"
+    ) {
+      reportDocumentHealth(
+        {
+          hasSearchableText: true,
+          scannedPageCount: 0,
+        },
+        historyState.workspaceDocument.id,
+      );
+    }
+  }, [
+    historyState.workspaceDocument.id,
+    ocrSearchablePublicationCurrent,
+    pageTextCapability.category,
+    pdfMeta,
+    reportDocumentHealth,
   ]);
 
   // Product-facing explanations are derived from structured capability

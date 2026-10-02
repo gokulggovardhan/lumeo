@@ -63,6 +63,13 @@ export type WorkspaceContinuationPayload = {
   runtime: WorkspaceDocumentRuntime;
 };
 
+export type WorkspaceDocumentHealthFacts = {
+  hasSearchableText?: boolean | null;
+  scannedPageCount?: number | null;
+  rotatedPageCount?: number | null;
+  imageHeavy?: boolean | null;
+};
+
 export type WorkspaceGlobalHistoryState = {
   connected: boolean;
   canUndo: boolean;
@@ -83,6 +90,11 @@ type WorkspaceDocumentContextValue = {
   document: WorkspaceDocumentRuntime | null;
   continuationTarget: WorkspaceArea | null;
   globalHistory: WorkspaceGlobalHistoryState;
+  documentHealth: WorkspaceDocumentHealthFacts;
+  reportDocumentHealth: (
+    facts: WorkspaceDocumentHealthFacts,
+    documentId?: string,
+  ) => void;
   undoWorkspace: () => WorkspaceDocumentRuntime | null;
   redoWorkspace: () => WorkspaceDocumentRuntime | null;
   startDocument: (
@@ -158,6 +170,9 @@ export function WorkspaceDocumentProvider({
   const historyRef = useRef<WorkspaceRevisionHistory | null>(null);
   const [globalHistory, setGlobalHistory] =
     useState<WorkspaceGlobalHistoryState>(EMPTY_GLOBAL_HISTORY);
+  const [documentHealth, setDocumentHealth] =
+    useState<WorkspaceDocumentHealthFacts>({});
+  const documentHealthDocumentIdRef = useRef<string | null>(null);
 
   const commit = useCallback((next: WorkspaceDocumentRuntime | null) => {
     documentRef.current = next;
@@ -185,10 +200,27 @@ export function WorkspaceDocumentProvider({
     setContinuationTarget(area);
   }, []);
 
+  const reportDocumentHealth = useCallback(
+    (facts: WorkspaceDocumentHealthFacts, documentId?: string) => {
+      if (
+        documentId &&
+        documentHealthDocumentIdRef.current !== documentId
+      ) {
+        documentHealthDocumentIdRef.current = documentId;
+        setDocumentHealth(facts);
+        return;
+      }
+      setDocumentHealth((current) => ({ ...current, ...facts }));
+    },
+    [],
+  );
+
   const startDocument = useCallback(
     (input: StartWorkspaceDocumentInput) => {
       const id = createId("workspace");
       syncHistory(null);
+      documentHealthDocumentIdRef.current = null;
+      setDocumentHealth({});
       setContinuationTargetSafely(null);
       return commit(
         createWorkspaceRuntime({
@@ -241,11 +273,10 @@ export function WorkspaceDocumentProvider({
     (input: StageWorkspaceContinuationInput) => {
       const current = documentRef.current;
       let next: WorkspaceDocumentRuntime;
+      const continuesCurrentDocument =
+        current?.session.state.document.id === input.session.state.document.id;
 
-      if (
-        current &&
-        current.session.state.document.id === input.session.state.document.id
-      ) {
+      if (current && continuesCurrentDocument) {
         const session = mergeWorkspaceSessions(
           current.session,
           input.session,
@@ -272,6 +303,14 @@ export function WorkspaceDocumentProvider({
       }
 
       assertContinuationTransfer(current, input, next);
+      if (
+        documentHealthDocumentIdRef.current !==
+        next.session.state.document.id
+      ) {
+        documentHealthDocumentIdRef.current =
+          next.session.state.document.id;
+        setDocumentHealth({});
+      }
       const history = historyRef.current;
       if (
         history &&
@@ -368,6 +407,8 @@ export function WorkspaceDocumentProvider({
   const clearDocument = useCallback(() => {
     setContinuationTargetSafely(null);
     syncHistory(null);
+    documentHealthDocumentIdRef.current = null;
+    setDocumentHealth({});
     commit(null);
   }, [commit, setContinuationTargetSafely, syncHistory]);
 
@@ -376,6 +417,8 @@ export function WorkspaceDocumentProvider({
       document,
       continuationTarget,
       globalHistory,
+      documentHealth,
+      reportDocumentHealth,
       undoWorkspace,
       redoWorkspace,
       startDocument,
@@ -392,9 +435,11 @@ export function WorkspaceDocumentProvider({
       continuationTarget,
       continueCurrent,
       document,
+      documentHealth,
       fileForCurrentRevision,
       globalHistory,
       redoWorkspace,
+      reportDocumentHealth,
       publishRevision,
       replaceSession,
       stageContinuation,

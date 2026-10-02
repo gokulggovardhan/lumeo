@@ -197,6 +197,7 @@ export default function OrganizePdfTool() {
   const {
     continuationTarget,
     takeContinuation,
+    reportDocumentHealth,
   } = useWorkspaceDocument();
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
@@ -370,6 +371,11 @@ export default function OrganizePdfTool() {
 
       const pdf = await PDFDocument.load(copyArrayBuffer(bytes));
       const pageCount = pdf.getPageCount();
+      const rotatedPageCount = pdf
+        .getPages()
+        .filter((page) => ((page.getRotation().angle % 360) + 360) % 360 !== 0)
+        .length;
+      reportDocumentHealth({ rotatedPageCount });
       const pdfJsDoc = await openPdfJsDocument(copyArrayBuffer(bytes));
       if (nextSession !== sessionRef.current) {
         await (pdfJsDoc as PDFDocumentProxy & { destroy?: () => Promise<void> | void }).destroy?.();
@@ -378,17 +384,21 @@ export default function OrganizePdfTool() {
       pdfJsDocRef.current = pdfJsDoc;
 
       const sourceId = `organize-source-${sourceSequenceRef.current++}`;
+      const workspaceDocument =
+        sharedDocument ??
+        createWorkspaceDocument(`organize-document-${sourceId}`, {
+          id: sourceId,
+          name: file.name,
+          byteLength: file.size,
+          pageCount,
+        });
+      reportDocumentHealth(
+        { rotatedPageCount },
+        workspaceDocument.id,
+      );
       setDocument({ name: file.name, size: file.size, bytes, pageCount });
       resetOrganizerState(
-        createOrganizerWorkspaceSnapshot(
-          sharedDocument ??
-            createWorkspaceDocument(`organize-document-${sourceId}`, {
-              id: sourceId,
-              name: file.name,
-              byteLength: file.size,
-              pageCount,
-            }),
-        ),
+        createOrganizerWorkspaceSnapshot(workspaceDocument),
       );
       duplicateSequenceRef.current = 1;
       exportRevisionRef.current += 1;
@@ -402,7 +412,12 @@ export default function OrganizePdfTool() {
           : "This file could not be read. It may be damaged or password-protected.";
       setError(message);
     }
-  }, [destroyPdfJsDocument, renderThumbnails, resetOrganizerState]);
+  }, [
+    destroyPdfJsDocument,
+    renderThumbnails,
+    reportDocumentHealth,
+    resetOrganizerState,
+  ]);
 
   const handleFiles = useCallback(
     async (files: FileList) => {

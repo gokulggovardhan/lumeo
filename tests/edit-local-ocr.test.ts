@@ -331,6 +331,47 @@ test("local OCR retries cleanly after worker startup fails", async () => {
   await engine.terminate();
 });
 
+test("local OCR retries one empty recognition with a fresh worker", async () => {
+  let workersCreated = 0;
+  let emptyWorkerTerminated = 0;
+  const engine = createLocalOcrEngine("https://lumeo.in", {
+    createCanvas: fakeOcrCanvas,
+    createWorker: async () => {
+      workersCreated += 1;
+      if (workersCreated === 1) {
+        return {
+          async setParameters() {},
+          async recognize() {
+            return {
+              data: {
+                text: "",
+                confidence: 0,
+                blocks: [],
+              },
+            };
+          },
+          async terminate() {
+            emptyWorkerTerminated += 1;
+          },
+        };
+      }
+      return successfulWorker("Recovered after empty result");
+    },
+  });
+
+  const result = await engine.recognizePage({
+    page: resolvedRenderPage() as never,
+    pageIndex: 0,
+    orientationCorrection: 270,
+  });
+
+  assert.equal(workersCreated, 2);
+  assert.equal(emptyWorkerTerminated, 1);
+  assert.equal(result.text, "Recovered after empty result");
+  assert.equal(result.orientationCorrection, 270);
+  await engine.terminate();
+});
+
 test("local OCR discards a worker after recognition failure before retrying", async () => {
   let workersCreated = 0;
   let failedWorkerTerminated = 0;

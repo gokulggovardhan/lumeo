@@ -152,3 +152,37 @@ test("Finish uses the current materialized PDF and one primary download", () => 
   assert.equal((finish.match(/lumeo-primary-action/g) ?? []).length, 1);
   assert.doesNotMatch(finish, /PDFDocument|copyPages|embedPage|drawText/);
 });
+
+
+test("document health stays contextual, compact, and connected to proven tools", () => {
+  const layout = read("app/pdf/layout.tsx");
+  const provider = read(
+    "components/pdf/workspace/WorkspaceDocumentProvider.tsx",
+  );
+  const health = read(
+    "components/pdf/workspace/WorkspaceDocumentHealth.tsx",
+  );
+  const edit = read("components/pdf/EditPdfTool.tsx");
+  const pages = read("components/pdf/OrganizePdfTool.tsx");
+  const compress = read("components/pdf/CompressPdfTool.tsx");
+
+  assert.match(layout, /WorkspaceDocumentHealth/);
+  assert.match(provider, /reportDocumentHealth/);
+  assert.match(provider, /documentHealthDocumentIdRef/);
+  assert.match(provider, /setDocumentHealth\(\{\}\)/);
+  assert.match(health, /getDocumentHealthSuggestions/);
+  assert.match(health, /globalHistory\.connected/);
+  assert.match(health, /\.slice\(0, 2\)/);
+  assert.match(health, /Recognize text/);
+  assert.match(health, /Fix rotation/);
+  assert.match(health, /Reduce size/);
+  assert.match(edit, /reportDocumentHealth/);
+  assert.match(edit, /SCANNED_IMAGE/);
+  assert.match(pages, /rotatedPageCount/);
+  assert.match(compress, /imageHeavy/);
+
+  assert.doesNotMatch(
+    health,
+    /diagnostics dashboard|document analyzer|technical diagnostics/i,
+  );
+});

@@ -29,7 +29,7 @@ test("document health suggests only relevant actions in priority order", () => {
   assert.deepEqual(
     suggestions.map(({ id, area, priority }) => ({ id, area, priority })),
     [
-      { id: "ocr", area: "enhance", priority: 1 },
+      { id: "ocr", area: "edit", priority: 1 },
       { id: "rotate", area: "pages", priority: 1 },
       { id: "compress", area: "optimize", priority: 2 },
       { id: "optimize-images", area: "optimize", priority: 3 },
@@ -52,4 +52,16 @@ test("large-file suggestion starts at the intended threshold", () => {
     }).some((item) => item.id === "compress"),
     true,
   );
+});
+
+
+test("a searchable OCR layer suppresses the recognize-text suggestion", () => {
+  const suggestions = getDocumentHealthSuggestions({
+    byteLength: 3 * 1024 * 1024,
+    pageCount: 1,
+    hasSearchableText: true,
+    scannedPageCount: 1,
+  });
+
+  assert.equal(suggestions.some((item) => item.id === "ocr"), false);
 });

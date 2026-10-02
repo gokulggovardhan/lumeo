@@ -530,21 +530,45 @@ export function createLocalOcrEngine(
         );
         activeWorker = readyWorker;
         if (terminated) throw new Error("The OCR session was cancelled.");
-        await activeWorker.setParameters({
-          user_defined_dpi: String(Math.max(72, Math.round(scale * 72))),
-        });
-        const recognition = await activeWorker.recognize(
-          recognitionCanvas,
-          {},
-          { text: true, blocks: true },
-        );
+        const recognizeWithWorker = async (candidate: OcrWorker) => {
+          await candidate.setParameters({
+            user_defined_dpi: String(Math.max(72, Math.round(scale * 72))),
+          });
+          return candidate.recognize(
+            recognitionCanvas,
+            {},
+            { text: true, blocks: true },
+          );
+        };
+
+        let recognition = await recognizeWithWorker(activeWorker);
         if (terminated) throw new Error("The OCR session was cancelled.");
-        const words = ocrWordsFromBlocks(
+
+        let words = ocrWordsFromBlocks(
           recognition.data.blocks,
           recognitionCanvas.width,
           recognitionCanvas.height,
           orientationCorrection,
         );
+        if (!recognition.data.text.trim() && words.length === 0) {
+          onProgress?.({
+            status: "Retrying recognition locally",
+            progress: 0,
+          });
+          await discardWorker(activeWorker);
+          activeWorker = null;
+          const retryWorker = await ensureWorker(language);
+          activeWorker = retryWorker;
+          recognition = await recognizeWithWorker(retryWorker);
+          if (terminated) throw new Error("The OCR session was cancelled.");
+          words = ocrWordsFromBlocks(
+            recognition.data.blocks,
+            recognitionCanvas.width,
+            recognitionCanvas.height,
+            orientationCorrection,
+          );
+        }
+
         return {
           textSource: "ocr",
           pageIndex,
