@@ -31,6 +31,8 @@ import {
   type TargetUnit,
 } from "@/lib/compressionTarget";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
+import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import {
   L2AdvancedDisclosure,
   L2FileCard,
@@ -58,6 +60,12 @@ import {
   isPdfNamedFile,
   checkPdfFileSize,
 } from "@/lib/pdf/uploadValidation";
+import {
+  createCompressWorkspaceSession,
+  createStandaloneCompressWorkspaceDocument,
+} from "@/lib/pdf/workspace/compressAdapter";
+import type { WorkspaceDocument } from "@/lib/pdf/workspace/model";
+import type { DocumentSession } from "@/lib/pdf/workspace/session";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
 type ExpertMode = "profile" | "custom";
@@ -104,6 +112,7 @@ type CompressAnalysis = {
 
 type CompressResult = {
   url: string;
+  bytes: ArrayBuffer;
   fileName: string;
   originalSize: number;
   compressedSize: number;
@@ -273,6 +282,7 @@ function CompressIcon() {
 
 export default function CompressPdfTool() {
   const { availability, track } = useAnalytics();
+  const { continuationTarget, takeContinuation } = useWorkspaceDocument();
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
@@ -305,6 +315,10 @@ export default function CompressPdfTool() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [result, setResult] = useState<CompressResult | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [workspaceDocument, setWorkspaceDocument] =
+    useState<WorkspaceDocument | null>(null);
+  const [workspaceBaseSession, setWorkspaceBaseSession] =
+    useState<DocumentSession | null>(null);
 
   const selectedPlan = useMemo(() => {
     if (expertMode === "custom") {
