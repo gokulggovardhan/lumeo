@@ -69,6 +69,37 @@ type WorkspaceDocumentContextValue = {
   clearDocument: () => void;
 };
 
+function assertContinuationTransfer(
+  previous: WorkspaceDocumentRuntime | null,
+  input: StageWorkspaceContinuationInput,
+  next: WorkspaceDocumentRuntime,
+): void {
+  const continuesCurrentDocument =
+    previous?.session.state.document.id === input.session.state.document.id;
+  const expectedRevision = continuesCurrentDocument
+    ? previous.revision.number + 1
+    : 0;
+
+  if (next.revision.number !== expectedRevision) {
+    throw new Error("Workspace continuation revision did not advance safely.");
+  }
+  if (next.revision.fileName !== input.fileName) {
+    throw new Error("Workspace continuation filename changed unexpectedly.");
+  }
+  if (next.revision.pageCount !== input.pageCount) {
+    throw new Error("Workspace continuation page count changed unexpectedly.");
+  }
+  if (next.revision.byteLength !== input.bytes.byteLength) {
+    throw new Error("Workspace continuation bytes changed unexpectedly.");
+  }
+  if (next.session.state.document.id !== input.session.state.document.id) {
+    throw new Error("Workspace continuation changed document identity.");
+  }
+  if (next.session.state.activeArea !== input.target) {
+    throw new Error("Workspace continuation opened the wrong tool area.");
+  }
+}
+
 const WorkspaceDocumentContext =
   createContext<WorkspaceDocumentContextValue | null>(null);
 
@@ -172,6 +203,7 @@ export function WorkspaceDocumentProvider({
         });
       }
 
+      assertContinuationTransfer(current, input, next);
       commit(next);
       continuationTargetRef.current = input.target;
       setContinuationTarget(input.target);
