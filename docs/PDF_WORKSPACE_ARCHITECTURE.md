@@ -48,3 +48,19 @@ The current Sign model stores `pageIndex`. During Workspace migration, adapters 
 ## Stage 1
 
 The first code slice adds dependency-free Workspace domain types and operation history. It deliberately does not replace any public post-selection UI yet. This keeps PR 1 reviewable and gives Stage 2 a tested contract for Organize → Watermark → Sign → Compress → Export.
+
+
+## Shared document runtime
+
+The first connected-workflow foundation is an in-memory provider mounted at the shared `/pdf` layout. It is deliberately invisible to users and does not replace any processing engine.
+
+Properties:
+- survives client-side navigation between PDF tool routes while the `/pdf` layout remains mounted;
+- keeps one guarded current PDF revision in browser memory;
+- carries the existing `DocumentSession` domain state alongside current bytes;
+- rejects stale asynchronous publishers with an expected-revision check;
+- preserves stable page identity unless an adapter explicitly publishes a new validated page topology;
+- does not use localStorage, sessionStorage, IndexedDB, OPFS, network upload, or account storage;
+- can materialize the current revision as a normal browser `File` so existing tools can adopt it without a new PDF engine.
+
+This is infrastructure only. Standalone tools remain standalone by default. Later continuation adapters opt into the runtime only after a user chooses to keep working with the same PDF.
