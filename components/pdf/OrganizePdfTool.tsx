@@ -274,7 +274,7 @@ export default function OrganizePdfTool() {
       thumbnailUrls.clear();
       void destroyPdfJsDocument();
     };
-  }, []);
+  }, [destroyPdfJsDocument]);
 
   // Same cleanup an unmount already does, plus a full reset of the loaded
   // document, its items/selection/thumbnails, and any pending result --
