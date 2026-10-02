@@ -31,6 +31,8 @@ import {
   type TargetUnit,
 } from "@/lib/compressionTarget";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
+import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import {
   L2AdvancedDisclosure,
   L2FileCard,
@@ -58,6 +60,12 @@ import {
   isPdfNamedFile,
   checkPdfFileSize,
 } from "@/lib/pdf/uploadValidation";
+import {
+  createCompressWorkspaceSession,
+  createStandaloneCompressWorkspaceDocument,
+} from "@/lib/pdf/workspace/compressAdapter";
+import type { WorkspaceDocument } from "@/lib/pdf/workspace/model";
+import type { DocumentSession } from "@/lib/pdf/workspace/session";
 
 type ResolutionPreset = "dpi220" | "dpi150" | "dpi96";
 type ExpertMode = "profile" | "custom";
@@ -104,6 +112,7 @@ type CompressAnalysis = {
 
 type CompressResult = {
   url: string;
+  bytes: ArrayBuffer;
   fileName: string;
   originalSize: number;
   compressedSize: number;
@@ -273,6 +282,7 @@ function CompressIcon() {
 
 export default function CompressPdfTool() {
   const { availability, track } = useAnalytics();
+  const { continuationTarget, takeContinuation } = useWorkspaceDocument();
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
@@ -305,6 +315,10 @@ export default function CompressPdfTool() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [result, setResult] = useState<CompressResult | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [workspaceDocument, setWorkspaceDocument] =
+    useState<WorkspaceDocument | null>(null);
+  const [workspaceBaseSession, setWorkspaceBaseSession] =
+    useState<DocumentSession | null>(null);
 
   const selectedPlan = useMemo(() => {
     if (expertMode === "custom") {
@@ -431,10 +445,10 @@ export default function CompressPdfTool() {
     }
   }, [result]);
 
-  function resetSettings(
+  const resetSettings = useCallback((
     nextProfile: CompressProfile,
     preserveColour = false,
-  ) {
+  ) => {
     const base = profiles[nextProfile];
     setProfile(nextProfile);
     setResolution(base.dpi >= 180 ? "dpi220" : base.dpi <= 100 ? "dpi96" : "dpi150");
@@ -444,7 +458,7 @@ export default function CompressPdfTool() {
     setExpertMode("profile");
     setCustomDpi(base.dpi);
     setCustomQuality(Math.round(base.quality * 100));
-  }
+  }, []);
 
   function resetTool() {
     sessionRef.current += 1;
@@ -452,6 +466,8 @@ export default function CompressPdfTool() {
     clearPreview();
     void cleanupTasks();
     setAnalysis(null);
+    setWorkspaceDocument(null);
+    setWorkspaceBaseSession(null);
     setCompressionMode("quality");
     setTargetPreset("400");
     setCustomTargetValue("400");
@@ -470,7 +486,11 @@ export default function CompressPdfTool() {
   // handleCompress opens its own separate document for the actual
   // compression pass, so keeping this one alive afterward just holds a full
   // decoded PDF in memory for the rest of the session for no reason.
-  async function renderPreview(doc: PDFDocumentProxy, pageNumber: number, currentSession: number) {
+  const renderPreview = useCallback(async (
+    doc: PDFDocumentProxy,
+    pageNumber: number,
+    currentSession: number,
+  ) => {
     try {
       setPreviewIssue("");
       const page = await doc.getPage(pageNumber);
@@ -507,9 +527,15 @@ export default function CompressPdfTool() {
         // PDF.js may already be cleaning itself up.
       }
     }
-  }
+  }, [clearPreview]);
 
-  async function readPdfFile(file: File) {
+  const readPdfFile = useCallback(async (
+    file: File,
+    continuation?: {
+      document: WorkspaceDocument;
+      session: DocumentSession;
+    },
+  ) => {
     const nextSession = sessionRef.current + 1;
     sessionRef.current = nextSession;
     setError("");
@@ -591,6 +617,15 @@ export default function CompressPdfTool() {
       };
 
       setAnalysis(nextAnalysis);
+      setWorkspaceDocument(
+        continuation?.document ??
+          createStandaloneCompressWorkspaceDocument({
+            fileName: file.name,
+            byteLength: bytes.byteLength,
+            pageCount: sourcePdf.getPageCount(),
+          }),
+      );
+      setWorkspaceBaseSession(continuation?.session ?? null);
       resetSettings(recommendation);
       setOutputName(sourceOutputName(file.name));
       setStatus("Ready");
@@ -606,7 +641,24 @@ export default function CompressPdfTool() {
       setBlockingError(message);
       setAnalysis(null);
     }
-  }
+  }, [cleanupTasks, clearPreview, clearResult, renderPreview, resetSettings]);
+
+  useEffect(() => {
+    if (analysis || continuationTarget !== "optimize") return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      const payload = takeContinuation("optimize");
+      if (!payload || cancelled) return;
+      void readPdfFile(payload.file, {
+        document: payload.runtime.session.state.document,
+        session: payload.runtime.session,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [analysis, continuationTarget, readPdfFile, takeContinuation]);
 
   function handleFiles(files: FileList | File[]) {
     const file = Array.from(files)[0];
@@ -1175,6 +1227,7 @@ export default function CompressPdfTool() {
       const tone: ResultTone = savedBytes < 0 ? "larger" : savedPercent < 5 ? "limited" : "success";
       setResult({
         url,
+        bytes: outputBuffer,
         fileName: outputFileName,
         originalSize: analysis.size,
         compressedSize: blob.size,
@@ -1236,6 +1289,20 @@ export default function CompressPdfTool() {
       setIsCompressing(false);
     }
   }
+
+  const workspaceSession = useMemo(() => {
+    if (!analysis || !result || !workspaceDocument) return null;
+    return createCompressWorkspaceSession({
+      document: workspaceDocument,
+      baseSession: workspaceBaseSession,
+      details: {
+        mode: result.mode,
+        profile: result.profile,
+        originalBytes: result.originalSize,
+        outputBytes: result.compressedSize,
+      },
+    });
+  }, [analysis, result, workspaceBaseSession, workspaceDocument]);
 
   function handleDownload() {
     if (!result) return;
@@ -1677,6 +1744,16 @@ export default function CompressPdfTool() {
           </button>
         )}
       </ToolActionBar>
+
+      {result && workspaceSession ? (
+        <ContinueWithPdf
+          sourceArea="optimize"
+          fileName={result.fileName}
+          bytes={result.bytes}
+          pageCount={result.pageCount}
+          session={workspaceSession}
+        />
+      ) : null}
 
       <L2PrivacyNote />
     </section>
