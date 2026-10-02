@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PDFDocument, rgb } from "pdf-lib";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
 import {
   L2AdvancedDisclosure,
   L2FileCard,
@@ -26,6 +27,7 @@ import { recordRecentFile } from "@/lib/recent-files";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { normalizeRotation } from "@/lib/pdf/rotation";
+import { createFreshPdfContinuation } from "@/lib/pdf/workspace/standaloneContinuation";
 import {
   hasPdfMagicBytes,
   isPdfNamedFile,
@@ -319,6 +321,12 @@ export default function MergePdfTool() {
   const [downloadUrl, setDownloadUrl] = useState("");
   const [downloadName, setDownloadName] = useState("lumeo-merged.pdf");
   const [outputName, setOutputName] = useState("lumeo-merged.pdf");
+  const [continuation, setContinuation] = useState<{
+    bytes: ArrayBuffer;
+    fileName: string;
+    pageCount: number;
+    session: ReturnType<typeof createFreshPdfContinuation>["session"];
+  } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [draggingFileId, setDraggingFileId] = useState("");
   const [dragOverFileId, setDragOverFileId] = useState("");
@@ -498,6 +506,7 @@ export default function MergePdfTool() {
   const clearDownload = () => {
     if (downloadUrl) URL.revokeObjectURL(downloadUrl);
     setDownloadUrl("");
+    setContinuation(null);
     setDownloadName(sanitizePdfFileName(outputName));
   };
 
@@ -794,6 +803,19 @@ export default function MergePdfTool() {
       const safeName = sanitizePdfFileName(outputName);
       setDownloadUrl(url);
       setDownloadName(safeName);
+      const fresh = createFreshPdfContinuation({
+        kind: "merge",
+        fileName: safeName,
+        byteLength: mergedBuffer.byteLength,
+        pageCount: totalPages,
+        initialArea: "pages",
+      });
+      setContinuation({
+        bytes: mergedBuffer.slice(0),
+        fileName: safeName,
+        pageCount: totalPages,
+        session: fresh.session,
+      });
       setCleanupMessage("");
       setStatus("Download ready");
       track({
@@ -1197,6 +1219,18 @@ export default function MergePdfTool() {
           <span className="text-sm font-bold text-[var(--text-secondary)]">Add one more PDF to merge.</span>
         )}
       </ToolActionBar>
+
+      {downloadUrl && continuation ? (
+        <ContinueWithPdf
+          sourceArea="pages"
+          includeSourceArea
+          fileName={continuation.fileName}
+          bytes={continuation.bytes}
+          pageCount={continuation.pageCount}
+          session={continuation.session}
+          identityNote="A merged PDF is a new document, so it starts a fresh Workspace history."
+        />
+      ) : null}
 
       {previewFile ? (
         <div
