@@ -1556,29 +1556,39 @@ export default function EditPdfTool() {
   useEffect(() => {
     if (!pdfMeta) return;
     if (ocrSearchablePublicationCurrent) {
-      reportDocumentHealth({
-        hasSearchableText: true,
-        scannedPageCount: 0,
-      });
+      reportDocumentHealth(
+        {
+          hasSearchableText: true,
+          scannedPageCount: 0,
+        },
+        historyState.workspaceDocument.id,
+      );
       return;
     }
     if (pageTextCapability.category === "SCANNED_IMAGE") {
-      reportDocumentHealth({
-        hasSearchableText: false,
-        scannedPageCount: 1,
-      });
+      reportDocumentHealth(
+        {
+          hasSearchableText: false,
+          scannedPageCount: 1,
+        },
+        historyState.workspaceDocument.id,
+      );
       return;
     }
     if (
       pageTextCapability.category === "NATIVE_TEXT" ||
       pageTextCapability.category === "HYBRID_TEXT_AND_IMAGE"
     ) {
-      reportDocumentHealth({
-        hasSearchableText: true,
-        scannedPageCount: 0,
-      });
+      reportDocumentHealth(
+        {
+          hasSearchableText: true,
+          scannedPageCount: 0,
+        },
+        historyState.workspaceDocument.id,
+      );
     }
   }, [
+    historyState.workspaceDocument.id,
     ocrSearchablePublicationCurrent,
     pageTextCapability.category,
     pdfMeta,
