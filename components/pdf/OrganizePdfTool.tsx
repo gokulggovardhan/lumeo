@@ -384,17 +384,21 @@ export default function OrganizePdfTool() {
       pdfJsDocRef.current = pdfJsDoc;
 
       const sourceId = `organize-source-${sourceSequenceRef.current++}`;
+      const workspaceDocument =
+        sharedDocument ??
+        createWorkspaceDocument(`organize-document-${sourceId}`, {
+          id: sourceId,
+          name: file.name,
+          byteLength: file.size,
+          pageCount,
+        });
+      reportDocumentHealth(
+        { rotatedPageCount },
+        workspaceDocument.id,
+      );
       setDocument({ name: file.name, size: file.size, bytes, pageCount });
       resetOrganizerState(
-        createOrganizerWorkspaceSnapshot(
-          sharedDocument ??
-            createWorkspaceDocument(`organize-document-${sourceId}`, {
-              id: sourceId,
-              name: file.name,
-              byteLength: file.size,
-              pageCount,
-            }),
-        ),
+        createOrganizerWorkspaceSnapshot(workspaceDocument),
       );
       duplicateSequenceRef.current = 1;
       exportRevisionRef.current += 1;
