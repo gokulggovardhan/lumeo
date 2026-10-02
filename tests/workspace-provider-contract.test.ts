@@ -168,6 +168,7 @@ test("document health stays contextual, compact, and connected to proven tools",
 
   assert.match(layout, /WorkspaceDocumentHealth/);
   assert.match(provider, /reportDocumentHealth/);
+  assert.match(provider, /documentHealthDocumentIdRef/);
   assert.match(provider, /setDocumentHealth\(\{\}\)/);
   assert.match(health, /getDocumentHealthSuggestions/);
   assert.match(health, /globalHistory\.connected/);
