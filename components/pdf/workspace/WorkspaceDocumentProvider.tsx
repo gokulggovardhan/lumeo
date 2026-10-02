@@ -91,7 +91,10 @@ type WorkspaceDocumentContextValue = {
   continuationTarget: WorkspaceArea | null;
   globalHistory: WorkspaceGlobalHistoryState;
   documentHealth: WorkspaceDocumentHealthFacts;
-  reportDocumentHealth: (facts: WorkspaceDocumentHealthFacts) => void;
+  reportDocumentHealth: (
+    facts: WorkspaceDocumentHealthFacts,
+    documentId?: string,
+  ) => void;
   undoWorkspace: () => WorkspaceDocumentRuntime | null;
   redoWorkspace: () => WorkspaceDocumentRuntime | null;
   startDocument: (
@@ -169,6 +172,7 @@ export function WorkspaceDocumentProvider({
     useState<WorkspaceGlobalHistoryState>(EMPTY_GLOBAL_HISTORY);
   const [documentHealth, setDocumentHealth] =
     useState<WorkspaceDocumentHealthFacts>({});
+  const documentHealthDocumentIdRef = useRef<string | null>(null);
 
   const commit = useCallback((next: WorkspaceDocumentRuntime | null) => {
     documentRef.current = next;
@@ -197,7 +201,15 @@ export function WorkspaceDocumentProvider({
   }, []);
 
   const reportDocumentHealth = useCallback(
-    (facts: WorkspaceDocumentHealthFacts) => {
+    (facts: WorkspaceDocumentHealthFacts, documentId?: string) => {
+      if (
+        documentId &&
+        documentHealthDocumentIdRef.current !== documentId
+      ) {
+        documentHealthDocumentIdRef.current = documentId;
+        setDocumentHealth(facts);
+        return;
+      }
       setDocumentHealth((current) => ({ ...current, ...facts }));
     },
     [],
@@ -207,6 +219,7 @@ export function WorkspaceDocumentProvider({
     (input: StartWorkspaceDocumentInput) => {
       const id = createId("workspace");
       syncHistory(null);
+      documentHealthDocumentIdRef.current = null;
       setDocumentHealth({});
       setContinuationTargetSafely(null);
       return commit(
@@ -290,7 +303,12 @@ export function WorkspaceDocumentProvider({
       }
 
       assertContinuationTransfer(current, input, next);
-      if (!continuesCurrentDocument) {
+      if (
+        documentHealthDocumentIdRef.current !==
+        next.session.state.document.id
+      ) {
+        documentHealthDocumentIdRef.current =
+          next.session.state.document.id;
         setDocumentHealth({});
       }
       const history = historyRef.current;
@@ -389,6 +407,7 @@ export function WorkspaceDocumentProvider({
   const clearDocument = useCallback(() => {
     setContinuationTargetSafely(null);
     syncHistory(null);
+    documentHealthDocumentIdRef.current = null;
     setDocumentHealth({});
     commit(null);
   }, [commit, setContinuationTargetSafely, syncHistory]);
