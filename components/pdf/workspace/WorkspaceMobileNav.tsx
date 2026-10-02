@@ -9,7 +9,7 @@ import {
 import type { WorkspaceArea } from "@/lib/pdf/workspace/model";
 import { useWorkspaceDocument } from "./WorkspaceDocumentProvider";
 
-const MOBILE_NAV_MEDIA = "(max-width: 639px)";
+const MOBILE_NAV_MEDIA = "(max-width: 1023px)";
 const MOBILE_NAV_OFFSET = "4.5rem";
 
 function routeForArea(area: WorkspaceArea): string {
@@ -121,7 +121,7 @@ export function WorkspaceMobileNav() {
       ref={wrapperRef}
       aria-label="PDF Workspace mobile navigation"
       data-workspace-mobile-nav
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--border-default)] bg-[rgba(18,20,17,0.96)] px-2 pt-2 shadow-[0_-14px_34px_rgba(0,0,0,0.24)] backdrop-blur-xl sm:hidden"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-[var(--border-default)] bg-[rgba(18,20,17,0.96)] px-2 pt-2 shadow-[0_-14px_34px_rgba(0,0,0,0.24)] backdrop-blur-xl lg:hidden"
       style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
     >
       {moreOpen ? (
