@@ -8,6 +8,7 @@ import {
 } from "./model.ts";
 import {
   createDocumentSession,
+  recordWorkspaceOperation,
   setWorkspaceArea,
   type DocumentSession,
 } from "./session.ts";
@@ -41,6 +42,15 @@ export type CreateWorkspaceRuntimeInput = {
   bytes: ArrayBuffer;
   pageCount: number;
   initialArea: WorkspaceArea;
+};
+
+export type CreateWorkspaceRuntimeFromSessionInput = {
+  id: string;
+  fileName: string;
+  bytes: ArrayBuffer;
+  pageCount: number;
+  area: WorkspaceArea;
+  session: DocumentSession;
 };
 
 export type PublishWorkspaceRevisionInput = {
@@ -125,6 +135,90 @@ export function createWorkspaceRuntime(
     },
     session,
   };
+}
+
+export function createWorkspaceRuntimeFromSession(
+  input: CreateWorkspaceRuntimeFromSessionInput,
+): WorkspaceDocumentRuntime {
+  assertBytes(input.bytes);
+  assertPageCount(input.pageCount);
+  assertUniquePageIds(input.session.state.document.pages);
+
+  if (visiblePageCount(input.session.state.document) !== input.pageCount) {
+    throw new Error(
+      "Workspace continuation page count does not match the active document topology.",
+    );
+  }
+
+  const firstSource = input.session.state.document.sources[0];
+  const session = setWorkspaceArea(input.session, input.area);
+
+  return {
+    id: input.id,
+    origin: {
+      fileName: firstSource?.name ?? input.fileName,
+      byteLength: firstSource?.byteLength ?? input.bytes.byteLength,
+      pageCount: firstSource?.pageCount ?? input.pageCount,
+    },
+    revision: {
+      id: `${input.id}:revision:0`,
+      number: 0,
+      fileName: input.fileName,
+      byteLength: input.bytes.byteLength,
+      pageCount: input.pageCount,
+      bytes: copyArrayBuffer(input.bytes),
+    },
+    session,
+  };
+}
+
+function operationIdentity(
+  operation: DocumentSession["history"]["operations"][number],
+): string {
+  return `${operation.area}:${operation.id}`;
+}
+
+export function mergeWorkspaceSessions(
+  base: DocumentSession,
+  incoming: DocumentSession,
+  activeArea: WorkspaceArea,
+): DocumentSession {
+  if (base.state.document.id !== incoming.state.document.id) {
+    throw new Error("Workspace continuation belongs to a different document.");
+  }
+
+  assertUniquePageIds(incoming.state.document.pages);
+
+  const appliedBase = base.history.operations.slice(0, base.history.cursor);
+  const appliedIncoming = incoming.history.operations.slice(
+    0,
+    incoming.history.cursor,
+  );
+  const known = new Set(appliedBase.map(operationIdentity));
+
+  let merged: DocumentSession = {
+    ...base,
+    history: {
+      operations: appliedBase,
+      cursor: appliedBase.length,
+    },
+    state: {
+      ...base.state,
+      document: incoming.state.document,
+      selectedPageIds: [],
+      historyCursor: appliedBase.length,
+      operationCount: appliedBase.length,
+    },
+  };
+
+  for (const operation of appliedIncoming) {
+    const key = operationIdentity(operation);
+    if (known.has(key)) continue;
+    merged = recordWorkspaceOperation(merged, operation);
+    known.add(key);
+  }
+
+  return setWorkspaceArea(merged, activeArea);
 }
 
 export function publishWorkspaceRevision(
