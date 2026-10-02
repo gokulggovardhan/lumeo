@@ -1220,7 +1220,7 @@ export default function MergePdfTool() {
         )}
       </ToolActionBar>
 
-      {downloadUrl && continuation ? (
+      {continuation ? (
         <ContinueWithPdf
           sourceArea="pages"
           includeSourceArea
