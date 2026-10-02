@@ -11,6 +11,7 @@ import {
   WorkspaceRevisionConflictError,
 } from "../lib/pdf/workspace/runtime.ts";
 import {
+  createDocumentSession,
   recordWorkspaceOperation,
   setWorkspaceArea,
 } from "../lib/pdf/workspace/session.ts";
