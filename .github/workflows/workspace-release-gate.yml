@@ -1,0 +1,337 @@
+name: PDF Workspace Release Gate
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workspace-release-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    name: Core Workspace fidelity and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Verify maintained architecture
+        run: |
+          npm run verify:public-catalog
+          npm run verify:analytics
+          npm run verify:aura
+          npm run verify:lumeo2-foundation
+          npm run verify:lumeo2-public-experience
+          npm run verify:lumeo2-workspaces
+          npm run verify:release
+
+      - name: Run complete unit suite
+        run: npm test
+
+      - name: Generate Edit PDF fidelity evidence
+        run: npm run report:edit-fidelity
+
+      - name: Upload Edit PDF fidelity evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: workspace-release-edit-fidelity
+          path: artifacts/edit-pdf-fidelity-report.json
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Lint application
+        run: npm run lint
+
+      - name: Build production application
+        run: npm run build
+
+      - name: Build Cloudflare Worker
+        run: npm run build:vinext
+
+      - name: Verify Cloudflare Worker compatibility
+        run: node scripts/verify-cloudflare-worker-config.mjs dist/server/wrangler.json
+
+      - name: Validate Cloudflare Worker bundle
+        run: npx vinext-cloudflare deploy --dry-run --config dist/server/wrangler.json
+
+      - name: Verify public routes
+        run: npm run verify:public
+
+  workspace-browsers:
+    name: Workspace mobile and Edit browsers
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Initialize isolated Supabase catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+
+      - name: Configure public catalog environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/lumeo-workspace-release-supabase.env
+          set -a
+          source /tmp/lumeo-workspace-release-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Chromium, WebKit and Firefox
+        run: npx playwright install --with-deps chromium webkit firefox
+
+      - name: Build production application for mobile Workspace
+        run: npm run build
+
+      - name: Run mobile Workspace across Chromium, WebKit and Firefox
+        env:
+          CI: "1"
+          E2E_PROD: "1"
+        run: >
+          npx playwright test e2e/workspace-mobile.spec.ts
+          --project=chromium
+          --project=webkit
+          --project=firefox
+
+      - name: Build Cloudflare Worker for Edit PDF
+        run: npm run build:vinext
+
+      - name: Run Edit PDF against local Cloudflare Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev \
+            --config dist/server/wrangler.json \
+            --port 8787 \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            > /tmp/lumeo-workspace-release-edit.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/pdf/edit >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/lumeo-workspace-release-edit.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat /tmp/lumeo-workspace-release-edit.log
+            echo "Local release-gate Worker did not become ready." >&2
+            exit 1
+          fi
+
+          if curl --fail --silent http://127.0.0.1:8787/pdf/edit | grep -q "Temporarily unavailable"; then
+            cat /tmp/lumeo-workspace-release-edit.log
+            echo "Edit PDF remained blocked in the isolated release catalog." >&2
+            exit 1
+          fi
+
+          npx playwright test --config=playwright.vinext.config.ts
+
+      - name: Upload Workspace browser traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: workspace-release-browser-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  conversion-browsers:
+    name: Conversion corpus on Chromium, WebKit and Firefox
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install deterministic document fidelity tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils python3-pil
+
+      - name: Install Chromium, WebKit and Firefox
+        run: npx playwright install --with-deps chromium webkit firefox
+
+      - name: Run real browser conversion corpus
+        env:
+          CI: "1"
+          LUMEO_FIDELITY_CLI: "1"
+        run: npx playwright test --config=playwright.browser-conversion.config.ts
+
+      - name: Upload conversion traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: workspace-release-conversion-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  edit-performance:
+    name: Edit PDF 120 and 320 page performance
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      NEXT_PUBLIC_EDIT_PERFORMANCE_DIAGNOSTICS: "1"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Initialize isolated Supabase catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+
+      - name: Configure public catalog environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/lumeo-workspace-performance-supabase.env
+          set -a
+          source /tmp/lumeo-workspace-performance-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build Cloudflare Worker with diagnostics
+        run: npm run build:vinext
+
+      - name: Measure 120 and 320 page Edit PDF sessions
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev \
+            --config dist/server/wrangler.json \
+            --port 8787 \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            > /tmp/lumeo-workspace-release-performance.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+
+          ready=false
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/pdf/edit >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$server_pid" 2>/dev/null; then
+              cat /tmp/lumeo-workspace-release-performance.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat /tmp/lumeo-workspace-release-performance.log
+            echo "Local performance Worker did not become ready." >&2
+            exit 1
+          fi
+
+          npx playwright test --config=playwright.edit-performance.config.ts
+
+      - name: Upload performance evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: workspace-release-performance
+          path: |
+            test-results/edit-performance/*.json
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
+
+  release-gate:
+    name: Workspace release gate
+    needs:
+      - core
+      - workspace-browsers
+      - conversion-browsers
+      - edit-performance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirm complete validation
+        run: echo "All PDF Workspace release-gate jobs passed."
