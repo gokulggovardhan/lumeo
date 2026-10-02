@@ -295,3 +295,15 @@ Run 2 originally included protected `/admin/design-system` and `/admin/guide` re
 - Add richer contextual guidance to each Control Center form.
 - Add compact Aura loading states for data-heavy admin tables.
 - Apply Aura result cards to future JPG/PDF conversion tools as they become real engines.
+
+
+## 25. Workspace Continuation Chrome
+
+Connected PDF Workspace chrome is part of the Aura system, not a separate visual language.
+
+- Use `AuraButton`, `AuraInput`, `AuraStatus`, and other shared primitives for continuation, history, document-health and Finish controls.
+- Use semantic tokens such as `--surface-overlay`, `--surface-success`, `--text-success`, border tokens and elevation tokens instead of new raw RGB/hex values.
+- Keep practical touch targets at 44px or larger for primary connected-workspace actions.
+- Mobile Workspace navigation remains `Edit | Pages | More | Finish`; Sign, Add and Compress stay behind More.
+- The main Download action remains visually dominant at Finish. Continuation and navigation actions remain secondary.
+- Shared Workspace chrome must never become a second PDF mutation engine or persistence layer.
