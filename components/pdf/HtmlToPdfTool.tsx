@@ -445,7 +445,7 @@ async function generatePagedPdfBlob(
   pageSize: PageSize,
   orientation: Orientation,
   margin: MarginPreset,
-): Promise<Blob> {
+): Promise<{ blob: Blob; pageCount: number; bytes: ArrayBuffer }> {
   const [{ default: html2canvas }, { PDFDocument }] = await Promise.all([
     import("html2canvas"),
     import("pdf-lib"),
@@ -512,7 +512,15 @@ async function generatePagedPdfBlob(
     const pdfBytes = await pdf.save();
     const outputBytes = new Uint8Array(pdfBytes.byteLength);
     outputBytes.set(pdfBytes);
-    return new Blob([outputBytes.buffer], { type: "application/pdf" });
+    const bytes = outputBytes.buffer.slice(
+      outputBytes.byteOffset,
+      outputBytes.byteOffset + outputBytes.byteLength,
+    ) as ArrayBuffer;
+    return {
+      blob: new Blob([bytes], { type: "application/pdf" }),
+      pageCount,
+      bytes,
+    };
   } finally {
     mirror.host.remove();
   }
@@ -610,20 +618,15 @@ export default function HtmlToPdfTool() {
       // pdf-lib assembles the final document entirely in the browser.
       const outputFileName =
         `${sanitizeFileStem(fileName, "lumeo-document")}.pdf`;
-      const blob = await generatePagedPdfBlob(
+      const generated = await generatePagedPdfBlob(
         surface,
         pageSliceHeightPx,
         pageSize,
         orientation,
         margin,
       );
+      const { blob, bytes, pageCount } = generated;
       try {
-        const bytes = await blob.arrayBuffer();
-        const { PDFDocument } = await import("pdf-lib");
-        const outputPdf = await PDFDocument.load(bytes, {
-          ignoreEncryption: false,
-        });
-        const pageCount = outputPdf.getPageCount();
         const fresh = createFreshPdfContinuation({
           kind: "html-to-pdf",
           fileName: outputFileName,
