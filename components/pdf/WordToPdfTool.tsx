@@ -340,12 +340,11 @@ export default function WordToPdfTool() {
 
       setResult(conversionResult);
       try {
+        const pageCount = conversionResult.metadata.pageCount;
+        if (!pageCount) {
+          throw new Error("Converted PDF page count is unavailable.");
+        }
         const bytes = await conversionResult.blob.arrayBuffer();
-        const { PDFDocument } = await import("pdf-lib");
-        const outputPdf = await PDFDocument.load(bytes, {
-          ignoreEncryption: false,
-        });
-        const pageCount = outputPdf.getPageCount();
         const fresh = createFreshPdfContinuation({
           kind: "word-to-pdf",
           fileName: conversionResult.fileName,
