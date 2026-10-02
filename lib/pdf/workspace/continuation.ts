@@ -25,13 +25,14 @@ const REPEATABLE_SOURCE_AREAS: readonly ContinuationArea[] = ["enhance"];
 export function continuationTargetsFor(
   sourceArea: ContinuationArea,
   incompatibleTargets: readonly ContinuationArea[] = [],
+  includeSourceArea = false,
 ): readonly ContinuationTarget[] {
   const incompatible = new Set(incompatibleTargets);
 
   return WORKSPACE_CONTINUATION_TARGETS.filter((target) => {
     if (incompatible.has(target.area)) return false;
     if (target.area !== sourceArea) return true;
-    return REPEATABLE_SOURCE_AREAS.includes(sourceArea);
+    return includeSourceArea || REPEATABLE_SOURCE_AREAS.includes(sourceArea);
   });
 }
 
