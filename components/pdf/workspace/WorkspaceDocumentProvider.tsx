@@ -13,6 +13,8 @@ import type { WorkspaceArea } from "@/lib/pdf/workspace/model";
 import type { DocumentSession } from "@/lib/pdf/workspace/session";
 import {
   createWorkspaceRuntime,
+  createWorkspaceRuntimeFromSession,
+  mergeWorkspaceSessions,
   publishWorkspaceRevision,
   updateWorkspaceRuntimeSession,
   workspaceRuntimeBytes,
@@ -34,8 +36,22 @@ type PublishSharedRevisionInput = Omit<
   expectedRevision?: number;
 };
 
+type StageWorkspaceContinuationInput = {
+  target: WorkspaceArea;
+  fileName: string;
+  bytes: ArrayBuffer;
+  pageCount: number;
+  session: DocumentSession;
+};
+
+export type WorkspaceContinuationPayload = {
+  file: File;
+  runtime: WorkspaceDocumentRuntime;
+};
+
 type WorkspaceDocumentContextValue = {
   document: WorkspaceDocumentRuntime | null;
+  continuationTarget: WorkspaceArea | null;
   startDocument: (
     input: StartWorkspaceDocumentInput,
   ) => WorkspaceDocumentRuntime;
@@ -43,6 +59,12 @@ type WorkspaceDocumentContextValue = {
     input: PublishSharedRevisionInput,
   ) => WorkspaceDocumentRuntime | null;
   replaceSession: (session: DocumentSession) => WorkspaceDocumentRuntime | null;
+  stageContinuation: (
+    input: StageWorkspaceContinuationInput,
+  ) => WorkspaceDocumentRuntime;
+  takeContinuation: (
+    target: WorkspaceArea,
+  ) => WorkspaceContinuationPayload | null;
   fileForCurrentRevision: () => File | null;
   clearDocument: () => void;
 };
@@ -65,6 +87,9 @@ export function WorkspaceDocumentProvider({
   const [document, setDocument] =
     useState<WorkspaceDocumentRuntime | null>(null);
   const documentRef = useRef<WorkspaceDocumentRuntime | null>(null);
+  const [continuationTarget, setContinuationTarget] =
+    useState<WorkspaceArea | null>(null);
+  const continuationTargetRef = useRef<WorkspaceArea | null>(null);
 
   const commit = useCallback((next: WorkspaceDocumentRuntime | null) => {
     documentRef.current = next;
@@ -113,6 +138,64 @@ export function WorkspaceDocumentProvider({
     [commit],
   );
 
+  const stageContinuation = useCallback(
+    (input: StageWorkspaceContinuationInput) => {
+      const current = documentRef.current;
+      let next: WorkspaceDocumentRuntime;
+
+      if (
+        current &&
+        current.session.state.document.id === input.session.state.document.id
+      ) {
+        const session = mergeWorkspaceSessions(
+          current.session,
+          input.session,
+          input.target,
+        );
+        next = publishWorkspaceRevision(current, {
+          expectedRevision: current.revision.number,
+          bytes: input.bytes,
+          fileName: input.fileName,
+          pageCount: input.pageCount,
+          area: input.target,
+          document: input.session.state.document,
+          session,
+        });
+      } else {
+        next = createWorkspaceRuntimeFromSession({
+          id: createId("workspace"),
+          fileName: input.fileName,
+          bytes: input.bytes,
+          pageCount: input.pageCount,
+          area: input.target,
+          session: input.session,
+        });
+      }
+
+      commit(next);
+      continuationTargetRef.current = input.target;
+      setContinuationTarget(input.target);
+      return next;
+    },
+    [commit],
+  );
+
+  const takeContinuation = useCallback((target: WorkspaceArea) => {
+    const current = documentRef.current;
+    if (!current || continuationTargetRef.current !== target) return null;
+
+    continuationTargetRef.current = null;
+    setContinuationTarget(null);
+    return {
+      file: new File(
+        [workspaceRuntimeBytes(current)],
+        current.revision.fileName,
+        { type: "application/pdf" },
+      ),
+      runtime: current,
+    };
+  }, []);
+
   const fileForCurrentRevision = useCallback(() => {
     const current = documentRef.current;
     if (!current) return null;
@@ -124,25 +207,33 @@ export function WorkspaceDocumentProvider({
   }, []);
 
   const clearDocument = useCallback(() => {
+    continuationTargetRef.current = null;
+    setContinuationTarget(null);
     commit(null);
   }, [commit]);
 
   const value = useMemo<WorkspaceDocumentContextValue>(
     () => ({
       document,
+      continuationTarget,
       startDocument,
       publishRevision,
       replaceSession,
+      stageContinuation,
+      takeContinuation,
       fileForCurrentRevision,
       clearDocument,
     }),
     [
       clearDocument,
+      continuationTarget,
       document,
       fileForCurrentRevision,
       publishRevision,
       replaceSession,
+      stageContinuation,
       startDocument,
+      takeContinuation,
     ],
   );
 
