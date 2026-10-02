@@ -927,7 +927,11 @@ test("Organize projects page history and verified export into Workspace state", 
   page,
 }) => {
   await page.goto("/pdf/organize", { waitUntil: "domcontentloaded" });
-  await page.locator('input[type="file"]').first().setInputFiles(TWO_PAGE_PDF);
+  const organizeUpload = page.locator(
+    'input[type="file"][data-upload-client-ready="true"]',
+  ).first();
+  await expect(organizeUpload).toBeAttached({ timeout: 30_000 });
+  await organizeUpload.setInputFiles(TWO_PAGE_PDF);
 
   const workspace = page.locator("[data-workspace-lifecycle]");
   await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready");
@@ -2213,6 +2217,10 @@ test("vinext Edit PDF replaces all safe document matches in one undo step", asyn
   await expect(count).toHaveAttribute("data-edit-search-match-count", "2", {
     timeout: 90_000,
   });
+  // The document index is progressive. Wait for its completed UI state before
+  // moving focus into Replace so WebKit cannot finish a pending Find update
+  // in the middle of the controlled-input fill.
+  await expect(count).not.toContainText("Indexing", { timeout: 90_000 });
 
   const replacement = page.getByRole("textbox", {
     name: "Replace search match with",
