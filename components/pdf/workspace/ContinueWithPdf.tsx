@@ -8,7 +8,7 @@ import { useWorkspaceDocument } from "./WorkspaceDocumentProvider";
 
 export type ContinuationArea = Extract<
   WorkspaceArea,
-  "edit" | "pages" | "sign" | "enhance"
+  "edit" | "pages" | "sign" | "enhance" | "optimize"
 >;
 
 const TARGETS: ReadonlyArray<{
@@ -20,6 +20,7 @@ const TARGETS: ReadonlyArray<{
   { area: "pages", label: "Pages", route: "/pdf/organize" },
   { area: "sign", label: "Sign", route: "/pdf/sign" },
   { area: "enhance", label: "Add", route: "/pdf/add" },
+  { area: "optimize", label: "Compress", route: "/pdf/compress" },
 ];
 
 export function ContinueWithPdf({
