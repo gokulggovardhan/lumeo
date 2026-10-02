@@ -70,7 +70,7 @@ export function WorkspaceHistoryControls() {
           <button
             type="button"
             onClick={() => router.push("/pdf/finish")}
-            className="lumeo-focus-ring inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 text-sm font-extrabold text-[var(--text-primary)] transition hover:bg-[var(--surface-raised)]"
+            className="lumeo-focus-ring hidden min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 text-sm font-extrabold text-[var(--text-primary)] transition hover:bg-[var(--surface-raised)] lg:inline-flex"
           >
             Finish
           </button>
