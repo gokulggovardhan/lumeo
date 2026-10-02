@@ -282,7 +282,11 @@ function CompressIcon() {
 
 export default function CompressPdfTool() {
   const { availability, track } = useAnalytics();
-  const { continuationTarget, takeContinuation } = useWorkspaceDocument();
+  const {
+    continuationTarget,
+    takeContinuation,
+    reportDocumentHealth,
+  } = useWorkspaceDocument();
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
@@ -617,6 +621,9 @@ export default function CompressPdfTool() {
       };
 
       setAnalysis(nextAnalysis);
+      reportDocumentHealth({
+        imageHeavy: nextAnalysis.estimatedImageHeavyRatio >= 0.7,
+      });
       setWorkspaceDocument(
         continuation?.document ??
           createStandaloneCompressWorkspaceDocument({
@@ -641,7 +648,14 @@ export default function CompressPdfTool() {
       setBlockingError(message);
       setAnalysis(null);
     }
-  }, [cleanupTasks, clearPreview, clearResult, renderPreview, resetSettings]);
+  }, [
+    cleanupTasks,
+    clearPreview,
+    clearResult,
+    renderPreview,
+    reportDocumentHealth,
+    resetSettings,
+  ]);
 
   useEffect(() => {
     if (analysis || continuationTarget !== "optimize") return;
