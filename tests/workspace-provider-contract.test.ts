@@ -95,3 +95,31 @@ test("continuation centralizes compatibility and guards transfer continuity", ()
   assert.match(provider, /next\.revision\.pageCount !== input\.pageCount/);
   assert.match(provider, /next\.session\.state\.document\.id !== input\.session\.state\.document\.id/);
 });
+
+
+test("cross-tool history restores actual revisions and stays browser-memory only", () => {
+  const provider = read(
+    "components/pdf/workspace/WorkspaceDocumentProvider.tsx",
+  );
+  const history = read("lib/pdf/workspace/revisionHistory.ts");
+  const controls = read(
+    "components/pdf/workspace/WorkspaceHistoryControls.tsx",
+  );
+  const layout = read("app/pdf/layout.tsx");
+
+  assert.match(provider, /appendWorkspaceCheckpoint/);
+  assert.match(provider, /undoWorkspaceCheckpoint/);
+  assert.match(provider, /redoWorkspaceCheckpoint/);
+  assert.match(provider, /currentWorkspaceCheckpoint/);
+  assert.match(provider, /setContinuationTargetSafely/);
+  assert.match(history, /checkpoints/);
+  assert.match(history, /slice\(0, history\.cursor \+ 1\)/);
+  assert.match(controls, />\s*Undo\s*</);
+  assert.match(controls, />\s*Redo\s*</);
+  assert.match(controls, /Recent changes/);
+  assert.match(layout, /WorkspaceHistoryControls/);
+
+  for (const source of [provider, history, controls]) {
+    assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB|OPFS/i);
+  }
+});

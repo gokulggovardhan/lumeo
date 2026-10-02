@@ -33,3 +33,11 @@ export function continuationTargetsFor(
     return REPEATABLE_SOURCE_AREAS.includes(sourceArea);
   });
 }
+
+
+export function continuationRouteForArea(area: ContinuationArea): string {
+  return (
+    WORKSPACE_CONTINUATION_TARGETS.find((target) => target.area === area)?.route ??
+    "/pdf"
+  );
+}
