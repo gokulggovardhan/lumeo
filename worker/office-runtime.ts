@@ -16,6 +16,75 @@ type CloudflareResponseInit = ResponseInit & {
   encodeBody?: "automatic" | "manual";
 };
 
+const UPSTREAM_RETRY_DELAYS_MS = [250, 1_000, 2_500] as const;
+
+function isTransientUpstreamStatus(status: number): boolean {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
+async function waitForUpstreamRetry(
+  delayMs: number,
+  signal: AbortSignal,
+): Promise<void> {
+  if (signal.aborted) throw signal.reason ?? new Error("Request aborted.");
+
+  await new Promise<void>((resolve, reject) => {
+    const timer = setTimeout(resolve, delayMs);
+    const onAbort = () => {
+      clearTimeout(timer);
+      reject(signal.reason ?? new Error("Request aborted."));
+    };
+    signal.addEventListener("abort", onAbort, { once: true });
+    setTimeout(() => signal.removeEventListener("abort", onAbort), delayMs + 1);
+  });
+}
+
+async function fetchRuntimeSource(
+  request: Request,
+  asset: RuntimeAssetName,
+  headers: Headers,
+): Promise<Response> {
+  let lastError: unknown;
+
+  for (
+    let attempt = 0;
+    attempt <= UPSTREAM_RETRY_DELAYS_MS.length;
+    attempt += 1
+  ) {
+    if (request.signal.aborted) {
+      throw request.signal.reason ?? new Error("Request aborted.");
+    }
+
+    try {
+      const response = await fetch(runtimeSourceUrl(asset), {
+        method: request.method,
+        headers,
+        redirect: "follow",
+        cache: "no-store",
+      });
+
+      if (
+        !isTransientUpstreamStatus(response.status) ||
+        attempt === UPSTREAM_RETRY_DELAYS_MS.length
+      ) {
+        return response;
+      }
+
+      await response.body?.cancel().catch(() => {});
+    } catch (error) {
+      lastError = error;
+      if (attempt === UPSTREAM_RETRY_DELAYS_MS.length) throw error;
+    }
+
+    await waitForUpstreamRetry(
+      UPSTREAM_RETRY_DELAYS_MS[attempt] ?? 0,
+      request.signal,
+    );
+  }
+
+  throw lastError ?? new Error("Office runtime upstream request failed.");
+}
+
 function runtimeSourceUrl(asset: RuntimeAssetName): string {
   return `https://github.com/gokulggovardhan/lumeo/releases/download/${runtimeRelease.releaseTag}/${asset}`;
 }
@@ -105,12 +174,7 @@ export async function maybeHandleOfficeRuntimeRequest(
 
   let upstream: Response;
   try {
-    upstream = await fetch(runtimeSourceUrl(asset), {
-      method: request.method,
-      headers: upstreamHeaders,
-      redirect: "follow",
-      cache: "no-store",
-    });
+    upstream = await fetchRuntimeSource(request, asset, upstreamHeaders);
   } catch {
     return runtimeError(503, "Office runtime is temporarily unavailable.");
   }
