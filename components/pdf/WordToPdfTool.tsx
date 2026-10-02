@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, FileDown, FileText } from "lucide-react";
 
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
 import {
   ConversionStageIndicator,
   LocalConversionPrivacyNote,
@@ -49,6 +50,7 @@ import type {
   ConversionResult,
 } from "@/lib/conversion/types";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
+import { createFreshPdfContinuation } from "@/lib/pdf/workspace/standaloneContinuation";
 import { recordRecentFile } from "@/lib/recent-files";
 
 type Stage =
@@ -115,6 +117,12 @@ export default function WordToPdfTool() {
   const [statusLabel, setStatusLabel] = useState("");
   const [error, setError] = useState<ConversionUserError | null>(null);
   const [result, setResult] = useState<ConversionResult | null>(null);
+  const [continuation, setContinuation] = useState<{
+    bytes: ArrayBuffer;
+    fileName: string;
+    pageCount: number;
+    session: ReturnType<typeof createFreshPdfContinuation>["session"];
+  } | null>(null);
   const [engineReady, setEngineReady] = useState(false);
   const [clientReady, setClientReady] = useState(false);
 
@@ -160,6 +168,7 @@ export default function WordToPdfTool() {
     setStatusLabel("");
     setError(null);
     setResult(null);
+    setContinuation(null);
     setEngineReady(false);
   }
 
@@ -298,6 +307,7 @@ export default function WordToPdfTool() {
 
     setError(null);
     setResult(null);
+    setContinuation(null);
     setPhase("preparing");
     conversionPhaseRef.current = "preparing";
     setStage("preparing");
@@ -329,6 +339,29 @@ export default function WordToPdfTool() {
       if (currentSession !== sessionRef.current) return;
 
       setResult(conversionResult);
+      try {
+        const bytes = await conversionResult.blob.arrayBuffer();
+        const { PDFDocument } = await import("pdf-lib");
+        const outputPdf = await PDFDocument.load(bytes, {
+          ignoreEncryption: false,
+        });
+        const pageCount = outputPdf.getPageCount();
+        const fresh = createFreshPdfContinuation({
+          kind: "word-to-pdf",
+          fileName: conversionResult.fileName,
+          byteLength: bytes.byteLength,
+          pageCount,
+          initialArea: "edit",
+        });
+        setContinuation({
+          bytes: bytes.slice(0),
+          fileName: conversionResult.fileName,
+          pageCount,
+          session: fresh.session,
+        });
+      } catch {
+        setContinuation(null);
+      }
       setPhase(null);
       setStage("success");
       setStatusLabel("Ready to download");
@@ -655,6 +688,18 @@ export default function WordToPdfTool() {
           </button>
         )}
       </ToolActionBar>
+
+      {result && continuation ? (
+        <ContinueWithPdf
+          sourceArea="edit"
+          includeSourceArea
+          fileName={continuation.fileName}
+          bytes={continuation.bytes}
+          pageCount={continuation.pageCount}
+          session={continuation.session}
+          identityNote="This converted PDF starts a fresh Workspace history."
+        />
+      ) : null}
 
       <LocalConversionPrivacyNote />
     </section>
