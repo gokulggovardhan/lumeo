@@ -16,6 +16,9 @@ test("PDF routes share one in-memory workspace provider", () => {
   assert.match(provider, /createWorkspaceRuntime/);
   assert.match(provider, /publishWorkspaceRevision/);
   assert.match(provider, /fileForCurrentRevision/);
+  assert.match(provider, /stageContinuation/);
+  assert.match(provider, /takeContinuation/);
+  assert.match(provider, /mergeWorkspaceSessions/);
 
   // The initial shared-document foundation intentionally survives client-side
   // route changes only. It must not silently persist document bytes.
@@ -38,4 +41,34 @@ test("shared document architecture stays internal rather than becoming user copy
     assert.doesNotMatch(`${provider}\n${layout}`, new RegExp(`>[^
 <]*${phrase}`, "i"));
   }
+});
+
+test("continuation UI stays user-facing and secondary to existing tool downloads", () => {
+  const continuation = read(
+    "components/pdf/workspace/ContinueWithPdf.tsx",
+  );
+  const edit = read("components/pdf/EditPdfTool.tsx");
+  const pages = read("components/pdf/OrganizePdfTool.tsx");
+  const sign = read("components/pdf/SignPdfTool.tsx");
+
+  assert.match(continuation, /Continue with this PDF/);
+  assert.match(continuation, /Keep working without opening the file again/);
+  assert.match(continuation, /Edit/);
+  assert.match(continuation, /Pages/);
+  assert.match(continuation, /Sign/);
+
+  for (const source of [continuation, edit, pages, sign]) {
+    for (const phrase of [
+      "document authority",
+      "byte ownership",
+      "mutation engine",
+      "local session",
+    ]) {
+      assert.doesNotMatch(source, new RegExp(phrase, "i"));
+    }
+  }
+
+  assert.match(edit, /Download edited PDF/);
+  assert.match(sign, /Download signed PDF/);
+  assert.match(pages, />\s*Download\s*</);
 });
