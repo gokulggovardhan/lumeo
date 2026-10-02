@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
 import {
   L2FileCard,
   L2PanelLabel,
@@ -53,6 +54,7 @@ import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 import { resetPdfPreviewState } from "@/lib/pdf/resetPreviewState";
+import { createFreshPdfContinuation } from "@/lib/pdf/workspace/standaloneContinuation";
 
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 
@@ -117,6 +119,12 @@ export default function CropPdfTool() {
   const [downloadUrl, setDownloadUrl] = useState("");
   const [downloadName, setDownloadName] = useState("lumeo-cropped.pdf");
   const [outputName, setOutputName] = useState("lumeo-cropped.pdf");
+  const [continuation, setContinuation] = useState<{
+    bytes: ArrayBuffer;
+    fileName: string;
+    pageCount: number;
+    session: ReturnType<typeof createFreshPdfContinuation>["session"];
+  } | null>(null);
 
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
@@ -153,6 +161,7 @@ export default function CropPdfTool() {
     setScopeError("");
     setLockAspectRatio(false);
     setDownloadUrl("");
+    setContinuation(null);
     setOutputName("lumeo-cropped.pdf");
   }
 
@@ -360,8 +369,22 @@ export default function CropPdfTool() {
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
       downloadUrlRef.current = url;
+      const safeName = sanitizePdfFileName(outputName);
       setDownloadUrl(url);
-      setDownloadName(sanitizePdfFileName(outputName));
+      setDownloadName(safeName);
+      const fresh = createFreshPdfContinuation({
+        kind: "crop",
+        fileName: safeName,
+        byteLength: buffer.byteLength,
+        pageCount: pdf.pageCount,
+        initialArea: "pages",
+      });
+      setContinuation({
+        bytes: buffer.slice(0),
+        fileName: safeName,
+        pageCount: pdf.pageCount,
+        session: fresh.session,
+      });
       track({ eventName: "processing_succeeded", toolSlug: "crop", durationMs: performance.now() - startedAt, success: true });
       recordRecentFile({ tool: "crop", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
     } catch (exportError) {
@@ -607,6 +630,7 @@ export default function CropPdfTool() {
                   onChange={(e) => {
                     setOutputName(e.target.value);
                     setDownloadUrl("");
+                    setContinuation(null);
                   }}
                   className="mt-1.5 w-full rounded-md border border-transparent bg-transparent px-0 py-1 text-sm font-semibold text-[var(--text-primary)] outline-none placeholder:text-[var(--text-primary)]/26 focus:border-b-[var(--lumeo-gold)]/45"
                   placeholder="lumeo-cropped.pdf"
@@ -637,6 +661,18 @@ export default function CropPdfTool() {
           </button>
         )}
       </ToolActionBar>
+
+      {downloadUrl && continuation ? (
+        <ContinueWithPdf
+          sourceArea="pages"
+          includeSourceArea
+          fileName={continuation.fileName}
+          bytes={continuation.bytes}
+          pageCount={continuation.pageCount}
+          session={continuation.session}
+          identityNote="This cropped PDF starts a fresh Workspace history."
+        />
+      ) : null}
 
       <L2PrivacyNote />
     </section>

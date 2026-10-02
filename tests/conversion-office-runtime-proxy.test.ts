@@ -99,6 +99,47 @@ test("Office runtime fast path streams identity bytes and preserves Range", asyn
   }
 });
 
+test("Office runtime fast path retries a transient upstream 429", async () => {
+  const originalFetch = globalThis.fetch;
+  let attempts = 0;
+
+  globalThis.fetch = (async (): Promise<Response> => {
+    attempts += 1;
+    if (attempts === 1) {
+      return new Response("rate limited", {
+        status: 429,
+        headers: { "Retry-After": "1" },
+      });
+    }
+
+    return new Response("console.log('office runtime');", {
+      status: 200,
+      headers: {
+        "Content-Length": "30",
+        ETag: "\"runtime-js\"",
+      },
+    });
+  }) as typeof fetch;
+
+  try {
+    const response = await maybeHandleOfficeRuntimeRequest(
+      new Request(
+        `https://lumeo.in/office-runtime/${runtimeRelease.releaseId}/soffice.js`,
+      ),
+    );
+
+    assert.ok(response);
+    assert.equal(response.status, 200);
+    assert.equal(attempts, 2);
+    assert.equal(
+      response.headers.get("Content-Type"),
+      "application/javascript",
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("Office runtime production and fallback routes never buffer conversion assets", async () => {
   const workerSource = await readFile("worker/office-runtime.ts", "utf8");
   const fallbackSource = await readFile(

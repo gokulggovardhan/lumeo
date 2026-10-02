@@ -407,10 +407,15 @@ export async function preflightOfficeAssetOrigin(
 
   const manifest = validateOfficeRuntimeManifest(manifestJson, config.releaseId);
 
-  for (const name of Object.keys(OFFICE_RUNTIME_REQUIRED_FILES)) {
-    await probeRuntimeAsset(config, name, manifest.files[name], signal);
-  }
-
+  // The immutable manifest is the production publication marker and already
+  // records the required runtime inventory, byte sizes, content types and
+  // SHA-256 fingerprints. Do not eagerly probe every large runtime asset here:
+  // each probe becomes a same-origin Worker subrequest to the release source,
+  // immediately followed by the real Emscripten loads. That request
+  // amplification can trip upstream anti-abuse/rate limits before the actual
+  // script or WASM payload is fetched. The runtime loader remains the
+  // availability authority, while release publishing verifies the full asset
+  // inventory and hashes before the manifest is made public.
   return manifest;
 }
 

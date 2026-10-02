@@ -27,6 +27,7 @@ export type ConversionResult = {
   metadata: {
     processingLocation: ConversionProcessingLocation;
     engineId: string;
+    pageCount?: number;
   };
 };
 

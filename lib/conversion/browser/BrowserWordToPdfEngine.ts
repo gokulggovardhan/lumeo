@@ -166,8 +166,9 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
         message: "Validating PDF",
       });
 
+      let pageCount: number;
       try {
-        await validateGeneratedPdf(blob);
+        pageCount = await validateGeneratedPdf(blob);
       } catch (error) {
         throw normalizeConversionError(error, "output");
       }
@@ -198,6 +199,7 @@ export class BrowserWordToPdfEngine implements ConversionEngine {
         metadata: {
           processingLocation: this.processingLocation,
           engineId: this.id,
+          pageCount,
         },
       };
       return result;
