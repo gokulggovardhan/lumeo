@@ -46,4 +46,6 @@ test("Workspace release gate includes fidelity, static quality and Worker valida
   assert.match(workflow, /verify-cloudflare-worker-config/);
   assert.match(workflow, /vinext-cloudflare deploy --dry-run/);
   assert.match(workflow, /npm run verify:public/);
+  assert.match(workflow, /npm run verify:supabase/);
+  assert.match(workflow, /trap 'rm -f \.env\.local' EXIT/);
 });
