@@ -415,12 +415,19 @@ export default function OrganizePdfTool() {
 
   useEffect(() => {
     if (document_ || continuationTarget !== "pages") return;
-    const payload = takeContinuation("pages");
-    if (!payload) return;
-    void loadFile(
-      payload.file,
-      payload.runtime.session.state.document,
-    );
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      const payload = takeContinuation("pages");
+      if (!payload || cancelled) return;
+      void loadFile(
+        payload.file,
+        payload.runtime.session.state.document,
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [continuationTarget, document_, loadFile, takeContinuation]);
 
   function toggleSelected(index: number) {
