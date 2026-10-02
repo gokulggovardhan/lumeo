@@ -66,3 +66,16 @@ test("non-PDF standalone outputs are not forced into the PDF Workspace", () => {
     assert.doesNotMatch(source, /ContinueWithPdf/);
   }
 });
+
+
+test("Word to PDF reuses its validated page count for continuation", () => {
+  const engine = read(
+    "lib/conversion/browser/BrowserWordToPdfEngine.ts",
+  );
+  const word = read("components/pdf/WordToPdfTool.tsx");
+
+  assert.match(engine, /pageCount = await validateGeneratedPdf\(blob\)/);
+  assert.match(engine, /pageCount,/);
+  assert.match(word, /conversionResult\.metadata\.pageCount/);
+  assert.doesNotMatch(word, /PDFDocument\.load\(bytes/);
+});
