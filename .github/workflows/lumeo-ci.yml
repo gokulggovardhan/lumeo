@@ -196,6 +196,9 @@ jobs:
       - name: Run Sign drag history regression
         run: npx playwright test e2e/sign-drag.spec.ts --project=chromium
 
+      - name: Run PDF Workspace mobile navigation regression
+        run: npx playwright test e2e/workspace-mobile.spec.ts --project=chromium
+
       - name: Run Chromium desktop/mobile and WebKit admin lifecycle
         run: npm run test:e2e:admin
 
