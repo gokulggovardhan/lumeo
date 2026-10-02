@@ -620,18 +620,21 @@ export default function CompressPdfTool() {
         samplePage,
       };
 
-      setAnalysis(nextAnalysis);
-      reportDocumentHealth({
-        imageHeavy: nextAnalysis.estimatedImageHeavyRatio >= 0.7,
-      });
-      setWorkspaceDocument(
+      const nextWorkspaceDocument =
         continuation?.document ??
-          createStandaloneCompressWorkspaceDocument({
-            fileName: file.name,
-            byteLength: bytes.byteLength,
-            pageCount: sourcePdf.getPageCount(),
-          }),
+        createStandaloneCompressWorkspaceDocument({
+          fileName: file.name,
+          byteLength: bytes.byteLength,
+          pageCount: sourcePdf.getPageCount(),
+        });
+      setAnalysis(nextAnalysis);
+      reportDocumentHealth(
+        {
+          imageHeavy: nextAnalysis.estimatedImageHeavyRatio >= 0.7,
+        },
+        nextWorkspaceDocument.id,
       );
+      setWorkspaceDocument(nextWorkspaceDocument);
       setWorkspaceBaseSession(continuation?.session ?? null);
       resetSettings(recommendation);
       setOutputName(sourceOutputName(file.name));
