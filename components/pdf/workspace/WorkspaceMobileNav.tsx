@@ -25,7 +25,8 @@ export function WorkspaceMobileNav() {
   const pathname = usePathname();
   const wrapperRef = useRef<HTMLElement | null>(null);
   const moreButtonRef = useRef<HTMLButtonElement | null>(null);
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [openPath, setOpenPath] = useState<string | null>(null);
+  const moreOpen = openPath === pathname;
   const {
     document: workspaceDocument,
     continueCurrent,
@@ -54,15 +55,11 @@ export function WorkspaceMobileNav() {
   }, [workspaceDocument]);
 
   useEffect(() => {
-    setMoreOpen(false);
-  }, [pathname]);
-
-  useEffect(() => {
     if (!moreOpen) return;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
-      setMoreOpen(false);
+      setOpenPath(null);
       moreButtonRef.current?.focus();
     }
 
@@ -72,7 +69,7 @@ export function WorkspaceMobileNav() {
         target instanceof Node &&
         !wrapperRef.current?.contains(target)
       ) {
-        setMoreOpen(false);
+        setOpenPath(null);
       }
     }
 
@@ -90,11 +87,11 @@ export function WorkspaceMobileNav() {
 
   function moveTo(area: WorkspaceArea) {
     if (activeArea === area && pathname === routeForArea(area)) {
-      setMoreOpen(false);
+      setOpenPath(null);
       return;
     }
     if (!continueCurrent(area)) return;
-    setMoreOpen(false);
+    setOpenPath(null);
     router.push(routeForArea(area));
   }
 
@@ -185,7 +182,7 @@ export function WorkspaceMobileNav() {
           aria-expanded={moreOpen}
           aria-controls="workspace-mobile-more"
           aria-current={isMoreArea(activeArea) ? "page" : undefined}
-          onClick={() => setMoreOpen((open) => !open)}
+          onClick={() => setOpenPath(moreOpen ? null : pathname)}
           className={
             "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-extrabold transition " +
             (isMoreArea(activeArea)
