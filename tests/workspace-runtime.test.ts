@@ -306,3 +306,43 @@ test("continuation does not duplicate an operation already present in shared his
   assert.equal(merged.history.operations.length, 1);
   assert.equal(merged.state.activeArea, "sign");
 });
+
+
+test("multi-tool continuation preserves identity while advancing the current revision", () => {
+  const runtime = createWorkspaceRuntime({
+    id: "doc-chain",
+    sourceId: "source-chain",
+    fileName: "source.pdf",
+    bytes: bytes(1, 2),
+    pageCount: 2,
+    initialArea: "edit",
+  });
+  const pageIds = runtime.session.state.document.pages.map((page) => page.id);
+
+  const edited = publishWorkspaceRevision(runtime, {
+    expectedRevision: 0,
+    bytes: bytes(3, 4, 5),
+    fileName: "source-edited.pdf",
+    pageCount: 2,
+    area: "pages",
+  });
+  const signed = publishWorkspaceRevision(edited, {
+    expectedRevision: 1,
+    bytes: bytes(6, 7, 8, 9),
+    fileName: "source-signed.pdf",
+    pageCount: 2,
+    area: "sign",
+  });
+
+  assert.equal(signed.id, runtime.id);
+  assert.equal(signed.origin.fileName, "source.pdf");
+  assert.equal(signed.revision.number, 2);
+  assert.equal(signed.revision.fileName, "source-signed.pdf");
+  assert.equal(signed.revision.pageCount, 2);
+  assert.deepEqual([...new Uint8Array(workspaceRuntimeBytes(signed))], [6, 7, 8, 9]);
+  assert.deepEqual(
+    signed.session.state.document.pages.map((page) => page.id),
+    pageIds,
+  );
+  assert.equal(signed.session.state.activeArea, "sign");
+});

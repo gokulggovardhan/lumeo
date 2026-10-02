@@ -47,15 +47,16 @@ test("continuation UI stays user-facing and secondary to existing tool downloads
   const continuation = read(
     "components/pdf/workspace/ContinueWithPdf.tsx",
   );
+  const targets = read("lib/pdf/workspace/continuation.ts");
   const edit = read("components/pdf/EditPdfTool.tsx");
   const pages = read("components/pdf/OrganizePdfTool.tsx");
   const sign = read("components/pdf/SignPdfTool.tsx");
 
   assert.match(continuation, /Continue with this PDF/);
   assert.match(continuation, /Keep working without opening the file again/);
-  assert.match(continuation, /Edit/);
-  assert.match(continuation, /Pages/);
-  assert.match(continuation, /Sign/);
+  assert.match(targets, /label: "Edit"/);
+  assert.match(targets, /label: "Pages"/);
+  assert.match(targets, /label: "Sign"/);
 
   for (const source of [continuation, edit, pages, sign]) {
     for (const phrase of [
@@ -71,4 +72,26 @@ test("continuation UI stays user-facing and secondary to existing tool downloads
   assert.match(edit, /Download edited PDF/);
   assert.match(sign, /Download signed PDF/);
   assert.match(pages, />\s*Download\s*</);
+});
+
+
+test("continuation centralizes compatibility and guards transfer continuity", () => {
+  const continuation = read(
+    "components/pdf/workspace/ContinueWithPdf.tsx",
+  );
+  const targets = read("lib/pdf/workspace/continuation.ts");
+  const provider = read(
+    "components/pdf/workspace/WorkspaceDocumentProvider.tsx",
+  );
+
+  assert.match(continuation, /continuationTargetsFor/);
+  assert.match(continuation, /incompatibleTargets/);
+  assert.match(continuation, /disabledTargets/);
+  assert.match(continuation, /aria-describedby/);
+  assert.match(targets, /WORKSPACE_CONTINUATION_TARGETS/);
+  assert.match(provider, /assertContinuationTransfer/);
+  assert.match(provider, /next\.revision\.number !== expectedRevision/);
+  assert.match(provider, /next\.revision\.fileName !== input\.fileName/);
+  assert.match(provider, /next\.revision\.pageCount !== input\.pageCount/);
+  assert.match(provider, /next\.session\.state\.document\.id !== input\.session\.state\.document\.id/);
 });
