@@ -262,3 +262,42 @@ test("Sign export lifecycle is truthful and undo invalidates the published resul
     "true",
   );
 });
+
+
+test("signed PDF can continue directly into Pages without reopening the file", async ({ page }) => {
+  await openSignWithPlacedText(page);
+
+  // Give export one guaranteed non-empty field without changing the existing
+  // signature engine or relying on the signature-library UI.
+  await page.getByRole("button", { name: "+ Date", exact: true }).click();
+  await expect(page.locator(PLACED)).toHaveCount(2);
+
+  await page.getByRole("button", { name: "Sign PDF", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Download signed PDF", exact: true }),
+  ).toBeVisible({ timeout: 30_000 });
+
+  const continuation = page.getByRole("region", {
+    name: "Continue with this PDF",
+  });
+  await expect(continuation).toBeVisible();
+  await expect(
+    continuation.getByRole("button", { name: "Pages", exact: true }),
+  ).toBeVisible();
+
+  await continuation
+    .getByRole("button", { name: "Pages", exact: true })
+    .click();
+
+  await expect(page).toHaveURL(/\\/pdf\\/organize$/);
+  await expect(
+    page.locator('[data-workspace-active-area="pages"]'),
+  ).toBeVisible({ timeout: 30_000 });
+  await expect(
+    page.getByText("Page 1", { exact: true }).first(),
+  ).toBeVisible({ timeout: 30_000 });
+
+  // A continuation arrives already open. The target tool must not send the
+  // user back through its standalone file-selection stage.
+  await expect(page.locator("#organize-pdf-upload")).toHaveCount(0);
+});
