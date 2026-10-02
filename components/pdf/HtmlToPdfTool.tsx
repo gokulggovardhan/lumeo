@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import DOMPurify from "dompurify";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
 import { L2ActionArea, L2PrivacyNote } from "@/components/pdf/workspace/ToolWorkspace";
 import {
   getPageContentWidthPx,
@@ -15,6 +16,7 @@ import {
   type PageSize,
 } from "@/lib/pdf/htmlToPdfOptions";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
+import { createFreshPdfContinuation } from "@/lib/pdf/workspace/standaloneContinuation";
 import { recordRecentFile } from "@/lib/recent-files";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
@@ -443,7 +445,7 @@ async function generatePagedPdfBlob(
   pageSize: PageSize,
   orientation: Orientation,
   margin: MarginPreset,
-): Promise<Blob> {
+): Promise<{ blob: Blob; pageCount: number; bytes: ArrayBuffer }> {
   const [{ default: html2canvas }, { PDFDocument }] = await Promise.all([
     import("html2canvas"),
     import("pdf-lib"),
@@ -510,7 +512,15 @@ async function generatePagedPdfBlob(
     const pdfBytes = await pdf.save();
     const outputBytes = new Uint8Array(pdfBytes.byteLength);
     outputBytes.set(pdfBytes);
-    return new Blob([outputBytes.buffer], { type: "application/pdf" });
+    const bytes = outputBytes.buffer.slice(
+      outputBytes.byteOffset,
+      outputBytes.byteOffset + outputBytes.byteLength,
+    ) as ArrayBuffer;
+    return {
+      blob: new Blob([bytes], { type: "application/pdf" }),
+      pageCount,
+      bytes,
+    };
   } finally {
     mirror.host.remove();
   }
@@ -531,6 +541,12 @@ export default function HtmlToPdfTool() {
   const [fileName, setFileName] = useState(initialDraft?.fileName ?? "lumeo-document");
   const [error, setError] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [continuation, setContinuation] = useState<{
+    bytes: ArrayBuffer;
+    fileName: string;
+    pageCount: number;
+    session: ReturnType<typeof createFreshPdfContinuation>["session"];
+  } | null>(null);
 
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
@@ -566,6 +582,7 @@ export default function HtmlToPdfTool() {
   function handleReset() {
     setSource(TEMPLATES.Blank);
     setError("");
+    setContinuation(null);
   }
 
   async function handleGenerate() {
@@ -577,6 +594,7 @@ export default function HtmlToPdfTool() {
 
     setIsGenerating(true);
     setError("");
+    setContinuation(null);
     const startedAt = performance.now();
     track({ eventName: "processing_started", toolSlug: "html-to-pdf" });
 
@@ -600,13 +618,32 @@ export default function HtmlToPdfTool() {
       // pdf-lib assembles the final document entirely in the browser.
       const outputFileName =
         `${sanitizeFileStem(fileName, "lumeo-document")}.pdf`;
-      const blob = await generatePagedPdfBlob(
+      const generated = await generatePagedPdfBlob(
         surface,
         pageSliceHeightPx,
         pageSize,
         orientation,
         margin,
       );
+      const { blob, bytes, pageCount } = generated;
+      try {
+        const fresh = createFreshPdfContinuation({
+          kind: "html-to-pdf",
+          fileName: outputFileName,
+          byteLength: bytes.byteLength,
+          pageCount,
+          initialArea: "edit",
+        });
+        setContinuation({
+          bytes: bytes.slice(0),
+          fileName: outputFileName,
+          pageCount,
+          session: fresh.session,
+        });
+      } catch {
+        setContinuation(null);
+      }
+
       const blobUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = blobUrl;
@@ -653,7 +690,10 @@ export default function HtmlToPdfTool() {
                 <button
                   key={name}
                   type="button"
-                  onClick={() => setSource(TEMPLATES[name])}
+                  onClick={() => {
+                    setSource(TEMPLATES[name]);
+                    setContinuation(null);
+                  }}
                   className="rounded-full border border-[var(--text-primary)]/14 px-2.5 py-1 text-xs font-bold text-[var(--text-primary)]"
                 >
                   {name}
@@ -672,7 +712,10 @@ export default function HtmlToPdfTool() {
           <div className="flex h-full flex-col gap-1.5">
             <textarea
               value={source}
-              onChange={(event) => setSource(event.target.value)}
+              onChange={(event) => {
+                setSource(event.target.value);
+                setContinuation(null);
+              }}
               spellCheck={false}
               aria-label="HTML and CSS source"
               className="min-h-[260px] w-full flex-1 resize-none rounded-lg border border-[var(--text-primary)]/14 bg-[var(--atelier-surface-1)] p-3 font-mono text-sm text-[var(--text-primary)]"
@@ -704,13 +747,19 @@ export default function HtmlToPdfTool() {
               File name
               <input
                 value={fileName}
-                onChange={(event) => setFileName(event.target.value)}
+                onChange={(event) => {
+                  setFileName(event.target.value);
+                  setContinuation(null);
+                }}
                 className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm"
               />
             </label>
             <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
               Page size
-              <select value={pageSize} onChange={(event) => setPageSize(event.target.value as PageSize)} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
+              <select value={pageSize} onChange={(event) => {
+                setPageSize(event.target.value as PageSize);
+                setContinuation(null);
+              }} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
                 <option value="a4">A4</option>
                 <option value="letter">Letter</option>
                 <option value="legal">Legal</option>
@@ -718,14 +767,20 @@ export default function HtmlToPdfTool() {
             </label>
             <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
               Orientation
-              <select value={orientation} onChange={(event) => setOrientation(event.target.value as Orientation)} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
+              <select value={orientation} onChange={(event) => {
+                setOrientation(event.target.value as Orientation);
+                setContinuation(null);
+              }} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
                 <option value="portrait">Portrait</option>
                 <option value="landscape">Landscape</option>
               </select>
             </label>
             <label className="grid gap-1 text-sm font-bold text-[var(--text-primary)]">
               Margin
-              <select value={margin} onChange={(event) => setMargin(event.target.value as MarginPreset)} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
+              <select value={margin} onChange={(event) => {
+                setMargin(event.target.value as MarginPreset);
+                setContinuation(null);
+              }} className="rounded-lg border border-[var(--text-primary)]/14 px-3 py-2 text-sm">
                 <option value="none">None</option>
                 <option value="normal">Normal</option>
                 <option value="wide">Wide</option>
@@ -754,6 +809,18 @@ export default function HtmlToPdfTool() {
           </div>
         </ToolPanel>
       </div>
+
+      {continuation ? (
+        <ContinueWithPdf
+          sourceArea="edit"
+          includeSourceArea
+          fileName={continuation.fileName}
+          bytes={continuation.bytes}
+          pageCount={continuation.pageCount}
+          session={continuation.session}
+          identityNote="This generated PDF starts a fresh Workspace history."
+        />
+      ) : null}
 
       <L2PrivacyNote />
     </section>
