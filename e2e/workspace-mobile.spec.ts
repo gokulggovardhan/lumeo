@@ -50,9 +50,11 @@ async function expectMobileNavFits(page: Page, width: number, height: number) {
   expect(overflow.offset).toBe("4.5rem");
 
   for (const label of ["Edit", "Pages", "More", "Finish"]) {
-    await expect(
-      nav.getByRole("button", { name: label, exact: true }),
-    ).toBeVisible();
+    const button = nav.getByRole("button", { name: label, exact: true });
+    await expect(button).toBeVisible();
+    const buttonBox = await button.boundingBox();
+    expect(buttonBox).not.toBeNull();
+    expect(buttonBox!.height).toBeGreaterThanOrEqual(44);
   }
 }
 
