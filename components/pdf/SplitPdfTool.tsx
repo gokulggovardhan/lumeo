@@ -5,6 +5,7 @@ import JSZip from "jszip";
 import { degrees, PDFDocument } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
 import {
   L2FileCard,
   L2PrivacyNote,
@@ -25,6 +26,7 @@ import { formatBytes } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
+import { createFreshPdfContinuation } from "@/lib/pdf/workspace/standaloneContinuation";
 import { normalizeRotation } from "@/lib/pdf/rotation";
 import {
   hasPdfMagicBytes,
@@ -518,6 +520,12 @@ export default function SplitPdfTool() {
   const [cleanupMessage, setCleanupMessage] = useState("");
   const [isSplitting, setIsSplitting] = useState(false);
   const [result, setResult] = useState<SplitResult | null>(null);
+  const [continuation, setContinuation] = useState<{
+    bytes: ArrayBuffer;
+    fileName: string;
+    pageCount: number;
+    session: ReturnType<typeof createFreshPdfContinuation>["session"];
+  } | null>(null);
   const [rotations, setRotations] = useState<Record<number, number>>({});
   const [pageOrder, setPageOrder] = useState<number[]>([]);
   const [draggingPage, setDraggingPage] = useState<number | null>(null);
@@ -615,6 +623,7 @@ export default function SplitPdfTool() {
     (message = "") => {
       if (result?.url) URL.revokeObjectURL(result.url);
       setResult(null);
+      setContinuation(null);
       setCleanupMessage(message);
     },
     [result],
@@ -1142,13 +1151,18 @@ export default function SplitPdfTool() {
       const usedNames = new Set<string>();
       let blob: Blob;
       let fileName: string;
+      let continuationBytes: ArrayBuffer | null = null;
+      let continuationPageCount = 0;
 
       if (resultType === "pdf") {
         setStatus("Creating PDF");
         setProgressDetail("Creating PDF 1 of 1.");
         const bytes = await createPdfFromPages(analysis.bytes, groups[0], rotations);
-        blob = new Blob([toArrayBuffer(bytes)], { type: "application/pdf" });
+        const pdfBuffer = toArrayBuffer(bytes);
+        blob = new Blob([pdfBuffer], { type: "application/pdf" });
         fileName = uniqueName(ensureExtension(outputName || "lumeo-split", ".pdf"), usedNames);
+        continuationBytes = pdfBuffer.slice(0);
+        continuationPageCount = groups[0].length;
       } else {
         const zip = new JSZip();
         for (let index = 0; index < groups.length; index += 1) {
@@ -1182,6 +1196,21 @@ export default function SplitPdfTool() {
         size: blob.size,
         methodLabel: selectedMode.label,
       });
+      if (continuationBytes) {
+        const fresh = createFreshPdfContinuation({
+          kind: "split",
+          fileName,
+          byteLength: continuationBytes.byteLength,
+          pageCount: continuationPageCount,
+          initialArea: "pages",
+        });
+        setContinuation({
+          bytes: continuationBytes,
+          fileName,
+          pageCount: continuationPageCount,
+          session: fresh.session,
+        });
+      }
       setStatus("Download ready");
       setProgressDetail("Split complete.");
       track({
@@ -1839,6 +1868,18 @@ export default function SplitPdfTool() {
           </>
         )}
       </ToolActionBar>
+
+      {result?.kind === "pdf" && continuation ? (
+        <ContinueWithPdf
+          sourceArea="pages"
+          includeSourceArea
+          fileName={continuation.fileName}
+          bytes={continuation.bytes}
+          pageCount={continuation.pageCount}
+          session={continuation.session}
+          identityNote="A split or extracted PDF is a new document, so it starts a fresh Workspace history."
+        />
+      ) : null}
 
       <style jsx>{`
         .preset-button {
