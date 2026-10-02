@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   continuationRouteForArea,
   type ContinuationArea,
@@ -16,6 +16,7 @@ function routeForArea(area: WorkspaceArea): string {
 
 export function WorkspaceHistoryControls() {
   const router = useRouter();
+  const pathname = usePathname();
   const {
     document,
     globalHistory,
@@ -64,6 +65,16 @@ export function WorkspaceHistoryControls() {
         >
           Redo
         </button>
+
+        {pathname !== "/pdf/finish" ? (
+          <button
+            type="button"
+            onClick={() => router.push("/pdf/finish")}
+            className="lumeo-focus-ring inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 text-sm font-extrabold text-[var(--text-primary)] transition hover:bg-[var(--surface-raised)]"
+          >
+            Finish
+          </button>
+        ) : null}
 
         {recent.length > 0 ? (
           <details className="ml-auto min-w-0 text-xs text-[var(--text-secondary)]">

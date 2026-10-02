@@ -2,7 +2,7 @@ import type { WorkspaceArea } from "./model";
 
 export type ContinuationArea = Extract<
   WorkspaceArea,
-  "edit" | "pages" | "sign" | "enhance" | "optimize"
+  "edit" | "pages" | "sign" | "enhance" | "optimize" | "export"
 >;
 
 export type ContinuationTarget = {
@@ -17,6 +17,7 @@ export const WORKSPACE_CONTINUATION_TARGETS: readonly ContinuationTarget[] = [
   { area: "sign", label: "Sign", route: "/pdf/sign" },
   { area: "enhance", label: "Add", route: "/pdf/add" },
   { area: "optimize", label: "Compress", route: "/pdf/compress" },
+  { area: "export", label: "Finish", route: "/pdf/finish" },
 ];
 
 const REPEATABLE_SOURCE_AREAS: readonly ContinuationArea[] = ["enhance"];

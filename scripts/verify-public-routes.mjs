@@ -24,6 +24,7 @@ const routes = [
   "/pdf/crop",
   "/pdf/page-numbers",
   "/pdf/header-footer",
+  "/pdf/finish",
   "/guides",
   "/about",
   "/privacy",
