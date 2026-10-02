@@ -123,3 +123,27 @@ test("cross-tool history restores actual revisions and stays browser-memory only
     assert.doesNotMatch(source, /localStorage|sessionStorage|indexedDB|OPFS/i);
   }
 });
+
+
+test("Finish uses the current materialized PDF and one primary download", () => {
+  const finish = read("components/pdf/workspace/WorkspaceFinish.tsx");
+  const page = read("app/pdf/finish/page.tsx");
+  const continuation = read("lib/pdf/workspace/continuation.ts");
+  const provider = read(
+    "components/pdf/workspace/WorkspaceDocumentProvider.tsx",
+  );
+
+  assert.match(continuation, /area: "export", label: "Finish", route: "\/pdf\/finish"/);
+  assert.match(finish, /fileForCurrentRevision/);
+  assert.match(finish, /beginWorkspaceExport/);
+  assert.match(finish, /completeWorkspaceExport/);
+  assert.match(finish, /Download PDF/);
+  assert.match(finish, /Reduce size first/);
+  assert.match(finish, /continueCurrent\("optimize"\)/);
+  assert.match(provider, /continueCurrent/);
+  assert.match(provider, /setWorkspaceArea\(current\.session, target\)/);
+  assert.match(page, /robots:/);
+  assert.match(page, /index: false/);
+  assert.equal((finish.match(/lumeo-primary-action/g) ?? []).length, 1);
+  assert.doesNotMatch(finish, /PDFDocument|copyPages|embedPage|drawText/);
+});
