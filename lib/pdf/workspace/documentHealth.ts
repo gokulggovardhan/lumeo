@@ -28,21 +28,21 @@ export function getDocumentHealthSuggestions(
     suggestions.push({
       id: "compress",
       area: "optimize",
-      label: "Large PDF",
-      detail: "Compress after you finish if you need a smaller file.",
+      label: "This PDF is quite large",
+      detail: "Reduce size if you want a smaller final file.",
       priority: 2,
     });
   }
 
   if (
     input.hasSearchableText === false ||
-    (input.scannedPageCount ?? 0) > 0
+    (input.hasSearchableText !== true && (input.scannedPageCount ?? 0) > 0)
   ) {
     suggestions.push({
       id: "ocr",
-      area: "enhance",
-      label: "Scanned document",
-      detail: "OCR can make scanned text searchable and selectable.",
+      area: "edit",
+      label: "Scanned page detected",
+      detail: "Recognize text to make this page searchable and selectable.",
       priority: 1,
     });
   }
@@ -51,8 +51,8 @@ export function getDocumentHealthSuggestions(
     suggestions.push({
       id: "rotate",
       area: "pages",
-      label: "Page orientation",
-      detail: "Some pages appear rotated. Review them in Pages before finishing.",
+      label: "Some pages appear rotated",
+      detail: "Review and fix rotation in Pages.",
       priority: 1,
     });
   }
@@ -62,7 +62,7 @@ export function getDocumentHealthSuggestions(
       id: "optimize-images",
       area: "optimize",
       label: "Image-heavy PDF",
-      detail: "Compression may reduce image weight without changing your edits.",
+      detail: "Reduce size may help with image-heavy pages.",
       priority: 3,
     });
   }
