@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import {
@@ -38,16 +38,11 @@ export function WorkspaceFinish() {
     replaceSession,
     continueCurrent,
   } = useWorkspaceDocument();
-  const [name, setName] = useState("lumeo-finished.pdf");
+  const [name, setName] = useState(() =>
+    outputName(document?.revision.fileName ?? "lumeo-finished.pdf"),
+  );
   const [error, setError] = useState("");
   const [downloaded, setDownloaded] = useState(false);
-
-  useEffect(() => {
-    if (!document) return;
-    setName(outputName(document.revision.fileName));
-    setError("");
-    setDownloaded(false);
-  }, [document?.id, document?.revision.number, document?.revision.fileName]);
 
   const changes = useMemo(() => {
     if (!document) return [];
