@@ -1250,7 +1250,9 @@ export default function SplitPdfTool() {
     track({ eventName: "download_started", toolSlug: "split" });
     downloadUrl(result.url, result.fileName);
     window.setTimeout(() => {
-      clearResult("Temporary file cleared from this session.");
+      URL.revokeObjectURL(result.url);
+      setResult(null);
+      setCleanupMessage("Temporary file cleared from this session.");
       setStatus("Ready");
       setProgressDetail("");
     }, 900);
@@ -1869,7 +1871,7 @@ export default function SplitPdfTool() {
         )}
       </ToolActionBar>
 
-      {result?.kind === "pdf" && continuation ? (
+      {continuation ? (
         <ContinueWithPdf
           sourceArea="pages"
           includeSourceArea
