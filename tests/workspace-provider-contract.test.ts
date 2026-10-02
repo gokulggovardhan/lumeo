@@ -149,7 +149,8 @@ test("Finish uses the current materialized PDF and one primary download", () => 
   assert.match(controls, />\s*Finish\s*</);
   assert.match(page, /robots:/);
   assert.match(page, /index: false/);
-  assert.equal((finish.match(/lumeo-primary-action/g) ?? []).length, 1);
+  assert.equal((finish.match(/variant="primary"/g) ?? []).length, 1);
+  assert.match(finish, /AuraButton/);
   assert.doesNotMatch(finish, /PDFDocument|copyPages|embedPage|drawText/);
 });
 
