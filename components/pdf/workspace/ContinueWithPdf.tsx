@@ -2,26 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import type { WorkspaceArea } from "@/lib/pdf/workspace/model";
+import {
+  continuationTargetsFor,
+  type ContinuationArea,
+} from "@/lib/pdf/workspace/continuation";
 import type { DocumentSession } from "@/lib/pdf/workspace/session";
 import { useWorkspaceDocument } from "./WorkspaceDocumentProvider";
-
-export type ContinuationArea = Extract<
-  WorkspaceArea,
-  "edit" | "pages" | "sign" | "enhance" | "optimize"
->;
-
-const TARGETS: ReadonlyArray<{
-  area: ContinuationArea;
-  label: string;
-  route: string;
-}> = [
-  { area: "edit", label: "Edit", route: "/pdf/edit" },
-  { area: "pages", label: "Pages", route: "/pdf/organize" },
-  { area: "sign", label: "Sign", route: "/pdf/sign" },
-  { area: "enhance", label: "Add", route: "/pdf/add" },
-  { area: "optimize", label: "Compress", route: "/pdf/compress" },
-];
 
 export function ContinueWithPdf({
   sourceArea,
@@ -29,24 +15,26 @@ export function ContinueWithPdf({
   bytes,
   pageCount,
   session,
+  incompatibleTargets = [],
+  disabledTargets,
 }: {
   sourceArea: ContinuationArea;
   fileName: string;
   bytes: ArrayBuffer;
   pageCount: number;
   session: DocumentSession;
+  incompatibleTargets?: readonly ContinuationArea[];
+  disabledTargets?: Partial<Record<ContinuationArea, string>>;
 }) {
   const router = useRouter();
   const { stageContinuation } = useWorkspaceDocument();
   const [busyTarget, setBusyTarget] = useState<ContinuationArea | null>(null);
   const [error, setError] = useState("");
 
-  const targets = TARGETS.filter(
-    (target) => target.area !== sourceArea || sourceArea === "enhance",
-  );
+  const targets = continuationTargetsFor(sourceArea, incompatibleTargets);
 
   function continueTo(
-    target: (typeof TARGETS)[number],
+    target: (typeof targets)[number],
   ) {
     if (busyTarget) return;
     setBusyTarget(target.area);
@@ -69,6 +57,8 @@ export function ContinueWithPdf({
     }
   }
 
+  if (targets.length === 0) return null;
+
   return (
     <section
       aria-label="Continue with this PDF"
@@ -84,17 +74,32 @@ export function ContinueWithPdf({
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-0 sm:flex sm:shrink-0">
-        {targets.map((target) => (
-          <button
-            key={target.area}
-            type="button"
-            disabled={Boolean(busyTarget)}
-            onClick={() => continueTo(target)}
-            className="lumeo-focus-ring inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-raised)] px-4 text-sm font-bold text-[var(--text-primary)] transition hover:border-[var(--border-selected)] hover:bg-[var(--surface-selected)] disabled:cursor-wait disabled:opacity-60"
-          >
-            {busyTarget === target.area ? "Opening…" : target.label}
-          </button>
-        ))}
+        {targets.map((target) => {
+          const disabledReason = disabledTargets?.[target.area]?.trim() ?? "";
+          const reasonId = `continue-${target.area}-reason`;
+
+          return (
+            <div key={target.area} className="min-w-0">
+              <button
+                type="button"
+                disabled={Boolean(busyTarget) || Boolean(disabledReason)}
+                aria-describedby={disabledReason ? reasonId : undefined}
+                onClick={() => continueTo(target)}
+                className="lumeo-focus-ring inline-flex min-h-11 w-full items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-raised)] px-4 text-sm font-bold text-[var(--text-primary)] transition hover:border-[var(--border-selected)] hover:bg-[var(--surface-selected)] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {busyTarget === target.area ? "Opening…" : target.label}
+              </button>
+              {disabledReason ? (
+                <p
+                  id={reasonId}
+                  className="mt-1 max-w-36 text-[11px] leading-4 text-[var(--text-muted)]"
+                >
+                  {disabledReason}
+                </p>
+              ) : null}
+            </div>
+          );
+        })}
       </div>
 
       {error ? (
