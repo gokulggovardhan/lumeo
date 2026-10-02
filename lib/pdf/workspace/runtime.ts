@@ -54,14 +54,16 @@ export type PublishWorkspaceRevisionInput = {
 };
 
 export class WorkspaceRevisionConflictError extends Error {
-  constructor(
-    public readonly expectedRevision: number,
-    public readonly actualRevision: number,
-  ) {
+  readonly expectedRevision: number;
+  readonly actualRevision: number;
+
+  constructor(expectedRevision: number, actualRevision: number) {
     super(
       `Workspace revision changed before this update completed (expected ${expectedRevision}, current ${actualRevision}).`,
     );
     this.name = "WorkspaceRevisionConflictError";
+    this.expectedRevision = expectedRevision;
+    this.actualRevision = actualRevision;
   }
 }
 
