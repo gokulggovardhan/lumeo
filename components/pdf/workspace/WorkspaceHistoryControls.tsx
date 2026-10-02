@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { AuraButton } from "@/components/ui/Aura";
 import {
   continuationRouteForArea,
   type ContinuationArea,
@@ -49,31 +50,35 @@ export function WorkspaceHistoryControls() {
           Workspace changes
         </span>
 
-        <button
+        <AuraButton
           type="button"
+          variant="secondary"
+          size="md"
           onClick={() => moveHistory("undo")}
           disabled={!globalHistory.canUndo}
-          className="lumeo-focus-ring inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-raised)] px-3 text-sm font-bold text-[var(--text-primary)] transition hover:border-[var(--border-selected)] hover:bg-[var(--surface-selected)] disabled:cursor-not-allowed disabled:opacity-45"
         >
           Undo
-        </button>
-        <button
+        </AuraButton>
+        <AuraButton
           type="button"
+          variant="secondary"
+          size="md"
           onClick={() => moveHistory("redo")}
           disabled={!globalHistory.canRedo}
-          className="lumeo-focus-ring inline-flex min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] bg-[var(--surface-raised)] px-3 text-sm font-bold text-[var(--text-primary)] transition hover:border-[var(--border-selected)] hover:bg-[var(--surface-selected)] disabled:cursor-not-allowed disabled:opacity-45"
         >
           Redo
-        </button>
+        </AuraButton>
 
         {pathname !== "/pdf/finish" ? (
-          <button
+          <AuraButton
             type="button"
+            variant="success"
+            size="md"
             onClick={() => router.push("/pdf/finish")}
-            className="lumeo-focus-ring hidden min-h-10 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3 text-sm font-extrabold text-[var(--text-primary)] transition hover:bg-[var(--surface-raised)] lg:inline-flex"
+            className="hidden lg:inline-flex"
           >
             Finish
-          </button>
+          </AuraButton>
         ) : null}
 
         {recent.length > 0 ? (
