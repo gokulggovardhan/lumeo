@@ -67,14 +67,14 @@ export const PROCESSING_LABEL: Record<ToolProcessing, string> = {
 };
 
 export const DISCOVERY_CATEGORY_LABEL: Record<ToolDiscoveryCategory, string> = {
-  organize: "Organize",
+  organize: "Pages",
   edit: "Edit",
   convert: "Convert",
-  "sign-fill": "Sign & Fill",
-  optimize: "Optimize",
-  secure: "Secure",
-  recognize: "Recognize",
-  "image-tools": "Image Tools",
+  "sign-fill": "Sign",
+  optimize: "Compress",
+  secure: "Protect",
+  recognize: "OCR & Text",
+  "image-tools": "Images",
 };
 
 export const lumeoTools: LumeoTool[] = [
@@ -87,12 +87,12 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/merge",
     actions: [
-      { label: "Merge", slug: "merge", route: "/pdf/merge", live: true, searchAliases: ["combine", "join", "concatenate"] },
-      { label: "Split", slug: "split", route: "/pdf/split", live: true, searchAliases: ["separate", "divide", "extract range"] },
+      { label: "Merge", slug: "merge", route: "/pdf/merge", live: true, searchAliases: ["combine", "join", "join pdfs", "combine pdfs", "put together", "concatenate"] },
+      { label: "Split", slug: "split", route: "/pdf/split", live: true, searchAliases: ["separate", "divide", "break apart", "extract pages", "extract range"] },
       { label: "Split by range", slug: "split-range", route: "/pdf/split", live: true },
-      { label: "Page Re-Order", slug: "reorder", route: "/pdf/organize", live: true },
-      { label: "Rotate pages", slug: "rotate", route: "/pdf/organize", live: true },
-      { label: "Remove pages", slug: "remove-pages", route: "/pdf/organize", live: true },
+      { label: "Page Re-Order", slug: "reorder", route: "/pdf/organize", live: true, searchAliases: ["organize", "arrange pages", "move pages", "page order"] },
+      { label: "Rotate pages", slug: "rotate", route: "/pdf/organize", live: true, searchAliases: ["turn pages", "orientation"] },
+      { label: "Remove pages", slug: "remove-pages", route: "/pdf/organize", live: true, searchAliases: ["delete pages", "drop pages"] },
       { label: "Extract pages", slug: "extract-pages", route: "/pdf/split", live: true },
       { label: "Duplicate page", slug: "duplicate-page", route: "/pdf/organize", live: true },
     ],
@@ -106,7 +106,7 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/compress",
     actions: [
-      { label: "Compress", slug: "compress", route: "/pdf/compress", live: true, searchAliases: ["reduce", "shrink", "smaller", "optimize"] },
+      { label: "Compress", slug: "compress", route: "/pdf/compress", live: true, searchAliases: ["reduce", "reduce size", "shrink", "shrink pdf", "smaller", "smaller pdf", "file size", "make smaller", "save space", "optimize"] },
       { label: "Deep compress", slug: "deep-compress", route: "/pdf/compress", live: true },
       { label: "Grayscale", slug: "grayscale", route: "/pdf/compress", live: true },
       { label: "Flatten", slug: "flatten", route: "/pdf/compress", live: true },
@@ -126,7 +126,7 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/jpg-to-pdf",
     actions: [
-      { label: "JPG to PDF", slug: "jpg-to-pdf", route: "/pdf/jpg-to-pdf", live: true, searchAliases: ["jpeg", "image", "photo", "picture"] },
+      { label: "JPG to PDF", slug: "jpg-to-pdf", route: "/pdf/jpg-to-pdf", live: true, searchAliases: ["jpeg", "image", "photo", "picture", "photo to pdf", "image to pdf"] },
       { label: "PNG to PDF", slug: "png-to-pdf", route: "/pdf/jpg-to-pdf", live: true },
       { label: "WEBP to PDF", slug: "webp-to-pdf", route: "/pdf/jpg-to-pdf", live: true },
       { label: "HEIC to PDF", slug: "heic-to-pdf", live: false },
@@ -145,10 +145,10 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/pdf-to-jpg",
     actions: [
-      { label: "PDF to JPG", slug: "pdf-to-jpg", route: "/pdf/pdf-to-jpg", live: true, searchAliases: ["jpeg", "image", "export", "picture"] },
+      { label: "PDF to JPG", slug: "pdf-to-jpg", route: "/pdf/pdf-to-jpg", live: true, searchAliases: ["jpeg", "image", "export", "picture", "pdf to image", "save page as image"] },
       { label: "PDF to PNG", slug: "pdf-to-png", route: "/pdf/pdf-to-jpg", live: true },
       { label: "PDF to WEBP", slug: "pdf-to-webp", route: "/pdf/pdf-to-jpg", live: true },
-      { label: "Extract Text", slug: "extract-text", route: "/pdf/extract-text", live: true, searchAliases: ["copy text", "read", "selectable text"] },
+      { label: "Extract Text", slug: "extract-text", route: "/pdf/extract-text", live: true, searchAliases: ["copy text", "read", "read text", "selectable text", "pull text", "text from pdf"] },
       { label: "PDF to HTML", slug: "pdf-to-html", live: false },
     ],
   },
@@ -161,9 +161,9 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/edit",
     actions: [
-      { label: "Edit PDF", slug: "edit", route: "/pdf/edit", live: true, searchAliases: ["annotate", "draw", "text", "whiteout"] },
+      { label: "Edit PDF", slug: "edit", route: "/pdf/edit", live: true, searchAliases: ["write", "write on pdf", "type", "type on pdf", "change text", "modify", "annotate", "draw", "text", "whiteout"] },
       { label: "Images", slug: "add-images", live: false },
-      { label: "Watermark", slug: "watermark", route: "/pdf/watermark", live: true, searchAliases: ["stamp", "brand", "overlay"] },
+      { label: "Watermark", slug: "watermark", route: "/pdf/watermark", live: true, searchAliases: ["stamp", "brand", "overlay", "logo", "copyright", "mark pdf"] },
       { label: "Page numbers", slug: "page-numbers", route: "/pdf/page-numbers", live: true },
       { label: "Header & footer", slug: "header-footer", route: "/pdf/header-footer", live: true },
       { label: "Crop", slug: "crop", route: "/pdf/crop", live: true, searchAliases: ["trim", "resize", "margins"] },
@@ -179,7 +179,7 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/sign",
     actions: [
-      { label: "Sign PDF", slug: "sign", route: "/pdf/sign", live: true, searchAliases: ["signature", "initials"] },
+      { label: "Sign PDF", slug: "sign", route: "/pdf/sign", live: true, searchAliases: ["signature", "sign document", "e-sign", "esign", "autograph", "initials"] },
       { label: "Fill forms", slug: "fill-forms", live: false },
       { label: "Initials & date", slug: "initials-date", route: "/pdf/sign", live: true },
     ],
@@ -208,10 +208,10 @@ export const lumeoTools: LumeoTool[] = [
     availability: "available",
     primaryRoute: "/pdf/word-to-pdf",
     actions: [
-      { label: "Word to PDF", slug: "word-to-pdf", route: "/pdf/word-to-pdf", live: true, searchAliases: ["doc", "docx", "office"] },
+      { label: "Word to PDF", slug: "word-to-pdf", route: "/pdf/word-to-pdf", live: true, searchAliases: ["doc", "docx", "office", "docx to pdf", "document to pdf", "word document"] },
       { label: "Excel to PDF", slug: "excel-to-pdf", live: false },
       { label: "PowerPoint to PDF", slug: "powerpoint-to-pdf", live: false },
-      { label: "PDF to Word", slug: "pdf-to-word", route: "/pdf/pdf-to-word", live: true, searchAliases: ["doc", "docx", "editable"] },
+      { label: "PDF to Word", slug: "pdf-to-word", route: "/pdf/pdf-to-word", live: true, searchAliases: ["doc", "docx", "editable", "pdf to docx", "edit in word", "word document"] },
       { label: "HTML to PDF", slug: "html-to-pdf", route: "/pdf/html-to-pdf", live: true, processing: "browser", searchAliases: ["webpage", "website", "css"] },
     ],
   },

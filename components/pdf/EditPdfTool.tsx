@@ -30,6 +30,7 @@ import {
   L2ToolbarButton,
   L2UploadStage,
   L2WorkspaceHeader,
+  L2WorkspaceStatus,
   ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
 import { EditElementView } from "@/components/pdf/edit/EditElementView";
@@ -6713,6 +6714,15 @@ export default function EditPdfTool() {
         title="Edit PDF"
         description={`${pdf.file.name} · ${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
       />
+
+      {workspaceProjection?.compatible ? (
+        <L2WorkspaceStatus
+          activeArea={workspaceProjection.session.state.activeArea}
+          operationCount={workspaceProjection.session.state.operationCount}
+          operations={workspaceProjection.session.history.operations}
+          historyCursor={workspaceProjection.session.state.historyCursor}
+        />
+      ) : null}
 
       {/* Phase 27: a coherent document toolbar -- undo/redo, page navigation,
           and zoom each get their own visually grouped cluster (divider rules

@@ -100,10 +100,32 @@ async function semanticHistoryCount(page: Page) {
 
 /** A real drag: press, several moves, one release. */
 async function dragBy(page: Page, dx: number, dy: number, steps: number) {
-  const box = await page.locator(PLACED).first().boundingBox();
+  const placed = page.locator(PLACED).first();
+
+  // The workspace now has a compact status/history row above the canvas.
+  // A real user naturally scrolls the document into view before dragging,
+  // but raw page.mouse coordinates do not do that for us. Keep this
+  // regression focused on Sign's gesture/history invariant rather than on
+  // where the canvas happens to land vertically as the workspace chrome
+  // evolves.
+  await placed.scrollIntoViewIfNeeded();
+  await expect(placed).toBeVisible();
+
+  const box = await placed.boundingBox();
   if (!box) throw new Error("placed element has no box");
   const startX = box.x + box.width / 2;
   const startY = box.y + box.height / 2;
+
+  const hitTarget = await page.evaluate(
+    ({ x, y }) => {
+      const target = document.elementFromPoint(x, y);
+      return Boolean(target?.closest('[role="button"][aria-label*="element, use arrow keys"]'));
+    },
+    { x: startX, y: startY },
+  );
+  if (!hitTarget) {
+    throw new Error("placed element is not the pointer hit target after scrolling into view");
+  }
 
   await page.mouse.move(startX, startY);
   await page.mouse.down();

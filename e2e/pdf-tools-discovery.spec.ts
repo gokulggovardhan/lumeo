@@ -67,7 +67,7 @@ test.describe("PDF Tools discovery", () => {
   test("supports direct discovery, combined filters, and keyboard shortcuts", async ({ page }) => {
     await page.goto("/pdf-tools");
 
-    await expect(page.getByRole("heading", { name: "Find the right tool" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Find the right tool." })).toBeVisible();
     await expect(page.getByRole("link", { name: /Open Merge PDF/ })).toHaveAttribute("href", "/pdf/merge");
 
     const search = page.getByRole("searchbox", { name: "Search tools and actions" });
@@ -77,6 +77,16 @@ test.describe("PDF Tools discovery", () => {
     await expect(page.getByRole("link", { name: /Open Organize PDF/ })).toBeVisible();
     await expect(page.getByText("1 tool", { exact: true })).toBeVisible();
 
+    await search.fill("reduce size");
+    await expect(page.getByRole("link", { name: /Open Compress PDF/ })).toBeVisible();
+
+    await search.fill("write");
+    await expect(page.getByRole("link", { name: /Open Edit PDF/ })).toBeVisible();
+
+    await search.fill("signature");
+    await expect(page.getByRole("link", { name: /Open Sign PDF/ })).toBeVisible();
+
+    await search.fill("rotate");
     await page.getByRole("button", { name: "Edit" }).click();
     await expect(page.getByText("No tools match that search")).toBeVisible();
 
@@ -94,17 +104,43 @@ test.describe("PDF Tools discovery", () => {
     await expect(commandTrigger).toBeFocused();
   });
 
-  test("stays usable without horizontal overflow on a narrow mobile viewport", async ({ page }) => {
-    await page.setViewportSize({ width: 320, height: 760 });
-    await page.goto("/pdf-tools");
+  test("keeps the complete directory compact and touch-safe across responsive widths", async ({ page }) => {
+    for (const viewport of [
+      { width: 1280, height: 900 },
+      { width: 768, height: 900 },
+      { width: 430, height: 820 },
+      { width: 390, height: 844 },
+      { width: 320, height: 760 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto("/pdf-tools");
 
-    const dimensions = await page.evaluate(() => ({
-      viewport: document.documentElement.clientWidth,
-      page: document.documentElement.scrollWidth,
-    }));
+      await expect(page.getByRole("searchbox", { name: "Search tools and actions" })).toBeVisible();
+      await expect(page.getByRole("link", { name: /Open Merge PDF/ })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Pages" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Compress" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "OCR & Text" })).toBeVisible();
 
-    expect(dimensions.page).toBeLessThanOrEqual(dimensions.viewport);
-    await expect(page.getByRole("searchbox", { name: "Search tools and actions" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Open Merge PDF/ })).toBeVisible();
+      const dimensions = await page.evaluate(() => ({
+        viewport: document.documentElement.clientWidth,
+        page: document.documentElement.scrollWidth,
+      }));
+      expect(dimensions.page).toBeLessThanOrEqual(dimensions.viewport);
+
+      const targets = page.locator(
+        '#pdf-tool-search, [aria-label="Filter PDF tools by category"] button, a[aria-label^="Open "]',
+      );
+      const boxes = await targets.evaluateAll((nodes) =>
+        nodes.slice(0, 16).map((node) => {
+          const rect = node.getBoundingClientRect();
+          return { width: rect.width, height: rect.height };
+        }),
+      );
+      expect(boxes.length).toBeGreaterThan(0);
+      for (const box of boxes) {
+        expect(box.width).toBeGreaterThanOrEqual(40);
+        expect(box.height).toBeGreaterThanOrEqual(40);
+      }
+    }
   });
 });

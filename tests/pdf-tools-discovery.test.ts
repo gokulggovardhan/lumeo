@@ -34,21 +34,25 @@ test("discovery search matches names, descriptions, categories, aliases, and bun
   assert.equal(toolMatchesQuery(organize, "unrelated"), false);
 });
 
-test("discovery search exposes signature, image, and text vocabulary", () => {
-  assert.equal(toolMatchesQuery(tile({ label: "Sign PDF", aliases: ["signature", "initials"] }), "signature"), true);
-  assert.equal(toolMatchesQuery(tile({ label: "JPG to PDF", aliases: ["image", "photo"] }), "image"), true);
-  assert.equal(toolMatchesQuery(tile({ label: "Edit PDF", aliases: ["text", "whiteout"] }), "text"), true);
-  assert.equal(toolMatchesQuery(tile({ label: "Extract Text", aliases: ["copy text"] }), "text"), true);
+test("discovery search exposes plain-language action vocabulary", () => {
+  assert.equal(toolMatchesQuery(tile({ label: "Merge PDF", aliases: ["join pdfs", "combine pdfs"] }), "join"), true);
+  assert.equal(toolMatchesQuery(tile({ label: "Compress PDF", aliases: ["reduce size", "make smaller"] }), "reduce size"), true);
+  assert.equal(toolMatchesQuery(tile({ label: "Sign PDF", aliases: ["signature", "esign"] }), "signature"), true);
+  assert.equal(toolMatchesQuery(tile({ label: "Edit PDF", aliases: ["write", "change text"] }), "write"), true);
+  assert.equal(toolMatchesQuery(tile({ label: "JPG to PDF", aliases: ["image", "photo to pdf"] }), "photo"), true);
+  assert.equal(toolMatchesQuery(tile({ label: "Extract Text", aliases: ["copy text", "read text"] }), "read text"), true);
 });
 
 test("public category mapping keeps specialist tools in clear homes", () => {
   const catalog = readFileSync("lib/tools/catalog.ts", "utf8");
   const tiles = readFileSync("lib/tools/tiles.ts", "utf8");
 
+  assert.match(catalog, /organize: "Pages"/);
   assert.match(catalog, /edit: "Edit"/);
-  assert.match(catalog, /"sign-fill": "Sign & Fill"/);
-  assert.match(catalog, /recognize: "Recognize"/);
-  assert.match(catalog, /"image-tools": "Image Tools"/);
+  assert.match(catalog, /"sign-fill": "Sign"/);
+  assert.match(catalog, /optimize: "Compress"/);
+  assert.match(catalog, /recognize: "OCR & Text"/);
+  assert.match(catalog, /"image-tools": "Images"/);
 
   assert.match(tiles, /seal: "sign-fill"/);
   assert.match(tiles, /"extract-text": "recognize"/);
@@ -58,14 +62,14 @@ test("public category mapping keeps specialist tools in clear homes", () => {
 test("directory uses direct links, combined filters, live counts, and truthful availability", () => {
   const source = readFileSync("components/tools/ToolsExplorer.tsx", "utf8");
   for (const label of [
-    "All tools",
-    "Organize",
+    "All",
+    "Pages",
     "Edit",
     "Convert",
-    "Sign & Fill",
-    "Optimize",
-    "Recognize",
-    "Image Tools",
+    "Sign",
+    "Compress",
+    "OCR & Text",
+    "Images",
   ]) {
     assert.match(source, new RegExp(label));
   }
@@ -75,7 +79,8 @@ test("directory uses direct links, combined filters, live counts, and truthful a
   assert.match(source, /Temporarily unavailable/);
   assert.doesNotMatch(source, /Notify me/);
   assert.match(source, /On device/);
-  assert.match(source, /Current live tools are browser-based/);
+  assert.match(source, /Local-first by default/);
+  assert.doesNotMatch(source, /Popular PDF tools/);
 });
 
 test("slash and Escape keyboard contracts are explicit", () => {

@@ -34,6 +34,7 @@ import {
   L2WorkspaceHeader,
   L2WorkspaceInspector,
   L2WorkspacePanel,
+  L2WorkspaceStatus,
   L2WorkspaceToolbar,
   ToolActionBar,
 } from "@/components/pdf/workspace/ToolWorkspace";
@@ -775,6 +776,15 @@ export default function SignPdfTool() {
         title="Sign PDF"
         description={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
       />
+
+      {workspaceProjection?.compatible ? (
+        <L2WorkspaceStatus
+          activeArea={workspaceProjection.session.state.activeArea}
+          operationCount={workspaceProjection.session.state.operationCount}
+          operations={workspaceProjection.session.history.operations}
+          historyCursor={workspaceProjection.session.state.historyCursor}
+        />
+      ) : null}
 
       <L2WorkspaceToolbar>
         <L2ToolbarButton onClick={undo} disabled={!canUndo}>

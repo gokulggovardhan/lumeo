@@ -82,7 +82,9 @@ try {
   assert(css.includes("top: 96px"), "Desktop sticky settings offset is missing.");
   assert(css.includes("@media (max-width: 1023px)") && css.includes("position: static"), "Mobile sticky reset is missing.");
   assert(css.includes("@media (prefers-reduced-motion: reduce)"), "Reduced-motion support is missing.");
-  assert(workspace.includes("Private by design · Browser-only · Cleared after download"), "Exact privacy note is missing.");
+  const publicCopy = read("lib/public-site/copy.ts");
+  assert(publicCopy.includes("Files stay on your device · Local processing where supported"), "Shared local-first privacy copy is missing.");
+  assert(workspace.includes("LOCAL_FIRST_SHORT"), "Workspace privacy note must use the shared local-first copy.");
   assert(css.includes("--atelier-sage-500") && css.includes("--atelier-brass-400"), "Atelier workspace palette is missing.");
   assert(!workspace.includes("rgba(var(--sky-rgb)"), "Workspace shared primitives must not use blue/cyan focus accents.");
   assert(workspace.includes("max-w-[560px]") && workspace.includes("text-[var(--text-muted)]"), "Workspace privacy note must be compact and secondary.");
