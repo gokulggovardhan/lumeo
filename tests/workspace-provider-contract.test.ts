@@ -142,6 +142,11 @@ test("Finish uses the current materialized PDF and one primary download", () => 
   assert.match(finish, /continueCurrent\("optimize"\)/);
   assert.match(provider, /continueCurrent/);
   assert.match(provider, /setWorkspaceArea\(current\.session, target\)/);
+  const controls = read(
+    "components/pdf/workspace/WorkspaceHistoryControls.tsx",
+  );
+  assert.match(controls, /router\.push\("\/pdf\/finish"\)/);
+  assert.match(controls, />\s*Finish\s*</);
   assert.match(page, /robots:/);
   assert.match(page, /index: false/);
   assert.equal((finish.match(/lumeo-primary-action/g) ?? []).length, 1);
