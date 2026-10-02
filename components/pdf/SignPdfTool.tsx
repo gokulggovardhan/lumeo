@@ -24,6 +24,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { degrees, PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
+import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import {
   L2FileCard,
   L2PanelLabel,
@@ -131,6 +133,10 @@ function SignIcon() {
 
 export default function SignPdfTool() {
   const { availability, track } = useAnalytics();
+  const {
+    continuationTarget,
+    takeContinuation,
+  } = useWorkspaceDocument();
   const openedTrackedRef = useRef(false);
   const sourceSequenceRef = useRef(1);
   const exportRevisionRef = useRef(0);
@@ -145,6 +151,7 @@ export default function SignPdfTool() {
   const [pageLoading, setPageLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [downloadUrl, setDownloadUrl] = useState("");
+  const [exportedBytes, setExportedBytes] = useState<ArrayBuffer | null>(null);
   const [downloadName, setDownloadName] = useState("lumeo-signed.pdf");
   const [outputName, setOutputName] = useState("lumeo-signed.pdf");
   const [workspaceExportState, setWorkspaceExportState] = useState<
@@ -173,6 +180,7 @@ export default function SignPdfTool() {
       downloadUrlRef.current = "";
     }
     setDownloadUrl("");
+    setExportedBytes(null);
   }, []);
   // Preserve Sign's exact existing setElements contract and ref-backed
   // useHistoryState authority. The semantic journal travels inside the same
@@ -420,7 +428,10 @@ export default function SignPdfTool() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [redo, undo, selectedId, setElements]);
 
-  const addFile = async (files: FileList | File[]) => {
+  const addFile = useCallback(async (
+    files: FileList | File[],
+    sharedDocument?: WorkspaceDocument,
+  ) => {
     const file = Array.from(files)[0];
     if (!file) return;
     const loadToken = fileLoadAuthorityRef.current.begin();
@@ -459,15 +470,17 @@ export default function SignPdfTool() {
         bytes,
         pageCount,
         pageSizes,
-        workspaceDocument: createWorkspaceDocument(
-          `sign-document-${sourceId}`,
-          {
-            id: sourceId,
-            name: file.name,
-            byteLength: file.size,
-            pageCount,
-          },
-        ),
+        workspaceDocument:
+          sharedDocument ??
+          createWorkspaceDocument(
+            `sign-document-${sourceId}`,
+            {
+              id: sourceId,
+              name: file.name,
+              byteLength: file.size,
+              pageCount,
+            },
+          ),
       });
       setPageIndex(0);
       resetElements([]);
@@ -477,7 +490,24 @@ export default function SignPdfTool() {
       if (!fileLoadAuthorityRef.current.isCurrent(loadToken)) return;
       setError("This file could not be read. It may be damaged or password-protected.");
     }
-  };
+  }, [resetElements]);
+
+  useEffect(() => {
+    if (pdf || continuationTarget !== "sign") return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      const payload = takeContinuation("sign");
+      if (!payload || cancelled) return;
+      void addFile(
+        [payload.file],
+        payload.runtime.session.state.document,
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [addFile, continuationTarget, pdf, takeContinuation]);
 
   const startNew = () => {
     fileLoadAuthorityRef.current.invalidate();
@@ -490,6 +520,7 @@ export default function SignPdfTool() {
     resetElements([]);
     setSelectedId(null);
     setDownloadUrl("");
+    setExportedBytes(null);
     setError("");
     setOutputName("lumeo-signed.pdf");
     setArmedSignature(null);
@@ -699,6 +730,7 @@ export default function SignPdfTool() {
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
       downloadUrlRef.current = url;
+      setExportedBytes(buffer);
       setDownloadUrl(url);
       setDownloadName(sanitizePdfFileName(outputName));
       setWorkspaceExportState("exported");
@@ -1014,6 +1046,16 @@ export default function SignPdfTool() {
           </button>
         )}
       </ToolActionBar>
+
+      {downloadUrl && exportedBytes && workspaceProjection?.compatible ? (
+        <ContinueWithPdf
+          sourceArea="sign"
+          fileName={downloadName}
+          bytes={exportedBytes}
+          pageCount={pdf.pageCount}
+          session={workspaceProjection.session}
+        />
+      ) : null}
 
       <L2PrivacyNote />
 

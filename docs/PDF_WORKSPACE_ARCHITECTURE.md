@@ -64,3 +64,20 @@ Properties:
 - can materialize the current revision as a normal browser `File` so existing tools can adopt it without a new PDF engine.
 
 This is infrastructure only. Standalone tools remain standalone by default. Later continuation adapters opt into the runtime only after a user chooses to keep working with the same PDF.
+
+
+## Explicit continuation between proven tools
+
+The connected experience is opt-in and begins only after a tool has produced a verified PDF result. The existing standalone route remains the normal single-task path.
+
+Current continuation contract:
+- the primary Download action remains unchanged and visually dominant;
+- a secondary “Continue with this PDF” action can stage the verified output for Edit, Pages, or Sign;
+- the shared /pdf provider survives the client-side route transition and hands the target tool a normal browser file;
+- stable Workspace page identity and source provenance travel separately from the PDF bytes;
+- the target tool continues using its existing processing engine and local undo authority;
+- completed semantic operations are merged into the shared Workspace journal at continuation boundaries;
+- an explicit target token prevents an unrelated tool route from silently adopting a staged document;
+- shared bytes stay in memory only and are never placed in URLs, analytics, persistent storage, or account state.
+
+This stage does not yet make the shared journal the mutation authority for Undo/Redo inside every tool. That migration remains separate so Edit, Organize, and Sign cannot lose their already-proven local history behavior while cross-tool continuation is established.

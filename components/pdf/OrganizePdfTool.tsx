@@ -1,9 +1,11 @@
 "use client";
 
-import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { degrees, PDFDocument } from "pdf-lib";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
+import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import {
   L2PanelLabel,
   L2PrivacyNote,
@@ -26,7 +28,10 @@ import {
   type OrganizerItem,
 } from "@/lib/pdf/pageOrganizer";
 import { organizerItemsFromWorkspacePages } from "@/lib/pdf/workspace/adapters";
-import { createWorkspaceDocument } from "@/lib/pdf/workspace/model";
+import {
+  createWorkspaceDocument,
+  type WorkspaceDocument,
+} from "@/lib/pdf/workspace/model";
 import {
   createOrganizerWorkspaceSession,
   createOrganizerWorkspaceSnapshot,
@@ -58,6 +63,7 @@ type OrganizeResult = {
   fileName: string;
   size: number;
   pageCount: number;
+  bytes: ArrayBuffer;
 };
 
 type OrganizePageCellProps = {
@@ -188,6 +194,10 @@ function downloadUrl(url: string, fileName: string) {
 
 export default function OrganizePdfTool() {
   const { availability, track } = useAnalytics();
+  const {
+    continuationTarget,
+    takeContinuation,
+  } = useWorkspaceDocument();
   const openedTrackedRef = useRef(false);
   const pdfJsDocRef = useRef<PDFDocumentProxy | null>(null);
   const thumbnailUrlsRef = useRef<Map<string, string>>(new Map());
@@ -231,7 +241,7 @@ export default function OrganizePdfTool() {
     );
   }, [organizerState, workspaceExportState]);
 
-  async function destroyPdfJsDocument() {
+  const destroyPdfJsDocument = useCallback(async () => {
     const doc = pdfJsDocRef.current;
     pdfJsDocRef.current = null;
     if (doc) {
@@ -241,7 +251,7 @@ export default function OrganizePdfTool() {
         // PDF.js may already be cleaning itself up.
       }
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
@@ -264,7 +274,7 @@ export default function OrganizePdfTool() {
       thumbnailUrls.clear();
       void destroyPdfJsDocument();
     };
-  }, []);
+  }, [destroyPdfJsDocument]);
 
   // Same cleanup an unmount already does, plus a full reset of the loaded
   // document, its items/selection/thumbnails, and any pending result --
@@ -286,7 +296,7 @@ export default function OrganizePdfTool() {
     setWorkspaceExportState("idle");
   }
 
-  async function renderThumbnails(doc: PDFDocumentProxy, pageCount: number, session: number) {
+  const renderThumbnails = useCallback(async (doc: PDFDocumentProxy, pageCount: number, session: number) => {
     const pending = Array.from({ length: pageCount }, (_, index) => index + 1);
 
     async function renderOne(pageNumber: number) {
@@ -326,12 +336,12 @@ export default function OrganizePdfTool() {
     }
 
     await Promise.all(Array.from({ length: THUMBNAIL_CONCURRENCY }, worker));
-  }
+  }, []);
 
-  async function handleFiles(files: FileList) {
-    const file = Array.from(files)[0];
-    if (!file) return;
-
+  const loadFile = useCallback(async (
+    file: File,
+    sharedDocument?: WorkspaceDocument,
+  ) => {
     const nextSession = sessionRef.current + 1;
     sessionRef.current = nextSession;
     setError("");
@@ -371,12 +381,13 @@ export default function OrganizePdfTool() {
       setDocument({ name: file.name, size: file.size, bytes, pageCount });
       resetOrganizerState(
         createOrganizerWorkspaceSnapshot(
-          createWorkspaceDocument(`organize-document-${sourceId}`, {
-            id: sourceId,
-            name: file.name,
-            byteLength: file.size,
-            pageCount,
-          }),
+          sharedDocument ??
+            createWorkspaceDocument(`organize-document-${sourceId}`, {
+              id: sourceId,
+              name: file.name,
+              byteLength: file.size,
+              pageCount,
+            }),
         ),
       );
       duplicateSequenceRef.current = 1;
@@ -391,7 +402,33 @@ export default function OrganizePdfTool() {
           : "This file could not be read. It may be damaged or password-protected.";
       setError(message);
     }
-  }
+  }, [destroyPdfJsDocument, renderThumbnails, resetOrganizerState]);
+
+  const handleFiles = useCallback(
+    async (files: FileList) => {
+      const file = Array.from(files)[0];
+      if (!file) return;
+      await loadFile(file);
+    },
+    [loadFile],
+  );
+
+  useEffect(() => {
+    if (document_ || continuationTarget !== "pages") return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      const payload = takeContinuation("pages");
+      if (!payload || cancelled) return;
+      void loadFile(
+        payload.file,
+        payload.runtime.session.state.document,
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [continuationTarget, document_, loadFile, takeContinuation]);
 
   function toggleSelected(index: number) {
     setSelected((current) => {
@@ -497,7 +534,8 @@ export default function OrganizePdfTool() {
 
     try {
       const bytes = await buildOrganizedPdf(document_.bytes, items);
-      const blob = new Blob([toArrayBuffer(bytes)], { type: "application/pdf" });
+      const buffer = toArrayBuffer(bytes);
+      const blob = new Blob([buffer], { type: "application/pdf" });
       if (
         exportRevision !== exportRevisionRef.current ||
         exportSnapshot !== getCurrentOrganizerState()
@@ -506,7 +544,13 @@ export default function OrganizePdfTool() {
       }
       const url = URL.createObjectURL(blob);
       const fileName = `${sanitizeFileStem(document_.name, "lumeo-organize")}.pdf`;
-      setResult({ url, fileName, size: blob.size, pageCount: items.length });
+      setResult({
+        url,
+        fileName,
+        size: blob.size,
+        pageCount: items.length,
+        bytes: buffer,
+      });
       setWorkspaceExportState("exported");
       track({
         eventName: "processing_succeeded",
@@ -651,22 +695,33 @@ export default function OrganizePdfTool() {
       </ToolActionBar>
 
       {result ? (
-        <L2ResultState
-          title="Organized PDF ready"
-          details={[
-            { label: "Pages", value: String(result.pageCount) },
-            { label: "Size", value: formatBytes(result.size) },
-          ]}
-          primaryAction={
-            <button
-              type="button"
-              onClick={handleDownload}
-              className="lumeo-primary-action lumeo-press inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)]"
-            >
-              Download
-            </button>
-          }
-        />
+        <>
+          <L2ResultState
+            title="Organized PDF ready"
+            details={[
+              { label: "Pages", value: String(result.pageCount) },
+              { label: "Size", value: formatBytes(result.size) },
+            ]}
+            primaryAction={
+              <button
+                type="button"
+                onClick={handleDownload}
+                className="lumeo-primary-action lumeo-press inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] px-6 py-3 text-sm font-extrabold text-[var(--text-on-accent)]"
+              >
+                Download
+              </button>
+            }
+          />
+          {workspaceSession ? (
+            <ContinueWithPdf
+              sourceArea="pages"
+              fileName={result.fileName}
+              bytes={result.bytes}
+              pageCount={result.pageCount}
+              session={workspaceSession}
+            />
+          ) : null}
+        </>
       ) : null}
 
       <L2PrivacyNote />

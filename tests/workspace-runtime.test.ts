@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createWorkspaceRuntime,
+  createWorkspaceRuntimeFromSession,
+  mergeWorkspaceSessions,
   publishWorkspaceRevision,
   updateWorkspaceRuntimeSession,
   workspaceRuntimeBytes,
@@ -9,12 +11,32 @@ import {
   WorkspaceRevisionConflictError,
 } from "../lib/pdf/workspace/runtime.ts";
 import {
+  createDocumentSession,
   recordWorkspaceOperation,
   setWorkspaceArea,
 } from "../lib/pdf/workspace/session.ts";
 
 function bytes(...values: number[]): ArrayBuffer {
   return Uint8Array.from(values).buffer;
+}
+
+function operation(
+  id: string,
+  area: "edit" | "pages" | "sign",
+  description: string,
+) {
+  return {
+    id,
+    type: id,
+    area,
+    description,
+    scope: { kind: "document" as const },
+    parameters: {},
+    undoable: true,
+    affectsPreview: true,
+    affectsExport: true,
+    flow: { eligible: false as const, reason: "content-specific" as const },
+  };
 }
 
 test("shared runtime starts with one stable document and an immutable byte copy", () => {
@@ -189,4 +211,98 @@ test("runtime byte reads return defensive copies", () => {
   const second = workspaceRuntimeBytes(runtime);
 
   assert.deepEqual([...new Uint8Array(second)], [1, 2, 3]);
+});
+
+test("continuation can start from an existing semantic session without losing provenance", () => {
+  const local = createWorkspaceRuntime({
+    id: "local-doc",
+    sourceId: "source-a",
+    fileName: "source.pdf",
+    bytes: bytes(1, 2),
+    pageCount: 2,
+    initialArea: "edit",
+  });
+  const edited = recordWorkspaceOperation(
+    local.session,
+    operation("edit-1", "edit", "Text edited"),
+  );
+
+  const shared = createWorkspaceRuntimeFromSession({
+    id: "shared-doc",
+    fileName: "edited.pdf",
+    bytes: bytes(7, 8, 9),
+    pageCount: 2,
+    area: "pages",
+    session: edited,
+  });
+
+  assert.equal(shared.session.state.document.id, "local-doc");
+  assert.equal(shared.session.state.activeArea, "pages");
+  assert.equal(shared.session.state.operationCount, 1);
+  assert.equal(shared.session.history.operations[0]?.description, "Text edited");
+  assert.equal(shared.origin.fileName, "source.pdf");
+  assert.equal(shared.revision.fileName, "edited.pdf");
+});
+
+test("continuation merges new tool history onto the shared document history", () => {
+  const runtime = createWorkspaceRuntime({
+    id: "doc-a",
+    sourceId: "source-a",
+    fileName: "source.pdf",
+    bytes: bytes(1),
+    pageCount: 1,
+    initialArea: "edit",
+  });
+  const afterEdit = recordWorkspaceOperation(
+    runtime.session,
+    operation("edit-1", "edit", "Text edited"),
+  );
+
+  let signOnly = createDocumentSession({
+    id: "sign-local",
+    document: afterEdit.state.document,
+    initialArea: "sign",
+  });
+  signOnly = recordWorkspaceOperation(
+    signOnly,
+    operation("sign-1", "sign", "Signature added"),
+  );
+
+  const merged = mergeWorkspaceSessions(afterEdit, signOnly, "pages");
+
+  assert.deepEqual(
+    merged.history.operations.map((item) => item.description),
+    ["Text edited", "Signature added"],
+  );
+  assert.equal(merged.state.historyCursor, 2);
+  assert.equal(merged.state.operationCount, 2);
+  assert.equal(merged.state.activeArea, "pages");
+  assert.equal(
+    merged.state.document.pages[0]?.id,
+    afterEdit.state.document.pages[0]?.id,
+  );
+});
+
+test("continuation does not duplicate an operation already present in shared history", () => {
+  const runtime = createWorkspaceRuntime({
+    id: "doc-a",
+    sourceId: "source-a",
+    fileName: "source.pdf",
+    bytes: bytes(1),
+    pageCount: 1,
+    initialArea: "edit",
+  });
+  const editOperation = operation("edit-1", "edit", "Text edited");
+  const base = recordWorkspaceOperation(runtime.session, editOperation);
+
+  let incoming = createDocumentSession({
+    id: "edit-local",
+    document: base.state.document,
+    initialArea: "edit",
+  });
+  incoming = recordWorkspaceOperation(incoming, editOperation);
+
+  const merged = mergeWorkspaceSessions(base, incoming, "sign");
+  assert.equal(merged.history.operations.length, 1);
+  assert.equal(merged.state.activeArea, "sign");
 });

@@ -25,6 +25,8 @@ import type { PDFDocumentProxy, PDFPageProxy, PageViewport } from "pdfjs-dist";
 // pdfjs-dist, also lazy-loaded) already gets above.
 import type { PDFDocument, PDFDict } from "pdf-lib";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
+import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import {
   L2PrivacyNote,
   L2ToolbarButton,
@@ -630,6 +632,10 @@ function RedoIcon() {
 
 export default function EditPdfTool() {
   const { availability, track } = useAnalytics();
+  const {
+    continuationTarget,
+    takeContinuation,
+  } = useWorkspaceDocument();
   const openedTrackedRef = useRef(false);
   const workspaceSourceSequenceRef = useRef(1);
 
@@ -660,6 +666,7 @@ export default function EditPdfTool() {
   // below close over the URL and lifecycle setters; names stay grouped with
   // the remaining toolbar state further down.
   const [downloadUrl, setDownloadUrl] = useState("");
+  const [exportedBytes, setExportedBytes] = useState<ArrayBuffer | null>(null);
   const downloadUrlRef = useRef("");
   const [workspaceExportState, setWorkspaceExportState] = useState<
     "idle" | "exporting" | "exported" | "error"
@@ -698,6 +705,7 @@ export default function EditPdfTool() {
       downloadUrlRef.current = "";
     }
     setDownloadUrl("");
+    setExportedBytes(null);
   }, []);
   // Every document mutation -- placing, moving, restyling or deleting an
   // element, applying a text edit, or undoing/redoing any of those -- makes
@@ -3330,7 +3338,10 @@ export default function EditPdfTool() {
   }, [activeTool, selectedRunIndices, editableRunMatches]);
 
 
-  async function addFile(files: FileList | File[]) {
+  const addFile = useCallback(async (
+    files: FileList | File[],
+    sharedDocument?: WorkspaceDocument,
+  ) => {
     setError("");
     const file = Array.from(files)[0];
     if (!file) return;
@@ -3403,10 +3414,12 @@ export default function EditPdfTool() {
         elements: [],
         pdfBytes: bytes,
         session: createPdfEditSession(bytes.byteLength),
-        workspaceDocument: createWorkspaceDocument(
-          "edit-pdf-document",
-          source,
-        ),
+        workspaceDocument:
+          sharedDocument ??
+          createWorkspaceDocument(
+            "edit-pdf-document",
+            source,
+          ),
       });
       setSelectedId(null);
       invalidatePublishedExport();
@@ -3417,7 +3430,28 @@ export default function EditPdfTool() {
           : "This file could not be read. It may be damaged or password-protected.";
       setError(message);
     }
-  }
+  }, [
+    invalidatePublishedExport,
+    resetHistory,
+    resetLocalCustomFonts,
+  ]);
+
+  useEffect(() => {
+    if (pdfMeta || continuationTarget !== "edit") return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      const payload = takeContinuation("edit");
+      if (!payload || cancelled) return;
+      void addFile(
+        [payload.file],
+        payload.runtime.session.state.document,
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [addFile, continuationTarget, pdfMeta, takeContinuation]);
 
   function nextElementId() {
     elementIdCounterRef.current += 1;
@@ -6642,6 +6676,7 @@ export default function EditPdfTool() {
       if (downloadUrlRef.current) URL.revokeObjectURL(downloadUrlRef.current);
       const url = URL.createObjectURL(blob);
       downloadUrlRef.current = url;
+      setExportedBytes(buffer);
       setDownloadUrl(url);
       setWorkspaceExportState("exported");
       setDownloadName(sanitizePdfFileName(outputName));
@@ -8593,6 +8628,16 @@ export default function EditPdfTool() {
           </button>
         )}
       </ToolActionBar>
+
+      {downloadUrl && exportedBytes && workspaceProjection?.compatible ? (
+        <ContinueWithPdf
+          sourceArea="edit"
+          fileName={downloadName}
+          bytes={exportedBytes}
+          pageCount={pdf.pageCount}
+          session={workspaceProjection.session}
+        />
+      ) : null}
 
       <L2PrivacyNote />
     </section>
