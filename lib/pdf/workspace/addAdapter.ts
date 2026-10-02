@@ -1,4 +1,7 @@
-import type { WorkspaceDocument } from "./model.ts";
+import {
+  createWorkspaceDocument,
+  type WorkspaceDocument,
+} from "./model.ts";
 import {
   createDocumentSession,
   recordWorkspaceOperation,
@@ -55,5 +58,31 @@ export function createAddWorkspaceSession({
     affectsPreview: true,
     affectsExport: true,
     flow: { eligible: false, reason: "content-specific" },
+  });
+}
+
+
+export function createStandaloneAddWorkspaceDocument({
+  kind,
+  fileName,
+  byteLength,
+  pageCount,
+}: {
+  kind: AddWorkspaceOperationKind;
+  fileName: string;
+  byteLength: number;
+  pageCount: number;
+}): WorkspaceDocument {
+  const nonce =
+    typeof globalThis.crypto !== "undefined" &&
+    typeof globalThis.crypto.randomUUID === "function"
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  const documentId = `add:${kind}:${nonce}`;
+  return createWorkspaceDocument(documentId, {
+    id: `${documentId}:source`,
+    name: fileName,
+    byteLength,
+    pageCount,
   });
 }
