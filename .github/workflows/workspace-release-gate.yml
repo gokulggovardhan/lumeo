@@ -40,7 +40,19 @@ jobs:
           npm run verify:lumeo2-foundation
           npm run verify:lumeo2-public-experience
           npm run verify:lumeo2-workspaces
-          npm run verify:release
+          npm run verify:admin-auth
+          npm run verify:control-center
+
+      - name: Verify Supabase environment contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -f .env.local' EXIT
+          cat > .env.local <<'EOF'
+          NEXT_PUBLIC_SUPABASE_URL=https://ci-release-check.example.com
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=ci-release-check-public-key
+          EOF
+          npm run verify:supabase
 
       - name: Run complete unit suite
         run: npm test
