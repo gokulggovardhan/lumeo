@@ -7,7 +7,7 @@ function read(path: string): string {
 }
 
 test("Continue with this PDF exposes Compress as a simple action", () => {
-  const source = read("components/pdf/workspace/ContinueWithPdf.tsx");
+  const source = read("lib/pdf/workspace/continuation.ts");
   assert.match(source, /area: "optimize", label: "Compress", route: "\/pdf\/compress"/);
 });
 
