@@ -21,7 +21,10 @@ import {
   undoWorkspaceCheckpoint,
   type WorkspaceRevisionHistory,
 } from "@/lib/pdf/workspace/revisionHistory";
-import type { DocumentSession } from "@/lib/pdf/workspace/session";
+import {
+  setWorkspaceArea,
+  type DocumentSession,
+} from "@/lib/pdf/workspace/session";
 import {
   createWorkspaceRuntime,
   createWorkspaceRuntimeFromSession,
@@ -95,6 +98,7 @@ type WorkspaceDocumentContextValue = {
   takeContinuation: (
     target: WorkspaceArea,
   ) => WorkspaceContinuationPayload | null;
+  continueCurrent: (target: WorkspaceArea) => WorkspaceDocumentRuntime | null;
   fileForCurrentRevision: () => File | null;
   clearDocument: () => void;
 };
@@ -310,6 +314,25 @@ export function WorkspaceDocumentProvider({
     };
   }, [setContinuationTargetSafely]);
 
+  const continueCurrent = useCallback(
+    (target: WorkspaceArea) => {
+      const current = documentRef.current;
+      if (!current) return null;
+      const next = updateWorkspaceRuntimeSession(
+        current,
+        setWorkspaceArea(current.session, target),
+      );
+      const history = historyRef.current;
+      if (history) {
+        syncHistory(replaceCurrentWorkspaceCheckpoint(history, next));
+      }
+      commit(next);
+      setContinuationTargetSafely(target);
+      return next;
+    },
+    [commit, setContinuationTargetSafely, syncHistory],
+  );
+
   const undoWorkspace = useCallback(() => {
     const history = historyRef.current;
     if (!history || !canUndoWorkspaceCheckpoint(history)) return null;
@@ -360,12 +383,14 @@ export function WorkspaceDocumentProvider({
       replaceSession,
       stageContinuation,
       takeContinuation,
+      continueCurrent,
       fileForCurrentRevision,
       clearDocument,
     }),
     [
       clearDocument,
       continuationTarget,
+      continueCurrent,
       document,
       fileForCurrentRevision,
       globalHistory,
