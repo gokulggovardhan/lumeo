@@ -17,6 +17,8 @@ export function ContinueWithPdf({
   session,
   incompatibleTargets = [],
   disabledTargets,
+  includeSourceArea = false,
+  identityNote,
 }: {
   sourceArea: ContinuationArea;
   fileName: string;
@@ -25,13 +27,19 @@ export function ContinueWithPdf({
   session: DocumentSession;
   incompatibleTargets?: readonly ContinuationArea[];
   disabledTargets?: Partial<Record<ContinuationArea, string>>;
+  includeSourceArea?: boolean;
+  identityNote?: string;
 }) {
   const router = useRouter();
   const { stageContinuation } = useWorkspaceDocument();
   const [busyTarget, setBusyTarget] = useState<ContinuationArea | null>(null);
   const [error, setError] = useState("");
 
-  const targets = continuationTargetsFor(sourceArea, incompatibleTargets);
+  const targets = continuationTargetsFor(
+    sourceArea,
+    incompatibleTargets,
+    includeSourceArea,
+  );
 
   function continueTo(
     target: (typeof targets)[number],
@@ -71,6 +79,11 @@ export function ContinueWithPdf({
         <p className="mt-0.5 text-xs leading-5 text-[var(--text-muted)]">
           Keep working without opening the file again.
         </p>
+        {identityNote ? (
+          <p className="mt-1 text-[11px] leading-4 text-[var(--text-subtle)]">
+            {identityNote}
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:mt-0 sm:flex sm:shrink-0">
