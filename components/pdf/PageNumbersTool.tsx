@@ -17,9 +17,11 @@
 // numeric alignment shortcuts (drag + arrow keys + corner presets already
 // cover manual positioning).
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
+import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import {
   L2FileCard,
   L2PanelLabel,
@@ -55,6 +57,12 @@ import { recordRecentFile } from "@/lib/recent-files";
 import { copyArrayBuffer } from "@/lib/pdf/arrayBuffer";
 import { hasPdfMagicBytes, isPdfNamedFile, checkPdfFileSize, checkPdfPageCount } from "@/lib/pdf/uploadValidation";
 import { resetPdfPreviewState } from "@/lib/pdf/resetPreviewState";
+import {
+  createAddWorkspaceSession,
+  createStandaloneAddWorkspaceDocument,
+} from "@/lib/pdf/workspace/addAdapter";
+import type { WorkspaceDocument } from "@/lib/pdf/workspace/model";
+import type { DocumentSession } from "@/lib/pdf/workspace/session";
 
 type LoadedPdf = { file: File; bytes: ArrayBuffer; pageCount: number };
 
@@ -125,6 +133,7 @@ function PageNumbersIcon() {
 
 export default function PageNumbersTool() {
   const { availability, track } = useAnalytics();
+  const { continuationTarget, takeContinuation } = useWorkspaceDocument();
   const openedTrackedRef = useRef(false);
 
   const [pdf, setPdf] = useState<LoadedPdf | null>(null);
@@ -142,6 +151,11 @@ export default function PageNumbersTool() {
   const [downloadUrl, setDownloadUrl] = useState("");
   const [downloadName, setDownloadName] = useState("lumeo-page-numbers.pdf");
   const [outputName, setOutputName] = useState("lumeo-page-numbers.pdf");
+  const [exportedBytes, setExportedBytes] = useState<ArrayBuffer | null>(null);
+  const [workspaceDocument, setWorkspaceDocument] =
+    useState<WorkspaceDocument | null>(null);
+  const [workspaceBaseSession, setWorkspaceBaseSession] =
+    useState<DocumentSession | null>(null);
 
   const pageImageUrlRef = useRef("");
   const downloadUrlRef = useRef("");
@@ -176,6 +190,9 @@ export default function PageNumbersTool() {
     setPageRangeInput("");
     setPageRangeError("");
     setDownloadUrl("");
+    setExportedBytes(null);
+    setWorkspaceDocument(null);
+    setWorkspaceBaseSession(null);
     setOutputName("lumeo-page-numbers.pdf");
   }
 
@@ -186,6 +203,7 @@ export default function PageNumbersTool() {
     URL.revokeObjectURL(downloadUrlRef.current);
     downloadUrlRef.current = "";
     setDownloadUrl("");
+    setExportedBytes(null);
   }, [config]);
 
   useEffect(() => {
@@ -252,7 +270,13 @@ export default function PageNumbersTool() {
     };
   }, [pdf, pageIndex, docReady]);
 
-  async function addFile(files: FileList | File[]) {
+  const addFile = useCallback(async (
+    files: FileList | File[],
+    continuation?: {
+      document: WorkspaceDocument;
+      session: DocumentSession;
+    },
+  ) => {
     setError("");
     const file = Array.from(files)[0];
     if (!file) return;
@@ -284,6 +308,17 @@ export default function PageNumbersTool() {
       }
 
       setPdf({ file, bytes, pageCount });
+      setWorkspaceDocument(
+        continuation?.document ??
+          createStandaloneAddWorkspaceDocument({
+            kind: "page-numbers",
+            fileName: file.name,
+            byteLength: bytes.byteLength,
+            pageCount,
+          }),
+      );
+      setWorkspaceBaseSession(continuation?.session ?? null);
+      setExportedBytes(null);
       setPageIndex(0);
       setConfig(createDefaultPageNumbersConfig());
       setPageRangeInput("");
@@ -298,7 +333,24 @@ export default function PageNumbersTool() {
           : "This file could not be read. It may be damaged or password-protected.";
       setError(message);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (pdf || continuationTarget !== "enhance") return;
+    let cancelled = false;
+    void Promise.resolve().then(() => {
+      if (cancelled) return;
+      const payload = takeContinuation("enhance");
+      if (!payload || cancelled) return;
+      void addFile([payload.file], {
+        document: payload.runtime.session.state.document,
+        session: payload.runtime.session,
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [addFile, continuationTarget, pdf, takeContinuation]);
 
   function applyCorner(corner: PlacementCorner) {
     setConfig((current) => ({ ...current, placement: { mode: "corner", corner } }));
@@ -357,6 +409,7 @@ export default function PageNumbersTool() {
       const url = URL.createObjectURL(blob);
       downloadUrlRef.current = url;
       setDownloadUrl(url);
+      setExportedBytes(buffer);
       setDownloadName(sanitizePdfFileName(outputName));
       track({ eventName: "processing_succeeded", toolSlug: "page-numbers", durationMs: performance.now() - startedAt, success: true });
       recordRecentFile({ tool: "page-numbers", filename: sanitizePdfFileName(outputName), fileSize: blob.size, pageCount: pdf.pageCount });
@@ -367,6 +420,15 @@ export default function PageNumbersTool() {
       setIsExporting(false);
     }
   }, [pdf, config, outputName, track]);
+
+  const workspaceSession = useMemo(() => {
+    if (!workspaceDocument || !exportedBytes) return null;
+    return createAddWorkspaceSession({
+      document: workspaceDocument,
+      baseSession: workspaceBaseSession,
+      kind: "page-numbers",
+    });
+  }, [exportedBytes, workspaceBaseSession, workspaceDocument]);
 
   function downloadPageNumberedPdf() {
     if (!downloadUrl) return;
@@ -744,6 +806,16 @@ export default function PageNumbersTool() {
           </button>
         )}
       </ToolActionBar>
+
+      {downloadUrl && exportedBytes && workspaceSession ? (
+        <ContinueWithPdf
+          sourceArea="enhance"
+          fileName={downloadName}
+          bytes={exportedBytes}
+          pageCount={pdf.pageCount}
+          session={workspaceSession}
+        />
+      ) : null}
 
       <L2PrivacyNote />
     </section>
