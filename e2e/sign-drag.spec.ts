@@ -49,12 +49,35 @@ test("a slower earlier upload cannot replace the latest selected PDF", async ({ 
 
 async function openSignWithPlacedText(page: Page) {
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.goto("/pdf/sign");
-  await page.locator('input[type="file"]').first().setInputFiles(TEXT_ONLY_PDF);
 
-  // "+ Text" places an element without needing a drawn signature first.
-  const addText = page.getByRole("button", { name: "+ Text", exact: true });
-  await expect(addText).toBeVisible({ timeout: 90_000 });
+  // A cold CI browser can occasionally lose the first local fixture handoff
+  // while PDF.js/Worker startup is still settling. Retry the whole open once
+  // instead of waiting 90 seconds on a missing control. The second attempt
+  // still has to prove the real filename, tool control, Workspace projection,
+  // and semantic history below, so this cannot turn a product regression into
+  // a false green.
+  let addText = page.getByRole("button", { name: "+ Text", exact: true });
+  let openError: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await page.goto("/pdf/sign", { waitUntil: "domcontentloaded" });
+    const input = page.locator('input[type="file"]').first();
+    await expect(input).toBeAttached({ timeout: 30_000 });
+    await input.setInputFiles(TEXT_ONLY_PDF);
+    addText = page.getByRole("button", { name: "+ Text", exact: true });
+
+    try {
+      await expect(
+        page.getByText("text-only.pdf", { exact: true }).first(),
+      ).toBeVisible({ timeout: 30_000 });
+      await expect(addText).toBeVisible({ timeout: 30_000 });
+      openError = null;
+      break;
+    } catch (error) {
+      openError = error;
+    }
+  }
+  if (openError) throw openError;
+
   const workspace = page.locator("[data-workspace-lifecycle]");
   await expect(workspace).toHaveAttribute(
     "data-workspace-projection-compatible",
