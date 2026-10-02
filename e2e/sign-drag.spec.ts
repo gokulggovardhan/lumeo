@@ -33,7 +33,10 @@ test("a slower earlier upload cannot replace the latest selected PDF", async ({ 
     };
   });
   await page.goto("/pdf/sign");
-  const input = page.locator('input[type="file"]').first();
+  const input = page
+    .locator('input[type="file"][data-upload-client-ready="true"]')
+    .first();
+  await expect(input).toBeAttached({ timeout: 30_000 });
 
   await input.setInputFiles(TEXT_ONLY_PDF);
   await input.setInputFiles(TWO_PAGE_PDF);
@@ -60,7 +63,9 @@ async function openSignWithPlacedText(page: Page) {
   let openError: unknown = null;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     await page.goto("/pdf/sign", { waitUntil: "domcontentloaded" });
-    const input = page.locator('input[type="file"]').first();
+    const input = page
+      .locator('input[type="file"][data-upload-client-ready="true"]')
+      .first();
     await expect(input).toBeAttached({ timeout: 30_000 });
     await input.setInputFiles(TEXT_ONLY_PDF);
     addText = page.getByRole("button", { name: "+ Text", exact: true });
