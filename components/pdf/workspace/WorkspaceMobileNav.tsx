@@ -11,6 +11,14 @@ import { useWorkspaceDocument } from "./WorkspaceDocumentProvider";
 
 const MOBILE_NAV_MEDIA = "(max-width: 1023px)";
 const MOBILE_NAV_OFFSET = "4.5rem";
+const CANONICAL_NAV_AREAS: readonly WorkspaceArea[] = [
+  "edit",
+  "pages",
+  "sign",
+  "enhance",
+  "optimize",
+  "export",
+];
 
 function routeForArea(area: WorkspaceArea): string {
   return continuationRouteForArea(area as ContinuationArea);
@@ -84,9 +92,14 @@ export function WorkspaceMobileNav() {
   if (!workspaceDocument) return null;
 
   const activeArea = workspaceDocument.session.state.activeArea;
+  const routeArea =
+    CANONICAL_NAV_AREAS.find((area) => pathname === routeForArea(area)) ?? null;
+  // The visible route is authoritative for navigation state. Session activeArea
+  // remains the fallback for connected sub-routes such as Watermark/Page Numbers.
+  const currentArea = routeArea ?? activeArea;
 
   function moveTo(area: WorkspaceArea) {
-    if (activeArea === area && pathname === routeForArea(area)) {
+    if (currentArea === area && pathname === routeForArea(area)) {
       setOpenPath(null);
       return;
     }
@@ -127,7 +140,7 @@ export function WorkspaceMobileNav() {
           className="aura-menu-reveal absolute bottom-[calc(100%+0.5rem)] left-1/2 grid w-[min(calc(100vw-1rem),22rem)] -translate-x-1/2 gap-1 rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-2 shadow-[var(--v2-elevation-4)]"
         >
           {moreItems.map((item) => {
-            const active = activeArea === item.area;
+            const active = currentArea === item.area;
             return (
               <button
                 key={item.area}
@@ -157,7 +170,7 @@ export function WorkspaceMobileNav() {
 
       <div className="mx-auto grid max-w-[30rem] grid-cols-4 gap-1">
         {directItems.map((item) => {
-          const active = activeArea === item.area;
+          const active = currentArea === item.area;
           return (
             <button
               key={item.area}
@@ -181,11 +194,11 @@ export function WorkspaceMobileNav() {
           type="button"
           aria-expanded={moreOpen}
           aria-controls="workspace-mobile-more"
-          aria-current={isMoreArea(activeArea) ? "page" : undefined}
+          aria-current={isMoreArea(currentArea) ? "page" : undefined}
           onClick={() => setOpenPath(moreOpen ? null : pathname)}
           className={
             "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-extrabold transition " +
-            (isMoreArea(activeArea)
+            (isMoreArea(currentArea)
               ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
               : "text-[var(--text-muted)] hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)]")
           }
@@ -195,11 +208,11 @@ export function WorkspaceMobileNav() {
 
         <button
           type="button"
-          aria-current={activeArea === "export" ? "page" : undefined}
+          aria-current={currentArea === "export" ? "page" : undefined}
           onClick={() => moveTo("export")}
           className={
             "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-black transition " +
-            (activeArea === "export"
+            (currentArea === "export"
               ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
               : "bg-[var(--surface-success)] text-[var(--text-success)] hover:bg-[var(--surface-selected)]")
           }
