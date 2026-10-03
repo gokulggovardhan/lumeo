@@ -25,6 +25,9 @@ test("/pdf is a real upload-once Workspace entry, not a redirect", () => {
   assert.match(start, /startDocument/);
   assert.match(start, /continueCurrent/);
   assert.match(start, /multiple=\{false\}/);
+  assert.match(start, /checkPdfFileSize/);
+  assert.match(start, /hasPdfMagicBytes/);
+  assert.match(start, /checkPdfPageCount/);
   assert.match(start, /PDFDocument\.load/);
 });
 
