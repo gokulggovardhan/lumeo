@@ -30,6 +30,18 @@ test.describe("PDF Tools discovery", () => {
       await expect(page.getByRole("heading", { name: "Choose what you want to do." })).toBeVisible();
       await expect(page.getByRole("link", { name: "View all tools" })).toBeVisible();
 
+      if (viewport.width < 640) {
+        const toolsHeadingBox = await page
+          .getByRole("heading", { name: "Choose what you want to do." })
+          .boundingBox();
+        const trustBox = await page
+          .locator('[aria-label="Lumeo trust principles"]')
+          .boundingBox();
+        expect(toolsHeadingBox).not.toBeNull();
+        expect(trustBox).not.toBeNull();
+        expect(toolsHeadingBox!.y).toBeLessThan(trustBox!.y);
+      }
+
       const launcherLinks = page.getByRole("link", { name: /^(Open .*|View all tools)$/ });
       const dimensions = await page.evaluate(() => ({
         viewport: document.documentElement.clientWidth,
@@ -126,6 +138,17 @@ test.describe("PDF Tools discovery", () => {
         page: document.documentElement.scrollWidth,
       }));
       expect(dimensions.page).toBeLessThanOrEqual(dimensions.viewport);
+
+      if (viewport.width <= 430) {
+        const cards = page.locator('a.lumeo-tool-card[aria-label^="Open "]');
+        const first = await cards.nth(0).boundingBox();
+        const second = await cards.nth(1).boundingBox();
+        expect(first).not.toBeNull();
+        expect(second).not.toBeNull();
+        expect(Math.abs(first!.y - second!.y)).toBeLessThanOrEqual(2);
+        expect(first!.width).toBeLessThan(viewport.width * 0.55);
+        expect(second!.width).toBeLessThan(viewport.width * 0.55);
+      }
 
       const targets = page.locator(
         '#pdf-tool-search, [aria-label="Filter PDF tools by category"] button, a[aria-label^="Open "]',

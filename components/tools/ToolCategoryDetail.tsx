@@ -82,24 +82,24 @@ export function ToolCategoryDetail({ tool }: { tool: ResolvedTool }) {
       </div>
 
       {destinations.length > 0 ? (
-        <div className="mt-8 grid gap-3 sm:grid-cols-2">
+        <div className="mt-8 grid grid-cols-2 gap-2.5 max-[360px]:grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {destinations.map(({ headline, modes }) => {
             const registryEntry = pdfTools.find((entry) => entry.route === headline.route);
             return (
               <Link
                 key={headline.slug}
                 href={headline.route as string}
-                className="group flex flex-col gap-2.5 rounded-[14px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-4 transition duration-300 hover:-translate-y-1 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-base)]"
+                className="group flex min-h-[6rem] flex-col gap-1.5 rounded-[13px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-3 transition duration-300 hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-base)] sm:min-h-[7rem] sm:gap-2.5 sm:rounded-[14px] sm:p-4"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <span className="font-serif text-[1.15rem] font-medium text-[var(--text-primary)]">{headline.label}</span>
+                  <span className="font-serif text-[1rem] font-medium leading-tight text-[var(--text-primary)] sm:text-[1.15rem]">{headline.label}</span>
                   <span aria-hidden="true" className="text-[var(--text-premium)] transition group-hover:translate-x-0.5 motion-reduce:transform-none">→</span>
                 </div>
-                <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
+                <p className="line-clamp-2 text-[12px] leading-5 text-[var(--text-secondary)] sm:text-[13px] sm:leading-relaxed">
                   {registryEntry?.description ?? `Open ${headline.label.toLowerCase()} in the ${tool.name} workspace.`}
                 </p>
                 {modes.length > 0 ? (
-                  <p className="mt-auto text-[11.5px] leading-6 text-[var(--text-muted)]">
+                  <p className="mt-auto hidden text-[11.5px] leading-6 text-[var(--text-muted)] sm:block">
                     Also inside: {modes.map((mode) => mode.label).join(" · ")}
                   </p>
                 ) : null}
