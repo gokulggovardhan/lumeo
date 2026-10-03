@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { WorkspaceArea } from "@/lib/pdf/workspace/model";
+import type { WorkspaceArea, WorkspaceDocument } from "@/lib/pdf/workspace/model";
 import {
   appendWorkspaceCheckpoint,
   canRedoWorkspaceCheckpoint,
@@ -22,6 +22,7 @@ import {
   type WorkspaceRevisionHistory,
 } from "@/lib/pdf/workspace/revisionHistory";
 import {
+  createDocumentSession,
   setWorkspaceArea,
   type DocumentSession,
 } from "@/lib/pdf/workspace/session";
@@ -48,6 +49,22 @@ type PublishSharedRevisionInput = Omit<
   "expectedRevision"
 > & {
   expectedRevision?: number;
+};
+
+type AdoptWorkspaceDocumentInput = {
+  area: WorkspaceArea;
+  fileName: string;
+  bytes: ArrayBuffer;
+  pageCount: number;
+  document: WorkspaceDocument;
+};
+
+type SyncWorkspaceRevisionInput = {
+  area: WorkspaceArea;
+  fileName: string;
+  bytes: ArrayBuffer;
+  pageCount: number;
+  session: DocumentSession;
 };
 
 type StageWorkspaceContinuationInput = {
@@ -100,6 +117,12 @@ type WorkspaceDocumentContextValue = {
   startDocument: (
     input: StartWorkspaceDocumentInput,
   ) => WorkspaceDocumentRuntime;
+  adoptDocument: (
+    input: AdoptWorkspaceDocumentInput,
+  ) => WorkspaceDocumentRuntime;
+  syncRevision: (
+    input: SyncWorkspaceRevisionInput,
+  ) => WorkspaceDocumentRuntime;
   publishRevision: (
     input: PublishSharedRevisionInput,
   ) => WorkspaceDocumentRuntime | null;
@@ -115,6 +138,27 @@ type WorkspaceDocumentContextValue = {
   clearDocument: () => void;
 };
 
+function equalArrayBuffers(left: ArrayBuffer, right: ArrayBuffer): boolean {
+  if (left.byteLength !== right.byteLength) return false;
+  const a = new Uint8Array(left);
+  const b = new Uint8Array(right);
+  for (let index = 0; index < a.length; index += 1) {
+    if (a[index] !== b[index]) return false;
+  }
+  return true;
+}
+
+function matchesMaterializedRevision(
+  runtime: WorkspaceDocumentRuntime,
+  input: Pick<StageWorkspaceContinuationInput, "fileName" | "bytes" | "pageCount">,
+): boolean {
+  return (
+    runtime.revision.fileName === input.fileName &&
+    runtime.revision.pageCount === input.pageCount &&
+    equalArrayBuffers(runtime.revision.bytes, input.bytes)
+  );
+}
+
 function assertContinuationTransfer(
   previous: WorkspaceDocumentRuntime | null,
   input: StageWorkspaceContinuationInput,
@@ -123,7 +167,7 @@ function assertContinuationTransfer(
   const continuesCurrentDocument =
     previous?.session.state.document.id === input.session.state.document.id;
   const expectedRevision = continuesCurrentDocument
-    ? previous.revision.number + 1
+    ? previous.revision.number + (matchesMaterializedRevision(previous, input) ? 0 : 1)
     : 0;
 
   if (next.revision.number !== expectedRevision) {
@@ -236,6 +280,111 @@ export function WorkspaceDocumentProvider({
     [commit, setContinuationTargetSafely, syncHistory],
   );
 
+  const adoptDocument = useCallback(
+    (input: AdoptWorkspaceDocumentInput) => {
+      const current = documentRef.current;
+      const continuesCurrentDocument =
+        current?.session.state.document.id === input.document.id;
+
+      if (current && continuesCurrentDocument) {
+        const next = updateWorkspaceRuntimeSession(
+          current,
+          setWorkspaceArea(current.session, input.area),
+        );
+        const history = historyRef.current;
+        if (history) {
+          syncHistory(replaceCurrentWorkspaceCheckpoint(history, next));
+        }
+        setContinuationTargetSafely(null);
+        return commit(next)!;
+      }
+
+      const session = createDocumentSession({
+        id: `session:${input.document.id}`,
+        document: input.document,
+        initialArea: input.area,
+      });
+      const next = createWorkspaceRuntimeFromSession({
+        id: createId("workspace"),
+        fileName: input.fileName,
+        bytes: input.bytes,
+        pageCount: input.pageCount,
+        area: input.area,
+        session,
+      });
+      if (documentHealthDocumentIdRef.current !== input.document.id) {
+        documentHealthDocumentIdRef.current = input.document.id;
+        setDocumentHealth({});
+      }
+      syncHistory(createWorkspaceRevisionHistory(next));
+      setContinuationTargetSafely(null);
+      return commit(next)!;
+    },
+    [commit, setContinuationTargetSafely, syncHistory],
+  );
+
+  const syncRevision = useCallback(
+    (input: SyncWorkspaceRevisionInput) => {
+      const current = documentRef.current;
+      const continuesCurrentDocument =
+        current?.session.state.document.id === input.session.state.document.id;
+      let next: WorkspaceDocumentRuntime;
+
+      if (current && continuesCurrentDocument) {
+        const session = mergeWorkspaceSessions(
+          current.session,
+          input.session,
+          input.area,
+        );
+        if (matchesMaterializedRevision(current, input)) {
+          next = updateWorkspaceRuntimeSession(current, session);
+          const history = historyRef.current;
+          if (history) {
+            syncHistory(replaceCurrentWorkspaceCheckpoint(history, next));
+          }
+        } else {
+          next = publishWorkspaceRevision(current, {
+            expectedRevision: current.revision.number,
+            bytes: input.bytes,
+            fileName: input.fileName,
+            pageCount: input.pageCount,
+            area: input.area,
+            document: input.session.state.document,
+            session,
+          });
+          const history = historyRef.current;
+          syncHistory(
+            history
+              ? appendWorkspaceCheckpoint(history, next)
+              : createWorkspaceRevisionHistory(next),
+          );
+        }
+      } else {
+        next = createWorkspaceRuntimeFromSession({
+          id: createId("workspace"),
+          fileName: input.fileName,
+          bytes: input.bytes,
+          pageCount: input.pageCount,
+          area: input.area,
+          session: input.session,
+        });
+        if (
+          documentHealthDocumentIdRef.current !==
+          input.session.state.document.id
+        ) {
+          documentHealthDocumentIdRef.current =
+            input.session.state.document.id;
+          setDocumentHealth({});
+        }
+        syncHistory(createWorkspaceRevisionHistory(next));
+      }
+
+      setContinuationTargetSafely(null);
+      return commit(next)!;
+    },
+    [commit, setContinuationTargetSafely, syncHistory],
+  );
+
   const publishRevision = useCallback(
     (input: PublishSharedRevisionInput) => {
       const current = documentRef.current;
@@ -282,15 +431,17 @@ export function WorkspaceDocumentProvider({
           input.session,
           input.target,
         );
-        next = publishWorkspaceRevision(current, {
-          expectedRevision: current.revision.number,
-          bytes: input.bytes,
-          fileName: input.fileName,
-          pageCount: input.pageCount,
-          area: input.target,
-          document: input.session.state.document,
-          session,
-        });
+        next = matchesMaterializedRevision(current, input)
+          ? updateWorkspaceRuntimeSession(current, session)
+          : publishWorkspaceRevision(current, {
+              expectedRevision: current.revision.number,
+              bytes: input.bytes,
+              fileName: input.fileName,
+              pageCount: input.pageCount,
+              area: input.target,
+              document: input.session.state.document,
+              session,
+            });
       } else {
         next = createWorkspaceRuntimeFromSession({
           id: createId("workspace"),
@@ -312,21 +463,25 @@ export function WorkspaceDocumentProvider({
         setDocumentHealth({});
       }
       const history = historyRef.current;
-      if (
-        history &&
+      const continuesSameDocument =
         current &&
-        current.session.state.document.id === next.session.state.document.id
-      ) {
-        syncHistory(appendWorkspaceCheckpoint(history, next));
-      } else if (
-        current &&
-        current.session.state.document.id === next.session.state.document.id
-      ) {
+        current.session.state.document.id === next.session.state.document.id;
+      const revisionAdvanced =
+        current && next.revision.number > current.revision.number;
+      if (history && continuesSameDocument) {
         syncHistory(
-          appendWorkspaceCheckpoint(
-            createWorkspaceRevisionHistory(current),
-            next,
-          ),
+          revisionAdvanced
+            ? appendWorkspaceCheckpoint(history, next)
+            : replaceCurrentWorkspaceCheckpoint(history, next),
+        );
+      } else if (continuesSameDocument) {
+        syncHistory(
+          revisionAdvanced
+            ? appendWorkspaceCheckpoint(
+                createWorkspaceRevisionHistory(current),
+                next,
+              )
+            : createWorkspaceRevisionHistory(next),
         );
       } else {
         syncHistory(createWorkspaceRevisionHistory(next));
@@ -422,6 +577,8 @@ export function WorkspaceDocumentProvider({
       undoWorkspace,
       redoWorkspace,
       startDocument,
+      adoptDocument,
+      syncRevision,
       publishRevision,
       replaceSession,
       stageContinuation,
@@ -444,6 +601,8 @@ export function WorkspaceDocumentProvider({
       replaceSession,
       stageContinuation,
       startDocument,
+      adoptDocument,
+      syncRevision,
       takeContinuation,
       undoWorkspace,
     ],

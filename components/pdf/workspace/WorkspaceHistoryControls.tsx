@@ -23,6 +23,7 @@ export function WorkspaceHistoryControls() {
     globalHistory,
     undoWorkspace,
     redoWorkspace,
+    continueCurrent,
   } = useWorkspaceDocument();
 
   if (!globalHistory.connected || !document) return null;
@@ -40,6 +41,19 @@ export function WorkspaceHistoryControls() {
     router.push(routeForArea(restored.session.state.activeArea));
   }
 
+  function moveTo(area: WorkspaceArea) {
+    if (!continueCurrent(area)) return;
+    router.push(routeForArea(area));
+  }
+
+  const desktopTools: readonly { area: WorkspaceArea; label: string }[] = [
+    { area: "edit", label: "Edit" },
+    { area: "pages", label: "Pages" },
+    { area: "sign", label: "Sign" },
+    { area: "enhance", label: "Add" },
+    { area: "optimize", label: "Compress" },
+  ];
+
   return (
     <div className="mx-auto w-full max-w-[1480px] px-4 pt-3 sm:px-6 lg:px-8">
       <div
@@ -54,6 +68,7 @@ export function WorkspaceHistoryControls() {
           type="button"
           variant="secondary"
           size="md"
+          aria-label="Revert workspace revision"
           onClick={() => moveHistory("undo")}
           disabled={!globalHistory.canUndo}
         >
@@ -63,11 +78,31 @@ export function WorkspaceHistoryControls() {
           type="button"
           variant="secondary"
           size="md"
+          aria-label="Restore workspace revision"
           onClick={() => moveHistory("redo")}
           disabled={!globalHistory.canRedo}
         >
           Redo
         </AuraButton>
+
+        <div
+          className="hidden items-center gap-1 border-l border-[var(--border-hairline)] pl-2 lg:flex"
+          aria-label="Workspace tools"
+        >
+          {desktopTools.map((tool) => (
+            <button
+              key={tool.area}
+              type="button"
+              onClick={() => moveTo(tool.area)}
+              aria-current={
+                pathname === routeForArea(tool.area) ? "page" : undefined
+              }
+              className="lumeo-focus-ring inline-flex min-h-10 items-center rounded-[var(--radius-md)] px-2.5 text-xs font-extrabold text-[var(--text-secondary)] transition hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)] aria-[current=page]:bg-[var(--surface-selected)] aria-[current=page]:text-[var(--text-primary)]"
+            >
+              {tool.label}
+            </button>
+          ))}
+        </div>
 
         {pathname !== "/pdf/finish" ? (
           <AuraButton

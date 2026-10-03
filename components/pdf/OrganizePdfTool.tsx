@@ -5,6 +5,7 @@ import { degrees, PDFDocument } from "pdf-lib";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
+import { WorkspaceDocumentBinding } from "@/components/pdf/workspace/WorkspaceDocumentBinding";
 import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import {
   L2PanelLabel,
@@ -636,6 +637,16 @@ export default function OrganizePdfTool() {
       data-workspace-active-area={workspaceSession?.state.activeArea}
       data-workspace-has-unsaved-changes={workspaceSession?.state.hasUnsavedChanges}
     >
+      {organizerState ? (
+        <WorkspaceDocumentBinding
+          area="pages"
+          fileName={document_.name}
+          bytes={document_.bytes}
+          pageCount={document_.pageCount}
+          document={organizerState.document}
+        />
+      ) : null}
+
       <L2WorkspaceHeader title="Organize PDF" description={summaryLine} />
 
       {workspaceSession ? (

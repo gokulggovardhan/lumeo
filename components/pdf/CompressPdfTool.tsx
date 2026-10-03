@@ -32,6 +32,7 @@ import {
 } from "@/lib/compressionTarget";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
+import { WorkspaceDocumentBinding } from "@/components/pdf/workspace/WorkspaceDocumentBinding";
 import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import {
   L2AdvancedDisclosure,
@@ -1368,6 +1369,16 @@ export default function CompressPdfTool() {
 
   return (
     <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+      {workspaceDocument ? (
+        <WorkspaceDocumentBinding
+          area="optimize"
+          fileName={analysis.name}
+          bytes={analysis.bytes}
+          pageCount={analysis.pageCount}
+          document={workspaceDocument}
+        />
+      ) : null}
+
       <L2WorkspaceHeader
         title="Compress PDF"
         description={`${analysis.pageCount} page${analysis.pageCount === 1 ? "" : "s"} · ${formatFileSize(analysis.size)} · ${analysis.pageSizeType}`}
