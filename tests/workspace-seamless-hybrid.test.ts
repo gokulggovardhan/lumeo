@@ -31,6 +31,21 @@ test("validated first uploads bind directly to the shared Workspace", () => {
   }
 });
 
+test("same-document upload binding cannot overwrite an intentional Workspace navigation", () => {
+  const provider = read(
+    "components/pdf/workspace/WorkspaceDocumentProvider.tsx",
+  );
+
+  assert.match(
+    provider,
+    /if \(current && continuesCurrentDocument\) \{[\s\S]*?return current;[\s\S]*?\}/,
+  );
+  assert.doesNotMatch(
+    provider,
+    /if \(current && continuesCurrentDocument\) \{[\s\S]*?setWorkspaceArea\(current\.session, input\.area\)/,
+  );
+});
+
 test("successful tool results auto-materialize before cross-tool navigation", () => {
   const continuation = read(
     "components/pdf/workspace/ContinueWithPdf.tsx",
