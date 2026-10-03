@@ -25,12 +25,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  workspace-release-gate:
+    name: PDF Workspace release gate prerequisite
+    uses: ./.github/workflows/workspace-release-gate.yml
+
   validate:
     name: Validate Lumeo PDF Workspace
+    needs: workspace-release-gate
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
 
     steps:
+      - name: Enforce comprehensive Workspace release gate
+        if: ${{ needs.workspace-release-gate.result != 'success' }}
+        run: |
+          echo "Comprehensive PDF Workspace release gate did not pass." >&2
+          exit 1
+
       - name: Checkout repository
         uses: actions/checkout@v7
 
