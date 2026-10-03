@@ -60,7 +60,7 @@ test("production certification includes a live connected Workspace mutation and 
   assert.match(productionSmoke, /Rotate right/);
   assert.match(productionSmoke, /Organized PDF ready/);
   assert.match(productionSmoke, /\/pdf\/edit/);
-  assert.match(productionSmoke, /\/pdf\/finish/);
+  assert.match(productionSmoke, /heading", \{ name: "Finish", exact: true \}/);
   assert.match(productionSmoke, /Download PDF/);
   assert.match(productionSmoke, /getRotation\(\)\.angle/);
 });
