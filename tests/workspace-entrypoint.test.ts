@@ -37,7 +37,7 @@ test("Workspace is visibly discoverable from the homepage and PDF Tools menu", (
 
   assert.match(home, /href="\/pdf"/);
   assert.match(home, /Start PDF Workspace/);
-  assert.match(home, /Upload once · Use multiple tools · Download once/);
+  assert.match(home, /Upload once · Use multiple tools · Export once/);
 
   assert.match(menu, /href="\/pdf"/);
   assert.match(menu, /Start PDF Workspace/);
