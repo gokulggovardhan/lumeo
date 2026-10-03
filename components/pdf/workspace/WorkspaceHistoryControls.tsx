@@ -68,6 +68,7 @@ export function WorkspaceHistoryControls() {
           type="button"
           variant="secondary"
           size="md"
+          aria-label="Undo workspace change"
           onClick={() => moveHistory("undo")}
           disabled={!globalHistory.canUndo}
         >
@@ -77,6 +78,7 @@ export function WorkspaceHistoryControls() {
           type="button"
           variant="secondary"
           size="md"
+          aria-label="Redo workspace change"
           onClick={() => moveHistory("redo")}
           disabled={!globalHistory.canRedo}
         >
