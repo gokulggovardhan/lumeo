@@ -1,0 +1,183 @@
+name: PDF Workspace Production Certification
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/workspace-production-certification.yml"
+      - "docs/PDF_WORKSPACE_PRODUCTION_CERTIFICATION.md"
+      - "tests/workspace-production-certification.test.ts"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/workspace-production-certification.yml"
+      - "docs/PDF_WORKSPACE_PRODUCTION_CERTIFICATION.md"
+      - "tests/workspace-production-certification.test.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workspace-production-certification-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  certify-production:
+    name: Certify exact lumeo.in Workspace production
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Resolve production revision under certification
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            expected_sha="${{ github.event.pull_request.base.sha }}"
+          else
+            expected_sha="${{ github.sha }}"
+          fi
+          echo "EXPECTED_SHA=$expected_sha" >> "$GITHUB_ENV"
+          echo "Certifying production revision $expected_sha"
+
+      - name: Wait for exact Cloudflare production revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_url="https://lumeo.in"
+          deployed_commit=""
+          deployed_environment=""
+
+          for attempt in {1..36}; do
+            body="$(curl --silent --show-error --fail --max-time 30 "$base_url/api/build-info" || true)"
+            if [ -n "$body" ]; then
+              deployed_commit="$(node -e 'try { const value = JSON.parse(process.argv[1]); process.stdout.write(value.commit ?? ""); } catch {}' "$body")"
+              deployed_environment="$(node -e 'try { const value = JSON.parse(process.argv[1]); process.stdout.write(value.environment ?? ""); } catch {}' "$body")"
+            fi
+
+            if [ "$deployed_commit" = "$EXPECTED_SHA" ] && [ "$deployed_environment" = "production" ]; then
+              echo "PASS production revision $deployed_commit"
+              exit 0
+            fi
+
+            echo "Waiting for Cloudflare revision: expected $EXPECTED_SHA, observed ${deployed_commit:-none} (${deployed_environment:-unknown}) attempt $attempt/36"
+            sleep 10
+          done
+
+          echo "FAIL production did not reach expected revision $EXPECTED_SHA"
+          exit 1
+
+      - name: Verify connected Workspace production routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_url="https://lumeo.in"
+          routes=(
+            "/"
+            "/pdf"
+            "/pdf/edit"
+            "/pdf/organize"
+            "/pdf/sign"
+            "/pdf/add"
+            "/pdf/compress"
+            "/pdf/finish"
+            "/privacy"
+            "/security"
+            "/accessibility"
+            "/robots.txt"
+            "/sitemap.xml"
+          )
+
+          for route in "${routes[@]}"; do
+            status_code="$(
+              curl                 --location                 --silent                 --show-error                 --output /dev/null                 --write-out "%{http_code}"                 --max-time 30                 "$base_url$route"
+            )"
+
+            if [ "$status_code" != "200" ]; then
+              echo "FAIL $route returned HTTP $status_code"
+              exit 1
+            fi
+            echo "PASS $route HTTP 200"
+          done
+
+      - name: Verify production Admin boundary
+        shell: bash
+        run: |
+          set -euo pipefail
+          base_url="https://lumeo.in"
+
+          admin_headers="$(curl --silent --show-error --dump-header - --output /dev/null --max-time 30 "$base_url/admin")"
+          admin_status="$(printf "%s" "$admin_headers" | awk '/^HTTP\// { code=$2 } END { print code }')"
+          admin_location="$(printf "%s" "$admin_headers" | awk -F': ' 'tolower($1) == "location" { value=$2 } END { gsub("\r", "", value); print value }')"
+
+          case "$admin_status" in
+            302|303|307|308) ;;
+            *)
+              echo "FAIL unauthenticated /admin returned HTTP $admin_status"
+              exit 1
+              ;;
+          esac
+
+          case "$admin_location" in
+            *"/admin/login"*) ;;
+            *)
+              echo "FAIL unauthenticated /admin redirect location was '${admin_location:-missing}'"
+              exit 1
+              ;;
+          esac
+
+          login_headers="$(curl --silent --show-error --dump-header - --output /dev/null --max-time 30 "$base_url/admin/login")"
+          login_status="$(printf "%s" "$login_headers" | awk '/^HTTP\// { code=$2 } END { print code }')"
+          login_cache="$(printf "%s" "$login_headers" | awk -F': ' 'tolower($1) == "cache-control" { value=tolower($2) } END { gsub("\r", "", value); print value }')"
+
+          if [ "$login_status" != "200" ]; then
+            echo "FAIL /admin/login returned HTTP $login_status"
+            exit 1
+          fi
+
+          case "$login_cache" in
+            *private*no-store*|*no-store*private*) ;;
+            *)
+              echo "FAIL /admin/login cache-control was '${login_cache:-missing}'"
+              exit 1
+              ;;
+          esac
+
+          echo "PASS production Admin boundary"
+
+      - name: Install deterministic document fidelity tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libreoffice-writer poppler-utils python3-pil
+
+      - name: Install Chromium, WebKit and Firefox
+        run: npx playwright install --with-deps chromium webkit firefox
+
+      - name: Run live production conversion certification
+        run: xvfb-run -a npx playwright test --config=playwright.production-conversion.config.ts
+
+      - name: Upload production traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: workspace-production-certification-report
+          path: |
+            playwright-report
+            test-results
+          if-no-files-found: ignore
+          retention-days: 14
