@@ -7,6 +7,28 @@ test.beforeAll(async () => {
   await writeFixtures();
 });
 
+async function clickWorkspaceNav(
+  page: Page,
+  label: "Edit" | "Pages" | "More" | "Finish",
+) {
+  // next dev injects a localhost-only Dev Tools portal that can sit above
+  // fixed bottom navigation. Production builds do not render this portal.
+  // Neutralize only that framework-owned test overlay so Playwright still
+  // performs a normal pointer click on the real Lumeo navigation control.
+  if (new URL(page.url()).hostname === "localhost") {
+    await page.locator("nextjs-portal").evaluateAll((portals) => {
+      for (const portal of portals) {
+        (portal as HTMLElement).style.pointerEvents = "none";
+      }
+    });
+  }
+
+  await page
+    .locator("[data-workspace-mobile-nav]")
+    .getByRole("button", { name: label, exact: true })
+    .click();
+}
+
 async function openConnectedWorkspace(page: Page) {
   await page.goto("/pdf/organize", { waitUntil: "domcontentloaded" });
   const upload = page
@@ -27,7 +49,7 @@ async function openConnectedWorkspace(page: Page) {
 
   const nav = page.locator("[data-workspace-mobile-nav]");
   await expect(nav).toBeVisible();
-  await nav.getByRole("button", { name: "Edit", exact: true }).click();
+  await clickWorkspaceNav(page, "Edit");
   await expect(page).toHaveURL(/\/pdf\/edit$/);
   await expect(page.locator("[data-workspace-mobile-nav]")).toBeVisible();
 }
@@ -84,16 +106,13 @@ test("upload once can switch tools immediately and Finish exports the latest mat
 
   // The first validated upload is already the shared Workspace document:
   // switching tools does not require Save/Download/Continue first.
-  await nav.getByRole("button", { name: "Edit", exact: true }).click();
+  await clickWorkspaceNav(page, "Edit");
   await expect(page).toHaveURL(/\/pdf\/edit$/);
   await expect(
     page.locator('[data-workspace-projection-compatible="true"]'),
   ).toBeVisible({ timeout: 90_000 });
 
-  await page
-    .locator("[data-workspace-mobile-nav]")
-    .getByRole("button", { name: "Pages", exact: true })
-    .click();
+  await clickWorkspaceNav(page, "Pages");
   await expect(page).toHaveURL(/\/pdf\/organize$/);
   await expect(page.locator("[data-workspace-lifecycle]")).toHaveAttribute(
     "data-workspace-lifecycle",
@@ -109,10 +128,7 @@ test("upload once can switch tools immediately and Finish exports the latest mat
 
   // Do not click a Continue-with-this-PDF action. The successful result is
   // auto-materialized, so persistent Workspace navigation must use it.
-  await page
-    .locator("[data-workspace-mobile-nav]")
-    .getByRole("button", { name: "Finish", exact: true })
-    .click();
+  await clickWorkspaceNav(page, "Finish");
   await expect(page).toHaveURL(/\/pdf\/finish$/);
 
   const downloadPromise = page.waitForEvent("download");
@@ -144,7 +160,7 @@ test("connected PDF Workspace keeps dedicated mobile navigation usable across ta
   }
 
   const nav = page.locator("[data-workspace-mobile-nav]");
-  await nav.getByRole("button", { name: "More", exact: true }).click();
+  await clickWorkspaceNav(page, "More");
 
   const more = page.locator("#workspace-mobile-more");
   await expect(more).toBeVisible();
@@ -157,7 +173,7 @@ test("connected PDF Workspace keeps dedicated mobile navigation usable across ta
   await page.keyboard.press("Escape");
   await expect(more).toBeHidden();
 
-  await nav.getByRole("button", { name: "Pages", exact: true }).click();
+  await clickWorkspaceNav(page, "Pages");
   await expect(page).toHaveURL(/\/pdf\/organize$/);
   await expect(
     page
