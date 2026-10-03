@@ -15,6 +15,12 @@ import {
   type ContinuationArea,
 } from "@/lib/pdf/workspace/continuation";
 import type { WorkspaceArea } from "@/lib/pdf/workspace/model";
+import {
+  checkPdfFileSize,
+  checkPdfPageCount,
+  hasPdfMagicBytes,
+  isPdfNamedFile,
+} from "@/lib/pdf/uploadValidation";
 import { useWorkspaceDocument } from "./WorkspaceDocumentProvider";
 
 type PreparedPdf = {
@@ -78,16 +84,19 @@ export function WorkspaceStart() {
     setLoading(true);
 
     try {
-      const looksLikePdf =
-        file.type === "application/pdf" ||
-        file.name.toLowerCase().endsWith(".pdf");
-      if (!looksLikePdf) {
+      if (!isPdfNamedFile(file)) {
         throw new Error("not-pdf");
+      }
+      const sizeError = checkPdfFileSize(file);
+      if (sizeError) {
+        setPrepared(null);
+        setError(sizeError);
+        return;
       }
 
       const bytes = await file.arrayBuffer();
-      if (bytes.byteLength < 5) {
-        throw new Error("empty-pdf");
+      if (!hasPdfMagicBytes(bytes)) {
+        throw new Error("not-pdf");
       }
 
       const { PDFDocument } = await import("pdf-lib");
@@ -98,6 +107,12 @@ export function WorkspaceStart() {
       const pageCount = pdf.getPageCount();
       if (pageCount < 1) {
         throw new Error("empty-pdf");
+      }
+      const pageError = checkPdfPageCount(pageCount);
+      if (pageError) {
+        setPrepared(null);
+        setError(pageError);
+        return;
       }
 
       setPrepared({
