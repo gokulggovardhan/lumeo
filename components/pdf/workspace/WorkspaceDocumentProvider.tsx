@@ -287,16 +287,11 @@ export function WorkspaceDocumentProvider({
         current?.session.state.document.id === input.document.id;
 
       if (current && continuesCurrentDocument) {
-        const next = updateWorkspaceRuntimeSession(
-          current,
-          setWorkspaceArea(current.session, input.area),
-        );
-        const history = historyRef.current;
-        if (history) {
-          syncHistory(replaceCurrentWorkspaceCheckpoint(history, next));
-        }
-        setContinuationTargetSafely(null);
-        return commit(next)!;
+        // This binding exists to register the first validated upload. Once the
+        // same document is already open, a source-tool re-render must not
+        // overwrite an intentional navigation area (for example Pages -> Finish)
+        // or clear the pending continuation target before the destination reads it.
+        return current;
       }
 
       const session = createDocumentSession({
