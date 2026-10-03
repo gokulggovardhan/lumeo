@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AuraButton } from "@/components/ui/Aura";
 import {
@@ -32,7 +32,7 @@ export function ContinueWithPdf({
   identityNote?: string;
 }) {
   const router = useRouter();
-  const { stageContinuation } = useWorkspaceDocument();
+  const { stageContinuation, syncRevision } = useWorkspaceDocument();
   const [busyTarget, setBusyTarget] = useState<ContinuationArea | null>(null);
   const [error, setError] = useState("");
 
@@ -41,6 +41,22 @@ export function ContinueWithPdf({
     incompatibleTargets,
     includeSourceArea,
   );
+
+  useEffect(() => {
+    try {
+      syncRevision({
+        area: sourceArea,
+        fileName,
+        bytes,
+        pageCount,
+        session,
+      });
+    } catch {
+      // Keep the existing explicit Continue action available as a safe
+      // fallback. A failed background synchronization must never block the
+      // proven standalone download path.
+    }
+  }, [bytes, fileName, pageCount, session, sourceArea, syncRevision]);
 
   function continueTo(
     target: (typeof targets)[number],
