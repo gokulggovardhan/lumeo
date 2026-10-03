@@ -6,6 +6,10 @@ const workflow = readFileSync(
   ".github/workflows/workspace-release-gate.yml",
   "utf8",
 );
+const mainWorkflow = readFileSync(
+  ".github/workflows/lumeo-ci.yml",
+  "utf8",
+);
 
 test("Workspace release gate covers the five final jobs", () => {
   for (const job of [
@@ -48,4 +52,21 @@ test("Workspace release gate includes fidelity, static quality and Worker valida
   assert.match(workflow, /npm run verify:public/);
   assert.match(workflow, /npm run verify:supabase/);
   assert.match(workflow, /trap 'rm -f \.env\.local' EXIT/);
+});
+
+
+test("required main validation cannot bypass the comprehensive Workspace release gate", () => {
+  assert.match(workflow, /workflow_call:/);
+  assert.match(
+    mainWorkflow,
+    /workspace-release-gate:\s*[\s\S]*?uses:\s*\.\/\.github\/workflows\/workspace-release-gate\.yml/,
+  );
+  assert.match(
+    mainWorkflow,
+    /validate:\s*[\s\S]*?name:\s*Validate Lumeo PDF Workspace[\s\S]*?needs:\s*workspace-release-gate[\s\S]*?if:\s*\$\{\{ always\(\) \}\}/,
+  );
+  assert.match(
+    mainWorkflow,
+    /needs\.workspace-release-gate\.result != 'success'[\s\S]*?exit 1/,
+  );
 });

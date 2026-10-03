@@ -11,10 +11,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - ".github/workflows/workspace-production-certification.yml"
-      - "docs/PDF_WORKSPACE_PRODUCTION_CERTIFICATION.md"
-      - "tests/workspace-production-certification.test.ts"
   workflow_dispatch:
 
 permissions:
