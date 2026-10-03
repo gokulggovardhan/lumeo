@@ -18,7 +18,7 @@ import {
   makeFixedLayoutInvoicePdf,
 } from "./fixed-layout-pdf-fixture";
 import { makeProfessionalDocx } from "./professional-docx-fixture";
-import { TEXT_ONLY_PDF, writeFixtures } from "./fixtures";
+import { TEXT_ONLY_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures";
 import { waitForStageReady } from "./helpers";
 
 type FailedRequest = {
@@ -266,6 +266,56 @@ async function waitForL2UploadReady(page: Page) {
 
 test.beforeAll(async () => {
   await writeFixtures();
+});
+
+
+test("production connected Workspace preserves a real Pages change through Edit and Finish", async ({
+  page,
+}) => {
+  const runtime = watchConversionRuntime(page);
+
+  await gotoProductionRoute(page, "/pdf/organize");
+  const upload = await waitForL2UploadReady(page);
+  await upload.setInputFiles(TWO_PAGE_PDF);
+
+  const workspace = page.locator("[data-workspace-lifecycle]");
+  await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready", {
+    timeout: 90_000,
+  });
+
+  await page.getByRole("button", { name: "Rotate right" }).first().click();
+  await expect(page.locator("[data-workspace-operation-count]")).toHaveAttribute(
+    "data-workspace-operation-count",
+    "1",
+  );
+
+  await page.getByRole("button", { name: "Save organized PDF" }).click();
+  await expect(page.getByText("Organized PDF ready")).toBeVisible({
+    timeout: 90_000,
+  });
+
+  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await expect(page).toHaveURL(/\/pdf\/edit$/);
+  await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({
+    timeout: 30_000,
+  });
+
+  const finish = page.getByRole("button", { name: "Finish", exact: true }).first();
+  await expect(finish).toBeVisible({ timeout: 30_000 });
+  await finish.click();
+  await expect(page).toHaveURL(/\/pdf\/finish$/);
+  await expect(page.getByRole("heading", { name: "Finish", exact: true })).toBeVisible();
+
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download PDF", exact: true }).click();
+  const bytes = await downloadBytes(await downloadPromise);
+
+  expect(bytes.subarray(0, 5).toString("ascii")).toBe("%PDF-");
+  const exported = await PDFDocument.load(bytes);
+  expect(exported.getPageCount()).toBe(2);
+  expect(exported.getPage(0).getRotation().angle).toBe(90);
+
+  expectCleanRuntime(runtime);
 });
 
 test("production Edit PDF certifies native colour, formatting, history and export", async ({
