@@ -6,6 +6,10 @@ const workflow = readFileSync(
   ".github/workflows/workspace-production-certification.yml",
   "utf8",
 );
+const productionSmoke = readFileSync(
+  "e2e/production-conversion-smoke.spec.ts",
+  "utf8",
+);
 
 test("production certification pins the exact deployed revision", () => {
   assert.match(workflow, /github\.event\.pull_request\.base\.sha/);
@@ -48,4 +52,15 @@ test("every protected-main push receives exact production certification", () => 
   const pushBlock = workflow.match(/\n  push:\n([\s\S]*?)\n  workflow_dispatch:/)?.[1] ?? "";
   assert.match(pushBlock, /branches:\s*\n\s*- main/);
   assert.doesNotMatch(pushBlock, /paths:/);
+});
+
+
+test("production certification includes a live connected Workspace mutation and final export", () => {
+  assert.match(productionSmoke, /production connected Workspace preserves a real Pages change through Edit and Finish/);
+  assert.match(productionSmoke, /Rotate right/);
+  assert.match(productionSmoke, /Organized PDF ready/);
+  assert.match(productionSmoke, /\/pdf\/edit/);
+  assert.match(productionSmoke, /\/pdf\/finish/);
+  assert.match(productionSmoke, /Download PDF/);
+  assert.match(productionSmoke, /getRotation\(\)\.angle/);
 });
