@@ -137,8 +137,9 @@ export default async function Home() {
 
       <section className="relative z-10 flex-1">
         <div className="mx-auto w-full max-w-[1160px] px-5 pb-12 pt-5 sm:px-8 sm:pt-7 lg:pt-8">
-          <header className={`lumeo-fade-up ${styles.heroGrid}`}>
-            <div className="max-w-[48rem]">
+          <div className={`lumeo-fade-up ${styles.heroGrid}`}>
+            <header className={styles.heroCopy}>
+              <div className="max-w-[48rem]">
               <p className="aura-text-label inline-flex items-center gap-2 text-[var(--text-accent)]">
                 <span
                   aria-hidden="true"
@@ -169,7 +170,7 @@ export default async function Home() {
                   Fast to open · Simple to use
                 </span>
               </div>
-            </div>
+            </header>
 
             <aside className={styles.heroTrust} aria-label="Lumeo trust principles">
               <p className="aura-text-label text-[var(--atelier-sage-300)]">
@@ -187,10 +188,10 @@ export default async function Home() {
                 ))}
               </div>
             </aside>
-          </header>
 
-          <div className="mt-7 sm:mt-8">
-            <PdfToolLauncher allToolsLabel="View all tools" />
+            <div className={styles.heroTools}>
+              <PdfToolLauncher allToolsLabel="View all tools" />
+            </div>
           </div>
 
           <ContinueWorking tiles={tiles} />
