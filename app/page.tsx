@@ -170,6 +170,7 @@ export default async function Home() {
                   Fast to open · Simple to use
                 </span>
               </div>
+              </div>
             </header>
 
             <aside className={styles.heroTrust} aria-label="Lumeo trust principles">
