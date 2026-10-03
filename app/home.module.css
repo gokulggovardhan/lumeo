@@ -1,7 +1,20 @@
 .heroGrid {
   display: grid;
-  gap: 1rem;
+  grid-template-areas:
+    "hero"
+    "tools"
+    "trust";
+  gap: 1.15rem;
   align-items: stretch;
+}
+
+.heroCopy {
+  grid-area: hero;
+}
+
+.heroTools {
+  grid-area: tools;
+  min-width: 0;
 }
 
 .heroTitle {
@@ -11,6 +24,7 @@
 }
 
 .heroTrust {
+  grid-area: trust;
   align-self: end;
   border: 1px solid var(--border-hairline);
   border-radius: 16px;
@@ -22,13 +36,17 @@
 @media (min-width: 900px) {
   .heroGrid {
     grid-template-columns: minmax(0, 1.45fr) minmax(17rem, 0.55fr);
-    gap: 1.5rem;
+    grid-template-areas:
+      "hero trust"
+      "tools tools";
+    column-gap: 1.5rem;
+    row-gap: 1.75rem;
   }
 }
 
 @media (max-width: 639px) {
   .heroGrid {
-    gap: 0.85rem;
+    gap: 1rem;
   }
 
   .heroTitle {

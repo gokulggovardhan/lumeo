@@ -46,38 +46,38 @@ function ToolCard({ tool }: { tool: Tile }) {
       <div className="flex items-start justify-between gap-3">
         <span
           aria-hidden="true"
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)] shadow-[inset_0_1px_0_rgba(var(--paper-rgb),0.05)] transition duration-200 group-hover:-translate-y-0.5 motion-reduce:transform-none"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--atelier-sage-300)] shadow-[inset_0_1px_0_rgba(var(--paper-rgb),0.05)] transition duration-200 group-hover:-translate-y-0.5 motion-reduce:transform-none sm:h-10 sm:w-10 sm:rounded-[11px]"
         >
-          <ToolGlyph name={tool.glyph} className="h-[19px] w-[19px]" />
+          <ToolGlyph name={tool.glyph} className="h-[17px] w-[17px] sm:h-[19px] sm:w-[19px]" />
         </span>
-        <span className="rounded-full border border-[var(--border-hairline)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)]">
+        <span className="hidden rounded-full border border-[var(--border-hairline)] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.08em] text-[var(--text-muted)] sm:inline-flex">
           {tool.categoryLabel}
         </span>
       </div>
 
       <div className="min-w-0">
-        <h3 className="font-serif text-[1.02rem] font-semibold leading-tight text-[var(--text-primary)]">
+        <h3 className="font-serif text-[0.94rem] font-semibold leading-tight text-[var(--text-primary)] sm:text-[1.02rem]">
           {tool.label}
         </h3>
-        <p className="mt-1.5 line-clamp-2 text-[12.5px] leading-[1.15rem] text-[var(--text-secondary)]">
+        <p className="mt-1.5 hidden line-clamp-2 text-[12.5px] leading-[1.15rem] text-[var(--text-secondary)] sm:block">
           {tool.description}
         </p>
       </div>
 
-      <div className="mt-auto flex min-h-9 items-center justify-between gap-3 pt-2">
+      <div className="mt-auto flex min-h-8 items-center justify-between gap-2 pt-1.5 sm:min-h-9 sm:gap-3 sm:pt-2">
         <span
           className={
             tool.availability === "beta"
-              ? "text-[11px] font-bold text-[var(--text-premium)]"
+              ? "text-[10px] font-bold text-[var(--text-premium)] sm:text-[11px]"
               : available
-                ? "text-[11px] font-semibold text-[var(--text-muted)]"
-                : "text-[11px] font-bold text-[var(--atelier-warning)]"
+                ? "text-[10px] font-semibold text-[var(--text-muted)] sm:text-[11px]"
+                : "text-[10px] font-bold text-[var(--atelier-warning)] sm:text-[11px]"
           }
         >
           {available ? (tool.availability === "beta" ? "Beta" : PROCESSING_LABEL[tool.processing]) : status}
         </span>
         {available ? (
-          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-bold text-[var(--atelier-sage-300)]">
+          <span className="inline-flex shrink-0 items-center gap-1 text-[11px] font-bold text-[var(--atelier-sage-300)] sm:text-xs">
             Open
             <span
               aria-hidden="true"
@@ -92,7 +92,7 @@ function ToolCard({ tool }: { tool: Tile }) {
   );
 
   const shell =
-    "lumeo-tool-card group flex min-h-[10.75rem] flex-col gap-3 rounded-[15px] border p-4 shadow-[var(--shadow-sm)] " +
+    "lumeo-tool-card group flex min-h-[8rem] flex-col gap-2 rounded-[14px] border p-3 shadow-[var(--shadow-sm)] sm:min-h-[10rem] sm:gap-3 sm:rounded-[15px] sm:p-4 " +
     (available
       ? "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
       : "border-[var(--border-subtle)] bg-[var(--surface-raised)] opacity-80");
@@ -118,7 +118,7 @@ function ToolCard({ tool }: { tool: Tile }) {
 
 function ToolGrid({ tools }: { tools: Tile[] }) {
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
       {tools.map((tool) => (
         <ToolCard key={tool.route} tool={tool} />
       ))}
