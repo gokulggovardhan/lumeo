@@ -154,20 +154,26 @@ export default async function Home() {
                 Your PDFs stay yours.
               </h1>
 
-              <p className="mt-3 max-w-[43rem] text-[15px] leading-6 text-[var(--text-secondary)] sm:text-base">
-                Merge, edit, sign, compress, and convert documents directly in
-                your browser, with file handling explained before you begin.
+              <p className="mt-2.5 max-w-[43rem] text-[14px] leading-6 text-[var(--text-secondary)] sm:mt-3 sm:text-base">
+                Use one focused tool for a quick task, or upload once into PDF
+                Workspace and keep the same document open across compatible tools.
               </p>
 
-              <div className="mt-4 flex flex-wrap items-center gap-3">
+              <div className="mt-3.5 grid grid-cols-2 gap-2.5 sm:mt-4 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+                <Link
+                  href="/pdf"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--action-primary)] px-3 text-center text-[13px] font-bold leading-tight text-[var(--text-on-accent)] shadow-[0_10px_24px_rgba(var(--atelier-sage-rgb),0.14)] transition hover:-translate-y-0.5 hover:bg-[var(--action-primary-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none sm:px-5 sm:text-sm"
+                >
+                  Start PDF Workspace
+                </Link>
                 <Link
                   href="/pdf-tools"
-                  className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--action-primary)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[0_10px_24px_rgba(var(--atelier-sage-rgb),0.14)] transition hover:-translate-y-0.5 hover:bg-[var(--action-primary-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 text-center text-[13px] font-bold leading-tight text-[var(--text-secondary)] transition hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] sm:px-4 sm:text-sm"
                 >
                   Explore PDF tools
                 </Link>
-                <span className="text-xs font-semibold text-[var(--text-muted)]">
-                  Fast to open · Simple to use
+                <span className="col-span-2 text-xs font-semibold leading-5 text-[var(--text-muted)] sm:w-auto">
+                  Quick tool when you need one · Upload once when you need more
                 </span>
               </div>
               </div>
