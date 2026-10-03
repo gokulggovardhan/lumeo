@@ -49,3 +49,17 @@ test("mobile Workspace navigation preserves connected-document routing and acces
   assert.match(nav, /event\.key !== "Escape"/);
   assert.match(nav, /moreButtonRef\.current\?\.focus\(\)/);
 });
+
+
+test("mobile Workspace uses the visible canonical route as the current-state authority", () => {
+  const nav = read("components/pdf/workspace/WorkspaceMobileNav.tsx");
+
+  assert.match(nav, /CANONICAL_NAV_AREAS/);
+  assert.match(
+    nav,
+    /CANONICAL_NAV_AREAS\.find\(\(area\) => pathname === routeForArea\(area\)\)/,
+  );
+  assert.match(nav, /const currentArea = routeArea \?\? activeArea/);
+  assert.match(nav, /aria-current=\{currentArea === "export" \? "page" : undefined\}/);
+  assert.match(nav, /isMoreArea\(currentArea\)/);
+});
