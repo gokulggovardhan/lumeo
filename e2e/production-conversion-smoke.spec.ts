@@ -162,7 +162,7 @@ function isExpectedWorkspaceRscNavigationAbort(failure: FailedRequest): boolean 
   const url = new URL(failure.url);
   return (
     url.origin === "https://lumeo.in" &&
-    (url.pathname === "/pdf/edit" || url.pathname === "/pdf/finish") &&
+    ["/pdf/organize", "/pdf/edit", "/pdf/finish"].includes(url.pathname) &&
     url.searchParams.has("_rsc")
   );
 }
