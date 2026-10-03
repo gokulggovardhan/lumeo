@@ -42,19 +42,19 @@ export function AddWorkspaceEntry() {
       ) : null}
 
       <div
-        className="grid gap-2.5 sm:grid-cols-3"
+        className="grid grid-cols-2 gap-2.5 max-[340px]:grid-cols-1 sm:grid-cols-3"
         aria-label="Add to PDF"
       >
         {ADD_ACTIONS.map((action) => (
           <Link
             key={action.href}
             href={action.href}
-            className="lumeo-focus-ring group flex min-h-[5.5rem] flex-col justify-center rounded-[var(--radius-xl)] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-4 py-3 transition hover:-translate-y-0.5 hover:border-[var(--border-selected)] hover:bg-[var(--surface-elevated)] motion-reduce:transform-none"
+            className="lumeo-focus-ring group flex min-h-[4.75rem] flex-col justify-center rounded-[var(--radius-xl)] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-3 py-2.5 transition hover:-translate-y-0.5 hover:border-[var(--border-selected)] hover:bg-[var(--surface-elevated)] motion-reduce:transform-none sm:min-h-[5.5rem] sm:px-4 sm:py-3"
           >
             <span className="text-sm font-extrabold text-[var(--text-primary)]">
               {action.label}
             </span>
-            <span className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+            <span className="mt-1 line-clamp-2 text-[11px] leading-4 text-[var(--text-muted)] sm:text-xs sm:leading-5">
               {action.description}
             </span>
           </Link>
