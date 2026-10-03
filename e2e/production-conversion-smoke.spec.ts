@@ -149,6 +149,23 @@ function isExpectedPublicRpcNavigationAbort(failure: FailedRequest): boolean {
   );
 }
 
+
+function isExpectedWorkspaceRscNavigationAbort(failure: FailedRequest): boolean {
+  if (
+    failure.method !== "GET" ||
+    failure.errorText !== "net::ERR_ABORTED"
+  ) {
+    return false;
+  }
+
+  const url = new URL(failure.url);
+  return (
+    url.origin === "https://lumeo.in" &&
+    (url.pathname === "/pdf/edit" || url.pathname === "/pdf/finish") &&
+    url.searchParams.has("_rsc")
+  );
+}
+
 function expectCleanRuntime(watch: RuntimeWatch) {
   expect(watch.pageErrors).toEqual([]);
   const unrecoveredFailures = watch.failedRequests.filter(
@@ -156,7 +173,9 @@ function expectCleanRuntime(watch: RuntimeWatch) {
       !isRecoveredPdfWorkerBootstrapFailure(
         failure,
         watch.successfulResponseUrls,
-      ) && !isExpectedPublicRpcNavigationAbort(failure),
+      ) &&
+      !isExpectedPublicRpcNavigationAbort(failure) &&
+      !isExpectedWorkspaceRscNavigationAbort(failure),
   );
   expect(
     unrecoveredFailures.map(
