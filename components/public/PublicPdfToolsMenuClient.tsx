@@ -104,6 +104,22 @@ export function PublicPdfToolsMenuClient({
               </button>
             </div>
 
+            <Link
+              href="/pdf"
+              prefetch={false}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="mb-2 flex min-h-12 items-center justify-between rounded-[var(--radius-lg)] border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3.5 text-sm font-black text-[var(--text-primary)] transition hover:-translate-y-0.5 hover:bg-[var(--surface-elevated)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)] motion-reduce:transform-none"
+            >
+              <span>
+                <span className="block">Start PDF Workspace</span>
+                <span className="mt-0.5 block text-[10.5px] font-semibold text-[var(--text-muted)]">
+                  Upload once · use multiple tools · download once
+                </span>
+              </span>
+              <span aria-hidden="true" className="text-[var(--text-premium)]">→</span>
+            </Link>
+
             <div className="mt-1 grid gap-1">
               {tiles.map((tile) => (
                 <Link
