@@ -38,6 +38,7 @@ export function WorkspaceFinish() {
     fileForCurrentRevision,
     replaceSession,
     continueCurrent,
+    clearDocument,
   } = useWorkspaceDocument();
   const [name, setName] = useState(() =>
     outputName(document?.revision.fileName ?? "lumeo-finished.pdf"),
@@ -69,10 +70,19 @@ export function WorkspaceFinish() {
           type="button"
           variant="secondary"
           size="md"
-          onClick={() => router.push("/pdf-tools")}
+          onClick={() => router.push("/pdf")}
           className="mt-5"
         >
-          Browse PDF tools
+          Start PDF Workspace
+        </AuraButton>
+        <AuraButton
+          type="button"
+          variant="secondary"
+          size="md"
+          onClick={() => router.push("/pdf-tools")}
+          className="mt-2"
+        >
+          Browse standalone tools
         </AuraButton>
       </section>
     );
@@ -85,6 +95,11 @@ export function WorkspaceFinish() {
   function moveToCompress() {
     if (!continueCurrent("optimize")) return;
     router.push("/pdf/compress");
+  }
+
+  function startAnotherPdf() {
+    clearDocument();
+    router.push("/pdf");
   }
 
   function downloadPdf() {
@@ -128,7 +143,10 @@ export function WorkspaceFinish() {
             <h2 className="mt-2 font-serif text-2xl font-semibold text-[var(--text-primary)]">
               Review your PDF
             </h2>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+            <p className="mt-2 max-w-xl truncate text-sm font-bold text-[var(--text-primary)]">
+              {currentDocument.revision.fileName}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
               {pageLabel} · {formatBytes(currentDocument.revision.byteLength)}
             </p>
           </div>
@@ -208,9 +226,18 @@ export function WorkspaceFinish() {
           Download PDF
         </AuraButton>
         {downloaded ? (
-          <p className="mt-2 text-center text-xs font-semibold text-[var(--atelier-sage-300)]">
-            Download prepared. Your workspace stays open.
-          </p>
+          <div className="mt-2 flex flex-col items-center gap-2 sm:flex-row sm:justify-center">
+            <p className="text-center text-xs font-semibold text-[var(--atelier-sage-300)]">
+              Download prepared. Your workspace stays open.
+            </p>
+            <button
+              type="button"
+              onClick={startAnotherPdf}
+              className="lumeo-focus-ring min-h-9 rounded-[var(--radius-md)] px-3 text-xs font-bold text-[var(--text-secondary)] transition hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)]"
+            >
+              Start another PDF
+            </button>
+          </div>
         ) : null}
         {error ? (
           <p role="alert" className="mt-2 text-center text-xs font-semibold text-[var(--text-danger)]">
