@@ -161,13 +161,19 @@ export default async function Home() {
 
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Link
-                  href="/pdf-tools"
+                  href="/pdf"
                   className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--action-primary)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[0_10px_24px_rgba(var(--atelier-sage-rgb),0.14)] transition hover:-translate-y-0.5 hover:bg-[var(--action-primary-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
+                >
+                  Start PDF Workspace
+                </Link>
+                <Link
+                  href="/pdf-tools"
+                  className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-4 text-sm font-bold text-[var(--text-secondary)] transition hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]"
                 >
                   Explore PDF tools
                 </Link>
-                <span className="text-xs font-semibold text-[var(--text-muted)]">
-                  Fast to open · Simple to use
+                <span className="w-full text-xs font-semibold text-[var(--text-muted)] sm:w-auto">
+                  Upload once · Use multiple tools · Export once
                 </span>
               </div>
               </div>

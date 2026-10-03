@@ -21,6 +21,7 @@ test("production certification pins the exact deployed revision", () => {
 
 test("production certification covers connected Workspace routes and Admin boundary", () => {
   for (const route of [
+    "/pdf",
     "/pdf/edit",
     "/pdf/organize",
     "/pdf/sign",
@@ -57,6 +58,9 @@ test("every protected-main push receives exact production certification", () => 
 
 test("production certification includes a live connected Workspace mutation and final export", () => {
   assert.match(productionSmoke, /production connected Workspace preserves a real Pages change through Edit and Finish/);
+  assert.match(productionSmoke, /gotoProductionRoute\(page, "\/pdf"\)/);
+  assert.match(productionSmoke, /heading", \{ name: "PDF Workspace", exact: true \}/);
+  assert.match(productionSmoke, /getByRole\("button", \{ name: \/\^Pages\//);
   assert.match(productionSmoke, /Rotate right/);
   assert.match(productionSmoke, /Organized PDF ready/);
   assert.match(productionSmoke, /clickPersistentWorkspaceNav\(page, "Edit"\)/);

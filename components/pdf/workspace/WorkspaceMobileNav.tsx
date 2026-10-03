@@ -85,6 +85,10 @@ export function WorkspaceMobileNav() {
 
   const activeArea = workspaceDocument.session.state.activeArea;
 
+  function routeIsActive(area: WorkspaceArea) {
+    return pathname === routeForArea(area);
+  }
+
   function moveTo(area: WorkspaceArea) {
     if (activeArea === area && pathname === routeForArea(area)) {
       setOpenPath(null);
@@ -127,7 +131,7 @@ export function WorkspaceMobileNav() {
           className="aura-menu-reveal absolute bottom-[calc(100%+0.5rem)] left-1/2 grid w-[min(calc(100vw-1rem),22rem)] -translate-x-1/2 gap-1 rounded-[var(--radius-xl)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-2 shadow-[var(--v2-elevation-4)]"
         >
           {moreItems.map((item) => {
-            const active = activeArea === item.area;
+            const active = routeIsActive(item.area) || activeArea === item.area;
             return (
               <button
                 key={item.area}
@@ -157,7 +161,7 @@ export function WorkspaceMobileNav() {
 
       <div className="mx-auto grid max-w-[30rem] grid-cols-4 gap-1">
         {directItems.map((item) => {
-          const active = activeArea === item.area;
+          const active = routeIsActive(item.area) || activeArea === item.area;
           return (
             <button
               key={item.area}
@@ -181,11 +185,17 @@ export function WorkspaceMobileNav() {
           type="button"
           aria-expanded={moreOpen}
           aria-controls="workspace-mobile-more"
-          aria-current={isMoreArea(activeArea) ? "page" : undefined}
+          aria-current={
+            moreItems.some((item) => routeIsActive(item.area)) ||
+            isMoreArea(activeArea)
+              ? "page"
+              : undefined
+          }
           onClick={() => setOpenPath(moreOpen ? null : pathname)}
           className={
             "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-extrabold transition " +
-            (isMoreArea(activeArea)
+            (moreItems.some((item) => routeIsActive(item.area)) ||
+            isMoreArea(activeArea)
               ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
               : "text-[var(--text-muted)] hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)]")
           }
@@ -195,11 +205,15 @@ export function WorkspaceMobileNav() {
 
         <button
           type="button"
-          aria-current={activeArea === "export" ? "page" : undefined}
+          aria-current={
+            routeIsActive("export") || activeArea === "export"
+              ? "page"
+              : undefined
+          }
           onClick={() => moveTo("export")}
           className={
             "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-black transition " +
-            (activeArea === "export"
+            (routeIsActive("export") || activeArea === "export"
               ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
               : "bg-[var(--surface-success)] text-[var(--text-success)] hover:bg-[var(--surface-selected)]")
           }
