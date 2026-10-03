@@ -173,7 +173,7 @@ export default async function Home() {
                   Explore PDF tools
                 </Link>
                 <span className="w-full text-xs font-semibold text-[var(--text-muted)] sm:w-auto">
-                  Upload once · Use multiple tools · Download once
+                  Upload once · Use multiple tools · Export once
                 </span>
               </div>
               </div>
