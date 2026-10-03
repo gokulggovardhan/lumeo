@@ -42,3 +42,10 @@ test("production certification runs the maintained multi-browser live conversion
   assert.match(workflow, /chromium webkit firefox/);
   assert.match(workflow, /workspace-production-certification-report/);
 });
+
+
+test("every protected-main push receives exact production certification", () => {
+  const pushBlock = workflow.match(/\n  push:\n([\s\S]*?)\n  workflow_dispatch:/)?.[1] ?? "";
+  assert.match(pushBlock, /branches:\s*\n\s*- main/);
+  assert.doesNotMatch(pushBlock, /paths:/);
+});
