@@ -149,37 +149,6 @@ function isExpectedPublicRpcNavigationAbort(failure: FailedRequest): boolean {
   );
 }
 
-function isExpectedPublicBootstrapAccessControlError(message: string): boolean {
-  // WebKit can promote CORS cancellations from Cloudflare browser telemetry
-  // and Lumeo's best-effort public bootstrap RPCs to pageerror while an
-  // intentional client-side navigation is replacing the document. Scope this
-  // exception to those exact non-document endpoints; application errors still
-  // fail the certification.
-  const normalized = message.replace(/^https?:\/\//, "/");
-  return (
-    /\/lumeo\.in\/cdn-cgi\/rum\? .*due to access control checks\.?$/i.test(
-      normalized,
-    ) ||
-    /\/[A-Za-z0-9-]+\.supabase\.co\/rest\/v1\/rpc\/(?:get_public_analytics_setting|get_public_announcements|record_public_analytics_event).*due to access control checks\.?$/i.test(
-      normalized,
-    )
-  );
-}
-
-function isExpectedNavigationAssetAbort(failure: FailedRequest): boolean {
-  if (failure.method !== "GET") return false;
-  if (!/(?:NS_BINDING_ABORTED|net::ERR_ABORTED|Load request cancelled)/i.test(failure.errorText)) {
-    return false;
-  }
-
-  const url = new URL(failure.url);
-  return (
-    url.origin === "https://lumeo.in" &&
-    ["/android-chrome-512x512.png", "/android-chrome-192x192.png", "/favicon.ico"].includes(
-      url.pathname,
-    )
-  );
-}
 
 
 function isExpectedWorkspaceRscNavigationAbort(failure: FailedRequest): boolean {
@@ -199,10 +168,7 @@ function isExpectedWorkspaceRscNavigationAbort(failure: FailedRequest): boolean 
 }
 
 function expectCleanRuntime(watch: RuntimeWatch) {
-  const unexpectedPageErrors = watch.pageErrors.filter(
-    (message) => !isExpectedPublicBootstrapAccessControlError(message),
-  );
-  expect(unexpectedPageErrors).toEqual([]);
+  expect(watch.pageErrors).toEqual([]);
   const unrecoveredFailures = watch.failedRequests.filter(
     (failure) =>
       !isRecoveredPdfWorkerBootstrapFailure(
@@ -210,8 +176,7 @@ function expectCleanRuntime(watch: RuntimeWatch) {
         watch.successfulResponseUrls,
       ) &&
       !isExpectedPublicRpcNavigationAbort(failure) &&
-      !isExpectedWorkspaceRscNavigationAbort(failure) &&
-      !isExpectedNavigationAssetAbort(failure),
+      !isExpectedWorkspaceRscNavigationAbort(failure),
   );
   expect(
     unrecoveredFailures.map(
@@ -355,10 +320,14 @@ test("production connected Workspace preserves a real Pages change through Edit 
 }) => {
   const runtime = watchConversionRuntime(page);
 
-  await gotoProductionRoute(page, "/pdf");
-  const workspaceEntryAvailable = new URL(page.url()).pathname === "/pdf";
+  const workspaceProbe = await page.request.get("/pdf", {
+    maxRedirects: 0,
+    failOnStatusCode: false,
+  });
+  const workspaceEntryAvailable = workspaceProbe.status() === 200;
 
   if (workspaceEntryAvailable) {
+    await gotoProductionRoute(page, "/pdf");
     await expect(
       page.getByRole("heading", { name: "PDF Workspace", exact: true }),
     ).toBeVisible({ timeout: 30_000 });
