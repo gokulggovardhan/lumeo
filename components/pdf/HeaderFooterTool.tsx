@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { ContinueWithPdf } from "@/components/pdf/workspace/ContinueWithPdf";
+import { WorkspaceDocumentBinding } from "@/components/pdf/workspace/WorkspaceDocumentBinding";
 import { useWorkspaceDocument } from "@/components/pdf/workspace/WorkspaceDocumentProvider";
 import {
   L2FileCard,
@@ -494,6 +495,16 @@ export default function HeaderFooterTool() {
 
   return (
     <section className="l2-workspace-deep grid gap-4 pb-28 lg:pb-6">
+      {workspaceDocument ? (
+        <WorkspaceDocumentBinding
+          area="enhance"
+          fileName={pdf.file.name}
+          bytes={pdf.bytes}
+          pageCount={pdf.pageCount}
+          document={workspaceDocument}
+        />
+      ) : null}
+
       <L2WorkspaceHeader
         title="Header & Footer"
         description={`${pdf.pageCount} page${pdf.pageCount === 1 ? "" : "s"} · ${formatFileSize(pdf.file.size)}`}
