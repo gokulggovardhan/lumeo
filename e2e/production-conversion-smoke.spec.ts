@@ -283,6 +283,32 @@ async function waitForL2UploadReady(page: Page) {
   return input;
 }
 
+async function clickPersistentWorkspaceNav(
+  page: Page,
+  label: "Edit" | "Pages" | "Sign" | "Add" | "Compress" | "Finish",
+) {
+  const mobileNav = page.locator("[data-workspace-mobile-nav]:visible");
+  if ((await mobileNav.count()) > 0) {
+    await mobileNav
+      .getByRole("button", { name: label, exact: true })
+      .click();
+    return;
+  }
+
+  if (label === "Finish") {
+    await page
+      .getByLabel("Workspace history")
+      .getByRole("button", { name: "Finish", exact: true })
+      .click();
+    return;
+  }
+
+  await page
+    .getByLabel("Workspace tools")
+    .getByRole("button", { name: label, exact: true })
+    .click();
+}
+
 test.beforeAll(async () => {
   await writeFixtures();
 });
@@ -313,15 +339,13 @@ test("production connected Workspace preserves a real Pages change through Edit 
     timeout: 90_000,
   });
 
-  await page.getByRole("button", { name: "Edit", exact: true }).click();
+  await clickPersistentWorkspaceNav(page, "Edit");
   await expect(page).toHaveURL(/\/pdf\/edit$/);
   await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({
     timeout: 30_000,
   });
 
-  const finish = page.getByRole("button", { name: "Finish", exact: true }).first();
-  await expect(finish).toBeVisible({ timeout: 30_000 });
-  await finish.click();
+  await clickPersistentWorkspaceNav(page, "Finish");
   await expect(page).toHaveURL(/\/pdf\/finish$/);
   await expect(page.getByRole("heading", { name: "Finish", exact: true })).toBeVisible();
 

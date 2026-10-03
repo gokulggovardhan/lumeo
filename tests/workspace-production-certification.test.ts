@@ -59,6 +59,8 @@ test("production certification includes a live connected Workspace mutation and 
   assert.match(productionSmoke, /production connected Workspace preserves a real Pages change through Edit and Finish/);
   assert.match(productionSmoke, /Rotate right/);
   assert.match(productionSmoke, /Organized PDF ready/);
+  assert.match(productionSmoke, /clickPersistentWorkspaceNav\(page, "Edit"\)/);
+  assert.match(productionSmoke, /clickPersistentWorkspaceNav\(page, "Finish"\)/);
   assert.match(productionSmoke, /\/pdf\/edit/);
   assert.match(productionSmoke, /heading", \{ name: "Finish", exact: true \}/);
   assert.match(productionSmoke, /Download PDF/);
