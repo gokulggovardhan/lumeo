@@ -319,9 +319,18 @@ test("production connected Workspace preserves a real Pages change through Edit 
 }) => {
   const runtime = watchConversionRuntime(page);
 
-  await gotoProductionRoute(page, "/pdf/organize");
+  await gotoProductionRoute(page, "/pdf");
+  await expect(
+    page.getByRole("heading", { name: "PDF Workspace", exact: true }),
+  ).toBeVisible({ timeout: 30_000 });
+
   const upload = await waitForL2UploadReady(page);
   await upload.setInputFiles(TWO_PAGE_PDF);
+  await expect(
+    page.getByRole("heading", { name: "Choose your next step.", exact: true }),
+  ).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: /^Pages/ }).click();
+  await expect(page).toHaveURL(/\/pdf\/organize$/);
 
   const workspace = page.locator("[data-workspace-lifecycle]");
   await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready", {
