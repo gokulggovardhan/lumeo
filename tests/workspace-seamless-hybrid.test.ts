@@ -81,3 +81,16 @@ test("hybrid synchronization remains browser-memory only", () => {
     assert.doesNotMatch(sources, new RegExp(forbidden, "i"));
   }
 });
+
+
+test("outgoing tool bindings cannot overwrite a pending Workspace navigation target", () => {
+  const provider = read(
+    "components/pdf/workspace/WorkspaceDocumentProvider.tsx",
+  );
+
+  assert.match(provider, /const pendingTarget = continuationTargetRef\.current/);
+  assert.match(provider, /pendingTarget !== null && pendingTarget !== input\.area/);
+  assert.match(provider, /if \(outgoingBindingIsStale\) \{\s*return current;/);
+  assert.match(provider, /const effectiveArea =\s*preservePendingTarget && pendingTarget \? pendingTarget : input\.area/);
+  assert.match(provider, /if \(!preservePendingTarget\) \{\s*setContinuationTargetSafely\(null\);/);
+});
