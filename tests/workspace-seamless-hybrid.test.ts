@@ -6,6 +6,28 @@ function read(path: string): string {
   return readFileSync(path, "utf8");
 }
 
+test("hybrid entry exposes upload-once Workspace without removing quick tools", () => {
+  const workspaceRoute = read("app/pdf/page.tsx");
+  const workspaceStart = read(
+    "components/pdf/workspace/WorkspaceStart.tsx",
+  );
+  const home = read("app/page.tsx");
+  const menu = read("components/public/PublicPdfToolsMenuClient.tsx");
+
+  assert.match(workspaceRoute, /WorkspaceStart/);
+  assert.doesNotMatch(workspaceRoute, /redirect\(/);
+  assert.match(workspaceRoute, /canonical: "\/pdf"/);
+  assert.match(workspaceStart, /Upload one PDF to start/);
+  assert.match(workspaceStart, /startDocument/);
+  assert.match(workspaceStart, /continueCurrent/);
+  assert.match(workspaceStart, /Browse all PDF tools/);
+  assert.match(home, /href="\/pdf"/);
+  assert.match(home, /Start PDF Workspace/);
+  assert.match(home, /href="\/pdf-tools"/);
+  assert.match(home, /Explore PDF tools/);
+  assert.match(menu, /Start PDF Workspace/);
+});
+
 test("validated first uploads bind directly to the shared Workspace", () => {
   const binder = read(
     "components/pdf/workspace/WorkspaceDocumentBinding.tsx",
@@ -83,6 +105,7 @@ test("hybrid synchronization remains browser-memory only", () => {
     read("components/pdf/workspace/WorkspaceDocumentProvider.tsx"),
     read("components/pdf/workspace/WorkspaceDocumentBinding.tsx"),
     read("components/pdf/workspace/ContinueWithPdf.tsx"),
+    read("components/pdf/workspace/WorkspaceStart.tsx"),
   ].join("\n");
 
   for (const forbidden of [

@@ -90,7 +90,7 @@ export function PublicPdfToolsMenuClient({
             <div className="flex items-start justify-between gap-4 px-1 pb-2">
               <div>
                 <p className="text-sm font-black text-[var(--text-primary)]">PDF Tools</p>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">Jump straight to popular tools.</p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">Start a multi-step Workspace or jump straight to one tool.</p>
               </div>
               <button
                 type="button"
@@ -103,6 +103,22 @@ export function PublicPdfToolsMenuClient({
                 Close
               </button>
             </div>
+
+            <Link
+              href="/pdf"
+              prefetch={false}
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="mb-2 flex min-h-12 items-center justify-between gap-3 rounded-[var(--radius-lg)] border border-[var(--border-selected)] bg-[var(--surface-selected)] px-3.5 py-2.5 text-sm font-black text-[var(--text-primary)] transition hover:-translate-y-0.5 hover:bg-[var(--surface-elevated)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--v2-focus-ring-default)] motion-reduce:transform-none"
+            >
+              <span className="min-w-0">
+                <span className="block">Start PDF Workspace</span>
+                <span className="mt-0.5 block text-[10.5px] font-semibold leading-4 text-[var(--text-muted)]">
+                  Upload once · switch tools · download once
+                </span>
+              </span>
+              <span aria-hidden="true" className="shrink-0 text-[var(--text-premium)]">→</span>
+            </Link>
 
             <div className="mt-1 grid gap-1">
               {tiles.map((tile) => (

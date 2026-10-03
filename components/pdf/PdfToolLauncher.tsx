@@ -83,7 +83,7 @@ function CompactToolCard({
   );
 
   const classes =
-    "group flex min-h-[4.75rem] w-full items-center gap-3 rounded-[15px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-3.5 py-3 text-left max-[380px]:gap-2.5 max-[380px]:px-3 shadow-[var(--shadow-sm)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none";
+    "group flex min-h-[4.4rem] w-full items-center gap-2.5 rounded-[15px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] px-3 py-2.5 text-left sm:min-h-[4.75rem] sm:gap-3 sm:px-3.5 sm:py-3 shadow-[var(--shadow-sm)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none";
 
   return (
     <li className="min-w-0">
@@ -119,7 +119,7 @@ function AllToolsTile({ label }: { label: string }) {
     <li className="min-w-0">
       <Link
         href="/pdf-tools"
-        className="group flex min-h-[4.75rem] w-full items-center gap-3 rounded-[15px] border border-dashed max-[380px]:gap-2.5 border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.018)] px-3.5 py-3 text-left max-[380px]:px-3 transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--atelier-sage-300)] hover:bg-[var(--surface-raised)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
+        className="group flex min-h-[4.4rem] w-full items-center gap-2.5 rounded-[15px] border border-dashed border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.018)] px-3 py-2.5 text-left transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--atelier-sage-300)] hover:bg-[var(--surface-raised)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none sm:min-h-[4.75rem] sm:gap-3 sm:px-3.5 sm:py-3"
         aria-label={label}
       >
         <span
@@ -184,7 +184,7 @@ export async function PdfToolLauncher({
   return (
     <div>
       <section aria-labelledby="popular-tools-heading">
-        <div className="mb-4 flex flex-col gap-2 sm:mb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="mb-3 flex flex-col gap-1.5 sm:mb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="aura-text-label text-[var(--atelier-sage-300)]">
               PDF tools
@@ -201,7 +201,7 @@ export async function PdfToolLauncher({
           </p>
         </div>
 
-        <ul className="grid grid-cols-2 gap-2.5 max-[340px]:grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        <ul className="grid grid-cols-2 gap-2 max-[330px]:grid-cols-1 sm:grid-cols-3 sm:gap-2.5 md:grid-cols-4 lg:grid-cols-6">
           {curated.map((tile, index) => (
             <CompactToolCard key={tile.route} tile={tile} index={index} />
           ))}

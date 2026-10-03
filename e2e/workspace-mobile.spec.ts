@@ -88,13 +88,22 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/pdf/organize", { waitUntil: "domcontentloaded" });
+  await page.goto("/pdf", { waitUntil: "domcontentloaded" });
+  await expect(
+    page.getByRole("heading", { name: "PDF Workspace", exact: true }),
+  ).toBeVisible();
 
   const upload = page
     .locator('input[type="file"][data-upload-client-ready="true"]')
     .first();
   await expect(upload).toBeAttached({ timeout: 30_000 });
   await upload.setInputFiles(TWO_PAGE_PDF);
+
+  await expect(
+    page.getByRole("heading", { name: "Choose your next step.", exact: true }),
+  ).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("button", { name: /^Pages/ }).click();
+  await expect(page).toHaveURL(/\/pdf\/organize$/);
 
   const workspace = page.locator("[data-workspace-lifecycle]");
   await expect(workspace).toHaveAttribute("data-workspace-lifecycle", "ready", {
@@ -104,8 +113,8 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   const nav = page.locator("[data-workspace-mobile-nav]");
   await expect(nav).toBeVisible();
 
-  // The first validated upload is already the shared Workspace document:
-  // switching tools does not require Save/Download/Continue first.
+  // The PDF was uploaded once on the visible /pdf hybrid Workspace entry.
+  // Switching tools does not require Save/Download/Continue first.
   await clickWorkspaceNav(page, "Edit");
   await expect(page).toHaveURL(/\/pdf\/edit$/);
   await expect(
