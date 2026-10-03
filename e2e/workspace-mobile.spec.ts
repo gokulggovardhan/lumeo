@@ -181,10 +181,7 @@ test("connected PDF Workspace keeps dedicated mobile navigation usable across ta
       .getByRole("button", { name: "Pages", exact: true }),
   ).toHaveAttribute("aria-current", "page");
 
-  await page
-    .locator("[data-workspace-mobile-nav]")
-    .getByRole("button", { name: "Finish", exact: true })
-    .click();
+  await clickWorkspaceNav(page, "Finish");
   await expect(page).toHaveURL(/\/pdf\/finish$/);
   await expect(page.getByRole("heading", { name: "Finish", exact: true })).toBeVisible();
   await expect(

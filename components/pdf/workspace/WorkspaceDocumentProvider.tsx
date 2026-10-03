@@ -287,6 +287,17 @@ export function WorkspaceDocumentProvider({
         current?.session.state.document.id === input.document.id;
 
       if (current && continuesCurrentDocument) {
+        const pendingTarget = continuationTargetRef.current;
+        const outgoingBindingIsStale =
+          pendingTarget !== null && pendingTarget !== input.area;
+
+        // A source tool can remain mounted briefly while the router is
+        // changing areas. Never let that outgoing binding overwrite the
+        // navigation target that continueCurrent() already committed.
+        if (outgoingBindingIsStale) {
+          return current;
+        }
+
         const next = updateWorkspaceRuntimeSession(
           current,
           setWorkspaceArea(current.session, input.area),
@@ -330,11 +341,20 @@ export function WorkspaceDocumentProvider({
         current?.session.state.document.id === input.session.state.document.id;
       let next: WorkspaceDocumentRuntime;
 
+      const pendingTarget = continuationTargetRef.current;
+      const preservePendingTarget =
+        current &&
+        continuesCurrentDocument &&
+        pendingTarget !== null &&
+        pendingTarget !== input.area;
+      const effectiveArea =
+        preservePendingTarget && pendingTarget ? pendingTarget : input.area;
+
       if (current && continuesCurrentDocument) {
         const session = mergeWorkspaceSessions(
           current.session,
           input.session,
-          input.area,
+          effectiveArea,
         );
         if (matchesMaterializedRevision(current, input)) {
           next = updateWorkspaceRuntimeSession(current, session);
@@ -348,7 +368,7 @@ export function WorkspaceDocumentProvider({
             bytes: input.bytes,
             fileName: input.fileName,
             pageCount: input.pageCount,
-            area: input.area,
+            area: effectiveArea,
             document: input.session.state.document,
             session,
           });
@@ -379,7 +399,9 @@ export function WorkspaceDocumentProvider({
         syncHistory(createWorkspaceRevisionHistory(next));
       }
 
-      setContinuationTargetSafely(null);
+      if (!preservePendingTarget) {
+        setContinuationTargetSafely(null);
+      }
       return commit(next)!;
     },
     [commit, setContinuationTargetSafely, syncHistory],
