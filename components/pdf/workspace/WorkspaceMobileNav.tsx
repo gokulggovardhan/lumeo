@@ -84,6 +84,8 @@ export function WorkspaceMobileNav() {
   if (!workspaceDocument) return null;
 
   const activeArea = workspaceDocument.session.state.activeArea;
+  const finishActive =
+    pathname === routeForArea("export") || activeArea === "export";
 
   function moveTo(area: WorkspaceArea) {
     if (activeArea === area && pathname === routeForArea(area)) {
@@ -195,11 +197,11 @@ export function WorkspaceMobileNav() {
 
         <button
           type="button"
-          aria-current={activeArea === "export" ? "page" : undefined}
+          aria-current={finishActive ? "page" : undefined}
           onClick={() => moveTo("export")}
           className={
             "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-black transition " +
-            (activeArea === "export"
+            (finishActive
               ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
               : "bg-[var(--surface-success)] text-[var(--text-success)] hover:bg-[var(--surface-selected)]")
           }
