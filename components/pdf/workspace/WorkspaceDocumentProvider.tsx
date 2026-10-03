@@ -312,8 +312,10 @@ export function WorkspaceDocumentProvider({
         area: input.area,
         session,
       });
-      documentHealthDocumentIdRef.current = input.document.id;
-      setDocumentHealth({});
+      if (documentHealthDocumentIdRef.current !== input.document.id) {
+        documentHealthDocumentIdRef.current = input.document.id;
+        setDocumentHealth({});
+      }
       syncHistory(createWorkspaceRevisionHistory(next));
       setContinuationTargetSafely(null);
       return commit(next)!;
@@ -366,9 +368,14 @@ export function WorkspaceDocumentProvider({
           area: input.area,
           session: input.session,
         });
-        documentHealthDocumentIdRef.current =
-          input.session.state.document.id;
-        setDocumentHealth({});
+        if (
+          documentHealthDocumentIdRef.current !==
+          input.session.state.document.id
+        ) {
+          documentHealthDocumentIdRef.current =
+            input.session.state.document.id;
+          setDocumentHealth({});
+        }
         syncHistory(createWorkspaceRevisionHistory(next));
       }
 
