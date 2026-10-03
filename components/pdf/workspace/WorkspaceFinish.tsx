@@ -215,7 +215,13 @@ export function WorkspaceFinish() {
         </div>
       </div>
 
-      <div className="sticky bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-20 rounded-[var(--radius-2xl)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3 shadow-[var(--v2-elevation-4)] backdrop-blur-xl">
+      <div
+        className="sticky z-20 rounded-[var(--radius-2xl)] border border-[var(--border-default)] bg-[var(--surface-overlay)] p-3 shadow-[var(--v2-elevation-4)] backdrop-blur-xl"
+        style={{
+          bottom:
+            "calc(0.75rem + env(safe-area-inset-bottom) + var(--workspace-mobile-nav-offset, 0px))",
+        }}
+      >
         <AuraButton
           type="button"
           variant="primary"
