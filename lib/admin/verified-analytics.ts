@@ -24,6 +24,7 @@ export type VerifiedTrafficSummary = {
   processingSucceeded: number;
   processingFailed: number;
   processingCancelled: number;
+  unfinishedAttempts: number;
   downloadsStarted: number;
   averageSuccessfulDurationMs: number | null;
   latestEventAt: string | null;
@@ -89,10 +90,21 @@ export type VerifiedTrafficIntegrity = {
   cutoverAt: string | null;
   latestVerifiedEventAt: string | null;
   locationCoveragePercent: number | null;
+  environmentVisitors: number;
+  environmentDeviceTotal: number;
+  environmentBrowserTotal: number;
+  environmentOsTotal: number;
+  uncorrelatedProcessingEvents: number;
+  orphanTerminalAttempts: number;
+  operationCorrelationCutoverAt: string | null;
+  lifecycleReconciles: boolean;
+  environmentReconciles: boolean;
+  reconciliationIssue: boolean;
 };
 
 export type VerifiedTrafficData = {
   dataStatus: "available";
+  asOf: string | null;
   trafficScope: VerifiedTrafficScope;
   summary: VerifiedTrafficSummary;
   daily: VerifiedDailyTraffic[];
@@ -166,6 +178,7 @@ function parseSummary(value: unknown): VerifiedTrafficSummary | null {
     processingSucceeded: countValue(value.processing_succeeded),
     processingFailed: countValue(value.processing_failed),
     processingCancelled: countValue(value.processing_cancelled),
+    unfinishedAttempts: countValue(value.unfinished_attempts),
     downloadsStarted: countValue(value.downloads_started),
     averageSuccessfulDurationMs: numberValue(value.average_successful_duration_ms),
     latestEventAt: stringValue(value.latest_event_at),
@@ -300,6 +313,16 @@ function parseIntegrity(value: unknown): VerifiedTrafficIntegrity | null {
     cutoverAt: stringValue(value.cutover_at),
     latestVerifiedEventAt: stringValue(value.latest_verified_event_at),
     locationCoveragePercent: numberValue(value.location_coverage_percent),
+    environmentVisitors: countValue(value.environment_visitors),
+    environmentDeviceTotal: countValue(value.environment_device_total),
+    environmentBrowserTotal: countValue(value.environment_browser_total),
+    environmentOsTotal: countValue(value.environment_os_total),
+    uncorrelatedProcessingEvents: countValue(value.uncorrelated_processing_events),
+    orphanTerminalAttempts: countValue(value.orphan_terminal_attempts),
+    operationCorrelationCutoverAt: stringValue(value.operation_correlation_cutover_at),
+    lifecycleReconciles: value.lifecycle_reconciles !== false,
+    environmentReconciles: value.environment_reconciles !== false,
+    reconciliationIssue: value.reconciliation_issue === true,
   };
 }
 
@@ -357,6 +380,7 @@ export function parseVerifiedTraffic(value: unknown): VerifiedTrafficData | null
 
   return {
     dataStatus: "available",
+    asOf: stringValue(value.as_of),
     trafficScope: scope,
     summary,
     daily,
@@ -492,7 +516,7 @@ export async function getVerifiedTraffic(
   trafficScope: VerifiedTrafficScope = "real_audience",
 ): Promise<DataResult<VerifiedTrafficData | null>> {
   const supabase = await createClient();
-  const result = await supabase.rpc("get_admin_verified_traffic", {
+  const result = await supabase.rpc("get_admin_verified_traffic_v3", {
     p_start_date: range.startDate,
     p_end_date: range.endDate,
     p_traffic_scope: trafficScope,
@@ -515,13 +539,12 @@ export async function getVerifiedTraffic(
 }
 
 export async function getVerifiedRecentEvents(
-  limit = 100,
-  trafficScope: VerifiedTrafficScope = "real_audience",
+  limit = 40,
+  _trafficScope: VerifiedTrafficScope = "real_audience",
 ): Promise<DataResult<VerifiedRecentEvent[]>> {
   const supabase = await createClient();
-  const result = await supabase.rpc("get_admin_recent_analytics_events_v2", {
-    p_limit: Math.max(1, Math.min(limit, 200)),
-    p_traffic_scope: trafficScope,
+  const result = await supabase.rpc("get_admin_recent_operational_events_v3", {
+    p_limit: Math.max(1, Math.min(limit, 50)),
   });
 
   if (result.error || !Array.isArray(result.data)) {
