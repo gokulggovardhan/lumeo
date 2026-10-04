@@ -227,6 +227,23 @@ export type AnalyticsEvent = {
   error_code: string | null;
   failure_stage: string | null;
   metadata: Json;
+  region: string | null;
+  city: string | null;
+  visitor_key: string | null;
+  session_key: string | null;
+  traffic_class: "real_audience" | "synthetic" | "known_bot" | "suspected_automation" | null;
+  traffic_class_reason: string | null;
+  geo_source: "cloudflare" | "unresolved" | null;
+  geo_precision: "city" | "region" | "country" | "unresolved" | null;
+  region_code: string | null;
+  page_path: string | null;
+  referrer_host: string | null;
+  landing_path: string | null;
+  acquisition_source: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  analytics_schema_version: number;
 };
 
 export type DailyToolMetric = {
@@ -321,6 +338,84 @@ export type ControlCenterDatabase = {
           failure_stage?: string | null;
         };
         Returns: number;
+      };
+      get_admin_traffic_analytics: {
+        Args: {
+          p_start_date: string;
+          p_end_date: string;
+          p_traffic_scope?: string;
+        };
+        Returns: Json;
+      };
+      get_admin_analytics_dashboard: {
+        Args: {
+          p_start_date: string;
+          p_end_date: string;
+          p_traffic_scope?: string;
+        };
+        Returns: Json;
+      };
+      get_admin_recent_analytics_events_v2: {
+        Args: { p_limit?: number; p_traffic_scope?: string };
+        Returns: Array<{
+          occurred_at: string;
+          event_name: string;
+          tool_slug: string | null;
+          traffic_class: string;
+          device_class: string;
+          browser_family: string;
+          operating_system: string;
+          city: string | null;
+          region: string | null;
+          region_code: string | null;
+          country_code: string | null;
+          geo_precision: string;
+          page_path: string | null;
+          acquisition_source: string | null;
+          success: boolean | null;
+        }>;
+      };
+      get_admin_conversion_diagnostics_v2: {
+        Args: {
+          p_start_date: string;
+          p_end_date: string;
+          p_traffic_scope?: string;
+        };
+        Returns: Json;
+      };
+      record_server_analytics_event_v2: {
+        Args: {
+          p_event_name: string;
+          p_tool_slug?: string | null;
+          p_visitor_key?: string | null;
+          p_session_key?: string | null;
+          p_request_key?: string | null;
+          p_traffic_class?: string;
+          p_traffic_class_reason?: string | null;
+          p_duration_ms?: number | null;
+          p_input_size_bucket?: string | null;
+          p_output_size_bucket?: string | null;
+          p_device_class?: string;
+          p_browser_family?: string;
+          p_operating_system?: string;
+          p_success?: boolean | null;
+          p_error_code?: string | null;
+          p_country_code?: string | null;
+          p_region?: string | null;
+          p_region_code?: string | null;
+          p_city?: string | null;
+          p_geo_source?: string;
+          p_geo_precision?: string;
+          p_page_path?: string | null;
+          p_referrer_host?: string | null;
+          p_landing_path?: string | null;
+          p_acquisition_source?: string;
+          p_utm_source?: string | null;
+          p_utm_medium?: string | null;
+          p_utm_campaign?: string | null;
+          p_failure_stage?: string | null;
+        };
+        Returns: boolean;
       };
       get_admin_conversion_diagnostics: {
         Args: { p_start_date: string; p_end_date: string };
