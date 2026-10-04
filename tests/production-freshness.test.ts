@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { verifyProductionFreshness } from "../scripts/verify-production-freshness.mjs";
 
@@ -8,6 +9,22 @@ const currentHomepage = `<!doctype html>
   <a href="/pdf-tools">Explore PDF tools</a>
   <p>Use one focused tool for a quick task, or upload once into PDF Workspace</p>
   <script src="/_next/static/chunks/app-current.ABC123.js"></script>`;
+
+test("production health waits for the exact deployment before checking document freshness", () => {
+  const workflow = readFileSync(
+    new URL("../.github/workflows/production-health.yml", import.meta.url),
+    "utf8",
+  );
+  const deploymentCheck = workflow.indexOf("Verify deployed revision and Admin boundary");
+  const freshnessCheck = workflow.indexOf("Verify production document freshness");
+
+  assert.notEqual(deploymentCheck, -1);
+  assert.notEqual(freshnessCheck, -1);
+  assert.ok(
+    deploymentCheck < freshnessCheck,
+    "document freshness must run only after the bounded exact-SHA deployment wait",
+  );
+});
 
 function response(body: BodyInit | null, init: ResponseInit = {}) {
   return new Response(body, { status: 200, ...init });
