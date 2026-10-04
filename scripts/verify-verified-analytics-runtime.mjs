@@ -245,10 +245,26 @@ const { error: retiredWriterError } = await retiredClient.rpc(
   "record_public_analytics_event",
   {
     event_name: "page_view",
+    tool_slug: null,
     anonymous_session_id: randomUUID(),
+    duration_ms: null,
+    input_size_bucket: "unknown",
+    output_size_bucket: "unknown",
+    device_class: "desktop",
+    browser_family: "Chrome",
+    operating_system: "Linux",
+    success: null,
+    error_code: null,
+    country_code: "US",
+    region: "Virginia",
+    city: "Boydton",
+    failure_stage: null,
   },
 );
-assert.ok(retiredWriterError, "Legacy browser analytics writer must be revoked.");
+assert.ok(
+  retiredWriterError,
+  "15-argument legacy browser analytics writer must be revoked.",
+);
 
 function serverWriterArgs(secretLabel) {
   return {
