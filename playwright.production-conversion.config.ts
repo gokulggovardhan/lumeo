@@ -15,6 +15,9 @@ export default defineConfig({
     baseURL: "https://lumeo.in",
     trace: "retain-on-failure",
     video: "retain-on-failure",
+    extraHTTPHeaders: {
+      "x-lumeo-analytics-traffic": "synthetic",
+    },
   },
   projects: [
     {
