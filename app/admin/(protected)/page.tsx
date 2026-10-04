@@ -8,7 +8,6 @@ import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { AnalyticsTrendChart } from "@/components/admin/analytics/AnalyticsTrendChart";
 import { requireAdmin } from "@/lib/admin/auth";
 import {
-  getAnalyticsSummary,
   getAuditLogs,
   getFeedbackQueries,
   getPdfTools,
@@ -19,7 +18,8 @@ import {
   getErrorLogSummary,
   getUnresolvedErrorLogs,
 } from "@/lib/admin/errors";
-import { formatAdminDateTime } from "@/lib/admin/timezone";
+import { formatAdminDateTime, istIsoDate } from "@/lib/admin/timezone";
+import { getVerifiedTraffic } from "@/lib/admin/verified-analytics";
 
 function formatDate(value: string | null) {
   return value ? formatAdminDateTime(value) : "Unavailable";
@@ -59,9 +59,12 @@ function StatusRow({
 
 export default async function AdminPage() {
   const admin = await requireAdmin();
+  const today = istIsoDate();
+  const sixDaysAgo = istIsoDate(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
   const [
     tools,
-    analytics,
+    analyticsToday,
+    analyticsWeek,
     unreadInbox,
     inbox,
     errorSummary,
@@ -70,7 +73,8 @@ export default async function AdminPage() {
     settings,
   ] = await Promise.all([
     getPdfTools(),
-    getAnalyticsSummary(),
+    getVerifiedTraffic({ startDate: today, endDate: today }),
+    getVerifiedTraffic({ startDate: sixDaysAgo, endDate: today }),
     getUnreadInboxCount(),
     getFeedbackQueries(5, 0),
     getErrorLogSummary(),
@@ -82,7 +86,51 @@ export default async function AdminPage() {
   const deploymentEnvironment = process.env.LUMEO_DEPLOYMENT_ENV ?? "local";
   const gitCommitSha = process.env.LUMEO_BUILD_SHA ?? null;
   const analyticsUnavailable =
-    Boolean(analytics.error) || analytics.data.dataStatus === "unavailable";
+    Boolean(analyticsToday.error) ||
+    Boolean(analyticsWeek.error) ||
+    !analyticsToday.data ||
+    !analyticsWeek.data;
+
+  const analyticsData =
+    analyticsToday.data && analyticsWeek.data
+      ? {
+          pageViewsToday: analyticsToday.data.summary.pageViews,
+          toolOpens: analyticsToday.data.summary.toolOpens,
+          processingStarted: analyticsToday.data.summary.processingStarted,
+          processingSucceeded: analyticsToday.data.summary.processingSucceeded,
+          processingFailed: analyticsToday.data.summary.processingFailed,
+          processingCancelled: analyticsToday.data.summary.processingCancelled,
+          unreconciledStarts: Math.max(
+            0,
+            analyticsToday.data.summary.processingStarted -
+              analyticsToday.data.summary.processingSucceeded -
+              analyticsToday.data.summary.processingFailed -
+              analyticsToday.data.summary.processingCancelled,
+          ),
+          downloadsStarted: analyticsToday.data.summary.downloadsStarted,
+          successRate:
+            analyticsToday.data.summary.processingSucceeded +
+                analyticsToday.data.summary.processingFailed >
+              0
+              ? Math.round(
+                  (analyticsToday.data.summary.processingSucceeded /
+                    (analyticsToday.data.summary.processingSucceeded +
+                      analyticsToday.data.summary.processingFailed)) *
+                    1000,
+                ) / 10
+              : null,
+          averageDurationMs:
+            analyticsToday.data.summary.averageSuccessfulDurationMs,
+          topToolsByOpens: analyticsToday.data.topToolsByOpens,
+          sevenDayTotals: analyticsWeek.data.daily.map((point) => ({
+            date: point.date,
+            events: point.pageViews + point.toolOpens,
+            pageViews: point.pageViews,
+            toolOpens: point.toolOpens,
+          })),
+          verifiedEvents: analyticsToday.data.integrity.verifiedEvents,
+        }
+      : null;
   const maintenanceTools = tools.data.filter((tool) => tool.status === "maintenance");
   const disabledTools = tools.data.filter((tool) => !tool.is_enabled);
   const maintenanceSetting = settings.data.find((setting) => setting.key === "maintenance_mode");
@@ -145,6 +193,18 @@ export default async function AdminPage() {
       tone: "warning",
     });
   }
+  if (
+    !analyticsUnavailable &&
+    analyticsEnabled &&
+    analyticsData?.verifiedEvents === 0
+  ) {
+    attention.push({
+      title: "Verified analytics has no events yet",
+      detail: "The schema-v2 real-audience pipeline has not recorded a verified event today.",
+      href: "/admin/analytics",
+      tone: "warning",
+    });
+  }
   if (tools.error || settings.error || inbox.error || errorSummary.error || recentErrors.error || audit.error) {
     attention.push({
       title: "Operational health is degraded",
@@ -154,8 +214,10 @@ export default async function AdminPage() {
     });
   }
 
-  const processingTotal = analytics.data.processingSucceeded + analytics.data.processingFailed;
-  const topTools = analytics.data.topToolsByOpens.slice(0, 5);
+  const processingTotal =
+    (analyticsData?.processingSucceeded ?? 0) +
+    (analyticsData?.processingFailed ?? 0);
+  const topTools = analyticsData?.topToolsByOpens.slice(0, 5) ?? [];
 
   return (
     <div className="space-y-6">
@@ -259,41 +321,41 @@ export default async function AdminPage() {
           />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <AdminMetricCard label="Page Views" value={analytics.data.pageViewsToday} detail="Public page-view events today." />
-            <AdminMetricCard label="Tool Opens" value={analytics.data.toolOpens} detail="PDF tool workspaces opened today." tone="gold" />
+            <AdminMetricCard label="Page Views" value={analyticsData!.pageViewsToday} detail="Public page-view events today." />
+            <AdminMetricCard label="Tool Opens" value={analyticsData!.toolOpens} detail="PDF tool workspaces opened today." tone="gold" />
             <AdminMetricCard
               label="Processing Success"
-              value={analytics.data.successRate === null ? "N/A" : `${analytics.data.successRate}%`}
+              value={analyticsData!.successRate === null ? "N/A" : `${analyticsData!.successRate}%`}
               detail={processingTotal > 0 ? `${processingTotal} completed processing outcomes.` : "No completed processing outcomes today."}
-              tone={analytics.data.successRate !== null && analytics.data.successRate < 90 ? "warning" : "success"}
+              tone={analyticsData!.successRate !== null && analyticsData!.successRate < 90 ? "warning" : "success"}
             />
-            <AdminMetricCard label="Downloads" value={analytics.data.downloadsStarted} detail="Output downloads started today." />
+            <AdminMetricCard label="Downloads" value={analyticsData!.downloadsStarted} detail="Output downloads started today." />
           </div>
         )}
       </section>
 
       {!analyticsUnavailable ? (
         <section className="grid min-w-0 gap-4 xl:grid-cols-[1.4fr_0.6fr]">
-          <AnalyticsTrendChart points={analytics.data.sevenDayTotals} rangeLabel="Last 7 days" />
+          <AnalyticsTrendChart points={analyticsData!.sevenDayTotals} rangeLabel="Last 7 days" />
 
           <AdminSectionCard
             title="Processing health"
             description="Today’s real processing lifecycle signals."
           >
             <div className="space-y-1">
-              <StatusRow label="Started" value={String(analytics.data.processingStarted)} detail="Processing operations started." tone="neutral" />
-              <StatusRow label="Succeeded" value={String(analytics.data.processingSucceeded)} detail="Processing operations completed successfully." tone="success" />
-              <StatusRow label="Failed" value={String(analytics.data.processingFailed)} detail="Processing operations reporting failure." tone={analytics.data.processingFailed > 0 ? "warning" : "neutral"} />
-              <StatusRow label="Cancelled" value={String(analytics.data.processingCancelled)} detail="Explicitly cancelled processing operations." tone="neutral" />
+              <StatusRow label="Started" value={String(analyticsData!.processingStarted)} detail="Processing operations started." tone="neutral" />
+              <StatusRow label="Succeeded" value={String(analyticsData!.processingSucceeded)} detail="Processing operations completed successfully." tone="success" />
+              <StatusRow label="Failed" value={String(analyticsData!.processingFailed)} detail="Processing operations reporting failure." tone={analyticsData!.processingFailed > 0 ? "warning" : "neutral"} />
+              <StatusRow label="Cancelled" value={String(analyticsData!.processingCancelled)} detail="Explicitly cancelled processing operations." tone="neutral" />
               <StatusRow
                 label="No terminal event"
-                value={String(analytics.data.unreconciledStarts)}
+                value={String(analyticsData!.unreconciledStarts)}
                 detail="Started attempts without success, failure, or an explicit cancellation in today's range."
-                tone={analytics.data.unreconciledStarts > 0 ? "warning" : "success"}
+                tone={analyticsData!.unreconciledStarts > 0 ? "warning" : "success"}
               />
               <StatusRow
                 label="Average duration"
-                value={analytics.data.averageDurationMs === null ? "N/A" : `${(analytics.data.averageDurationMs / 1000).toFixed(1)}s`}
+                value={analyticsData!.averageDurationMs === null ? "N/A" : `${(analyticsData!.averageDurationMs / 1000).toFixed(1)}s`}
                 detail="Average duration of successful processing."
                 tone="gold"
               />
