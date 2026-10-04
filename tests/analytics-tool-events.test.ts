@@ -215,7 +215,11 @@ test("owned production browser tests mark only analytics requests as synthetic",
   );
 
   assert.match(route, /x-lumeo-synthetic-test/);
+  assert.match(route, /lumeo_synthetic_test/);
   assert.match(route, /owned_test_header/);
+  assert.match(markerHelper, /context\.addCookies/);
+  assert.match(markerHelper, /name: "lumeo_synthetic_test"/);
+  assert.match(markerHelper, /httpOnly: true/);
   assert.match(markerHelper, /context\.route\("\*\*\/api\/analytics"/);
   assert.match(markerHelper, /"x-lumeo-synthetic-test": "1"/);
   for (const source of [
