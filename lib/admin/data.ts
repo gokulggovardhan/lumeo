@@ -3,6 +3,7 @@ import "server-only";
 import { createClient } from "@/lib/supabase/server";
 import { formatLocationLabel } from "@/lib/analytics/location-names";
 import { istIsoDate } from "@/lib/admin/timezone";
+import { getVerifiedAnalytics, type VerifiedAnalytics } from "@/lib/admin/verified-analytics";
 import type { AdminRole } from "@/lib/admin/types";
 import type {
   Announcement,
@@ -536,104 +537,118 @@ function parseAdminAnalyticsSummary(
   };
 }
 
+function verifiedToLegacySummary(data: VerifiedAnalytics): AnalyticsSummary {
+  const summary = data.summary;
+  const completed = summary.processingSucceeded + summary.processingFailed;
+  const totalEvents =
+    summary.pageViews +
+    summary.toolOpens +
+    summary.processingStarted +
+    summary.processingSucceeded +
+    summary.processingFailed +
+    summary.processingCancelled +
+    summary.downloadsStarted;
+
+  return {
+    dataStatus: data.dataStatus,
+    eventsToday: totalEvents,
+    uniqueVisitorsToday: summary.uniqueVisitors,
+    pageViewsToday: summary.pageViews,
+    toolOpens: summary.toolOpens,
+    processingStarted: summary.processingStarted,
+    processingSucceeded: summary.processingSucceeded,
+    processingFailed: summary.processingFailed,
+    processingCancelled: summary.processingCancelled,
+    unreconciledStarts: Math.max(
+      0,
+      summary.processingStarted -
+        summary.processingSucceeded -
+        summary.processingFailed -
+        summary.processingCancelled,
+    ),
+    downloadsStarted: summary.downloadsStarted,
+    successRate:
+      completed > 0
+        ? Math.round((summary.processingSucceeded / completed) * 1000) / 10
+        : null,
+    averageDurationMs: summary.averageDurationMs,
+    latestEventAt: summary.latestEventAt,
+    dailyMetrics: data.daily.map((row) => ({
+      metric_date: row.date,
+      tool_slug: "all",
+      tool_opens: row.toolOpens,
+      processing_started: row.processingStarted,
+      processing_succeeded: row.processingSucceeded,
+      processing_failed: row.processingFailed,
+      total_duration_ms: 0,
+    })),
+    sevenDayTotals: data.daily.map((row) => ({
+      date: row.date,
+      events:
+        row.pageViews +
+        row.toolOpens +
+        row.processingStarted +
+        row.processingSucceeded +
+        row.processingFailed +
+        row.processingCancelled +
+        row.downloadsStarted,
+      uniqueVisitors: row.uniqueVisitors,
+      pageViews: row.pageViews,
+      toolOpens: row.toolOpens,
+      succeeded: row.processingSucceeded,
+      failed: row.processingFailed,
+      cancelled: row.processingCancelled,
+    })),
+    topToolsByOpens: data.topToolsByOpens,
+    topToolsBySuccess: data.topToolsBySuccess,
+    errorSummary: data.errorSummary.map((item) => ({
+      errorCode: item.label,
+      count: item.count,
+    })),
+    failureStageSummary: data.failureStageSummary,
+    cancellationStageSummary: data.cancellationStageSummary,
+    deviceSummary: data.deviceSummary,
+    browserSummary: data.browserSummary,
+    osSummary: data.osSummary,
+    locationSummary: data.locations.map((item) => ({
+      label: item.label,
+      count: item.pageViews,
+    })),
+  };
+}
+
 export async function getAnalyticsSummary(
   range?: { startDate: string; endDate: string },
 ): Promise<DataResult<AnalyticsSummary>> {
-  const supabase = await createClient();
-
-  // The Analytics page can request an explicit bounded range. The existing
-  // Overview behavior remains unchanged below: real "today" summary cards
-  // plus a seven-day trend.
   if (range) {
-    const [rangeResult, diagnosticsResult] = await Promise.all([
-      supabase.rpc("get_admin_analytics_summary", {
-        p_start_date: range.startDate,
-        p_end_date: range.endDate,
-      }),
-      supabase.rpc("get_admin_conversion_diagnostics", {
-        p_start_date: range.startDate,
-        p_end_date: range.endDate,
-      }),
-    ]);
-
-    if (rangeResult.error) {
-      return safe(unavailableAnalyticsSummary(), rangeResult.error);
-    }
-
-    const parsedRange = parseAdminAnalyticsSummary(
-      rangeResult.data as AdminAnalyticsSummaryResult | unknown,
-      diagnosticsResult.error ? undefined : diagnosticsResult.data,
-    );
-
-    return parsedRange
-      ? safe(parsedRange, null)
-      : safe(
-          unavailableAnalyticsSummary(),
-          new Error("Malformed admin analytics aggregate."),
-        );
+    const verified = await getVerifiedAnalytics(range, "real_audience");
+    return verified.error
+      ? safe(unavailableAnalyticsSummary(), verified.error)
+      : safe(verifiedToLegacySummary(verified.data), null);
   }
 
   const today = todayIsoDate();
   const sevenDaysAgo = sixDaysAgoIsoDate();
-
-  // Two calls, not one: the RPC scopes both its "today" summary numbers and its
-  // daily_trend array off the same start/end range. A single 7-day-wide call
-  // would silently turn "Events Today" into a 7-day sum; a single today-only
-  // call (the prior behavior) silently turned "seven-day trend" into one day.
-  const [
-    todayResult,
-    trendResult,
-    todayDiagnosticsResult,
-    trendDiagnosticsResult,
-  ] = await Promise.all([
-    supabase.rpc("get_admin_analytics_summary", {
-      p_start_date: today,
-      p_end_date: today,
-    }),
-    supabase.rpc("get_admin_analytics_summary", {
-      p_start_date: sevenDaysAgo,
-      p_end_date: today,
-    }),
-    supabase.rpc("get_admin_conversion_diagnostics", {
-      p_start_date: today,
-      p_end_date: today,
-    }),
-    supabase.rpc("get_admin_conversion_diagnostics", {
-      p_start_date: sevenDaysAgo,
-      p_end_date: today,
-    }),
+  const [todayResult, trendResult] = await Promise.all([
+    getVerifiedAnalytics({ startDate: today, endDate: today }, "real_audience"),
+    getVerifiedAnalytics({ startDate: sevenDaysAgo, endDate: today }, "real_audience"),
   ]);
 
   if (todayResult.error) {
     return safe(unavailableAnalyticsSummary(), todayResult.error);
   }
 
-  const parsedToday = parseAdminAnalyticsSummary(
-    todayResult.data as AdminAnalyticsSummaryResult | unknown,
-    todayDiagnosticsResult.error ? undefined : todayDiagnosticsResult.data,
-  );
-  if (!parsedToday) {
-    return safe(unavailableAnalyticsSummary(), new Error("Malformed admin analytics aggregate."));
-  }
-
-  // The trend call is best-effort: if it fails or is malformed, still return
-  // today's real numbers rather than hiding the whole dashboard behind it.
-  const parsedTrend = trendResult.error
-    ? null
-    : parseAdminAnalyticsSummary(
-        trendResult.data as AdminAnalyticsSummaryResult | unknown,
-        trendDiagnosticsResult.error ? undefined : trendDiagnosticsResult.data,
-      );
+  const todaySummary = verifiedToLegacySummary(todayResult.data);
+  const trendSummary = trendResult.error
+    ? todaySummary
+    : verifiedToLegacySummary(trendResult.data);
 
   return safe(
     {
-      ...parsedToday,
-      sevenDayTotals: parsedTrend?.sevenDayTotals ?? parsedToday.sevenDayTotals,
-      dailyMetrics: parsedTrend?.dailyMetrics ?? parsedToday.dailyMetrics,
-      // Locations are sparse per-day -- scope this to the same 7-day window
-      // as the trend, not the single "today" range, or the panel reads empty
-      // on any day with little UTC-day traffic yet.
-      locationSummary: parsedTrend?.locationSummary ?? parsedToday.locationSummary,
+      ...todaySummary,
+      sevenDayTotals: trendSummary.sevenDayTotals,
+      dailyMetrics: trendSummary.dailyMetrics,
+      locationSummary: trendSummary.locationSummary,
     },
     null,
   );
