@@ -8,7 +8,7 @@ import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { AdminSubmitButton } from "@/components/admin/AdminSubmitButton";
 import { requireAdmin } from "@/lib/admin/auth";
-import { getAnalyticsSummary, getPdfTools, getToolCategories } from "@/lib/admin/data";
+import { getPdfTools, getToolCategories, getVerifiedAnalytics } from "@/lib/admin/data";
 import { asAdminFormAction } from "@/lib/admin/form-action";
 import { canManageTools } from "@/lib/admin/permissions";
 import {
@@ -16,7 +16,7 @@ import {
   hasActiveToolFilters,
   resolveToolFilters,
 } from "@/lib/admin/tool-filters";
-import { formatAdminDate } from "@/lib/admin/timezone";
+import { formatAdminDate, istIsoDate } from "@/lib/admin/timezone";
 
 const TOOL_STATUSES = ["active", "beta", "coming_soon", "hidden", "maintenance"] as const;
 
@@ -35,10 +35,11 @@ export default async function ToolsPage({
   const admin = await requireAdmin();
   const params = (await searchParams) ?? {};
   const filters = resolveToolFilters(params);
+  const today = istIsoDate();
   const [tools, categories, analytics] = await Promise.all([
     getPdfTools(),
     getToolCategories(),
-    getAnalyticsSummary(),
+    getVerifiedAnalytics({ startDate: today, endDate: today }),
   ]);
   const canEdit = canManageTools(admin.role);
 
