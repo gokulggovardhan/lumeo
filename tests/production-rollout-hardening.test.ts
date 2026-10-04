@@ -6,18 +6,22 @@ function read(path: string) {
   return readFileSync(path, "utf8");
 }
 
-test("analytics rollout remains compatible until terminal diagnostics migration is live", () => {
+test("trusted analytics cutover keeps public processing independent and production tests synthetic", () => {
   const client = read("lib/analytics/client.ts");
-  const workflow = read(".github/workflows/production-conversion-smoke.yml");
+  const route = read("app/api/analytics/route.ts");
+  const cloudflareConfig = read("playwright.cloudflare-production.config.ts");
+  const productionConfig = read("playwright.production-conversion.config.ts");
+  const migration = read("supabase/migrations/20261004090000_trusted_analytics_cutover.sql");
 
-  assert.match(
-    client,
-    /input\.failureStage \? \{ failure_stage: input\.failureStage \} : \{\}/,
-  );
-  assert.match(workflow, /Wait for production analytics schema/);
-  assert.match(workflow, /record_public_analytics_event/);
-  assert.match(workflow, /failure_stage text/);
-  assert.match(workflow, /pg_notify\('pgrst', 'reload schema'\)/);
+  assert.match(client, /fetch\("\/api\/analytics"/);
+  assert.match(client, /failureStage: input\.failureStage/);
+  assert.match(route, /x-lumeo-analytics-traffic/);
+  assert.match(route, /synthetic/);
+  assert.match(cloudflareConfig, /x-lumeo-analytics-traffic/);
+  assert.match(productionConfig, /x-lumeo-analytics-traffic/);
+  assert.match(migration, /record_trusted_analytics_event/);
+  assert.match(migration, /get_admin_verified_analytics/);
+  assert.doesNotMatch(client, /await\s+track/);
 });
 
 test("Word to PDF waits until cross-origin isolation recovery settles", () => {
