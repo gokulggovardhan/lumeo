@@ -356,7 +356,8 @@ export async function POST(request: NextRequest) {
 
   const userAgent = request.headers.get("user-agent");
   const ownedSyntheticRequest =
-    request.headers.get("x-lumeo-synthetic-test") === "1";
+    request.headers.get("x-lumeo-synthetic-test") === "1" ||
+    request.cookies.get("lumeo_synthetic_test")?.value === "1";
   const traffic = ownedSyntheticRequest
     ? {
         trafficClass: "synthetic" as const,
