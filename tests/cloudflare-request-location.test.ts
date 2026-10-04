@@ -20,7 +20,8 @@ test("prefers Cloudflare Request.cf geolocation", () => {
 
   assert.deepEqual(readCloudflareApproximateLocation(request), {
     city: "Pune",
-    region: "MH",
+    region: "Maharashtra",
+    regionCode: "MH",
     country: "IN",
   });
 });
@@ -37,6 +38,7 @@ test("falls back to Cloudflare visitor-location headers", () => {
   assert.deepEqual(readCloudflareApproximateLocation(request), {
     city: "Pune",
     region: "MH",
+    regionCode: "MH",
     country: "IN",
   });
 });
@@ -45,13 +47,23 @@ test("never needs an IP address and degrades to an empty location", () => {
   const request = new Request("http://127.0.0.1:3000/");
   const location = readCloudflareApproximateLocation(request);
 
-  assert.deepEqual(location, { city: null, region: null, country: null });
+  assert.deepEqual(location, {
+    city: null,
+    region: null,
+    regionCode: null,
+    country: null,
+  });
   assert.equal(formatApproximateLocation(location), null);
   assert.equal(encodeAnalyticsGeoCookie(location), null);
 });
 
 test("formats feedback labels and analytics cookie compatibly", () => {
-  const location = { city: "Pune", region: "MH", country: "IN" };
-  assert.equal(formatApproximateLocation(location), "Pune, MH, IN");
+  const location = {
+    city: "Pune",
+    region: "Maharashtra",
+    regionCode: "MH",
+    country: "IN",
+  };
+  assert.equal(formatApproximateLocation(location), "Pune, Maharashtra, IN");
   assert.equal(encodeAnalyticsGeoCookie(location), "Pune|MH|IN");
 });
