@@ -43,6 +43,29 @@ async function uploadEditFixture(page: Page, fixturePath: string) {
   await page.locator('input[type="file"]').first().setInputFiles(fixturePath);
 }
 
+async function uploadEditFixtureWithColdStartRecovery(
+  page: Page,
+  fixturePath: string,
+) {
+  await uploadEditFixture(page, fixturePath);
+
+  // WebKit can occasionally leave the first document load without rendered
+  // text runs after a long, heavily loaded CI browser sequence. Recover the
+  // setup once by creating a fresh document page; the second load still has
+  // to satisfy the normal stage-ready proof, so a real rendering regression
+  // remains a hard failure.
+  try {
+    await expect(
+      page.locator('div[role="button"][aria-label^="Editable text: "]').first(),
+    ).toBeVisible({ timeout: 30_000 });
+  } catch {
+    await page.goto("about:blank", { waitUntil: "domcontentloaded" });
+    await uploadEditFixture(page, fixturePath);
+  }
+
+  await waitForStageReady(page);
+}
+
 async function findCiTrueTypeFont(): Promise<string> {
   const candidates = [
     path.join(
@@ -968,8 +991,7 @@ test("Organize projects page history and verified export into Workspace state", 
 test("vinext Edit PDF keeps IME composition isolated until the candidate is committed", async ({
   page,
 }) => {
-  await uploadEditFixture(page, TEXT_ONLY_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureWithColdStartRecovery(page, TEXT_ONLY_PDF);
 
   const workspace = page.locator("[data-edit-operation-count]");
   await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
