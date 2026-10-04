@@ -6,6 +6,7 @@ import {
   formatApproximateLocation,
   readCloudflareApproximateLocation,
 } from "../lib/cloudflare/request-location.ts";
+import { classifyAnalyticsTraffic } from "../lib/analytics/traffic-classification.ts";
 
 test("prefers Cloudflare Request.cf geolocation", () => {
   const request = new Request("https://lumeo.in/") as Request & {
@@ -66,4 +67,91 @@ test("formats feedback labels and analytics cookie compatibly", () => {
   };
   assert.equal(formatApproximateLocation(location), "Pune, Maharashtra, IN");
   assert.equal(encodeAnalyticsGeoCookie(location), "Pune|MH|IN");
+});
+
+
+test("trusted Cloudflare US geography is preserved without guessing around VPN or proxy routing", () => {
+  const request = new Request("https://lumeo.in/") as Request & {
+    cf?: Record<string, string>;
+  };
+  request.cf = {
+    city: "Omaha",
+    region: "Nebraska",
+    regionCode: "NE",
+    country: "US",
+    colo: "IAD",
+  };
+
+  assert.deepEqual(readCloudflareApproximateLocation(request), {
+    city: "Omaha",
+    region: "Nebraska",
+    regionCode: "NE",
+    country: "US",
+  });
+});
+
+test("partial Cloudflare geography stays partial for downstream Unknown Location handling", () => {
+  const request = new Request("https://lumeo.in/") as Request & {
+    cf?: Record<string, string>;
+  };
+  request.cf = {
+    region: "Maharashtra",
+    regionCode: "MH",
+    country: "IN",
+  };
+
+  assert.deepEqual(readCloudflareApproximateLocation(request), {
+    city: null,
+    region: "Maharashtra",
+    regionCode: "MH",
+    country: "IN",
+  });
+});
+
+test("Cloudflare colo and unrelated server-location headers are never visitor geography", () => {
+  const request = new Request("https://lumeo.in/", {
+    headers: {
+      "x-vercel-ip-city": "Server City",
+      "x-worker-region": "server-region",
+      "cf-ray": "example-IAD",
+    },
+  }) as Request & {
+    cf?: Record<string, string>;
+  };
+  request.cf = { colo: "IAD" };
+
+  assert.deepEqual(readCloudflareApproximateLocation(request), {
+    city: null,
+    region: null,
+    regionCode: null,
+    country: null,
+  });
+});
+
+test("traffic classification separates owned tests and reliable automation without treating uncertain clients as bots", () => {
+  assert.equal(
+    classifyAnalyticsTraffic({
+      userAgent: "Mozilla/5.0 Chrome/140.0 LumeoSyntheticTest/1",
+    }).trafficClass,
+    "synthetic",
+  );
+  assert.equal(
+    classifyAnalyticsTraffic({
+      userAgent: "Mozilla/5.0",
+      cloudflareBot: { verifiedBot: true },
+    }).trafficClass,
+    "known_bot",
+  );
+  assert.equal(
+    classifyAnalyticsTraffic({
+      userAgent: "Mozilla/5.0 HeadlessChrome/140.0",
+    }).trafficClass,
+    "suspected_automation",
+  );
+  assert.equal(
+    classifyAnalyticsTraffic({
+      userAgent: "curl/8.0 unusual-but-not-proven-bot",
+    }).trafficClass,
+    "real_audience",
+  );
 });
