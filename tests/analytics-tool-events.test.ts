@@ -278,8 +278,8 @@ test("verified analytics keeps browser identity opaque and avoids localStorage",
 test("admin audience analytics reads use the verified aggregate RPC instead of direct event rows", () => {
   const dataLayer = readFileSync("lib/admin/verified-analytics.ts", "utf8");
 
-  assert.match(dataLayer, /get_admin_verified_traffic/);
-  assert.match(dataLayer, /get_admin_recent_analytics_events_v2/);
+  assert.match(dataLayer, /get_admin_verified_traffic_v3/);
+  assert.match(dataLayer, /get_admin_recent_operational_events_v3/);
   assert.doesNotMatch(dataLayer, /\.from\("analytics_events"\)/);
   assert.match(dataLayer, /known \+ unknown !== pageViews/);
 });
@@ -289,21 +289,28 @@ test("admin analytics dashboard exposes current range controls and lifecycle met
 
   assert.match(page, /eyebrow="Analytics"/);
   assert.match(page, /title="Verified traffic analytics"/);
-  assert.match(page, /Real audience analytics only/);
+  assert.match(page, /Real Audience only/);
   assert.match(page, /title="Date range"/);
   assert.match(page, /name="range"/);
   assert.match(page, /<option value="30d">Last 30 days<\/option>/);
   assert.match(page, /<option value="custom">Custom<\/option>/);
   assert.match(page, /label="Page Views"/);
   assert.match(page, /label="Tool Opens"/);
-  assert.match(page, /title="Top Locations"/);
-  assert.match(page, /title="Tool performance"/);
+  assert.doesNotMatch(page, /title="Top Locations"/);
+  assert.match(page, /title="Geography"/);
+  assert.match(page, /title="Tool usage"/);
   assert.match(page, /title="Operation analytics"/);
   assert.match(page, /label="Processing Started"/);
   assert.match(page, /label="Processing Succeeded"/);
   assert.match(page, /label="Processing Failed"/);
   assert.match(page, /label="Downloads Started"/);
   assert.match(page, /label="Success Rate"/);
+  assert.match(page, /value={summary!\.unfinishedAttempts}/);
+  assert.match(page, /Recent operational activity/);
+  assert.doesNotMatch(page, /Started minus succeeded, failed and cancelled/);
+  assert.doesNotMatch(page, /<option value="yesterday">/);
+  assert.doesNotMatch(page, /<option value="this-month">/);
+  assert.doesNotMatch(page, /<option value="previous-month">/);
   assert.doesNotMatch(page, /Analytics V1/);
 });
 
