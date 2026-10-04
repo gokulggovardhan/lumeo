@@ -5,10 +5,10 @@ import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
-import { AnalyticsTrendChart } from "@/components/admin/analytics/AnalyticsTrendChart";
+import { AudienceTrendChart } from "@/components/admin/analytics/AudienceTrendChart";
 import { requireAdmin } from "@/lib/admin/auth";
 import {
-  getAnalyticsSummary,
+  getVerifiedAnalytics,
   getAuditLogs,
   getFeedbackQueries,
   getPdfTools,
@@ -19,7 +19,7 @@ import {
   getErrorLogSummary,
   getUnresolvedErrorLogs,
 } from "@/lib/admin/errors";
-import { formatAdminDateTime } from "@/lib/admin/timezone";
+import { formatAdminDateTime, istIsoDate } from "@/lib/admin/timezone";
 
 function formatDate(value: string | null) {
   return value ? formatAdminDateTime(value) : "Unavailable";
@@ -59,6 +59,8 @@ function StatusRow({
 
 export default async function AdminPage() {
   const admin = await requireAdmin();
+  const today = istIsoDate();
+  const sevenDaysAgo = istIsoDate(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
   const [
     tools,
     analytics,
@@ -70,7 +72,7 @@ export default async function AdminPage() {
     settings,
   ] = await Promise.all([
     getPdfTools(),
-    getAnalyticsSummary(),
+    getVerifiedAnalytics({ startDate: sevenDaysAgo, endDate: today }),
     getUnreadInboxCount(),
     getFeedbackQueries(5, 0),
     getErrorLogSummary(),
@@ -246,7 +248,7 @@ export default async function AdminPage() {
         <div className="mb-3 flex items-end justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-[var(--text-primary)]">Important metrics</p>
-            <p className="mt-1 text-xs text-[var(--text-muted)]">Today (IST) · verified analytics only.</p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">Last 7 days (IST) · verified real-audience analytics only.</p>
           </div>
           <Link href="/admin/analytics" className="text-xs font-semibold text-[var(--text-accent)] hover:underline">
             Analytics →
@@ -259,26 +261,26 @@ export default async function AdminPage() {
           />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <AdminMetricCard label="Page Views" value={analytics.data.pageViewsToday} detail="Public page-view events today." />
-            <AdminMetricCard label="Tool Opens" value={analytics.data.toolOpens} detail="PDF tool workspaces opened today." tone="gold" />
+            <AdminMetricCard label="Page Views" value={analytics.data.pageViews} detail="Verified real-audience page views in the last 7 days." />
+            <AdminMetricCard label="Tool Opens" value={analytics.data.toolOpens} detail="Verified real-audience tool workspaces opened in the last 7 days." tone="gold" />
             <AdminMetricCard
               label="Processing Success"
               value={analytics.data.successRate === null ? "N/A" : `${analytics.data.successRate}%`}
-              detail={processingTotal > 0 ? `${processingTotal} completed processing outcomes.` : "No completed processing outcomes today."}
+              detail={processingTotal > 0 ? `${processingTotal} completed processing outcomes.` : "No completed processing outcomes in the last 7 days."}
               tone={analytics.data.successRate !== null && analytics.data.successRate < 90 ? "warning" : "success"}
             />
-            <AdminMetricCard label="Downloads" value={analytics.data.downloadsStarted} detail="Output downloads started today." />
+            <AdminMetricCard label="Downloads" value={analytics.data.downloadsStarted} detail="Verified real-audience downloads started in the last 7 days." />
           </div>
         )}
       </section>
 
       {!analyticsUnavailable ? (
         <section className="grid min-w-0 gap-4 xl:grid-cols-[1.4fr_0.6fr]">
-          <AnalyticsTrendChart points={analytics.data.sevenDayTotals} rangeLabel="Last 7 days" />
+          <AudienceTrendChart points={analytics.data.daily} rangeLabel="Last 7 days" />
 
           <AdminSectionCard
             title="Processing health"
-            description="Today’s real processing lifecycle signals."
+            description="Verified real-audience processing lifecycle signals from the last 7 days."
           >
             <div className="space-y-1">
               <StatusRow label="Started" value={String(analytics.data.processingStarted)} detail="Processing operations started." tone="neutral" />
@@ -287,9 +289,9 @@ export default async function AdminPage() {
               <StatusRow label="Cancelled" value={String(analytics.data.processingCancelled)} detail="Explicitly cancelled processing operations." tone="neutral" />
               <StatusRow
                 label="No terminal event"
-                value={String(analytics.data.unreconciledStarts)}
-                detail="Started attempts without success, failure, or an explicit cancellation in today's range."
-                tone={analytics.data.unreconciledStarts > 0 ? "warning" : "success"}
+                value={String(Math.max(0, analytics.data.processingStarted - analytics.data.processingSucceeded - analytics.data.processingFailed - analytics.data.processingCancelled))}
+                detail="Started attempts without success, failure, or an explicit cancellation in the selected range."
+                tone={analytics.data.processingStarted - analytics.data.processingSucceeded - analytics.data.processingFailed - analytics.data.processingCancelled > 0 ? "warning" : "success"}
               />
               <StatusRow
                 label="Average duration"
@@ -305,11 +307,11 @@ export default async function AdminPage() {
       <section className="grid gap-4 xl:grid-cols-2">
         <AdminSectionCard
           title="Tool activity"
-          description="Most-opened tools today (IST), mapped to the current catalog state."
+          description="Most-opened tools in the last 7 days (IST), mapped to the current catalog state."
           action={<Link href="/admin/tools" className="text-xs font-semibold text-[var(--text-accent)] hover:underline">Manage tools →</Link>}
         >
           {topTools.length === 0 ? (
-            <AdminEmptyState title="No tool activity yet" description="No tool-open events have been recorded today." />
+            <AdminEmptyState title="No tool activity yet" description="No verified real-audience tool-open events were recorded in the last 7 days." />
           ) : (
             <div className="space-y-1">
               {topTools.map((item, index) => {
