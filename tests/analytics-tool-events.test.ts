@@ -187,6 +187,23 @@ test("operation lifecycle event schema is defined and reflected in the migration
   }
 });
 
+test("owned production browser tests use an explicit synthetic marker header", () => {
+  const route = readFileSync("app/api/analytics/route.ts", "utf8");
+  const productionConversion = readFileSync(
+    "playwright.production-conversion.config.ts",
+    "utf8",
+  );
+  const cloudflareProduction = readFileSync(
+    "playwright.cloudflare-production.config.ts",
+    "utf8",
+  );
+
+  assert.match(route, /x-lumeo-synthetic-test/);
+  assert.match(route, /owned_test_header/);
+  assert.match(productionConversion, /"x-lumeo-synthetic-test": "1"/);
+  assert.match(cloudflareProduction, /"x-lumeo-synthetic-test": "1"/);
+});
+
 test("analytics endpoint requires same-origin browser request metadata", () => {
   const route = readFileSync("app/api/analytics/route.ts", "utf8");
 
