@@ -2,6 +2,11 @@ export type PublicRouteConfig = {
   path: string;
   changeFrequency: "weekly" | "monthly";
   priority: number;
+  /**
+   * Source-controlled ISO calendar date for a known meaningful page change.
+   * Omit this when the page's last meaningful change is not known reliably.
+   */
+  lastModified?: `${number}-${number}-${number}`;
 };
 
 /**
@@ -9,11 +14,12 @@ export type PublicRouteConfig = {
  * coverage. Keep public route inventory in one place so the operator console
  * cannot drift from the live sitemap.
  */
-export const PUBLIC_ROUTE_CONFIG = [
+export const PUBLIC_ROUTE_CONFIG: readonly PublicRouteConfig[] = [
   { path: "/heic-to-jpeg", changeFrequency: "monthly", priority: 0.8 },
-  { path: "/", changeFrequency: "weekly", priority: 1 },
-  { path: "/pdf", changeFrequency: "weekly", priority: 0.9 },
-  { path: "/pdf-tools", changeFrequency: "weekly", priority: 0.9 },
+  // Hybrid entry release, PR #573 (498ef1ff). Update per meaningful page change.
+  { path: "/", changeFrequency: "weekly", priority: 1, lastModified: "2026-10-03" },
+  { path: "/pdf", changeFrequency: "weekly", priority: 0.9, lastModified: "2026-10-03" },
+  { path: "/pdf-tools", changeFrequency: "weekly", priority: 0.9, lastModified: "2026-10-03" },
   { path: "/pdf/merge", changeFrequency: "monthly", priority: 0.8 },
   { path: "/pdf/split", changeFrequency: "monthly", priority: 0.8 },
   { path: "/pdf/compress", changeFrequency: "monthly", priority: 0.8 },
@@ -37,6 +43,6 @@ export const PUBLIC_ROUTE_CONFIG = [
   { path: "/security", changeFrequency: "monthly", priority: 0.55 },
   { path: "/accessibility", changeFrequency: "monthly", priority: 0.5 },
   { path: "/contact", changeFrequency: "monthly", priority: 0.55 },
-] as const satisfies readonly PublicRouteConfig[];
+];
 
 export const PUBLIC_ROUTE_PATHS: readonly string[] = PUBLIC_ROUTE_CONFIG.map((route) => route.path);

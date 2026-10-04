@@ -1,0 +1,57 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import test from "node:test";
+import { PUBLIC_ROUTE_CONFIG, PUBLIC_ROUTE_PATHS } from "../lib/public-site/routes.ts";
+import { buildPublicSitemap } from "../lib/public-site/sitemap.ts";
+
+test("sitemap output stays stable when wall-clock time advances", (context) => {
+  context.mock.timers.enable({ apis: ["Date"], now: Date.UTC(2026, 9, 4) });
+  const first = buildPublicSitemap();
+  context.mock.timers.tick(86_400_000);
+  const second = buildPublicSitemap();
+  assert.deepEqual(second, first);
+
+  const sitemapSource = readFileSync("app/sitemap.ts", "utf8");
+  assert.doesNotMatch(sitemapSource, /new Date|Date\.now/);
+});
+
+test("sitemap uses only explicit source-controlled last-modified dates", () => {
+  const entries = buildPublicSitemap();
+  const configuredDates = new Map<string, string | undefined>(
+    PUBLIC_ROUTE_CONFIG.map((route) => [route.path, route.lastModified]),
+  );
+
+  for (const entry of entries) {
+    const path = new URL(entry.url).pathname;
+    assert.equal(entry.lastModified, configuredDates.get(path));
+    if (entry.lastModified) {
+      assert.match(String(entry.lastModified), /^\d{4}-\d{2}-\d{2}$/);
+    }
+  }
+});
+
+test("all canonical public routes remain represented without indexing transient Workspace routes", () => {
+  const sitemapPaths = buildPublicSitemap().map((entry) => new URL(entry.url).pathname);
+
+  assert.deepEqual(sitemapPaths, [...PUBLIC_ROUTE_PATHS]);
+  for (const path of [
+    "/",
+    "/pdf",
+    "/pdf-tools",
+    "/pdf/edit",
+    "/pdf/organize",
+    "/pdf/sign",
+    "/pdf/compress",
+    "/pdf/word-to-pdf",
+    "/pdf/pdf-to-word",
+    "/about",
+    "/privacy",
+    "/terms",
+    "/contact",
+  ]) {
+    assert.ok(sitemapPaths.includes(path), `missing public sitemap route ${path}`);
+  }
+
+  assert.equal(sitemapPaths.includes("/pdf/add"), false);
+  assert.equal(sitemapPaths.includes("/pdf/finish"), false);
+});

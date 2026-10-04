@@ -32,7 +32,7 @@ test("health summary distinguishes required and optional dependencies", () => {
 });
 
 test("Admin SEO and sitemap share one intentional public route registry", () => {
-  const sitemap = read("app/sitemap.ts");
+  const sitemap = `${read("app/sitemap.ts")}\n${read("lib/public-site/sitemap.ts")}`;
   const seo = read("app/admin/(protected)/seo/page.tsx");
 
   assert.match(sitemap, /PUBLIC_ROUTE_CONFIG/);
