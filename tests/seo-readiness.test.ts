@@ -25,7 +25,7 @@ test("public social metadata fills missing preview images without replacing rout
   });
 
   assert.deepEqual(fallback.openGraph?.images, [PUBLIC_OPEN_GRAPH_IMAGE]);
-  assert.equal(fallback.twitter?.card, "summary_large_image");
+  assert.equal((fallback.twitter as { card?: string } | null | undefined)?.card, "summary_large_image");
   assert.deepEqual(fallback.twitter?.images, [PUBLIC_TWITTER_IMAGE]);
 
   const custom = withPublicSocialImages({
