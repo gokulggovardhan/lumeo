@@ -96,10 +96,10 @@ test("Admin tool filters reject unknown enum values and match case-insensitively
 
 test("Analytics V2 keeps verified unavailable handling and the real aggregate reader", () => {
   const source = readFileSync("app/admin/(protected)/analytics/page.tsx", "utf8");
-  assert.match(source, /getAnalyticsSummary/);
+  assert.match(source, /getVerifiedAnalytics/);
   assert.match(source, /dataStatus === "unavailable"/);
-  assert.match(source, /Metrics are withheld instead of presenting unverified zero values/);
-  assert.match(source, /AnalyticsTrendChart/);
+  assert.match(source, /Metrics are withheld instead of falling back to legacy or fabricated values/);
+  assert.match(source, /AudienceTrendChart/);
   assert.match(source, /AnalyticsDistribution/);
   assert.match(source, /RecentActivityTable/);
   assert.doesNotMatch(source, /revenue|storage saved|AI insight/i);
@@ -116,7 +116,7 @@ test("Tools V2 is server-authorized, URL-filtered, audited through the existing 
     assert.match(page, new RegExp(`name="${field}"`));
   }
   assert.match(page, /Analyst · read only/);
-  assert.match(page, /getAnalyticsSummary\(\)/);
+  assert.match(page, /getVerifiedAnalytics\(\{ startDate: today, endDate: today \}\)/);
   assert.match(page, /usageAvailable \?/);
   assert.match(page, /target="_blank"/);
   assert.match(action, /requireAdmin\(\)/);
