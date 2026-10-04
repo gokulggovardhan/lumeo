@@ -121,7 +121,7 @@ test("Tools V2 is server-authorized, URL-filtered, audited through the existing 
     assert.match(page, new RegExp(`name="${field}"`));
   }
   assert.match(page, /Analyst · read only/);
-  assert.match(page, /getAnalyticsSummary\(\)/);
+  assert.match(page, /getVerifiedTraffic/);
   assert.match(page, /usageAvailable \?/);
   assert.match(page, /target="_blank"/);
   assert.match(action, /requireAdmin\(\)/);
