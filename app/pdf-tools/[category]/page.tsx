@@ -23,7 +23,7 @@ export async function generateMetadata({
   const tool = lumeoTools.find((item) => item.key === category);
   if (!tool) return {};
 
-  return withSeoOverride(`/pdf-tools/${category}`, {
+  const metadata = await withSeoOverride(`/pdf-tools/${category}`, {
     title: { absolute: `${tool.name} - ${tool.plain} | Lumeo PDF` },
     description: tool.tag,
     alternates: { canonical: `/pdf-tools/${category}` },
@@ -35,6 +35,18 @@ export async function generateMetadata({
       type: "website",
     },
   });
+
+  // These legacy branded-category detail pages are useful navigation fallbacks
+  // but are no longer part of the canonical discovery surface. Keep links
+  // crawlable while preventing duplicate/near-duplicate search results beside
+  // the focused tool URLs and /pdf-tools.
+  return {
+    ...metadata,
+    robots: {
+      index: false,
+      follow: true,
+    },
+  };
 }
 
 export default async function ToolCategoryPage({

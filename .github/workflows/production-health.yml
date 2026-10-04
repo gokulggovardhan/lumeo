@@ -181,6 +181,9 @@ jobs:
           EXPECTED_SHA: ${{ github.sha }}
         run: node scripts/verify-production-freshness.mjs
 
+      - name: Verify crawler SEO readiness
+        run: npm run verify:production-seo
+
       - name: Verify production social images
         shell: bash
         run: |
