@@ -17,7 +17,19 @@ function collectUnexpectedBrowserErrors(page: Page) {
   const errors: string[] = [];
 
   page.on("pageerror", (error) => {
-    errors.push(`pageerror: ${error.message}`);
+    const message = error.message;
+    // WebKit can surface an aborted localhost RSC navigation as a page error
+    // even after the target Admin page has rendered successfully. Ignore only
+    // this exact local /admin/health RSC cancellation; auth/API/page failures
+    // and all production-origin errors remain fatal.
+    if (
+      /^\/127\.0\.0\.1:3000\/admin\/health\?_rsc=[A-Za-z0-9_-]+ due to access control checks\.$/.test(
+        message,
+      )
+    ) {
+      return;
+    }
+    errors.push(`pageerror: ${message}`);
   });
   page.on("console", (message) => {
     if (message.type() === "error") {
