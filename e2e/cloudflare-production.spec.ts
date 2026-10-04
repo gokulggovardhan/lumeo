@@ -2,18 +2,8 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { TEXT_ONLY_PDF, writeFixtures } from "./fixtures.ts";
+import { installOwnedAnalyticsMarker } from "./owned-analytics-marker";
 
-
-async function installOwnedAnalyticsMarker(context: import("@playwright/test").BrowserContext) {
-  await context.route("**/api/analytics", async (route) => {
-    await route.continue({
-      headers: {
-        ...route.request().headers(),
-        "x-lumeo-synthetic-test": "1",
-      },
-    });
-  });
-}
 
 test.beforeEach(async ({ context }) => {
   await installOwnedAnalyticsMarker(context);
