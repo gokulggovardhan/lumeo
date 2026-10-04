@@ -7,6 +7,7 @@ import {
   acquisitionSource,
   analyticsHmac,
   classifyTraffic,
+  isFirstPartyAnalyticsRequest,
   parseServerAnalyticsInput,
   readTrustedGeo,
 } from "../lib/analytics/server-ingest.ts";
@@ -57,7 +58,26 @@ test("partial or missing geography never fabricates fields", () => {
   });
 });
 
-test("only explicit Lumeo audits or Cloudflare-verified bots leave real audience", () => {
+test("analytics ingestion rejects cross-site browser requests", () => {
+  assert.equal(
+    isFirstPartyAnalyticsRequest(
+      new Request("https://lumeo.in/api/analytics/event", {
+        headers: { origin: "https://evil.example", "sec-fetch-site": "cross-site" },
+      }),
+    ),
+    false,
+  );
+  assert.equal(
+    isFirstPartyAnalyticsRequest(
+      new Request("https://lumeo.in/api/analytics/event", {
+        headers: { origin: "https://lumeo.in", "sec-fetch-site": "same-origin" },
+      }),
+    ),
+    true,
+  );
+});
+
+test("only explicit audits, verified bots, or self-identified crawlers leave real audience", () => {
   const synthetic = new Request("https://lumeo.in/", {
     headers: { [SYNTHETIC_TRAFFIC_HEADER]: SYNTHETIC_TRAFFIC_VALUE },
   });
@@ -69,7 +89,14 @@ test("only explicit Lumeo audits or Cloudflare-verified bots leave real audience
   bot.cf = { botManagement: { verifiedBot: true } };
   assert.equal(classifyTraffic(bot).trafficClass, "known_bot");
 
-  const ordinary = new Request("https://lumeo.in/");
+  const crawler = new Request("https://lumeo.in/", {
+    headers: { "user-agent": "Mozilla/5.0 (compatible; Googlebot/2.1)" },
+  });
+  assert.equal(classifyTraffic(crawler).trafficClass, "known_bot");
+
+  const ordinary = new Request("https://lumeo.in/", {
+    headers: { "user-agent": "Mozilla/5.0 Safari/605.1.15" },
+  });
   assert.equal(classifyTraffic(ordinary).trafficClass, "real_audience");
 });
 
