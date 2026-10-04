@@ -70,3 +70,14 @@ test("production certification includes a live connected Workspace mutation and 
   assert.match(productionSmoke, /Download PDF/);
   assert.match(productionSmoke, /getRotation\(\)\.angle/);
 });
+
+
+test("production certification ignores only the exact Cloudflare RUM 404 console noise", () => {
+  assert.match(productionSmoke, /isExpectedCloudflareRumConsoleError/);
+  assert.match(productionSmoke, /https:\/\/lumeo\.in\/cdn-cgi\/rum\?/);
+  assert.match(
+    productionSmoke,
+    /Failed to load resource: the server responded with a status of 404 \(Not Found\)/,
+  );
+  assert.match(productionSmoke, /!isExpectedCloudflareRumConsoleError\(message\)/);
+});
