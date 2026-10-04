@@ -259,3 +259,25 @@ Production certification must additionally confirm:
 This design minimizes identity and document data, but privacy/legal requirements
 vary by jurisdiction. Production analytics should continue to receive
 appropriate legal review as the product evolves.
+
+
+## Live Admin traffic
+
+Admin Analytics includes a near-real-time live view that refreshes from a
+same-origin, server-authorized endpoint approximately every 10 seconds.
+
+The live view uses only verified schema-v2 Page Views. It reports:
+
+- Page Views ("hits") in the rolling last 60 seconds and five minutes,
+- active visitors with a Page View in the last five minutes,
+- active sessions with activity in the last five minutes,
+- a ten-minute per-minute Page View trend,
+- known/unknown location reconciliation for the last five minutes,
+- recent Page Views with page path and coarse Cloudflare city/region/country.
+
+"Active" does not mean a persistent socket or exact presence. It is a
+privacy-preserving rolling activity window. The live view never returns raw IP
+addresses, raw visitor/session tokens or keys, cookies, full user agents,
+coordinates, street addresses, filenames, or document content. Synthetic
+Lumeo production tests and reliably classified automation remain separate from
+the default real-audience view.

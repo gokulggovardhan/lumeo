@@ -8,12 +8,13 @@ import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { AnalyticsBarList } from "@/components/admin/analytics/AnalyticsBarList";
 import { AnalyticsPrivacyNotice } from "@/components/admin/analytics/AnalyticsPrivacyNotice";
 import { AnalyticsTrendChart } from "@/components/admin/analytics/AnalyticsTrendChart";
+import { LiveTrafficPanel } from "@/components/admin/analytics/LiveTrafficPanel";
 import { resolveAnalyticsRange } from "@/lib/admin/analytics-range";
 import { formatAdminDateTime, istIsoDate } from "@/lib/admin/timezone";
 import {
+  getVerifiedLiveTraffic,
   getVerifiedRecentEvents,
   getVerifiedTraffic,
-  type VerifiedTrafficScope,
 } from "@/lib/admin/verified-analytics";
 import { formatLocationLabel } from "@/lib/analytics/location-names";
 
@@ -28,36 +29,6 @@ function formatDuration(value: number | null) {
     : `${(value / 1000).toFixed(1)}s`;
 }
 
-function parseTrafficScope(value: string | undefined): VerifiedTrafficScope {
-  return value === "synthetic" ||
-    value === "automation" ||
-    value === "all"
-    ? value
-    : "real_audience";
-}
-
-function trafficLabel(scope: VerifiedTrafficScope) {
-  if (scope === "real_audience") return "Real audience";
-  if (scope === "synthetic") return "Lumeo synthetic tests";
-  if (scope === "automation") return "Bots & suspected automation";
-  return "All verified traffic";
-}
-
-function scopeHref(
-  scope: VerifiedTrafficScope,
-  range: string | undefined,
-  start: string | undefined,
-  end: string | undefined,
-) {
-  const params = new URLSearchParams();
-  if (range) params.set("range", range);
-  if (start) params.set("start", start);
-  if (end) params.set("end", end);
-  if (scope !== "real_audience") params.set("traffic", scope);
-  const query = params.toString();
-  return query ? `/admin/analytics?${query}` : "/admin/analytics";
-}
-
 export default async function AnalyticsPage({
   searchParams,
 }: {
@@ -65,20 +36,19 @@ export default async function AnalyticsPage({
     range?: string;
     start?: string;
     end?: string;
-    traffic?: string;
   }>;
 }) {
   const params = (await searchParams) ?? {};
   const range = resolveAnalyticsRange(params, new Date());
   const maxDate = istIsoDate();
-  const trafficScope = parseTrafficScope(params.traffic);
 
-  const [verified, recent] = await Promise.all([
+  const [verified, recent, live] = await Promise.all([
     getVerifiedTraffic(
       { startDate: range.startDate, endDate: range.endDate },
-      trafficScope,
+      "real_audience",
     ),
-    getVerifiedRecentEvents(100, trafficScope),
+    getVerifiedRecentEvents(100, "real_audience"),
+    getVerifiedLiveTraffic("real_audience"),
   ]);
 
   const data = verified.data;
@@ -105,7 +75,7 @@ export default async function AnalyticsPage({
       <AdminPageHeader
         eyebrow="Analytics"
         title="Verified traffic analytics"
-        description="Server-verified audience, sessions, page views, tool usage and Cloudflare network geography. Real audience is separated from Lumeo tests, bots and suspected automation."
+        description="Real audience analytics only: verified visitors, sessions, page views, live hits, tool usage and approximate Cloudflare network geography."
         meta={
           <Link
             href="/admin/analytics/activity"
@@ -119,34 +89,10 @@ export default async function AnalyticsPage({
 
       <AnalyticsPrivacyNotice />
 
-      <AdminSectionCard
-        title="Traffic scope"
-        description="Real audience is the default business view. Diagnostic scopes are kept separate so CI and browser automation cannot inflate visitor or location metrics."
-      >
-        <div className="flex flex-wrap gap-2">
-          {(
-            [
-              "real_audience",
-              "synthetic",
-              "automation",
-              "all",
-            ] as VerifiedTrafficScope[]
-          ).map((scope) => (
-            <Link
-              key={scope}
-              href={scopeHref(scope, params.range, params.start, params.end)}
-              prefetch={false}
-              className={
-                scope === trafficScope
-                  ? "inline-flex min-h-10 items-center rounded-xl border border-[var(--border-premium)] bg-[rgba(var(--lumeo-gold-rgb),0.10)] px-3 text-sm font-bold text-[var(--text-primary)]"
-                  : "inline-flex min-h-10 items-center rounded-xl border border-[var(--border-subtle)] px-3 text-sm font-semibold text-[var(--text-secondary)] hover:border-[var(--border-premium)] hover:text-[var(--text-primary)]"
-              }
-            >
-              {trafficLabel(scope)}
-            </Link>
-          ))}
-        </div>
-      </AdminSectionCard>
+      <LiveTrafficPanel
+        initialData={live.data}
+        initialError={live.error}
+      />
 
       <AdminSectionCard
         title="Date range"
@@ -157,9 +103,6 @@ export default async function AnalyticsPage({
           method="get"
           className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
         >
-          {trafficScope !== "real_audience" ? (
-            <input type="hidden" name="traffic" value={trafficScope} />
-          ) : null}
           <label className="text-xs font-semibold text-[var(--text-secondary)]">
             Range
             <select
@@ -206,7 +149,7 @@ export default async function AnalyticsPage({
           </div>
         </form>
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-          <AdminStatusBadge tone="gold">{trafficLabel(trafficScope)}</AdminStatusBadge>
+          <AdminStatusBadge tone="gold">Real Audience</AdminStatusBadge>
           <AdminStatusBadge tone="gold">Selected: {range.label}</AdminStatusBadge>
           <span>{range.startDate} to {range.endDate} · IST</span>
         </div>
@@ -249,7 +192,7 @@ export default async function AnalyticsPage({
             <AdminMetricCard
               label="Page Views"
               value={summary!.pageViews}
-              detail="Verified page-view events for the selected traffic scope."
+              detail="Verified page-view events for real audience."
               tone="gold"
             />
             <AdminMetricCard
@@ -307,7 +250,7 @@ export default async function AnalyticsPage({
           {noData ? (
             <AdminEmptyState
               title="No verified traffic in this range"
-              description="This is a genuine zero for the selected verified traffic scope."
+              description="This is a genuine zero for real audience."
             />
           ) : null}
 
@@ -531,22 +474,6 @@ export default async function AnalyticsPage({
           </AdminSectionCard>
 
           <AdminSectionCard
-            title="Traffic separation"
-            description="This diagnostic proves test/bot traffic is visible but not mixed into the default Real audience view."
-          >
-            <AdminDataTable
-              columns={["Class", "Page views", "Visitors", "Sessions", "Events"]}
-              rows={data.trafficCounts.map((row) => [
-                row.trafficClass,
-                row.pageViews,
-                row.visitors,
-                row.sessions,
-                row.events,
-              ])}
-            />
-          </AdminSectionCard>
-
-          <AdminSectionCard
             title="Data integrity"
             description="Schema-v1 data is retained for audit history but excluded from verified visitor and location metrics."
           >
@@ -580,7 +507,7 @@ export default async function AnalyticsPage({
 
           <AdminSectionCard
             title="Recent verified activity"
-            description="Newest verified events for the selected traffic scope. No visitor/session key, raw IP, precise coordinate, filename or document content is displayed."
+            description="Newest verified events for real audience. No visitor/session key, raw IP, precise coordinate, filename or document content is displayed."
           >
             {recent.error ? (
               <AdminEmptyState

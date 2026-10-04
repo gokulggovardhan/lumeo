@@ -289,7 +289,7 @@ test("admin analytics dashboard exposes current range controls and lifecycle met
 
   assert.match(page, /eyebrow="Analytics"/);
   assert.match(page, /title="Verified traffic analytics"/);
-  assert.match(page, /Server-verified audience/);
+  assert.match(page, /Real audience analytics only/);
   assert.match(page, /title="Date range"/);
   assert.match(page, /name="range"/);
   assert.match(page, /<option value="30d">Last 30 days<\/option>/);

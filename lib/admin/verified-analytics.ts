@@ -1,6 +1,11 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import type {
+  VerifiedLiveHit,
+  VerifiedLiveMinuteBucket,
+  VerifiedLiveTrafficData,
+} from "@/lib/admin/live-analytics-types";
 
 export type VerifiedTrafficScope =
   | "real_audience"
@@ -371,6 +376,115 @@ export function parseVerifiedTraffic(value: unknown): VerifiedTrafficData | null
     trafficCounts,
     integrity,
   };
+}
+
+function parseVerifiedLiveTraffic(value: unknown): VerifiedLiveTrafficData | null {
+  if (!isRecord(value) || value.schema_version !== 2) return null;
+
+  const scope = stringValue(value.traffic_scope);
+  if (
+    scope !== "real_audience" &&
+    scope !== "synthetic" &&
+    scope !== "automation" &&
+    scope !== "all"
+  ) {
+    return null;
+  }
+
+  const asOf = stringValue(value.as_of);
+  const summaryValue = value.summary;
+  const minuteValue = value.minute_buckets;
+  const hitsValue = value.recent_hits;
+  if (!asOf || !isRecord(summaryValue) || !Array.isArray(minuteValue) || !Array.isArray(hitsValue)) {
+    return null;
+  }
+
+  const pageViewsLastFiveMinutes = countValue(summaryValue.page_views_last_five_minutes);
+  const knownLocationPageViewsLastFiveMinutes = countValue(
+    summaryValue.known_location_page_views_last_five_minutes,
+  );
+  const unknownLocationPageViewsLastFiveMinutes = countValue(
+    summaryValue.unknown_location_page_views_last_five_minutes,
+  );
+  if (
+    knownLocationPageViewsLastFiveMinutes + unknownLocationPageViewsLastFiveMinutes !==
+    pageViewsLastFiveMinutes
+  ) {
+    return null;
+  }
+
+  const minuteBuckets: VerifiedLiveMinuteBucket[] = [];
+  for (const item of minuteValue) {
+    if (!isRecord(item)) return null;
+    const minute = stringValue(item.minute);
+    if (!minute) return null;
+    minuteBuckets.push({
+      minute,
+      pageViews: countValue(item.page_views),
+      visitors: countValue(item.visitors),
+    });
+  }
+
+  const recentHits: VerifiedLiveHit[] = [];
+  for (const item of hitsValue) {
+    if (!isRecord(item)) return null;
+    const occurredAt = stringValue(item.occurred_at);
+    if (!occurredAt) return null;
+    recentHits.push({
+      occurredAt,
+      pagePath: stringValue(item.page_path),
+      toolSlug: stringValue(item.tool_slug),
+      city: stringValue(item.city),
+      region: stringValue(item.region),
+      regionCode: stringValue(item.region_code),
+      countryCode: stringValue(item.country_code),
+    });
+  }
+
+  return {
+    schemaVersion: 2,
+    trafficScope: scope,
+    asOf,
+    summary: {
+      pageViewsLastMinute: countValue(summaryValue.page_views_last_minute),
+      pageViewsLastFiveMinutes,
+      activeVisitorsLastFiveMinutes: countValue(
+        summaryValue.active_visitors_last_five_minutes,
+      ),
+      activeSessionsLastFiveMinutes: countValue(
+        summaryValue.active_sessions_last_five_minutes,
+      ),
+      knownLocationPageViewsLastFiveMinutes,
+      unknownLocationPageViewsLastFiveMinutes,
+      lastPageViewAt: stringValue(summaryValue.last_page_view_at),
+    },
+    minuteBuckets,
+    recentHits,
+  };
+}
+
+export async function getVerifiedLiveTraffic(
+  trafficScope: VerifiedTrafficScope = "real_audience",
+): Promise<DataResult<VerifiedLiveTrafficData | null>> {
+  const supabase = await createClient();
+  const result = await supabase.rpc("get_admin_live_analytics_v2", {
+    p_traffic_scope: trafficScope,
+  });
+
+  if (result.error) {
+    return {
+      data: null,
+      error: "Live verified analytics are temporarily unavailable.",
+    };
+  }
+
+  const parsed = parseVerifiedLiveTraffic(result.data);
+  return parsed
+    ? { data: parsed, error: null }
+    : {
+        data: null,
+        error: "Live verified analytics returned an invalid response.",
+      };
 }
 
 export async function getVerifiedTraffic(

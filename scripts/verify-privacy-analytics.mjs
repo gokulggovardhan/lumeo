@@ -6,11 +6,15 @@ const migrationPath = "supabase/migrations/20260712004_privacy_analytics.sql";
 const adminMigrationPath = "supabase/migrations/20260714005_admin_analytics_reads.sql";
 const verifiedMigrationPath =
   "supabase/migrations/20261004090000_verified_analytics_activation.sql";
+const liveMigrationPath =
+  "supabase/migrations/20261004110000_admin_live_traffic.sql";
 const files = [
   migrationPath,
   adminMigrationPath,
   verifiedMigrationPath,
+  liveMigrationPath,
   "app/api/analytics/route.ts",
+  "app/admin/(protected)/analytics/live/route.ts",
   "lib/analytics/server-identity.ts",
   "lib/analytics/server-user-agent.ts",
   "lib/analytics/traffic-classification.ts",
@@ -27,6 +31,7 @@ const files = [
   "components/admin/analytics/AnalyticsBarList.tsx",
   "components/admin/analytics/AnalyticsDistribution.tsx",
   "components/admin/analytics/AnalyticsPrivacyNotice.tsx",
+  "components/admin/analytics/LiveTrafficPanel.tsx",
   "docs/PRIVACY_ANALYTICS.md",
   "tests/analytics-tool-events.test.ts",
   "lib/admin/data.ts",
@@ -54,6 +59,7 @@ try {
   const migration = read(migrationPath);
   const adminMigration = read(adminMigrationPath);
   const verifiedMigration = read(verifiedMigrationPath);
+  const liveMigration = read(liveMigrationPath);
   assert(/^begin;/im.test(migration) && /^commit;/im.test(migration), "Migration 004 must be transactional.");
   assert(/record_public_analytics_event/i.test(migration), "Public analytics RPC missing.");
   assert(/refresh_daily_tool_metrics/i.test(migration), "Daily metrics refresh function missing.");
@@ -158,6 +164,48 @@ try {
     ),
     "Verified Admin aggregate must reject anon execution.",
   );
+  assert(
+    /^begin;/im.test(liveMigration) && /^commit;/im.test(liveMigration),
+    "Live analytics migration must be transactional.",
+  );
+  assert(
+    /get_admin_live_analytics_v2/i.test(liveMigration),
+    "Live Admin analytics RPC missing.",
+  );
+  assert(
+    /event_name\s*=\s*'page_view'/i.test(liveMigration),
+    "Live hits must be based on page_view events, not raw requests.",
+  );
+  assert(
+    /count\(distinct visitor_key\)/i.test(liveMigration) &&
+      /count\(distinct session_key\)/i.test(liveMigration),
+    "Live analytics must use the verified visitor/session model.",
+  );
+  assert(
+    /revoke all on function public\.get_admin_live_analytics_v2\(text\) from anon/i.test(
+      liveMigration,
+    ),
+    "Live Admin analytics must reject anonymous execution.",
+  );
+  assert(
+    /grant execute on function public\.get_admin_live_analytics_v2\(text\) to authenticated/i.test(
+      liveMigration,
+    ),
+    "Live Admin analytics must grant only authenticated execution.",
+  );
+  for (const forbidden of [
+    "cf-connecting-ip",
+    "anonymous_session_id",
+    "latitude",
+    "longitude",
+    "street_address",
+  ]) {
+    assert(
+      !liveMigration.toLowerCase().includes(forbidden),
+      `Live Admin analytics must not expose ${forbidden}.`,
+    );
+  }
+
   const adminReturnStart = adminMigration.indexOf("return jsonb_build_object");
   const adminReturnTail = adminMigration.slice(adminReturnStart);
   const adminReturnEndMatch = /end;\s*\$\$;/i.exec(adminReturnTail);
@@ -309,7 +357,10 @@ try {
   assert(adminPage.includes("Real audience"), "Admin analytics page must default to a real-audience scope.");
   assert(adminPage.includes("Known-location page views"), "Admin analytics page must show known-location page views.");
   assert(adminPage.includes("Unknown-location page views"), "Admin analytics page must show unknown-location page views.");
-  assert(adminPage.includes("Traffic separation"), "Admin analytics page must expose traffic-class diagnostics.");
+  assert(!adminPage.includes("Traffic scope"), "Primary Admin analytics must not expose diagnostic traffic scopes.");
+  assert(!adminPage.includes("Traffic separation"), "Primary Admin analytics must not expose traffic-class diagnostics.");
+  assert(!adminPage.includes("Lumeo synthetic tests"), "Primary Admin analytics must remain Real Audience only.");
+  assert(!adminPage.includes("Bots & suspected automation"), "Primary Admin analytics must remain Real Audience only.");
   assert(adminPage.includes('label="Page Views"'), "Admin analytics page must display page views.");
   assert(adminPage.includes('label="Tool Opens"'), "Admin analytics page must display tool opens.");
   assert(adminPage.includes("Top tools by opens"), "Admin analytics page must display top tools by opens.");
@@ -327,6 +378,8 @@ try {
     adminPage.includes("Verified analytics are unavailable"),
     "Admin analytics page must distinguish reader failure from genuine zero.",
   );
+  assert(adminPage.includes("LiveTrafficPanel"), "Admin analytics page must include live traffic.");
+  assert(adminPage.includes('"real_audience"'), "Primary Admin analytics must explicitly query Real Audience.");
 
   const adminData = read("lib/admin/verified-analytics.ts");
   assert(
@@ -336,6 +389,10 @@ try {
   assert(
     adminData.includes("get_admin_recent_analytics_events_v2"),
     "Verified Admin data layer must call the schema-v2 recent-event RPC.",
+  );
+  assert(
+    adminData.includes("get_admin_live_analytics_v2"),
+    "Verified Admin data layer must call the live schema-v2 RPC.",
   );
   assert(
     !/\.from\("analytics_events"\)/.test(adminData),
@@ -354,6 +411,10 @@ try {
   assert(
     databaseTypes.includes("get_admin_recent_analytics_events_v2"),
     "Database types must include the verified recent-event RPC.",
+  );
+  assert(
+    databaseTypes.includes("get_admin_live_analytics_v2"),
+    "Database types must include the live verified analytics RPC.",
   );
 
   const privacy = read("app/privacy/page.tsx");

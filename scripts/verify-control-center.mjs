@@ -209,7 +209,10 @@ try {
   assert(analyticsPage.includes('label="Sessions"'), "Analytics page must display verified sessions.");
   assert(analyticsPage.includes('title="Location integrity"'), "Analytics page must expose known/unknown location reconciliation.");
   assert(analyticsPage.includes('title="Top Locations"'), "Analytics page must expose verified visitor locations.");
-  assert(analyticsPage.includes('title="Traffic separation"'), "Analytics page must keep synthetic and automation traffic separate.");
+  assert(!analyticsPage.includes('title="Traffic separation"'), "Primary Analytics UI must not expose diagnostic traffic classes.");
+  assert(!analyticsPage.includes("Lumeo synthetic tests"), "Primary Analytics UI must remain Real Audience only.");
+  assert(!analyticsPage.includes("Bots & suspected automation"), "Primary Analytics UI must remain Real Audience only.");
+  assert(analyticsPage.includes('"real_audience"'), "Analytics page must query the verified Real Audience scope.");
   assert(analyticsPage.includes('label="Tool Opens"'), "Analytics page must display tool opens.");
   assert(analyticsPage.includes('title="Operation analytics"'), "Analytics page must explain operation analytics.");
   assert(!analyticsPage.includes("Analytics V1"), "Analytics page must not restore obsolete Analytics V1 copy.");
