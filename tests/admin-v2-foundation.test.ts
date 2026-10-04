@@ -35,7 +35,7 @@ test("Admin Console V2 Dashboard derives attention and metrics from real protect
 
   for (const reader of [
     "getPdfTools",
-    "getAnalyticsSummary",
+    "getVerifiedAnalytics",
     "getUnreadInboxCount",
     "getFeedbackQueries",
     "getErrorLogSummary",
