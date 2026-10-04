@@ -10,7 +10,7 @@ import {
 } from "@/components/InfoPage";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
-const lastUpdated = "September 25, 2026";
+const lastUpdated = "October 4, 2026";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/privacy", {
@@ -107,22 +107,38 @@ export default function PrivacyPage() {
 
         <InfoPageSection title="Analytics and diagnostics">
           <p>
-            Lumeo may record optional anonymous product-use events to understand
-            reliability and which PDF tools need attention. These events use a
-            temporary browser-session ID and coarse categories only.
+            Lumeo may record optional first-party product-use events to understand
+            genuine audience traffic, reliability, and which PDF tools need
+            attention. When enabled, Lumeo sets random first-party visitor and
+            30-minute session identifiers. Only HMAC-pseudonymized forms are
+            stored with analytics events; the raw cookie values are not stored
+            in analytics records.
+          </p>
+          <p>
+            Approximate City, State/Region, and Country may be derived
+            server-side from Cloudflare visitor-IP geolocation. Lumeo does not
+            store the raw IP address, GPS coordinates, precise address, or
+            browser geolocation permission data. If complete location data is
+            unavailable, the visit remains counted with Unknown Location rather
+            than being guessed.
           </p>
           <p>
             Analytics events do not include documents, filenames, document
             contents, exact file sizes, extracted text, passwords, emails, or
             account identifiers. Do Not Track disables optional analytics.
+            Lumeo synthetic browser tests and reliably identified automation are
+            separated from the default genuine-audience reporting.
           </p>
         </InfoPageSection>
 
         <InfoPageSection title="Cookies">
           <p>
-            Current browser-first tools do not require account cookies. Hosting
-            platforms, browsers, or future product features may use cookies or
-            similar storage for operational purposes.
+            Current browser-first tools do not require an account. When optional
+            analytics is enabled, Lumeo may use a first-party random visitor
+            cookie for up to 90 days and a sliding 30-minute first-party session
+            cookie so repeat visits and sessions can be counted without storing
+            the raw cookie tokens in analytics records. Administrative sign-in
+            uses separate authentication cookies.
           </p>
         </InfoPageSection>
 
