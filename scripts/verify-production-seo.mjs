@@ -10,13 +10,19 @@ function normalizeUrl(value) {
   return `${url.origin}${url.pathname.replace(/\/$/, "")}`;
 }
 
+const XML_ENTITY = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+};
+
 function decodeXml(value) {
-  return value
-    .replaceAll("&amp;", "&")
-    .replaceAll("&lt;", "<")
-    .replaceAll("&gt;", ">")
-    .replaceAll("&quot;", '"')
-    .replaceAll("&apos;", "'");
+  return value.replace(
+    /&(amp|lt|gt|quot|apos);/g,
+    (_match, entity) => XML_ENTITY[entity],
+  );
 }
 
 function attributes(tag) {
