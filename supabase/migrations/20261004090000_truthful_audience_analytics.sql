@@ -194,6 +194,7 @@ begin
       and events.session_key = p_session_key
       and events.event_name = cleaned_event
       and coalesce(events.tool_slug,'') = coalesce(cleaned_tool,'')
+      and coalesce(events.page_path,'') = coalesce(cleaned_page_path,'')
       and events.occurred_at > now() - interval '3 seconds'
   ) then
     return true;
