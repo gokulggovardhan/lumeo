@@ -264,9 +264,9 @@ export default async function AnalyticsPage({
               rangeLabel={range.label}
               points={data.daily.map((point) => ({
                 date: point.date,
-                events: point.pageViews + point.toolOpens,
                 pageViews: point.pageViews,
-                toolOpens: point.toolOpens,
+                uniqueVisitors: point.uniqueVisitors,
+                sessions: point.sessions,
               }))}
             />
             <AdminSectionCard
@@ -317,16 +317,26 @@ export default async function AnalyticsPage({
           >
             <AdminDataTable
               columns={["Location", "Page views", "Visitors", "Sessions"]}
-              rows={data.locations.map((row) => [
-                formatLocationLabel(
-                  row.city,
-                  row.regionCode ?? row.region,
-                  row.countryCode,
-                ),
-                row.pageViews,
-                row.visitors,
-                row.sessions,
-              ])}
+              rows={[
+                ...data.locations.map((row) => [
+                  formatLocationLabel(
+                    row.city,
+                    row.regionCode ?? row.region,
+                    row.countryCode,
+                  ),
+                  row.pageViews,
+                  row.visitors,
+                  row.sessions,
+                ]),
+                ...(summary!.unknownLocationPageViews > 0
+                  ? [[
+                      "Unknown Location",
+                      summary!.unknownLocationPageViews,
+                      "—",
+                      "—",
+                    ]]
+                  : []),
+              ]}
               empty={
                 <AdminEmptyState
                   title="No verified city-level locations"
