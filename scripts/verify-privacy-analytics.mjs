@@ -357,7 +357,10 @@ try {
   assert(adminPage.includes("Real audience"), "Admin analytics page must default to a real-audience scope.");
   assert(adminPage.includes("Known-location page views"), "Admin analytics page must show known-location page views.");
   assert(adminPage.includes("Unknown-location page views"), "Admin analytics page must show unknown-location page views.");
-  assert(adminPage.includes("Traffic separation"), "Admin analytics page must expose traffic-class diagnostics.");
+  assert(!adminPage.includes("Traffic scope"), "Primary Admin analytics must not expose diagnostic traffic scopes.");
+  assert(!adminPage.includes("Traffic separation"), "Primary Admin analytics must not expose traffic-class diagnostics.");
+  assert(!adminPage.includes("Lumeo synthetic tests"), "Primary Admin analytics must remain Real Audience only.");
+  assert(!adminPage.includes("Bots & suspected automation"), "Primary Admin analytics must remain Real Audience only.");
   assert(adminPage.includes('label="Page Views"'), "Admin analytics page must display page views.");
   assert(adminPage.includes('label="Tool Opens"'), "Admin analytics page must display tool opens.");
   assert(adminPage.includes("Top tools by opens"), "Admin analytics page must display top tools by opens.");
@@ -376,6 +379,7 @@ try {
     "Admin analytics page must distinguish reader failure from genuine zero.",
   );
   assert(adminPage.includes("LiveTrafficPanel"), "Admin analytics page must include live traffic.");
+  assert(adminPage.includes('"real_audience"'), "Primary Admin analytics must explicitly query Real Audience.");
 
   const adminData = read("lib/admin/verified-analytics.ts");
   assert(
