@@ -35,15 +35,15 @@ export default defineConfig({
     },
     {
       name: "webkit-production-conversion",
-      use: { ...devices["Desktop Safari"] },
+      use: { ...devices["Desktop Safari"], userAgent: `${devices["Desktop Safari"].userAgent} LumeoSyntheticTest/1` },
     },
     {
       name: "webkit-mobile-production-conversion",
-      use: { ...devices["iPhone 15 Pro"] },
+      use: { ...devices["iPhone 15 Pro"], userAgent: `${devices["iPhone 15 Pro"].userAgent} LumeoSyntheticTest/1` },
     },
     {
       name: "firefox-production-conversion",
-      use: { ...devices["Desktop Firefox"] },
+      use: { ...devices["Desktop Firefox"], userAgent: `${devices["Desktop Firefox"].userAgent} LumeoSyntheticTest/1` },
     },
   ],
 });
