@@ -8,11 +8,14 @@ const verifiedMigrationPath =
   "supabase/migrations/20261004090000_verified_analytics_activation.sql";
 const liveMigrationPath =
   "supabase/migrations/20261004110000_admin_live_traffic.sql";
+const reconciliationMigrationPath =
+  "supabase/migrations/20261004120000_analytics_reconciliation.sql";
 const files = [
   migrationPath,
   adminMigrationPath,
   verifiedMigrationPath,
   liveMigrationPath,
+  reconciliationMigrationPath,
   "app/api/analytics/route.ts",
   "app/admin/(protected)/analytics/live/route.ts",
   "lib/analytics/server-identity.ts",
@@ -60,6 +63,7 @@ try {
   const adminMigration = read(adminMigrationPath);
   const verifiedMigration = read(verifiedMigrationPath);
   const liveMigration = read(liveMigrationPath);
+  const reconciliationMigration = read(reconciliationMigrationPath);
   assert(/^begin;/im.test(migration) && /^commit;/im.test(migration), "Migration 004 must be transactional.");
   assert(/record_public_analytics_event/i.test(migration), "Public analytics RPC missing.");
   assert(/refresh_daily_tool_metrics/i.test(migration), "Daily metrics refresh function missing.");
@@ -164,6 +168,54 @@ try {
     ),
     "Verified Admin aggregate must reject anon execution.",
   );
+  assert(
+    /^begin;/im.test(reconciliationMigration) &&
+      /^commit;/im.test(reconciliationMigration),
+    "Analytics reconciliation migration must be transactional.",
+  );
+  assert(
+    /operation_attempt_id uuid/i.test(reconciliationMigration) &&
+      /assign_analytics_operation_attempt/i.test(reconciliationMigration),
+    "Processing lifecycle must use a server-assigned attempt identity.",
+  );
+  assert(
+    /get_admin_verified_traffic_v2_base/i.test(reconciliationMigration) &&
+      /create or replace function public\.get_admin_verified_traffic\(/i.test(
+        reconciliationMigration,
+      ),
+    "Reconciled analytics must upgrade the existing aggregate RPC atomically.",
+  );
+  assert(
+    /get_admin_recent_operational_events_v3/i.test(reconciliationMigration) &&
+      /event_name in \([\s\S]*'tool_opened'[\s\S]*'download_started'/i.test(
+        reconciliationMigration,
+      ),
+    "Recent Admin analytics must expose operational events without page-view duplication.",
+  );
+  assert(
+    /distinct on \(e\.visitor_key\)/i.test(reconciliationMigration) &&
+      /latest page view/i.test(reconciliationMigration),
+    "Audience Environment must assign one canonical environment per verified visitor.",
+  );
+  assert(
+    /unfinished_attempts/i.test(reconciliationMigration) &&
+      /terminal_event is null/i.test(reconciliationMigration),
+    "Unfinished processing must come from correlated attempts, not subtraction.",
+  );
+  for (const forbidden of [
+    "raw_ip",
+    "street_address",
+    "document_content",
+    "filename",
+    "email",
+    "authenticated_user_id",
+  ]) {
+    assert(
+      !reconciliationMigration.toLowerCase().includes(forbidden),
+      `Reconciled analytics must not expose ${forbidden}.`,
+    );
+  }
+
   assert(
     /^begin;/im.test(liveMigration) && /^commit;/im.test(liveMigration),
     "Live analytics migration must be transactional.",
@@ -354,7 +406,7 @@ try {
   assert(adminPage.includes("AnalyticsPrivacyNotice"), "Admin analytics privacy notice missing.");
   assert(!adminPage.includes("Analytics V1"), "Admin analytics page must not restore obsolete Analytics V1 copy.");
   assert(adminPage.includes("Verified traffic analytics"), "Admin analytics page must identify the verified traffic view.");
-  assert(adminPage.includes("Real audience"), "Admin analytics page must default to a real-audience scope.");
+  assert(/Real Audience/.test(adminPage), "Admin analytics page must remain Real Audience only.");
   assert(adminPage.includes("Known-location page views"), "Admin analytics page must show known-location page views.");
   assert(adminPage.includes("Unknown-location page views"), "Admin analytics page must show unknown-location page views.");
   assert(!adminPage.includes("Traffic scope"), "Primary Admin analytics must not expose diagnostic traffic scopes.");
@@ -364,8 +416,8 @@ try {
   assert(adminPage.includes('label="Page Views"'), "Admin analytics page must display page views.");
   assert(adminPage.includes('label="Tool Opens"'), "Admin analytics page must display tool opens.");
   assert(adminPage.includes("Top tools by opens"), "Admin analytics page must display top tools by opens.");
-  assert(adminPage.includes("Device class"), "Admin analytics page must display device summary.");
-  assert(adminPage.includes("Browser family"), "Admin analytics page must display browser summary.");
+  assert(adminPage.includes('title="Device"'), "Admin analytics page must display device summary.");
+  assert(adminPage.includes('title="Browser"'), "Admin analytics page must display browser summary.");
   assert(adminPage.includes("Operating system"), "Admin analytics page must display operating-system summary.");
   assert(adminPage.includes("Operation analytics"), "Admin analytics page must explain operation lifecycle metrics.");
   // Operation lifecycle metric cards are current production behavior; keep
@@ -384,11 +436,11 @@ try {
   const adminData = read("lib/admin/verified-analytics.ts");
   assert(
     adminData.includes("get_admin_verified_traffic"),
-    "Verified Admin data layer must call the schema-v2 aggregate RPC.",
+    "Verified Admin data layer must call the stable reconciled aggregate RPC.",
   );
   assert(
-    adminData.includes("get_admin_recent_analytics_events_v2"),
-    "Verified Admin data layer must call the schema-v2 recent-event RPC.",
+    adminData.includes("get_admin_recent_operational_events_v3"),
+    "Verified Admin data layer must call the operational recent-event RPC.",
   );
   assert(
     adminData.includes("get_admin_live_analytics_v2"),
@@ -409,8 +461,8 @@ try {
     "Database types must include the verified aggregate analytics RPC.",
   );
   assert(
-    databaseTypes.includes("get_admin_recent_analytics_events_v2"),
-    "Database types must include the verified recent-event RPC.",
+    databaseTypes.includes("get_admin_recent_operational_events_v3"),
+    "Database types must include the operational recent-event RPC.",
   );
   assert(
     databaseTypes.includes("get_admin_live_analytics_v2"),
