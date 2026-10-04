@@ -8,9 +8,11 @@ import { AdminStatusBadge } from "@/components/admin/AdminStatusBadge";
 import { AnalyticsBarList } from "@/components/admin/analytics/AnalyticsBarList";
 import { AnalyticsPrivacyNotice } from "@/components/admin/analytics/AnalyticsPrivacyNotice";
 import { AnalyticsTrendChart } from "@/components/admin/analytics/AnalyticsTrendChart";
+import { LiveTrafficPanel } from "@/components/admin/analytics/LiveTrafficPanel";
 import { resolveAnalyticsRange } from "@/lib/admin/analytics-range";
 import { formatAdminDateTime, istIsoDate } from "@/lib/admin/timezone";
 import {
+  getVerifiedLiveTraffic,
   getVerifiedRecentEvents,
   getVerifiedTraffic,
   type VerifiedTrafficScope,
@@ -73,12 +75,13 @@ export default async function AnalyticsPage({
   const maxDate = istIsoDate();
   const trafficScope = parseTrafficScope(params.traffic);
 
-  const [verified, recent] = await Promise.all([
+  const [verified, recent, live] = await Promise.all([
     getVerifiedTraffic(
       { startDate: range.startDate, endDate: range.endDate },
       trafficScope,
     ),
     getVerifiedRecentEvents(100, trafficScope),
+    getVerifiedLiveTraffic(trafficScope),
   ]);
 
   const data = verified.data;
@@ -147,6 +150,12 @@ export default async function AnalyticsPage({
           ))}
         </div>
       </AdminSectionCard>
+
+      <LiveTrafficPanel
+        trafficScope={trafficScope}
+        initialData={live.data}
+        initialError={live.error}
+      />
 
       <AdminSectionCard
         title="Date range"
