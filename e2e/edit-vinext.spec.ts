@@ -202,6 +202,11 @@ test("vinext Edit PDF keeps invisible searchable-scan text read-only", async ({
 test("vinext Edit PDF recognizes a proven scanned page locally without promoting it to native text", async ({
   page,
 }) => {
+  // WebKit's first self-hosted OCR worker/model initialization can be
+  // materially slower on a cold CI runner. This keeps the fidelity assertion
+  // strict while allowing that one-time local startup cost to complete.
+  test.setTimeout(240_000);
+
   await uploadEditFixture(page, IMAGE_ONLY_PDF);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
@@ -240,7 +245,7 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
   await page.getByRole("button", { name: "Recognize text locally" }).click();
   const recognizedText = page.getByRole("textbox", { name: "Recognized text (OCR)" });
   await expect(recognizedText).toHaveValue(/SCANNED PAGE SAMPLE/i, {
-    timeout: 90_000,
+    timeout: 150_000,
   });
   await expect(recognizedText).toHaveValue(/text exists only in image pixels/i);
   await expect(page.locator("[data-edit-ocr-panel]")).toHaveAttribute(
