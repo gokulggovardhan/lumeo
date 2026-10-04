@@ -6,8 +6,6 @@ import {
   getDeviceClass,
   getOperatingSystem,
 } from "@/lib/analytics/device";
-import { getAnonymousSessionId } from "@/lib/analytics/session";
-import { readGeoCookie } from "@/lib/analytics/geo";
 import type { AnalyticsEventInput, AnalyticsRemoteTrackResult } from "@/lib/analytics/types";
 
 const REQUEST_TIMEOUT_MS = 2500;
@@ -32,6 +30,34 @@ function safeDuration(value: number | null | undefined) {
   return Math.max(0, Math.min(Math.round(value), 86_400_000));
 }
 
+function currentPagePath() {
+  return window.location.pathname.slice(0, 220);
+}
+
+function externalReferrerHost() {
+  if (!document.referrer) return null;
+  try {
+    const referrer = new URL(document.referrer);
+    if (referrer.origin === window.location.origin) return null;
+    return referrer.hostname.slice(0, 160);
+  } catch {
+    return null;
+  }
+}
+
+function campaignFields() {
+  const params = new URLSearchParams(window.location.search);
+  const clean = (key: string, max: number) => {
+    const value = params.get(key)?.trim();
+    return value ? value.slice(0, max) : null;
+  };
+  return {
+    utmSource: clean("utm_source", 100),
+    utmMedium: clean("utm_medium", 100),
+    utmCampaign: clean("utm_campaign", 120),
+  };
+}
+
 export async function fetchPublicAnalyticsEnabled(): Promise<boolean> {
   try {
     const supabase = createClient();
@@ -50,31 +76,35 @@ export async function trackPublicAnalyticsEvent(
   input: AnalyticsEventInput,
 ): Promise<AnalyticsRemoteTrackResult> {
   try {
-    const supabase = createClient();
-    const geo = readGeoCookie();
-    const { data, error } = await withTimeout(
-      supabase.rpc("record_public_analytics_event", {
-        event_name: input.eventName,
-        tool_slug: input.toolSlug ?? null,
-        anonymous_session_id: getAnonymousSessionId(),
-        duration_ms: safeDuration(input.durationMs),
-        input_size_bucket: input.inputSizeBucket ?? "unknown",
-        output_size_bucket: input.outputSizeBucket ?? "unknown",
-        device_class: getDeviceClass(),
-        browser_family: getBrowserFamily(),
-        operating_system: getOperatingSystem(),
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const response = await fetch("/api/analytics/event", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "same-origin",
+      cache: "no-store",
+      keepalive: true,
+      signal: controller.signal,
+      body: JSON.stringify({
+        eventName: input.eventName,
+        toolSlug: input.toolSlug ?? null,
+        durationMs: safeDuration(input.durationMs),
+        inputSizeBucket: input.inputSizeBucket ?? "unknown",
+        outputSizeBucket: input.outputSizeBucket ?? "unknown",
+        deviceClass: getDeviceClass(),
+        browserFamily: getBrowserFamily(),
+        operatingSystem: getOperatingSystem(),
         success: input.success ?? null,
-        error_code: input.errorCode ?? null,
-        ...(input.failureStage ? { failure_stage: input.failureStage } : {}),
-        country_code: geo?.country ?? null,
-        region: geo?.region ?? null,
-        city: geo?.city ?? null,
-      }) as unknown as Promise<RpcResult<number>>,
-      REQUEST_TIMEOUT_MS,
-    );
+        errorCode: input.errorCode ?? null,
+        failureStage: input.failureStage ?? null,
+        pagePath: currentPagePath(),
+        referrerHost: externalReferrerHost(),
+        ...campaignFields(),
+      }),
+    }).finally(() => window.clearTimeout(timer));
 
-    if (error) return { success: false };
-    return { success: true, eventId: typeof data === "number" ? data : null };
+    if (!response.ok) return { success: false };
+    return { success: true, eventId: null };
   } catch {
     return { success: false };
   }
