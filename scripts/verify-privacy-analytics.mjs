@@ -189,11 +189,20 @@ try {
   assert(state.includes("availability === \"loading\""), "Analytics decision helper must reject loading state.");
   assert(state.includes("availability === \"enabled\" && !alreadyAccepted"), "One-shot helper must wait for enabled availability.");
 
-  const session = read("lib/analytics/session.ts");
-  assert(session.includes("sessionStorage"), "Anonymous analytics session must use sessionStorage.");
-  assert(!session.includes("localStorage"), "Anonymous analytics session must not use localStorage.");
-  assert(session.includes("crypto") && session.includes("randomUUID"), "Anonymous analytics session must use crypto.randomUUID.");
-  assert(session.includes("UUID_PATTERN"), "Malformed anonymous session IDs must be validated.");
+  const serverIdentity = read("lib/analytics/server-identity.ts");
+  assert(
+    serverIdentity.includes("ANALYTICS_VISITOR_COOKIE") &&
+      serverIdentity.includes("ANALYTICS_SESSION_COOKIE"),
+    "Verified analytics must define first-party visitor and session cookies.",
+  );
+  assert(
+    serverIdentity.includes("httpOnly: true"),
+    "Verified analytics identity cookies must be HttpOnly.",
+  );
+  assert(
+    serverIdentity.includes("HMAC") && serverIdentity.includes("deriveAnalyticsKey"),
+    "Verified analytics must store server-derived pseudonyms rather than raw cookie tokens.",
+  );
 
   const client = read("lib/analytics/client.ts");
   const analyticsRoute = read("app/api/analytics/route.ts");
@@ -348,11 +357,24 @@ try {
   );
 
   const privacy = read("app/privacy/page.tsx");
-  assert(privacy.includes("temporary browser-session ID"), "Privacy disclosure must mention temporary session IDs.");
+  assert(
+    privacy.includes("random first-party visitor and session tokens"),
+    "Privacy disclosure must describe verified first-party analytics identity.",
+  );
+  assert(
+    privacy.includes("Approximate city, region, and country"),
+    "Privacy disclosure must describe approximate Cloudflare geography.",
+  );
   assert(privacy.includes("Do Not Track"), "Privacy disclosure must mention Do Not Track.");
   const docs = read("docs/PRIVACY_ANALYTICS.md");
-  assert(docs.includes("Current Analytics Scope"), "Privacy analytics docs must document the current scope.");
-  assert(docs.includes("processing_started") && /all 16 live PDF tools/i.test(docs), "Privacy analytics docs must describe the current lifecycle coverage.");
+  assert(
+    docs.includes("Current verified architecture"),
+    "Privacy analytics docs must document the verified architecture.",
+  );
+  assert(
+    docs.includes("processing_started") && /all live PDF tools/i.test(docs),
+    "Privacy analytics docs must describe the current lifecycle coverage.",
+  );
   assert(migration.includes("coalesce(settings.value @>") && migration.includes("false"), "Analytics setting must default disabled when absent.");
 
   const packageJson = JSON.parse(read("package.json"));
