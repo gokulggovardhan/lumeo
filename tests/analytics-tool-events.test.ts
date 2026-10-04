@@ -181,6 +181,8 @@ test("analytics client posts events to the same-origin server endpoint without c
   assert.match(route, /deriveAnalyticsKey/);
   assert.match(route, /classifyAnalyticsTraffic/);
   assert.match(route, /p_failure_stage/);
+  assert.match(client, /deliveryQueue/);
+  assert.match(client, /deliveryQueue\.then/);
   assert.doesNotMatch(route, /analytics_events.*insert/i);
 });
 
