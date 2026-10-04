@@ -219,7 +219,7 @@ test("Audit filters reject malformed date input without throwing", () => {
 test("Analytics recent-feed failure does not invalidate verified aggregate analytics", () => {
   const analytics = read("app/admin/(protected)/analytics/page.tsx");
   assert.match(analytics, /recent\.error/);
-  assert.match(analytics, /The aggregate above remains valid/);
+  assert.match(analytics, /The selected-range aggregate above remains valid/);
 });
 
 
