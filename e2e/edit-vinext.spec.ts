@@ -49,9 +49,9 @@ async function uploadEditFixtureReady(
 ) {
   await uploadEditFixture(page, fixturePath);
 
-  // WebKit can occasionally leave the first document load without rendered
-  // text runs after a long, heavily loaded CI browser sequence. Recover the
-  // setup once by creating a fresh document page; the second load still has
+  // WebKit and Firefox can occasionally leave the first document load without
+  // rendered text runs after a long, heavily loaded CI browser sequence.
+  // Recover the setup once by creating a fresh document page; the second load still has
   // to satisfy the normal stage-ready proof, so a real rendering regression
   // remains a hard failure.
   try {
