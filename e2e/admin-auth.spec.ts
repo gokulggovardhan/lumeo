@@ -125,7 +125,7 @@ test.describe("Control Center authentication", () => {
     await overviewNavigation.getByRole("link", { name: "Analytics" }).click();
     await expect(page).toHaveURL(/\/admin\/analytics/);
     await expect(
-      page.getByRole("heading", { name: "Analytics", exact: true }),
+      page.getByRole("heading", { name: "Verified traffic analytics", exact: true }),
     ).toBeVisible();
 
     // vinext may retain a hidden previous route tree during navigation.
