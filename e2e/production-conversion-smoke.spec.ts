@@ -1,4 +1,4 @@
-import { expect, test, type Page, type Request } from "@playwright/test";
+import { expect, test, type ConsoleMessage, type Page, type Request } from "@playwright/test";
 import type { Download } from "@playwright/test";
 import JSZip from "jszip";
 import { PDFDocument, StandardFonts } from "pdf-lib";
@@ -38,6 +38,15 @@ type RuntimeWatch = {
   successfulResponseUrls: Set<string>;
   retiredTransportRequests: string[];
 };
+
+function isExpectedCloudflareRumConsoleError(message: ConsoleMessage): boolean {
+  return (
+    message.type() === "error" &&
+    message.text() ===
+      "Failed to load resource: the server responded with a status of 404 (Not Found)" &&
+    message.location().url === "https://lumeo.in/cdn-cgi/rum?"
+  );
+}
 
 function isExpectedOfficePreflightAbort(request: Request): boolean {
   const failure = request.failure()?.errorText ?? "";
@@ -412,7 +421,12 @@ test("production Edit PDF certifies native colour, formatting, history and expor
   const runtime = watchConversionRuntime(page);
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
+    if (
+      message.type() === "error" &&
+      !isExpectedCloudflareRumConsoleError(message)
+    ) {
+      consoleErrors.push(message.text());
+    }
   });
 
   const selectEmployeeAndOpenFormat = async () => {
