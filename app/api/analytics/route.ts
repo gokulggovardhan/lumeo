@@ -355,12 +355,19 @@ export async function POST(request: NextRequest) {
   ]);
 
   const userAgent = request.headers.get("user-agent");
-  const traffic = classifyAnalyticsTraffic({
-    userAgent,
-    cloudflareBot: {
-      verifiedBot: readCloudflareVerifiedBot(request),
-    },
-  });
+  const ownedSyntheticRequest =
+    request.headers.get("x-lumeo-synthetic-test") === "1";
+  const traffic = ownedSyntheticRequest
+    ? {
+        trafficClass: "synthetic" as const,
+        reason: "owned_test_header",
+      }
+    : classifyAnalyticsTraffic({
+        userAgent,
+        cloudflareBot: {
+          verifiedBot: readCloudflareVerifiedBot(request),
+        },
+      });
   const technical = classifyServerUserAgent(userAgent);
   const location = readCloudflareApproximateLocation(request);
   const countryCode =

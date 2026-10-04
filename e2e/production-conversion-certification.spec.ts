@@ -11,6 +11,11 @@ import {
   makeTwoColumnReportPdf,
   makeWhitespaceStatementPdf,
 } from "./semantic-pdf-fixtures";
+import { installOwnedAnalyticsMarker } from "./owned-analytics-marker";
+
+test.beforeEach(async ({ context }) => {
+  await installOwnedAnalyticsMarker(context);
+});
 
 type FailedRequest = {
   method: string;

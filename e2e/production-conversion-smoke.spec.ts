@@ -20,6 +20,11 @@ import {
 import { makeProfessionalDocx } from "./professional-docx-fixture";
 import { TEXT_ONLY_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures";
 import { waitForStageReady } from "./helpers";
+import { installOwnedAnalyticsMarker } from "./owned-analytics-marker";
+
+test.beforeEach(async ({ context }) => {
+  await installOwnedAnalyticsMarker(context);
+});
 
 type FailedRequest = {
   method: string;

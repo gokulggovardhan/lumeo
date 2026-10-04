@@ -2,7 +2,12 @@ import { expect, test } from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { TEXT_ONLY_PDF, writeFixtures } from "./fixtures.ts";
+import { installOwnedAnalyticsMarker } from "./owned-analytics-marker";
 
+
+test.beforeEach(async ({ context }) => {
+  await installOwnedAnalyticsMarker(context);
+});
 const EDITABLE_RUN = 'div[role="button"][aria-label^="Editable text"]';
 
 function jpegDimensions(bytes: Buffer): { width: number; height: number } {

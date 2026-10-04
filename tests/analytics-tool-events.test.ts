@@ -187,6 +187,48 @@ test("operation lifecycle event schema is defined and reflected in the migration
   }
 });
 
+test("owned production browser tests mark only analytics requests as synthetic", () => {
+  const route = readFileSync("app/api/analytics/route.ts", "utf8");
+  const markerHelper = readFileSync(
+    "e2e/owned-analytics-marker.ts",
+    "utf8",
+  );
+  const productionSmoke = readFileSync(
+    "e2e/production-conversion-smoke.spec.ts",
+    "utf8",
+  );
+  const productionCertification = readFileSync(
+    "e2e/production-conversion-certification.spec.ts",
+    "utf8",
+  );
+  const cloudflareProduction = readFileSync(
+    "e2e/cloudflare-production.spec.ts",
+    "utf8",
+  );
+  const productionConfig = readFileSync(
+    "playwright.production-conversion.config.ts",
+    "utf8",
+  );
+  const cloudflareConfig = readFileSync(
+    "playwright.cloudflare-production.config.ts",
+    "utf8",
+  );
+
+  assert.match(route, /x-lumeo-synthetic-test/);
+  assert.match(route, /owned_test_header/);
+  assert.match(markerHelper, /context\.route\("\*\*\/api\/analytics"/);
+  assert.match(markerHelper, /"x-lumeo-synthetic-test": "1"/);
+  for (const source of [
+    productionSmoke,
+    productionCertification,
+    cloudflareProduction,
+  ]) {
+    assert.match(source, /installOwnedAnalyticsMarker/);
+  }
+  assert.doesNotMatch(productionConfig, /extraHTTPHeaders/);
+  assert.doesNotMatch(cloudflareConfig, /extraHTTPHeaders/);
+});
+
 test("analytics endpoint requires same-origin browser request metadata", () => {
   const route = readFileSync("app/api/analytics/route.ts", "utf8");
 
