@@ -516,7 +516,7 @@ export async function getVerifiedTraffic(
   trafficScope: VerifiedTrafficScope = "real_audience",
 ): Promise<DataResult<VerifiedTrafficData | null>> {
   const supabase = await createClient();
-  const result = await supabase.rpc("get_admin_verified_traffic_v3", {
+  const result = await supabase.rpc("get_admin_verified_traffic", {
     p_start_date: range.startDate,
     p_end_date: range.endDate,
     p_traffic_scope: trafficScope,
@@ -543,11 +543,33 @@ export async function getVerifiedRecentEvents(
   _trafficScope: VerifiedTrafficScope = "real_audience",
 ): Promise<DataResult<VerifiedRecentEvent[]>> {
   const supabase = await createClient();
-  const result = await supabase.rpc("get_admin_recent_operational_events_v3", {
-    p_limit: Math.max(1, Math.min(limit, 50)),
+  const safeLimit = Math.max(1, Math.min(limit, 50));
+  const operational = await supabase.rpc("get_admin_recent_operational_events_v3", {
+    p_limit: safeLimit,
   });
 
-  if (result.error || !Array.isArray(result.data)) {
+  let resultData: unknown = operational.data;
+  let resultError: unknown = operational.error;
+
+  // During the atomic production rollout, application code can reach the
+  // Worker before the additive migration is visible. Fall back only for this
+  // short compatibility window; the primary aggregate RPC keeps its existing
+  // name and never has a gap.
+  if (operational.error) {
+    const fallback = await supabase.rpc("get_admin_recent_analytics_events_v2", {
+      p_limit: 50,
+      p_traffic_scope: "real_audience",
+    });
+    resultData = Array.isArray(fallback.data)
+      ? fallback.data.filter((value) => {
+          if (!isRecord(value)) return false;
+          return value.event_name !== "page_view";
+        }).slice(0, safeLimit)
+      : fallback.data;
+    resultError = fallback.error;
+  }
+
+  if (resultError || !Array.isArray(resultData)) {
     return {
       data: [],
       error: "Verified recent analytics are temporarily unavailable.",
@@ -555,7 +577,7 @@ export async function getVerifiedRecentEvents(
   }
 
   const rows: VerifiedRecentEvent[] = [];
-  for (const value of result.data) {
+  for (const value of resultData) {
     if (!isRecord(value)) continue;
     const occurredAt = stringValue(value.occurred_at);
     const eventName = stringValue(value.event_name);
