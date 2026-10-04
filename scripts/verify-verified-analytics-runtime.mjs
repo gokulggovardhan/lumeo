@@ -228,6 +228,22 @@ const { error: legacyInsertError } = await service.from("analytics_events").inse
 });
 if (legacyInsertError) throw legacyInsertError;
 
+// The verified writer intentionally obeys the live public analytics switch.
+// The disposable test database starts with analytics disabled, so enable it
+// explicitly before testing accepted server-side writes.
+const { error: enableAnalyticsError } = await service
+  .from("site_settings")
+  .upsert(
+    {
+      key: "public_analytics_enabled",
+      value: { enabled: true },
+      is_public: true,
+      description: "Disposable runtime verification setting.",
+    },
+    { onConflict: "key" },
+  );
+if (enableAnalyticsError) throw enableAnalyticsError;
+
 // Runtime-prove the protected server writer: anonymous callers cannot use the
 // retired browser RPC, the wrong ingest secret fails, and the correct private
 // header can write a schema-v2 event.
