@@ -44,6 +44,23 @@ function trackCallsFrom(source: string) {
   return source.match(/track\(\{[\s\S]*?\}\);/g) ?? [];
 }
 
+test("page-view duplicate initialization guard does not use a time-window database dedupe", () => {
+  const pageView = readFileSync(
+    "components/analytics/AnalyticsPageView.tsx",
+    "utf8",
+  );
+  const migration = readFileSync(
+    "supabase/migrations/20261004090000_verified_analytics_activation.sql",
+    "utf8",
+  );
+
+  assert.match(pageView, /lastAcceptedPagePathInRuntime/);
+  assert.match(pageView, /lastAcceptedPagePathInRuntime = null/);
+  assert.match(pageView, /lastAcceptedPagePathInRuntime = pathname/);
+  assert.doesNotMatch(migration, /interval '3 seconds'/);
+  assert.match(migration, /genuine rapid reload/);
+});
+
 test("page_view remains supported and waits for analytics availability", () => {
   const pageViewEvent: AnalyticsEventInput = { eventName: "page_view" };
 
