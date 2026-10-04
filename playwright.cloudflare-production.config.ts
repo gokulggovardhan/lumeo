@@ -10,6 +10,9 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: process.env.CLOUDFLARE_AUDIT_BASE_URL ?? "https://lumeo.in",
+    extraHTTPHeaders: {
+      "x-lumeo-synthetic-traffic": "cloudflare-production-audit",
+    },
     trace: "retain-on-failure",
   },
   projects: [
