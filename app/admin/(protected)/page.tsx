@@ -124,9 +124,9 @@ export default async function AdminPage() {
           topToolsByOpens: analyticsToday.data.topToolsByOpens,
           sevenDayTotals: analyticsWeek.data.daily.map((point) => ({
             date: point.date,
-            events: point.pageViews + point.toolOpens,
             pageViews: point.pageViews,
-            toolOpens: point.toolOpens,
+            uniqueVisitors: point.uniqueVisitors,
+            sessions: point.sessions,
           })),
           verifiedEvents: analyticsToday.data.integrity.verifiedEvents,
         }
