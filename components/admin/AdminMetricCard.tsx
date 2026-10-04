@@ -37,7 +37,7 @@ export function AdminMetricCard({
             </button>
             <span
               role="tooltip"
-              className="pointer-events-none invisible absolute left-1/2 top-7 z-20 w-56 -translate-x-1/2 rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-[11px] font-medium normal-case tracking-normal text-[var(--text-secondary)] shadow-xl group-hover:visible group-focus-within:visible"
+              className="pointer-events-none invisible absolute right-0 top-7 z-20 w-56 max-w-[calc(100vw-2rem)] rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] px-3 py-2 text-[11px] font-medium normal-case tracking-normal text-[var(--text-secondary)] shadow-xl group-hover:visible group-focus-within:visible"
             >
               {definition}
             </span>
