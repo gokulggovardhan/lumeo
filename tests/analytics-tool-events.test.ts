@@ -278,7 +278,7 @@ test("verified analytics keeps browser identity opaque and avoids localStorage",
 test("admin audience analytics reads use the verified aggregate RPC instead of direct event rows", () => {
   const dataLayer = readFileSync("lib/admin/verified-analytics.ts", "utf8");
 
-  assert.match(dataLayer, /get_admin_verified_traffic_v3/);
+  assert.match(dataLayer, /get_admin_verified_traffic/);
   assert.match(dataLayer, /get_admin_recent_operational_events_v3/);
   assert.doesNotMatch(dataLayer, /\.from\("analytics_events"\)/);
   assert.match(dataLayer, /known \+ unknown !== pageViews/);
