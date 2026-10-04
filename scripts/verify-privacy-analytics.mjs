@@ -358,7 +358,7 @@ try {
 
   const privacy = read("app/privacy/page.tsx");
   assert(
-    privacy.includes("random first-party visitor and session tokens"),
+    /random\s+first-party visitor and session tokens/.test(privacy),
     "Privacy disclosure must describe verified first-party analytics identity.",
   );
   assert(
