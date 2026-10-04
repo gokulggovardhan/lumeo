@@ -281,3 +281,39 @@ addresses, raw visitor/session tokens or keys, cookies, full user agents,
 coordinates, street addresses, filenames, or document content. Synthetic
 Lumeo production tests and reliably classified automation remain separate from
 the default real-audience view.
+
+
+## Reconciled operation analytics
+
+Processing lifecycle reporting uses a random server-assigned
+`operation_attempt_id` to correlate one `processing_started` event with a
+single `processing_succeeded`, `processing_failed`, or
+`processing_cancelled` terminal outcome.
+
+The attempt UUID:
+
+- is created by the server/database,
+- contains no visitor, account, file, document, or location information,
+- is not returned by the Admin aggregate or recent-activity APIs,
+- is not shown in the Admin UI,
+- exists only to make operation lifecycle counts internally consistent.
+
+Historical lifecycle events created before attempt correlation remain preserved
+for audit. They are excluded from reconciled Started/Succeeded/Failed/Cancelled
+and success-rate metrics instead of being guessed into an operation.
+
+## Canonical audience environment
+
+Device, browser, and operating-system breakdowns use exactly the verified
+page-view visitor population for the selected IST range. Each visitor appears
+once per dimension using the environment from that visitor's latest verified
+page view in the range. Therefore each dimension reconciles to the same
+`Unique Visitors` total.
+
+## Realtime vs selected-range analytics
+
+Live Traffic remains a rolling near-real-time view and is independent of the
+historical date selector. The live cards, ten-minute buckets, location
+reconciliation, recent hits, and `Last updated` timestamp come from one
+database snapshot time. Selected-range analytics use inclusive Asia/Kolkata
+calendar-day boundaries and retain zero-traffic days in the daily trend.
