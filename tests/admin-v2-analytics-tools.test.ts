@@ -94,14 +94,19 @@ test("Admin tool filters reject unknown enum values and match case-insensitively
   assert.deepEqual(filterAdminTools(tools, filters).map((tool) => tool.slug), ["merge"]);
 });
 
-test("Analytics V2 keeps verified unavailable handling and the real aggregate reader", () => {
+test("Analytics V2 defaults to verified genuine-audience traffic with explicit integrity handling", () => {
   const source = readFileSync("app/admin/(protected)/analytics/page.tsx", "utf8");
-  assert.match(source, /getAnalyticsSummary/);
+  const reader = readFileSync("lib/admin/verified-analytics.ts", "utf8");
+  assert.match(source, /getVerifiedAnalytics/);
+  assert.match(source, /real_audience/);
   assert.match(source, /dataStatus === "unavailable"/);
-  assert.match(source, /Metrics are withheld instead of presenting unverified zero values/);
-  assert.match(source, /AnalyticsTrendChart/);
-  assert.match(source, /AnalyticsDistribution/);
-  assert.match(source, /RecentActivityTable/);
+  assert.match(source, /Lumeo withholds the metrics instead of falling back to legacy or fabricated traffic data/);
+  assert.match(source, /AudienceTrendChart/);
+  assert.match(source, /Known Location/);
+  assert.match(source, /Unknown Location/);
+  assert.match(source, /Traffic integrity/);
+  assert.match(reader, /get_admin_verified_analytics/);
+  assert.match(reader, /known \+ unknown !== pageViews/);
   assert.doesNotMatch(source, /revenue|storage saved|AI insight/i);
 });
 
