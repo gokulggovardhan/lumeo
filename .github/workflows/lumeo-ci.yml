@@ -185,6 +185,9 @@ jobs:
       - name: Create disposable local administrator
         run: node scripts/seed-admin-e2e.mjs
 
+      - name: Verify server-side analytics semantics and reconciliation
+        run: node scripts/verify-verified-analytics-runtime.mjs
+
       - name: Verify Admin Inbox RLS roles
         run: node scripts/verify-admin-inbox-rls.mjs
 
