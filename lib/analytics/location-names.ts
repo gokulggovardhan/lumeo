@@ -138,5 +138,5 @@ export function formatLocationLabel(
     countryName(country),
   ].filter((part): part is string => Boolean(part && part.length > 0));
 
-  return parts.length > 0 ? parts.join(", ") : "Unknown location";
+  return parts.length > 0 ? parts.join(", ") : "Unknown Location";
 }
