@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
   const { url, publishableKey } = getSupabaseEnv();
 
   const rpcResponse = await fetch(
-    `${url}/rest/v1/rpc/record_server_analytics_event`,
+    `${url}/rest/v1/rpc/record_server_analytics_event_v2`,
     {
       method: "POST",
       headers: {
