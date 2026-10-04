@@ -46,7 +46,7 @@ test("Health V2 distinguishes core outages from optional operational degradation
     "Admin authorization",
     "Supabase database",
     "Maintenance state",
-    "Analytics aggregates",
+    "Verified analytics",
     "Error monitoring",
     "Feedback Inbox",
     "Cloudflare runtime",
