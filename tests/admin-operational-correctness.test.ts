@@ -90,12 +90,12 @@ test("Dashboard avoids retired status queries and reads current operational sour
   assert.doesNotMatch(data, /homepage_tool_slots/);
   assert.doesNotMatch(data, /latestDailyMetricDate/);
   assert.doesNotMatch(page, /getSystemStatus/);
-  assert.match(page, /getAnalyticsSummary\(\)/);
+  assert.match(page, /getVerifiedAnalytics/);
   assert.match(page, /getAuditLogs\(5\)/);
   assert.match(page, /getErrorLogSummary\(\)/);
   assert.match(page, /getUnresolvedErrorLogs\(5, 0\)/);
   assert.match(page, /processingCancelled/);
-  assert.match(page, /unreconciledStarts/);
+  assert.match(page, /processingStarted - analytics\.data\.processingSucceeded/);
   assert.match(page, /getUnreadInboxCount\(\)/);
   assert.match(page, /Requires attention/);
 });
