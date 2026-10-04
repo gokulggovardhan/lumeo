@@ -5,21 +5,6 @@ import { PDFDocument, StandardFonts } from "pdf-lib";
 import { collectPageTextOperators } from "../lib/pdf/edit/formXObjects.ts";
 import { readFile } from "node:fs/promises";
 
-
-async function installOwnedAnalyticsMarker(context: import("@playwright/test").BrowserContext) {
-  await context.route("**/api/analytics", async (route) => {
-    await route.continue({
-      headers: {
-        ...route.request().headers(),
-        "x-lumeo-synthetic-test": "1",
-      },
-    });
-  });
-}
-
-test.beforeEach(async ({ context }) => {
-  await installOwnedAnalyticsMarker(context);
-});
 import {
   assertPdfAnchorFidelity,
   assertPdfLineAnchorFidelity,
@@ -35,6 +20,11 @@ import {
 import { makeProfessionalDocx } from "./professional-docx-fixture";
 import { TEXT_ONLY_PDF, TWO_PAGE_PDF, writeFixtures } from "./fixtures";
 import { waitForStageReady } from "./helpers";
+import { installOwnedAnalyticsMarker } from "./owned-analytics-marker";
+
+test.beforeEach(async ({ context }) => {
+  await installOwnedAnalyticsMarker(context);
+});
 
 type FailedRequest = {
   method: string;
