@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import type { VerifiedLiveTrafficData } from "@/lib/admin/live-analytics-types";
@@ -41,9 +41,12 @@ export function LiveTrafficPanel({
   const [data, setData] = useState(initialData);
   const [error, setError] = useState(initialError);
   const [refreshing, setRefreshing] = useState(false);
+  const [stale, setStale] = useState(Boolean(initialError && initialData));
+  const inFlightRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    if (refreshing) return;
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setRefreshing(true);
     try {
       const response = await fetch(
@@ -66,12 +69,19 @@ export function LiveTrafficPanel({
       }
       setData(payload.data);
       setError(null);
+      setStale(false);
     } catch {
-      setError("Live traffic refresh failed. The last verified snapshot is retained.");
+      setError(
+        data
+          ? "Unable to refresh analytics. Showing the last verified snapshot."
+          : "Unable to refresh analytics.",
+      );
+      setStale(Boolean(data));
     } finally {
+      inFlightRef.current = false;
       setRefreshing(false);
     }
-  }, [refreshing]);
+  }, [data]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -102,9 +112,18 @@ export function LiveTrafficPanel({
         </button>
       }
     >
+      <div
+        aria-busy={refreshing}
+        className={stale ? "opacity-90" : undefined}
+      >
       {error ? (
         <div className="mb-4 rounded-xl border border-[rgba(216,109,109,0.32)] bg-[rgba(216,109,109,0.08)] px-4 py-3 text-sm text-[var(--text-secondary)]">
           {error}
+          {stale && data ? (
+            <span className="ml-1">
+              Last verified snapshot: {formatTime(data.asOf)}.
+            </span>
+          ) : null}
         </div>
       ) : null}
 
@@ -126,12 +145,14 @@ export function LiveTrafficPanel({
               label="Active Visitors"
               value={data.summary.activeVisitorsLastFiveMinutes}
               detail="Distinct privacy-preserving visitors with a Page View in the last five minutes."
+              definition="Distinct verified visitor pseudonyms with at least one Real Audience page view in the rolling last five minutes."
               tone="success"
             />
             <AdminMetricCard
               label="Active Sessions"
               value={data.summary.activeSessionsLastFiveMinutes}
               detail="Distinct 30-minute sessions with activity in the last five minutes."
+              definition="Distinct verified 30-minute session pseudonyms with at least one Real Audience page view in the rolling last five minutes."
             />
           </div>
 
@@ -145,7 +166,8 @@ export function LiveTrafficPanel({
                   </p>
                 </div>
                 <span className="text-xs font-semibold text-[var(--text-subtle)]">
-                  as of {formatTime(data.asOf)}
+                  Last updated {formatTime(data.asOf)}
+                  {stale ? " · stale" : ""}
                 </span>
               </div>
               <div className="mt-4 space-y-2">
@@ -222,9 +244,10 @@ export function LiveTrafficPanel({
         </div>
       ) : (
         <div className="py-6 text-sm text-[var(--text-muted)]">
-          Live traffic is temporarily unavailable.
+          Unable to refresh analytics.
         </div>
       )}
+      </div>
     </AdminSectionCard>
   );
 }
