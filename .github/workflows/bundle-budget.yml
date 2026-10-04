@@ -1,0 +1,64 @@
+name: Client Bundle Budget
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "fix/**"
+      - "feature/**"
+      - "hardening/**"
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "worker/**"
+      - "scripts/check-client-bundle-budget.mjs"
+      - ".github/workflows/bundle-budget.yml"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bundle-budget-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  budget:
+    name: Build and enforce client JavaScript budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Build production Cloudflare bundle
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: public-anon-placeholder
+        run: npm run build:vinext
+
+      - name: Enforce bundle budgets
+        run: npm run verify:bundle-budget
+
+      - name: Upload bundle report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: client-bundle-budget
+          path: test-results/bundle-budget.json
+          if-no-files-found: ignore
+          retention-days: 14
