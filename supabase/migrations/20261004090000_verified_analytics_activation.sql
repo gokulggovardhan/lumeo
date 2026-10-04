@@ -1067,10 +1067,10 @@ grant execute on function public.get_admin_verified_traffic(date, date, text) to
 revoke execute on function public.record_public_analytics_event(
   text, text, uuid, integer, text, text, text, text, text, boolean, text, text,
   text, text
-) from anon, authenticated;
+) from public, anon, authenticated;
 revoke execute on function public.record_public_analytics_event(
   text, text, uuid, integer, text, text, text, text, text, boolean, text, text,
   text, text, text
-) from anon, authenticated;
+) from public, anon, authenticated;
 
 commit;
