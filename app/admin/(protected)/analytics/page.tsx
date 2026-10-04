@@ -312,7 +312,7 @@ export default async function AnalyticsPage({
           ) : null}
 
           <AdminSectionCard
-            title="Visitor locations"
+            title="Top Locations"
             description="Ranked by verified page views. Location is approximate network geography from Cloudflare, not GPS and never a precise address."
           >
             <AdminDataTable
