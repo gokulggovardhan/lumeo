@@ -187,6 +187,16 @@ test("operation lifecycle event schema is defined and reflected in the migration
   }
 });
 
+test("analytics endpoint requires same-origin browser request metadata", () => {
+  const route = readFileSync("app/api/analytics/route.ts", "utf8");
+
+  assert.match(route, /fetchSite && fetchSite !== "same-origin"/);
+  assert.match(route, /new URL\(origin\)\.origin === request\.nextUrl\.origin/);
+  assert.match(route, /return fetchSite === "same-origin"/);
+  assert.match(route, /health probes and scanners/);
+  assert.doesNotMatch(route, /if \(!origin\) return true/);
+});
+
 test("analytics client posts events to the same-origin server endpoint without client-supplied identity or geography", () => {
   const client = readFileSync("lib/analytics/client.ts", "utf8");
   const route = readFileSync("app/api/analytics/route.ts", "utf8");
