@@ -99,7 +99,13 @@ test("Analytics V2 reads only verified schema-v2 traffic for the primary audienc
   const data = readFileSync("lib/admin/verified-analytics.ts", "utf8");
   assert.match(source, /getVerifiedTraffic/);
   assert.match(source, /Verified analytics are unavailable/);
-  assert.match(source, /Real audience/);
+  assert.match(source, /Real Audience/);
+  assert.match(source, /"real_audience"/);
+  assert.doesNotMatch(source, /Lumeo synthetic tests/);
+  assert.doesNotMatch(source, /Bots & suspected automation/);
+  assert.doesNotMatch(source, /All verified traffic/);
+  assert.doesNotMatch(source, /Traffic scope/);
+  assert.doesNotMatch(source, /Traffic separation/);
   assert.match(source, /Known-location page views/);
   assert.match(source, /Unknown-location page views/);
   assert.match(source, /AnalyticsTrendChart/);
@@ -107,7 +113,6 @@ test("Analytics V2 reads only verified schema-v2 traffic for the primary audienc
   assert.match(source, /sessions: point\.sessions/);
   assert.match(source, /Unknown Location/);
   assert.match(source, /summary!\.unknownLocationPageViews > 0/);
-  assert.match(source, /Traffic separation/);
   assert.match(data, /get_admin_verified_traffic/);
   assert.match(data, /known \+ unknown !== pageViews/);
   assert.doesNotMatch(source, /getAnalyticsSummary/);
