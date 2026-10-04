@@ -365,14 +365,6 @@ export type ControlCenterDatabase = {
         };
         Returns: Json;
       };
-      get_admin_verified_traffic_v3: {
-        Args: {
-          p_start_date: string;
-          p_end_date: string;
-          p_traffic_scope?: string;
-        };
-        Returns: Json;
-      };
       get_admin_recent_operational_events_v3: {
         Args: {
           p_limit?: number;
