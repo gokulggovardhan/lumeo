@@ -1,5 +1,7 @@
 # Analytics Certification
 
+> Historical certification: the reconciliation below covers the legacy schema-v1 browser analytics path. The October 2026 verified schema-v2 audience pipeline supersedes it for current visitor, session, geography, and traffic-class reporting. Production schema-v2 certification is performed at rollout by checking new schema-v2 rows, real/synthetic separation, exact location reconciliation, and cessation of legacy writes.
+
 Release commit: `332fe8d` (main, post-#121)
 Date: 2026-07-30
 Status: **RECONCILED** (previously blocked — see "History" below)
