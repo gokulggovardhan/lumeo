@@ -27,11 +27,6 @@ jobs:
       - name: Check out production verification
         uses: actions/checkout@v6
 
-      - name: Verify production document freshness
-        env:
-          EXPECTED_SHA: ${{ github.sha }}
-        run: node scripts/verify-production-freshness.mjs
-
       - name: Verify production routes
         shell: bash
         run: |
@@ -180,6 +175,11 @@ jobs:
           esac
 
           echo "PASS signed-out /admin/session is unauthorized and private/no-store"
+
+      - name: Verify production document freshness
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: node scripts/verify-production-freshness.mjs
 
       - name: Verify production social images
         shell: bash
