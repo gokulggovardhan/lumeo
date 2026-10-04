@@ -223,10 +223,27 @@ export type AnalyticsEvent = {
   browser_family: string | null;
   operating_system: string | null;
   country_code: string | null;
+  region: string | null;
+  region_code: string | null;
+  city: string | null;
   success: boolean | null;
   error_code: string | null;
   failure_stage: string | null;
   metadata: Json;
+  visitor_key: string | null;
+  session_key: string | null;
+  traffic_class: string | null;
+  traffic_class_reason: string | null;
+  geo_source: string | null;
+  geo_precision: string | null;
+  page_path: string | null;
+  referrer_host: string | null;
+  landing_path: string | null;
+  acquisition_source: string | null;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  analytics_schema_version: number;
 };
 
 export type DailyToolMetric = {
@@ -338,6 +355,37 @@ export type ControlCenterDatabase = {
       get_admin_analytics_summary: {
         Args: { p_start_date: string; p_end_date: string };
         Returns: AdminAnalyticsSummaryResult;
+      };
+      get_admin_verified_traffic: {
+        Args: {
+          p_start_date: string;
+          p_end_date: string;
+          p_traffic_scope?: string;
+        };
+        Returns: Json;
+      };
+      get_admin_recent_analytics_events_v2: {
+        Args: {
+          p_limit?: number;
+          p_traffic_scope?: string;
+        };
+        Returns: Array<{
+          occurred_at: string;
+          event_name: string;
+          tool_slug: string | null;
+          traffic_class: string;
+          device_class: string | null;
+          browser_family: string | null;
+          operating_system: string | null;
+          city: string | null;
+          region: string | null;
+          region_code: string | null;
+          country_code: string | null;
+          geo_precision: string | null;
+          page_path: string | null;
+          acquisition_source: string | null;
+          success: boolean | null;
+        }>;
       };
       get_public_maintenance_status: {
         Args: Record<string, never>;
