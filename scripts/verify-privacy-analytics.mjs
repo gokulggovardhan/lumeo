@@ -9,6 +9,9 @@ const files = [
   adminMigrationPath,
   "lib/analytics/types.ts",
   "lib/analytics/client.ts",
+  "lib/analytics/server-ingest.ts",
+  "app/api/analytics/event/route.ts",
+  "supabase/migrations/20261004090000_truthful_audience_analytics.sql",
   "lib/analytics/state.ts",
   "lib/analytics/session.ts",
   "lib/analytics/device.ts",
@@ -132,7 +135,9 @@ try {
   assert(session.includes("UUID_PATTERN"), "Malformed anonymous session IDs must be validated.");
 
   const client = read("lib/analytics/client.ts");
-  assert(client.includes("record_public_analytics_event"), "Analytics client must call only the analytics RPC.");
+  assert(client.includes('fetch("/api/analytics/event"'), "Analytics client must use the first-party server ingestion route.");
+  assert(!client.includes("record_public_analytics_event"), "Browser analytics must not write directly to Supabase.");
+  assert(!/readGeoCookie|country_code|getAnonymousSessionId/.test(client), "Browser analytics must not submit visitor geography or legacy session identity.");
   assert(!/\.from\(/.test(client), "Analytics client must not query tables.");
   assert(!/throw\s/.test(client), "Analytics client must not throw into public UI.");
   assert(!/console\.(log|warn|error)/.test(client), "Analytics client must not log raw errors.");
@@ -214,7 +219,9 @@ try {
   assert(adminPage.includes("dataStatus") && adminPage.includes("unavailable"), "Admin analytics page must distinguish unavailable data from genuine zero.");
 
   const adminData = read("lib/admin/data.ts");
-  assert(adminData.includes("get_admin_analytics_summary"), "Admin data layer must call aggregate analytics RPC.");
+  assert(adminData.includes("get_admin_traffic_analytics"), "Admin data layer must call verified traffic analytics RPC.");
+  assert(adminData.includes("get_admin_analytics_dashboard"), "Admin data layer must call verified operational analytics RPC.");
+  assert(adminData.includes("get_admin_analytics_summary"), "Legacy aggregate reader remains available for non-audience compatibility paths.");
   assert(!/\.from\("analytics_events"\)/.test(adminData), "Admin data layer must not directly query analytics_events.");
   assert(adminData.includes("pageViewsToday"), "Admin data layer must expose page-view totals separately.");
   assert(adminData.includes("topToolsByOpens"), "Admin data layer must expose top tools by opens.");
@@ -224,7 +231,7 @@ try {
   assert(databaseTypes.includes("get_admin_analytics_summary"), "Database types must include admin aggregate analytics RPC.");
 
   const privacy = read("app/privacy/page.tsx");
-  assert(privacy.includes("temporary browser-session ID"), "Privacy disclosure must mention temporary session IDs.");
+  assert(/visitor|session/i.test(privacy), "Privacy disclosure must explain privacy-preserving visitor/session analytics.");
   assert(privacy.includes("Do Not Track"), "Privacy disclosure must mention Do Not Track.");
   const docs = read("docs/PRIVACY_ANALYTICS.md");
   assert(docs.includes("Current Analytics Scope"), "Privacy analytics docs must document the current scope.");
@@ -241,7 +248,7 @@ try {
   console.log("PASS privacy analytics migration exists");
   console.log("PASS approved event allowlist and secure RPCs exist");
   console.log("PASS no anon analytics table grants or policies");
-  console.log("PASS client uses sessionStorage, crypto.randomUUID, and RPC-only tracking");
+  console.log("PASS browser analytics uses first-party server ingestion with no client geography");
   console.log("PASS Do Not Track and public route allowlist are present");
   console.log("PASS PDF tools emit the approved discovery and operation lifecycle events");
   console.log("PASS admin analytics and privacy disclosure exist");
