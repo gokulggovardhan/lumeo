@@ -312,7 +312,7 @@ try {
   assert(toolsAction.includes('.select("id")') && toolsAction.includes(".maybeSingle()"), "Tool saves must verify that one catalog row was updated.");
   assert(toolsAction.includes("maintenance_message: maintenanceMessage || null"), "Tool audit changes must include maintenance messaging.");
   assert(toolsAction.includes('updateTag("public-pdf-catalog")'), "Tool saves must invalidate the shared public catalog immediately.");
-  assert(analyticsPage.includes('title="Tool performance"'), "Analytics V2 tool-performance section is missing.");
+  assert(analyticsPage.includes('title="Tool usage"'), "Analytics V2 tool-usage section is missing.");
   assert(analyticsPage.includes('title="Audience environment"'), "Analytics V2 environment section is missing.");
   assert(analyticsPage.includes("Legacy browser analytics are intentionally not substituted"), "Analytics V2 must explain unavailable verified metrics honestly.");
 
