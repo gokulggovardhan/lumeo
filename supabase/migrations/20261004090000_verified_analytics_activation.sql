@@ -301,20 +301,9 @@ begin
     raise exception 'Analytics rate limit reached.';
   end if;
 
-  -- Suppress duplicate initialization/retry events without suppressing a
-  -- genuine fast navigation to a different page.
-  if exists (
-    select 1
-    from public.analytics_events as events
-    where events.analytics_schema_version = 2
-      and events.session_key = p_session_key
-      and events.event_name = cleaned_event
-      and coalesce(events.tool_slug, '') = coalesce(cleaned_tool, '')
-      and coalesce(events.page_path, '') = coalesce(cleaned_page_path, '')
-      and events.occurred_at > now() - interval '3 seconds'
-  ) then
-    return true;
-  end if;
+  -- Do not time-window-dedupe stored events here. A genuine rapid reload is a
+  -- legitimate new page view. Duplicate SPA initialization is prevented in
+  -- AnalyticsPageView, and the browser client does not retry failed POSTs.
 
   insert into public.analytics_events (
     event_name,
