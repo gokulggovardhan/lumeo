@@ -7,51 +7,66 @@ import {
   readCloudflareApproximateLocation,
 } from "../lib/cloudflare/request-location.ts";
 
-test("prefers Cloudflare Request.cf geolocation", () => {
+test("prefers visitor IP geography and keeps full region separate from region code", () => {
   const request = new Request("https://lumeo.in/") as Request & {
-    cf?: Record<string, string>;
+    cf?: Record<string, unknown>;
   };
   request.cf = {
     city: "Pune",
     region: "Maharashtra",
     regionCode: "MH",
     country: "IN",
+    colo: "BOM",
   };
 
   assert.deepEqual(readCloudflareApproximateLocation(request), {
     city: "Pune",
-    region: "MH",
+    region: "Maharashtra",
+    regionCode: "MH",
     country: "IN",
   });
 });
 
-test("falls back to Cloudflare visitor-location headers", () => {
+test("falls back to Cloudflare visitor-location headers without using colo", () => {
   const request = new Request("https://lumeo.in/", {
     headers: {
-      "cf-ipcity": "Pune",
-      "cf-region-code": "MH",
+      "cf-ipcity": "Tirupati",
+      "cf-region": "Andhra Pradesh",
+      "cf-region-code": "AP",
       "cf-ipcountry": "IN",
+      "cf-ray": "example-BOM",
     },
   });
 
   assert.deepEqual(readCloudflareApproximateLocation(request), {
-    city: "Pune",
-    region: "MH",
+    city: "Tirupati",
+    region: "Andhra Pradesh",
+    regionCode: "AP",
     country: "IN",
   });
 });
 
-test("never needs an IP address and degrades to an empty location", () => {
+test("never invents geography and degrades to an empty location", () => {
   const request = new Request("http://127.0.0.1:3000/");
   const location = readCloudflareApproximateLocation(request);
 
-  assert.deepEqual(location, { city: null, region: null, country: null });
+  assert.deepEqual(location, {
+    city: null,
+    region: null,
+    regionCode: null,
+    country: null,
+  });
   assert.equal(formatApproximateLocation(location), null);
   assert.equal(encodeAnalyticsGeoCookie(location), null);
 });
 
-test("formats feedback labels and analytics cookie compatibly", () => {
-  const location = { city: "Pune", region: "MH", country: "IN" };
-  assert.equal(formatApproximateLocation(location), "Pune, MH, IN");
-  assert.equal(encodeAnalyticsGeoCookie(location), "Pune|MH|IN");
+test("formats feedback with full visitor region when available", () => {
+  const location = {
+    city: "Pune",
+    region: "Maharashtra",
+    regionCode: "MH",
+    country: "IN",
+  };
+  assert.equal(formatApproximateLocation(location), "Pune, Maharashtra, IN");
+  assert.equal(encodeAnalyticsGeoCookie(location), "Pune|Maharashtra|IN");
 });
