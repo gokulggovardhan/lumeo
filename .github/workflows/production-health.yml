@@ -24,6 +24,14 @@ jobs:
     timeout-minutes: 10
 
     steps:
+      - name: Check out production verification
+        uses: actions/checkout@v6
+
+      - name: Verify production document freshness
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: node scripts/verify-production-freshness.mjs
+
       - name: Verify production routes
         shell: bash
         run: |

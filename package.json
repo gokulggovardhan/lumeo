@@ -6,6 +6,7 @@
     "dev": "npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && next dev",
     "build": "npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && next build",
     "verify:public": "node scripts/verify-public-routes.mjs",
+    "verify:production-freshness": "node scripts/verify-production-freshness.mjs",
     "verify:supabase": "node scripts/verify-supabase-env.mjs",
     "verify:admin-auth": "node scripts/verify-admin-auth.mjs",
     "verify:control-center": "node scripts/verify-control-center.mjs",
