@@ -188,7 +188,7 @@ begin
 
   if session_recent_count >= 80 then raise exception 'Analytics rate limit reached.'; end if;
 
-  if exists (
+  if cleaned_event <> 'page_view' and exists (
     select 1 from public.analytics_events as events
     where events.analytics_schema_version = 2
       and events.session_key = p_session_key
