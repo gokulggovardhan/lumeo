@@ -127,6 +127,18 @@ const PUBLIC_RPC_NAVIGATION_ABORT_PATHS = new Set([
   "/rest/v1/rpc/record_public_analytics_event",
 ]);
 
+
+function isExpectedAnalyticsNavigationAbort(failure: FailedRequest): boolean {
+  if (failure.method !== "POST") return false;
+  const url = new URL(failure.url);
+  if (url.origin !== "https://lumeo.in" || url.pathname !== "/api/analytics") {
+    return false;
+  }
+  return /(?:Load request cancelled|NS_BINDING_ABORTED|net::ERR_ABORTED)/i.test(
+    failure.errorText,
+  );
+}
+
 function isExpectedPublicRpcNavigationAbort(failure: FailedRequest): boolean {
   if (failure.method !== "POST") return false;
 
@@ -176,6 +188,7 @@ function expectCleanRuntime(watch: RuntimeWatch) {
         watch.successfulResponseUrls,
       ) &&
       !isExpectedPublicRpcNavigationAbort(failure) &&
+      !isExpectedAnalyticsNavigationAbort(failure) &&
       !isExpectedWorkspaceRscNavigationAbort(failure),
   );
   expect(
