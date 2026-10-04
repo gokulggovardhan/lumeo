@@ -7,6 +7,7 @@ import {
   acquisitionSource,
   analyticsHmac,
   classifyTraffic,
+  isFirstPartyAnalyticsRequest,
   parseServerAnalyticsInput,
   randomAnalyticsToken,
   readTrustedGeo,
@@ -48,6 +49,13 @@ function responseWithCookies(
 }
 
 export async function POST(request: NextRequest) {
+  if (!isFirstPartyAnalyticsRequest(request)) {
+    return NextResponse.json(
+      { ok: false },
+      { status: 403, headers: { "Cache-Control": "private, no-store" } },
+    );
+  }
+
   if (request.headers.get("dnt") === "1") {
     return new NextResponse(null, {
       status: 204,
