@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import { WorkspaceStart } from "@/components/pdf/workspace/WorkspaceStart";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf", {
-    title: "PDF Workspace - Upload Once, Use Multiple PDF Tools | Lumeo",
+    title: { absolute: "PDF Workspace - Upload Once, Use Multiple Tools | Lumeo" },
     description:
       "Upload one PDF once, then move between Edit, Pages, Sign, Add and Compress before one final download. Prefer one task? Lumeo's standalone PDF tools remain available.",
     alternates: {
@@ -28,6 +29,24 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
+const workspaceSchema = buildSoftwareApplicationSchema({
+  name: "Lumeo PDF Workspace",
+  description:
+    "Upload one PDF once and move between compatible editing, page, signing, enhancement, and compression tools before a final download.",
+  path: "/pdf",
+  featureList: [
+    "Upload one PDF once",
+    "Switch between compatible PDF tools",
+    "Keep supported document work in browser memory",
+    "Finish with one final download",
+  ],
+});
+
+const workspaceBreadcrumbSchema = buildBreadcrumbSchema([
+  { name: "Home", path: "/" },
+  { name: "PDF Workspace", path: "/pdf" },
+]);
+
 export default function PdfWorkspacePage() {
   return (
     <PublicCatalogPageShell
@@ -36,6 +55,14 @@ export default function PdfWorkspacePage() {
       contentClassName="px-4 pb-20 pt-4 sm:px-8 sm:pb-20 sm:pt-7"
     >
       <WorkspaceStart />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(workspaceSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(workspaceBreadcrumbSchema) }}
+      />
     </PublicCatalogPageShell>
   );
 }
