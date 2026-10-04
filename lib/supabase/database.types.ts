@@ -302,6 +302,65 @@ export type ControlCenterDatabase = {
         Returns: number;
       };
       get_public_analytics_setting: { Args: Record<string, never>; Returns: boolean };
+      record_trusted_analytics_event: {
+        Args: {
+          p_event_name: string;
+          p_tool_slug: string | null;
+          p_visitor_key: string;
+          p_session_key: string;
+          p_request_key: string;
+          p_traffic_class: string;
+          p_traffic_class_reason: string | null;
+          p_duration_ms: number | null;
+          p_input_size_bucket: string | null;
+          p_output_size_bucket: string | null;
+          p_device_class: string | null;
+          p_browser_family: string | null;
+          p_operating_system: string | null;
+          p_success: boolean | null;
+          p_error_code: string | null;
+          p_failure_stage: string | null;
+          p_country_code: string | null;
+          p_region: string | null;
+          p_region_code: string | null;
+          p_city: string | null;
+          p_geo_source: string;
+          p_geo_precision: string;
+          p_page_path: string | null;
+        };
+        Returns: boolean;
+      };
+      get_admin_verified_analytics: {
+        Args: {
+          p_start_date: string;
+          p_end_date: string;
+          p_traffic_scope?: string;
+        };
+        Returns: Json;
+      };
+      get_admin_recent_analytics_events_v2: {
+        Args: {
+          p_limit?: number;
+          p_traffic_scope?: string;
+        };
+        Returns: Array<{
+          occurred_at: string;
+          event_name: string;
+          tool_slug: string | null;
+          traffic_class: string;
+          device_class: string | null;
+          browser_family: string | null;
+          operating_system: string | null;
+          city: string | null;
+          region: string | null;
+          region_code: string | null;
+          country_code: string | null;
+          geo_precision: string | null;
+          page_path: string | null;
+          acquisition_source: string | null;
+          success: boolean | null;
+        }>;
+      };
       record_public_analytics_event: {
         Args: {
           event_name: string;
