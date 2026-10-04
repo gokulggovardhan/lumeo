@@ -111,9 +111,13 @@ test("Analytics V2 reads only verified schema-v2 traffic for the primary audienc
   assert.match(source, /AnalyticsTrendChart/);
   assert.match(source, /uniqueVisitors: point\.uniqueVisitors/);
   assert.match(source, /sessions: point\.sessions/);
-  assert.match(source, /Unknown Location/);
-  assert.match(source, /summary!\.unknownLocationPageViews > 0/);
+  assert.doesNotMatch(source, /title="Top Locations"/);
+  assert.match(source, /title="Geography"/);
+  assert.match(source, /title="Page performance"/);
+  assert.match(source, /title="Tool usage"/);
+  assert.match(source, /Recent operational activity/);
   assert.match(data, /get_admin_verified_traffic/);
+  assert.match(data, /get_admin_recent_operational_events_v3/);
   assert.match(data, /known \+ unknown !== pageViews/);
   assert.doesNotMatch(source, /getAnalyticsSummary/);
   assert.doesNotMatch(source, /revenue|storage saved|AI insight/i);
@@ -130,9 +134,15 @@ test("Daily traffic trend exposes page views, visitors and sessions", () => {
   assert.match(trend, /sessions: number/);
   assert.match(trend, /Real Audience daily trend/);
   assert.match(trend, /verified page views, visitors and sessions/);
-  assert.match(trend, /No Real Audience traffic in this date range/);
+  assert.match(trend, /No verified page views in this period/);
   assert.match(trend, /point\.uniqueVisitors/);
   assert.match(trend, /point\.sessions/);
+  assert.match(trend, /onMouseEnter/);
+  assert.match(trend, /onClick/);
+  assert.match(trend, /role="tooltip"/);
+  assert.match(trend, /<span>0<\/span>/);
+  assert.match(trend, /sr-only/);
+  assert.doesNotMatch(trend, /Text summary:/);
 });
 
 test("Tools V2 is server-authorized, URL-filtered, audited through the existing action, and analyst-safe", () => {

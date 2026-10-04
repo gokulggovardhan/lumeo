@@ -207,14 +207,18 @@ try {
   assert(analyticsPage.includes('label="Page Views"'), "Analytics page must display page views.");
   assert(analyticsPage.includes('label="Unique Visitors"'), "Analytics page must display verified unique visitors.");
   assert(analyticsPage.includes('label="Sessions"'), "Analytics page must display verified sessions.");
-  assert(analyticsPage.includes('title="Location integrity"'), "Analytics page must expose known/unknown location reconciliation.");
-  assert(analyticsPage.includes('title="Top Locations"'), "Analytics page must expose verified visitor locations.");
+  assert(analyticsPage.includes('title="Geography"'), "Analytics page must expose verified geography.");
+  assert(analyticsPage.includes("Location integrity"), "Analytics page must expose known/unknown location reconciliation.");
+  assert(!analyticsPage.includes('title="Top Locations"'), "Analytics page must not duplicate city ranking as Top Locations.");
   assert(!analyticsPage.includes('title="Traffic separation"'), "Primary Analytics UI must not expose diagnostic traffic classes.");
   assert(!analyticsPage.includes("Lumeo synthetic tests"), "Primary Analytics UI must remain Real Audience only.");
   assert(!analyticsPage.includes("Bots & suspected automation"), "Primary Analytics UI must remain Real Audience only.");
   assert(analyticsPage.includes('"real_audience"'), "Analytics page must query the verified Real Audience scope.");
   assert(analyticsPage.includes('label="Tool Opens"'), "Analytics page must display tool opens.");
   assert(analyticsPage.includes('title="Operation analytics"'), "Analytics page must explain operation analytics.");
+  assert(analyticsPage.includes("server-assigned attempt IDs"), "Operation analytics must describe correlated attempts.");
+  assert(analyticsPage.includes("summary!.unfinishedAttempts"), "No-terminal metric must come from correlated unfinished attempts.");
+  assert(!analyticsPage.includes("Started minus succeeded, failed and cancelled"), "Operation analytics must not use subtraction reconciliation.");
   assert(!analyticsPage.includes("Analytics V1"), "Analytics page must not restore obsolete Analytics V1 copy.");
   assert(!analyticsActivityPage.includes("Analytics V1"), "Analytics activity page must not restore obsolete Analytics V1 copy.");
   // Operation lifecycle metrics are current production behavior and must
@@ -293,7 +297,7 @@ try {
   // reference nav" #34) -- current analytics messaging lives on the
   // analytics page checked above (`analyticsPage`), so no separate read is
   // needed here.
-  assert(analyticsPage.includes("Conversion lifecycle metrics stay separated from visitor counting."), "Analytics page must describe verified processing lifecycle metrics.");
+  assert(analyticsPage.includes("Processing metrics use correlated server-assigned attempt IDs."), "Analytics page must describe verified processing lifecycle metrics.");
 
   const toolsPage = read("app/admin/(protected)/tools/page.tsx");
   const toolsAction = read("app/admin/(protected)/tools/actions.ts");
@@ -308,7 +312,7 @@ try {
   assert(toolsAction.includes('.select("id")') && toolsAction.includes(".maybeSingle()"), "Tool saves must verify that one catalog row was updated.");
   assert(toolsAction.includes("maintenance_message: maintenanceMessage || null"), "Tool audit changes must include maintenance messaging.");
   assert(toolsAction.includes('updateTag("public-pdf-catalog")'), "Tool saves must invalidate the shared public catalog immediately.");
-  assert(analyticsPage.includes('title="Tool performance"'), "Analytics V2 tool-performance section is missing.");
+  assert(analyticsPage.includes('title="Tool usage"'), "Analytics V2 tool-usage section is missing.");
   assert(analyticsPage.includes('title="Audience environment"'), "Analytics V2 environment section is missing.");
   assert(analyticsPage.includes("Legacy browser analytics are intentionally not substituted"), "Analytics V2 must explain unavailable verified metrics honestly.");
 

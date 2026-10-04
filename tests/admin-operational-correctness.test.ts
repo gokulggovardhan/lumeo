@@ -219,7 +219,7 @@ test("Audit filters reject malformed date input without throwing", () => {
 test("Analytics recent-feed failure does not invalidate verified aggregate analytics", () => {
   const analytics = read("app/admin/(protected)/analytics/page.tsx");
   assert.match(analytics, /recent\.error/);
-  assert.match(analytics, /The aggregate above remains valid/);
+  assert.match(analytics, /The selected-range aggregate above remains valid/);
 });
 
 
@@ -338,7 +338,9 @@ test("operation analytics exposes starts without a terminal outcome instead of h
   );
   assert.match(page, /Processing Cancelled/);
   assert.match(page, /No terminal event/);
-  assert.match(page, /Started minus succeeded, failed and cancelled/);
+  assert.match(page, /value={summary!\.unfinishedAttempts}/);
+  assert.match(page, /server-assigned attempt IDs/);
+  assert.doesNotMatch(page, /Started minus succeeded, failed and cancelled/);
 });
 
 

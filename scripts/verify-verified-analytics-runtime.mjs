@@ -87,6 +87,57 @@ function pageView({
   };
 }
 
+function lifecycleEvent({
+  date,
+  eventName,
+  tool,
+  visitor,
+  session,
+  minuteOffset,
+  durationMs = null,
+  success = null,
+  errorCode = null,
+  failureStage = null,
+}) {
+  const occurredAt = new Date(noonIst(date));
+  occurredAt.setUTCMinutes(occurredAt.getUTCMinutes() + minuteOffset);
+  return {
+    event_name: eventName,
+    tool_slug: tool,
+    anonymous_session_id: null,
+    occurred_at: occurredAt.toISOString(),
+    duration_ms: durationMs,
+    input_size_bucket: "unknown",
+    output_size_bucket: "unknown",
+    device_class: "desktop",
+    browser_family: "Chrome",
+    operating_system: "Linux",
+    country_code: "IN",
+    success,
+    error_code: errorCode,
+    failure_stage: failureStage,
+    metadata: {},
+    region: "Maharashtra",
+    region_code: "MH",
+    city: "Pune",
+    visitor_key: analyticsKey(`visitor:${visitor}`),
+    session_key: analyticsKey(`session:${session}`),
+    traffic_class: "real_audience",
+    traffic_class_reason: "default_real_audience",
+    geo_source: "cloudflare",
+    geo_precision: "city",
+    page_path: `/pdf/${tool}`,
+    referrer_host: null,
+    landing_path: null,
+    acquisition_source: "direct",
+    utm_source: null,
+    utm_medium: null,
+    utm_campaign: null,
+    analytics_schema_version: 2,
+    operation_attempt_id: null,
+  };
+}
+
 function summaryOf(data) {
   assert.ok(data && typeof data === "object" && !Array.isArray(data));
   assert.equal(data.schema_version, 2);
@@ -153,10 +204,18 @@ const rows = [
     date: today, visitor: "a", session: "a1", path: "/",
     city: "Pune", region: "Maharashtra", regionCode: "MH", country: "IN",
   }),
-  pageView({
-    date: today, visitor: "a", session: "a2", path: "/pdf",
-    city: "Pune", region: "Maharashtra", regionCode: "MH", country: "IN",
-  }),
+  {
+    ...pageView({
+      date: today, visitor: "a", session: "a2", path: "/pdf",
+      city: "Pune", region: "Maharashtra", regionCode: "MH", country: "IN",
+    }),
+    occurred_at: new Date(
+      new Date(noonIst(today)).getTime() + 2 * 60_000,
+    ).toISOString(),
+    device_class: "mobile",
+    browser_family: "Safari",
+    operating_system: "iOS",
+  },
   pageView({
     date: today, visitor: "b", session: "b1", path: "/pdf/merge",
     city: "Omaha", region: "Nebraska", regionCode: "NE", country: "US",
@@ -189,6 +248,98 @@ const rows = [
 
 const { error: insertError } = await service.from("analytics_events").insert(rows);
 if (insertError) throw insertError;
+
+const lifecycleRows = [
+  lifecycleEvent({
+    date: today,
+    eventName: "processing_started",
+    tool: "merge",
+    visitor: "op",
+    session: "op",
+    minuteOffset: 10,
+  }),
+  lifecycleEvent({
+    date: today,
+    eventName: "processing_succeeded",
+    tool: "merge",
+    visitor: "op",
+    session: "op",
+    minuteOffset: 11,
+    durationMs: 1200,
+    success: true,
+  }),
+  lifecycleEvent({
+    date: today,
+    eventName: "processing_started",
+    tool: "compress",
+    visitor: "op",
+    session: "op",
+    minuteOffset: 12,
+  }),
+  lifecycleEvent({
+    date: today,
+    eventName: "processing_failed",
+    tool: "compress",
+    visitor: "op",
+    session: "op",
+    minuteOffset: 13,
+    durationMs: 900,
+    success: false,
+    errorCode: "processing_error",
+    failureStage: "converting",
+  }),
+  lifecycleEvent({
+    date: today,
+    eventName: "processing_started",
+    tool: "split",
+    visitor: "op",
+    session: "op",
+    minuteOffset: 14,
+  }),
+  lifecycleEvent({
+    date: today,
+    eventName: "processing_started",
+    tool: "organize",
+    visitor: "op",
+    session: "op",
+    minuteOffset: 15,
+  }),
+  lifecycleEvent({
+    date: today,
+    eventName: "processing_cancelled",
+    tool: "organize",
+    visitor: "op",
+    session: "op",
+    minuteOffset: 16,
+    durationMs: 400,
+    success: false,
+    errorCode: "user_cancelled",
+    failureStage: "converting",
+  }),
+];
+
+for (const row of lifecycleRows) {
+  const { error } = await service.from("analytics_events").insert(row);
+  if (error) throw error;
+}
+
+// Preserve one historical-style uncorrelated terminal event. Primary operation
+// metrics must ignore it and diagnostics must surface it.
+const { error: uncorrelatedError } = await service
+  .from("analytics_events")
+  .insert(
+    lifecycleEvent({
+      date: today,
+      eventName: "processing_succeeded",
+      tool: "merge",
+      visitor: "legacy-op",
+      session: "legacy-op",
+      minuteOffset: 17,
+      durationMs: 500,
+      success: true,
+    }),
+  );
+if (uncorrelatedError) throw uncorrelatedError;
 
 // Preserve one legacy row to prove pre-cutover browser events are retained but
 // excluded from every verified audience metric.
@@ -380,6 +531,26 @@ assert.deepEqual(
   },
   { pageViews: 6, visitors: 4, sessions: 5, known: 4, unknown: 2 },
 );
+assert.deepEqual(
+  {
+    started: todaySummary.processing_started,
+    succeeded: todaySummary.processing_succeeded,
+    failed: todaySummary.processing_failed,
+    cancelled: todaySummary.processing_cancelled,
+    unfinished: todaySummary.unfinished_attempts,
+  },
+  { started: 4, succeeded: 1, failed: 1, cancelled: 1, unfinished: 1 },
+);
+assert.equal(
+  todaySummary.processing_started,
+  todaySummary.processing_succeeded +
+    todaySummary.processing_failed +
+    todaySummary.processing_cancelled +
+    todaySummary.unfinished_attempts,
+);
+assert.equal(todayData.integrity.lifecycle_reconciles, true);
+assert.equal(todayData.integrity.uncorrelated_processing_events, 1);
+assert.equal(todayData.integrity.reconciliation_issue, true);
 assert.equal(todayData.daily.length, 1);
 assert.equal(todayData.daily[0].page_views, 6);
 
@@ -390,6 +561,28 @@ assert.equal(locations.get("Pune|MH|IN")?.page_views, 3);
 assert.equal(locations.get("Omaha|NE|US")?.page_views, 1);
 assert.equal(todayData.locations.some((row) => row.city == null), false);
 
+const environmentTotals = {
+  device: todayData.device_summary.reduce(
+    (total, row) => total + Number(row.visitors ?? 0),
+    0,
+  ),
+  browser: todayData.browser_summary.reduce(
+    (total, row) => total + Number(row.visitors ?? 0),
+    0,
+  ),
+  os: todayData.operating_system_summary.reduce(
+    (total, row) => total + Number(row.visitors ?? 0),
+    0,
+  ),
+};
+assert.deepEqual(environmentTotals, { device: 4, browser: 4, os: 4 });
+assert.equal(todayData.integrity.environment_reconciles, true);
+const devices = new Map(
+  todayData.device_summary.map((row) => [row.label, Number(row.visitors)]),
+);
+assert.equal(devices.get("mobile"), 1);
+assert.equal(devices.get("desktop"), 3);
+
 const countries = new Map(todayData.countries.map((row) => [row.country_code, row.page_views]));
 assert.equal(countries.get("IN"), 4, "Partial India geography still contributes to country analytics.");
 assert.equal(countries.get("US"), 1);
@@ -398,6 +591,10 @@ assert.ok([...countries.values()].reduce((sum, value) => sum + Number(value), 0)
 const sevenStart = shiftIsoDate(today, -6);
 const seven = await verified(sevenStart, today);
 assert.equal(seven.daily.length, 7);
+assert.ok(
+  seven.daily.some((day) => Number(day.page_views) === 0),
+  "Seven-day trend must retain zero-traffic IST calendar days.",
+);
 assert.deepEqual(
   {
     pageViews: seven.summary.page_views,
@@ -412,6 +609,10 @@ assert.deepEqual(
 const thirtyStart = shiftIsoDate(today, -29);
 const thirty = await verified(thirtyStart, today);
 assert.equal(thirty.daily.length, 30);
+assert.ok(
+  thirty.daily.some((day) => Number(day.page_views) === 0),
+  "Thirty-day trend must retain zero-traffic IST calendar days.",
+);
 assert.equal(thirty.summary.page_views, 8);
 assert.equal(thirty.summary.known_location_page_views, 6);
 assert.equal(thirty.summary.unknown_location_page_views, 2);
@@ -435,5 +636,54 @@ assert.equal(
   6,
   "Historical schema-v1 traffic must not pollute verified business traffic.",
 );
+
+const recentCutoff = new Date(Date.now() - 30 * 60_000).toISOString();
+const { error: recentCleanError } = await service
+  .from("analytics_events")
+  .delete()
+  .eq("event_name", "page_view")
+  .gte("occurred_at", recentCutoff);
+if (recentCleanError) throw recentCleanError;
+
+for (let index = 0; index < 3; index += 1) {
+  const liveRow = pageView({
+    date: today,
+    visitor: `live-${index}`,
+    session: `live-${index}`,
+    path: `/live-${index}`,
+    city: "Pune",
+    region: "Maharashtra",
+    regionCode: "MH",
+    country: "IN",
+  });
+  liveRow.occurred_at = new Date(Date.now() - index * 10_000).toISOString();
+  const { error } = await service.from("analytics_events").insert(liveRow);
+  if (error) throw error;
+}
+
+const { data: liveData, error: liveError } = await admin.rpc(
+  "get_admin_live_analytics_v2",
+  { p_traffic_scope: "real_audience" },
+);
+if (liveError) throw liveError;
+assert.equal(liveData.summary.page_views_last_five_minutes, 3);
+assert.equal(liveData.summary.known_location_page_views_last_five_minutes, 3);
+assert.equal(liveData.summary.unknown_location_page_views_last_five_minutes, 0);
+assert.equal(
+  liveData.recent_hits.filter((hit) => hit.city === "Pune").length,
+  3,
+  "Three recent Pune hits must reconcile to three known-location hits.",
+);
+
+const { data: operationalRows, error: operationalError } = await admin.rpc(
+  "get_admin_recent_operational_events_v3",
+  { p_limit: 40 },
+);
+if (operationalError) throw operationalError;
+assert.ok(
+  operationalRows.every((row) => row.event_name !== "page_view"),
+  "Recent operational activity must not duplicate Live Traffic page views.",
+);
+assert.ok(operationalRows.length <= 40);
 
 console.log("PASS verified analytics runtime semantics, security and reconciliation.");

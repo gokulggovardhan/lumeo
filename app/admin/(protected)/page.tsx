@@ -106,13 +106,7 @@ export default async function AdminPage() {
           processingSucceeded: analyticsToday.data.summary.processingSucceeded,
           processingFailed: analyticsToday.data.summary.processingFailed,
           processingCancelled: analyticsToday.data.summary.processingCancelled,
-          unreconciledStarts: Math.max(
-            0,
-            analyticsToday.data.summary.processingStarted -
-              analyticsToday.data.summary.processingSucceeded -
-              analyticsToday.data.summary.processingFailed -
-              analyticsToday.data.summary.processingCancelled,
-          ),
+          unreconciledStarts: analyticsToday.data.summary.unfinishedAttempts,
           downloadsStarted: analyticsToday.data.summary.downloadsStarted,
           successRate:
             analyticsToday.data.summary.processingSucceeded +
