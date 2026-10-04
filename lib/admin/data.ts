@@ -1,7 +1,11 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import { formatLocationLabel } from "@/lib/analytics/location-names";
+import {
+  countryName,
+  formatLocationLabel,
+  regionName,
+} from "@/lib/analytics/location-names";
 import { istIsoDate } from "@/lib/admin/timezone";
 import type { AdminRole } from "@/lib/admin/types";
 import type {
@@ -637,6 +641,327 @@ export async function getAnalyticsSummary(
     },
     null,
   );
+}
+
+
+export type VerifiedAnalytics = {
+  dataStatus: "available" | "unavailable";
+  pageViews: number;
+  uniqueVisitors: number;
+  sessions: number;
+  knownLocationPageViews: number;
+  unknownLocationPageViews: number;
+  locationCoveragePercent: number | null;
+  latestPageViewAt: string | null;
+  legacyPageViews: number;
+  cutoverAt: string | null;
+  daily: Array<{
+    date: string;
+    pageViews: number;
+    uniqueVisitors: number;
+    sessions: number;
+    knownLocationPageViews: number;
+    unknownLocationPageViews: number;
+  }>;
+  topLocations: Array<{
+    label: string;
+    pageViews: number;
+    visitors: number;
+    sessions: number;
+  }>;
+  countries: Array<{ label: string; pageViews: number; visitors: number; sessions: number }>;
+  regions: Array<{ label: string; pageViews: number; visitors: number; sessions: number }>;
+  cities: Array<{ label: string; pageViews: number; visitors: number; sessions: number }>;
+  topPages: Array<{ path: string; pageViews: number; visitors: number; sessions: number }>;
+  trafficCounts: Array<{
+    trafficClass: string;
+    pageViews: number;
+    visitors: number;
+    sessions: number;
+  }>;
+  toolOpens: number;
+  processingStarted: number;
+  processingSucceeded: number;
+  processingFailed: number;
+  processingCancelled: number;
+  downloadsStarted: number;
+  successRate: number | null;
+  averageDurationMs: number | null;
+  latestEventAt: string | null;
+  topToolsByOpens: Array<{ toolSlug: string; count: number }>;
+  topToolsBySuccess: Array<{ toolSlug: string; count: number }>;
+  failureStageSummary: Array<{ label: string; count: number }>;
+  cancellationStageSummary: Array<{ label: string; count: number }>;
+  deviceSummary: Array<{ label: string; count: number }>;
+  browserSummary: Array<{ label: string; count: number }>;
+  osSummary: Array<{ label: string; count: number }>;
+};
+
+function unavailableVerifiedAnalytics(): VerifiedAnalytics {
+  return {
+    dataStatus: "unavailable",
+    pageViews: 0,
+    uniqueVisitors: 0,
+    sessions: 0,
+    knownLocationPageViews: 0,
+    unknownLocationPageViews: 0,
+    locationCoveragePercent: null,
+    latestPageViewAt: null,
+    legacyPageViews: 0,
+    cutoverAt: null,
+    daily: [],
+    topLocations: [],
+    countries: [],
+    regions: [],
+    cities: [],
+    topPages: [],
+    trafficCounts: [],
+    toolOpens: 0,
+    processingStarted: 0,
+    processingSucceeded: 0,
+    processingFailed: 0,
+    processingCancelled: 0,
+    downloadsStarted: 0,
+    successRate: null,
+    averageDurationMs: null,
+    latestEventAt: null,
+    topToolsByOpens: [],
+    topToolsBySuccess: [],
+    failureStageSummary: [],
+    cancellationStageSummary: [],
+    deviceSummary: [],
+    browserSummary: [],
+    osSummary: [],
+  };
+}
+
+function parseMetricRows(
+  value: unknown,
+  labeler: (row: Record<string, unknown>) => string | null,
+) {
+  if (!Array.isArray(value)) return [];
+  const rows: Array<{ label: string; pageViews: number; visitors: number; sessions: number }> = [];
+  for (const item of value) {
+    if (!isRecord(item)) continue;
+    const label = labeler(item);
+    if (!label) continue;
+    rows.push({
+      label,
+      pageViews: parseCount(item.page_views),
+      visitors: parseCount(item.visitors),
+      sessions: parseCount(item.sessions),
+    });
+  }
+  return rows;
+}
+
+function parseVerifiedAnalytics(
+  trafficValue: unknown,
+  dashboardValue: unknown,
+  diagnosticsValue: unknown,
+): VerifiedAnalytics | null {
+  if (!isRecord(trafficValue) || !isRecord(trafficValue.summary)) return null;
+  if (!isRecord(dashboardValue) || !isRecord(dashboardValue.summary)) return null;
+
+  const summary = trafficValue.summary;
+  const operations = dashboardValue.summary;
+  const pageViews = parseCount(summary.page_views);
+  const knownLocationPageViews = parseCount(summary.known_location_page_views);
+  const unknownLocationPageViews = parseCount(summary.unknown_location_page_views);
+  if (knownLocationPageViews + unknownLocationPageViews !== pageViews) return null;
+
+  const daily: VerifiedAnalytics["daily"] = [];
+  if (!Array.isArray(trafficValue.daily)) return null;
+  for (const item of trafficValue.daily) {
+    if (!isRecord(item)) return null;
+    const date = stringValue(item.date);
+    if (!date) return null;
+    const dailyPageViews = parseCount(item.page_views);
+    const known = parseCount(item.known_location_page_views);
+    const unknown = parseCount(item.unknown_location_page_views);
+    if (known + unknown !== dailyPageViews) return null;
+    daily.push({
+      date,
+      pageViews: dailyPageViews,
+      uniqueVisitors: parseCount(item.unique_visitors),
+      sessions: parseCount(item.sessions),
+      knownLocationPageViews: known,
+      unknownLocationPageViews: unknown,
+    });
+  }
+
+  const topLocations = parseMetricRows(trafficValue.full_locations, (row) => {
+    const city = stringValue(row.city);
+    const region = stringValue(row.region) ?? stringValue(row.region_code);
+    const country = stringValue(row.country_code);
+    if (!city || !region || !country) return null;
+    return formatLocationLabel(city, region, country);
+  });
+  const countries = parseMetricRows(trafficValue.countries, (row) =>
+    countryName(stringValue(row.country_code)),
+  );
+  const regions = parseMetricRows(trafficValue.regions, (row) => {
+    const country = stringValue(row.country_code);
+    const region = stringValue(row.region) ?? stringValue(row.region_code);
+    const expanded = regionName(country, region);
+    const countryLabel = countryName(country);
+    return expanded && countryLabel ? `${expanded}, ${countryLabel}` : null;
+  });
+  const cities = parseMetricRows(trafficValue.cities, (row) => {
+    const city = stringValue(row.city);
+    const country = stringValue(row.country_code);
+    const region = stringValue(row.region) ?? stringValue(row.region_code);
+    if (!city || !country) return null;
+    return formatLocationLabel(city, region, country);
+  });
+
+  const topPages: VerifiedAnalytics["topPages"] = [];
+  if (Array.isArray(trafficValue.top_pages)) {
+    for (const item of trafficValue.top_pages) {
+      if (!isRecord(item)) continue;
+      const path = stringValue(item.page_path);
+      if (!path) continue;
+      topPages.push({
+        path,
+        pageViews: parseCount(item.page_views),
+        visitors: parseCount(item.visitors),
+        sessions: parseCount(item.sessions),
+      });
+    }
+  }
+
+  const trafficCounts: VerifiedAnalytics["trafficCounts"] = [];
+  if (Array.isArray(trafficValue.traffic_counts)) {
+    for (const item of trafficValue.traffic_counts) {
+      if (!isRecord(item)) continue;
+      const trafficClass = stringValue(item.traffic_class);
+      if (!trafficClass) continue;
+      trafficCounts.push({
+        trafficClass,
+        pageViews: parseCount(item.page_views),
+        visitors: parseCount(item.visitors),
+        sessions: parseCount(item.sessions),
+      });
+    }
+  }
+
+  const toolRows = Array.isArray(dashboardValue.tool_performance)
+    ? dashboardValue.tool_performance.filter(isRecord)
+    : [];
+  const topToolsByOpens = toolRows
+    .map((row) => ({
+      toolSlug: stringValue(row.tool_slug) ?? "",
+      count: parseCount(row.opens),
+    }))
+    .filter((row) => row.toolSlug)
+    .sort((a, b) => b.count - a.count);
+  const topToolsBySuccess = toolRows
+    .map((row) => ({
+      toolSlug: stringValue(row.tool_slug) ?? "",
+      count: parseCount(row.succeeded),
+    }))
+    .filter((row) => row.toolSlug)
+    .sort((a, b) => b.count - a.count);
+
+  const technical = isRecord(dashboardValue.technical) ? dashboardValue.technical : {};
+  const parseVisitorDimension = (value: unknown) => {
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((item) => {
+      if (!isRecord(item)) return [];
+      const label = stringValue(item.label);
+      return label ? [{ label, count: parseCount(item.visitors) }] : [];
+    });
+  };
+
+  const diagnostics = isRecord(diagnosticsValue) ? diagnosticsValue : {};
+  const parseStage = (value: unknown) => {
+    if (!Array.isArray(value)) return [];
+    return value.flatMap((item) => {
+      if (!isRecord(item)) return [];
+      const label = stringValue(item.failure_stage);
+      return label ? [{ label, count: parseCount(item.event_count) }] : [];
+    });
+  };
+
+  const succeeded = parseCount(operations.processing_succeeded);
+  const failed = parseCount(operations.processing_failed);
+  const cancelled = parseCount(diagnostics.processing_cancelled);
+  const completed = succeeded + failed;
+
+  return {
+    dataStatus: "available",
+    pageViews,
+    uniqueVisitors: parseCount(summary.unique_visitors),
+    sessions: parseCount(summary.sessions),
+    knownLocationPageViews,
+    unknownLocationPageViews,
+    locationCoveragePercent:
+      pageViews > 0 ? Math.round((knownLocationPageViews / pageViews) * 1000) / 10 : null,
+    latestPageViewAt: stringValue(summary.latest_page_view_at),
+    legacyPageViews: parseCount(summary.legacy_page_views),
+    cutoverAt: stringValue(summary.cutover_at),
+    daily,
+    topLocations,
+    countries,
+    regions,
+    cities,
+    topPages,
+    trafficCounts,
+    toolOpens: parseCount(operations.tool_opens),
+    processingStarted: parseCount(operations.processing_started),
+    processingSucceeded: succeeded,
+    processingFailed: failed,
+    processingCancelled: cancelled,
+    downloadsStarted: parseCount(operations.downloads_started),
+    successRate: completed > 0 ? Math.round((succeeded / completed) * 1000) / 10 : null,
+    averageDurationMs: numberValue(operations.average_successful_duration_ms),
+    latestEventAt: stringValue(operations.latest_event_at),
+    topToolsByOpens,
+    topToolsBySuccess,
+    failureStageSummary: parseStage(diagnostics.failure_stage_summary),
+    cancellationStageSummary: parseStage(diagnostics.cancellation_stage_summary),
+    deviceSummary: parseVisitorDimension(technical.device),
+    browserSummary: parseVisitorDimension(technical.browser),
+    osSummary: parseVisitorDimension(technical.operating_system),
+  };
+}
+
+export async function getVerifiedAnalytics(
+  range: { startDate: string; endDate: string },
+): Promise<DataResult<VerifiedAnalytics>> {
+  const supabase = await createClient();
+  const [traffic, dashboard, diagnostics] = await Promise.all([
+    supabase.rpc("get_admin_traffic_analytics", {
+      p_start_date: range.startDate,
+      p_end_date: range.endDate,
+      p_traffic_scope: "real_audience",
+    } as never),
+    supabase.rpc("get_admin_analytics_dashboard", {
+      p_start_date: range.startDate,
+      p_end_date: range.endDate,
+      p_traffic_scope: "real_audience",
+    } as never),
+    supabase.rpc("get_admin_conversion_diagnostics_v2", {
+      p_start_date: range.startDate,
+      p_end_date: range.endDate,
+      p_traffic_scope: "real_audience",
+    } as never),
+  ]);
+
+  const error = traffic.error ?? dashboard.error ?? diagnostics.error;
+  if (error) return safe(unavailableVerifiedAnalytics(), error);
+
+  const parsed = parseVerifiedAnalytics(
+    traffic.data,
+    dashboard.data,
+    diagnostics.data,
+  );
+  return parsed
+    ? safe(parsed, null)
+    : safe(
+        unavailableVerifiedAnalytics(),
+        new Error("Malformed verified analytics aggregate."),
+      );
 }
 
 export type RecentAnalyticsEvent = {
