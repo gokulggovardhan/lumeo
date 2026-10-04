@@ -61,7 +61,7 @@ begin
       new.session_key,
       new.tool_slug,
       attempt_id,
-      coalesce(new.occurred_at, now())
+      now()
     )
     on conflict (session_key, tool_slug) do update
       set operation_attempt_id = excluded.operation_attempt_id,
