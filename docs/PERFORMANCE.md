@@ -80,3 +80,29 @@ Wire `@next/bundle-analyzer` into the build for real per-route JS budgets,
 and run a scheduled Lighthouse CI job (already common as a GitHub Action)
 against the 14 tool routes so this document can be regenerated from real
 multi-run, throttled data rather than a single uncapped-network sample.
+
+
+## Mobile Lighthouse CI
+
+A dedicated mobile Lighthouse workflow now runs against a local production-style
+Cloudflare Worker for four representative public surfaces: `/`, `/pdf`,
+`/pdf-tools`, and `/pdf/edit`.
+
+Each URL is measured three times with mobile emulation. The current release
+budgets are:
+
+- Performance score >= 0.65
+- Accessibility score >= 0.90
+- Best Practices score >= 0.90
+- SEO score >= 0.90
+- LCP <= 4.0s
+- CLS <= 0.10
+- Total Blocking Time <= 600ms
+
+These are lab gates, not field Core Web Vitals. Google Search Console is
+connected, but the GSC Wizard Core Web Vitals report currently has no Chrome UX
+Report API key configured, so no field LCP/INP/CLS claim is made here. INP is a
+field metric and is not inferred from Lighthouse Total Blocking Time.
+
+The workflow stores Lighthouse reports as CI artifacts so later budget changes
+can be based on observed measurements rather than guesses.
