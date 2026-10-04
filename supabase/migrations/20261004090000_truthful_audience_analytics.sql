@@ -494,4 +494,117 @@ grant execute on function public.get_admin_traffic_analytics(date,date,text) to 
 comment on function public.get_admin_traffic_analytics(date,date,text) is
   'Verified schema-v2 traffic analytics. Default scope is real audience. Full-location page views require real Cloudflare city + region + country; every incomplete/unresolved page view remains counted under unknown location so known + unknown always equals total page views.';
 
+
+create or replace function public.get_admin_conversion_diagnostics_v2(
+  p_start_date date,
+  p_end_date date,
+  p_traffic_scope text default 'real_audience'
+)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $
+declare
+  admin_role text;
+  range_start timestamptz;
+  range_end timestamptz;
+  scope_name text := lower(trim(coalesce(p_traffic_scope,'real_audience')));
+  cancelled_count bigint;
+  daily_cancelled jsonb;
+  failure_stage_summary jsonb;
+  cancellation_stage_summary jsonb;
+begin
+  if auth.uid() is null then raise exception 'Authentication required.'; end if;
+  admin_role := public.current_admin_role();
+  if admin_role not in ('owner','admin','analyst') or not public.is_active_admin() then
+    raise exception 'Active administrator access required.';
+  end if;
+  if p_start_date is null or p_end_date is null or p_end_date < p_start_date then
+    raise exception 'Valid analytics date range is required.';
+  end if;
+  if p_end_date - p_start_date > 89 then raise exception 'Analytics date range cannot exceed 90 days.'; end if;
+  if scope_name not in ('real_audience','synthetic','automation','all') then raise exception 'Unsupported analytics traffic scope.'; end if;
+
+  range_start := p_start_date::timestamp at time zone 'Asia/Kolkata';
+  range_end := (p_end_date + 1)::timestamp at time zone 'Asia/Kolkata';
+
+  with scoped as (
+    select * from public.analytics_events e
+    where e.analytics_schema_version=2
+      and e.occurred_at>=range_start and e.occurred_at<range_end
+      and (
+        scope_name='all' or e.traffic_class=scope_name
+        or (scope_name='automation' and e.traffic_class in ('known_bot','suspected_automation'))
+      )
+  )
+  select count(*)::bigint into cancelled_count
+  from scoped where event_name='processing_cancelled';
+
+  with days as (
+    select generate_series(p_start_date,p_end_date,interval '1 day')::date as metric_date
+  ), grouped as (
+    select (e.occurred_at at time zone 'Asia/Kolkata')::date as metric_date,count(*)::bigint as event_count
+    from public.analytics_events e
+    where e.analytics_schema_version=2
+      and e.event_name='processing_cancelled'
+      and e.occurred_at>=range_start and e.occurred_at<range_end
+      and (
+        scope_name='all' or e.traffic_class=scope_name
+        or (scope_name='automation' and e.traffic_class in ('known_bot','suspected_automation'))
+      )
+    group by 1
+  )
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'date',days.metric_date,'event_count',coalesce(grouped.event_count,0)
+  ) order by days.metric_date),'[]'::jsonb)
+  into daily_cancelled from days left join grouped using(metric_date);
+
+  with grouped as (
+    select coalesce(e.failure_stage,'unknown') as failure_stage,count(*)::bigint as event_count
+    from public.analytics_events e
+    where e.analytics_schema_version=2
+      and e.event_name='processing_failed'
+      and e.occurred_at>=range_start and e.occurred_at<range_end
+      and (
+        scope_name='all' or e.traffic_class=scope_name
+        or (scope_name='automation' and e.traffic_class in ('known_bot','suspected_automation'))
+      )
+    group by coalesce(e.failure_stage,'unknown')
+    order by event_count desc,failure_stage
+  )
+  select coalesce(jsonb_agg(to_jsonb(grouped)),'[]'::jsonb)
+  into failure_stage_summary from grouped;
+
+  with grouped as (
+    select coalesce(e.failure_stage,'unknown') as failure_stage,count(*)::bigint as event_count
+    from public.analytics_events e
+    where e.analytics_schema_version=2
+      and e.event_name='processing_cancelled'
+      and e.occurred_at>=range_start and e.occurred_at<range_end
+      and (
+        scope_name='all' or e.traffic_class=scope_name
+        or (scope_name='automation' and e.traffic_class in ('known_bot','suspected_automation'))
+      )
+    group by coalesce(e.failure_stage,'unknown')
+    order by event_count desc,failure_stage
+  )
+  select coalesce(jsonb_agg(to_jsonb(grouped)),'[]'::jsonb)
+  into cancellation_stage_summary from grouped;
+
+  return jsonb_build_object(
+    'processing_cancelled',cancelled_count,
+    'daily_cancelled',daily_cancelled,
+    'failure_stage_summary',failure_stage_summary,
+    'cancellation_stage_summary',cancellation_stage_summary
+  );
+end;
+$;
+
+revoke all on function public.get_admin_conversion_diagnostics_v2(date,date,text) from public;
+revoke all on function public.get_admin_conversion_diagnostics_v2(date,date,text) from anon;
+revoke all on function public.get_admin_conversion_diagnostics_v2(date,date,text) from authenticated;
+grant execute on function public.get_admin_conversion_diagnostics_v2(date,date,text) to authenticated;
+
 commit;
