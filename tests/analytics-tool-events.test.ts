@@ -250,7 +250,7 @@ test("admin analytics dashboard exposes current range controls and lifecycle met
   assert.match(page, /<option value="custom">Custom<\/option>/);
   assert.match(page, /label="Page Views"/);
   assert.match(page, /label="Tool Opens"/);
-  assert.match(page, /title="Visitor locations"/);
+  assert.match(page, /title="Top Locations"/);
   assert.match(page, /title="Tool performance"/);
   assert.match(page, /title="Operation analytics"/);
   assert.match(page, /label="Processing Started"/);
