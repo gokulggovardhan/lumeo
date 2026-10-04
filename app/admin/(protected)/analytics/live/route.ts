@@ -1,10 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { getAdminContext } from "@/lib/admin/auth";
 import { canViewAnalytics } from "@/lib/admin/permissions";
-import {
-  getVerifiedLiveTraffic,
-  type VerifiedTrafficScope,
-} from "@/lib/admin/verified-analytics";
+import { getVerifiedLiveTraffic } from "@/lib/admin/verified-analytics";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -14,14 +11,7 @@ const noStoreHeaders = {
   "X-Robots-Tag": "noindex, nofollow, noarchive",
 };
 
-function parseScope(value: string | null): VerifiedTrafficScope {
-  if (value === "synthetic" || value === "automation" || value === "all") {
-    return value;
-  }
-  return "real_audience";
-}
-
-export async function GET(request: NextRequest) {
+export async function GET() {
   const admin = await getAdminContext();
   if (!admin.authenticated) {
     return NextResponse.json(
@@ -36,8 +26,7 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const scope = parseScope(request.nextUrl.searchParams.get("traffic"));
-  const live = await getVerifiedLiveTraffic(scope);
+  const live = await getVerifiedLiveTraffic("real_audience");
   if (!live.data) {
     return NextResponse.json(
       { data: null, error: live.error },
