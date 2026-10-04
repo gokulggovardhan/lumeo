@@ -244,6 +244,7 @@ export type AnalyticsEvent = {
   utm_medium: string | null;
   utm_campaign: string | null;
   analytics_schema_version: number;
+  operation_attempt_id: string | null;
 };
 
 export type DailyToolMetric = {
@@ -363,6 +364,36 @@ export type ControlCenterDatabase = {
           p_traffic_scope?: string;
         };
         Returns: Json;
+      };
+      get_admin_verified_traffic_v3: {
+        Args: {
+          p_start_date: string;
+          p_end_date: string;
+          p_traffic_scope?: string;
+        };
+        Returns: Json;
+      };
+      get_admin_recent_operational_events_v3: {
+        Args: {
+          p_limit?: number;
+        };
+        Returns: Array<{
+          occurred_at: string;
+          event_name: string;
+          tool_slug: string | null;
+          traffic_class: string;
+          device_class: string | null;
+          browser_family: string | null;
+          operating_system: string | null;
+          city: string | null;
+          region: string | null;
+          region_code: string | null;
+          country_code: string | null;
+          geo_precision: string | null;
+          page_path: string | null;
+          acquisition_source: string | null;
+          success: boolean | null;
+        }>;
       };
       get_admin_recent_analytics_events_v2: {
         Args: {
