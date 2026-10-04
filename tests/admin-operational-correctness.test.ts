@@ -338,7 +338,9 @@ test("operation analytics exposes starts without a terminal outcome instead of h
   );
   assert.match(page, /Processing Cancelled/);
   assert.match(page, /No terminal event/);
-  assert.match(page, /Started minus succeeded, failed and cancelled/);
+  assert.match(page, /value={summary!\.unfinishedAttempts}/);
+  assert.match(page, /server-assigned attempt IDs/);
+  assert.doesNotMatch(page, /Started minus succeeded, failed and cancelled/);
 });
 
 
