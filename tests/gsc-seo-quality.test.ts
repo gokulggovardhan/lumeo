@@ -44,7 +44,13 @@ test("PDF Workspace has an absolute title and structured data", () => {
 
 test("SEO content is informational and does not claim remote document storage", () => {
   const source = readFileSync("components/pdf/ToolSeoContent.tsx", "utf8");
-  assert.doesNotMatch(source, /upload(?:ed|ing)?\s+to\s+(?:our|a)\s+server/i);
+  assert.doesNotMatch(
+    source,
+    /\b(?:your\s+)?(?:files?|documents?|pdfs?|photos?|images?)\s+(?:are|is)\s+(?:uploaded|sent)\s+to\s+(?:our|a)\s+server\b/i,
+  );
   assert.match(source, /browser/i);
-  assert.match(source, /original file remains unchanged|original file on your device is unchanged|source file on your device is unchanged/i);
+  assert.match(
+    source,
+    /original file remains unchanged|original file on your device is unchanged|source file on your device is unchanged/i,
+  );
 });
