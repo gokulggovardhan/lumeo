@@ -1,10 +1,8 @@
-// Cloudflare request geolocation gives country as an ISO 3166-1 alpha-2 code
-// ("IN") and region as an ISO 3166-2 subdivision code (for example "MH") -- see
-// lib/supabase/proxy.ts. Analytics storage keeps those codes as-is (compact,
-// stable, safe to index/group by). This module is the single place codes get
-// expanded to full names for display, e.g. "IN"+"MH" -> "India"/"Maharashtra",
-// so every admin surface reads "Pune, Maharashtra, India" instead of
-// "Pune, MH, IN".
+// Cloudflare visitor geolocation provides a country code plus, when known,
+ // a human-readable region and separate ISO-style region code. New verified
+ // analytics stores both. Legacy rows may contain only the code, so this
+ // module expands recognized codes without guessing and formats one consistent
+ // "City, State/Region, Country" label.
 
 let countryDisplayNames: Intl.DisplayNames | null = null;
 
