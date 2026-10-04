@@ -58,22 +58,22 @@ async function deliverPublicAnalyticsEvent(
   try {
     const response = await withTimeout(
       fetch("/api/analytics", {
-      method: "POST",
-      credentials: "same-origin",
-      keepalive: true,
-      cache: "no-store",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        eventName: input.eventName,
-        toolSlug: input.toolSlug ?? null,
-        durationMs: safeDuration(input.durationMs),
-        inputSizeBucket: input.inputSizeBucket ?? null,
-        outputSizeBucket: input.outputSizeBucket ?? null,
-        success: input.success ?? null,
-        errorCode: input.errorCode ?? null,
-        failureStage: input.failureStage ?? null,
-        pagePath: window.location.pathname,
-      }),
+        method: "POST",
+        credentials: "same-origin",
+        keepalive: true,
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          eventName: input.eventName,
+          toolSlug: input.toolSlug ?? null,
+          durationMs: safeDuration(input.durationMs),
+          inputSizeBucket: input.inputSizeBucket ?? null,
+          outputSizeBucket: input.outputSizeBucket ?? null,
+          success: input.success ?? null,
+          errorCode: input.errorCode ?? null,
+          failureStage: input.failureStage ?? null,
+          pagePath: window.location.pathname,
+        }),
       }),
       DELIVERY_TIMEOUT_MS,
     );
