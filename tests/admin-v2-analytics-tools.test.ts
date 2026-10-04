@@ -116,7 +116,7 @@ test("Analytics V2 reads only verified schema-v2 traffic for the primary audienc
   assert.match(source, /title="Page performance"/);
   assert.match(source, /title="Tool usage"/);
   assert.match(source, /Recent operational activity/);
-  assert.match(data, /get_admin_verified_traffic_v3/);
+  assert.match(data, /get_admin_verified_traffic/);
   assert.match(data, /get_admin_recent_operational_events_v3/);
   assert.match(data, /known \+ unknown !== pageViews/);
   assert.doesNotMatch(source, /getAnalyticsSummary/);
