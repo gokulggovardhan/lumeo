@@ -103,11 +103,29 @@ test("Analytics V2 reads only verified schema-v2 traffic for the primary audienc
   assert.match(source, /Known-location page views/);
   assert.match(source, /Unknown-location page views/);
   assert.match(source, /AnalyticsTrendChart/);
+  assert.match(source, /uniqueVisitors: point\.uniqueVisitors/);
+  assert.match(source, /sessions: point\.sessions/);
+  assert.match(source, /Unknown Location/);
+  assert.match(source, /summary!\.unknownLocationPageViews > 0/);
   assert.match(source, /Traffic separation/);
   assert.match(data, /get_admin_verified_traffic/);
   assert.match(data, /known \+ unknown !== pageViews/);
   assert.doesNotMatch(source, /getAnalyticsSummary/);
   assert.doesNotMatch(source, /revenue|storage saved|AI insight/i);
+});
+
+test("Daily traffic trend exposes page views, visitors and sessions", () => {
+  const trend = readFileSync(
+    "components/admin/analytics/AnalyticsTrendChart.tsx",
+    "utf8",
+  );
+
+  assert.match(trend, /pageViews: number/);
+  assert.match(trend, /uniqueVisitors: number/);
+  assert.match(trend, /sessions: number/);
+  assert.match(trend, /page views, visitors and sessions/);
+  assert.match(trend, /point\.uniqueVisitors/);
+  assert.match(trend, /point\.sessions/);
 });
 
 test("Tools V2 is server-authorized, URL-filtered, audited through the existing action, and analyst-safe", () => {
