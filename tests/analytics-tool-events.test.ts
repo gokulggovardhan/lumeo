@@ -170,6 +170,20 @@ test("operation lifecycle event schema is defined and reflected in the migration
   }
 });
 
+test("analytics client posts events to the same-origin server endpoint without client-supplied identity or geography", () => {
+  const client = readFileSync("lib/analytics/client.ts", "utf8");
+  const route = readFileSync("app/api/analytics/route.ts", "utf8");
+
+  assert.match(client, /fetch\("\/api\/analytics"/);
+  assert.doesNotMatch(client, /record_public_analytics_event/);
+  assert.doesNotMatch(client, /country_code|region: geo|city: geo|anonymous_session_id/);
+  assert.match(route, /readCloudflareApproximateLocation/);
+  assert.match(route, /deriveAnalyticsKey/);
+  assert.match(route, /classifyAnalyticsTraffic/);
+  assert.match(route, /p_failure_stage/);
+  assert.doesNotMatch(route, /analytics_events.*insert/i);
+});
+
 test("analytics client code does not introduce persistent local storage", () => {
   const provider = readFileSync(
     "components/analytics/AnalyticsProvider.tsx",
@@ -184,30 +198,28 @@ test("analytics client code does not introduce persistent local storage", () => 
   assert.doesNotMatch(combined, /localStorage/);
 });
 
-test("admin analytics reads use the aggregate RPC instead of direct event table reads", () => {
-  const dataLayer = readFileSync("lib/admin/data.ts", "utf8");
+test("admin audience analytics reads use the verified aggregate RPC instead of direct event rows", () => {
+  const dataLayer = readFileSync("lib/admin/verified-analytics.ts", "utf8");
 
-  assert.match(dataLayer, /get_admin_analytics_summary/);
+  assert.match(dataLayer, /get_admin_verified_traffic/);
+  assert.match(dataLayer, /get_admin_recent_analytics_events_v2/);
   assert.doesNotMatch(dataLayer, /\.from\("analytics_events"\)/);
-  assert.match(dataLayer, /pageViewsToday/);
-  assert.match(dataLayer, /topToolsByOpens/);
-  assert.match(dataLayer, /dataStatus/);
-  assert.match(dataLayer, /"unavailable"/);
+  assert.match(dataLayer, /known \+ unknown !== pageViews/);
 });
 
 test("admin analytics dashboard exposes current range controls and lifecycle metrics", () => {
   const page = readFileSync("app/admin/(protected)/analytics/page.tsx", "utf8");
 
   assert.match(page, /eyebrow="Analytics"/);
-  assert.match(page, /title="Analytics"/);
-  assert.match(page, /Discovery & operation analytics/);
+  assert.match(page, /title="Verified traffic analytics"/);
+  assert.match(page, /Server-verified audience/);
   assert.match(page, /title="Date range"/);
   assert.match(page, /name="range"/);
   assert.match(page, /<option value="30d">Last 30 days<\/option>/);
   assert.match(page, /<option value="custom">Custom<\/option>/);
   assert.match(page, /label="Page Views"/);
   assert.match(page, /label="Tool Opens"/);
-  assert.match(page, /Most opened tool/);
+  assert.match(page, /title="Visitor locations"/);
   assert.match(page, /title="Tool performance"/);
   assert.match(page, /title="Operation analytics"/);
   assert.match(page, /label="Processing Started"/);
@@ -259,7 +271,7 @@ test("conversion cancellation is an approved terminal event with privacy-safe st
   );
   assert.match(state, /"processing_cancelled"/);
   assert.match(types, /AnalyticsConversionStage/);
-  assert.match(client, /failure_stage: input\.failureStage/);
+  assert.match(client, /failureStage: input\.failureStage/);
   assert.match(migration, /processing_cancelled/);
   assert.match(migration, /failure_stage/);
   assert.doesNotMatch(
