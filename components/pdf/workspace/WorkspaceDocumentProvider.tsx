@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -217,6 +218,20 @@ export function WorkspaceDocumentProvider({
   const [documentHealth, setDocumentHealth] =
     useState<WorkspaceDocumentHealthFacts>({});
   const documentHealthDocumentIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!document?.session.state.hasUnsavedChanges) return;
+
+    function warnBeforeUnload(event: BeforeUnloadEvent) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+
+    window.addEventListener("beforeunload", warnBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", warnBeforeUnload);
+    };
+  }, [document?.session.state.hasUnsavedChanges]);
 
   const commit = useCallback((next: WorkspaceDocumentRuntime | null) => {
     documentRef.current = next;
