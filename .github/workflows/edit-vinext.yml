@@ -55,6 +55,10 @@ jobs:
           if [ ! -f supabase/config.toml ]; then
             npx supabase init
           fi
+          # GitHub-hosted runners can occasionally retain a stale local
+          # Supabase container long enough to keep one of the fixed dev ports
+          # bound. Clean only this disposable local project before starting it.
+          npx supabase stop --no-backup >/dev/null 2>&1 || true
           npx supabase start
 
       - name: Configure public catalog environment
