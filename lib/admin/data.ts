@@ -1009,7 +1009,10 @@ function parseRecentEvents(value: unknown): RecentAnalyticsEvent[] {
 // everywhere else: no session id, no IP, no precise coordinates.
 export async function getRecentAnalyticsEvents(limit = 200): Promise<DataResult<RecentAnalyticsEvent[]>> {
   const supabase = await createClient();
-  const { data, error } = await supabase.rpc("get_admin_recent_analytics_events", { p_limit: limit });
+  const { data, error } = await supabase.rpc("get_admin_recent_analytics_events_v2", {
+    p_limit: limit,
+    p_traffic_scope: "real_audience",
+  } as never);
 
   if (error) return safe([], error);
   return safe(parseRecentEvents(data), null);
@@ -1021,7 +1024,7 @@ export type RecentActivityRow =
 
 // Bots, ad blockers, and requests that arrive without the geo cookie yet
 // (first hit before it's set, or requests without Cloudflare geo metadata) all land as
-// "Unknown location" -- in bursts, they drown out the events that actually
+// "Unknown Location" -- in bursts, they drown out the events that actually
 // have somewhere to show. Collapses each consecutive run of unknown-location
 // events (list is already newest-first) into one summary row instead of
 // listing every one individually; events with a real location are always
@@ -1032,14 +1035,14 @@ export function collapseUnknownLocationRuns(events: RecentAnalyticsEvent[]): Rec
 
   while (i < events.length) {
     const event = events[i];
-    if (event.locationLabel !== "Unknown location") {
+    if (event.locationLabel !== "Unknown Location") {
       rows.push({ kind: "event", event });
       i += 1;
       continue;
     }
 
     let j = i;
-    while (j < events.length && events[j].locationLabel === "Unknown location") j += 1;
+    while (j < events.length && events[j].locationLabel === "Unknown Location") j += 1;
     const run = events.slice(i, j);
 
     if (run.length === 1) {
