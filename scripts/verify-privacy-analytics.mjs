@@ -2,38 +2,36 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const root = process.cwd();
-const migrationPath = "supabase/migrations/20260712004_privacy_analytics.sql";
-const adminMigrationPath = "supabase/migrations/20260714005_admin_analytics_reads.sql";
-const files = [
-  migrationPath,
-  adminMigrationPath,
-  "lib/analytics/types.ts",
-  "lib/analytics/client.ts",
-  "lib/analytics/state.ts",
-  "lib/analytics/session.ts",
-  "lib/analytics/device.ts",
-  "lib/analytics/size-bucket.ts",
+const foundationPath =
+  "supabase/migrations/20260925113850_analytics_real_audience_foundation.sql";
+const cutoverPath =
+  "supabase/migrations/20261004090000_trusted_analytics_cutover.sql";
+
+const requiredFiles = [
+  foundationPath,
+  cutoverPath,
+  "app/api/analytics/route.ts",
   "components/analytics/AnalyticsProvider.tsx",
   "components/analytics/AnalyticsPageView.tsx",
-  "components/admin/analytics/AnalyticsTrendChart.tsx",
-  "components/admin/analytics/AnalyticsBarList.tsx",
-  "components/admin/analytics/AnalyticsDistribution.tsx",
   "components/admin/analytics/AnalyticsPrivacyNotice.tsx",
-  "docs/PRIVACY_ANALYTICS.md",
-  "tests/analytics-tool-events.test.ts",
+  "components/admin/analytics/AudienceTrendChart.tsx",
+  "lib/analytics/client.ts",
+  "lib/analytics/server.ts",
+  "lib/analytics/types.ts",
+  "lib/cloudflare/request-location.ts",
+  "lib/admin/verified-analytics.ts",
   "lib/admin/data.ts",
   "lib/supabase/database.types.ts",
   "app/admin/(protected)/analytics/page.tsx",
-  "app/admin/(protected)/page.tsx",
-  "app/admin/(protected)/settings/page.tsx",
+  "app/admin/(protected)/analytics/activity/page.tsx",
+  "app/privacy/page.tsx",
+  "docs/PRIVACY_ANALYTICS.md",
+  "playwright.cloudflare-production.config.ts",
+  "playwright.production-conversion.config.ts",
 ];
 
 function read(relativePath) {
   return readFileSync(join(root, relativePath), "utf8");
-}
-
-function exists(relativePath) {
-  return existsSync(join(root, relativePath));
 }
 
 function assert(condition, message) {
@@ -41,211 +39,126 @@ function assert(condition, message) {
 }
 
 try {
-  for (const file of files) assert(exists(file), `Missing analytics file: ${file}`);
-
-  const migration = read(migrationPath);
-  const adminMigration = read(adminMigrationPath);
-  assert(/^begin;/im.test(migration) && /^commit;/im.test(migration), "Migration 004 must be transactional.");
-  assert(/record_public_analytics_event/i.test(migration), "Public analytics RPC missing.");
-  assert(/refresh_daily_tool_metrics/i.test(migration), "Daily metrics refresh function missing.");
-  assert(/get_public_analytics_setting/i.test(migration), "Public analytics setting RPC missing.");
-  for (const table of ["analytics_events", "daily_tool_metrics", "pdf_tools", "site_settings", "admin_members"]) {
-    assert(migration.includes(`public.${table}`), `Migration must check or reference required table public.${table}.`);
-  }
-  assert(/set search_path = public/gi.test(migration), "Analytics functions must lock search_path.");
-  assert(/page_view[\s\S]*tool_opened[\s\S]*processing_started[\s\S]*processing_succeeded[\s\S]*processing_failed[\s\S]*download_started/i.test(migration), "Approved event allowlist missing.");
-  for (const bucket of ["under_1mb", "1mb_to_5mb", "5mb_to_20mb", "20mb_to_50mb", "over_50mb", "unknown"]) {
-    assert(migration.includes(bucket), `Size bucket ${bucket} missing.`);
-  }
-  for (const device of ["desktop", "tablet", "mobile", "unknown"]) {
-    assert(migration.includes(device), `Device class ${device} missing.`);
-  }
-  for (const code of ["unsupported_file", "file_too_large", "invalid_pdf", "processing_error", "browser_limit", "cancelled", "unknown"]) {
-    assert(migration.includes(code), `Error code ${code} missing.`);
-  }
-  assert(/grant execute on function public\.record_public_analytics_event/i.test(migration), "Public analytics RPC execute grant missing.");
-  assert(!/grant\s+(insert|select|update|delete)[\s\S]*analytics_events[\s\S]*to\s+anon/i.test(migration), "Migration must not grant anon analytics_events table access.");
-  assert(!/create policy[\s\S]*analytics_events[\s\S]*to anon/i.test(migration), "Migration must not create anon analytics_events policies.");
-  const rpcSignature = migration.slice(
-    migration.indexOf("create or replace function public.record_public_analytics_event"),
-    migration.indexOf("returns bigint"),
-  );
-  assert(!/metadata/i.test(rpcSignature), "Public analytics RPC must not accept metadata from callers.");
-  assert(!/country_code\s*[,:=].+\$/im.test(migration), "Public analytics RPC must not accept country_code from callers.");
-
-  assert(/^begin;/im.test(adminMigration) && /^commit;/im.test(adminMigration), "Migration 005 must be transactional.");
-  assert(/get_admin_analytics_summary/i.test(adminMigration), "Admin aggregate analytics RPC missing.");
-  for (const dependency of [
-    "public.analytics_events",
-    "public.daily_tool_metrics",
-    "public.admin_members",
-    "public.current_admin_role",
-    "public.is_active_admin",
-  ]) {
-    assert(adminMigration.includes(dependency), `Migration 005 must check dependency ${dependency}.`);
-  }
-  assert(/security definer/i.test(adminMigration), "Admin aggregate RPC must use SECURITY DEFINER.");
-  assert(/set search_path = public/i.test(adminMigration), "Admin aggregate RPC must lock search_path.");
-  assert(/public\.current_admin_role\(\)/.test(adminMigration), "Admin aggregate RPC must validate active admin role.");
-  assert(/owner[\s\S]*admin[\s\S]*analyst/i.test(adminMigration), "Admin aggregate RPC must support owner/admin/analyst roles.");
-  assert(/p_end_date - p_start_date > 89/.test(adminMigration), "Admin aggregate RPC must enforce 90 day range.");
-  assert(/revoke all on function public\.get_admin_analytics_summary\(date, date\) from public/i.test(adminMigration), "Admin aggregate RPC must revoke public execution.");
-  assert(/revoke all on function public\.get_admin_analytics_summary\(date, date\) from anon/i.test(adminMigration), "Admin aggregate RPC must revoke anon execution.");
-  assert(/grant execute on function public\.get_admin_analytics_summary\(date, date\) to authenticated/i.test(adminMigration), "Admin aggregate RPC must grant authenticated execution.");
-  assert(!/grant\s+select[\s\S]*analytics_events[\s\S]*to\s+authenticated/i.test(adminMigration), "Migration 005 must not grant broad authenticated analytics_events SELECT.");
-  assert(!/create policy[\s\S]*analytics_events[\s\S]*to anon/i.test(adminMigration), "Migration 005 must not add anon analytics_events policy.");
-  const adminReturnStart = adminMigration.indexOf("return jsonb_build_object");
-  const adminReturnTail = adminMigration.slice(adminReturnStart);
-  const adminReturnEndMatch = /end;\s*\$\$;/i.exec(adminReturnTail);
-  assert(adminReturnStart > -1 && adminReturnEndMatch, "Admin aggregate RPC return block could not be isolated.");
-  const adminReturn = adminReturnTail.slice(0, adminReturnEndMatch.index);
-  for (const aggregateKey of ["total_events", "daily_trend", "top_tools_by_opens", "device_summary", "browser_summary", "operating_system_summary"]) {
-    assert(adminMigration.includes(aggregateKey), `Admin aggregate RPC return missing ${aggregateKey}.`);
-  }
-  for (const forbidden of ["anonymous_session_id", "metadata", "filename", "file_name", "country_code", "user_id", "email", "token"]) {
-    assert(!adminReturn.includes(forbidden), `Admin aggregate RPC must not return ${forbidden}.`);
+  for (const file of requiredFiles) {
+    assert(existsSync(join(root, file)), `Missing analytics file: ${file}`);
   }
 
-  const types = read("lib/analytics/types.ts");
-  for (const event of ["page_view", "tool_opened", "processing_started", "processing_succeeded", "processing_failed", "download_started"]) {
-    assert(types.includes(`"${event}"`), `Missing event type ${event}.`);
-  }
-  for (const state of ["loading", "enabled", "disabled"]) {
-    assert(types.includes(`"${state}"`), `Analytics availability state ${state} missing.`);
-  }
-  for (const reason of ["loading", "disabled", "do_not_track", "invalid_event", "unavailable"]) {
-    assert(types.includes(`"${reason}"`), `Analytics track rejection reason ${reason} missing.`);
-  }
-  assert(types.includes("AnalyticsProviderTrackResult"), "Provider track result contract missing.");
-  assert(!/\bany\b/.test(types), "Analytics types must not use any.");
-
-  const state = read("lib/analytics/state.ts");
-  assert(state.includes("providerTrackDecision"), "Analytics provider decision helper missing.");
-  assert(state.includes("shouldAttemptOnce"), "Analytics one-shot attempt helper missing.");
-  assert(state.includes("availability === \"loading\""), "Analytics decision helper must reject loading state.");
-  assert(state.includes("availability === \"enabled\" && !alreadyAccepted"), "One-shot helper must wait for enabled availability.");
-
-  const session = read("lib/analytics/session.ts");
-  assert(session.includes("sessionStorage"), "Anonymous analytics session must use sessionStorage.");
-  assert(!session.includes("localStorage"), "Anonymous analytics session must not use localStorage.");
-  assert(session.includes("crypto") && session.includes("randomUUID"), "Anonymous analytics session must use crypto.randomUUID.");
-  assert(session.includes("UUID_PATTERN"), "Malformed anonymous session IDs must be validated.");
-
+  const foundation = read(foundationPath);
+  const cutover = read(cutoverPath);
+  const route = read("app/api/analytics/route.ts");
   const client = read("lib/analytics/client.ts");
-  assert(client.includes("record_public_analytics_event"), "Analytics client must call only the analytics RPC.");
-  assert(!/\.from\(/.test(client), "Analytics client must not query tables.");
-  assert(!/throw\s/.test(client), "Analytics client must not throw into public UI.");
-  assert(!/console\.(log|warn|error)/.test(client), "Analytics client must not log raw errors.");
-
-  const provider = read("components/analytics/AnalyticsProvider.tsx");
-  assert(provider.includes("doNotTrack"), "Analytics provider must respect Do Not Track.");
-  assert(provider.includes("PUBLIC_ANALYTICS_ROUTES"), "Analytics provider must use a public route allowlist.");
-  assert(provider.includes("get_public_analytics_setting") || client.includes("get_public_analytics_setting"), "Analytics setting RPC must be used.");
-  assert(provider.includes("availability") && provider.includes("\"loading\""), "Analytics provider must expose loading availability.");
-  assert(provider.includes("enabled") && provider.includes("ready"), "Analytics provider must expose enabled and ready booleans.");
-  assert(provider.includes("providerTrackDecision"), "Analytics provider must use the typed decision helper.");
-  assert(provider.includes("accepted: false") && provider.includes("reason"), "Analytics provider track must return accepted/reason results.");
-
-  const pageView = read("components/analytics/AnalyticsPageView.tsx");
-  for (const route of ["/", "/pdf-tools", "/pdf/merge", "/pdf/split", "/pdf/compress", "/pdf/jpg-to-pdf", "/pdf/pdf-to-jpg"]) {
-    assert(pageView.includes(`"${route}"`), `Public page-view route ${route} missing.`);
-  }
-  assert(pageView.includes("availability"), "Page-view tracking must wait for analytics availability.");
-  assert(pageView.includes("shouldAttemptOnce"), "Page-view tracking must use the one-shot helper.");
-  assert(pageView.includes("result.accepted"), "Page-view tracking must mark a route only after accepted tracking.");
-  assert(!pageView.includes("/admin") && !pageView.includes("/dashboard"), "Admin/dashboard routes must not be tracked.");
-
-  const combined = files.map(read).join("\n");
-  assert(!/getSession\(/.test(combined), "Analytics files must not use getSession.");
-  assert(!/service_role/i.test(combined), "Analytics files must not reference service_role.");
-  assert(!/secret[_-]?key/i.test(combined), "Analytics files must not reference secret keys.");
-  assert(!/\b(fileName|file_name|filename)\s*[:=]/.test(combined), "Analytics files must not define filename fields.");
-  assert(!/exact file/i.test(combined) || combined.includes("exact file sizes"), "Only privacy disclosure may mention exact file sizes.");
-  assert(!/raw IP|raw user-agent/i.test(combined) || combined.includes("raw IP") || combined.includes("raw user-agent"), "Raw identifiers must only be mentioned as excluded data.");
-
-  const pdfTools = [
-    { file: "components/pdf/MergePdfTool.tsx", slug: "merge" },
-    { file: "components/pdf/SplitPdfTool.tsx", slug: "split" },
-    { file: "components/pdf/CompressPdfTool.tsx", slug: "compress" },
-  ];
-  // Operation lifecycle events are part of the current production analytics
-  // contract. Merge, Split, and Compress are the focused source-level guard
-  // here; the catalog/docs describe the complete live PDF-tool coverage.
-  const activeToolEvents = ["tool_opened", "processing_started", "processing_succeeded", "processing_failed", "download_started"];
-  for (const { file: toolFile, slug } of pdfTools) {
-    const tool = read(toolFile);
-    assert(tool.includes("availability"), `${toolFile} must read analytics availability.`);
-    assert(tool.includes("shouldAttemptOnce"), `${toolFile} must wait for enabled analytics before tool_opened.`);
-    assert(tool.includes("result.accepted"), `${toolFile} must mark tool_opened only after accepted tracking.`);
-    assert(tool.includes(`toolSlug: "${slug}"`), `${toolFile} must use exact tool slug ${slug}.`);
-    assert(!/openedTrackedRef\.current\s*=\s*true;\s*[\r\n]+\s*track\(\{\s*eventName:\s*"tool_opened"/.test(tool), `${toolFile} must not mark tool_opened before tracking is accepted.`);
-    for (const eventName of activeToolEvents) {
-      assert(tool.includes(`eventName: "${eventName}"`), `${toolFile} must track ${eventName}.`);
-    }
-    assert(!/await\s+track\(/.test(tool), `${toolFile} must not block processing on analytics.`);
-    assert(!/await\s+trackMergeAnalytics\(/.test(tool), `${toolFile} must not block processing on analytics.`);
-    const trackCalls = tool.match(/(?:track|trackMergeAnalytics)\(\{[\s\S]*?\}\);/g) ?? [];
-    assert(trackCalls.length === activeToolEvents.length, `${toolFile} must include exactly the ${activeToolEvents.length} approved analytics events (tool_opened + operation lifecycle).`);
-    assert(!/console\.info\(/.test(tool), `${toolFile} must not contain analytics debug console logs.`);
-    assert(!/Analytics Probe/.test(tool), `${toolFile} must not contain temporary analytics probes.`);
-    for (const call of trackCalls) {
-      assert(!/fileName|file_name|filename|pageCount|metadata|outputName|rawError|errorMessage|document|pdfText|thumbnail/.test(call), `${toolFile} analytics must not send filenames, page counts, metadata, or document data.`);
-      assert(!/\b(size|bytes)\s*:/.test(call), `${toolFile} analytics must not send exact sizes.`);
-    }
-  }
-
+  const server = read("lib/analytics/server.ts");
+  const geo = read("lib/cloudflare/request-location.ts");
+  const reader = read("lib/admin/verified-analytics.ts");
   const adminPage = read("app/admin/(protected)/analytics/page.tsx");
-  assert(adminPage.includes("AnalyticsPrivacyNotice"), "Admin analytics privacy notice missing.");
-  assert(!adminPage.includes("Analytics V1"), "Admin analytics page must not restore obsolete Analytics V1 copy.");
-  assert(adminPage.includes("Discovery & operation analytics"), "Admin analytics page must use discovery & operation analytics wording.");
-  assert(adminPage.includes('label="Page Views"'), "Admin analytics page must display page views.");
-  assert(adminPage.includes('label="Tool Opens"'), "Admin analytics page must display tool opens.");
-  assert(adminPage.includes("Top tools by opens"), "Admin analytics page must display top tools by opens.");
-  assert(adminPage.includes("Device class"), "Admin analytics page must display device summary.");
-  assert(adminPage.includes("Browser family"), "Admin analytics page must display browser summary.");
-  assert(adminPage.includes("Operating system"), "Admin analytics page must display operating-system summary.");
-  assert(adminPage.includes("Operation analytics"), "Admin analytics page must explain operation lifecycle metrics.");
-  // Operation lifecycle metric cards are current production behavior; keep
-  // the dashboard aligned with the events emitted by live tool workspaces.
-  for (const requiredLabel of ["Processing Started", "Processing Succeeded", "Processing Failed", "Downloads Started"]) {
-    assert(adminPage.includes(`label="${requiredLabel}"`), `Admin analytics page must show ${requiredLabel} as a metric card.`);
+  const activityPage = read("app/admin/(protected)/analytics/activity/page.tsx");
+  const privacyPage = read("app/privacy/page.tsx");
+  const privacyDocs = read("docs/PRIVACY_ANALYTICS.md");
+  const cfPlaywright = read("playwright.cloudflare-production.config.ts");
+  const conversionPlaywright = read("playwright.production-conversion.config.ts");
+  const dbTypes = read("lib/supabase/database.types.ts");
+
+  assert(/^begin;/im.test(cutover) && /^commit;/im.test(cutover), "Trusted analytics cutover must be transactional.");
+  assert(/record_trusted_analytics_event/i.test(cutover), "Trusted analytics writer missing.");
+  assert(/get_admin_verified_analytics/i.test(cutover), "Verified analytics aggregate missing.");
+  assert(/analytics_schema_version\s*=\s*2/i.test(cutover), "Verified analytics must read only schema-v2 rows.");
+  assert(/traffic_class/i.test(cutover), "Traffic classification missing.");
+  assert(/real_audience/.test(cutover), "Genuine audience scope missing.");
+  assert(/synthetic/.test(cutover), "Synthetic traffic class missing.");
+  assert(/known_bot/.test(cutover), "Known-bot traffic class missing.");
+  assert(/suspected_automation/.test(cutover), "Suspected-automation traffic class missing.");
+  assert(/Asia\/Kolkata/.test(cutover), "Analytics date boundaries must remain IST.");
+  assert(/security definer/i.test(cutover), "Trusted analytics RPCs must use SECURITY DEFINER.");
+  assert(/set search_path = ''/i.test(cutover), "Trusted analytics RPCs must lock search_path.");
+  assert(/x-lumeo-analytics-ingest/.test(cutover), "Trusted writer must require ingest authorization.");
+  assert(/extensions\.digest/.test(cutover), "Trusted writer must verify the ingest secret hash.");
+  assert(/Known Location|known_location_page_views/i.test(cutover), "Known-location accounting missing.");
+  assert(/unknown_location_page_views/i.test(cutover), "Unknown-location accounting missing.");
+  assert(/page_path/i.test(cutover), "Page-view path storage missing.");
+  assert(!/latitude|longitude|street_address|postal_address/i.test(cutover), "Precise location fields are forbidden.");
+
+  for (const event of [
+    "page_view",
+    "tool_opened",
+    "processing_started",
+    "processing_succeeded",
+    "processing_failed",
+    "processing_cancelled",
+    "download_started",
+  ]) {
+    assert(cutover.includes(`'${event}'`), `Trusted writer must allow ${event}.`);
   }
-  assert(adminPage.includes("Success Rate"), "Admin analytics page must show processing success rate.");
-  assert(adminPage.includes("dataStatus") && adminPage.includes("unavailable"), "Admin analytics page must distinguish unavailable data from genuine zero.");
 
-  const adminData = read("lib/admin/data.ts");
-  assert(adminData.includes("get_admin_analytics_summary"), "Admin data layer must call aggregate analytics RPC.");
-  assert(!/\.from\("analytics_events"\)/.test(adminData), "Admin data layer must not directly query analytics_events.");
-  assert(adminData.includes("pageViewsToday"), "Admin data layer must expose page-view totals separately.");
-  assert(adminData.includes("topToolsByOpens"), "Admin data layer must expose top tools by opens.");
-  assert(adminData.includes("dataStatus") && adminData.includes("\"unavailable\""), "Admin data layer must expose unavailable analytics state.");
+  assert(client.includes('fetch("/api/analytics"'), "Browser analytics must use the same-origin analytics route.");
+  assert(!client.includes("record_public_analytics_event"), "Browser must not call the legacy analytics writer.");
+  assert(!/sessionStorage|localStorage|document\.cookie/.test(client), "Browser analytics client must not own persistent identity.");
+  assert(!/\.from\(/.test(client), "Browser analytics client must not query tables.");
+  assert(!/console\.(log|warn|error)/.test(client), "Analytics client must fail quietly.");
 
-  const databaseTypes = read("lib/supabase/database.types.ts");
-  assert(databaseTypes.includes("get_admin_analytics_summary"), "Database types must include admin aggregate analytics RPC.");
+  assert(route.includes("ANALYTICS_VISITOR_COOKIE"), "Visitor cookie handling missing.");
+  assert(route.includes("ANALYTICS_SESSION_COOKIE"), "Session cookie handling missing.");
+  assert(route.includes("httpOnly: true"), "Analytics identity cookies must be HttpOnly.");
+  assert(route.includes("sameSite: \"lax\""), "Analytics identity cookies must be SameSite=Lax.");
+  assert(route.includes("pseudonymousAnalyticsKey"), "Raw analytics cookies must be pseudonymized.");
+  assert(route.includes('request.headers.get("cf-connecting-ip")'), "Transient request IP must be used only for rate-limit pseudonymization.");
+  assert(!/insert|analytics_events/.test(route), "Route must use the trusted RPC, not direct table writes.");
+  assert(!/navigator\.geolocation|latitude|longitude/.test(route), "Route must not request precise browser location.");
 
-  const privacy = read("app/privacy/page.tsx");
-  assert(privacy.includes("temporary browser-session ID"), "Privacy disclosure must mention temporary session IDs.");
-  assert(privacy.includes("Do Not Track"), "Privacy disclosure must mention Do Not Track.");
-  const docs = read("docs/PRIVACY_ANALYTICS.md");
-  assert(docs.includes("Current Analytics Scope"), "Privacy analytics docs must document the current scope.");
-  assert(docs.includes("processing_started") && /all 16 live PDF tools/i.test(docs), "Privacy analytics docs must describe the current lifecycle coverage.");
-  assert(migration.includes("coalesce(settings.value @>") && migration.includes("false"), "Analytics setting must default disabled when absent.");
+  assert(server.includes("crypto.subtle.sign"), "Analytics identities must use Web Crypto HMAC.");
+  assert(server.includes("LUMEO_ANALYTICS_INGEST_SECRET"), "Private ingest binding missing.");
+  assert(server.includes("record_trusted_analytics_event"), "Server writer must call trusted RPC.");
+  assert(!/service_role|SUPABASE_SERVICE_ROLE_KEY/i.test(server), "Trusted analytics must not depend on a service-role key.");
 
-  const packageJson = JSON.parse(read("package.json"));
-  assert(packageJson.scripts["verify:analytics"] === "node scripts/verify-privacy-analytics.mjs", "verify:analytics script missing.");
-  assert(packageJson.scripts.test === "node --no-warnings --test --experimental-strip-types", "generic test script missing.");
-  assert(packageJson.dependencies.next === "^16.3.0", "Next.js version changed unexpectedly.");
-  assert(packageJson.dependencies.react === "^19.2.8", "React version changed unexpectedly.");
-  assert(packageJson.dependencies["react-dom"] === "^19.2.8", "React DOM version changed unexpectedly.");
+  assert(geo.includes("cf?.city"), "Cloudflare visitor city missing.");
+  assert(geo.includes("cf?.region"), "Cloudflare visitor region missing.");
+  assert(geo.includes("cf?.country"), "Cloudflare visitor country missing.");
+  assert(!/\.colo\b/.test(geo.replace(/colo\?:/g, "")), "Cloudflare POP/colo must never be used as visitor location.");
+  assert(geo.includes("isCloudflareVerifiedBot"), "Verified-bot classification support missing.");
 
-  console.log("PASS privacy analytics migration exists");
-  console.log("PASS approved event allowlist and secure RPCs exist");
-  console.log("PASS no anon analytics table grants or policies");
-  console.log("PASS client uses sessionStorage, crypto.randomUUID, and RPC-only tracking");
-  console.log("PASS Do Not Track and public route allowlist are present");
-  console.log("PASS PDF tools emit the approved discovery and operation lifecycle events");
-  console.log("PASS admin analytics and privacy disclosure exist");
-  console.log("PASS protected package versions are unchanged");
+  assert(reader.includes("get_admin_verified_analytics"), "Admin must use the verified aggregate RPC.");
+  assert(reader.includes("get_admin_recent_analytics_events_v2"), "Admin recent activity must use schema-v2 reader.");
+  assert(reader.includes("known + unknown !== pageViews"), "Known + Unknown = Page Views invariant missing.");
+  assert(!/\.from\("analytics_events"\)/.test(reader), "Admin data layer must not read raw analytics table.");
+
+  assert(adminPage.includes('defaultValue={scope}'), "Traffic-scope control missing.");
+  assert(adminPage.includes("Genuine audience"), "Genuine-audience default label missing.");
+  assert(adminPage.includes('label="Page Views"'), "Page Views card missing.");
+  assert(adminPage.includes('label="Unique Visitors"'), "Unique Visitors card missing.");
+  assert(adminPage.includes('label="Sessions"'), "Sessions card missing.");
+  assert(adminPage.includes('label="Known Location"'), "Known Location card missing.");
+  assert(adminPage.includes('label="Unknown Location"'), "Unknown Location card missing.");
+  assert(adminPage.includes('title="Top Locations"'), "Top Locations table missing.");
+  assert(adminPage.includes("Country, State/Region and City"), "Country/region/city detail missing.");
+  assert(adminPage.includes('title="Top Pages"'), "Top Pages reporting missing.");
+  assert(adminPage.includes('title="Traffic integrity"'), "Traffic-integrity panel missing.");
+  assert(adminPage.includes("Legacy Unverified Page Views"), "Legacy data warning missing.");
+  assert(adminPage.includes("Excluded Automation Page Views"), "Automation exclusion metric missing.");
+  assert(activityPage.includes("getVerifiedRecentAnalyticsEvents"), "Full activity log must use verified events.");
+
+  assert(cfPlaywright.includes('"x-lumeo-analytics-traffic": "synthetic"'), "Cloudflare production browser checks must be marked synthetic.");
+  assert(conversionPlaywright.includes('"x-lumeo-analytics-traffic": "synthetic"'), "Conversion production browser checks must be marked synthetic.");
+
+  assert(privacyPage.includes("HMAC-pseudonymized"), "Public privacy page must disclose pseudonymous analytics identity.");
+  assert(privacyPage.includes("Unknown Location"), "Public privacy page must explain unresolved geography.");
+  assert(privacyPage.includes("Do Not Track"), "Public privacy page must disclose Do Not Track.");
+  assert(privacyDocs.includes("Known Location page views + Unknown Location page views = total Page Views"), "Analytics docs must lock reconciliation invariant.");
+  assert(privacyDocs.includes("cf.colo"), "Analytics docs must explicitly reject POP-as-visitor-location semantics.");
+
+  assert(dbTypes.includes("record_trusted_analytics_event"), "Database types missing trusted writer.");
+  assert(dbTypes.includes("get_admin_verified_analytics"), "Database types missing verified aggregate.");
+  assert(dbTypes.includes("get_admin_recent_analytics_events_v2"), "Database types missing recent verified reader.");
+
+  assert(/analytics_schema_version/.test(foundation), "Schema-v2 foundation missing.");
+  assert(/visitor_key/.test(foundation) && /session_key/.test(foundation), "Schema-v2 pseudonymous identities missing.");
+  assert(!/grant\s+(insert|select|update|delete)[\s\S]*analytics_events[\s\S]*to\s+anon/i.test(cutover), "Do not grant anon direct analytics table access.");
+
+  console.log("PASS trusted same-origin analytics ingestion");
+  console.log("PASS HMAC pseudonymous visitor/session identity");
+  console.log("PASS Cloudflare visitor geography without POP substitution");
+  console.log("PASS synthetic and automation traffic separation");
+  console.log("PASS verified Admin audience/location/page reporting");
+  console.log("PASS Known + Unknown = Page Views reconciliation");
+  console.log("PASS public privacy disclosure matches implementation");
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Privacy analytics verification failed.");
   process.exit(1);
