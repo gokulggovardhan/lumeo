@@ -94,14 +94,19 @@ test("Admin tool filters reject unknown enum values and match case-insensitively
   assert.deepEqual(filterAdminTools(tools, filters).map((tool) => tool.slug), ["merge"]);
 });
 
-test("Analytics V2 keeps verified unavailable handling and the real aggregate reader", () => {
+test("Analytics V2 reads only verified schema-v2 traffic for the primary audience view", () => {
   const source = readFileSync("app/admin/(protected)/analytics/page.tsx", "utf8");
-  assert.match(source, /getAnalyticsSummary/);
-  assert.match(source, /dataStatus === "unavailable"/);
-  assert.match(source, /Metrics are withheld instead of presenting unverified zero values/);
+  const data = readFileSync("lib/admin/verified-analytics.ts", "utf8");
+  assert.match(source, /getVerifiedTraffic/);
+  assert.match(source, /Verified analytics are unavailable/);
+  assert.match(source, /Real audience/);
+  assert.match(source, /Known-location page views/);
+  assert.match(source, /Unknown-location page views/);
   assert.match(source, /AnalyticsTrendChart/);
-  assert.match(source, /AnalyticsDistribution/);
-  assert.match(source, /RecentActivityTable/);
+  assert.match(source, /Traffic separation/);
+  assert.match(data, /get_admin_verified_traffic/);
+  assert.match(data, /known \+ unknown !== pageViews/);
+  assert.doesNotMatch(source, /getAnalyticsSummary/);
   assert.doesNotMatch(source, /revenue|storage saved|AI insight/i);
 });
 
