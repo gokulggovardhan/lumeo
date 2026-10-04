@@ -141,6 +141,25 @@ export function parseServerAnalyticsInput(body: unknown): ServerAnalyticsInput |
   };
 }
 
+const EXPLICIT_BOT_UA =
+  /(?:googlebot|bingbot|duckduckbot|yandexbot|baiduspider|applebot|slurp|facebookexternalhit)/i;
+
+export function isFirstPartyAnalyticsRequest(request: Request): boolean {
+  const url = new URL(request.url);
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      if (new URL(origin).origin !== url.origin) return false;
+    } catch {
+      return false;
+    }
+  }
+
+  const fetchSite = request.headers.get("sec-fetch-site");
+  if (fetchSite && fetchSite !== "same-origin") return false;
+  return true;
+}
+
 export function classifyTraffic(request: Request): {
   trafficClass: TrafficClass;
   reason: string;
@@ -154,6 +173,11 @@ export function classifyTraffic(request: Request): {
 
   if (isCloudflareVerifiedBot(request)) {
     return { trafficClass: "known_bot", reason: "cloudflare-verified-bot" };
+  }
+
+  const userAgent = request.headers.get("user-agent") ?? "";
+  if (EXPLICIT_BOT_UA.test(userAgent)) {
+    return { trafficClass: "known_bot", reason: "self-identified-crawler" };
   }
 
   return { trafficClass: "real_audience", reason: "public-browser" };
