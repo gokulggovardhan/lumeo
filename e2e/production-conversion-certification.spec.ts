@@ -232,16 +232,30 @@ async function replaceControlledText(
   value: string,
 ): Promise<void> {
   const field = page.getByLabel(label);
-  await field.evaluate((element, nextValue) => {
-    const textarea = element as HTMLTextAreaElement;
-    const setter = Object.getOwnPropertyDescriptor(
-      HTMLTextAreaElement.prototype,
-      "value",
-    )?.set;
-    setter?.call(textarea, nextValue);
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
-    textarea.dispatchEvent(new Event("change", { bubbles: true }));
-  }, value);
+  await expect(field).toBeVisible();
+
+  // The production page can expose the SSR textarea before React has attached
+  // its client event handlers, especially in WebKit. Writing before hydration
+  // lets React restore the default value a moment later. Wait for React's
+  // element metadata, then use Playwright's normal input path.
+  await field.evaluate(async (element) => {
+    const hydrated = () =>
+      Object.keys(element).some(
+        (key) =>
+          key.startsWith("__reactFiber$") ||
+          key.startsWith("__reactProps$"),
+      );
+
+    const deadline = Date.now() + 30_000;
+    while (!hydrated()) {
+      if (Date.now() >= deadline) {
+        throw new Error("HTML source textarea did not hydrate.");
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+    }
+  });
+
+  await field.fill(value);
   await expect(field).toHaveValue(value);
 }
 
