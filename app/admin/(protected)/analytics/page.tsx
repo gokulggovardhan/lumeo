@@ -47,14 +47,14 @@ export default async function AnalyticsPage({
       { startDate: range.startDate, endDate: range.endDate },
       "real_audience",
     ),
-    getVerifiedRecentEvents(100, "real_audience"),
+    getVerifiedRecentEvents(40, "real_audience"),
     getVerifiedLiveTraffic("real_audience"),
   ]);
 
   const data = verified.data;
   const unavailable = !data;
   const summary = data?.summary;
-  const noData = Boolean(data && summary?.pageViews === 0 && data.integrity.verifiedEvents === 0);
+  const noPageViews = Boolean(data && summary?.pageViews === 0);
 
   const completed =
     (summary?.processingSucceeded ?? 0) + (summary?.processingFailed ?? 0);
@@ -62,12 +62,12 @@ export default async function AnalyticsPage({
     completed > 0
       ? Math.round(((summary?.processingSucceeded ?? 0) / completed) * 1000) / 10
       : null;
-  const unreconciled = Math.max(
-    0,
-    (summary?.processingStarted ?? 0) -
-      (summary?.processingSucceeded ?? 0) -
-      (summary?.processingFailed ?? 0) -
-      (summary?.processingCancelled ?? 0),
+
+  const hasFailureBreakdown = Boolean(
+    data &&
+      (data.errorSummary.length > 0 ||
+        data.failureStageSummary.length > 0 ||
+        data.cancellationStageSummary.length > 0),
   );
 
   return (
@@ -75,7 +75,7 @@ export default async function AnalyticsPage({
       <AdminPageHeader
         eyebrow="Analytics"
         title="Verified traffic analytics"
-        description="Real audience analytics only: verified visitors, sessions, page views, live hits, tool usage and approximate Cloudflare network geography."
+        description="Real Audience only: live hits, verified visitors, sessions, page views, tool usage and approximate Cloudflare network geography."
         meta={
           <Link
             href="/admin/analytics/activity"
@@ -96,7 +96,7 @@ export default async function AnalyticsPage({
 
       <AdminSectionCard
         title="Date range"
-        description="All verified metrics below use the same Asia/Kolkata calendar-day boundaries."
+        description="All non-live analytics below use the same IST calendar-day boundaries. Live Traffic always keeps its rolling realtime windows."
       >
         <form
           action="/admin/analytics"
@@ -111,16 +111,13 @@ export default async function AnalyticsPage({
               className="mt-2 min-h-11 w-full rounded-xl border border-[var(--border-subtle)] bg-[var(--surface-input)] px-3 text-base text-[var(--text-primary)] sm:text-sm"
             >
               <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
               <option value="7d">Last 7 days</option>
               <option value="30d">Last 30 days</option>
-              <option value="this-month">This month</option>
-              <option value="previous-month">Previous month</option>
               <option value="custom">Custom</option>
             </select>
           </label>
           <label className="text-xs font-semibold text-[var(--text-secondary)]">
-            Custom start (IST)
+            Custom start
             <input
               type="date"
               name="start"
@@ -130,7 +127,7 @@ export default async function AnalyticsPage({
             />
           </label>
           <label className="text-xs font-semibold text-[var(--text-secondary)]">
-            Custom end (IST)
+            Custom end
             <input
               type="date"
               name="end"
@@ -148,11 +145,16 @@ export default async function AnalyticsPage({
             </button>
           </div>
         </form>
+
         <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
           <AdminStatusBadge tone="gold">Real Audience</AdminStatusBadge>
           <AdminStatusBadge tone="gold">Selected: {range.label}</AdminStatusBadge>
-          <span>{range.startDate} to {range.endDate} · IST</span>
+          <span>{range.startDate} to {range.endDate}</span>
+          {data?.asOf ? (
+            <span>· Last updated {formatAdminDateTime(data.asOf, "medium")}</span>
+          ) : null}
         </div>
+
         {range.warning ? (
           <p className="mt-3 rounded-xl border border-[rgba(var(--lumeo-gold-rgb),0.24)] bg-[rgba(var(--lumeo-gold-rgb),0.08)] px-4 py-3 text-sm text-[var(--text-secondary)]">
             {range.warning} Showing the last 7 days instead.
@@ -163,172 +165,154 @@ export default async function AnalyticsPage({
       {unavailable ? (
         <AdminEmptyState
           title="Verified analytics are unavailable"
-          description="The server-verified aggregate could not be read. Legacy browser analytics are intentionally not substituted because they mix real users with test and automation traffic."
+          description="Unable to refresh analytics. Legacy browser analytics are intentionally not substituted."
         />
       ) : (
         <>
-          {data.integrity.verifiedEvents === 0 ? (
-            <AdminEmptyState
-              title="Verified analytics cutover has no events yet"
-              description="The verified schema-v2 pipeline is ready, but this selected range contains no server-verified events yet. Legacy rows remain historical evidence and are not promoted into real-audience metrics."
-            />
-          ) : null}
-
-          <section
-            aria-label="Verified traffic metrics"
-            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-          >
-            <AdminMetricCard
-              label="Unique Visitors"
-              value={summary!.uniqueVisitors}
-              detail="Persistent privacy-safe visitor pseudonyms with page views in this range."
-              tone="success"
-            />
-            <AdminMetricCard
-              label="Sessions"
-              value={summary!.sessions}
-              detail="Distinct 30-minute first-party sessions with page views."
-            />
-            <AdminMetricCard
-              label="Page Views"
-              value={summary!.pageViews}
-              detail="Verified page-view events for real audience."
-              tone="gold"
-            />
-            <AdminMetricCard
-              label="Tool Opens"
-              value={summary!.toolOpens}
-              detail="Verified tool workspace opens."
-            />
-          </section>
-
-          <section className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(18rem,0.6fr)]">
-            <AnalyticsTrendChart
-              rangeLabel={range.label}
-              points={data.daily.map((point) => ({
-                date: point.date,
-                pageViews: point.pageViews,
-                uniqueVisitors: point.uniqueVisitors,
-                sessions: point.sessions,
-              }))}
-            />
-            <AdminSectionCard
-              title="Location integrity"
-              description="Known location requires Cloudflare-verified country + region + city. Anything less remains unknown."
-            >
-              <dl className="space-y-4 text-sm">
-                <div>
-                  <dt className="text-[var(--text-muted)]">Known-location page views</dt>
-                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
-                    {summary!.knownLocationPageViews}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--text-muted)]">Unknown-location page views</dt>
-                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
-                    {summary!.unknownLocationPageViews}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--text-muted)]">Coverage</dt>
-                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
-                    {data.integrity.locationCoveragePercent === null
-                      ? "N/A"
-                      : `${data.integrity.locationCoveragePercent}%`}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-[var(--text-muted)]">Reconciliation</dt>
-                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
-                    {summary!.knownLocationPageViews + summary!.unknownLocationPageViews} = {summary!.pageViews} page views
-                  </dd>
-                </div>
-              </dl>
-            </AdminSectionCard>
-          </section>
-
-          {noData ? (
-            <AdminEmptyState
-              title="No verified traffic in this range"
-              description="This is a genuine zero for real audience."
-            />
+          {data.integrity.reconciliationIssue ? (
+            <div className="rounded-2xl border border-[rgba(var(--lumeo-gold-rgb),0.34)] bg-[rgba(var(--lumeo-gold-rgb),0.09)] px-4 py-3 text-sm text-[var(--text-secondary)]">
+              <strong className="text-[var(--text-primary)]">
+                Data reconciliation issue detected.
+              </strong>{" "}
+              Uncorrelated historical lifecycle events are excluded from primary
+              processing metrics. Current visitor/location metrics remain verified.
+            </div>
           ) : null}
 
           <AdminSectionCard
-            title="Top Locations"
-            description="Ranked by verified page views. Location is approximate network geography from Cloudflare, not GPS and never a precise address."
+            title="Real Audience"
+            description="Verified people and browsing activity for the selected range."
           >
-            <AdminDataTable
-              columns={["Location", "Page views", "Visitors", "Sessions"]}
-              rows={[
-                ...data.locations.map((row) => [
-                  formatLocationLabel(
-                    row.city,
-                    row.regionCode ?? row.region,
-                    row.countryCode,
-                  ),
-                  row.pageViews,
-                  row.visitors,
-                  row.sessions,
-                ]),
-                ...(summary!.unknownLocationPageViews > 0
-                  ? [[
-                      "Unknown Location",
-                      summary!.unknownLocationPageViews,
-                      "—",
-                      "—",
-                    ]]
-                  : []),
-              ]}
-              empty={
+            <section
+              aria-label="Real Audience metrics"
+              className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+            >
+              <AdminMetricCard
+                label="Unique Visitors"
+                value={summary!.uniqueVisitors}
+                detail="Distinct verified visitor pseudonyms with page views."
+                definition="A privacy-safe persistent first-party pseudonym counted once in the selected range when it has a verified page view."
+                tone="success"
+              />
+              <AdminMetricCard
+                label="Sessions"
+                value={summary!.sessions}
+                detail="Distinct verified 30-minute browsing sessions."
+                definition="A privacy-safe first-party session pseudonym. The session cookie expires after 30 minutes."
+              />
+              <AdminMetricCard
+                label="Page Views"
+                value={summary!.pageViews}
+                detail="Verified Real Audience page-view events."
+                tone="gold"
+              />
+              <AdminMetricCard
+                label="Tool Opens"
+                value={summary!.toolOpens}
+                detail="Verified tool workspace opens."
+                definition="A verified tool_opened event. Opening a tool is separate from successfully completing processing."
+              />
+            </section>
+
+            {noPageViews ? (
+              <div className="mt-4">
                 <AdminEmptyState
-                  title="No verified city-level locations"
-                  description="Page views without complete Cloudflare city, region and country data remain in Unknown Location rather than being guessed."
+                  title="No verified page views in this period"
+                  description="This is a genuine zero for Real Audience."
                 />
-              }
-            />
+              </div>
+            ) : null}
           </AdminSectionCard>
 
+          <AnalyticsTrendChart
+            rangeLabel={range.label}
+            points={data.daily.map((point) => ({
+              date: point.date,
+              pageViews: point.pageViews,
+              uniqueVisitors: point.uniqueVisitors,
+              sessions: point.sessions,
+            }))}
+          />
+
           <AdminSectionCard
-            title="Geography drill-down"
-            description="Country, region and city rankings are derived only from verified page-view events."
+            title="Geography"
+            description="Approximate Cloudflare network geography for verified page views only. No GPS, exact coordinates or addresses."
           >
-            <div className="grid gap-4 lg:grid-cols-3">
-              <AnalyticsBarList
-                title="Countries by page views"
-                items={data.countries.slice(0, 12).map((row) => ({
-                  label: formatLocationLabel(null, null, row.countryCode),
-                  value: row.pageViews,
-                }))}
-              />
-              <AnalyticsBarList
-                title="Regions by page views"
-                items={data.regions.slice(0, 12).map((row) => ({
-                  label: formatLocationLabel(
-                    null,
-                    row.regionCode ?? row.region,
-                    row.countryCode,
-                  ),
-                  value: row.pageViews,
-                }))}
-              />
-              <AnalyticsBarList
-                title="Cities by page views"
-                items={data.cities.slice(0, 12).map((row) => ({
-                  label: formatLocationLabel(
-                    row.city,
-                    row.regionCode ?? row.region,
-                    row.countryCode,
-                  ),
-                  value: row.pageViews,
-                }))}
-              />
+            <div className="grid gap-5 xl:grid-cols-[minmax(16rem,0.55fr)_minmax(0,1.45fr)]">
+              <div className="rounded-xl border border-[var(--border-hairline)] p-4">
+                <h3 className="text-sm font-semibold text-[var(--text-primary)]">
+                  Location integrity
+                </h3>
+                <dl className="mt-4 space-y-4 text-sm">
+                  <div>
+                    <dt className="text-[var(--text-muted)]">Known-location page views</dt>
+                    <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                      {summary!.knownLocationPageViews}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--text-muted)]">Unknown-location page views</dt>
+                    <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                      {summary!.unknownLocationPageViews}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--text-muted)]">Coverage</dt>
+                    <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                      {data.integrity.locationCoveragePercent === null
+                        ? "N/A"
+                        : `${data.integrity.locationCoveragePercent}%`}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[var(--text-muted)]">Reconciliation</dt>
+                    <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                      {summary!.knownLocationPageViews + summary!.unknownLocationPageViews} = {summary!.pageViews} page views
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+
+              <div className="grid min-w-0 gap-4 lg:grid-cols-3">
+                <AnalyticsBarList
+                  title="Countries"
+                  emptyText="No verified country data in this period."
+                  items={data.countries.slice(0, 12).map((row) => ({
+                    label: formatLocationLabel(null, null, row.countryCode),
+                    value: row.pageViews,
+                  }))}
+                />
+                <AnalyticsBarList
+                  title="Regions"
+                  emptyText="No verified region data in this period."
+                  items={data.regions.slice(0, 12).map((row) => ({
+                    label: formatLocationLabel(
+                      null,
+                      row.regionCode ?? row.region,
+                      row.countryCode,
+                    ),
+                    value: row.pageViews,
+                  }))}
+                />
+                <AnalyticsBarList
+                  title="Cities"
+                  emptyText="No verified city data in this period."
+                  items={data.cities.slice(0, 12).map((row) => ({
+                    label: formatLocationLabel(
+                      row.city,
+                      row.regionCode ?? row.region,
+                      row.countryCode,
+                    ),
+                    value: row.pageViews,
+                  }))}
+                />
+              </div>
             </div>
           </AdminSectionCard>
 
           <AdminSectionCard
             title="Page performance"
-            description="Verified discovery traffic by public path."
+            description="Verified Real Audience traffic by public path for the selected range."
           >
             <AdminDataTable
               columns={["Page", "Page views", "Visitors", "Sessions"]}
@@ -340,50 +324,75 @@ export default async function AnalyticsPage({
               ])}
               empty={
                 <AdminEmptyState
-                  title="No verified page traffic"
-                  description="No verified page views were recorded in this range."
+                  title="No verified page views in this period"
+                  description="Page performance will appear when Real Audience page views are recorded."
                 />
               }
             />
           </AdminSectionCard>
 
           <AdminSectionCard
+            title="Tool usage"
+            description="Tool opening and successful processing remain separate business actions."
+          >
+            <div className="grid gap-4 lg:grid-cols-2">
+              <AnalyticsBarList
+                title="Top tools by opens"
+                emptyText="No tool activity in this period."
+                items={data.topToolsByOpens.map((item) => ({
+                  label: item.toolSlug,
+                  value: item.count,
+                }))}
+              />
+              <AnalyticsBarList
+                title="Tools by successful processing"
+                emptyText="No successful processing in this period."
+                items={data.topToolsBySuccess.map((item) => ({
+                  label: item.toolSlug,
+                  value: item.count,
+                }))}
+              />
+            </div>
+          </AdminSectionCard>
+
+          <AdminSectionCard
             title="Operation analytics"
-            description="Conversion lifecycle metrics stay separated from visitor counting."
+            description="Processing metrics use correlated server-assigned attempt IDs. Historical uncorrelated events are excluded."
           >
             <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <AdminMetricCard
                 label="Processing Started"
                 value={summary!.processingStarted}
-                detail="Verified processing attempts started."
+                detail="Correlated processing attempts started in this range."
               />
               <AdminMetricCard
                 label="Processing Succeeded"
                 value={summary!.processingSucceeded}
-                detail="Usable outputs created."
+                detail="Correlated attempts with a success terminal event."
                 tone="success"
               />
               <AdminMetricCard
                 label="Processing Failed"
                 value={summary!.processingFailed}
-                detail="Approved failure events."
+                detail="Correlated attempts with a failure terminal event."
                 tone={summary!.processingFailed ? "danger" : "neutral"}
               />
               <AdminMetricCard
                 label="Processing Cancelled"
                 value={summary!.processingCancelled}
-                detail="Explicit cancellation terminal outcomes."
+                detail="Correlated attempts explicitly cancelled."
               />
               <AdminMetricCard
                 label="No terminal event"
-                value={unreconciled}
-                detail="Started minus succeeded, failed and cancelled."
-                tone={unreconciled ? "warning" : "neutral"}
+                value={summary!.unfinishedAttempts}
+                detail="Started attempts with no correlated terminal event in this range."
+                tone={summary!.unfinishedAttempts ? "warning" : "neutral"}
               />
               <AdminMetricCard
                 label="Success Rate"
                 value={successRate === null ? "N/A" : `${successRate}%`}
-                detail="Succeeded ÷ succeeded+failed."
+                detail="Succeeded ÷ (succeeded + failed)."
+                definition="Calculated only from correlated succeeded and failed attempts. Cancelled and unfinished attempts are not included."
                 tone="gold"
               />
               <AdminMetricCard
@@ -394,70 +403,68 @@ export default async function AnalyticsPage({
               <AdminMetricCard
                 label="Average Duration"
                 value={formatDuration(summary!.averageSuccessfulDurationMs)}
-                detail="Successful processing events only."
+                detail="Correlated successful processing attempts only."
               />
             </section>
-            <div className="mt-4 grid gap-4 lg:grid-cols-3">
-              <AnalyticsBarList
-                title="Error categories"
-                items={data.errorSummary.map((item) => ({
-                  label: item.label,
-                  value: item.count,
-                }))}
-              />
-              <AnalyticsBarList
-                title="Failure stages"
-                items={data.failureStageSummary.map((item) => ({
-                  label: item.label,
-                  value: item.count,
-                }))}
-              />
-              <AnalyticsBarList
-                title="Cancellation stages"
-                items={data.cancellationStageSummary.map((item) => ({
-                  label: item.label,
-                  value: item.count,
-                }))}
-              />
-            </div>
-          </AdminSectionCard>
 
-          <AdminSectionCard
-            title="Tool performance"
-            description="Verified opens and successful processing only."
-          >
-            <div className="grid gap-4 lg:grid-cols-2">
-              <AnalyticsBarList
-                title="Top tools by opens"
-                items={data.topToolsByOpens.map((item) => ({
-                  label: item.toolSlug,
-                  value: item.count,
-                }))}
-              />
-              <AnalyticsBarList
-                title="Tools by successful processing"
-                items={data.topToolsBySuccess.map((item) => ({
-                  label: item.toolSlug,
-                  value: item.count,
-                }))}
-              />
-            </div>
+            {hasFailureBreakdown ? (
+              <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                {data.errorSummary.length > 0 ? (
+                  <AnalyticsBarList
+                    title="Error categories"
+                    items={data.errorSummary.map((item) => ({
+                      label: item.label,
+                      value: item.count,
+                    }))}
+                  />
+                ) : null}
+                {data.failureStageSummary.length > 0 ? (
+                  <AnalyticsBarList
+                    title="Failure stages"
+                    items={data.failureStageSummary.map((item) => ({
+                      label: item.label,
+                      value: item.count,
+                    }))}
+                  />
+                ) : null}
+                {data.cancellationStageSummary.length > 0 ? (
+                  <AnalyticsBarList
+                    title="Cancellation stages"
+                    items={data.cancellationStageSummary.map((item) => ({
+                      label: item.label,
+                      value: item.count,
+                    }))}
+                  />
+                ) : null}
+              </div>
+            ) : (
+              <p className="mt-4 text-sm text-[var(--text-muted)]">
+                No processing failures or cancellations in this period.
+              </p>
+            )}
           </AdminSectionCard>
 
           <AdminSectionCard
             title="Audience environment"
-            description="Technical breakdowns count distinct verified visitor pseudonyms rather than raw event volume."
+            description="Each verified visitor is assigned once per dimension using their latest page-view environment in the selected range."
           >
+            {!data.integrity.environmentReconciles ? (
+              <p className="mb-4 rounded-xl border border-[rgba(var(--lumeo-gold-rgb),0.28)] bg-[rgba(var(--lumeo-gold-rgb),0.08)] px-3 py-2 text-sm text-[var(--text-secondary)]">
+                Data reconciliation issue detected for audience environment.
+              </p>
+            ) : null}
             <div className="grid gap-4 md:grid-cols-3">
               <AnalyticsBarList
-                title="Device class"
+                title="Device"
+                emptyText="No verified visitors in this period."
                 items={data.deviceSummary.map((item) => ({
                   label: item.label,
                   value: item.visitors,
                 }))}
               />
               <AnalyticsBarList
-                title="Browser family"
+                title="Browser"
+                emptyText="No verified visitors in this period."
                 items={data.browserSummary.map((item) => ({
                   label: item.label,
                   value: item.visitors,
@@ -465,62 +472,34 @@ export default async function AnalyticsPage({
               />
               <AnalyticsBarList
                 title="Operating system"
+                emptyText="No verified visitors in this period."
                 items={data.osSummary.map((item) => ({
                   label: item.label,
                   value: item.visitors,
                 }))}
               />
             </div>
+            <p className="mt-3 text-xs text-[var(--text-muted)]">
+              Each dimension reconciles to {summary!.uniqueVisitors} verified unique visitors.
+            </p>
           </AdminSectionCard>
 
           <AdminSectionCard
-            title="Data integrity"
-            description="Schema-v1 data is retained for audit history but excluded from verified visitor and location metrics."
-          >
-            <dl className="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
-              <div>
-                <dt className="text-[var(--text-muted)]">Verified events in range</dt>
-                <dd className="mt-1 font-semibold text-[var(--text-primary)]">
-                  {data.integrity.verifiedEvents}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[var(--text-muted)]">Legacy events excluded</dt>
-                <dd className="mt-1 font-semibold text-[var(--text-primary)]">
-                  {data.integrity.legacyEvents}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[var(--text-muted)]">Legacy page views excluded</dt>
-                <dd className="mt-1 font-semibold text-[var(--text-primary)]">
-                  {data.integrity.legacyPageViews}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-[var(--text-muted)]">Verified cutover</dt>
-                <dd className="mt-1 font-semibold text-[var(--text-primary)]">
-                  {formatDate(data.integrity.cutoverAt)}
-                </dd>
-              </div>
-            </dl>
-          </AdminSectionCard>
-
-          <AdminSectionCard
-            title="Recent verified activity"
-            description="Newest verified events for real audience. No visitor/session key, raw IP, precise coordinate, filename or document content is displayed."
+            title="Recent operational activity"
+            description="Latest verified tool and processing events. Ordinary page views stay in Live Traffic and are not repeated here."
           >
             {recent.error ? (
               <AdminEmptyState
-                title="Recent verified activity is unavailable"
-                description="The aggregate above remains valid."
+                title="Recent operational activity is unavailable"
+                description="The selected-range aggregate above remains valid."
               />
             ) : (
               <AdminDataTable
-                columns={["Time (IST)", "Event", "Page / tool", "Location", "Device"]}
-                rows={recent.data.slice(0, 25).map((event) => [
+                columns={["Time", "Event", "Tool", "Location", "Device"]}
+                rows={recent.data.slice(0, 40).map((event) => [
                   formatAdminDateTime(event.occurredAt, "medium"),
                   event.eventName,
-                  event.toolSlug ?? event.pagePath ?? "—",
+                  event.toolSlug ?? "—",
                   formatLocationLabel(
                     event.city,
                     event.regionCode ?? event.region,
@@ -530,13 +509,71 @@ export default async function AnalyticsPage({
                 ])}
                 empty={
                   <AdminEmptyState
-                    title="No recent verified activity"
-                    description="Verified activity will appear after the cutover begins receiving events."
+                    title="No recent operational activity"
+                    description="Tool and processing events will appear here when they occur."
                   />
                 }
               />
             )}
           </AdminSectionCard>
+
+          <details className="rounded-2xl border border-[var(--border-hairline)] bg-[rgba(var(--lumeo-paper-rgb),0.018)]">
+            <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-[var(--text-secondary)]">
+              Data integrity / diagnostics
+            </summary>
+            <div className="border-t border-[var(--border-hairline)] px-4 py-4">
+              <dl className="grid gap-4 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                <div>
+                  <dt className="text-[var(--text-muted)]">Verified events</dt>
+                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {data.integrity.verifiedEvents}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--text-muted)]">Legacy events excluded</dt>
+                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {data.integrity.legacyEvents}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--text-muted)]">Legacy page views excluded</dt>
+                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {data.integrity.legacyPageViews}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--text-muted)]">Verified cutover</dt>
+                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {formatDate(data.integrity.cutoverAt)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--text-muted)]">Lifecycle reconciliation</dt>
+                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {data.integrity.lifecycleReconciles ? "OK" : "Needs attention"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--text-muted)]">Environment reconciliation</dt>
+                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {data.integrity.environmentReconciles ? "OK" : "Needs attention"}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--text-muted)]">Uncorrelated lifecycle events</dt>
+                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {data.integrity.uncorrelatedProcessingEvents}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-[var(--text-muted)]">Correlation cutover</dt>
+                  <dd className="mt-1 font-semibold text-[var(--text-primary)]">
+                    {formatDate(data.integrity.operationCorrelationCutoverAt)}
+                  </dd>
+                </div>
+              </dl>
+            </div>
+          </details>
         </>
       )}
     </div>
