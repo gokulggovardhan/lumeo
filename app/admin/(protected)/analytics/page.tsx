@@ -398,7 +398,7 @@ export default async function AnalyticsPage({
             title="Operation analytics"
             description="Conversion lifecycle metrics stay separated from visitor counting."
           >
-            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
               <AdminMetricCard
                 label="Processing Started"
                 value={summary!.processingStarted}
@@ -433,6 +433,16 @@ export default async function AnalyticsPage({
                 detail="Succeeded ÷ succeeded+failed."
                 tone="gold"
               />
+              <AdminMetricCard
+                label="Downloads Started"
+                value={summary!.downloadsStarted}
+                detail="Verified output download initiations."
+              />
+              <AdminMetricCard
+                label="Average Duration"
+                value={formatDuration(summary!.averageSuccessfulDurationMs)}
+                detail="Successful processing events only."
+              />
             </section>
             <div className="mt-4 grid gap-4 lg:grid-cols-3">
               <AnalyticsBarList
@@ -457,9 +467,6 @@ export default async function AnalyticsPage({
                 }))}
               />
             </div>
-            <p className="mt-4 text-xs text-[var(--text-muted)]">
-              Average successful duration: {formatDuration(summary!.averageSuccessfulDurationMs)} · Downloads started: {summary!.downloadsStarted}
-            </p>
           </AdminSectionCard>
 
           <AdminSectionCard
