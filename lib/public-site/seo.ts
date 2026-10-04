@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
+import { withPublicSocialImages } from "@/lib/public-site/metadata";
 
 type SeoOverride = {
   title: string;
@@ -32,33 +33,35 @@ function parseSeoOverride(value: unknown): SeoOverride | null {
 // the caller's static defaultMetadata untouched -- SEO records are additive,
 // never a way to break a page's metadata.
 export async function withSeoOverride(route: string, defaultMetadata: Metadata): Promise<Metadata> {
+  const fallbackMetadata = withPublicSocialImages(defaultMetadata);
+
   try {
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("get_public_seo_setting", { p_route: route });
-    if (error) return defaultMetadata;
+    if (error) return fallbackMetadata;
 
     const override = parseSeoOverride(data);
-    if (!override) return defaultMetadata;
+    if (!override) return fallbackMetadata;
 
     return {
-      ...defaultMetadata,
+      ...fallbackMetadata,
       title: override.title,
       description: override.description,
       alternates: {
-        ...defaultMetadata.alternates,
-        canonical: override.canonicalPath ?? defaultMetadata.alternates?.canonical,
+        ...fallbackMetadata.alternates,
+        canonical: override.canonicalPath ?? fallbackMetadata.alternates?.canonical,
       },
       robots: {
         index: override.robotsIndex,
         follow: override.robotsFollow,
       },
       openGraph: {
-        ...defaultMetadata.openGraph,
-        title: override.openGraphTitle ?? defaultMetadata.openGraph?.title,
-        description: override.openGraphDescription ?? defaultMetadata.openGraph?.description,
+        ...fallbackMetadata.openGraph,
+        title: override.openGraphTitle ?? fallbackMetadata.openGraph?.title,
+        description: override.openGraphDescription ?? fallbackMetadata.openGraph?.description,
       },
     };
   } catch {
-    return defaultMetadata;
+    return fallbackMetadata;
   }
 }
