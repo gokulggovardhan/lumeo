@@ -4,9 +4,17 @@ import { join } from "node:path";
 const root = process.cwd();
 const migrationPath = "supabase/migrations/20260712004_privacy_analytics.sql";
 const adminMigrationPath = "supabase/migrations/20260714005_admin_analytics_reads.sql";
+const verifiedMigrationPath =
+  "supabase/migrations/20261004090000_verified_analytics_activation.sql";
 const files = [
   migrationPath,
   adminMigrationPath,
+  verifiedMigrationPath,
+  "app/api/analytics/route.ts",
+  "lib/analytics/server-identity.ts",
+  "lib/analytics/server-user-agent.ts",
+  "lib/analytics/traffic-classification.ts",
+  "lib/admin/verified-analytics.ts",
   "lib/analytics/types.ts",
   "lib/analytics/client.ts",
   "lib/analytics/state.ts",
@@ -45,6 +53,7 @@ try {
 
   const migration = read(migrationPath);
   const adminMigration = read(adminMigrationPath);
+  const verifiedMigration = read(verifiedMigrationPath);
   assert(/^begin;/im.test(migration) && /^commit;/im.test(migration), "Migration 004 must be transactional.");
   assert(/record_public_analytics_event/i.test(migration), "Public analytics RPC missing.");
   assert(/refresh_daily_tool_metrics/i.test(migration), "Daily metrics refresh function missing.");
@@ -94,6 +103,61 @@ try {
   assert(/grant execute on function public\.get_admin_analytics_summary\(date, date\) to authenticated/i.test(adminMigration), "Admin aggregate RPC must grant authenticated execution.");
   assert(!/grant\s+select[\s\S]*analytics_events[\s\S]*to\s+authenticated/i.test(adminMigration), "Migration 005 must not grant broad authenticated analytics_events SELECT.");
   assert(!/create policy[\s\S]*analytics_events[\s\S]*to anon/i.test(adminMigration), "Migration 005 must not add anon analytics_events policy.");
+
+  assert(
+    /^begin;/im.test(verifiedMigration) && /^commit;/im.test(verifiedMigration),
+    "Verified analytics activation migration must be transactional.",
+  );
+  assert(
+    /record_server_analytics_event/i.test(verifiedMigration),
+    "Verified server analytics writer missing.",
+  );
+  assert(
+    /get_admin_verified_traffic/i.test(verifiedMigration),
+    "Verified Admin aggregate RPC missing.",
+  );
+  assert(
+    /analytics_schema_version\s*=\s*2/i.test(verifiedMigration),
+    "Verified analytics must isolate schema-v2 rows.",
+  );
+  for (const eventName of [
+    "page_view",
+    "tool_opened",
+    "processing_started",
+    "processing_succeeded",
+    "processing_failed",
+    "processing_cancelled",
+    "download_started",
+  ]) {
+    assert(
+      verifiedMigration.includes(`'${eventName}'`),
+      `Verified writer missing event ${eventName}.`,
+    );
+  }
+  assert(
+    /geo_source\s*=\s*'cloudflare'|cleaned_geo_source\s*:=\s*'cloudflare'/i.test(
+      verifiedMigration,
+    ),
+    "Verified geography must be Cloudflare sourced.",
+  );
+  assert(
+    /known_location_page_views[\s\S]*unknown_location_page_views/i.test(
+      verifiedMigration,
+    ),
+    "Verified traffic must return known and unknown location page views.",
+  );
+  assert(
+    /revoke execute on function public\.record_public_analytics_event/i.test(
+      verifiedMigration,
+    ),
+    "Legacy browser analytics writer must be revoked at cutover.",
+  );
+  assert(
+    /revoke all on function public\.get_admin_verified_traffic\(date, date, text\) from anon/i.test(
+      verifiedMigration,
+    ),
+    "Verified Admin aggregate must reject anon execution.",
+  );
   const adminReturnStart = adminMigration.indexOf("return jsonb_build_object");
   const adminReturnTail = adminMigration.slice(adminReturnStart);
   const adminReturnEndMatch = /end;\s*\$\$;/i.exec(adminReturnTail);
@@ -132,10 +196,45 @@ try {
   assert(session.includes("UUID_PATTERN"), "Malformed anonymous session IDs must be validated.");
 
   const client = read("lib/analytics/client.ts");
-  assert(client.includes("record_public_analytics_event"), "Analytics client must call only the analytics RPC.");
+  const analyticsRoute = read("app/api/analytics/route.ts");
+  assert(
+    client.includes('fetch("/api/analytics"'),
+    "Analytics client must send events only to the same-origin analytics endpoint.",
+  );
+  assert(
+    !client.includes("record_public_analytics_event"),
+    "Browser analytics must not call the legacy Supabase event writer.",
+  );
   assert(!/\.from\(/.test(client), "Analytics client must not query tables.");
   assert(!/throw\s/.test(client), "Analytics client must not throw into public UI.");
   assert(!/console\.(log|warn|error)/.test(client), "Analytics client must not log raw errors.");
+  for (const forbidden of [
+    "anonymous_session_id",
+    "country_code",
+    "cf-connecting-ip",
+  ]) {
+    assert(
+      !client.includes(forbidden),
+      `Browser analytics must not submit ${forbidden}.`,
+    );
+  }
+  assert(
+    analyticsRoute.includes("readCloudflareApproximateLocation"),
+    "Analytics endpoint must derive geography from Cloudflare request metadata.",
+  );
+  assert(
+    analyticsRoute.includes("deriveAnalyticsKey"),
+    "Analytics endpoint must derive pseudonymous visitor/session keys server-side.",
+  );
+  assert(
+    analyticsRoute.includes("classifyAnalyticsTraffic"),
+    "Analytics endpoint must classify real, synthetic, and automated traffic.",
+  );
+  assert(
+    analyticsRoute.includes("ANALYTICS_IDENTITY_SECRET") &&
+      analyticsRoute.includes("ANALYTICS_INGEST_SECRET"),
+    "Analytics endpoint must fail closed without its private server secrets.",
+  );
 
   const provider = read("components/analytics/AnalyticsProvider.tsx");
   assert(provider.includes("doNotTrack"), "Analytics provider must respect Do Not Track.");
@@ -197,7 +296,11 @@ try {
   const adminPage = read("app/admin/(protected)/analytics/page.tsx");
   assert(adminPage.includes("AnalyticsPrivacyNotice"), "Admin analytics privacy notice missing.");
   assert(!adminPage.includes("Analytics V1"), "Admin analytics page must not restore obsolete Analytics V1 copy.");
-  assert(adminPage.includes("Discovery & operation analytics"), "Admin analytics page must use discovery & operation analytics wording.");
+  assert(adminPage.includes("Verified traffic analytics"), "Admin analytics page must identify the verified traffic view.");
+  assert(adminPage.includes("Real audience"), "Admin analytics page must default to a real-audience scope.");
+  assert(adminPage.includes("Known-location page views"), "Admin analytics page must show known-location page views.");
+  assert(adminPage.includes("Unknown-location page views"), "Admin analytics page must show unknown-location page views.");
+  assert(adminPage.includes("Traffic separation"), "Admin analytics page must expose traffic-class diagnostics.");
   assert(adminPage.includes('label="Page Views"'), "Admin analytics page must display page views.");
   assert(adminPage.includes('label="Tool Opens"'), "Admin analytics page must display tool opens.");
   assert(adminPage.includes("Top tools by opens"), "Admin analytics page must display top tools by opens.");
@@ -211,17 +314,38 @@ try {
     assert(adminPage.includes(`label="${requiredLabel}"`), `Admin analytics page must show ${requiredLabel} as a metric card.`);
   }
   assert(adminPage.includes("Success Rate"), "Admin analytics page must show processing success rate.");
-  assert(adminPage.includes("dataStatus") && adminPage.includes("unavailable"), "Admin analytics page must distinguish unavailable data from genuine zero.");
+  assert(
+    adminPage.includes("Verified analytics are unavailable"),
+    "Admin analytics page must distinguish reader failure from genuine zero.",
+  );
 
-  const adminData = read("lib/admin/data.ts");
-  assert(adminData.includes("get_admin_analytics_summary"), "Admin data layer must call aggregate analytics RPC.");
-  assert(!/\.from\("analytics_events"\)/.test(adminData), "Admin data layer must not directly query analytics_events.");
-  assert(adminData.includes("pageViewsToday"), "Admin data layer must expose page-view totals separately.");
-  assert(adminData.includes("topToolsByOpens"), "Admin data layer must expose top tools by opens.");
-  assert(adminData.includes("dataStatus") && adminData.includes("\"unavailable\""), "Admin data layer must expose unavailable analytics state.");
+  const adminData = read("lib/admin/verified-analytics.ts");
+  assert(
+    adminData.includes("get_admin_verified_traffic"),
+    "Verified Admin data layer must call the schema-v2 aggregate RPC.",
+  );
+  assert(
+    adminData.includes("get_admin_recent_analytics_events_v2"),
+    "Verified Admin data layer must call the schema-v2 recent-event RPC.",
+  );
+  assert(
+    !/\.from\("analytics_events"\)/.test(adminData),
+    "Verified Admin data layer must not directly query analytics_events.",
+  );
+  assert(
+    adminData.includes("known + unknown !== pageViews"),
+    "Verified Admin parser must enforce location/page-view reconciliation.",
+  );
 
   const databaseTypes = read("lib/supabase/database.types.ts");
-  assert(databaseTypes.includes("get_admin_analytics_summary"), "Database types must include admin aggregate analytics RPC.");
+  assert(
+    databaseTypes.includes("get_admin_verified_traffic"),
+    "Database types must include the verified aggregate analytics RPC.",
+  );
+  assert(
+    databaseTypes.includes("get_admin_recent_analytics_events_v2"),
+    "Database types must include the verified recent-event RPC.",
+  );
 
   const privacy = read("app/privacy/page.tsx");
   assert(privacy.includes("temporary browser-session ID"), "Privacy disclosure must mention temporary session IDs.");
@@ -241,7 +365,8 @@ try {
   console.log("PASS privacy analytics migration exists");
   console.log("PASS approved event allowlist and secure RPCs exist");
   console.log("PASS no anon analytics table grants or policies");
-  console.log("PASS client uses sessionStorage, crypto.randomUUID, and RPC-only tracking");
+  console.log("PASS browser analytics uses the trusted same-origin server endpoint");
+  console.log("PASS visitor/session identity and Cloudflare geography are server-derived");
   console.log("PASS Do Not Track and public route allowlist are present");
   console.log("PASS PDF tools emit the approved discovery and operation lifecycle events");
   console.log("PASS admin analytics and privacy disclosure exist");
