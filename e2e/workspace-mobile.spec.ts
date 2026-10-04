@@ -47,6 +47,7 @@ async function openConnectedWorkspace(page: Page) {
     timeout: 90_000,
   });
 
+  const nav = page.locator("[data-workspace-mobile-nav]");
   await expect(nav).toBeVisible();
   await clickWorkspaceNav(page, "Edit");
   await expect(page).toHaveURL(/\/pdf\/edit$/);
@@ -167,7 +168,6 @@ test("connected PDF Workspace keeps dedicated mobile navigation usable across ta
     await expectMobileNavFits(page, width, height);
   }
 
-  const nav = page.locator("[data-workspace-mobile-nav]");
   await clickWorkspaceNav(page, "More");
 
   const more = page.locator("#workspace-mobile-more");
