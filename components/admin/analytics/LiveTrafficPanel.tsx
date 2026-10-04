@@ -5,13 +5,13 @@ import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
 import type {
   VerifiedLiveTrafficData,
-  VerifiedTrafficScope,
-} from "@/lib/admin/verified-analytics";
+  LiveTrafficScope,
+} from "@/lib/admin/live-analytics-types";
 import { formatLocationLabel } from "@/lib/analytics/location-names";
 
 const REFRESH_INTERVAL_MS = 10_000;
 
-function scopeLabel(scope: VerifiedTrafficScope) {
+function scopeLabel(scope: LiveTrafficScope) {
   if (scope === "real_audience") return "Real audience";
   if (scope === "synthetic") return "Lumeo synthetic tests";
   if (scope === "automation") return "Bots & suspected automation";
@@ -46,7 +46,7 @@ export function LiveTrafficPanel({
   initialData,
   initialError,
 }: {
-  trafficScope: VerifiedTrafficScope;
+  trafficScope: LiveTrafficScope;
   initialData: VerifiedLiveTrafficData | null;
   initialError: string | null;
 }) {
