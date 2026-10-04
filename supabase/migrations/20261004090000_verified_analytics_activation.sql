@@ -552,6 +552,10 @@ begin
       count(*) filter (where event_name = 'page_view')::bigint as page_views,
       count(distinct visitor_key) filter (where event_name = 'page_view')::bigint as visitors,
       count(distinct session_key) filter (where event_name = 'page_view')::bigint as sessions,
+      count(*) filter (where event_name = 'tool_opened')::bigint as tool_opens,
+      count(*) filter (where event_name = 'processing_succeeded')::bigint as processing_succeeded,
+      count(*) filter (where event_name = 'processing_failed')::bigint as processing_failed,
+      count(*) filter (where event_name = 'processing_cancelled')::bigint as processing_cancelled,
       count(*) filter (
         where event_name = 'page_view'
           and geo_source = 'cloudflare'
@@ -567,6 +571,10 @@ begin
     'page_views', coalesce(grouped.page_views, 0),
     'unique_visitors', coalesce(grouped.visitors, 0),
     'sessions', coalesce(grouped.sessions, 0),
+    'tool_opens', coalesce(grouped.tool_opens, 0),
+    'processing_succeeded', coalesce(grouped.processing_succeeded, 0),
+    'processing_failed', coalesce(grouped.processing_failed, 0),
+    'processing_cancelled', coalesce(grouped.processing_cancelled, 0),
     'known_location_page_views', coalesce(grouped.known_location_page_views, 0),
     'unknown_location_page_views',
       coalesce(grouped.page_views, 0) - coalesce(grouped.known_location_page_views, 0)
