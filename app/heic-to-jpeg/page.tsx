@@ -5,6 +5,26 @@ import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspa
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { withSeoOverride } from "@/lib/public-site/seo";
+import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
+
+const softwareSchema = buildSoftwareApplicationSchema({
+  name: "Lumeo HEIC to JPEG",
+  description:
+    "Convert iPhone HEIC and HEIF photos to high-quality JPEG directly in your browser.",
+  path: "/heic-to-jpeg",
+  featureList: [
+    "Batch HEIC and HEIF conversion",
+    "High-quality JPEG output",
+    "Companion-file inspection",
+    "No photo upload",
+  ],
+});
+
+const breadcrumbSchema = buildBreadcrumbSchema([
+  { name: "Home", path: "/" },
+  { name: "PDF Tools", path: "/pdf-tools" },
+  { name: "HEIC to JPEG", path: "/heic-to-jpeg" },
+]);
 
 const HeicToJpegTool = dynamic(() => import("@/components/heic/HeicToJpegTool"), { loading: () => <ToolWorkspaceLoading /> });
 export async function generateMetadata(): Promise<Metadata> {
@@ -17,8 +37,27 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 export default async function HeicToJpegPage() {
   const state = await getToolBlockedState("heic-to-jpeg");
-  return <PublicCatalogPageShell maxWidth="max-w-[1240px]">
-    <L2ToolPageHeader categoryLabel="IMAGE TOOLS" title="HEIC to JPEG" description="Convert iPhone HEIC photos to high-quality JPEG directly in your browser." />
-    {state.blocked ? <ToolMaintenanceNotice status={state.status} message={state.message} /> : <HeicToJpegTool />}
-  </PublicCatalogPageShell>;
+
+  return (
+    <PublicCatalogPageShell maxWidth="max-w-[1240px]">
+      <L2ToolPageHeader
+        categoryLabel="IMAGE TOOLS"
+        title="HEIC to JPEG"
+        description="Convert iPhone HEIC photos to high-quality JPEG directly in your browser."
+      />
+      {state.blocked ? (
+        <ToolMaintenanceNotice status={state.status} message={state.message} />
+      ) : (
+        <HeicToJpegTool />
+      )}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+      />
+    </PublicCatalogPageShell>
+  );
 }
