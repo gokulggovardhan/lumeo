@@ -387,6 +387,12 @@ export type ControlCenterDatabase = {
           success: boolean | null;
         }>;
       };
+      get_admin_live_analytics_v2: {
+        Args: {
+          p_traffic_scope?: string;
+        };
+        Returns: Json;
+      };
       get_public_maintenance_status: {
         Args: Record<string, never>;
         Returns: { enabled: boolean; title: string | null; message: string | null };
