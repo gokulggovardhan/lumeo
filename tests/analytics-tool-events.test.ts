@@ -184,18 +184,20 @@ test("analytics client posts events to the same-origin server endpoint without c
   assert.doesNotMatch(route, /analytics_events.*insert/i);
 });
 
-test("analytics client code does not introduce persistent local storage", () => {
+test("verified analytics keeps browser identity opaque and avoids localStorage", () => {
   const provider = readFileSync(
     "components/analytics/AnalyticsProvider.tsx",
     "utf8",
   );
-  const session = readFileSync("lib/analytics/session.ts", "utf8");
   const client = readFileSync("lib/analytics/client.ts", "utf8");
-  const combined = `${provider}\n${session}\n${client}`;
+  const identity = readFileSync("lib/analytics/server-identity.ts", "utf8");
+  const combined = `${provider}\n${client}\n${identity}`;
 
-  assert.match(combined, /sessionStorage/);
-  assert.match(combined, /randomUUID/);
-  assert.doesNotMatch(combined, /localStorage/);
+  assert.doesNotMatch(client, /localStorage|sessionStorage/);
+  assert.doesNotMatch(client, /randomUUID|anonymous_session_id/);
+  assert.match(identity, /httpOnly: true/);
+  assert.match(identity, /deriveAnalyticsKey/);
+  assert.doesNotMatch(combined, /document\.cookie/);
 });
 
 test("admin audience analytics reads use the verified aggregate RPC instead of direct event rows", () => {
