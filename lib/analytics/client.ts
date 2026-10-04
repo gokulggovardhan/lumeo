@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { AnalyticsEventInput, AnalyticsRemoteTrackResult } from "@/lib/analytics/types";
 
 const REQUEST_TIMEOUT_MS = 2500;
+const DELIVERY_TIMEOUT_MS = 8000;
 
 // Delivery is serialized per browser page so the first successful event can
 // establish the HttpOnly visitor/session cookies before a second mount event
@@ -54,37 +55,34 @@ export async function fetchPublicAnalyticsEnabled(): Promise<boolean> {
 async function deliverPublicAnalyticsEvent(
   input: AnalyticsEventInput,
 ): Promise<AnalyticsRemoteTrackResult> {
-  const controller = new AbortController();
-  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
   try {
-    const response = await fetch("/api/analytics", {
-      method: "POST",
-      credentials: "same-origin",
-      keepalive: true,
-      cache: "no-store",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        eventName: input.eventName,
-        toolSlug: input.toolSlug ?? null,
-        durationMs: safeDuration(input.durationMs),
-        inputSizeBucket: input.inputSizeBucket ?? null,
-        outputSizeBucket: input.outputSizeBucket ?? null,
-        success: input.success ?? null,
-        errorCode: input.errorCode ?? null,
-        failureStage: input.failureStage ?? null,
-        pagePath: window.location.pathname,
+    const response = await withTimeout(
+      fetch("/api/analytics", {
+        method: "POST",
+        credentials: "same-origin",
+        keepalive: true,
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          eventName: input.eventName,
+          toolSlug: input.toolSlug ?? null,
+          durationMs: safeDuration(input.durationMs),
+          inputSizeBucket: input.inputSizeBucket ?? null,
+          outputSizeBucket: input.outputSizeBucket ?? null,
+          success: input.success ?? null,
+          errorCode: input.errorCode ?? null,
+          failureStage: input.failureStage ?? null,
+          pagePath: window.location.pathname,
+        }),
       }),
-      signal: controller.signal,
-    });
+      DELIVERY_TIMEOUT_MS,
+    );
 
     return response.ok
       ? { success: true, eventId: null }
       : { success: false };
   } catch {
     return { success: false };
-  } finally {
-    window.clearTimeout(timer);
   }
 }
 

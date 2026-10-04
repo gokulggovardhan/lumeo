@@ -210,6 +210,10 @@ test("analytics client posts events to the same-origin server endpoint without c
   assert.match(route, /p_failure_stage/);
   assert.match(client, /deliveryQueue/);
   assert.match(client, /deliveryQueue\.then/);
+  assert.match(client, /keepalive: true/);
+  assert.match(client, /DELIVERY_TIMEOUT_MS/);
+  assert.doesNotMatch(client, /new AbortController\(\)/);
+  assert.doesNotMatch(client, /signal: controller\.signal/);
   assert.doesNotMatch(route, /analytics_events.*insert/i);
 });
 

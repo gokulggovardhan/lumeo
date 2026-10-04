@@ -213,9 +213,7 @@ async function replaceControlledText(
   value: string,
 ): Promise<void> {
   const field = page.getByLabel(label);
-  await field.click();
-  await field.press("ControlOrMeta+A");
-  await page.keyboard.insertText(value);
+  await field.fill(value);
   await expect(field).toHaveValue(value);
 }
 
