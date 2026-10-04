@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
+import type { VerifiedLiveTrafficData } from "@/lib/admin/live-analytics-types";
 
 export type VerifiedTrafficScope =
   | "real_audience"
@@ -123,41 +124,6 @@ export type VerifiedRecentEvent = {
   geoPrecision: string | null;
   pagePath: string | null;
   success: boolean | null;
-};
-
-export type VerifiedLiveTrafficSummary = {
-  pageViewsLastMinute: number;
-  pageViewsLastFiveMinutes: number;
-  activeVisitorsLastFiveMinutes: number;
-  activeSessionsLastFiveMinutes: number;
-  knownLocationPageViewsLastFiveMinutes: number;
-  unknownLocationPageViewsLastFiveMinutes: number;
-  lastPageViewAt: string | null;
-};
-
-export type VerifiedLiveMinuteBucket = {
-  minute: string;
-  pageViews: number;
-  visitors: number;
-};
-
-export type VerifiedLiveHit = {
-  occurredAt: string;
-  pagePath: string | null;
-  toolSlug: string | null;
-  city: string | null;
-  region: string | null;
-  regionCode: string | null;
-  countryCode: string | null;
-};
-
-export type VerifiedLiveTrafficData = {
-  schemaVersion: 2;
-  trafficScope: VerifiedTrafficScope;
-  asOf: string;
-  summary: VerifiedLiveTrafficSummary;
-  minuteBuckets: VerifiedLiveMinuteBucket[];
-  recentHits: VerifiedLiveHit[];
 };
 
 type DataResult<T> = { data: T; error: string | null };
