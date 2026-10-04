@@ -106,14 +106,23 @@ function rejected(status: number) {
 }
 
 function sameOriginRequest(request: NextRequest) {
-  if (request.headers.get("sec-fetch-site") === "cross-site") return false;
+  const fetchSite = request.headers.get("sec-fetch-site")?.toLowerCase() ?? null;
+  if (fetchSite && fetchSite !== "same-origin") return false;
+
   const origin = request.headers.get("origin");
-  if (!origin) return true;
-  try {
-    return new URL(origin).origin === request.nextUrl.origin;
-  } catch {
-    return false;
+  if (origin) {
+    try {
+      return new URL(origin).origin === request.nextUrl.origin;
+    } catch {
+      return false;
+    }
   }
+
+  // Analytics is emitted by same-origin browser fetch(), never by a top-level
+  // navigation. Requiring browser fetch metadata when Origin is unavailable
+  // keeps bare HTTP clients, health probes and scanners from manufacturing
+  // business page views through this public endpoint.
+  return fetchSite === "same-origin";
 }
 
 function normalizePagePath(value: unknown) {
