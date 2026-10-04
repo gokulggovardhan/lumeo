@@ -131,6 +131,7 @@ try {
     ...actionFiles,
     "lib/admin/permissions.ts",
     "lib/admin/data.ts",
+    "lib/admin/verified-analytics.ts",
     "lib/admin/audit.ts",
     "lib/admin/validation.ts",
     "components/admin/ControlCenterShell.tsx",
@@ -179,7 +180,7 @@ try {
   }
   assert(buildInfoSource.includes("LUMEO_BUILD_SHA"), "Build-info endpoint must expose Cloudflare build SHA metadata.");
   assert(errorCaptureSource.includes("LUMEO_BUILD_SHA"), "Server error capture must tag Cloudflare build SHA metadata.");
-  for (const check of ["Admin authorization", "Supabase database", "Maintenance state", "Analytics aggregates", "Error monitoring", "Feedback Inbox", "Cloudflare runtime"]) {
+  for (const check of ["Admin authorization", "Supabase database", "Maintenance state", "Verified analytics", "Error monitoring", "Feedback Inbox", "Cloudflare runtime"]) {
     assert(healthSource.includes(check), `Health V2 evidence check missing: ${check}.`);
   }
   assert(healthPage.includes("Core operations") && healthPage.includes("Supporting operations"), "Health V2 must separate core and supporting checks.");
