@@ -4,21 +4,6 @@ import JSZip from "jszip";
 import { PDFDocument } from "pdf-lib";
 import { readFile } from "node:fs/promises";
 
-
-async function installOwnedAnalyticsMarker(context: import("@playwright/test").BrowserContext) {
-  await context.route("**/api/analytics", async (route) => {
-    await route.continue({
-      headers: {
-        ...route.request().headers(),
-        "x-lumeo-synthetic-test": "1",
-      },
-    });
-  });
-}
-
-test.beforeEach(async ({ context }) => {
-  await installOwnedAnalyticsMarker(context);
-});
 import { makeAdvancedLayoutDocx } from "./advanced-word-docx-fixture";
 import { makeProfessionalDocx } from "./professional-docx-fixture";
 import {
@@ -26,6 +11,11 @@ import {
   makeTwoColumnReportPdf,
   makeWhitespaceStatementPdf,
 } from "./semantic-pdf-fixtures";
+import { installOwnedAnalyticsMarker } from "./owned-analytics-marker";
+
+test.beforeEach(async ({ context }) => {
+  await installOwnedAnalyticsMarker(context);
+});
 
 type FailedRequest = {
   method: string;
