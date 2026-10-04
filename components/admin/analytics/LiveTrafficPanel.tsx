@@ -3,20 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AdminMetricCard } from "@/components/admin/AdminMetricCard";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
-import type {
-  VerifiedLiveTrafficData,
-  LiveTrafficScope,
-} from "@/lib/admin/live-analytics-types";
+import type { VerifiedLiveTrafficData } from "@/lib/admin/live-analytics-types";
 import { formatLocationLabel } from "@/lib/analytics/location-names";
 
 const REFRESH_INTERVAL_MS = 10_000;
-
-function scopeLabel(scope: LiveTrafficScope) {
-  if (scope === "real_audience") return "Real audience";
-  if (scope === "synthetic") return "Lumeo synthetic tests";
-  if (scope === "automation") return "Bots & suspected automation";
-  return "All verified traffic";
-}
 
 function formatTime(value: string | null) {
   if (!value) return "None yet";
@@ -42,11 +32,9 @@ function pageLabel(path: string | null) {
 }
 
 export function LiveTrafficPanel({
-  trafficScope,
   initialData,
   initialError,
 }: {
-  trafficScope: LiveTrafficScope;
   initialData: VerifiedLiveTrafficData | null;
   initialError: string | null;
 }) {
@@ -59,7 +47,7 @@ export function LiveTrafficPanel({
     setRefreshing(true);
     try {
       const response = await fetch(
-        `/admin/analytics/live?traffic=${encodeURIComponent(trafficScope)}`,
+        "/admin/analytics/live",
         {
           cache: "no-store",
           credentials: "same-origin",
@@ -83,7 +71,7 @@ export function LiveTrafficPanel({
     } finally {
       setRefreshing(false);
     }
-  }, [refreshing, trafficScope]);
+  }, [refreshing]);
 
   useEffect(() => {
     const id = window.setInterval(() => {
@@ -102,7 +90,7 @@ export function LiveTrafficPanel({
   return (
     <AdminSectionCard
       title="Live Traffic"
-      description={`Near-real-time ${scopeLabel(trafficScope)} page views. Auto-refreshes every 10 seconds; “active” means activity within the last five minutes.`}
+      description="Near-real-time Real Audience page views. Auto-refreshes every 10 seconds; “active” means activity within the last five minutes."
       action={
         <button
           type="button"
