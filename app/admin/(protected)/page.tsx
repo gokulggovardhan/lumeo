@@ -21,6 +21,12 @@ import {
 import { formatAdminDateTime, istIsoDate } from "@/lib/admin/timezone";
 import { getVerifiedTraffic } from "@/lib/admin/verified-analytics";
 
+function shiftIsoCalendarDate(value: string, dayOffset: number) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + dayOffset);
+  return date.toISOString().slice(0, 10);
+}
+
 function formatDate(value: string | null) {
   return value ? formatAdminDateTime(value) : "Unavailable";
 }
@@ -60,7 +66,7 @@ function StatusRow({
 export default async function AdminPage() {
   const admin = await requireAdmin();
   const today = istIsoDate();
-  const sixDaysAgo = istIsoDate(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
+  const sixDaysAgo = shiftIsoCalendarDate(today, -6);
   const [
     tools,
     analyticsToday,
