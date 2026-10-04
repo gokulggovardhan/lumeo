@@ -63,7 +63,28 @@ function watchConversionRuntime(page: Page): RuntimeWatch {
 
   page.on("pageerror", (error) => watch.pageErrors.push(error.message));
   page.on("console", (message) => {
-    if (message.type() === "error") watch.consoleErrors.push(message.text());
+    if (message.type() !== "error") return;
+
+    const text = message.text();
+    const locationUrl = message.location().url;
+    if (
+      text === "Failed to load resource: the server responded with a status of 404 (Not Found)" &&
+      locationUrl
+    ) {
+      try {
+        const location = new URL(locationUrl);
+        if (
+          location.origin === "https://lumeo.in" &&
+          location.pathname === "/cdn-cgi/rum"
+        ) {
+          return;
+        }
+      } catch {
+        // Preserve malformed/unknown console errors as failures below.
+      }
+    }
+
+    watch.consoleErrors.push(text);
   });
   page.on("response", (response) => {
     if (response.ok()) watch.successfulResponseUrls.add(response.url());
