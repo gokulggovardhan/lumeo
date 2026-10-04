@@ -5,6 +5,13 @@ import type { AnalyticsEventInput, AnalyticsRemoteTrackResult } from "@/lib/anal
 
 const REQUEST_TIMEOUT_MS = 2500;
 
+// Delivery is serialized per browser page so the first successful event can
+// establish the HttpOnly visitor/session cookies before a second mount event
+// (commonly page_view + tool_opened) reaches the server. This prevents a
+// first-visit race from creating two pseudonymous visitors for one person.
+// Callers never await this queue for PDF work; analytics remains best effort.
+let deliveryQueue: Promise<void> = Promise.resolve();
+
 type RpcResult<T> = {
   data: T | null;
   error: unknown;
@@ -44,7 +51,7 @@ export async function fetchPublicAnalyticsEnabled(): Promise<boolean> {
   }
 }
 
-export async function trackPublicAnalyticsEvent(
+async function deliverPublicAnalyticsEvent(
   input: AnalyticsEventInput,
 ): Promise<AnalyticsRemoteTrackResult> {
   const controller = new AbortController();
@@ -79,4 +86,18 @@ export async function trackPublicAnalyticsEvent(
   } finally {
     window.clearTimeout(timer);
   }
+}
+
+export function trackPublicAnalyticsEvent(
+  input: AnalyticsEventInput,
+): Promise<AnalyticsRemoteTrackResult> {
+  const result = deliveryQueue.then(
+    () => deliverPublicAnalyticsEvent(input),
+    () => deliverPublicAnalyticsEvent(input),
+  );
+  deliveryQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
 }
