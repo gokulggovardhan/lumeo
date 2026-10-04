@@ -412,7 +412,28 @@ test("production Edit PDF certifies native colour, formatting, history and expor
   const runtime = watchConversionRuntime(page);
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
-    if (message.type() === "error") consoleErrors.push(message.text());
+    if (message.type() !== "error") return;
+
+    const text = message.text();
+    const locationUrl = message.location().url;
+    if (
+      text === "Failed to load resource: the server responded with a status of 404 (Not Found)" &&
+      locationUrl
+    ) {
+      try {
+        const location = new URL(locationUrl);
+        if (
+          location.origin === "https://lumeo.in" &&
+          location.pathname === "/cdn-cgi/rum"
+        ) {
+          return;
+        }
+      } catch {
+        // Preserve malformed or unknown console errors as hard failures below.
+      }
+    }
+
+    consoleErrors.push(text);
   });
 
   const selectEmployeeAndOpenFormat = async () => {
