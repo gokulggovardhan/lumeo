@@ -1,3 +1,5 @@
+begin;
+
 -- Near-real-time Admin analytics for verified traffic only.
 -- "Live" is server-polled and privacy-preserving: no raw IP, cookies,
 -- visitor/session keys, user agents, coordinates, or document content leave
@@ -193,3 +195,5 @@ grant execute on function public.get_admin_live_analytics_v2(text) to authentica
 
 comment on function public.get_admin_live_analytics_v2(text) is
   'Returns privacy-preserving near-real-time verified Admin analytics. Active visitors/sessions mean distinct identifiers with a page view in the last five minutes. Recent hits expose no raw identity, IP, cookie, user agent, coordinates, or document data.';
+
+commit;
