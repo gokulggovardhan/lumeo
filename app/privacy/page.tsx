@@ -10,7 +10,7 @@ import {
 } from "@/components/InfoPage";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
-const lastUpdated = "September 25, 2026";
+const lastUpdated = "October 4, 2026";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/privacy", {
@@ -107,22 +107,31 @@ export default function PrivacyPage() {
 
         <InfoPageSection title="Analytics and diagnostics">
           <p>
-            Lumeo may record optional anonymous product-use events to understand
-            reliability and which PDF tools need attention. These events use a
-            temporary browser-session ID and coarse categories only.
+            Lumeo may record optional first-party product-use events to understand
+            genuine page traffic and PDF-tool reliability. When analytics is
+            enabled, Lumeo uses bounded pseudonymous visitor and 30-minute session
+            identifiers plus coarse device categories. The server may use
+            Cloudflare&apos;s approximate public-IP geolocation to record city,
+            state/region, and country when those values are available.
           </p>
           <p>
-            Analytics events do not include documents, filenames, document
-            contents, exact file sizes, extracted text, passwords, emails, or
-            account identifiers. Do Not Track disables optional analytics.
+            Lumeo does not request browser or GPS location permission, collect
+            exact coordinates or street addresses, store raw IP addresses, or
+            perform invasive device fingerprinting. Analytics events also exclude
+            documents, filenames, document contents, exact file sizes, extracted
+            text, passwords, emails, and account identifiers. Do Not Track
+            disables optional analytics.
           </p>
         </InfoPageSection>
 
         <InfoPageSection title="Cookies">
           <p>
-            Current browser-first tools do not require account cookies. Hosting
-            platforms, browsers, or future product features may use cookies or
-            similar storage for operational purposes.
+            Current browser-first PDF processing does not require an account.
+            When optional analytics is enabled, Lumeo may set HTTP-only
+            first-party cookies for a bounded pseudonymous visitor identifier
+            and a rolling 30-minute analytics session. The raw cookie values are
+            not stored in analytics records; the server stores only keyed,
+            one-way pseudonymous identifiers.
           </p>
         </InfoPageSection>
 
