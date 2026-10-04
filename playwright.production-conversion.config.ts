@@ -21,6 +21,7 @@ export default defineConfig({
       name: "chromium-production-conversion",
       use: {
         ...devices["Desktop Chrome"],
+        userAgent: `${devices["Desktop Chrome"].userAgent} LumeoSyntheticTest/1`,
         headless: false,
         launchOptions: {
           args: [
