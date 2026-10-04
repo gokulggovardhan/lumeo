@@ -13,9 +13,6 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: "https://lumeo.in",
-    extraHTTPHeaders: {
-      "x-lumeo-synthetic-test": "1",
-    },
     trace: "retain-on-failure",
     video: "retain-on-failure",
   },
