@@ -113,6 +113,19 @@ function isRecoveredPdfWorkerBootstrapFailure(
   );
 }
 
+function isExpectedAnalyticsNavigationAbort(failure: FailedRequest): boolean {
+  if (failure.method !== "POST") return false;
+
+  const url = new URL(failure.url);
+  if (url.origin !== "https://lumeo.in" || url.pathname !== "/api/analytics") {
+    return false;
+  }
+
+  return /(?:Load request cancelled|NS_BINDING_ABORTED|net::ERR_ABORTED)/i.test(
+    failure.errorText,
+  );
+}
+
 function isExpectedSandboxPreviewConsoleError(message: string): boolean {
   return /^Blocked script execution in 'about:srcdoc' because the document's frame is sandboxed and the 'allow-scripts' permission is not set\.$/.test(
     message,
@@ -162,7 +175,8 @@ function expectCleanRuntime(
           !isRecoveredPdfWorkerBootstrapFailure(
             failure,
             watch.successfulResponseUrls,
-          ),
+          ) &&
+          !isExpectedAnalyticsNavigationAbort(failure),
       )
       .map((failure) => `${failure.method} ${failure.url}: ${failure.errorText}`),
   ).toEqual([]);
