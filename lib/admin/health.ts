@@ -98,21 +98,29 @@ async function checkProtectedStore(
 async function checkAnalytics(supabase: ServerSupabaseClient): Promise<HealthCheck> {
   const today = istIsoDate();
   const { result, error, latencyMs } = await timed(async () =>
-    await supabase.rpc("get_admin_analytics_summary", {
+    await supabase.rpc("get_admin_verified_traffic", {
       p_start_date: today,
       p_end_date: today,
+      p_traffic_scope: "real_audience",
     }),
   );
-  const unavailable = Boolean(error || result?.error);
+  const payload = result?.data;
+  const validSchema =
+    payload &&
+    typeof payload === "object" &&
+    !Array.isArray(payload) &&
+    "schema_version" in payload &&
+    payload.schema_version === 2;
+  const unavailable = Boolean(error || result?.error || !validSchema);
 
   return {
-    name: "Analytics aggregates",
+    name: "Verified analytics",
     status: unavailable ? "down" : latencyMs > 2500 ? "degraded" : "ok",
     detail: unavailable
-      ? "The protected analytics aggregate reader is unavailable."
+      ? "The protected schema-v2 analytics reader is unavailable or invalid."
       : latencyMs > 2500
-        ? "The aggregate reader is available, but the response was slow."
-        : "The protected aggregate reader is available.",
+        ? "The verified aggregate reader is available, but the response was slow."
+        : "The verified schema-v2 aggregate reader is available.",
     latencyMs,
     required: false,
     href: "/admin/analytics",
