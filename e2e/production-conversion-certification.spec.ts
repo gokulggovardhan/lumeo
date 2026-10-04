@@ -232,16 +232,30 @@ async function replaceControlledText(
   value: string,
 ): Promise<void> {
   const field = page.getByLabel(label);
-  await field.evaluate((element, nextValue) => {
-    const textarea = element as HTMLTextAreaElement;
-    const setter = Object.getOwnPropertyDescriptor(
-      HTMLTextAreaElement.prototype,
-      "value",
-    )?.set;
-    setter?.call(textarea, nextValue);
-    textarea.dispatchEvent(new Event("input", { bubbles: true }));
-    textarea.dispatchEvent(new Event("change", { bubbles: true }));
-  }, value);
+  await expect(field).toBeVisible();
+
+  // WebKit can expose the server-rendered textarea before React attaches its
+  // client handlers. Writing during that gap lets hydration restore the
+  // default HTML a moment later. Wait for React to attach, then use the normal
+  // Playwright input path so the controlled value updates deterministically.
+  await field.evaluate(async (element) => {
+    const hydrated = () =>
+      Object.keys(element).some(
+        (key) =>
+          key.startsWith("__reactFiber$") ||
+          key.startsWith("__reactProps$"),
+      );
+
+    const deadline = Date.now() + 30_000;
+    while (!hydrated()) {
+      if (Date.now() >= deadline) {
+        throw new Error("HTML source textarea did not hydrate.");
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 50));
+    }
+  });
+
+  await field.fill(value);
   await expect(field).toHaveValue(value);
 }
 
