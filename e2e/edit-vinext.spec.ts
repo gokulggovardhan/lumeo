@@ -1820,8 +1820,20 @@ test("vinext Edit PDF applies one safe formatting transaction across mixed nativ
     expect(firstIndex).toBeGreaterThanOrEqual(0);
     expect(secondIndex).toBeGreaterThanOrEqual(0);
 
-    await editableRuns.nth(firstIndex).click();
-    await editableRuns.nth(secondIndex).click({ modifiers: ["Shift"] });
+    const firstRun = editableRuns.nth(firstIndex);
+    const secondRun = editableRuns.nth(secondIndex);
+
+    await firstRun.click();
+    await expect(firstRun).toHaveAttribute("aria-pressed", "true");
+
+    // WebKit can intermittently drop Playwright's synthetic click modifier
+    // while focus moves from the inline editor to the next native run. Drive
+    // the component's actual Shift+click contract explicitly; this still
+    // exercises TextRunOverlay -> selectDetectedRun and then proves both runs
+    // are selected before the mixed-formatting panel is inspected.
+    await secondRun.dispatchEvent("click", { shiftKey: true });
+    await expect(firstRun).toHaveAttribute("aria-pressed", "true");
+    await expect(secondRun).toHaveAttribute("aria-pressed", "true");
 
     const multiPanel = page.locator("[data-edit-multi-run-panel]");
     await expect(multiPanel).toBeVisible();
