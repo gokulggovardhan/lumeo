@@ -5,6 +5,11 @@ import { useEffect, useRef } from "react";
 import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
 
+// Survives component remounts inside the same SPA runtime so repeated provider
+// initialization cannot double-count the same navigation. A real browser reload
+// starts a fresh runtime, and navigating to a different route updates the value.
+let lastAcceptedPagePathInRuntime: string | null = null;
+
 const PUBLIC_PAGE_ROUTES = new Set([
   "/heic-to-jpeg",
   "/",
@@ -36,12 +41,20 @@ export function AnalyticsPageView() {
   const lastTrackedPath = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!PUBLIC_PAGE_ROUTES.has(pathname)) return;
-    if (!shouldAttemptOnce({ availability, alreadyAccepted: lastTrackedPath.current === pathname })) return;
+    if (!PUBLIC_PAGE_ROUTES.has(pathname)) {
+      lastAcceptedPagePathInRuntime = null;
+      return;
+    }
+
+    const alreadyAccepted =
+      lastTrackedPath.current === pathname ||
+      lastAcceptedPagePathInRuntime === pathname;
+    if (!shouldAttemptOnce({ availability, alreadyAccepted })) return;
 
     const result = track({ eventName: "page_view" });
     if (result.accepted) {
       lastTrackedPath.current = pathname;
+      lastAcceptedPagePathInRuntime = pathname;
     }
   }, [availability, pathname, track]);
 
