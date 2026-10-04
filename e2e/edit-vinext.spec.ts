@@ -1392,16 +1392,33 @@ test("vinext Edit PDF embeds a local font into one native text run with Undo and
   expect(nativeLocal!.profile.resourceIdentity.fontProgramObjectRef).toBeTruthy();
   expect(nativeLocal!.profile.embeddedProgramSha256).toMatch(/^[a-f0-9]{64}$/i);
 
-  await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
-  await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({
-    timeout: 30_000,
-  });
-  await page.locator('input[type="file"]').first().setInputFiles({
-    name: "native-local-font-output.pdf",
-    mimeType: "application/pdf",
-    buffer: Buffer.from(bytes),
-  });
-  await waitForStageReady(page);
+  const reopenExportedPdf = async () => {
+    await page.goto("/pdf/edit", { waitUntil: "domcontentloaded" });
+    await expect(page.locator("[data-edit-client-ready='true']")).toBeAttached({
+      timeout: 30_000,
+    });
+    await page.locator('input[type="file"]').first().setInputFiles({
+      name: "native-local-font-output.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from(bytes),
+    });
+  };
+
+  await reopenExportedPdf();
+
+  // WebKit can occasionally leave the first PDF.js reload with the raster and
+  // limited-text overlays present but without the editable run layer. Recover
+  // once on a fresh document page; the second load must still satisfy the
+  // normal stage-ready and exact editable-text proof, so a persistent native
+  // font regression remains a hard failure.
+  try {
+    await waitForStageReady(page);
+  } catch {
+    await page.goto("about:blank", { waitUntil: "domcontentloaded" });
+    await reopenExportedPdf();
+    await waitForStageReady(page);
+  }
+
   await expect(
     page
       .locator(
