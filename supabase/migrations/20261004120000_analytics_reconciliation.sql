@@ -98,7 +98,10 @@ before insert on public.analytics_events
 for each row
 execute function private.assign_analytics_operation_attempt();
 
-create or replace function public.get_admin_verified_traffic_v3(
+alter function public.get_admin_verified_traffic(date, date, text)
+  rename to get_admin_verified_traffic_v2_base;
+
+create or replace function public.get_admin_verified_traffic(
   p_start_date date,
   p_end_date date,
   p_traffic_scope text default 'real_audience'
@@ -139,7 +142,7 @@ declare
   operation_correlation_cutover_at timestamptz := null;
   reconciliation_issue boolean := false;
 begin
-  base := public.get_admin_verified_traffic(
+  base := public.get_admin_verified_traffic_v2_base(
     p_start_date,
     p_end_date,
     scope_name
@@ -530,9 +533,9 @@ begin
 end;
 $$;
 
-revoke all on function public.get_admin_verified_traffic_v3(date, date, text)
+revoke all on function public.get_admin_verified_traffic(date, date, text)
   from public, anon;
-grant execute on function public.get_admin_verified_traffic_v3(date, date, text)
+grant execute on function public.get_admin_verified_traffic(date, date, text)
   to authenticated;
 
 create or replace function public.get_admin_recent_operational_events_v3(
@@ -615,7 +618,7 @@ grant execute on function public.get_admin_recent_operational_events_v3(integer)
 comment on column public.analytics_events.operation_attempt_id is
   'Server-assigned random UUID used only to reconcile one processing_started event with its terminal processing outcome. It contains no user or document data.';
 
-comment on function public.get_admin_verified_traffic_v3(date, date, text) is
+comment on function public.get_admin_verified_traffic(date, date, text) is
   'Returns verified analytics with canonical per-visitor environment counts and correlated processing-attempt lifecycle metrics. Schema-v1 rows never enter business metrics.';
 
 comment on function public.get_admin_recent_operational_events_v3(integer) is
