@@ -43,7 +43,7 @@ async function uploadEditFixture(page: Page, fixturePath: string) {
   await page.locator('input[type="file"]').first().setInputFiles(fixturePath);
 }
 
-async function uploadEditFixtureWithColdStartRecovery(
+async function uploadEditFixtureReady(
   page: Page,
   fixturePath: string,
 ) {
@@ -683,8 +683,7 @@ test("vinext Edit PDF corrects sideways scan orientation locally and keeps revie
 test("vinext Edit PDF keeps a 120-page thumbnail rail bounded and scrollable", async ({
   page,
 }) => {
-  await uploadEditFixture(page, LARGE_DOCUMENT_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, LARGE_DOCUMENT_PDF);
 
   const rail = page.locator("ul[data-thumbnail-virtualized]");
   await expect(rail).toHaveAttribute("data-thumbnail-virtualized", "true", {
@@ -722,8 +721,7 @@ test("vinext Edit PDF keeps a 120-page thumbnail rail bounded and scrollable", a
 test("vinext Edit PDF aborts Replace All when the native PDF revision changes during preflight", async ({
   page,
 }) => {
-  await uploadEditFixture(page, LARGE_DOCUMENT_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, LARGE_DOCUMENT_PDF);
 
   const firstRun = page
     .locator(
@@ -807,8 +805,7 @@ test("vinext Edit PDF aborts Replace All when the native PDF revision changes du
 test("vinext Edit PDF cancels document Replace All without publishing partial changes", async ({
   page,
 }) => {
-  await uploadEditFixture(page, LARGE_DOCUMENT_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, LARGE_DOCUMENT_PDF);
 
   await page.getByRole("button", { name: "Find" }).click();
   const find = page.getByRole("searchbox", { name: "Find text in PDF" });
@@ -854,8 +851,7 @@ test("vinext Edit PDF cancels document Replace All without publishing partial ch
 test("vinext Edit PDF shares one linear semantic undo history across native Edit and Redaction", async ({
   page,
 }) => {
-  await uploadEditFixture(page, TEXT_ONLY_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, TEXT_ONLY_PDF);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
   await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
@@ -991,7 +987,7 @@ test("Organize projects page history and verified export into Workspace state", 
 test("vinext Edit PDF keeps IME composition isolated until the candidate is committed", async ({
   page,
 }) => {
-  await uploadEditFixtureWithColdStartRecovery(page, TEXT_ONLY_PDF);
+  await uploadEditFixtureReady(page, TEXT_ONLY_PDF);
 
   const workspace = page.locator("[data-edit-operation-count]");
   await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
@@ -1092,8 +1088,7 @@ test("vinext Edit PDF keeps IME composition isolated until the candidate is comm
 test("vinext Edit PDF clears an abandoned IME owner when native selection changes", async ({
   page,
 }) => {
-  await uploadEditFixture(page, TEXT_ONLY_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, TEXT_ONLY_PDF);
 
   const workspace = page.locator("[data-edit-operation-count]");
   await expect(workspace).toHaveAttribute("data-edit-operation-count", "0");
@@ -1295,8 +1290,7 @@ test("vinext Edit PDF releases stale export blobs without invalidating a current
 test("vinext Edit PDF embeds a local font into one native text run with Undo and reopen proof", async ({
   page,
 }) => {
-  await uploadEditFixture(page, TEXT_ONLY_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, TEXT_ONLY_PDF);
 
   const employeeRun = page
     .locator(
@@ -1560,8 +1554,7 @@ test("vinext Edit PDF edits measured skewed text while preserving its affine bas
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await uploadEditFixture(page, SKEWED_TEXT_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, SKEWED_TEXT_PDF);
 
   const source = page
     .locator(
@@ -1623,8 +1616,7 @@ test("vinext Edit PDF edits measured skewed text while preserving its affine bas
 
 test("vinext mobile-width Edit PDF keeps native Format controls above the tool dock", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await uploadEditFixture(page, TEXT_ONLY_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, TEXT_ONLY_PDF);
 
   const run = page
     .locator(
@@ -1895,8 +1887,7 @@ test("vinext Edit PDF edits preserved native paragraph lines as one atomic histo
     (entry) => entry.operator.textLineMatrix,
   );
 
-  await uploadEditFixture(page, PARAGRAPH_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, PARAGRAPH_PDF);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
   await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
@@ -1991,8 +1982,7 @@ test("vinext Edit PDF applies a proven LTR shaped-glyph replacement as one nativ
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await uploadEditFixture(page, SHAPED_LTR_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, SHAPED_LTR_PDF);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
   await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
@@ -2069,8 +2059,7 @@ test("vinext Edit PDF applies a proven Identity-V replacement and preserves sear
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await uploadEditFixture(page, SHAPED_VERTICAL_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, SHAPED_VERTICAL_PDF);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
   const source = page
@@ -2232,8 +2221,7 @@ test("vinext Edit PDF reconstructs and edits a pdf.js run split across consecuti
 
 
 test("vinext Edit PDF replaces all safe document matches in one undo step", async ({ page }) => {
-  await uploadEditFixture(page, EDITABLE_TWO_PAGE_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, EDITABLE_TWO_PAGE_PDF);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
   await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
@@ -2309,8 +2297,7 @@ test("vinext Edit PDF replaces all safe document matches in one undo step", asyn
 });
 
 test("vinext Edit PDF replaces only the current page when Replace All scope is This page", async ({ page }) => {
-  await uploadEditFixture(page, EDITABLE_TWO_PAGE_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, EDITABLE_TWO_PAGE_PDF);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
   await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
@@ -2392,8 +2379,7 @@ test("vinext Edit PDF searches across pages, highlights matches, and prepares a 
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await uploadEditFixture(page, EDITABLE_TWO_PAGE_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, EDITABLE_TWO_PAGE_PDF);
 
   await page.getByRole("button", { name: "Find" }).click();
   const find = page.getByRole("searchbox", { name: "Find text in PDF" });
@@ -2432,8 +2418,7 @@ test("vinext Edit PDF searches across pages, highlights matches, and prepares a 
 });
 
 test("vinext Replace All does not depend on the best-effort Find index", async ({ page }) => {
-  await uploadEditFixture(page, EDITABLE_TWO_PAGE_PDF);
-  await waitForStageReady(page);
+  await uploadEditFixtureReady(page, EDITABLE_TWO_PAGE_PDF);
 
   const workspace = page.locator("[data-edit-semantic-history-count]");
   await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "0");
