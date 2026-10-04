@@ -55,12 +55,17 @@ test("live Admin analytics remains verified, private and page-view based", () =>
   assert.match(route, /private, no-store/);
   assert.match(route, /status: 401/);
   assert.match(route, /status: 403/);
+  assert.match(route, /getVerifiedLiveTraffic\("real_audience"\)/);
+  assert.doesNotMatch(route, /searchParams/);
+  assert.doesNotMatch(route, /synthetic|automation|all/);
 
   assert.match(panel, /REFRESH_INTERVAL_MS = 10_000/);
   assert.match(panel, /Hits · 60 sec/);
   assert.match(panel, /Active Visitors/);
   assert.match(panel, /Active Sessions/);
   assert.match(panel, /Recent hits/);
+  assert.match(panel, /Near-real-time Real Audience page views/);
+  assert.doesNotMatch(panel, /Lumeo synthetic tests|Bots & suspected automation|All verified traffic/);
   assert.match(panel, /Unknown Location/);
   assert.match(panel, /No IP address or visitor\/session identifier is displayed/);
 
