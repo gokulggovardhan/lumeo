@@ -101,6 +101,9 @@ execute function private.assign_analytics_operation_attempt();
 alter function public.get_admin_verified_traffic(date, date, text)
   rename to get_admin_verified_traffic_v2_base;
 
+revoke all on function public.get_admin_verified_traffic_v2_base(date, date, text)
+  from public, anon, authenticated;
+
 create or replace function public.get_admin_verified_traffic(
   p_start_date date,
   p_end_date date,
