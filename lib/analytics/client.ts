@@ -6,8 +6,6 @@ import {
   getDeviceClass,
   getOperatingSystem,
 } from "@/lib/analytics/device";
-import { getAnonymousSessionId } from "@/lib/analytics/session";
-import { readGeoCookie } from "@/lib/analytics/geo";
 import type { AnalyticsEventInput, AnalyticsRemoteTrackResult } from "@/lib/analytics/types";
 
 const REQUEST_TIMEOUT_MS = 2500;
@@ -16,6 +14,8 @@ type RpcResult<T> = {
   data: T | null;
   error: unknown;
 };
+
+let deliveryQueue: Promise<void> = Promise.resolve();
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -46,36 +46,58 @@ export async function fetchPublicAnalyticsEnabled(): Promise<boolean> {
   }
 }
 
-export async function trackPublicAnalyticsEvent(
+async function sendPublicAnalyticsEvent(
   input: AnalyticsEventInput,
 ): Promise<AnalyticsRemoteTrackResult> {
   try {
-    const supabase = createClient();
-    const geo = readGeoCookie();
-    const { data, error } = await withTimeout(
-      supabase.rpc("record_public_analytics_event", {
-        event_name: input.eventName,
-        tool_slug: input.toolSlug ?? null,
-        anonymous_session_id: getAnonymousSessionId(),
-        duration_ms: safeDuration(input.durationMs),
-        input_size_bucket: input.inputSizeBucket ?? "unknown",
-        output_size_bucket: input.outputSizeBucket ?? "unknown",
-        device_class: getDeviceClass(),
-        browser_family: getBrowserFamily(),
-        operating_system: getOperatingSystem(),
-        success: input.success ?? null,
-        error_code: input.errorCode ?? null,
-        ...(input.failureStage ? { failure_stage: input.failureStage } : {}),
-        country_code: geo?.country ?? null,
-        region: geo?.region ?? null,
-        city: geo?.city ?? null,
-      }) as unknown as Promise<RpcResult<number>>,
+    const response = await withTimeout(
+      fetch("/api/analytics", {
+        method: "POST",
+        credentials: "same-origin",
+        keepalive: true,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          eventName: input.eventName,
+          toolSlug: input.toolSlug ?? null,
+          durationMs: safeDuration(input.durationMs),
+          inputSizeBucket: input.inputSizeBucket ?? "unknown",
+          outputSizeBucket: input.outputSizeBucket ?? "unknown",
+          deviceClass: getDeviceClass(),
+          browserFamily: getBrowserFamily(),
+          operatingSystem: getOperatingSystem(),
+          success: input.success ?? null,
+          errorCode: input.errorCode ?? null,
+          failureStage: input.failureStage ?? null,
+          pagePath: window.location.pathname,
+        }),
+      }),
       REQUEST_TIMEOUT_MS,
     );
 
-    if (error) return { success: false };
-    return { success: true, eventId: typeof data === "number" ? data : null };
+    if (!response.ok) return { success: false };
+    const payload = (await response.json().catch(() => null)) as
+      | { ok?: unknown }
+      | null;
+    return payload?.ok === true
+      ? { success: true, eventId: null }
+      : { success: false };
   } catch {
     return { success: false };
   }
+}
+
+export function trackPublicAnalyticsEvent(
+  input: AnalyticsEventInput,
+): Promise<AnalyticsRemoteTrackResult> {
+  // Serialize delivery so the first event can establish HttpOnly visitor and
+  // session cookies before any following event is sent. Analytics remains
+  // fire-and-forget to the product UI and never blocks PDF work.
+  const result = deliveryQueue.then(() => sendPublicAnalyticsEvent(input));
+  deliveryQueue = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
 }
