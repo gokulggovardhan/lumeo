@@ -11,6 +11,9 @@ export default defineConfig({
   use: {
     baseURL: process.env.CLOUDFLARE_AUDIT_BASE_URL ?? "https://lumeo.in",
     trace: "retain-on-failure",
+    extraHTTPHeaders: {
+      "x-lumeo-analytics-traffic": "synthetic",
+    },
   },
   projects: [
     { name: "chromium-production", use: { ...devices["Desktop Chrome"] } },
