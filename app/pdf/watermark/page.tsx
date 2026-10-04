@@ -6,6 +6,7 @@ import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
 import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
+import { ToolSeoContent } from "@/components/pdf/ToolSeoContent";
 
 const WatermarkTool = dynamic(() => import("@/components/pdf/WatermarkTool"), {
   loading: () => <ToolWorkspaceLoading />,
@@ -64,6 +65,7 @@ export default async function WatermarkPdfPage() {
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+      <ToolSeoContent route="/pdf/watermark" />
     </PublicCatalogPageShell>
   );
 }

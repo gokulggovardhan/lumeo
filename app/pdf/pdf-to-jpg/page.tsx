@@ -6,6 +6,7 @@ import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
 import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
+import { ToolSeoContent } from "@/components/pdf/ToolSeoContent";
 
 const softwareSchema = buildSoftwareApplicationSchema({
   name: "Lumeo PDF to JPG",
@@ -73,6 +74,7 @@ export default async function PdfToJpgPage() {
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
+      <ToolSeoContent route="/pdf/pdf-to-jpg" />
     </PublicCatalogPageShell>
   );
 }
