@@ -1,7 +1,11 @@
 import "server-only";
 
 import { createClient } from "@/lib/supabase/server";
-import type { VerifiedLiveTrafficData } from "@/lib/admin/live-analytics-types";
+import type {
+  VerifiedLiveHit,
+  VerifiedLiveMinuteBucket,
+  VerifiedLiveTrafficData,
+} from "@/lib/admin/live-analytics-types";
 
 export type VerifiedTrafficScope =
   | "real_audience"
