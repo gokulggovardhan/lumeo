@@ -7,6 +7,7 @@ import {
   readCloudflareApproximateLocation,
 } from "../lib/cloudflare/request-location.ts";
 import { classifyAnalyticsTraffic } from "../lib/analytics/traffic-classification.ts";
+import { formatLocationLabel } from "../lib/analytics/location-names.ts";
 
 test("prefers Cloudflare Request.cf geolocation", () => {
   const request = new Request("https://lumeo.in/") as Request & {
@@ -25,6 +26,18 @@ test("prefers Cloudflare Request.cf geolocation", () => {
     regionCode: "MH",
     country: "IN",
   });
+});
+
+test("expands trusted India and US region/country codes for Admin display", () => {
+  assert.equal(
+    formatLocationLabel("Pune", "MH", "IN"),
+    "Pune, Maharashtra, India",
+  );
+  assert.equal(
+    formatLocationLabel("Omaha", "NE", "US"),
+    "Omaha, Nebraska, United States",
+  );
+  assert.equal(formatLocationLabel(null, null, null), "Unknown location");
 });
 
 test("falls back to Cloudflare visitor-location headers", () => {
