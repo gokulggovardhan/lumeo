@@ -128,7 +128,9 @@ test("Daily traffic trend exposes page views, visitors and sessions", () => {
   assert.match(trend, /pageViews: number/);
   assert.match(trend, /uniqueVisitors: number/);
   assert.match(trend, /sessions: number/);
-  assert.match(trend, /page views, visitors and sessions/);
+  assert.match(trend, /Real Audience daily trend/);
+  assert.match(trend, /verified page views, visitors and sessions/);
+  assert.match(trend, /No Real Audience traffic in this date range/);
   assert.match(trend, /point\.uniqueVisitors/);
   assert.match(trend, /point\.sessions/);
 });
