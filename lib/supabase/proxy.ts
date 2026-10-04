@@ -1,10 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { GEO_COOKIE_NAME } from "@/lib/analytics/geo-cookie-name";
-import {
-  encodeAnalyticsGeoCookie,
-  readCloudflareApproximateLocation,
-} from "@/lib/cloudflare/request-location";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 
 const SESSION_CACHE_HEADERS = ["cache-control", "expires", "pragma"] as const;
@@ -38,21 +34,13 @@ function productionHttpsRedirect(request: NextRequest) {
   return response;
 }
 
-// Next's cookie serializer already percent-encodes the whole value on write
-// (that's a single encoding pass we don't control) -- pre-encoding each
-// segment here on top of that double-encodes it. The literal "|" join
-// character itself gets encoded to %7C by that pass, so the client-side
-// reader must decode the WHOLE value once before splitting on "|", not
-// split first and decode each part (see lib/analytics/geo.ts).
-function buildGeoCookieValue(request: NextRequest) {
-  return encodeAnalyticsGeoCookie(readCloudflareApproximateLocation(request));
-}
-
-function applyGeoCookie(response: NextResponse, value: string | null) {
-  if (!value) return;
-  response.cookies.set(GEO_COOKIE_NAME, value, {
+// Verified analytics reads Cloudflare visitor geolocation inside /api/analytics.
+// The former browser-readable geo cookie is no longer an analytics source.
+function clearLegacyGeoCookie(response: NextResponse, request: NextRequest) {
+  if (!request.cookies.has(GEO_COOKIE_NAME)) return;
+  response.cookies.set(GEO_COOKIE_NAME, "", {
     path: "/",
-    maxAge: 60 * 60 * 24,
+    maxAge: 0,
     sameSite: "lax",
   });
 }
@@ -122,6 +110,7 @@ export async function updateSession(request: NextRequest) {
     const fallbackResponse = NextResponse.next({
       request,
     });
+    clearLegacyGeoCookie(fallbackResponse, request);
     applyAdminCachePolicy(fallbackResponse, request.nextUrl.pathname);
     applyBaselineSecurityHeaders(fallbackResponse);
     return fallbackResponse;
@@ -164,8 +153,6 @@ export async function updateSession(request: NextRequest) {
   // Server Components read it.
   await supabase.auth.getClaims();
 
-  const geoCookieValue = buildGeoCookieValue(request);
-
   if (!bypassesMaintenanceMode(request.nextUrl.pathname)) {
     // Fails open: any RPC error (migration not yet applied, DB unreachable)
     // must never take the whole public site down on its own -- only an
@@ -184,13 +171,13 @@ export async function updateSession(request: NextRequest) {
       // and Supabase's cache-control metadata so auth state cannot go stale.
       copySessionMetadata(response, maintenanceResponse);
       maintenanceResponse.headers.set("X-Robots-Tag", "noindex");
-      applyGeoCookie(maintenanceResponse, geoCookieValue);
+      clearLegacyGeoCookie(maintenanceResponse, request);
       applyBaselineSecurityHeaders(maintenanceResponse);
       return maintenanceResponse;
     }
   }
 
-  applyGeoCookie(response, geoCookieValue);
+  clearLegacyGeoCookie(response, request);
   applyAdminCachePolicy(response, request.nextUrl.pathname);
   applyBaselineSecurityHeaders(response);
   return response;

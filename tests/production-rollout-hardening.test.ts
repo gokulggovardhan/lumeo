@@ -8,12 +8,11 @@ function read(path: string) {
 
 test("analytics rollout remains compatible until terminal diagnostics migration is live", () => {
   const client = read("lib/analytics/client.ts");
+  const route = read("app/api/analytics/route.ts");
   const workflow = read(".github/workflows/production-conversion-smoke.yml");
 
-  assert.match(
-    client,
-    /input\.failureStage \? \{ failure_stage: input\.failureStage \} : \{\}/,
-  );
+  assert.match(client, /failureStage: input\.failureStage/);
+  assert.match(route, /p_failure_stage: input\.failureStage/);
   assert.match(workflow, /Wait for production analytics schema/);
   assert.match(workflow, /record_public_analytics_event/);
   assert.match(workflow, /failure_stage text/);

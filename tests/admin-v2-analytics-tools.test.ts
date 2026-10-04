@@ -94,15 +94,38 @@ test("Admin tool filters reject unknown enum values and match case-insensitively
   assert.deepEqual(filterAdminTools(tools, filters).map((tool) => tool.slug), ["merge"]);
 });
 
-test("Analytics V2 keeps verified unavailable handling and the real aggregate reader", () => {
+test("Analytics V2 reads only verified schema-v2 traffic for the primary audience view", () => {
   const source = readFileSync("app/admin/(protected)/analytics/page.tsx", "utf8");
-  assert.match(source, /getAnalyticsSummary/);
-  assert.match(source, /dataStatus === "unavailable"/);
-  assert.match(source, /Metrics are withheld instead of presenting unverified zero values/);
+  const data = readFileSync("lib/admin/verified-analytics.ts", "utf8");
+  assert.match(source, /getVerifiedTraffic/);
+  assert.match(source, /Verified analytics are unavailable/);
+  assert.match(source, /Real audience/);
+  assert.match(source, /Known-location page views/);
+  assert.match(source, /Unknown-location page views/);
   assert.match(source, /AnalyticsTrendChart/);
-  assert.match(source, /AnalyticsDistribution/);
-  assert.match(source, /RecentActivityTable/);
+  assert.match(source, /uniqueVisitors: point\.uniqueVisitors/);
+  assert.match(source, /sessions: point\.sessions/);
+  assert.match(source, /Unknown Location/);
+  assert.match(source, /summary!\.unknownLocationPageViews > 0/);
+  assert.match(source, /Traffic separation/);
+  assert.match(data, /get_admin_verified_traffic/);
+  assert.match(data, /known \+ unknown !== pageViews/);
+  assert.doesNotMatch(source, /getAnalyticsSummary/);
   assert.doesNotMatch(source, /revenue|storage saved|AI insight/i);
+});
+
+test("Daily traffic trend exposes page views, visitors and sessions", () => {
+  const trend = readFileSync(
+    "components/admin/analytics/AnalyticsTrendChart.tsx",
+    "utf8",
+  );
+
+  assert.match(trend, /pageViews: number/);
+  assert.match(trend, /uniqueVisitors: number/);
+  assert.match(trend, /sessions: number/);
+  assert.match(trend, /page views, visitors and sessions/);
+  assert.match(trend, /point\.uniqueVisitors/);
+  assert.match(trend, /point\.sessions/);
 });
 
 test("Tools V2 is server-authorized, URL-filtered, audited through the existing action, and analyst-safe", () => {
@@ -116,7 +139,7 @@ test("Tools V2 is server-authorized, URL-filtered, audited through the existing 
     assert.match(page, new RegExp(`name="${field}"`));
   }
   assert.match(page, /Analyst · read only/);
-  assert.match(page, /getAnalyticsSummary\(\)/);
+  assert.match(page, /getVerifiedTraffic/);
   assert.match(page, /usageAvailable \?/);
   assert.match(page, /target="_blank"/);
   assert.match(action, /requireAdmin\(\)/);

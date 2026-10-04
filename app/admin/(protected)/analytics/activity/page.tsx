@@ -1,81 +1,139 @@
 import Link from "next/link";
+import { AdminDataTable } from "@/components/admin/AdminDataTable";
 import { AdminEmptyState } from "@/components/admin/AdminEmptyState";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { AdminSectionCard } from "@/components/admin/AdminSectionCard";
-import { RecentActivityTable, RECENT_ACTIVITY_PAGE_SIZE } from "@/components/admin/analytics/RecentActivityTable";
-import { collapseUnknownLocationRuns, getRecentAnalyticsEvents } from "@/lib/admin/data";
 import { pageNumber } from "@/lib/admin/pagination";
+import { formatAdminDateTime } from "@/lib/admin/timezone";
+import {
+  getVerifiedRecentEvents,
+  type VerifiedTrafficScope,
+} from "@/lib/admin/verified-analytics";
+import { formatLocationLabel } from "@/lib/analytics/location-names";
+
+const PAGE_SIZE = 25;
+
+function parseTrafficScope(value: string | undefined): VerifiedTrafficScope {
+  return value === "synthetic" || value === "automation" || value === "all"
+    ? value
+    : "real_audience";
+}
+
+function trafficLabel(scope: VerifiedTrafficScope) {
+  if (scope === "real_audience") return "Real audience";
+  if (scope === "synthetic") return "Lumeo synthetic tests";
+  if (scope === "automation") return "Bots & suspected automation";
+  return "All verified traffic";
+}
+
+function hrefFor(page: number, scope: VerifiedTrafficScope) {
+  const params = new URLSearchParams();
+  if (page > 1) params.set("page", String(page));
+  if (scope !== "real_audience") params.set("traffic", scope);
+  const query = params.toString();
+  return query ? `/admin/analytics/activity?${query}` : "/admin/analytics/activity";
+}
 
 export default async function AnalyticsActivityPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ page?: string }>;
+  searchParams?: Promise<{ page?: string; traffic?: string }>;
 }) {
   const params = (await searchParams) ?? {};
   const page = pageNumber(params.page);
+  const trafficScope = parseTrafficScope(params.traffic);
+  const recentEvents = await getVerifiedRecentEvents(200, trafficScope);
 
-  // The recent-events RPC caps at 200 rows -- plenty for browsing recent
-  // activity without needing real SQL offset pagination. Collapsed once
-  // over the full set so unknown-location bursts stay grouped consistently
-  // across pages, then sliced per page.
-  const recentEvents = await getRecentAnalyticsEvents(200);
   if (recentEvents.error) {
     return (
       <div className="space-y-7">
         <AdminPageHeader
           eyebrow="Analytics"
-          title="Full activity log"
-          description="Every recent public event, newest first, with approximate location where available."
+          title="Verified activity log"
+          description="Recent schema-v2 events only. Legacy browser analytics is excluded."
         />
         <AdminEmptyState
-          title="Recent activity is unavailable"
-          description="The secure recent-events reader could not return verified data. Try again after the data service recovers."
+          title="Verified activity is unavailable"
+          description="The secure verified event reader could not return data."
         />
-        <Link href="/admin/analytics" prefetch={false} className="text-sm font-semibold text-[#F0EAD6]/70 hover:underline">
+        <Link
+          href="/admin/analytics"
+          prefetch={false}
+          className="text-sm font-semibold text-[var(--text-secondary)] hover:underline"
+        >
           ← Back to analytics
         </Link>
       </div>
     );
   }
-  const rows = collapseUnknownLocationRuns(recentEvents.data);
-  const totalPages = Math.max(1, Math.ceil(rows.length / RECENT_ACTIVITY_PAGE_SIZE));
+
+  const totalPages = Math.max(1, Math.ceil(recentEvents.data.length / PAGE_SIZE));
   const safePage = Math.min(page, totalPages);
-  const pageRows = rows.slice((safePage - 1) * RECENT_ACTIVITY_PAGE_SIZE, safePage * RECENT_ACTIVITY_PAGE_SIZE);
+  const rows = recentEvents.data.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE,
+  );
 
   return (
     <div className="space-y-7">
       <AdminPageHeader
         eyebrow="Analytics"
-        title="Full activity log"
-        description="Every recent public event, newest first, with the approximate location behind each click. Capped at the 200 most recent events."
+        title="Verified activity log"
+        description={`${trafficLabel(trafficScope)} · newest verified events first · capped at 200 events.`}
       />
 
       <AdminSectionCard
         title={`Page ${safePage} of ${totalPages}`}
-        description="Consecutive events with no resolvable location are grouped into one row."
+        description="No visitor/session key, raw IP, precise coordinate, filename or document content is exposed."
       >
-        <RecentActivityTable rows={pageRows} />
+        <AdminDataTable
+          columns={["Time (IST)", "Event", "Page / tool", "Location", "Device"]}
+          rows={rows.map((event) => [
+            formatAdminDateTime(event.occurredAt, "medium"),
+            event.eventName,
+            event.toolSlug ?? event.pagePath ?? "—",
+            formatLocationLabel(
+              event.city,
+              event.regionCode ?? event.region,
+              event.countryCode,
+            ),
+            `${event.deviceClass} · ${event.browserFamily} · ${event.operatingSystem}`,
+          ])}
+          empty={
+            <AdminEmptyState
+              title="No verified recent activity"
+              description="Events will appear after the verified server-side analytics cutover receives traffic."
+            />
+          }
+        />
+
         <div className="mt-4 flex items-center justify-between gap-3">
-          <Link href="/admin/analytics" prefetch={false} className="text-sm font-semibold text-[#F0EAD6]/70 hover:underline">
+          <Link
+            href={trafficScope === "real_audience" ? "/admin/analytics" : `/admin/analytics?traffic=${trafficScope}`}
+            prefetch={false}
+            className="text-sm font-semibold text-[var(--text-secondary)] hover:underline"
+          >
             ← Back to analytics
           </Link>
           <div className="flex gap-3">
-            {safePage > 1 && (
+            {safePage > 1 ? (
               <Link
-                className="rounded-xl border border-[#E8DFC8]/12 px-4 py-2 text-sm font-semibold"
-                href={`/admin/analytics/activity?page=${safePage - 1}`} prefetch={false}
+                className="rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-sm font-semibold"
+                href={hrefFor(safePage - 1, trafficScope)}
+                prefetch={false}
               >
                 Previous
               </Link>
-            )}
-            {safePage < totalPages && (
+            ) : null}
+            {safePage < totalPages ? (
               <Link
-                className="rounded-xl border border-[#E8DFC8]/12 px-4 py-2 text-sm font-semibold"
-                href={`/admin/analytics/activity?page=${safePage + 1}`} prefetch={false}
+                className="rounded-xl border border-[var(--border-subtle)] px-4 py-2 text-sm font-semibold"
+                href={hrefFor(safePage + 1, trafficScope)}
+                prefetch={false}
               >
                 Next
               </Link>
-            )}
+            ) : null}
           </div>
         </div>
       </AdminSectionCard>

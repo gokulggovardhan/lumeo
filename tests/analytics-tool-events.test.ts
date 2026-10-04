@@ -44,6 +44,23 @@ function trackCallsFrom(source: string) {
   return source.match(/track\(\{[\s\S]*?\}\);/g) ?? [];
 }
 
+test("page-view duplicate initialization guard does not use a time-window database dedupe", () => {
+  const pageView = readFileSync(
+    "components/analytics/AnalyticsPageView.tsx",
+    "utf8",
+  );
+  const migration = readFileSync(
+    "supabase/migrations/20261004090000_verified_analytics_activation.sql",
+    "utf8",
+  );
+
+  assert.match(pageView, /lastAcceptedPagePathInRuntime/);
+  assert.match(pageView, /lastAcceptedPagePathInRuntime = null/);
+  assert.match(pageView, /lastAcceptedPagePathInRuntime = pathname/);
+  assert.doesNotMatch(migration, /interval '3 seconds'/);
+  assert.match(migration, /genuine rapid reload/);
+});
+
 test("page_view remains supported and waits for analytics availability", () => {
   const pageViewEvent: AnalyticsEventInput = { eventName: "page_view" };
 
@@ -170,44 +187,70 @@ test("operation lifecycle event schema is defined and reflected in the migration
   }
 });
 
-test("analytics client code does not introduce persistent local storage", () => {
+test("analytics endpoint requires same-origin browser request metadata", () => {
+  const route = readFileSync("app/api/analytics/route.ts", "utf8");
+
+  assert.match(route, /fetchSite && fetchSite !== "same-origin"/);
+  assert.match(route, /new URL\(origin\)\.origin === request\.nextUrl\.origin/);
+  assert.match(route, /return fetchSite === "same-origin"/);
+  assert.match(route, /health probes and scanners/);
+  assert.doesNotMatch(route, /if \(!origin\) return true/);
+});
+
+test("analytics client posts events to the same-origin server endpoint without client-supplied identity or geography", () => {
+  const client = readFileSync("lib/analytics/client.ts", "utf8");
+  const route = readFileSync("app/api/analytics/route.ts", "utf8");
+
+  assert.match(client, /fetch\("\/api\/analytics"/);
+  assert.doesNotMatch(client, /record_public_analytics_event/);
+  assert.doesNotMatch(client, /country_code|region: geo|city: geo|anonymous_session_id/);
+  assert.match(route, /readCloudflareApproximateLocation/);
+  assert.match(route, /deriveAnalyticsKey/);
+  assert.match(route, /classifyAnalyticsTraffic/);
+  assert.match(route, /p_failure_stage/);
+  assert.match(client, /deliveryQueue/);
+  assert.match(client, /deliveryQueue\.then/);
+  assert.doesNotMatch(route, /analytics_events.*insert/i);
+});
+
+test("verified analytics keeps browser identity opaque and avoids localStorage", () => {
   const provider = readFileSync(
     "components/analytics/AnalyticsProvider.tsx",
     "utf8",
   );
-  const session = readFileSync("lib/analytics/session.ts", "utf8");
   const client = readFileSync("lib/analytics/client.ts", "utf8");
-  const combined = `${provider}\n${session}\n${client}`;
+  const identity = readFileSync("lib/analytics/server-identity.ts", "utf8");
+  const combined = `${provider}\n${client}\n${identity}`;
 
-  assert.match(combined, /sessionStorage/);
-  assert.match(combined, /randomUUID/);
-  assert.doesNotMatch(combined, /localStorage/);
+  assert.doesNotMatch(client, /localStorage|sessionStorage/);
+  assert.doesNotMatch(client, /randomUUID|anonymous_session_id/);
+  assert.match(identity, /httpOnly: true/);
+  assert.match(identity, /deriveAnalyticsKey/);
+  assert.doesNotMatch(combined, /document\.cookie/);
 });
 
-test("admin analytics reads use the aggregate RPC instead of direct event table reads", () => {
-  const dataLayer = readFileSync("lib/admin/data.ts", "utf8");
+test("admin audience analytics reads use the verified aggregate RPC instead of direct event rows", () => {
+  const dataLayer = readFileSync("lib/admin/verified-analytics.ts", "utf8");
 
-  assert.match(dataLayer, /get_admin_analytics_summary/);
+  assert.match(dataLayer, /get_admin_verified_traffic/);
+  assert.match(dataLayer, /get_admin_recent_analytics_events_v2/);
   assert.doesNotMatch(dataLayer, /\.from\("analytics_events"\)/);
-  assert.match(dataLayer, /pageViewsToday/);
-  assert.match(dataLayer, /topToolsByOpens/);
-  assert.match(dataLayer, /dataStatus/);
-  assert.match(dataLayer, /"unavailable"/);
+  assert.match(dataLayer, /known \+ unknown !== pageViews/);
 });
 
 test("admin analytics dashboard exposes current range controls and lifecycle metrics", () => {
   const page = readFileSync("app/admin/(protected)/analytics/page.tsx", "utf8");
 
   assert.match(page, /eyebrow="Analytics"/);
-  assert.match(page, /title="Analytics"/);
-  assert.match(page, /Discovery & operation analytics/);
+  assert.match(page, /title="Verified traffic analytics"/);
+  assert.match(page, /Server-verified audience/);
   assert.match(page, /title="Date range"/);
   assert.match(page, /name="range"/);
   assert.match(page, /<option value="30d">Last 30 days<\/option>/);
   assert.match(page, /<option value="custom">Custom<\/option>/);
   assert.match(page, /label="Page Views"/);
   assert.match(page, /label="Tool Opens"/);
-  assert.match(page, /Most opened tool/);
+  assert.match(page, /title="Top Locations"/);
   assert.match(page, /title="Tool performance"/);
   assert.match(page, /title="Operation analytics"/);
   assert.match(page, /label="Processing Started"/);
@@ -259,7 +302,7 @@ test("conversion cancellation is an approved terminal event with privacy-safe st
   );
   assert.match(state, /"processing_cancelled"/);
   assert.match(types, /AnalyticsConversionStage/);
-  assert.match(client, /failure_stage: input\.failureStage/);
+  assert.match(client, /failureStage: input\.failureStage/);
   assert.match(migration, /processing_cancelled/);
   assert.match(migration, /failure_stage/);
   assert.doesNotMatch(

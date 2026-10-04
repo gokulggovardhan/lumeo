@@ -1,9 +1,14 @@
 type TrendPoint = {
   date: string;
-  events: number;
   pageViews: number;
-  toolOpens: number;
+  uniqueVisitors: number;
+  sessions: number;
 };
+
+function barHeight(value: number, max: number) {
+  if (value <= 0) return "0%";
+  return `${Math.max(5, (value / max) * 100)}%`;
+}
 
 export function AnalyticsTrendChart({
   points,
@@ -14,17 +19,19 @@ export function AnalyticsTrendChart({
 }) {
   const max = Math.max(
     1,
-    ...points.map((point) => Math.max(point.pageViews, point.toolOpens)),
+    ...points.map((point) =>
+      Math.max(point.pageViews, point.uniqueVisitors, point.sessions),
+    ),
   );
-  const minChartWidth = points.length > 14 ? points.length * 34 : undefined;
+  const minChartWidth = points.length > 14 ? points.length * 42 : undefined;
 
   return (
     <div className="min-w-0 max-w-full rounded-2xl border border-[var(--border-subtle)] bg-[var(--surface-elevated)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-bold text-[#F0EAD6]">Daily activity</h3>
+          <h3 className="text-sm font-bold text-[#F0EAD6]">Daily traffic trend</h3>
           <p className="mt-1 text-xs text-[#F0EAD6]/46">
-            {rangeLabel} · page views and tool opens.
+            {rangeLabel} · page views, visitors and sessions.
           </p>
         </div>
       </div>
@@ -32,24 +39,25 @@ export function AnalyticsTrendChart({
         <div
           className="flex h-32 items-end gap-2"
           style={minChartWidth ? { minWidth: `${minChartWidth}px` } : undefined}
-          aria-label={`Daily page views and tool opens for ${rangeLabel}`}
+          aria-label={`Daily page views, visitors and sessions for ${rangeLabel}`}
         >
           {points.map((point) => (
             <div key={point.date} className="flex min-w-0 flex-1 flex-col items-center gap-2">
               <div className="flex h-full w-full items-end gap-1">
                 <div
                   title={`${point.date}: ${point.pageViews} page views`}
-                  className="min-h-[5px] flex-1 rounded-t-lg border border-[#CBA052]/16 bg-[#1E6B4A]/80"
-                  style={{
-                    height: `${Math.max(5, (point.pageViews / max) * 100)}%`,
-                  }}
+                  className="flex-1 rounded-t-lg border border-[#CBA052]/16 bg-[#1E6B4A]/80"
+                  style={{ height: barHeight(point.pageViews, max) }}
                 />
                 <div
-                  title={`${point.date}: ${point.toolOpens} tool opens`}
-                  className="min-h-[5px] flex-1 rounded-t-lg border border-[#CBA052]/22 bg-[#CBA052]/78"
-                  style={{
-                    height: `${Math.max(5, (point.toolOpens / max) * 100)}%`,
-                  }}
+                  title={`${point.date}: ${point.uniqueVisitors} visitors`}
+                  className="flex-1 rounded-t-lg border border-[#CBA052]/22 bg-[#CBA052]/78"
+                  style={{ height: barHeight(point.uniqueVisitors, max) }}
+                />
+                <div
+                  title={`${point.date}: ${point.sessions} sessions`}
+                  className="flex-1 rounded-t-lg border border-[#F0EAD6]/16 bg-[#6E8FB8]/78"
+                  style={{ height: barHeight(point.sessions, max) }}
                 />
               </div>
               <span className="truncate text-[0.62rem] text-[#F0EAD6]/42">
@@ -66,15 +74,19 @@ export function AnalyticsTrendChart({
         </span>
         <span className="inline-flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-[#CBA052]" />
-          Tool opens
+          Visitors
+        </span>
+        <span className="inline-flex items-center gap-2">
+          <span className="h-2 w-2 rounded-full bg-[#6E8FB8]" />
+          Sessions
         </span>
       </div>
-      <p className="mt-3 text-xs text-[#F0EAD6]/46">
+      <p className="mt-3 text-xs leading-5 text-[#F0EAD6]/46">
         Text summary:{" "}
         {points
           .map(
             (point) =>
-              `${point.date} ${point.pageViews} page views, ${point.toolOpens} tool opens`,
+              `${point.date} ${point.pageViews} page views, ${point.uniqueVisitors} visitors, ${point.sessions} sessions`,
           )
           .join(", ")}
       </p>

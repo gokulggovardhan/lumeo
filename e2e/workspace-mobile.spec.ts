@@ -168,7 +168,6 @@ test("connected PDF Workspace keeps dedicated mobile navigation usable across ta
     await expectMobileNavFits(page, width, height);
   }
 
-  const nav = page.locator("[data-workspace-mobile-nav]");
   await clickWorkspaceNav(page, "More");
 
   const more = page.locator("#workspace-mobile-more");

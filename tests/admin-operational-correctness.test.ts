@@ -90,7 +90,7 @@ test("Dashboard avoids retired status queries and reads current operational sour
   assert.doesNotMatch(data, /homepage_tool_slots/);
   assert.doesNotMatch(data, /latestDailyMetricDate/);
   assert.doesNotMatch(page, /getSystemStatus/);
-  assert.match(page, /getAnalyticsSummary\(\)/);
+  assert.match(page, /getVerifiedTraffic\(/);
   assert.match(page, /getAuditLogs\(5\)/);
   assert.match(page, /getErrorLogSummary\(\)/);
   assert.match(page, /getUnresolvedErrorLogs\(5, 0\)/);
@@ -136,12 +136,14 @@ test("error-ingestion hardening keeps counters private and covers null-session a
 
 test("Admin request proxy is Cloudflare-native and enforces production edge safety", () => {
   const proxy = read("lib/supabase/proxy.ts");
+  const analyticsRoute = read("app/api/analytics/route.ts");
   const packageJson = read("package.json");
 
   const retiredFunctionsPackage = ["@ver", "cel/functions"].join("");
   assert.ok(!proxy.includes(retiredFunctionsPackage));
   assert.ok(!packageJson.includes(retiredFunctionsPackage));
-  assert.match(proxy, /readCloudflareApproximateLocation/);
+  assert.doesNotMatch(proxy, /readCloudflareApproximateLocation/);
+  assert.match(analyticsRoute, /readCloudflareApproximateLocation/);
   assert.match(proxy, /productionHttpsRedirect/);
   assert.match(proxy, /PRODUCTION_HOSTS/);
   assert.match(proxy, /X-Frame-Options/);
@@ -186,7 +188,7 @@ test("Admin runtime metadata is Cloudflare-native", () => {
 
 test("Admin database-backed pages distinguish unavailable data from valid empty state", () => {
   const expectations = [
-    ["app/admin/(protected)/analytics/activity/page.tsx", "recentEvents.error", "Recent activity is unavailable"],
+    ["app/admin/(protected)/analytics/activity/page.tsx", "recentEvents.error", "Verified activity is unavailable"],
     ["app/admin/(protected)/members/page.tsx", "members.error", "Administrator data is unavailable"],
     ["app/admin/(protected)/seo/page.tsx", "seo.error", "SEO records are unavailable"],
     ["app/admin/(protected)/settings/page.tsx", "settings.error", "Live settings are unavailable"],
@@ -216,8 +218,8 @@ test("Audit filters reject malformed date input without throwing", () => {
 
 test("Analytics recent-feed failure does not invalidate verified aggregate analytics", () => {
   const analytics = read("app/admin/(protected)/analytics/page.tsx");
-  assert.match(analytics, /recentEvents\.error/);
-  assert.match(analytics, /Aggregate analytics are still valid/);
+  assert.match(analytics, /recent\.error/);
+  assert.match(analytics, /The aggregate above remains valid/);
 });
 
 
@@ -328,18 +330,15 @@ test("error lifecycle is recurrence-aware and development telemetry cannot pollu
 });
 
 test("operation analytics exposes starts without a terminal outcome instead of hiding them", () => {
-  const data = read("lib/admin/data.ts");
   const page = read("app/admin/(protected)/analytics/page.tsx");
 
-  assert.match(data, /unreconciledStarts/);
-  assert.match(data, /processingCancelled/);
   assert.match(
-    data,
+    page,
     /processingStarted[\s\S]*processingSucceeded[\s\S]*processingFailed[\s\S]*processingCancelled/,
   );
   assert.match(page, /Processing Cancelled/);
   assert.match(page, /No terminal event/);
-  assert.match(page, /range-boundary spillover/);
+  assert.match(page, /Started minus succeeded, failed and cancelled/);
 });
 
 
@@ -386,7 +385,9 @@ test("conversion analytics tracks explicit cancellations separately and keeps fa
   assert.match(migration, /get_admin_conversion_diagnostics/);
   assert.doesNotMatch(migration, /filename|file_name|document_content|raw_error/i);
   assert.match(analyticsTypes, /"processing_cancelled"/);
-  assert.match(analyticsClient, /failure_stage: input\.failureStage/);
+  assert.match(analyticsClient, /failureStage: input\.failureStage/);
+  const analyticsRoute = read("app/api/analytics/route.ts");
+  assert.match(analyticsRoute, /p_failure_stage: input\.failureStage/);
 
   for (const source of [word, pdf]) {
     assert.match(source, /eventName: "processing_cancelled"/);

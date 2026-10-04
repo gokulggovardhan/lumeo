@@ -131,6 +131,7 @@ try {
     ...actionFiles,
     "lib/admin/permissions.ts",
     "lib/admin/data.ts",
+    "lib/admin/verified-analytics.ts",
     "lib/admin/audit.ts",
     "lib/admin/validation.ts",
     "components/admin/ControlCenterShell.tsx",
@@ -179,7 +180,7 @@ try {
   }
   assert(buildInfoSource.includes("LUMEO_BUILD_SHA"), "Build-info endpoint must expose Cloudflare build SHA metadata.");
   assert(errorCaptureSource.includes("LUMEO_BUILD_SHA"), "Server error capture must tag Cloudflare build SHA metadata.");
-  for (const check of ["Admin authorization", "Supabase database", "Maintenance state", "Analytics aggregates", "Error monitoring", "Feedback Inbox", "Cloudflare runtime"]) {
+  for (const check of ["Admin authorization", "Supabase database", "Maintenance state", "Verified analytics", "Error monitoring", "Feedback Inbox", "Cloudflare runtime"]) {
     assert(healthSource.includes(check), `Health V2 evidence check missing: ${check}.`);
   }
   assert(healthPage.includes("Core operations") && healthPage.includes("Supporting operations"), "Health V2 must separate core and supporting checks.");
@@ -204,6 +205,11 @@ try {
   assert(analyticsPage.includes('name="range"'), "Analytics page must expose the range selector.");
   assert(analyticsPage.includes('<option value="custom">Custom</option>'), "Analytics page must expose the custom range.");
   assert(analyticsPage.includes('label="Page Views"'), "Analytics page must display page views.");
+  assert(analyticsPage.includes('label="Unique Visitors"'), "Analytics page must display verified unique visitors.");
+  assert(analyticsPage.includes('label="Sessions"'), "Analytics page must display verified sessions.");
+  assert(analyticsPage.includes('title="Location integrity"'), "Analytics page must expose known/unknown location reconciliation.");
+  assert(analyticsPage.includes('title="Top Locations"'), "Analytics page must expose verified visitor locations.");
+  assert(analyticsPage.includes('title="Traffic separation"'), "Analytics page must keep synthetic and automation traffic separate.");
   assert(analyticsPage.includes('label="Tool Opens"'), "Analytics page must display tool opens.");
   assert(analyticsPage.includes('title="Operation analytics"'), "Analytics page must explain operation analytics.");
   assert(!analyticsPage.includes("Analytics V1"), "Analytics page must not restore obsolete Analytics V1 copy.");
@@ -224,7 +230,7 @@ try {
 
   for (const reader of [
     "getPdfTools",
-    "getAnalyticsSummary",
+    "getVerifiedTraffic",
     "getUnreadInboxCount",
     "getFeedbackQueries",
     "getErrorLogSummary",
@@ -284,7 +290,7 @@ try {
   // reference nav" #34) -- current analytics messaging lives on the
   // analytics page checked above (`analyticsPage`), so no separate read is
   // needed here.
-  assert(analyticsPage.includes("Processing lifecycle metrics"), "Analytics page must describe processing lifecycle metrics.");
+  assert(analyticsPage.includes("Conversion lifecycle metrics stay separated from visitor counting."), "Analytics page must describe verified processing lifecycle metrics.");
 
   const toolsPage = read("app/admin/(protected)/tools/page.tsx");
   const toolsAction = read("app/admin/(protected)/tools/actions.ts");
@@ -300,8 +306,8 @@ try {
   assert(toolsAction.includes("maintenance_message: maintenanceMessage || null"), "Tool audit changes must include maintenance messaging.");
   assert(toolsAction.includes('updateTag("public-pdf-catalog")'), "Tool saves must invalidate the shared public catalog immediately.");
   assert(analyticsPage.includes('title="Tool performance"'), "Analytics V2 tool-performance section is missing.");
-  assert(analyticsPage.includes('title="Audience and environment"'), "Analytics V2 environment section is missing.");
-  assert(analyticsPage.includes("Metrics are withheld instead of presenting unverified zero values"), "Analytics V2 must explain unavailable metrics honestly.");
+  assert(analyticsPage.includes('title="Audience environment"'), "Analytics V2 environment section is missing.");
+  assert(analyticsPage.includes("Legacy browser analytics are intentionally not substituted"), "Analytics V2 must explain unavailable verified metrics honestly.");
 
   const membersPage = read("app/admin/(protected)/members/page.tsx");
   const membersAction = read("app/admin/(protected)/members/actions.ts");

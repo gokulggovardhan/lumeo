@@ -13,8 +13,8 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   projects: [
-    { name: "chromium-production", use: { ...devices["Desktop Chrome"] } },
-    { name: "webkit-production", use: { ...devices["Desktop Safari"] } },
-    { name: "firefox-production", use: { ...devices["Desktop Firefox"] } },
+    { name: "chromium-production", use: { ...devices["Desktop Chrome"], userAgent: `${devices["Desktop Chrome"].userAgent} LumeoSyntheticTest/1` } },
+    { name: "webkit-production", use: { ...devices["Desktop Safari"], userAgent: `${devices["Desktop Safari"].userAgent} LumeoSyntheticTest/1` } },
+    { name: "firefox-production", use: { ...devices["Desktop Firefox"], userAgent: `${devices["Desktop Firefox"].userAgent} LumeoSyntheticTest/1` } },
   ],
 });

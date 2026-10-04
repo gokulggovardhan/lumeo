@@ -10,7 +10,7 @@ import {
 } from "@/components/InfoPage";
 import { withSeoOverride } from "@/lib/public-site/seo";
 
-const lastUpdated = "September 25, 2026";
+const lastUpdated = "October 4, 2026";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/privacy", {
@@ -107,22 +107,38 @@ export default function PrivacyPage() {
 
         <InfoPageSection title="Analytics and diagnostics">
           <p>
-            Lumeo may record optional anonymous product-use events to understand
-            reliability and which PDF tools need attention. These events use a
-            temporary browser-session ID and coarse categories only.
+            Lumeo may record optional privacy-preserving product-use events to
+            understand real audience activity, reliability, and which PDF tools
+            need attention. When analytics is enabled, Lumeo uses random
+            first-party visitor and session tokens. The server converts those
+            tokens into pseudonymous identifiers before analytics data is
+            stored, and separates known test/bot traffic from the default real
+            audience view.
+          </p>
+          <p>
+            Approximate city, region, and country may be derived from
+            Cloudflare request metadata. This is network-level approximation,
+            not GPS or a precise address. A raw network address may be used
+            transiently to derive a one-way rate-limit key, but the raw address
+            is not stored in product analytics.
           </p>
           <p>
             Analytics events do not include documents, filenames, document
-            contents, exact file sizes, extracted text, passwords, emails, or
-            account identifiers. Do Not Track disables optional analytics.
+            contents, exact file sizes, extracted text, passwords, emails,
+            authenticated account identifiers, raw IP addresses, or precise
+            coordinates. Do Not Track disables optional analytics.
           </p>
         </InfoPageSection>
 
         <InfoPageSection title="Cookies">
           <p>
-            Current browser-first tools do not require account cookies. Hosting
-            platforms, browsers, or future product features may use cookies or
-            similar storage for operational purposes.
+            Public PDF processing does not require an account. If optional
+            analytics is enabled and Do Not Track is not enabled, Lumeo may set
+            a random first-party visitor token for up to 180 days and a
+            short-lived session token for about 30 minutes. These tokens are
+            HttpOnly, are not document identifiers, and are not combined with
+            email or account identity. Authentication and other product
+            features may use additional operational cookies where required.
           </p>
         </InfoPageSection>
 
