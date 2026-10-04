@@ -224,7 +224,7 @@ try {
 
   for (const reader of [
     "getPdfTools",
-    "getAnalyticsSummary",
+    "getVerifiedAnalytics",
     "getUnreadInboxCount",
     "getFeedbackQueries",
     "getErrorLogSummary",
