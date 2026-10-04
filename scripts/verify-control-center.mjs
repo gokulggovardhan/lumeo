@@ -208,7 +208,7 @@ try {
   assert(analyticsPage.includes('label="Unique Visitors"'), "Analytics page must display verified unique visitors.");
   assert(analyticsPage.includes('label="Sessions"'), "Analytics page must display verified sessions.");
   assert(analyticsPage.includes('title="Location integrity"'), "Analytics page must expose known/unknown location reconciliation.");
-  assert(analyticsPage.includes('title="Visitor locations"'), "Analytics page must expose verified visitor locations.");
+  assert(analyticsPage.includes('title="Top Locations"'), "Analytics page must expose verified visitor locations.");
   assert(analyticsPage.includes('title="Traffic separation"'), "Analytics page must keep synthetic and automation traffic separate.");
   assert(analyticsPage.includes('label="Tool Opens"'), "Analytics page must display tool opens.");
   assert(analyticsPage.includes('title="Operation analytics"'), "Analytics page must explain operation analytics.");
