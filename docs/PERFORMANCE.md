@@ -106,3 +106,25 @@ field metric and is not inferred from Lighthouse Total Blocking Time.
 
 The workflow stores Lighthouse reports as CI artifacts so later budget changes
 can be based on observed measurements rather than guesses.
+
+
+## Client JavaScript bundle budgets
+
+The Cloudflare production client bundle is measured after `npm run build:vinext`
+by `scripts/check-client-bundle-budget.mjs`. The check records every emitted
+client JavaScript chunk with both raw and gzip size and stores the full report at
+`test-results/bundle-budget.json`.
+
+The initial regression ceilings are intentionally conservative so they protect
+against large accidental growth without pretending the existing application is
+already fully optimized:
+
+- Largest minified client JS chunk: <= 1.8 MB raw
+- Largest client JS chunk: <= 600 KB gzip
+- Total emitted client JS: <= 5.0 MB gzip
+
+These are regression budgets, not performance targets. The existing PDF, OCR,
+font, and conversion engines remain route-loaded; no proven engine has been
+replaced for the sake of a smaller headline bundle number. If a budget starts
+failing, the emitted report should be used to identify the specific chunk before
+changing loading boundaries.
