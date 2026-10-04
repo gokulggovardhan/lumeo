@@ -9,6 +9,10 @@ import {
 import type { AnalyticsEventInput, AnalyticsRemoteTrackResult } from "@/lib/analytics/types";
 
 const REQUEST_TIMEOUT_MS = 2500;
+let deliveryTail: Promise<AnalyticsRemoteTrackResult> = Promise.resolve({
+  success: true,
+  eventId: null,
+});
 
 type RpcResult<T> = {
   data: T | null;
@@ -72,7 +76,7 @@ export async function fetchPublicAnalyticsEnabled(): Promise<boolean> {
   }
 }
 
-export async function trackPublicAnalyticsEvent(
+async function deliverPublicAnalyticsEvent(
   input: AnalyticsEventInput,
 ): Promise<AnalyticsRemoteTrackResult> {
   try {
@@ -108,4 +112,19 @@ export async function trackPublicAnalyticsEvent(
   } catch {
     return { success: false };
   }
+}
+
+
+export function trackPublicAnalyticsEvent(
+  input: AnalyticsEventInput,
+): Promise<AnalyticsRemoteTrackResult> {
+  // The first event establishes HTTP-only visitor/session cookies. Serializing
+  // delivery prevents simultaneous first-load page/tool events from racing and
+  // being assigned different identities. This queue never blocks PDF work.
+  const next = deliveryTail.then(
+    () => deliverPublicAnalyticsEvent(input),
+    () => deliverPublicAnalyticsEvent(input),
+  );
+  deliveryTail = next;
+  return next;
 }
