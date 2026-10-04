@@ -694,14 +694,8 @@ comment on function public.record_trusted_analytics_event(
 comment on function public.get_admin_verified_analytics(date,date,text) is
   'Verified schema-v2 analytics for active administrators. Default real_audience scope excludes Lumeo synthetic browser tests and known/suspected automation. All date boundaries use Asia/Kolkata. Full-location reporting requires genuine city + region + country; incomplete geography remains counted in Unknown Location.';
 
--- Stop new browser-direct legacy events. Cached old clients may fail analytics
--- delivery briefly, but PDF operations remain unaffected and polluted v1 rows
--- can no longer grow after this cutover migration.
-revoke execute on function public.record_public_analytics_event(
-  text,text,uuid,integer,text,text,text,text,text,boolean,text,text,text,text
-) from anon, authenticated;
-revoke execute on function public.record_public_analytics_event(
-  text,text,uuid,integer,text,text,text,text,text,boolean,text,text,text,text,text
-) from anon, authenticated;
-
+-- The legacy writer stays executable during the rolling deploy so cached pre-cutover
+-- clients fail open rather than breaking product workflows. Verified Admin Analytics
+-- ignores schema-v1 rows. Revoke the legacy writer only after schema-v2 production
+-- ingestion is certified.
 commit;
