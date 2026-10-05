@@ -31,7 +31,7 @@ jobs:
   lighthouse:
     name: Mobile performance, accessibility and SEO budgets
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
 
     steps:
       - name: Checkout repository
@@ -45,6 +45,9 @@ jobs:
 
       - name: Install exact dependencies
         run: npm ci
+
+      - name: Install pinned Lighthouse runtime for CI only
+        run: npm install --no-save --package-lock=false lighthouse@13.5.0 chrome-launcher@1.0.1
 
       - name: Initialize isolated Supabase catalog
         shell: bash
