@@ -28,9 +28,9 @@ test("Lighthouse workflow uses a production server and independent fresh-browser
     workflow,
     /npm start -- --hostname 127\.0\.0\.1 --port 8787/,
   );
-  assert.match(workflow, /Warm audited routes/);
+  assert.match(workflow, /Warm audited routes/);\n  assert.match(workflow, /Xvfb :99/);\n  assert.match(workflow, /DISPLAY=:99/);
   assert.match(workflow, /include-hidden-files:\s*true/);
-  assert.match(runner, /chromeLauncher\.launch/);
+  assert.match(runner, /chromeLauncher\.launch/);\n  assert.doesNotMatch(runner, /"--headless"/);\n  assert.match(runner, /"--start-maximized"/);
   assert.match(runner, /Promise\.resolve\(chrome\.kill\(\)\)/);
   assert.match(runner, /NO_FCP/);
   assert.match(runner, /for \(let attempt = 1; attempt <= 2/);
