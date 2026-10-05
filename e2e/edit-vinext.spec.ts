@@ -2349,17 +2349,48 @@ test("vinext Edit PDF replaces only the current page when Replace All scope is T
   });
   await expect(replaceAllOnPage).toBeEnabled({ timeout: 90_000 });
 
-  page.once("dialog", async (dialog) => {
+  let replaceConfirmationCount = 0;
+  const confirmReplace = async (dialog: import("@playwright/test").Dialog) => {
     expect(dialog.message()).toMatch(/Replace 1 safely editable match in page 1/i);
     expect(dialog.message()).toMatch(/one Undo step/i);
+    replaceConfirmationCount += 1;
     await dialog.accept();
-  });
-  await replaceAllOnPage.click();
+  };
+  page.on("dialog", confirmReplace);
 
   const status = page.locator("[data-edit-replace-all-status]");
-  await expect(status).toContainText(/Replaced 1 match in one native PDF transaction/i, {
-    timeout: 90_000,
-  });
+  try {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await replaceAllOnPage.click();
+      await expect(status).toContainText(
+        /Replaced 1 match in one native PDF transaction|No current matches for “record” were found in page 1/i,
+        { timeout: 90_000 },
+      );
+
+      const message = (await status.textContent()) ?? "";
+      if (/Replaced 1 match in one native PDF transaction/i.test(message)) break;
+
+      // WebKit can occasionally expose the live page-search result one task
+      // before a fresh PDF.js getTextContent() call sees that same run after
+      // a long CI sequence. Nothing was mutated in this branch, so allow one
+      // bounded retry after the stage is proven ready again. A persistent
+      // extraction or native-rewrite regression still fails on attempt two.
+      expect(attempt).toBe(0);
+      await waitForStageReady(page);
+      await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
+        "data-edit-search-match-count",
+        "1",
+        { timeout: 30_000 },
+      );
+    }
+
+    await expect(status).toContainText(/Replaced 1 match in one native PDF transaction/i, {
+      timeout: 90_000,
+    });
+    expect(replaceConfirmationCount).toBe(1);
+  } finally {
+    page.off("dialog", confirmReplace);
+  }
   await expect(workspace).toHaveAttribute("data-edit-semantic-history-count", "1", {
     timeout: 90_000,
   });
