@@ -120,7 +120,7 @@ async function runSample(url, routeIndex, sampleIndex) {
       }
       throw error;
     } finally {
-      await chrome.kill().catch(() => {});
+      await Promise.resolve(chrome.kill()).catch(() => {});
     }
   }
 
