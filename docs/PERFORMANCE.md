@@ -148,3 +148,8 @@ The Lighthouse environment control can paint `https://example.com/`, while the d
 ### Heavy tool route prefetch control
 
 A valid Lighthouse 13.5 trace showed the homepage requesting Edit PDF, JSZip, Split, Compress, Sign, PDF-to-Word and other tool chunks before the user opened any tool. The cause was automatic route prefetch on the homepage launcher and tool-directory card links. Those tool-navigation links now use `prefetch={false}`, so initial public pages load only the JavaScript they need. Click navigation remains unchanged and no PDF/OCR/conversion engine is removed or weakened.
+
+
+### Homepage LCP convergence
+
+Once Lighthouse 13.5 collection became reliable, the PR-local homepage budget measured a median LCP of about 4026 ms against the unchanged 4000 ms budget. The LCP node was the hero heading, "Your PDFs stay yours." The heading still lived inside the generic `lumeo-fade-up` entrance animation, whose first frame is transparent. The homepage hero no longer uses that entrance animation, so the above-the-fold LCP content is paintable immediately. Other page motion remains unchanged.
