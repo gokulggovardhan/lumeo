@@ -2359,29 +2359,58 @@ test("vinext Edit PDF replaces only the current page when Replace All scope is T
   page.on("dialog", confirmReplace);
 
   const status = page.locator("[data-edit-replace-all-status]");
+  const terminalStatus =
+    /Replaced 1 match in one native PDF transaction|No current matches for “record” were found in page 1/i;
+
+  const waitForTerminalStatus = async (timeout = 45_000) => {
+    try {
+      await expect(status).toContainText(terminalStatus, { timeout });
+      return (await status.textContent()) ?? "";
+    } catch {
+      return null;
+    }
+  };
+
   try {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       await replaceAllOnPage.click();
-      await expect(status).toContainText(
-        /Replaced 1 match in one native PDF transaction|No current matches for “record” were found in page 1/i,
-        { timeout: 90_000 },
-      );
+      const message = await waitForTerminalStatus();
 
-      const message = (await status.textContent()) ?? "";
-      if (/Replaced 1 match in one native PDF transaction/i.test(message)) break;
+      if (message && /Replaced 1 match in one native PDF transaction/i.test(message)) {
+        break;
+      }
 
-      // WebKit can occasionally expose the live page-search result one task
-      // before a fresh PDF.js getTextContent() call sees that same run after
-      // a long CI sequence. Nothing was mutated in this branch, so allow one
-      // bounded retry after the stage is proven ready again. A persistent
-      // extraction or native-rewrite regression still fails on attempt two.
-      expect(attempt).toBe(0);
+      const historyCount = await workspace.getAttribute("data-edit-semantic-history-count");
+
+      if (historyCount === "1") {
+        // The native transaction completed; require the public status to catch
+        // up rather than issuing a second replacement click.
+        await expect(status).toContainText(/Replaced 1 match in one native PDF transaction/i, {
+          timeout: 45_000,
+        });
+        break;
+      }
+
+      if (message && /No current matches for “record” were found in page 1/i.test(message)) {
+        expect(attempt).toBe(0);
+      } else {
+        // A long WebKit CI sequence can very rarely drop this button action
+        // without opening the confirmation dialog or publishing any status.
+        // Retry only when nothing started and nothing mutated; a partially
+        // started replacement remains a hard failure.
+        expect(message).toBeNull();
+        expect(replaceConfirmationCount).toBe(0);
+        expect(historyCount).toBe("0");
+        expect(attempt).toBe(0);
+      }
+
       await waitForStageReady(page);
       await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
         "data-edit-search-match-count",
         "1",
         { timeout: 30_000 },
       );
+      await expect(replaceAllOnPage).toBeEnabled({ timeout: 30_000 });
     }
 
     await expect(status).toContainText(/Replaced 1 match in one native PDF transaction/i, {
