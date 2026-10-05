@@ -23,7 +23,12 @@ test("Lighthouse workflow uses a production server and independent fresh-browser
   const runner = readFileSync("scripts/run-mobile-lighthouse.mjs", "utf8");
   assert.match(workflow, /lighthouse@13\.5\.0/);
   assert.match(workflow, /chrome-launcher@1\.2\.1/);
-  assert.match(workflow, /npm run build/);\n  assert.match(workflow, /npm start -- --hostname 127\\.0\\.0\\.1 --port 8787/);\n  assert.match(workflow, /Warm audited routes/);
+  assert.match(workflow, /npm run build/);
+  assert.match(
+    workflow,
+    /npm start -- --hostname 127\.0\.0\.1 --port 8787/,
+  );
+  assert.match(workflow, /Warm audited routes/);
   assert.match(workflow, /include-hidden-files:\s*true/);
   assert.match(runner, /chromeLauncher\.launch/);
   assert.match(runner, /Promise\.resolve\(chrome\.kill\(\)\)/);
