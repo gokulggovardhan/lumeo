@@ -41,13 +41,9 @@ async function runSample(url, routeIndex, sampleIndex) {
   const chrome = await chromeLauncher.launch({
     chromePath,
     chromeFlags: [
+      "--headless=new",
       "--no-sandbox",
-      "--disable-gpu",
-      "--start-maximized",
       "--disable-dev-shm-usage",
-      "--disable-background-timer-throttling",
-      "--disable-renderer-backgrounding",
-      "--disable-backgrounding-occluded-windows",
     ],
   });
 

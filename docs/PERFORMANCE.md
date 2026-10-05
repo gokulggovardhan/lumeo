@@ -113,3 +113,8 @@ Production Lighthouse identified the header brand mark as the homepage LCP candi
 ### Collector recovery
 
 The first production run after the compact-brand fix showed nine consecutive `NO_FCP` runtime failures after adding native-window-occlusion and forced window-size Chrome flags. Those two flags are removed because the earlier headed Xvfb configuration produced valid production samples. The bounded valid-sample replacement logic and all Lighthouse budgets remain unchanged.
+
+
+### Deterministic production Lighthouse execution
+
+Repeated production certification showed that headed Chrome under Xvfb could return `NO_FCP` for every attempt even when the same production routes returned HTTP 200 and passed the full browser release matrix. Production Lighthouse now launches a fresh Chrome instance with `--headless=new` for every sample and no virtual display/window-manager dependency. The four audited routes, three-valid-sample requirement, bounded runtime-invalid replacement, and all score/LCP/CLS/TBT budgets remain unchanged.

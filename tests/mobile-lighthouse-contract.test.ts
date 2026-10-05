@@ -29,12 +29,13 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(workflow, /https:\/\/lumeo\.in\/api\/build-info/);
   assert.match(workflow, /lighthouse@13\.5\.0/);
   assert.match(workflow, /chrome-launcher@1\.2\.1/);
-  assert.match(workflow, /Xvfb :99/);
+  assert.doesNotMatch(workflow, /Xvfb/);
   assert.match(workflow, /include-hidden-files:\s*true/);
 
   assert.match(runner, /chromeLauncher\.launch/);
-  assert.doesNotMatch(runner, /"--headless"/);
-  assert.match(runner, /"--start-maximized"/);
+  assert.match(runner, /"--headless=new"/);
+  assert.doesNotMatch(runner, /"--start-maximized"/);
+  assert.doesNotMatch(runner, /"--disable-gpu"/);
   assert.doesNotMatch(runner, /CalculateNativeWinOcclusion/);
   assert.doesNotMatch(runner, /--window-size=390,844/);
   assert.match(runner, /Promise\.resolve\(chrome\.kill\(\)\)/);
