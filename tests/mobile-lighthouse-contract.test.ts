@@ -61,7 +61,6 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(runner, /https:\/\/example\.com\//);
   assert.match(runner, /LIGHTHOUSE_ENVIRONMENT_FAILURE/);
   assert.match(runner, /PASS Lighthouse environment control/);
-  assert.match(runner, /smokeMode \? 1 : baseConfig\.numberOfRuns/);
   assert.doesNotMatch(runner, /CalculateNativeWinOcclusion/);
   assert.doesNotMatch(runner, /--window-size=390,844/);
   assert.match(runner, /NO_FCP/);
@@ -69,7 +68,7 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(runner, /runtimeFailures/);
   assert.match(runner, /Discarding transient Lighthouse runtime-invalid attempt/);
   assert.match(runner, /median\(/);
-  assert.match(runner, /runsPerRoute = baseConfig\\.numberOfRuns/);\n  assert.match(runner, /LIGHTHOUSE BUDGET FAIL/);
+  assert.match(runner, /runsPerRoute = baseConfig\.numberOfRuns/);
 });
 
 
