@@ -27,7 +27,7 @@ concurrency:
 jobs:
   lighthouse:
     name: Mobile production performance, accessibility and SEO budgets
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     timeout-minutes: 35
 
     steps:
@@ -40,17 +40,12 @@ jobs:
           node-version: "24.x"
           cache: npm
 
-      - name: Install Chrome for Testing
-        id: chrome
-        uses: browser-actions/setup-chrome@v2
-        with:
-          chrome-version: stable
 
       - name: Install exact dependencies
         run: npm ci
 
       - name: Install pinned Lighthouse runtime for CI only
-        run: npm install --no-save --package-lock=false lighthouse@13.5.0 chrome-launcher@1.2.1
+        run: npm install --no-save --package-lock=false @lhci/cli@0.15.1
 
       - name: Wait for exact Cloudflare production revision
         shell: bash
@@ -99,7 +94,7 @@ jobs:
 
       - name: Run mobile Lighthouse budgets
         env:
-          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+          CHROME_PATH: /usr/bin/google-chrome
         run: node scripts/run-mobile-lighthouse.mjs
 
       - name: Upload Lighthouse reports
