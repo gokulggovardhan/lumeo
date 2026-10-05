@@ -1,6 +1,21 @@
 name: Mobile Lighthouse
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "worker/**"
+      - "scripts/run-mobile-lighthouse.mjs"
+      - ".lighthouserc.cjs"
+      - ".github/workflows/mobile-lighthouse.yml"
+      - "tests/mobile-lighthouse-contract.test.ts"
+      - "package.json"
+      - "package-lock.json"
   push:
     branches:
       - main
@@ -21,12 +36,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: mobile-lighthouse-production
+  group: mobile-lighthouse-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lighthouse:
-    name: Mobile production performance, accessibility and SEO budgets
+  collector-smoke:
+    if: github.event_name == 'pull_request'
+    name: Mobile Lighthouse collector smoke
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -40,12 +56,123 @@ jobs:
           node-version: "24.x"
           cache: npm
 
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install pinned Lighthouse runtime for CI only
+        run: npm install --no-save --package-lock=false lighthouse@13.5.0
+
+      - name: Initialize isolated Supabase catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+
+      - name: Configure public catalog environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/lumeo-lighthouse-supabase.env
+          set -a
+          source /tmp/lumeo-lighthouse-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Build Cloudflare Worker from PR branch
+        run: npm run build:vinext
+
+      - name: Start local PR Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev \
+            --config dist/server/wrangler.json \
+            --port 8787 \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            > /tmp/lumeo-lighthouse-worker.log 2>&1 &
+          echo $! > /tmp/lumeo-lighthouse-worker.pid
+
+          ready=false
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/ >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$(cat /tmp/lumeo-lighthouse-worker.pid)" 2>/dev/null; then
+              cat /tmp/lumeo-lighthouse-worker.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat /tmp/lumeo-lighthouse-worker.log
+            exit 1
+          fi
+
+      - name: Warm PR smoke route
+        run: curl --fail --silent --show-error --max-time 30 http://127.0.0.1:8787/ >/dev/null
+
+      - name: Run Lighthouse 13.5 collector smoke on PR build
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+          LIGHTHOUSE_COLLECTOR_SMOKE: "1"
+          LIGHTHOUSE_BASE_URL: http://127.0.0.1:8787
+          LIGHTHOUSE_CHROME_FLAGS: --headless=new --no-sandbox --disable-dev-shm-usage
+        run: node scripts/run-mobile-lighthouse.mjs
+
+      - name: Upload Lighthouse smoke report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mobile-lighthouse-smoke-report
+          path: .lighthouseci
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
+
+      - name: Stop local PR Worker
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/lumeo-lighthouse-worker.pid ]; then
+            kill "$(cat /tmp/lumeo-lighthouse-worker.pid)" 2>/dev/null || true
+          fi
+
+  lighthouse:
+    if: github.event_name != 'pull_request'
+    name: Mobile production performance, accessibility and SEO budgets
+    runs-on: windows-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install Chrome for Testing
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: stable
 
       - name: Install exact dependencies
         run: npm ci
 
       - name: Install pinned Lighthouse runtime for CI only
-        run: npm install --no-save --package-lock=false @lhci/cli@0.15.1
+        run: npm install --no-save --package-lock=false lighthouse@13.5.0
 
       - name: Wait for exact Cloudflare production revision
         shell: bash
@@ -94,7 +221,8 @@ jobs:
 
       - name: Run mobile Lighthouse budgets
         env:
-          CHROME_PATH: /usr/bin/google-chrome
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
+          LIGHTHOUSE_COLLECTOR_SMOKE: "0"
         run: node scripts/run-mobile-lighthouse.mjs
 
       - name: Upload Lighthouse reports
@@ -106,4 +234,3 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: true
           retention-days: 14
-
