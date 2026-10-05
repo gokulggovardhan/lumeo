@@ -153,3 +153,8 @@ A valid Lighthouse 13.5 trace showed the homepage requesting Edit PDF, JSZip, Sp
 ### Homepage LCP convergence
 
 Once Lighthouse 13.5 collection became reliable, the PR-local homepage budget measured a median LCP of about 4026 ms against the unchanged 4000 ms budget. The LCP node was the hero heading, "Your PDFs stay yours." The heading still lived inside the generic `lumeo-fade-up` entrance animation, whose first frame is transparent. The homepage hero no longer uses that entrance animation, so the above-the-fold LCP content is paintable immediately. Other page motion remains unchanged.
+
+
+### Final Step 4 LCP stabilization
+
+Exact-production Lighthouse 13.5 finally produced valid measurements for all four audited routes. The remaining misses were real and narrow: median LCP was about 4.71s on `/`, 4.61s on `/pdf`, 4.44s on `/pdf-tools`, and 4.47s on `/pdf/edit` against the unchanged 4.0s budget. In every case the LCP candidate was text. The audited public shells were still wrapped in a 640ms entrance transform, and `/pdf-tools` also wrapped its first-screen LCP copy in a 620ms fade-up transform. Those first-paint-critical wrappers now paint immediately; decorative/interaction motion remains available elsewhere. No Lighthouse threshold was weakened.
