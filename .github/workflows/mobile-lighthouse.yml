@@ -117,6 +117,20 @@ jobs:
             done
           done
 
+      - name: Start virtual display for Lighthouse
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v Xvfb >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends xvfb
+          fi
+          Xvfb :99 -screen 0 1920x1080x24 > /tmp/lumeo-xvfb.log 2>&1 &
+          echo $! > /tmp/lumeo-xvfb.pid
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          sleep 2
+          kill -0 "$(cat /tmp/lumeo-xvfb.pid)"
+
       - name: Run mobile Lighthouse budgets
         env:
           CHROME_PATH: /usr/bin/google-chrome
@@ -132,10 +146,13 @@ jobs:
           include-hidden-files: true
           retention-days: 14
 
-      - name: Stop local application
+      - name: Stop local application and virtual display
         if: always()
         shell: bash
         run: |
           if [ -f /tmp/lumeo-lighthouse-app.pid ]; then
             kill "$(cat /tmp/lumeo-lighthouse-app.pid)" 2>/dev/null || true
+          fi
+          if [ -f /tmp/lumeo-xvfb.pid ]; then
+            kill "$(cat /tmp/lumeo-xvfb.pid)" 2>/dev/null || true
           fi
