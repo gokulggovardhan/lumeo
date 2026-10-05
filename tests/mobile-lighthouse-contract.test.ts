@@ -35,6 +35,8 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(runner, /chromeLauncher\.launch/);
   assert.doesNotMatch(runner, /"--headless"/);
   assert.match(runner, /"--start-maximized"/);
+  assert.doesNotMatch(runner, /CalculateNativeWinOcclusion/);
+  assert.doesNotMatch(runner, /--window-size=390,844/);
   assert.match(runner, /Promise\.resolve\(chrome\.kill\(\)\)/);
   assert.match(runner, /NO_FCP/);
   assert.match(runner, /maxRuntimeAttemptsPerRoute/);
