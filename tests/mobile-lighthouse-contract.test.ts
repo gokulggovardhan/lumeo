@@ -22,7 +22,7 @@ test("Lighthouse workflow uses independent fresh-browser samples", () => {
   const workflow = readFileSync(".github/workflows/mobile-lighthouse.yml", "utf8");
   const runner = readFileSync("scripts/run-mobile-lighthouse.mjs", "utf8");
   assert.match(workflow, /lighthouse@13\.5\.0/);
-  assert.match(workflow, /chrome-launcher@1\\.2\\.1/);
+  assert.match(workflow, /chrome-launcher@1\.2\.1/);
   assert.match(workflow, /Warm audited routes/);
   assert.match(workflow, /include-hidden-files:\s*true/);
   assert.match(runner, /chromeLauncher\.launch/);
