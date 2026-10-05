@@ -24,7 +24,9 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
 
   assert.match(workflow, /push:/);
   assert.match(workflow, /branches:[\s\S]*main/);
-  assert.doesNotMatch(workflow, /pull_request:/);
+  assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /Collector smoke uses current certified production/);
+  assert.match(workflow, /if: github\.event_name == 'push'/);
   assert.match(workflow, /EXPECTED_SHA: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /https:\/\/lumeo\.in\/api\/build-info/);
   assert.match(workflow, /lighthouse@13\.5\.0/);
@@ -36,7 +38,8 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(workflow, /include-hidden-files:\s*true/);
 
   assert.match(runner, /chromeLauncher\.launch/);
-  assert.match(runner, /"--headless=new"/);
+  assert.match(runner, /chromeFlags:\s*\[\]/);
+  assert.doesNotMatch(runner, /--headless/);
   assert.doesNotMatch(runner, /"--start-maximized"/);
   assert.doesNotMatch(runner, /"--disable-gpu"/);
   assert.doesNotMatch(runner, /"--no-sandbox"/);
