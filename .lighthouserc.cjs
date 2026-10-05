@@ -3,16 +3,14 @@ module.exports = {
     collect: {
       numberOfRuns: 3,
       url: [
-        "http://127.0.0.1:8787/",
-        "http://127.0.0.1:8787/pdf",
-        "http://127.0.0.1:8787/pdf-tools",
-        "http://127.0.0.1:8787/pdf/edit",
+        "https://lumeo.in/",
+        "https://lumeo.in/pdf",
+        "https://lumeo.in/pdf-tools",
+        "https://lumeo.in/pdf/edit",
       ],
       settings: {
         formFactor: "mobile",
         throttlingMethod: "simulate",
-        chromeFlags:
-          "--headless --no-sandbox --disable-dev-shm-usage --disable-background-timer-throttling --disable-renderer-backgrounding --disable-backgrounding-occluded-windows",
         screenEmulation: {
           mobile: true,
           width: 390,
@@ -42,7 +40,6 @@ module.exports = {
     upload: {
       target: "filesystem",
       outputDir: ".lighthouseci",
-      reportFilenamePattern: "%%PATHNAME%%-%%DATETIME%%-report.%%EXTENSION%%",
     },
   },
 };
