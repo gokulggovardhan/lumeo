@@ -113,14 +113,17 @@ test("public page entrance motion never blocks first paint", () => {
 });
 
 
-test("homepage LCP hero is never hidden behind entrance motion", () => {
+test("homepage LCP hero paints immediately without a page-only stylesheet", () => {
   const home = readFileSync("app/page.tsx", "utf8");
-  assert.match(home, /className=\{styles\.heroGrid\}/);
+  assert.doesNotMatch(home, /home\.module\.css/);
+  assert.doesNotMatch(home, /styles\./);
   assert.doesNotMatch(
     home,
-    /lumeo-fade-up[^\n]*heroGrid|heroGrid[^\n]*lumeo-fade-up/,
+    /lumeo-fade-up/,
     "The above-the-fold hero contains the LCP heading and must paint immediately.",
   );
+  assert.match(home, /min-\[900px\]:grid-cols-/);
+  assert.match(home, /sm:text-\[clamp\(2\.25rem,4\.6vw,3\.75rem\)\]/);
 });
 
 
