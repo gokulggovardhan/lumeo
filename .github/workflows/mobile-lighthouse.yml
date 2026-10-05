@@ -71,20 +71,15 @@ jobs:
             echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
           } >> "$GITHUB_ENV"
 
-      - name: Build Cloudflare Worker
-        run: npm run build:vinext
+      - name: Build production application
+        run: npm run build
 
-      - name: Start local production Worker
+      - name: Start local production application
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler dev \
-            --config dist/server/wrangler.json \
-            --port 8787 \
-            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
-            --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
-            > /tmp/lumeo-lighthouse-worker.log 2>&1 &
-          echo $! > /tmp/lumeo-lighthouse-worker.pid
+          npm start -- --hostname 127.0.0.1 --port 8787 > /tmp/lumeo-lighthouse-app.log 2>&1 &
+          echo $! > /tmp/lumeo-lighthouse-app.pid
 
           ready=false
           for attempt in {1..90}; do
@@ -92,15 +87,15 @@ jobs:
               ready=true
               break
             fi
-            if ! kill -0 "$(cat /tmp/lumeo-lighthouse-worker.pid)" 2>/dev/null; then
-              cat /tmp/lumeo-lighthouse-worker.log
+            if ! kill -0 "$(cat /tmp/lumeo-lighthouse-app.pid)" 2>/dev/null; then
+              cat /tmp/lumeo-lighthouse-app.log
               exit 1
             fi
             sleep 1
           done
 
           if [ "$ready" != "true" ]; then
-            cat /tmp/lumeo-lighthouse-worker.log
+            cat /tmp/lumeo-lighthouse-app.log
             exit 1
           fi
 
@@ -114,7 +109,7 @@ jobs:
                 break
               fi
               if [ "$attempt" -eq 5 ]; then
-                cat /tmp/lumeo-lighthouse-worker.log
+                cat /tmp/lumeo-lighthouse-app.log
                 echo "Failed to warm $route before Lighthouse." >&2
                 exit 1
               fi
@@ -137,10 +132,10 @@ jobs:
           include-hidden-files: true
           retention-days: 14
 
-      - name: Stop local Worker
+      - name: Stop local application
         if: always()
         shell: bash
         run: |
-          if [ -f /tmp/lumeo-lighthouse-worker.pid ]; then
-            kill "$(cat /tmp/lumeo-lighthouse-worker.pid)" 2>/dev/null || true
+          if [ -f /tmp/lumeo-lighthouse-app.pid ]; then
+            kill "$(cat /tmp/lumeo-lighthouse-app.pid)" 2>/dev/null || true
           fi
