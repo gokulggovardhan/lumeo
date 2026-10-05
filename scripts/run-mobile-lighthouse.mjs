@@ -16,7 +16,7 @@ const routes = configuredRoutes.map((configuredUrl) => {
   const url = new URL(configuredUrl);
   return baseUrlOverride + url.pathname + url.search;
 });
-const runsPerRoute = smokeMode ? 1 : baseConfig.numberOfRuns;
+const runsPerRoute = baseConfig.numberOfRuns;
 const chromePath = process.env.CHROME_PATH || undefined;
 const reportDir = path.resolve(".lighthouseci");
 const workDir = path.resolve(".lighthouseci-work");
@@ -284,8 +284,7 @@ async function main() {
       medians[assertionName] = median(values);
     }
 
-    if (!smokeMode) {
-      for (const [assertionName, [, threshold]] of Object.entries(assertions)) {
+    for (const [assertionName, [, threshold]] of Object.entries(assertions)) {
         const value = medians[assertionName];
         if (typeof value !== "number") continue;
         if ("minScore" in threshold && value < threshold.minScore) {
@@ -311,7 +310,6 @@ async function main() {
           );
         }
       }
-    }
 
     routeReports.push({ url, samples, medians, runtimeFailures });
     console.log("PASS collection " + url + ": " + JSON.stringify(medians));
@@ -343,13 +341,12 @@ async function main() {
   }
 
   console.log(
-    smokeMode
-      ? "PASS Lighthouse collector smoke with current Lighthouse runtime."
-      : "PASS mobile Lighthouse budgets: " +
-          routeReports.length +
-          " routes x " +
-          runsPerRoute +
-          " isolated samples.",
+    "PASS mobile Lighthouse budgets: " +
+      routeReports.length +
+      " routes x " +
+      runsPerRoute +
+      " isolated samples" +
+      (smokeMode ? " on PR-local homepage." : "."),
   );
 }
 
