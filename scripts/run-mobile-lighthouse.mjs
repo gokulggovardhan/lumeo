@@ -1,5 +1,4 @@
-import lighthouse from "lighthouse";
-import * as chromeLauncher from "chrome-launcher";
+import { spawn } from "node:child_process";
 import { createRequire } from "node:module";
 import { promises as fs } from "node:fs";
 import path from "node:path";
@@ -8,10 +7,12 @@ const require = createRequire(import.meta.url);
 const lhciConfig = require("../.lighthouserc.cjs");
 const baseConfig = lhciConfig.ci.collect;
 const assertions = lhciConfig.ci.assert.assertions;
-const reportDir = path.resolve(".lighthouseci");
 const routes = baseConfig.url;
 const runsPerRoute = baseConfig.numberOfRuns;
 const chromePath = process.env.CHROME_PATH || undefined;
+const liveDir = path.resolve(".lighthouseci");
+const finalDir = path.resolve(".lighthouseci-final");
+const tempConfigPath = path.resolve(".lighthouseci-sample.cjs");
 const maxRuntimeAttemptsPerRoute = Math.max(runsPerRoute * 3, runsPerRoute + 2);
 
 function median(values) {
@@ -22,87 +23,139 @@ function median(values) {
     : sorted[middle];
 }
 
-function assertionValue(name, lhr) {
-  if (name.startsWith("categories:")) {
-    const category = name.slice("categories:".length);
-    return lhr.categories[category]?.score ?? null;
-  }
-  return lhr.audits[name]?.numericValue ?? null;
+function isRuntimeFailure(value) {
+  const text = String(value ?? "");
+  return /NO_FCP|PROTOCOL_TIMEOUT|PAGE_HUNG|TARGET_CRASHED|Chrome.*(?:disconnected|crashed)|Unable to connect to Chrome/i.test(text);
 }
 
-function isRuntimeFailure(error) {
-  const text = String(
-    error instanceof Error ? `${error.name}: ${error.message}\n${error.stack ?? ""}` : error,
-  );
-  return /NO_FCP|PROTOCOL_TIMEOUT|PAGE_HUNG|TARGET_CRASHED|Chrome.*(?:disconnected|crashed)/i.test(text);
-}
+async function run(command, args) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, {
+      cwd: process.cwd(),
+      env: process.env,
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
-async function runSample(url, routeIndex, sampleIndex) {
-  const chrome = await chromeLauncher.launch({
-    chromePath,
-    chromeFlags: [
-      "--headless=new",
-    ],
+    let stdout = "";
+    let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      const text = chunk.toString();
+      stdout += text;
+      process.stdout.write(text);
+    });
+    child.stderr.on("data", (chunk) => {
+      const text = chunk.toString();
+      stderr += text;
+      process.stderr.write(text);
+    });
+    child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
   });
+}
 
+async function findLhr() {
+  let entries = [];
   try {
-    const result = await lighthouse(
-      url,
-      {
-        port: chrome.port,
-        output: "json",
-        logLevel: "error",
-      },
-      {
-        extends: "lighthouse:default",
+    entries = await fs.readdir(liveDir);
+  } catch {
+    return null;
+  }
+
+  for (const name of entries) {
+    if (!name.endsWith(".json") || name === "manifest.json") continue;
+    const full = path.join(liveDir, name);
+    try {
+      const value = JSON.parse(await fs.readFile(full, "utf8"));
+      if (value && typeof value === "object" && value.categories && value.audits) {
+        return value;
+      }
+    } catch {
+      // Keep looking for the Lighthouse result.
+    }
+  }
+  return null;
+}
+
+async function collectSample(url, routeIndex, sampleIndex) {
+  await fs.rm(liveDir, { recursive: true, force: true });
+
+  const sampleConfig = {
+    ci: {
+      collect: {
+        url: [url],
+        numberOfRuns: 1,
         settings: {
           ...baseConfig.settings,
-          onlyCategories: baseConfig.settings.onlyCategories,
+          chromeFlags: "--no-sandbox --disable-dev-shm-usage",
         },
       },
+    },
+  };
+
+  await fs.writeFile(
+    tempConfigPath,
+    "module.exports = " + JSON.stringify(sampleConfig, null, 2) + ";\n",
+  );
+
+  const args = [
+    "--yes",
+    "@lhci/cli@0.15.1",
+    "collect",
+    `--config=${tempConfigPath}`,
+  ];
+  if (chromePath) args.push(`--chromePath=${chromePath}`);
+
+  const result = await run("npx", args);
+  const lhr = await findLhr();
+  const combined = `${result.stdout}\n${result.stderr}`;
+
+  if (lhr?.runtimeError) {
+    throw new Error(
+      `${lhr.runtimeError.code ?? "LIGHTHOUSE_RUNTIME"}: ${lhr.runtimeError.message ?? "Lighthouse runtime error"}`,
     );
-
-    if (!result?.lhr) {
-      throw new Error("Lighthouse returned no report.");
-    }
-    if (result.lhr.runtimeError) {
-      throw new Error(
-        `${result.lhr.runtimeError.code ?? "LIGHTHOUSE_RUNTIME"}: ${result.lhr.runtimeError.message ?? "Lighthouse runtime error"}`,
-      );
-    }
-
-    const reportPath = path.join(
-      reportDir,
-      `route-${routeIndex + 1}-sample-${sampleIndex}.json`,
-    );
-    await fs.writeFile(reportPath, JSON.stringify(result.lhr, null, 2) + "\n");
-
-    return {
-      sample: sampleIndex,
-      finalUrl: result.lhr.finalDisplayedUrl ?? result.lhr.finalUrl ?? url,
-      categories: Object.fromEntries(
-        baseConfig.settings.onlyCategories.map((name) => [
-          name,
-          result.lhr.categories[name]?.score ?? null,
-        ]),
-      ),
-      metrics: {
-        "largest-contentful-paint":
-          result.lhr.audits["largest-contentful-paint"]?.numericValue ?? null,
-        "cumulative-layout-shift":
-          result.lhr.audits["cumulative-layout-shift"]?.numericValue ?? null,
-        "total-blocking-time":
-          result.lhr.audits["total-blocking-time"]?.numericValue ?? null,
-      },
-    };
-  } finally {
-    await Promise.resolve(chrome.kill()).catch(() => {});
   }
+  if (!lhr) {
+    throw new Error(
+      result.code === 0
+        ? "LHCI collect completed without a Lighthouse result."
+        : combined || `LHCI collect exited with code ${result.code}`,
+    );
+  }
+  if (result.code !== 0) {
+    throw new Error(combined || `LHCI collect exited with code ${result.code}`);
+  }
+
+  const reportPath = path.join(
+    finalDir,
+    `route-${routeIndex + 1}-sample-${sampleIndex}.json`,
+  );
+  await fs.writeFile(reportPath, JSON.stringify(lhr, null, 2) + "\n");
+
+  return {
+    sample: sampleIndex,
+    finalUrl: lhr.finalDisplayedUrl ?? lhr.finalUrl ?? url,
+    categories: Object.fromEntries(
+      baseConfig.settings.onlyCategories.map((name) => [
+        name,
+        lhr.categories[name]?.score ?? null,
+      ]),
+    ),
+    metrics: {
+      "largest-contentful-paint":
+        lhr.audits["largest-contentful-paint"]?.numericValue ?? null,
+      "cumulative-layout-shift":
+        lhr.audits["cumulative-layout-shift"]?.numericValue ?? null,
+      "total-blocking-time":
+        lhr.audits["total-blocking-time"]?.numericValue ?? null,
+    },
+  };
 }
 
 async function main() {
-  await fs.rm(reportDir, { recursive: true, force: true });
-  await fs.mkdir(reportDir, { recursive: true });
+  await fs.rm(liveDir, { recursive: true, force: true });
+  await fs.rm(finalDir, { recursive: true, force: true });
+  await fs.rm(tempConfigPath, { force: true });
+  await fs.mkdir(finalDir, { recursive: true });
 
   const routeReports = [];
   const failures = [];
@@ -111,7 +164,7 @@ async function main() {
     const samples = [];
     const runtimeFailures = [];
     console.log(
-      `Measuring ${url} until ${runsPerRoute} valid independent mobile Lighthouse samples are collected (maximum ${maxRuntimeAttemptsPerRoute} browser attempts).`,
+      `Measuring ${url} until ${runsPerRoute} valid isolated LHCI samples are collected (maximum ${maxRuntimeAttemptsPerRoute} attempts).`,
     );
 
     for (
@@ -121,21 +174,20 @@ async function main() {
     ) {
       const sampleIndex = samples.length + 1;
       try {
-        samples.push(await runSample(url, routeIndex, sampleIndex));
+        samples.push(await collectSample(url, routeIndex, sampleIndex));
       } catch (error) {
-        if (!isRuntimeFailure(error)) throw error;
-        const message =
-          error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        const message = error instanceof Error ? error.message : String(error);
+        if (!isRuntimeFailure(message)) throw error;
         runtimeFailures.push({ attempt: attemptIndex, message });
         console.warn(
-          `Discarding transient Lighthouse runtime-invalid attempt ${attemptIndex}/${maxRuntimeAttemptsPerRoute} for ${url}: ${message}`,
+          `Discarding transient LHCI runtime-invalid attempt ${attemptIndex}/${maxRuntimeAttemptsPerRoute} for ${url}: ${message}`,
         );
       }
     }
 
     if (samples.length !== runsPerRoute) {
       throw new Error(
-        `Could not collect ${runsPerRoute} valid Lighthouse samples for ${url} after ${maxRuntimeAttemptsPerRoute} attempts. Runtime failures: ${runtimeFailures.length}`,
+        `Could not collect ${runsPerRoute} valid LHCI samples for ${url} after ${maxRuntimeAttemptsPerRoute} attempts. Runtime failures: ${runtimeFailures.length}`,
       );
     }
 
@@ -184,9 +236,13 @@ async function main() {
     failures,
   };
   await fs.writeFile(
-    path.join(reportDir, "summary.json"),
+    path.join(finalDir, "summary.json"),
     JSON.stringify(summary, null, 2) + "\n",
   );
+
+  await fs.rm(liveDir, { recursive: true, force: true });
+  await fs.rename(finalDir, liveDir);
+  await fs.rm(tempConfigPath, { force: true });
 
   if (failures.length > 0) {
     for (const failure of failures) console.error(`LIGHTHOUSE BUDGET FAIL: ${failure}`);
@@ -195,11 +251,18 @@ async function main() {
   }
 
   console.log(
-    `PASS mobile Lighthouse budgets: ${routeReports.length} routes x ${runsPerRoute} independent samples.`,
+    `PASS mobile Lighthouse budgets: ${routeReports.length} routes x ${runsPerRoute} isolated LHCI samples.`,
   );
 }
 
-main().catch((error) => {
+main().catch(async (error) => {
+  try {
+    if (await fs.stat(finalDir).catch(() => null)) {
+      await fs.rm(liveDir, { recursive: true, force: true });
+      await fs.rename(finalDir, liveDir);
+    }
+    await fs.rm(tempConfigPath, { force: true });
+  } catch {}
   console.error(error instanceof Error ? error.stack : String(error));
   process.exitCode = 1;
 });
