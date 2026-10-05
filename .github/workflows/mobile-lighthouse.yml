@@ -29,7 +29,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: mobile-lighthouse-production
+  group: mobile-lighthouse-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
