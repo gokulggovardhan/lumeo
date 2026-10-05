@@ -42,8 +42,6 @@ async function runSample(url, routeIndex, sampleIndex) {
     chromePath,
     chromeFlags: [
       "--headless=new",
-      "--no-sandbox",
-      "--disable-dev-shm-usage",
     ],
   });
 
