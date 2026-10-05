@@ -1,6 +1,14 @@
 name: Mobile Lighthouse
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "scripts/run-mobile-lighthouse.mjs"
+      - ".lighthouserc.cjs"
+      - ".github/workflows/mobile-lighthouse.yml"
+      - "tests/mobile-lighthouse-contract.test.ts"
   push:
     branches:
       - main
@@ -53,6 +61,7 @@ jobs:
         run: npm install --no-save --package-lock=false lighthouse@13.5.0 chrome-launcher@1.2.1
 
       - name: Wait for exact Cloudflare production revision
+        if: github.event_name == 'push'
         shell: bash
         env:
           EXPECTED_SHA: ${{ github.sha }}
@@ -88,6 +97,20 @@ jobs:
 
           echo "FAIL production did not reach expected revision $EXPECTED_SHA" >&2
           exit 1
+
+      - name: Collector smoke uses current certified production
+        if: github.event_name == 'pull_request'
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --silent --show-error --fail --max-time 30 https://lumeo.in/api/build-info)"
+          BODY="$body" node -e '
+            const value = JSON.parse(process.env.BODY || "{}");
+            if (value.environment !== "production" || typeof value.commit !== "string" || value.commit.length < 7) {
+              throw new Error("Collector smoke requires a valid production build-info response.");
+            }
+            console.log("Collector smoke target production revision", value.commit);
+          '
 
       - name: Warm audited production routes
         shell: bash
