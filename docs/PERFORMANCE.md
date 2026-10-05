@@ -123,3 +123,8 @@ Repeated production certification showed that headed Chrome under Xvfb could ret
 ### Linux CI Lighthouse limitation and Windows collector
 
 Exact-production runs on GitHub `ubuntu-latest` repeatedly produced runtime-only `NO_FCP` before any metrics were emitted, under both headed/Xvfb and fresh `--headless=new` Chrome. This matches an upstream Lighthouse 13 Linux-CI rendering/trace limitation rather than a Lumeo route failure. The production Lighthouse job now runs on `windows-latest` with Chrome for Testing installed explicitly by `browser-actions/setup-chrome@v2`. The audited production routes, three-valid-sample requirement, runtime-invalid retry bound, and every performance/accessibility/best-practices/SEO/LCP/CLS/TBT threshold remain unchanged.
+
+
+### Visible Windows Lighthouse collector smoke
+
+Production certification reproduced runtime-only `NO_FCP` before any metrics on both Ubuntu and Windows when Chrome was launched headless. The collector now tests visible Chrome on the Windows runner. Changes to the Lighthouse runner, config, workflow, or its contract test trigger a PR-only smoke against the currently certified production revision, while main-push certification still waits for the exact deployed SHA. PR smoke and main production runs use separate concurrency groups. The four audited routes, three-valid-sample requirement, runtime-invalid retry bound, and all Lighthouse score/LCP/CLS/TBT budgets remain unchanged.
