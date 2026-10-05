@@ -103,3 +103,8 @@ Each URL receives three independent mobile Lighthouse samples. Current certifica
 This job deliberately runs after deployment rather than as a pull-request release gate. Repeated `NO_FCP` failures were reproducible on healthy local Next.js and Wrangler servers in GitHub-hosted Lighthouse runs while ordinary curl and Playwright checks passed. Keeping that unstable collector out of branch protection prevents false merge blocks; the production workflow still fails loudly when the exact deployed revision misses a real budget.
 
 These are laboratory measurements, not field Core Web Vitals. The connected GSC integration currently has no CrUX API key configured, so field LCP/INP/CLS remain unverified. Lighthouse JSON reports and the median summary are retained as CI artifacts.
+
+
+### Step 4 production hardening follow-up
+
+Production Lighthouse identified the header brand mark as the homepage LCP candidate. The source artwork remains preserved, while builds now generate a compact 96px WebP for navigation so the critical logo does not require a runtime `/_next/image` transform. Lighthouse still requires three valid samples per route with the same score/LCP/CLS/TBT budgets. Known browser/runtime failures such as `NO_FCP` are discarded and replaced with a fresh-browser attempt up to a bounded per-route maximum; valid budget failures are never retried away.
