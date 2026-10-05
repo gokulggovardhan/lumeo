@@ -7,13 +7,28 @@ const require = createRequire(import.meta.url);
 const lhciConfig = require("../.lighthouserc.cjs");
 const baseConfig = lhciConfig.ci.collect;
 const assertions = lhciConfig.ci.assert.assertions;
-const routes = baseConfig.url;
-const runsPerRoute = baseConfig.numberOfRuns;
+const smokeMode = process.env.LIGHTHOUSE_COLLECTOR_SMOKE === "1";
+const baseUrlOverride = process.env.LIGHTHOUSE_BASE_URL?.replace(/\/$/, "") || null;
+const chromeFlags = process.env.LIGHTHOUSE_CHROME_FLAGS?.trim() || "";
+const configuredRoutes = smokeMode ? [baseConfig.url[0]] : baseConfig.url;
+const routes = configuredRoutes.map((configuredUrl) => {
+  if (!baseUrlOverride) return configuredUrl;
+  const url = new URL(configuredUrl);
+  return baseUrlOverride + url.pathname + url.search;
+});
+const runsPerRoute = smokeMode ? 1 : baseConfig.numberOfRuns;
 const chromePath = process.env.CHROME_PATH || undefined;
-const liveDir = path.resolve(".lighthouseci");
-const finalDir = path.resolve(".lighthouseci-final");
-const tempConfigPath = path.resolve(".lighthouseci-sample.cjs");
+const reportDir = path.resolve(".lighthouseci");
+const workDir = path.resolve(".lighthouseci-work");
+const configPath = path.resolve(".lighthouse-sample-config.mjs");
+const lighthouseCli = path.resolve(
+  "node_modules",
+  "lighthouse",
+  "cli",
+  "index.js",
+);
 const maxRuntimeAttemptsPerRoute = Math.max(runsPerRoute * 3, runsPerRoute + 2);
+const expectedLighthouseVersion = "13.5.0";
 
 function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
@@ -40,100 +55,103 @@ async function run(command, args) {
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk) => {
-      const text = chunk.toString();
-      stdout += text;
-      process.stdout.write(text);
+      const value = chunk.toString();
+      stdout += value;
+      process.stdout.write(value);
     });
     child.stderr.on("data", (chunk) => {
-      const text = chunk.toString();
-      stderr += text;
-      process.stderr.write(text);
+      const value = chunk.toString();
+      stderr += value;
+      process.stderr.write(value);
     });
     child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
   });
 }
 
-async function findLhr() {
-  let entries = [];
+async function readLhr(filePath) {
   try {
-    entries = await fs.readdir(liveDir);
-  } catch {
-    return null;
-  }
-
-  for (const name of entries) {
-    if (!name.endsWith(".json") || name === "manifest.json") continue;
-    const full = path.join(liveDir, name);
-    try {
-      const value = JSON.parse(await fs.readFile(full, "utf8"));
-      if (value && typeof value === "object" && value.categories && value.audits) {
-        return value;
-      }
-    } catch {
-      // Keep looking for the Lighthouse result.
+    const value = JSON.parse(await fs.readFile(filePath, "utf8"));
+    if (value && typeof value === "object" && value.categories && value.audits) {
+      return value;
     }
+  } catch {
+    // A runtime failure may exit before producing a report.
   }
   return null;
 }
 
-async function collectSample(url, routeIndex, sampleIndex) {
-  await fs.rm(liveDir, { recursive: true, force: true });
-
-  const sampleConfig = {
-    ci: {
-      collect: {
-        url: [url],
-        numberOfRuns: 1,
-        settings: {
-          ...baseConfig.settings,
-          chromeFlags: "--no-sandbox --disable-dev-shm-usage",
-        },
-      },
+async function writeConfig() {
+  const config = {
+    extends: "lighthouse:default",
+    settings: {
+      ...baseConfig.settings,
+      onlyCategories: baseConfig.settings.onlyCategories,
     },
   };
-
   await fs.writeFile(
-    tempConfigPath,
-    "module.exports = " + JSON.stringify(sampleConfig, null, 2) + ";\n",
+    configPath,
+    "export default " + JSON.stringify(config, null, 2) + ";\n",
   );
+}
+
+async function collectSample(url, routeIndex, sampleIndex, attemptIndex) {
+  const attemptPath = path.join(
+    workDir,
+    "route-" + (routeIndex + 1) + "-attempt-" + attemptIndex + ".json",
+  );
+  await fs.rm(attemptPath, { force: true });
 
   const args = [
-    "--yes",
-    "@lhci/cli@0.15.1",
-    "collect",
-    `--config=${tempConfigPath}`,
+    url,
+    "--config-path=" + configPath,
+    "--output=json",
+    "--output-path=" + attemptPath,
+    "--quiet",
   ];
-  if (chromePath) args.push(`--chromePath=${chromePath}`);
+  if (chromePath) args.push("--chrome-path=" + chromePath);
+  if (chromeFlags) args.push("--chrome-flags=" + chromeFlags);
 
-  const result = await run("npx", args);
-  const lhr = await findLhr();
-  const combined = `${result.stdout}\n${result.stderr}`;
+  const result = await run(process.execPath, [lighthouseCli, ...args]);
+  const lhr = await readLhr(attemptPath);
+  const combined = result.stdout + "\n" + result.stderr;
 
   if (lhr?.runtimeError) {
     throw new Error(
-      `${lhr.runtimeError.code ?? "LIGHTHOUSE_RUNTIME"}: ${lhr.runtimeError.message ?? "Lighthouse runtime error"}`,
+      (lhr.runtimeError.code ?? "LIGHTHOUSE_RUNTIME") +
+        ": " +
+        (lhr.runtimeError.message ?? "Lighthouse runtime error"),
     );
   }
   if (!lhr) {
     throw new Error(
       result.code === 0
-        ? "LHCI collect completed without a Lighthouse result."
-        : combined || `LHCI collect exited with code ${result.code}`,
+        ? "Lighthouse CLI completed without a JSON report."
+        : combined || "Lighthouse CLI exited with code " + result.code,
+    );
+  }
+  if (lhr.lighthouseVersion !== expectedLighthouseVersion) {
+    throw new Error(
+      "Unexpected Lighthouse runtime " +
+        String(lhr.lighthouseVersion ?? "unknown") +
+        "; expected " +
+        expectedLighthouseVersion +
+        ".",
     );
   }
   if (result.code !== 0) {
-    throw new Error(combined || `LHCI collect exited with code ${result.code}`);
+    throw new Error(combined || "Lighthouse CLI exited with code " + result.code);
   }
 
   const reportPath = path.join(
-    finalDir,
-    `route-${routeIndex + 1}-sample-${sampleIndex}.json`,
+    reportDir,
+    "route-" + (routeIndex + 1) + "-sample-" + sampleIndex + ".json",
   );
-  await fs.writeFile(reportPath, JSON.stringify(lhr, null, 2) + "\n");
+  await fs.copyFile(attemptPath, reportPath);
 
   return {
     sample: sampleIndex,
     finalUrl: lhr.finalDisplayedUrl ?? lhr.finalUrl ?? url,
+    lighthouseVersion: lhr.lighthouseVersion,
     categories: Object.fromEntries(
       baseConfig.settings.onlyCategories.map((name) => [
         name,
@@ -151,11 +169,44 @@ async function collectSample(url, routeIndex, sampleIndex) {
   };
 }
 
+async function verifyCollectorEnvironment() {
+  if (!smokeMode) return;
+
+  const controlUrl = "https://example.com/";
+  console.log(
+    "Verifying Lighthouse collector environment against control page " +
+      controlUrl,
+  );
+
+  try {
+    const control = await collectSample(controlUrl, 99, 1, 1);
+    console.log(
+      "PASS Lighthouse environment control: " +
+        controlUrl +
+        " painted with Lighthouse " +
+        control.lighthouseVersion +
+        ".",
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (isRuntimeFailure(message)) {
+      throw new Error(
+        "LIGHTHOUSE_ENVIRONMENT_FAILURE: control page could not paint: " +
+          message,
+      );
+    }
+    throw error;
+  }
+}
+
 async function main() {
-  await fs.rm(liveDir, { recursive: true, force: true });
-  await fs.rm(finalDir, { recursive: true, force: true });
-  await fs.rm(tempConfigPath, { force: true });
-  await fs.mkdir(finalDir, { recursive: true });
+  await fs.rm(reportDir, { recursive: true, force: true });
+  await fs.rm(workDir, { recursive: true, force: true });
+  await fs.rm(configPath, { force: true });
+  await fs.mkdir(reportDir, { recursive: true });
+  await fs.mkdir(workDir, { recursive: true });
+  await writeConfig();
+  await verifyCollectorEnvironment();
 
   const routeReports = [];
   const failures = [];
@@ -164,7 +215,15 @@ async function main() {
     const samples = [];
     const runtimeFailures = [];
     console.log(
-      `Measuring ${url} until ${runsPerRoute} valid isolated LHCI samples are collected (maximum ${maxRuntimeAttemptsPerRoute} attempts).`,
+      "Measuring " +
+        url +
+        " until " +
+        runsPerRoute +
+        " valid isolated Lighthouse " +
+        expectedLighthouseVersion +
+        " sample(s) are collected (maximum " +
+        maxRuntimeAttemptsPerRoute +
+        " attempts).",
     );
 
     for (
@@ -174,20 +233,36 @@ async function main() {
     ) {
       const sampleIndex = samples.length + 1;
       try {
-        samples.push(await collectSample(url, routeIndex, sampleIndex));
+        samples.push(
+          await collectSample(url, routeIndex, sampleIndex, attemptIndex),
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (!isRuntimeFailure(message)) throw error;
         runtimeFailures.push({ attempt: attemptIndex, message });
         console.warn(
-          `Discarding transient LHCI runtime-invalid attempt ${attemptIndex}/${maxRuntimeAttemptsPerRoute} for ${url}: ${message}`,
+          "Discarding transient Lighthouse runtime-invalid attempt " +
+            attemptIndex +
+            "/" +
+            maxRuntimeAttemptsPerRoute +
+            " for " +
+            url +
+            ": " +
+            message,
         );
       }
     }
 
     if (samples.length !== runsPerRoute) {
       throw new Error(
-        `Could not collect ${runsPerRoute} valid LHCI samples for ${url} after ${maxRuntimeAttemptsPerRoute} attempts. Runtime failures: ${runtimeFailures.length}`,
+        "Could not collect " +
+          runsPerRoute +
+          " valid Lighthouse samples for " +
+          url +
+          " after " +
+          maxRuntimeAttemptsPerRoute +
+          " attempts. Runtime failures: " +
+          runtimeFailures.length,
       );
     }
 
@@ -203,66 +278,84 @@ async function main() {
         .filter((value) => typeof value === "number" && Number.isFinite(value));
 
       if (values.length !== runsPerRoute) {
-        failures.push(`${url}: missing numeric samples for ${assertionName}`);
+        failures.push(url + ": missing numeric samples for " + assertionName);
         continue;
       }
       medians[assertionName] = median(values);
     }
 
-    for (const [assertionName, [, threshold]] of Object.entries(assertions)) {
-      const value = medians[assertionName];
-      if (typeof value !== "number") continue;
-      if ("minScore" in threshold && value < threshold.minScore) {
-        failures.push(
-          `${url}: median ${assertionName} ${value.toFixed(3)} < ${threshold.minScore}`,
-        );
-      }
-      if ("maxNumericValue" in threshold && value > threshold.maxNumericValue) {
-        failures.push(
-          `${url}: median ${assertionName} ${Math.round(value)} > ${threshold.maxNumericValue}`,
-        );
+    if (!smokeMode) {
+      for (const [assertionName, [, threshold]] of Object.entries(assertions)) {
+        const value = medians[assertionName];
+        if (typeof value !== "number") continue;
+        if ("minScore" in threshold && value < threshold.minScore) {
+          failures.push(
+            url +
+              ": median " +
+              assertionName +
+              " " +
+              value.toFixed(3) +
+              " < " +
+              threshold.minScore,
+          );
+        }
+        if ("maxNumericValue" in threshold && value > threshold.maxNumericValue) {
+          failures.push(
+            url +
+              ": median " +
+              assertionName +
+              " " +
+              Math.round(value) +
+              " > " +
+              threshold.maxNumericValue,
+          );
+        }
       }
     }
 
     routeReports.push({ url, samples, medians, runtimeFailures });
-    console.log(`PASS collection ${url}: ${JSON.stringify(medians)}`);
+    console.log("PASS collection " + url + ": " + JSON.stringify(medians));
   }
 
   const summary = {
     generatedAt: new Date().toISOString(),
+    mode: smokeMode ? "collector-smoke" : "production-budget",
+    lighthouseVersion: expectedLighthouseVersion,
     runsPerRoute,
     routes: routeReports,
     assertions,
     failures,
   };
   await fs.writeFile(
-    path.join(finalDir, "summary.json"),
+    path.join(reportDir, "summary.json"),
     JSON.stringify(summary, null, 2) + "\n",
   );
 
-  await fs.rm(liveDir, { recursive: true, force: true });
-  await fs.rename(finalDir, liveDir);
-  await fs.rm(tempConfigPath, { force: true });
+  await fs.rm(workDir, { recursive: true, force: true });
+  await fs.rm(configPath, { force: true });
 
   if (failures.length > 0) {
-    for (const failure of failures) console.error(`LIGHTHOUSE BUDGET FAIL: ${failure}`);
+    for (const failure of failures) {
+      console.error("LIGHTHOUSE BUDGET FAIL: " + failure);
+    }
     process.exitCode = 1;
     return;
   }
 
   console.log(
-    `PASS mobile Lighthouse budgets: ${routeReports.length} routes x ${runsPerRoute} isolated LHCI samples.`,
+    smokeMode
+      ? "PASS Lighthouse collector smoke with current Lighthouse runtime."
+      : "PASS mobile Lighthouse budgets: " +
+          routeReports.length +
+          " routes x " +
+          runsPerRoute +
+          " isolated samples.",
   );
 }
 
 main().catch(async (error) => {
-  try {
-    if (await fs.stat(finalDir).catch(() => null)) {
-      await fs.rm(liveDir, { recursive: true, force: true });
-      await fs.rename(finalDir, liveDir);
-    }
-    await fs.rm(tempConfigPath, { force: true });
-  } catch {}
+  await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});
+  await fs.rm(configPath, { force: true }).catch(() => {});
   console.error(error instanceof Error ? error.stack : String(error));
   process.exitCode = 1;
 });
