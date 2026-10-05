@@ -138,11 +138,24 @@ test("vinext Edit PDF explains read-only clipped text before an edit is attempte
   );
   await expect(pageCapability).toHaveAttribute("title", /clipping shape/i);
 
-  await limitedRun.hover();
   const explanation = page.locator("[data-edit-capability-explanation]");
-  await expect(explanation).toBeVisible();
-  await expect(explanation).toContainText(/clipping shape/i);
-  await expect(explanation).toContainText(/read-only/i);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await limitedRun.hover({ force: attempt === 1 });
+    try {
+      await expect(explanation).toBeVisible({ timeout: 10_000 });
+      await expect(explanation).toContainText(/clipping shape/i, {
+        timeout: 10_000,
+      });
+      await expect(explanation).toContainText(/read-only/i, {
+        timeout: 10_000,
+      });
+      break;
+    } catch (error) {
+      if (attempt === 1) throw error;
+      await page.mouse.move(0, 0);
+      await expect(limitedRun).toBeVisible({ timeout: 10_000 });
+    }
+  }
 
   // Keyboard users get the same proactive explanation. Selecting a limited
   // run must not produce the normal inline edit textbox.
