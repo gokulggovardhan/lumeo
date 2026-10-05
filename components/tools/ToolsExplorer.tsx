@@ -108,6 +108,7 @@ function ToolCard({ tool }: { tool: Tile }) {
   return (
     <Link
       href={tool.route}
+      prefetch={false}
       className={shell}
       aria-label={`Open ${tool.label}. ${PROCESSING_LABEL[tool.processing]}.`}
     >

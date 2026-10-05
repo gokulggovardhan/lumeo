@@ -939,6 +939,7 @@ export function L2FeaturedToolCard({ tool, className }: { tool: L2ToolCardData; 
   return (
     <Link
       href={tool.route}
+      prefetch={false}
       aria-label={`Open ${tool.toolName}`}
       className={cx(
         "l2-featured-tool-card lumeo-card aura-luminous-card group relative flex min-h-[15rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] p-6 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] motion-reduce:transform-none sm:p-6 lg:col-span-2",
@@ -954,6 +955,7 @@ export function L2ToolCard({ tool, allTools = false, className }: { tool: L2Tool
   return (
     <Link
       href={tool.route}
+      prefetch={false}
       aria-label={allTools ? "Browse all PDF tools" : `Open ${tool.toolName}`}
       className={cx(
         "l2-tool-card lumeo-card aura-luminous-card group relative flex min-h-[13rem] flex-col overflow-hidden rounded-[var(--radius-2xl)] p-5 transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] motion-reduce:transform-none",

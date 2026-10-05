@@ -137,7 +137,7 @@ export default async function Home() {
 
       <section className="relative z-10 flex-1">
         <div className="mx-auto w-full max-w-[1160px] px-5 pb-12 pt-5 sm:px-8 sm:pt-7 lg:pt-8">
-          <div className={`lumeo-fade-up ${styles.heroGrid}`}>
+          <div className={styles.heroGrid}>
             <header className={styles.heroCopy}>
               <div className="max-w-[48rem]">
               <p className="aura-text-label inline-flex items-center gap-2 text-[var(--text-accent)]">
@@ -162,12 +162,14 @@ export default async function Home() {
               <div className="mt-3.5 grid grid-cols-2 gap-2.5 sm:mt-4 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
                 <Link
                   href="/pdf"
+                  prefetch={false}
                   className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--action-primary)] px-3 text-center text-[13px] font-bold leading-tight text-[var(--text-on-accent)] shadow-[0_10px_24px_rgba(var(--atelier-sage-rgb),0.14)] transition hover:-translate-y-0.5 hover:bg-[var(--action-primary-hover)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none sm:px-5 sm:text-sm"
                 >
                   Start PDF Workspace
                 </Link>
                 <Link
                   href="/pdf-tools"
+                  prefetch={false}
                   className="inline-flex min-h-11 items-center justify-center rounded-[var(--radius-md)] border border-[var(--border-default)] px-3 text-center text-[13px] font-bold leading-tight text-[var(--text-secondary)] transition hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] sm:px-4 sm:text-sm"
                 >
                   Explore PDF tools

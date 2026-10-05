@@ -128,3 +128,28 @@ Exact-production runs on GitHub `ubuntu-latest` repeatedly produced runtime-only
 ### Isolated LHCI samples
 
 Direct programmatic Chrome/Lighthouse launches reproduced `NO_FCP` before metrics on both Linux and Windows CI. Earlier LHCI collection had produced valid samples but became unstable when multiple samples shared one LHCI/browser lifecycle. Production certification now uses the supported `lhci collect` path with exactly one Lighthouse run per process. Each route still requires three valid samples, runtime-invalid attempts remain bounded, medians are evaluated against the same budgets, and no invalid attempt can satisfy a threshold.
+
+
+### Lighthouse 13.5 isolated-process collector
+
+The LHCI 0.15.1 fallback was not acceptable for final certification because it embeds Lighthouse 12.6.1 while production CI is running Chrome 154; Lighthouse CI currently has an open request for Lighthouse 13 support. The collector therefore keeps process isolation but invokes the pinned standalone Lighthouse 13.5.0 CLI for every sample. Changes to the Lighthouse harness trigger a one-sample PR smoke against the currently certified production homepage; full main-push certification still waits for the exact deployed SHA and enforces the unchanged 4-route x 3-sample budgets.
+
+
+### Visible Windows validation for Lighthouse 13
+
+The PR smoke for isolated standalone Lighthouse 13.5.0 still reproduced runtime-only `NO_FCP` when Chrome was launched headless. The collector smoke now uses explicit Chrome for Testing on `windows-latest` without headless/Linux-only flags, while retaining one fresh Lighthouse 13.5 CLI process per sample. This is validated on the pull request before merge. Main-push certification still waits for the exact deployed SHA and retains the unchanged four-route, three-valid-sample budgets.
+
+
+### First-paint-safe public shells and PR-local smoke
+
+The Lighthouse environment control can paint `https://example.com/`, while the deployed Lumeo homepage repeatedly reported `NO_FCP`. The public shell used an entrance animation whose first keyframe made the entire page transparent. Public page entrance motion now keeps content paintable from the first frame and animates position only, so a throttled or backgrounded animation cannot leave the document invisible. The pull-request smoke builds the PR's own Cloudflare Worker with an isolated local Supabase catalog and audits that local branch build; post-merge certification continues to wait for and audit the exact deployed production SHA.
+
+
+### Heavy tool route prefetch control
+
+A valid Lighthouse 13.5 trace showed the homepage requesting Edit PDF, JSZip, Split, Compress, Sign, PDF-to-Word and other tool chunks before the user opened any tool. The cause was automatic route prefetch on the homepage launcher and tool-directory card links. Those tool-navigation links now use `prefetch={false}`, so initial public pages load only the JavaScript they need. Click navigation remains unchanged and no PDF/OCR/conversion engine is removed or weakened.
+
+
+### Homepage LCP convergence
+
+Once Lighthouse 13.5 collection became reliable, the PR-local homepage budget measured a median LCP of about 4026 ms against the unchanged 4000 ms budget. The LCP node was the hero heading, "Your PDFs stay yours." The heading still lived inside the generic `lumeo-fade-up` entrance animation, whose first frame is transparent. The homepage hero no longer uses that entrance animation, so the above-the-fold LCP content is paintable immediately. Other page motion remains unchanged.

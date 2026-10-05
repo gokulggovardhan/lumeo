@@ -91,6 +91,7 @@ function CompactToolCard({
         {available ? (
           <Link
             href={tile.route}
+            prefetch={false}
             className={classes}
             aria-label={
               "Open " + tile.label + (status ? ", " + status : "")
@@ -119,6 +120,7 @@ function AllToolsTile({ label }: { label: string }) {
     <li className="min-w-0">
       <Link
         href="/pdf-tools"
+        prefetch={false}
         className="group flex min-h-[4.4rem] w-full items-center gap-2.5 rounded-[15px] border border-dashed border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.018)] px-3 py-2.5 text-left transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--atelier-sage-300)] hover:bg-[var(--surface-raised)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none sm:min-h-[4.75rem] sm:gap-3 sm:px-3.5 sm:py-3"
         aria-label={label}
       >

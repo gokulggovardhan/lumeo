@@ -19,6 +19,7 @@ function RecentFileLink({ item, tile }: { item: RecentFileItem; tile: Tile }) {
   return (
     <Link
       href={tile.route}
+      prefetch={false}
       className="aura-glass-thin flex items-center gap-3 rounded-[var(--radius-lg)] px-3.5 py-3 transition duration-[var(--v2-motion-fast)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.18)] motion-reduce:transform-none"
     >
       <span
