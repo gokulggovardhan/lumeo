@@ -7,20 +7,25 @@ function read(path: string): string {
 }
 
 test("mobile homepage prioritizes PDF tools before supporting trust content", () => {
-  const css = read("app/home.module.css");
   const page = read("app/page.tsx");
 
+  assert.doesNotMatch(page, /home\.module\.css|styles\./);
   assert.match(
-    css,
-    /grid-template-areas:\s*"hero"\s*"tools"\s*"trust"/,
+    page,
+    /<header className="order-1 min-\[900px\]:col-start-1 min-\[900px\]:row-start-1">/,
   );
   assert.match(
-    css,
-    /@media \(min-width: 900px\)[\s\S]*grid-template-areas:\s*"hero trust"\s*"tools tools"/,
+    page,
+    /<div className="order-2 min-w-0 min-\[900px\]:order-3 min-\[900px\]:col-span-2 min-\[900px\]:row-start-2">[\s\S]*<PdfToolLauncher allToolsLabel="View all tools" \/>/,
   );
-  assert.match(page, /className=\{styles\.heroTools\}/);
-  assert.match(page, /<PdfToolLauncher allToolsLabel="View all tools" \/>/);
-  assert.match(page, /aria-label="Lumeo trust principles"/);
+  assert.match(
+    page,
+    /<aside className="order-3[\s\S]*min-\[900px\]:order-2[\s\S]*aria-label="Lumeo trust principles">/,
+  );
+  assert.match(
+    page,
+    /sm:text-\[clamp\(2\.25rem,4\.6vw,3\.75rem\)\]/,
+  );
 });
 
 test("tool directory keeps at least two compact cards per mobile row", () => {
