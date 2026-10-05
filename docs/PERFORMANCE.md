@@ -108,3 +108,8 @@ These are laboratory measurements, not field Core Web Vitals. The connected GSC 
 ### Step 4 production hardening follow-up
 
 Production Lighthouse identified the header brand mark as the homepage LCP candidate. The source artwork remains preserved, while builds now generate a compact 96px WebP for navigation so the critical logo does not require a runtime `/_next/image` transform. Lighthouse still requires three valid samples per route with the same score/LCP/CLS/TBT budgets. Known browser/runtime failures such as `NO_FCP` are discarded and replaced with a fresh-browser attempt up to a bounded per-route maximum; valid budget failures are never retried away.
+
+
+### Collector recovery
+
+The first production run after the compact-brand fix showed nine consecutive `NO_FCP` runtime failures after adding native-window-occlusion and forced window-size Chrome flags. Those two flags are removed because the earlier headed Xvfb configuration produced valid production samples. The bounded valid-sample replacement logic and all Lighthouse budgets remain unchanged.
