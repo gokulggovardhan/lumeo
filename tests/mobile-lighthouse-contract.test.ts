@@ -122,3 +122,26 @@ test("homepage LCP hero is never hidden behind entrance motion", () => {
     "The above-the-fold hero contains the LCP heading and must paint immediately.",
   );
 });
+
+
+test("audited public LCP content is not wrapped in entrance motion", () => {
+  const home = readFileSync("app/page.tsx", "utf8");
+  const shell = readFileSync("components/PublicPdfChrome.tsx", "utf8");
+  const tools = readFileSync("app/pdf-tools/page.tsx", "utf8");
+
+  assert.doesNotMatch(
+    home,
+    /<main[\s\S]{0,400}lumeo-page-enter/,
+    "Homepage LCP must not inherit the 640ms page entrance transform.",
+  );
+  assert.doesNotMatch(
+    shell,
+    /<main[\s\S]{0,400}lumeo-page-enter/,
+    "Audited public catalog routes must paint their shell immediately.",
+  );
+  assert.doesNotMatch(
+    tools,
+    /<section className="[^"]*lumeo-fade-up[^"]*"[^>]*>[\s\S]{0,900}Find the right tool\./,
+    "PDF Tools LCP copy must not wait on the 620ms fade-up animation.",
+  );
+});
