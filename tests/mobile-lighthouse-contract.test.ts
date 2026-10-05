@@ -92,13 +92,23 @@ test("mobile navigation brand mark is pre-optimized and bypasses runtime image t
 
 test("public page entrance motion never blocks first paint", () => {
   const css = readFileSync("app/globals.css", "utf8");
-  const keyframe = css.match(/@keyframes lumeo-page-enter\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  const pageEnter =
+    css.match(/@keyframes lumeo-page-enter\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+  const fadeUp =
+    css.match(/@keyframes lumeo-fade-up\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
 
   assert.match(css, /\.lumeo-page-enter\s*\{[\s\S]*animation:\s*lumeo-page-enter/);
-  assert.ok(keyframe.length > 0, "lumeo-page-enter keyframe must exist");
+  assert.match(css, /\.lumeo-fade-up\s*\{[\s\S]*animation:\s*lumeo-fade-up/);
+  assert.ok(pageEnter.length > 0, "lumeo-page-enter keyframe must exist");
+  assert.ok(fadeUp.length > 0, "lumeo-fade-up keyframe must exist");
   assert.doesNotMatch(
-    keyframe,
+    pageEnter,
     /opacity:\s*0/,
     "Public page shells must be paintable even when entrance animations are throttled.",
+  );
+  assert.doesNotMatch(
+    fadeUp,
+    /opacity:\s*0/,
+    "Primary page content must stay paintable during entrance motion.",
   );
 });
