@@ -118,19 +118,15 @@ export default async function Home() {
     <main
       id="main-content"
       className="aura-home relative flex min-h-dvh flex-col overflow-x-hidden text-[var(--lumeo-paper-100)]"
+      style={{
+        backgroundImage:
+          "radial-gradient(circle at 4% 2%, rgba(var(--atelier-sage-rgb),0.035), transparent 34%), radial-gradient(circle at 96% 12%, rgba(var(--atelier-brass-rgb),0.03), transparent 32%)",
+      }}
     >
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
-
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-      >
-        <div className="lumeo-ambient absolute -left-44 -top-52 h-[30rem] w-[30rem] rounded-full bg-[rgba(var(--atelier-sage-rgb),0.045)] blur-[60px] md:blur-[150px]" />
-        <div className="lumeo-ambient absolute -right-44 top-[-5rem] h-[28rem] w-[28rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.04)] blur-[60px] md:blur-[150px] [animation-delay:-4s]" />
-      </div>
 
       <PublicNav />
 
