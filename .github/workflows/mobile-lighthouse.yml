@@ -1,12 +1,9 @@
 name: Mobile Lighthouse
 
 on:
-  pull_request:
+  push:
     branches:
       - main
-      - "fix/**"
-      - "feature/**"
-      - "hardening/**"
     paths:
       - "app/**"
       - "components/**"
@@ -24,14 +21,14 @@ permissions:
   contents: read
 
 concurrency:
-  group: mobile-lighthouse-${{ github.ref }}
+  group: mobile-lighthouse-production
   cancel-in-progress: true
 
 jobs:
   lighthouse:
-    name: Mobile performance, accessibility and SEO budgets
+    name: Mobile production performance, accessibility and SEO budgets
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 35
 
     steps:
       - name: Checkout repository
@@ -49,72 +46,49 @@ jobs:
       - name: Install pinned Lighthouse runtime for CI only
         run: npm install --no-save --package-lock=false lighthouse@13.5.0 chrome-launcher@1.2.1
 
-      - name: Initialize isolated Supabase catalog
+      - name: Wait for exact Cloudflare production revision
         shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [ ! -f supabase/config.toml ]; then
-            npx supabase init
-          fi
-          npx supabase start
+          for attempt in {1..30}; do
+            body="$(curl --silent --show-error --fail --max-time 30 https://lumeo.in/api/build-info || true)"
+            deployed_commit="$(
+              BODY="$body" node -e '
+                try {
+                  const value = JSON.parse(process.env.BODY || "{}");
+                  process.stdout.write(typeof value.commit === "string" ? value.commit : "");
+                } catch {}
+              '
+            )"
+            deployed_environment="$(
+              BODY="$body" node -e '
+                try {
+                  const value = JSON.parse(process.env.BODY || "{}");
+                  process.stdout.write(typeof value.environment === "string" ? value.environment : "");
+                } catch {}
+              '
+            )"
 
-      - name: Configure public catalog environment
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx supabase status -o env > /tmp/lumeo-lighthouse-supabase.env
-          set -a
-          source /tmp/lumeo-lighthouse-supabase.env
-          set +a
-          {
-            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
-            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
-          } >> "$GITHUB_ENV"
-
-      - name: Build production application
-        run: npm run build
-
-      - name: Start local production application
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm start -- --hostname 127.0.0.1 --port 8787 > /tmp/lumeo-lighthouse-app.log 2>&1 &
-          echo $! > /tmp/lumeo-lighthouse-app.pid
-
-          ready=false
-          for attempt in {1..90}; do
-            if curl --fail --silent http://127.0.0.1:8787/ >/dev/null; then
-              ready=true
-              break
+            if [ "$deployed_commit" = "$EXPECTED_SHA" ] && [ "$deployed_environment" = "production" ]; then
+              echo "PASS exact production revision $deployed_commit"
+              exit 0
             fi
-            if ! kill -0 "$(cat /tmp/lumeo-lighthouse-app.pid)" 2>/dev/null; then
-              cat /tmp/lumeo-lighthouse-app.log
-              exit 1
-            fi
-            sleep 1
+
+            echo "Waiting for Cloudflare revision: expected $EXPECTED_SHA, observed ${deployed_commit:-none} (attempt $attempt/30)"
+            sleep 10
           done
 
-          if [ "$ready" != "true" ]; then
-            cat /tmp/lumeo-lighthouse-app.log
-            exit 1
-          fi
+          echo "FAIL production did not reach expected revision $EXPECTED_SHA" >&2
+          exit 1
 
-      - name: Warm audited routes
+      - name: Warm audited production routes
         shell: bash
         run: |
           set -euo pipefail
           for route in / /pdf /pdf-tools /pdf/edit; do
-            for attempt in {1..5}; do
-              if curl --fail --silent --show-error --max-time 30 "http://127.0.0.1:8787$route" >/dev/null; then
-                break
-              fi
-              if [ "$attempt" -eq 5 ]; then
-                cat /tmp/lumeo-lighthouse-app.log
-                echo "Failed to warm $route before Lighthouse." >&2
-                exit 1
-              fi
-              sleep 2
-            done
+            curl --fail --silent --show-error --max-time 30 "https://lumeo.in$route" >/dev/null
           done
 
       - name: Start virtual display for Lighthouse
@@ -146,13 +120,10 @@ jobs:
           include-hidden-files: true
           retention-days: 14
 
-      - name: Stop local application and virtual display
+      - name: Stop virtual display
         if: always()
         shell: bash
         run: |
-          if [ -f /tmp/lumeo-lighthouse-app.pid ]; then
-            kill "$(cat /tmp/lumeo-lighthouse-app.pid)" 2>/dev/null || true
-          fi
           if [ -f /tmp/lumeo-xvfb.pid ]; then
             kill "$(cat /tmp/lumeo-xvfb.pid)" 2>/dev/null || true
           fi
