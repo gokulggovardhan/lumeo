@@ -161,3 +161,6 @@ Exact-production Lighthouse 13.5 finally produced valid measurements for all fou
 
 
 The first PR-local measurement after removing LCP-critical entrance transforms reached a median homepage LCP of 4003.5 ms, proving the animation fix was effective but leaving no regression margin. The homepage hero's small CSS module was therefore removed from the critical path as well: the same responsive grid, title sizing and trust-card layout are expressed with existing utility classes, avoiding a separate page stylesheet request while preserving the visual design.
+
+
+The next exact PR measurement was 4013.9 ms median LCP—still only 13.9 ms above budget. The fresh Lighthouse report showed the fonts already preloaded early and the LCP remained the hero text, while the homepage still painted two very large animated blur-filter layers behind it. Those purely decorative blur layers were replaced with static radial gradients. This removes expensive first-screen filter/compositing work while preserving the same low-contrast sage/brass atmosphere and keeping the 4000 ms budget unchanged.
