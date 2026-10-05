@@ -1,0 +1,143 @@
+name: Mobile Lighthouse
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "fix/**"
+      - "feature/**"
+      - "hardening/**"
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "worker/**"
+      - "scripts/run-mobile-lighthouse.mjs"
+      - ".lighthouserc.cjs"
+      - ".github/workflows/mobile-lighthouse.yml"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-lighthouse-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    name: Mobile performance, accessibility and SEO budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Initialize isolated Supabase catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+
+      - name: Configure public catalog environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/lumeo-lighthouse-supabase.env
+          set -a
+          source /tmp/lumeo-lighthouse-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Build Cloudflare Worker
+        run: npm run build:vinext
+
+      - name: Start local production Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev \
+            --config dist/server/wrangler.json \
+            --port 8787 \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            > /tmp/lumeo-lighthouse-worker.log 2>&1 &
+          echo $! > /tmp/lumeo-lighthouse-worker.pid
+
+          ready=false
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/ >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$(cat /tmp/lumeo-lighthouse-worker.pid)" 2>/dev/null; then
+              cat /tmp/lumeo-lighthouse-worker.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat /tmp/lumeo-lighthouse-worker.log
+            exit 1
+          fi
+
+      - name: Warm audited routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for route in / /pdf /pdf-tools /pdf/edit; do
+            for attempt in {1..5}; do
+              if curl --fail --silent --show-error --max-time 30 "http://127.0.0.1:8787$route" >/dev/null; then
+                break
+              fi
+              if [ "$attempt" -eq 5 ]; then
+                cat /tmp/lumeo-lighthouse-worker.log
+                echo "Failed to warm $route before Lighthouse." >&2
+                exit 1
+              fi
+              sleep 2
+            done
+          done
+
+      - name: Run mobile Lighthouse budgets
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+        run: node scripts/run-mobile-lighthouse.mjs
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: mobile-lighthouse-reports
+          path: .lighthouseci
+          if-no-files-found: ignore
+          include-hidden-files: true
+          retention-days: 14
+
+      - name: Stop local Worker
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/lumeo-lighthouse-worker.pid ]; then
+            kill "$(cat /tmp/lumeo-lighthouse-worker.pid)" 2>/dev/null || true
+          fi
