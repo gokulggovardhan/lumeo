@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { captureClientError } from "@/lib/errors/client";
+import { isNonActionableGlobalClientError } from "@/lib/errors/classification";
 
 /**
  * Mounted once in the root layout. Catches errors that never reach a React
@@ -12,8 +13,11 @@ import { captureClientError } from "@/lib/errors/client";
 export function ErrorMonitor() {
   useEffect(() => {
     function handleError(event: ErrorEvent) {
+      const message = event.message || "Unhandled error";
+      if (isNonActionableGlobalClientError(message)) return;
+
       void captureClientError({
-        message: event.message || "Unhandled error",
+        message,
         stack: event.error instanceof Error ? event.error.stack : null,
         source: "client",
         severity: "medium",
@@ -22,8 +26,11 @@ export function ErrorMonitor() {
 
     function handleRejection(event: PromiseRejectionEvent) {
       const reason = event.reason;
+      const message = reason instanceof Error ? reason.message : String(reason);
+      if (isNonActionableGlobalClientError(message)) return;
+
       void captureClientError({
-        message: reason instanceof Error ? reason.message : String(reason),
+        message,
         stack: reason instanceof Error ? reason.stack : null,
         source: "unhandled_rejection",
         severity: "medium",
