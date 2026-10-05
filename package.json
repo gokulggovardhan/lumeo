@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && next dev",
-    "build": "npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && next build",
+    "dev": "npm run prepare:brand-assets && npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && next dev",
+    "build": "npm run prepare:brand-assets && npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && next build",
     "verify:public": "node scripts/verify-public-routes.mjs",
     "verify:production-freshness": "node scripts/verify-production-freshness.mjs",
     "verify:production-seo": "node scripts/verify-production-seo.mjs",
@@ -28,13 +28,14 @@
     "inspect:heic-samples": "node --no-warnings --experimental-strip-types inspector/inspect-heic-samples.ts",
     "verify:heic-samples": "node --no-warnings --experimental-strip-types inspector/verify-heic-conversion.ts",
     "test:heic-inspection": "node --no-warnings --test --experimental-strip-types inspector/*.test.ts",
-    "dev:vinext": "npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && vinext dev --port 3001",
-    "build:vinext": "npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && vinext build",
+    "dev:vinext": "npm run prepare:brand-assets && npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && vinext dev --port 3001",
+    "build:vinext": "npm run prepare:brand-assets && npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && vinext build",
     "start:vinext": "wrangler dev --config dist/server/wrangler.json",
-    "deploy:vinext": "npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && vinext-cloudflare deploy --config dist/server/wrangler.json",
+    "deploy:vinext": "npm run prepare:brand-assets && npm run prepare:pdfjs-assets && npm run prepare:ocr-assets && vinext-cloudflare deploy --config dist/server/wrangler.json",
     "report:edit-fidelity": "node --no-warnings --experimental-strip-types scripts/report-edit-pdf-fidelity.ts",
     "prepare:pdfjs-assets": "node scripts/prepare-pdfjs-assets.mjs",
-    "prepare:ocr-assets": "node scripts/prepare-ocr-assets.mjs"
+    "prepare:ocr-assets": "node scripts/prepare-ocr-assets.mjs",
+    "prepare:brand-assets": "node scripts/prepare-brand-assets.mjs"
   },
   "dependencies": {
     "@cantoo/fontkit": "2.0.12",
