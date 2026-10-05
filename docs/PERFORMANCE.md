@@ -123,3 +123,8 @@ Repeated production certification showed that headed Chrome under Xvfb could ret
 ### Linux CI Lighthouse limitation and Windows collector
 
 Exact-production runs on GitHub `ubuntu-latest` repeatedly produced runtime-only `NO_FCP` before any metrics were emitted, under both headed/Xvfb and fresh `--headless=new` Chrome. This matches an upstream Lighthouse 13 Linux-CI rendering/trace limitation rather than a Lumeo route failure. The production Lighthouse job now runs on `windows-latest` with Chrome for Testing installed explicitly by `browser-actions/setup-chrome@v2`. The audited production routes, three-valid-sample requirement, runtime-invalid retry bound, and every performance/accessibility/best-practices/SEO/LCP/CLS/TBT threshold remain unchanged.
+
+
+### Isolated LHCI samples
+
+Direct programmatic Chrome/Lighthouse launches reproduced `NO_FCP` before metrics on both Linux and Windows CI. Earlier LHCI collection had produced valid samples but became unstable when multiple samples shared one LHCI/browser lifecycle. Production certification now uses the supported `lhci collect` path with exactly one Lighthouse run per process. Each route still requires three valid samples, runtime-invalid attempts remain bounded, medians are evaluated against the same budgets, and no invalid attempt can satisfy a threshold.
