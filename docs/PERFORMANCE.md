@@ -80,3 +80,27 @@ Wire `@next/bundle-analyzer` into the build for real per-route JS budgets,
 and run a scheduled Lighthouse CI job (already common as a GitHub Action)
 against the 14 tool routes so this document can be regenerated from real
 multi-run, throttled data rather than a single uncapped-network sample.
+
+## Mobile Lighthouse CI
+
+Lumeo now measures representative public surfaces with a dedicated mobile Lighthouse CI workflow against a locally built Cloudflare Worker backed by an isolated Supabase catalog.
+
+Audited routes:
+- `/`
+- `/pdf`
+- `/pdf-tools`
+- `/pdf/edit`
+
+Each route is measured three times using mobile emulation. Current regression budgets are:
+
+- Performance score >= 0.65
+- Accessibility score >= 0.90
+- Best Practices score >= 0.90
+- SEO score >= 0.90
+- LCP <= 4.0s
+- CLS <= 0.10
+- Total Blocking Time <= 600ms
+
+These are laboratory measurements only. They must not be described as field Core Web Vitals. The connected GSC integration currently has no CrUX API key configured, so field LCP/INP/CLS remain unverified.
+
+The workflow pre-warms audited routes and retries only recognized Lighthouse browser/runtime failures such as `NO_FCP`. Score or metric assertion failures are never retried as success and remain release-blocking. Lighthouse reports are retained as CI artifacts for later baseline and budget review.
