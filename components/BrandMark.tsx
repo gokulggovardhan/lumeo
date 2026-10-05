@@ -4,12 +4,13 @@ export function LumeoSealMark() {
   return (
     <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[rgba(var(--atelier-brass-rgb),0.22)] bg-[var(--atelier-ivory-100)] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)]">
       <Image
-        src="/brand/lumeo-pdf-mark.png"
+        src="/brand/lumeo-pdf-mark-96.webp"
         alt=""
         width={36}
         height={36}
         className="h-full w-full object-contain"
         priority
+        unoptimized
       />
     </span>
   );
@@ -32,12 +33,13 @@ export function BrandLockup({
         className={`flex shrink-0 items-center justify-center rounded-lg border border-[rgba(var(--atelier-brass-rgb),0.22)] bg-[var(--atelier-ivory-100)] p-0.5 shadow-[0_8px_24px_rgba(0,0,0,0.18)] ${markSize}`}
       >
         <Image
-          src="/brand/lumeo-pdf-mark.png"
+          src="/brand/lumeo-pdf-mark-96.webp"
           alt=""
           width={40}
           height={40}
           className="h-full w-full object-contain"
           priority
+        unoptimized
         />
       </span>
 
