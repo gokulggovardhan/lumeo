@@ -148,3 +148,12 @@ test("audited public LCP content is not wrapped in entrance motion", () => {
     "PDF Tools LCP copy must not wait on the 620ms fade-up animation.",
   );
 });
+
+
+test("homepage avoids blur-filter layers before LCP", () => {
+  const home = readFileSync("app/page.tsx", "utf8");
+  assert.doesNotMatch(home, /lumeo-ambient/);
+  assert.doesNotMatch(home, /blur-\[(?:60|150)px\]/);
+  assert.match(home, /radial-gradient\(circle at 4% 2%/);
+  assert.match(home, /radial-gradient\(circle at 96% 12%/);
+});
