@@ -143,3 +143,8 @@ The PR smoke for isolated standalone Lighthouse 13.5.0 still reproduced runtime-
 ### First-paint-safe public shells and PR-local smoke
 
 The Lighthouse environment control can paint `https://example.com/`, while the deployed Lumeo homepage repeatedly reported `NO_FCP`. The public shell used an entrance animation whose first keyframe made the entire page transparent. Public page entrance motion now keeps content paintable from the first frame and animates position only, so a throttled or backgrounded animation cannot leave the document invisible. The pull-request smoke builds the PR's own Cloudflare Worker with an isolated local Supabase catalog and audits that local branch build; post-merge certification continues to wait for and audit the exact deployed production SHA.
+
+
+### Heavy tool route prefetch control
+
+A valid Lighthouse 13.5 trace showed the homepage requesting Edit PDF, JSZip, Split, Compress, Sign, PDF-to-Word and other tool chunks before the user opened any tool. The cause was automatic route prefetch on the homepage launcher and tool-directory card links. Those tool-navigation links now use `prefetch={false}`, so initial public pages load only the JavaScript they need. Click navigation remains unchanged and no PDF/OCR/conversion engine is removed or weakened.
