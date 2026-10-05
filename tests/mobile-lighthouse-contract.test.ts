@@ -24,27 +24,50 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
 
   assert.match(workflow, /push:/);
   assert.match(workflow, /branches:[\s\S]*main/);
-  assert.doesNotMatch(workflow, /pull_request:/);
+  assert.match(workflow, /pull_request:/);
+  assert.match(workflow, /Mobile Lighthouse collector smoke/);
+  assert.match(workflow, /Build Cloudflare Worker from PR branch/);
+  assert.match(workflow, /Start local PR Worker/);
+  assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE/);
+  assert.match(workflow, /LIGHTHOUSE_BASE_URL:\s*http:\/\/127\.0\.0\.1:8787/);
+  assert.match(workflow, /if: github\.event_name != 'pull_request'/);
   assert.match(workflow, /EXPECTED_SHA: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /https:\/\/lumeo\.in\/api\/build-info/);
-  assert.match(workflow, /@lhci\/cli@0\.15\.1/);
+  assert.match(workflow, /lighthouse@13\.5\.0/);
+  assert.doesNotMatch(workflow, /@lhci\/cli/);
   assert.match(workflow, /runs-on:\s*ubuntu-latest/);
-  assert.match(workflow, /CHROME_PATH:\s*\/usr\/bin\/google-chrome/);
-  assert.doesNotMatch(workflow, /browser-actions\/setup-chrome/);
+  assert.match(workflow, /runs-on:\s*windows-latest/);
+  assert.match(workflow, /browser-actions\/setup-chrome@v2/);
+  assert.match(workflow, /steps\.chrome\.outputs\.chrome-path/);
   assert.doesNotMatch(workflow, /Xvfb/);
   assert.match(workflow, /include-hidden-files:\s*true/);
 
   assert.doesNotMatch(runner, /chromeLauncher\.launch/);
-  assert.match(runner, /@lhci\/cli@0\.15\.1/);
-  assert.match(runner, /"collect"/);
-  assert.match(runner, /numberOfRuns:\s*1/);
-  assert.match(runner, /--no-sandbox --disable-dev-shm-usage/);
+  assert.match(runner, /expectedLighthouseVersion = "13\.5\.0"/);
+  assert.match(runner, /lighthouseCli/);
+  assert.match(runner, /"lighthouse",\s*"cli",\s*"index\.js"/);
+  assert.match(runner, /run\(process\.execPath, \[lighthouseCli, \.\.\.args\]\)/);
+  assert.doesNotMatch(runner, /lighthouse\.cmd/);
+  assert.match(runner, /--config-path=/);
+  assert.match(runner, /--output=json/);
+  assert.doesNotMatch(runner, /--headless/);
+  assert.doesNotMatch(runner, /--no-sandbox/);
+  assert.doesNotMatch(runner, /--disable-dev-shm-usage/);
+  assert.match(runner, /LIGHTHOUSE_COLLECTOR_SMOKE/);
+  assert.match(runner, /LIGHTHOUSE_BASE_URL/);
+  assert.match(runner, /LIGHTHOUSE_CHROME_FLAGS/);
+  assert.match(runner, /--chrome-path=/);
+  assert.match(runner, /--chrome-flags=/);
+  assert.match(runner, /https:\/\/example\.com\//);
+  assert.match(runner, /LIGHTHOUSE_ENVIRONMENT_FAILURE/);
+  assert.match(runner, /PASS Lighthouse environment control/);
+  assert.match(runner, /smokeMode \? 1 : baseConfig\.numberOfRuns/);
   assert.doesNotMatch(runner, /CalculateNativeWinOcclusion/);
   assert.doesNotMatch(runner, /--window-size=390,844/);
   assert.match(runner, /NO_FCP/);
   assert.match(runner, /maxRuntimeAttemptsPerRoute/);
   assert.match(runner, /runtimeFailures/);
-  assert.match(runner, /Discarding transient LHCI runtime-invalid attempt/);
+  assert.match(runner, /Discarding transient Lighthouse runtime-invalid attempt/);
   assert.match(runner, /median\(/);
   assert.match(runner, /LIGHTHOUSE BUDGET FAIL/);
 });
@@ -64,4 +87,18 @@ test("mobile navigation brand mark is pre-optimized and bypasses runtime image t
   assert.equal(pkg.scripts["prepare:brand-assets"], "node scripts/prepare-brand-assets.mjs");
   assert.match(pkg.scripts["build:vinext"], /prepare:brand-assets/);
   assert.match(pkg.scripts.build, /prepare:brand-assets/);
+});
+
+
+test("public page entrance motion never blocks first paint", () => {
+  const css = readFileSync("app/globals.css", "utf8");
+  const keyframe = css.match(/@keyframes lumeo-page-enter\s*\{[\s\S]*?\n\}/)?.[0] ?? "";
+
+  assert.match(css, /\.lumeo-page-enter\s*\{[\s\S]*animation:\s*lumeo-page-enter/);
+  assert.ok(keyframe.length > 0, "lumeo-page-enter keyframe must exist");
+  assert.doesNotMatch(
+    keyframe,
+    /opacity:\s*0/,
+    "Public page shells must be paintable even when entrance animations are throttled.",
+  );
 });
