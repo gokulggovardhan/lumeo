@@ -83,15 +83,14 @@ multi-run, throttled data rather than a single uncapped-network sample.
 
 ## Mobile Lighthouse CI
 
-Lumeo now measures representative public surfaces with a dedicated mobile Lighthouse CI workflow against a locally built production Next.js server backed by an isolated Supabase catalog. Cloudflare Worker build and compatibility remain enforced independently by the existing required Workspace release gate.
+A dedicated post-deploy workflow measures four representative production surfaces after Cloudflare reports the exact merged `main` revision through `/api/build-info`:
 
-Audited routes:
 - `/`
 - `/pdf`
 - `/pdf-tools`
 - `/pdf/edit`
 
-Each route is measured three times using mobile emulation. Current regression budgets are:
+Each URL receives three independent mobile Lighthouse samples. Current certification budgets are:
 
 - Performance score >= 0.65
 - Accessibility score >= 0.90
@@ -101,6 +100,6 @@ Each route is measured three times using mobile emulation. Current regression bu
 - CLS <= 0.10
 - Total Blocking Time <= 600ms
 
-These are laboratory measurements only. They must not be described as field Core Web Vitals. The connected GSC integration currently has no CrUX API key configured, so field LCP/INP/CLS remain unverified.
+This job deliberately runs after deployment rather than as a pull-request release gate. Repeated `NO_FCP` failures were reproducible on healthy local Next.js and Wrangler servers in GitHub-hosted Lighthouse runs while ordinary curl and Playwright checks passed. Keeping that unstable collector out of branch protection prevents false merge blocks; the production workflow still fails loudly when the exact deployed revision misses a real budget.
 
-The workflow pre-warms audited routes and retries only recognized Lighthouse browser/runtime failures such as `NO_FCP`. Score or metric assertion failures are never retried as success and remain release-blocking. Lighthouse reports are retained as CI artifacts for later baseline and budget review.
+These are laboratory measurements, not field Core Web Vitals. The connected GSC integration currently has no CrUX API key configured, so field LCP/INP/CLS remain unverified. Lighthouse JSON reports and the median summary are retained as CI artifacts.
