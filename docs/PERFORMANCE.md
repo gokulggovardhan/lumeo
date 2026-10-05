@@ -158,3 +158,6 @@ Once Lighthouse 13.5 collection became reliable, the PR-local homepage budget me
 ### Final Step 4 LCP stabilization
 
 Exact-production Lighthouse 13.5 finally produced valid measurements for all four audited routes. The remaining misses were real and narrow: median LCP was about 4.71s on `/`, 4.61s on `/pdf`, 4.44s on `/pdf-tools`, and 4.47s on `/pdf/edit` against the unchanged 4.0s budget. In every case the LCP candidate was text. The audited public shells were still wrapped in a 640ms entrance transform, and `/pdf-tools` also wrapped its first-screen LCP copy in a 620ms fade-up transform. Those first-paint-critical wrappers now paint immediately; decorative/interaction motion remains available elsewhere. No Lighthouse threshold was weakened.
+
+
+The first PR-local measurement after removing LCP-critical entrance transforms reached a median homepage LCP of 4003.5 ms, proving the animation fix was effective but leaving no regression margin. The homepage hero's small CSS module was therefore removed from the critical path as well: the same responsive grid, title sizing and trust-card layout are expressed with existing utility classes, avoiding a separate page stylesheet request while preserving the visual design.
