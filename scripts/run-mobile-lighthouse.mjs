@@ -48,8 +48,6 @@ async function runSample(url, routeIndex, sampleIndex) {
       "--disable-background-timer-throttling",
       "--disable-renderer-backgrounding",
       "--disable-backgrounding-occluded-windows",
-      "--disable-features=CalculateNativeWinOcclusion",
-      "--window-size=390,844",
     ],
   });
 
