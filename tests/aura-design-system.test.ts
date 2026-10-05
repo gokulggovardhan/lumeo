@@ -123,7 +123,8 @@ test("Lumeo Atelier retheme keeps soft semantic tokens and interaction contracts
   // Hero heading size was reduced after this test was written (verified
   // current value below), part of the same redesign that replaced the
   // 5-slot homepage with the flat tile grid.
-  assert.ok(homepage.includes("text-[clamp(2.45rem,6vw,4.6rem)]"));
+  assert.ok(homepage.includes("text-[clamp(2rem,10.5vw,2.65rem)]"));
+  assert.ok(homepage.includes("sm:text-[clamp(2.25rem,4.6vw,3.75rem)]"));
   assert.doesNotMatch(homepage, /#0D2C6D|sky-rgb|bg-\[var\(--surface-canvas\)\]/);
 });
 
