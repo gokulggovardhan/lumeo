@@ -42,7 +42,7 @@ concurrency:
 jobs:
   collector-smoke:
     if: github.event_name == 'pull_request'
-    name: Mobile Lighthouse collector smoke
+    name: Mobile Lighthouse homepage budget
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -120,7 +120,7 @@ jobs:
       - name: Warm PR smoke route
         run: curl --fail --silent --show-error --max-time 30 http://127.0.0.1:8787/ >/dev/null
 
-      - name: Run Lighthouse 13.5 collector smoke on PR build
+      - name: Run Lighthouse 13.5 homepage budgets on PR build
         env:
           CHROME_PATH: /usr/bin/google-chrome
           LIGHTHOUSE_COLLECTOR_SMOKE: "1"
@@ -132,7 +132,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: mobile-lighthouse-smoke-report
+          name: mobile-lighthouse-homepage-budget
           path: .lighthouseci
           if-no-files-found: ignore
           include-hidden-files: true
