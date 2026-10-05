@@ -47,7 +47,7 @@ jobs:
         run: npm ci
 
       - name: Install pinned Lighthouse runtime for CI only
-        run: npm install --no-save --package-lock=false lighthouse@13.5.0 chrome-launcher@1.0.1
+        run: npm install --no-save --package-lock=false lighthouse@13.5.0 chrome-launcher@1.2.1
 
       - name: Initialize isolated Supabase catalog
         shell: bash
