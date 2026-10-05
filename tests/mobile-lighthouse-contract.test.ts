@@ -111,3 +111,14 @@ test("public page entrance motion never blocks first paint", () => {
     "Primary page content must stay paintable during entrance motion.",
   );
 });
+
+
+test("homepage LCP hero is never hidden behind entrance motion", () => {
+  const home = readFileSync("app/page.tsx", "utf8");
+  assert.match(home, /className=\{styles\.heroGrid\}/);
+  assert.doesNotMatch(
+    home,
+    /lumeo-fade-up[^\n]*heroGrid|heroGrid[^\n]*lumeo-fade-up/,
+    "The above-the-fold hero contains the LCP heading and must paint immediately.",
+  );
+});
