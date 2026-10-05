@@ -27,7 +27,7 @@ concurrency:
 jobs:
   lighthouse:
     name: Mobile production performance, accessibility and SEO budgets
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     timeout-minutes: 35
 
     steps:
@@ -39,6 +39,12 @@ jobs:
         with:
           node-version: "24.x"
           cache: npm
+
+      - name: Install Chrome for Testing
+        id: chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: stable
 
       - name: Install exact dependencies
         run: npm ci
@@ -93,7 +99,7 @@ jobs:
 
       - name: Run mobile Lighthouse budgets
         env:
-          CHROME_PATH: /usr/bin/google-chrome
+          CHROME_PATH: ${{ steps.chrome.outputs.chrome-path }}
         run: node scripts/run-mobile-lighthouse.mjs
 
       - name: Upload Lighthouse reports

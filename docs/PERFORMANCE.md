@@ -118,3 +118,8 @@ The first production run after the compact-brand fix showed nine consecutive `NO
 ### Deterministic production Lighthouse execution
 
 Repeated production certification showed that headed Chrome under Xvfb could return `NO_FCP` for every attempt even when the same production routes returned HTTP 200 and passed the full browser release matrix. Production Lighthouse now launches a fresh Chrome instance with `--headless=new` for every sample and no virtual display/window-manager dependency. The four audited routes, three-valid-sample requirement, bounded runtime-invalid replacement, and all score/LCP/CLS/TBT budgets remain unchanged.
+
+
+### Linux CI Lighthouse limitation and Windows collector
+
+Exact-production runs on GitHub `ubuntu-latest` repeatedly produced runtime-only `NO_FCP` before any metrics were emitted, under both headed/Xvfb and fresh `--headless=new` Chrome. This matches an upstream Lighthouse 13 Linux-CI rendering/trace limitation rather than a Lumeo route failure. The production Lighthouse job now runs on `windows-latest` with Chrome for Testing installed explicitly by `browser-actions/setup-chrome@v2`. The audited production routes, three-valid-sample requirement, runtime-invalid retry bound, and every performance/accessibility/best-practices/SEO/LCP/CLS/TBT threshold remain unchanged.
