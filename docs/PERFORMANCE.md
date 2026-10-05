@@ -80,3 +80,26 @@ Wire `@next/bundle-analyzer` into the build for real per-route JS budgets,
 and run a scheduled Lighthouse CI job (already common as a GitHub Action)
 against the 14 tool routes so this document can be regenerated from real
 multi-run, throttled data rather than a single uncapped-network sample.
+
+## Mobile Lighthouse CI
+
+A dedicated post-deploy workflow measures four representative production surfaces after Cloudflare reports the exact merged `main` revision through `/api/build-info`:
+
+- `/`
+- `/pdf`
+- `/pdf-tools`
+- `/pdf/edit`
+
+Each URL receives three independent mobile Lighthouse samples. Current certification budgets are:
+
+- Performance score >= 0.65
+- Accessibility score >= 0.90
+- Best Practices score >= 0.90
+- SEO score >= 0.90
+- LCP <= 4.0s
+- CLS <= 0.10
+- Total Blocking Time <= 600ms
+
+This job deliberately runs after deployment rather than as a pull-request release gate. Repeated `NO_FCP` failures were reproducible on healthy local Next.js and Wrangler servers in GitHub-hosted Lighthouse runs while ordinary curl and Playwright checks passed. Keeping that unstable collector out of branch protection prevents false merge blocks; the production workflow still fails loudly when the exact deployed revision misses a real budget.
+
+These are laboratory measurements, not field Core Web Vitals. The connected GSC integration currently has no CrUX API key configured, so field LCP/INP/CLS remain unverified. Lighthouse JSON reports and the median summary are retained as CI artifacts.
