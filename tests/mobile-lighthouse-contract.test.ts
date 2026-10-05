@@ -18,15 +18,15 @@ test("mobile Lighthouse config protects the primary public surfaces", () => {
   assert.match(config, /total-blocking-time/);
 });
 
-test("Lighthouse workflow uses independent fresh-browser samples", () => {
+test("Lighthouse workflow uses a production server and independent fresh-browser samples", () => {
   const workflow = readFileSync(".github/workflows/mobile-lighthouse.yml", "utf8");
   const runner = readFileSync("scripts/run-mobile-lighthouse.mjs", "utf8");
   assert.match(workflow, /lighthouse@13\.5\.0/);
   assert.match(workflow, /chrome-launcher@1\.2\.1/);
-  assert.match(workflow, /Warm audited routes/);
+  assert.match(workflow, /npm run build/);\n  assert.match(workflow, /npm start -- --hostname 127\\.0\\.0\\.1 --port 8787/);\n  assert.match(workflow, /Warm audited routes/);
   assert.match(workflow, /include-hidden-files:\s*true/);
   assert.match(runner, /chromeLauncher\.launch/);
-  assert.match(runner, /await chrome\.kill/);
+  assert.match(runner, /Promise\.resolve\(chrome\.kill\(\)\)/);
   assert.match(runner, /NO_FCP/);
   assert.match(runner, /for \(let attempt = 1; attempt <= 2/);
   assert.match(runner, /median\(/);
