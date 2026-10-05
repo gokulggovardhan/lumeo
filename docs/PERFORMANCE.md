@@ -83,7 +83,7 @@ multi-run, throttled data rather than a single uncapped-network sample.
 
 ## Mobile Lighthouse CI
 
-Lumeo now measures representative public surfaces with a dedicated mobile Lighthouse CI workflow against a locally built Cloudflare Worker backed by an isolated Supabase catalog.
+Lumeo now measures representative public surfaces with a dedicated mobile Lighthouse CI workflow against a locally built production Next.js server backed by an isolated Supabase catalog. Cloudflare Worker build and compatibility remain enforced independently by the existing required Workspace release gate.
 
 Audited routes:
 - `/`
