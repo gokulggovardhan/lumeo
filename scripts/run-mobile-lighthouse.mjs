@@ -40,9 +40,7 @@ function isRuntimeFailure(error) {
 async function runSample(url, routeIndex, sampleIndex) {
   const chrome = await chromeLauncher.launch({
     chromePath,
-    chromeFlags: [
-      "--headless=new",
-    ],
+    chromeFlags: [],
   });
 
   try {
