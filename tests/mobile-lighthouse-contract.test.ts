@@ -25,7 +25,7 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(workflow, /push:/);
   assert.match(workflow, /branches:[\s\S]*main/);
   assert.match(workflow, /pull_request:/);
-  assert.match(workflow, /Mobile Lighthouse collector smoke/);
+  assert.match(workflow, /Mobile Lighthouse homepage budget/);
   assert.match(workflow, /Build Cloudflare Worker from PR branch/);
   assert.match(workflow, /Start local PR Worker/);
   assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE/);
@@ -69,7 +69,7 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(runner, /runtimeFailures/);
   assert.match(runner, /Discarding transient Lighthouse runtime-invalid attempt/);
   assert.match(runner, /median\(/);
-  assert.match(runner, /LIGHTHOUSE BUDGET FAIL/);
+  assert.match(runner, /runsPerRoute = baseConfig\\.numberOfRuns/);\n  assert.match(runner, /LIGHTHOUSE BUDGET FAIL/);
 });
 
 
