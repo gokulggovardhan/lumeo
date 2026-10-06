@@ -82,7 +82,7 @@ export function PublicPageShell({
   return (
     <main
       id="main-content"
-      className={`lumeo-page-enter aura-page-shell relative overflow-x-hidden ${mainClassName}`}
+      className={`aura-page-shell relative overflow-x-hidden ${mainClassName}`}
     >
       <div className="relative z-10">
         <PublicNav maxWidth={maxWidth} />
