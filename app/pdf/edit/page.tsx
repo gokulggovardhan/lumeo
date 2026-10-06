@@ -9,7 +9,7 @@ import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/pub
 import { ToolSeoContent } from "@/components/pdf/ToolSeoContent";
 
 const EditPdfTool = dynamic(() => import("@/components/pdf/EditPdfTool"), {
-  loading: () => <ToolWorkspaceLoading />,
+  loading: () => <ToolWorkspaceLoading minHeightClassName="min-h-[32rem]" />,
 });
 
 const softwareSchema = buildSoftwareApplicationSchema({
