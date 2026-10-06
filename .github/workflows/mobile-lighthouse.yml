@@ -56,6 +56,12 @@ jobs:
           node-version: "24.x"
           cache: npm
 
+      - name: Install Chrome for Testing for PR Lighthouse
+        id: pr-chrome
+        uses: browser-actions/setup-chrome@v2
+        with:
+          chrome-version: stable
+
       - name: Install exact dependencies
         run: npm ci
 
@@ -122,7 +128,7 @@ jobs:
 
       - name: Run Lighthouse 13.5 homepage budgets on PR build
         env:
-          CHROME_PATH: /usr/bin/google-chrome
+          CHROME_PATH: ${{ steps.pr-chrome.outputs.chrome-path }}
           LIGHTHOUSE_COLLECTOR_SMOKE: "1"
           LIGHTHOUSE_BASE_URL: http://127.0.0.1:8787
           LIGHTHOUSE_CHROME_FLAGS: --headless=new --no-sandbox --disable-dev-shm-usage
