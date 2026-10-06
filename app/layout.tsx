@@ -24,6 +24,7 @@ const plexMono = IBM_Plex_Mono({
   subsets: ["latin"],
   weight: "500",
   display: "swap",
+  preload: false,
 });
 
 export const metadata: Metadata = {
@@ -55,20 +56,7 @@ export const metadata: Metadata = {
     canonical: "/",
   },
   icons: {
-    icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/icon.png", type: "image/png" },
-      {
-        url: "/android-chrome-192x192.png",
-        sizes: "192x192",
-        type: "image/png",
-      },
-      {
-        url: "/android-chrome-512x512.png",
-        sizes: "512x512",
-        type: "image/png",
-      },
-    ],
+    icon: [{ url: "/favicon.ico", sizes: "any" }],
     shortcut: "/favicon.ico",
     apple: "/apple-touch-icon.png",
   },
