@@ -181,3 +181,30 @@ After the viewport boundary fix, the below-tool SEO paragraph stopped being LCP,
 The first exact-production run on merged SHA `ab6f2d9286edb6f13cba170a9b581d36c119db77` confirmed the new code in production and passed production health + exact Workspace certification. Lighthouse collected medians of about 4151 ms on `/`, 4186 ms on `/pdf`, and 4013 ms on `/pdf-tools` before a transient HTTP 503 interrupted `/pdf/edit` collection. The unchanged budget remains 4000 ms; this was not accepted as complete.
 
 The reports showed all three completed routes carrying the same early client/runtime work, while non-visual public services still statically pulled browser Supabase code into the initial dependency graph. `AnalyticsProvider` now keeps its context/DNT decision path immediate but dynamically loads the remote analytics client only after two animation frames. `AnnouncementBanner` likewise dynamically loads the Supabase browser client after first paint. Error monitoring, public navigation, PDF engines, route content, SEO, and the 4000 ms budget are unchanged.
+
+
+## Step 5 — Per-route JavaScript budgets
+
+Step 5 deliberately measures **JavaScript requested by a route in a real browser**, not every JavaScript file emitted by the build. This keeps lazy engines such as OCR/Tesseract out of ordinary-route budgets unless the browser actually requests them.
+
+The baseline is the exact-production Lighthouse 13.5 artifact for protected-main SHA `abfe1059256329488eae4d3dc83eaed0ef2037d2`. Median current production observations across three samples per route were:
+
+| Route | Loaded scripts | Raw JS | Encoded transfer JS |
+|---|---:|---:|---:|
+| `/` | 40 | 867,903 B | 281,114 B |
+| `/pdf` | 49 | 914,532 B | 301,691 B |
+| `/pdf-tools` | 37 | 880,055 B | 283,304 B |
+| `/pdf/edit` | 76 | 1,742,752 B | 619,955 B |
+
+No Tesseract/OCR JavaScript was requested by the audited `/pdf/edit` first-load samples. The much larger emitted OCR chunk therefore does not count against the route unless a future regression actually causes it to load.
+
+CI now records four independent measurements per route:
+
+- runtime-loaded script count;
+- decoded/raw JavaScript bytes from the actual response bodies;
+- deterministic gzip bytes from those loaded response bodies;
+- Chromium CDP `encodedDataLength` for real transfer bytes.
+
+The first PR measurement proved why this boundary matters: waiting through idle without suppressing marked navigation prefetch charged 70 scripts / 1.42 MB raw JS to the homepage by pulling future Merge/Compress/PDF.js/Workspace chunks, while the other three routes matched the production baseline. The audit therefore excludes only explicitly marked prefetch traffic rather than raising the byte budgets. With marked navigation prefetch suppressed, the local Cloudflare Worker measured 46 homepage scripts / 877,007 raw bytes / 255,059 gzip bytes, so the script-count regression ceiling is 52 (modest headroom over the highest current observed count) while the raw/gzip/transfer byte ceilings remain unchanged.
+
+Budgets include modest regression headroom over the measured production baseline rather than the obsolete multi-megabyte global emitted-chunk limits. Pull requests build and audit their own local Cloudflare Worker. Main-push verification waits until `/api/build-info` reports the exact deployed commit and then enforces the same route budgets against `https://lumeo.in`, including encoded transfer bytes.
