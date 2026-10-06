@@ -154,17 +154,18 @@ test("critical public pages avoid nonessential first-paint competition", () => {
 });
 
 
-test("Edit loading shell keeps SEO help below the first mobile viewport", () => {
+test("Edit workspace keeps below-tool SEO help out of the first mobile viewport", () => {
   const workspace = readFileSync("components/pdf/workspace/ToolWorkspace.tsx", "utf8");
   const editPage = readFileSync("app/pdf/edit/page.tsx", "utf8");
 
   assert.match(
     workspace,
-    /ToolWorkspaceLoading\(\{[\s\S]*minHeightClassName = "min-h-\[22rem\]"/,
+    /export function ToolWorkspaceLoading\(\)[\s\S]*min-h-\[22rem\]/,
+    "Shared tool loading shell stays unchanged.",
   );
   assert.match(
     editPage,
-    /ToolWorkspaceLoading minHeightClassName="min-h-\[32rem\]"/,
-    "Edit PDF needs a taller loading footprint so below-tool SEO copy cannot become first-viewport LCP.",
+    /aura-live-tool min-h-\[calc\(100dvh-12rem\)\] sm:min-h-0/,
+    "Edit PDF should dedicate the first mobile viewport to the actual tool before SEO/help content.",
   );
 });
