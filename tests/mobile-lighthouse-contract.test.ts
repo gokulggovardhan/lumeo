@@ -169,3 +169,24 @@ test("LCP-critical tool headers paint without entrance motion", () => {
     "Edit PDF must not carry the discarded viewport-height workaround.",
   );
 });
+
+
+test("homepage LCP-critical layout does not depend on a route CSS module", () => {
+  const homepage = readFileSync("app/page.tsx", "utf8");
+
+  assert.doesNotMatch(
+    homepage,
+    /home\.module\.css/,
+    "The homepage hero must not restore the separate render-blocking CSS module.",
+  );
+  assert.match(
+    homepage,
+    /Your PDFs stay yours\./,
+    "The measured homepage LCP heading remains present.",
+  );
+  assert.match(
+    homepage,
+    /min-\[900px\]:grid-cols-\[minmax\(0,1\.45fr\)_minmax\(17rem,0\.55fr\)\]/,
+    "The desktop hero grid must preserve the prior two-column layout.",
+  );
+});
