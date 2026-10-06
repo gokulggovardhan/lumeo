@@ -113,6 +113,15 @@ test("public page entrance motion never blocks first paint", () => {
 });
 
 
+test("homepage LCP hero uses a stable system serif without a late webfont swap", () => {
+  const home = readFileSync("app/page.tsx", "utf8");
+  const hero = home.match(/<h1[\s\S]*?>[\s\S]*?Your PDFs stay yours\.[\s\S]*?<\/h1>/)?.[0] ?? "";
+
+  assert.ok(hero.length > 0, "homepage hero heading must exist");
+  assert.match(hero, /fontFamily:\s*'Georgia, "Times New Roman", serif'/);
+  assert.doesNotMatch(hero, /font-serif/);
+});
+
 test("homepage LCP hero is never hidden behind entrance motion", () => {
   const home = readFileSync("app/page.tsx", "utf8");
   assert.match(home, /grid items-stretch gap-\[0\.85rem\]/);
