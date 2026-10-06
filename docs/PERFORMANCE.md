@@ -175,3 +175,8 @@ The first deferred-editor run brought /pdf/edit LCP below 4.0 s (about 3.69 s) b
 ### Homepage route stylesheet removal
 
 The final PR-local four-route run put the homepage at roughly 4.013 s LCP against the unchanged 4.0 s budget while the other three protected routes already passed. Lighthouse identified the homepage route-specific stylesheet as render-blocking. The small hero grid/title/trust layout is now expressed with existing utility classes in the page markup, eliminating that extra route stylesheet request while preserving the same responsive layout. No Lighthouse threshold was relaxed.
+
+
+### PDF Workspace interaction deferral
+
+After the homepage, PDF Tools and Edit PDF routes converged below the unchanged 4.0 s LCP budget, the remaining /pdf route was about 115 ms over budget. Its Lighthouse LCP was the static Workspace introduction while the route still eagerly loaded WorkspaceStart, ToolWorkspace/Aura controls and related interaction chunks. /pdf now uses the same proven two-animation-frame deferral pattern as Edit PDF: a lightweight static first-paint shell renders the exact Workspace introduction and stable page geometry immediately, then the full interactive WorkspaceStart mounts after first paint. Upload readiness remains guarded by the existing data-upload-client-ready contract. No Workspace state, privacy or PDF behavior changes.
