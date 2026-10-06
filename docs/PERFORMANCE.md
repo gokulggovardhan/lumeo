@@ -174,3 +174,10 @@ The post-header-fix four-route run moved `/pdf/edit` to 3708 ms and left only th
 ### Edit PDF first-paint client isolation
 
 After the viewport boundary fix, the below-tool SEO paragraph stopped being LCP, but the Edit header description still measured 3698–4385 ms with a 4233 ms median. The corresponding Lighthouse network trace showed the heavy editor graph starting before first paint, including an approximately 163 KB dependency chunk, a 76 KB `EditPdfTool` chunk, and additional PDF editing dependencies. The server route no longer directly imports that graph. A minimal client boundary keeps the existing `ToolWorkspaceLoading` surface visible immediately, then enables the real Edit tool after two animation frames. This changes no PDF editing architecture or export behavior; it only prevents the full native-edit client graph from competing with the LCP-critical page header.
+
+
+### Production margin after PR #615
+
+The first exact-production run on merged SHA `ab6f2d9286edb6f13cba170a9b581d36c119db77` confirmed the new code in production and passed production health + exact Workspace certification. Lighthouse collected medians of about 4151 ms on `/`, 4186 ms on `/pdf`, and 4013 ms on `/pdf-tools` before a transient HTTP 503 interrupted `/pdf/edit` collection. The unchanged budget remains 4000 ms; this was not accepted as complete.
+
+The reports showed all three completed routes carrying the same early client/runtime work, while non-visual public services still statically pulled browser Supabase code into the initial dependency graph. `AnalyticsProvider` now keeps its context/DNT decision path immediate but dynamically loads the remote analytics client only after two animation frames. `AnnouncementBanner` likewise dynamically loads the Supabase browser client after first paint. Error monitoring, public navigation, PDF engines, route content, SEO, and the 4000 ms budget are unchanged.
