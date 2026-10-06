@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
-import dynamic from "next/dynamic";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
-import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
+import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
 import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
 import { ToolSeoContent } from "@/components/pdf/ToolSeoContent";
+import DeferredEditPdfTool from "@/components/pdf/edit/DeferredEditPdfTool";
 
-const EditPdfTool = dynamic(() => import("@/components/pdf/EditPdfTool"), {
-  loading: () => <ToolWorkspaceLoading />,
-});
 
 const softwareSchema = buildSoftwareApplicationSchema({
   name: "Lumeo Edit PDF",
@@ -55,12 +52,12 @@ export default async function EditPdfPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader categoryLabel="EDIT" title="Edit PDF" description="Add text, drawing, shapes, and whiteout boxes to a PDF." />
+      <L2ToolPageHeader animate={false} categoryLabel="EDIT" title="Edit PDF" description="Add text, drawing, shapes, and whiteout boxes to a PDF." />
 
       {toolState.blocked ? (
         <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
       ) : (
-        <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool"><EditPdfTool /></div>
+        <div className="l2-live-tool-workspace aura-live-tool"><DeferredEditPdfTool /></div>
       )}
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
