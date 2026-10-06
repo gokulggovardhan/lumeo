@@ -65,6 +65,11 @@ test("GSC-enriched routes expose their known October 4 meaningful-change date", 
   }
 });
 
+test("PDF tools directory exposes its October 6 semantic SEO update date", () => {
+  const pdfTools = PUBLIC_ROUTE_CONFIG.find((route) => route.path === "/pdf-tools");
+  assert.equal(pdfTools?.lastModified, "2026-10-06");
+});
+
 test("all canonical public routes remain represented without indexing transient Workspace routes", () => {
   const sitemapPaths = buildPublicSitemap().map((entry) => new URL(entry.url).pathname);
 

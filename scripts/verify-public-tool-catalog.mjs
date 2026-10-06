@@ -116,7 +116,7 @@ try {
   const tiles = read("lib/tools/tiles.ts");
   const commandIndex = read("lib/command-palette/index.ts");
   assert(directory.includes("buildDiscoveryTiles") && directory.includes("ToolsExplorer"), "Directory must render resolved direct-action tools.");
-  assert(directory.includes("Find the right tool"), "Directory must use a clear complete-directory introduction.");
+  assert(directory.includes("All PDF tools in one place."), "Directory must use a clear complete-directory introduction.");
   assert(explorer.includes('type="search"') && explorer.includes('aria-live="polite"'), "Directory search and live result count are missing.");
   for (const filter of ["All", "Pages", "Edit", "Convert", "Sign", "Compress", "OCR & Text", "Images"]) {
     assert(explorer.includes(filter), `Directory filter missing: ${filter}`);

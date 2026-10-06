@@ -59,7 +59,7 @@ export default async function PdfToolsPage() {
           PDF tools
         </p>
         <h1 className="mt-2 font-serif text-[clamp(1.85rem,4vw,2.65rem)] font-semibold leading-tight tracking-[-0.025em] text-[var(--text-primary)]">
-          Find the right tool.
+          All PDF tools in one place.
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
           Search by what you want to do, then open the focused tool directly.
