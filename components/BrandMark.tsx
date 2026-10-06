@@ -25,7 +25,7 @@ export function BrandLockup({
 }) {
   const primaryText = tone === "dark" ? "text-[#151A22]" : "text-[var(--text-primary)]";
   const secondaryText =
-    tone === "dark" ? "text-[var(--atelier-sage-600)]" : "text-[var(--text-accent)]";
+    tone === "dark" ? "text-[var(--atelier-sage-600)]" : "text-[#FFFDF7]";
 
   return (
     <span className="flex min-w-0 items-center gap-3">
