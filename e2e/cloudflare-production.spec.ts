@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { PDFDocument } from "pdf-lib";
 import { TEXT_ONLY_PDF, writeFixtures } from "./fixtures.ts";
 import { installOwnedAnalyticsMarker } from "./owned-analytics-marker";
+import { waitForStageReady } from "./helpers.ts";
 
 
 test.beforeEach(async ({ context }) => {
@@ -83,6 +84,43 @@ async function openUploadWorkspaceReady(
   );
 }
 
+async function selectRefreshedNativeRun(
+  page: import("@playwright/test").Page,
+  run: import("@playwright/test").Locator,
+  workspace: import("@playwright/test").Locator,
+  expectedOperationCount: string,
+) {
+  const inlinePanel = page.locator("[data-edit-inline-panel]");
+
+  // A native save replaces the live PDF byte snapshot and intentionally
+  // rebuilds PDF.js detection + source-operator matching. In WebKit the
+  // first click can occasionally land on the just-refreshed overlay while
+  // that DOM node is being replaced, so the browser reports a completed
+  // click but the selection event never reaches the new node. Recover only
+  // the non-mutating selection once; never repeat Apply/edit/export work.
+  await waitForStageReady(page);
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await expect(run).toBeVisible({ timeout: 90_000 });
+    await run.click();
+
+    try {
+      await expect(inlinePanel).toBeAttached({ timeout: 10_000 });
+      await expect(run).toHaveAttribute("aria-pressed", "true");
+      return;
+    } catch (selectionError) {
+      if (attempt === 1) throw selectionError;
+
+      // Prove the already-committed native mutation is still exactly one
+      // semantic operation before attempting the selection-only recovery.
+      await expect(workspace).toHaveAttribute(
+        "data-edit-operation-count",
+        expectedOperationCount,
+      );
+      await waitForStageReady(page);
+    }
+  }
+}
+
 test("production Edit PDF loads the deployed pdf.js worker and detects text", async ({
   page,
 }) => {
@@ -139,10 +177,13 @@ test("production Edit PDF applies native formatting and exports a valid PDF", as
   const refreshedRun = page
     .locator('div[role="button"][aria-label^="Editable text: "][aria-label*="Employee record"]')
     .first();
-  await expect(refreshedRun).toBeVisible({ timeout: 90_000 });
-  await refreshedRun.click();
-  await page.getByRole("button", { name: "Format" }).click();
+  await selectRefreshedNativeRun(page, refreshedRun, workspace, "1");
+
+  const refreshedFormatButton = page.getByRole("button", { name: "Format" });
+  await expect(refreshedFormatButton).toBeVisible();
+  await refreshedFormatButton.click();
   await expect(page.getByRole("spinbutton", { name: "Native horizontal scale" })).toHaveValue("95");
+  await expect(workspace).toHaveAttribute("data-edit-operation-count", "1");
 
   await page.getByRole("button", { name: "Export PDF" }).click();
   const downloadButton = page.getByRole("button", { name: "Download edited PDF" });
