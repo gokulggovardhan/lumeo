@@ -201,8 +201,14 @@ test("full-resolution HEIC exports the primary image instead of its embedded 115
 
   for (const quality of qualities) {
     await page.goto("/heic-to-jpeg");
-    await page.locator('input[type="file"]').setInputFiles(fixture!);
-    await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible();
+    const uploadInput = page.locator('input[type="file"]');
+    await expect(uploadInput).toHaveAttribute("data-upload-client-ready", "true", {
+      timeout: 30_000,
+    });
+    await uploadInput.setInputFiles(fixture!);
+    await expect(page.getByRole("heading", { name: "1 photo detected" })).toBeVisible({
+      timeout: 30_000,
+    });
     await page.getByLabel("Quality").selectOption(quality);
     await page.getByRole("button", { name: "Convert to JPEG" }).click();
 
