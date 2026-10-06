@@ -10,10 +10,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  fetchPublicAnalyticsEnabled,
-  trackPublicAnalyticsEvent,
-} from "@/lib/analytics/client";
 import { providerTrackDecision } from "@/lib/analytics/state";
 import type {
   AnalyticsAvailability,
@@ -113,12 +109,24 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
       };
     }
 
-    void fetchPublicAnalyticsEnabled().then((value) => {
-      if (active) setAvailability(value ? "enabled" : "disabled");
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        void import("@/lib/analytics/client")
+          .then(({ fetchPublicAnalyticsEnabled }) => fetchPublicAnalyticsEnabled())
+          .then((value) => {
+            if (active) setAvailability(value ? "enabled" : "disabled");
+          })
+          .catch(() => {
+            if (active) setAvailability("disabled");
+          });
+      });
     });
 
     return () => {
       active = false;
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
     };
   }, [pathname]);
 
@@ -130,7 +138,9 @@ export function AnalyticsProvider({ children }: { children: ReactNode }) {
         event,
       });
       if (!decision.accepted) return decision;
-      void trackPublicAnalyticsEvent(event);
+      void import("@/lib/analytics/client")
+        .then(({ trackPublicAnalyticsEvent }) => trackPublicAnalyticsEvent(event))
+        .catch(() => undefined);
       return decision;
     },
     [availability],

@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
 
 type AnnouncementTone = "information" | "success" | "warning" | "maintenance";
 
@@ -52,6 +51,7 @@ export function AnnouncementBanner() {
     // empty -- never blocks or breaks the page it's mounted on.
     async function load() {
       try {
+        const { createClient } = await import("@/lib/supabase/client");
         const { data, error } = await createClient().rpc("get_public_announcements");
         if (cancelled || error || !Array.isArray(data)) return;
         setAnnouncements(data.map(parseAnnouncement).filter((item): item is PublicAnnouncement => item !== null));
@@ -59,10 +59,18 @@ export function AnnouncementBanner() {
         // no-op
       }
     }
-    void load();
+
+    let secondFrame = 0;
+    const firstFrame = window.requestAnimationFrame(() => {
+      secondFrame = window.requestAnimationFrame(() => {
+        void load();
+      });
+    });
 
     return () => {
       cancelled = true;
+      window.cancelAnimationFrame(firstFrame);
+      if (secondFrame) window.cancelAnimationFrame(secondFrame);
     };
   }, [skip]);
 
