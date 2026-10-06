@@ -154,18 +154,18 @@ test("critical public pages avoid nonessential first-paint competition", () => {
 });
 
 
-test("Edit workspace keeps below-tool SEO help out of the first mobile viewport", () => {
+test("LCP-critical tool headers paint without entrance motion", () => {
   const workspace = readFileSync("components/pdf/workspace/ToolWorkspace.tsx", "utf8");
   const editPage = readFileSync("app/pdf/edit/page.tsx", "utf8");
 
-  assert.match(
+  assert.doesNotMatch(
     workspace,
-    /export function ToolWorkspaceLoading\(\)[\s\S]*min-h-\[22rem\]/,
-    "Shared tool loading shell stays unchanged.",
+    /l2-tool-page-header lumeo-fade-up/,
+    "Shared public tool headers contain first-screen LCP text and must paint immediately.",
   );
-  assert.match(
+  assert.doesNotMatch(
     editPage,
-    /aura-live-tool min-h-\[calc\(100dvh-12rem\)\] sm:min-h-0/,
-    "Edit PDF should dedicate the first mobile viewport to the actual tool before SEO/help content.",
+    /min-h-\[calc\(100dvh-12rem\)\]/,
+    "Edit PDF must not carry the discarded viewport-height workaround.",
   );
 });
