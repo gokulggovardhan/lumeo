@@ -169,3 +169,8 @@ The four-route PR run confirmed `/`, `/pdf`, and `/pdf-tools` below the unchange
 ### Homepage route-CSS removal
 
 The post-header-fix four-route run moved `/pdf/edit` to 3708 ms and left only the homepage over budget at 4005 ms. All three homepage samples identified the same H1, “Your PDFs stay yours.”, as LCP. Lighthouse also identified the small homepage-only stylesheet as render-blocking. The former `app/home.module.css` rules are now expressed with equivalent utility classes directly in the homepage markup, preserving the mobile and >=900 px grid, title typography, and trust-card treatment while removing that separate route stylesheet request. The 4000 ms LCP budget is unchanged.
+
+
+### Edit PDF first-paint client isolation
+
+After the viewport boundary fix, the below-tool SEO paragraph stopped being LCP, but the Edit header description still measured 3698–4385 ms with a 4233 ms median. The corresponding Lighthouse network trace showed the heavy editor graph starting before first paint, including an approximately 163 KB dependency chunk, a 76 KB `EditPdfTool` chunk, and additional PDF editing dependencies. The server route no longer directly imports that graph. A minimal client boundary keeps the existing `ToolWorkspaceLoading` surface visible immediately, then enables the real Edit tool after two animation frames. This changes no PDF editing architecture or export behavior; it only prevents the full native-edit client graph from competing with the LCP-critical page header.
