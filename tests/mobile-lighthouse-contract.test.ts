@@ -154,3 +154,28 @@ test("critical public LCP shells stay stationary while lower-page motion remains
   assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE:\s*"0"/);
   assert.match(workflow, /LIGHTHOUSE_BASE_URL:\s*http:\/\/127\.0\.0\.1:8787/);
 });
+
+
+test("Edit PDF defers its heavy runtime until after first paint", () => {
+  const page = readFileSync("app/pdf/edit/page.tsx", "utf8");
+  const deferred = readFileSync("components/pdf/edit/DeferredEditPdfTool.tsx", "utf8");
+  const workspace = readFileSync("components/pdf/workspace/ToolWorkspace.tsx", "utf8");
+
+  assert.match(page, /DeferredEditPdfTool/);
+  assert.doesNotMatch(page, /dynamic\(\(\) => import\("@\/components\/pdf\/EditPdfTool"\)/);
+  assert.match(page, /<L2ToolPageHeader animate=\{false\}/);
+  assert.doesNotMatch(
+    page,
+    /l2-live-tool-workspace lumeo-fade-up/,
+    "Edit PDF critical workspace must not animate during LCP.",
+  );
+
+  assert.match(deferred, /ssr:\s*false/);
+  assert.match(deferred, /ToolWorkspaceLoading/);
+  assert.match(deferred, /requestAnimationFrame/);
+  assert.match(deferred, /cancelAnimationFrame/);
+  assert.match(deferred, /return <EditPdfTool \/>/);
+
+  assert.match(workspace, /animate = true/);
+  assert.match(workspace, /animate && "lumeo-fade-up"/);
+});
