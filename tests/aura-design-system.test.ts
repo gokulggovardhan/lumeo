@@ -120,10 +120,11 @@ test("Lumeo Atelier retheme keeps soft semantic tokens and interaction contracts
   assert.ok(workspace.includes("inputRef.current?.click()"));
   assert.ok(workspace.includes("onFilesSelected?.(event.dataTransfer.files)"));
   assert.ok(workspace.includes("max-w-[560px]"));
-  // Hero heading size was reduced after this test was written (verified
-  // current value below), part of the same redesign that replaced the
-  // 5-slot homepage with the flat tile grid.
-  assert.ok(homepage.includes("text-[clamp(2.45rem,6vw,4.6rem)]"));
+  // The LCP-critical hero heading preserves the former CSS-module typography
+  // directly in the homepage utility classes, including its compact mobile
+  // clamp and the >= sm desktop/tablet clamp.
+  assert.ok(homepage.includes("text-[clamp(2rem,10.5vw,2.65rem)]"));
+  assert.ok(homepage.includes("sm:text-[clamp(2.25rem,4.6vw,3.75rem)]"));
   assert.doesNotMatch(homepage, /#0D2C6D|sky-rgb|bg-\[var\(--surface-canvas\)\]/);
 });
 
