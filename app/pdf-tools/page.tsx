@@ -54,7 +54,7 @@ export default async function PdfToolsPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
       />
 
-      <section className="lumeo-fade-up mb-4 max-w-3xl sm:mb-5">
+      <section className="mb-4 max-w-3xl sm:mb-5">
         <p className="aura-text-label text-[var(--text-premium)]">
           PDF tools
         </p>
