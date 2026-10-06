@@ -180,3 +180,8 @@ The final PR-local four-route run put the homepage at roughly 4.013 s LCP agains
 ### PDF Workspace interaction deferral
 
 After the homepage, PDF Tools and Edit PDF routes converged below the unchanged 4.0 s LCP budget, the remaining /pdf route was about 115 ms over budget. Its Lighthouse LCP was the static Workspace introduction while the route still eagerly loaded WorkspaceStart, ToolWorkspace/Aura controls and related interaction chunks. /pdf now uses the same proven two-animation-frame deferral pattern as Edit PDF: a lightweight static first-paint shell renders the exact Workspace introduction and stable page geometry immediately, then the full interactive WorkspaceStart mounts after first paint. Upload readiness remains guarded by the existing data-upload-client-ready contract. No Workspace state, privacy or PDF behavior changes.
+
+
+### Homepage final font-swap margin
+
+The final four-route PR run left only the homepage at 4000.5 ms median LCP against the unchanged 4000 ms budget; the other three routes were already below target. Lighthouse still identified the hero heading as the LCP node. That heading used the downloadable Fraunces face, allowing a late font swap to become the final paint. The homepage hero now uses a stable Georgia/Times system-serif stack permanently, preserving the serif visual character while removing that late network-dependent LCP paint. No threshold was relaxed.
