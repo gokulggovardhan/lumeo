@@ -122,11 +122,15 @@ test("public page entrance motion never blocks first paint", () => {
 
 test("homepage LCP hero is never hidden behind entrance motion", () => {
   const home = readFileSync("app/page.tsx", "utf8");
-  assert.match(home, /className=\{styles\.heroGrid\}/);
+  assert.match(
+    home,
+    /<div className="grid items-stretch gap-\[0\.85rem\][^"]*">/,
+    "The above-the-fold hero grid must remain directly paintable.",
+  );
   assert.doesNotMatch(
     home,
-    /lumeo-fade-up[^\n]*heroGrid|heroGrid[^\n]*lumeo-fade-up/,
-    "The above-the-fold hero contains the LCP heading and must paint immediately.",
+    /lumeo-fade-up[^\n]*Your PDFs stay yours|Your PDFs stay yours[^\n]*lumeo-fade-up/,
+    "The measured LCP heading must not be gated by entrance motion.",
   );
 });
 
