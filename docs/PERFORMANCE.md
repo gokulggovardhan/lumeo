@@ -170,3 +170,8 @@ After the shared-shell motion fix, three protected routes met the unchanged 4.0 
 ### Edit PDF deferred-shell layout stability
 
 The first deferred-editor run brought /pdf/edit LCP below 4.0 s (about 3.69 s) but exposed CLS 0.1136 because the generic two-panel loading skeleton was much taller than Edit PDF's actual empty upload state. The editor, the pre-mount placeholder, and the dynamic-import loading fallback now reuse one compact EditPdfEmptyState component. This keeps the upload card and privacy-note geometry stable while the heavy editor bundle loads, preventing the SEO section below from jumping upward.
+
+
+### Homepage route stylesheet removal
+
+The final PR-local four-route run put the homepage at roughly 4.013 s LCP against the unchanged 4.0 s budget while the other three protected routes already passed. Lighthouse identified the homepage route-specific stylesheet as render-blocking. The small hero grid/title/trust layout is now expressed with existing utility classes in the page markup, eliminating that extra route stylesheet request while preserving the same responsive layout. No Lighthouse threshold was relaxed.
