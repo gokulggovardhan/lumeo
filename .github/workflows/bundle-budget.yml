@@ -1,0 +1,126 @@
+name: Client Bundle Budget
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "fix/**"
+      - "feature/**"
+      - "hardening/**"
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "worker/**"
+      - "scripts/check-client-bundle-budget.mjs"
+      - ".github/workflows/bundle-budget.yml"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bundle-budget-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  budget:
+    name: Build and enforce route-loaded JavaScript budgets
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Initialize isolated Supabase catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+
+      - name: Configure public catalog environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/lumeo-bundle-supabase.env
+          set -a
+          source /tmp/lumeo-bundle-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Build production Cloudflare bundle
+        run: npm run build:vinext
+
+      - name: Start local production Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev \
+            --config dist/server/wrangler.json \
+            --port 8787 \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            > /tmp/lumeo-bundle-worker.log 2>&1 &
+          echo $! > /tmp/lumeo-bundle-worker.pid
+
+          ready=false
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/pdf/edit >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$(cat /tmp/lumeo-bundle-worker.pid)" 2>/dev/null; then
+              cat /tmp/lumeo-bundle-worker.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat /tmp/lumeo-bundle-worker.log
+            exit 1
+          fi
+
+      - name: Enforce route-loaded JavaScript budgets
+        env:
+          LUMEO_BUNDLE_BASE_URL: http://127.0.0.1:8787
+        run: npm run verify:bundle-budget
+
+      - name: Upload bundle report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: client-route-bundle-budget
+          path: test-results/bundle-budget.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Stop local Worker
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/lumeo-bundle-worker.pid ]; then
+            kill "$(cat /tmp/lumeo-bundle-worker.pid)" 2>/dev/null || true
+          fi
