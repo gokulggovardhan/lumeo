@@ -164,3 +164,8 @@ The exact-production Lighthouse 13.5 run on `a60333e` produced valid samples on 
 ### Edit PDF LCP element correction
 
 The four-route PR run confirmed `/`, `/pdf`, and `/pdf-tools` below the unchanged 4.0s budget, while `/pdf/edit` had a 4126 ms median. The Lighthouse artifact identified the actual LCP node as the first-screen tool-header description (“Add text, drawing, shapes, and whiteout boxes to a PDF.”), not the below-tool SEO/help copy. The shared `L2ToolPageHeader` still carried `lumeo-fade-up`, so that LCP-critical entrance animation is removed for all public tool headers. The unrelated mobile minimum-height experiment is removed rather than retained as a layout workaround.
+
+
+### Homepage route-CSS removal
+
+The post-header-fix four-route run moved `/pdf/edit` to 3708 ms and left only the homepage over budget at 4005 ms. All three homepage samples identified the same H1, “Your PDFs stay yours.”, as LCP. Lighthouse also identified the small homepage-only stylesheet as render-blocking. The former `app/home.module.css` rules are now expressed with equivalent utility classes directly in the homepage markup, preserving the mobile and >=900 px grid, title typography, and trust-card treatment while removing that separate route stylesheet request. The 4000 ms LCP budget is unchanged.
