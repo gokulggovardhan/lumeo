@@ -25,10 +25,10 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(workflow, /push:/);
   assert.match(workflow, /branches:[\s\S]*main/);
   assert.match(workflow, /pull_request:/);
-  assert.match(workflow, /Mobile Lighthouse homepage budget/);
+  assert.match(workflow, /Mobile PR performance, accessibility and SEO budgets/);
   assert.match(workflow, /Build Cloudflare Worker from PR branch/);
   assert.match(workflow, /Start local PR Worker/);
-  assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE/);
+  assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE:\s*"0"/);
   assert.match(workflow, /LIGHTHOUSE_BASE_URL:\s*http:\/\/127\.0\.0\.1:8787/);
   assert.match(workflow, /if: github\.event_name != 'pull_request'/);
   assert.match(workflow, /EXPECTED_SHA: \$\{\{ github\.sha \}\}/);
@@ -121,4 +121,36 @@ test("homepage LCP hero is never hidden behind entrance motion", () => {
     /lumeo-fade-up[^\n]*heroGrid|heroGrid[^\n]*lumeo-fade-up/,
     "The above-the-fold hero contains the LCP heading and must paint immediately.",
   );
+});
+
+
+test("critical public LCP shells stay stationary while lower-page motion remains available", () => {
+  const home = readFileSync("app/page.tsx", "utf8");
+  const chrome = readFileSync("components/PublicPdfChrome.tsx", "utf8");
+  const tools = readFileSync("app/pdf-tools/page.tsx", "utf8");
+  const workflow = readFileSync(".github/workflows/mobile-lighthouse.yml", "utf8");
+
+  assert.doesNotMatch(
+    home,
+    /<main[\s\S]{0,300}lumeo-page-enter/,
+    "Homepage LCP hierarchy must not move during first paint.",
+  );
+  assert.doesNotMatch(
+    chrome,
+    /className=\{\`lumeo-page-enter aura-page-shell/,
+    "Shared public page shells must remain stationary during LCP.",
+  );
+  assert.doesNotMatch(
+    tools,
+    /<section className="lumeo-fade-up mb-4 max-w-3xl/,
+    "PDF Tools above-the-fold LCP copy must not use entrance motion.",
+  );
+
+  for (const route of ["/", "/pdf", "/pdf-tools", "/pdf/edit"]) {
+    assert.match(workflow, new RegExp(`for route in / /pdf /pdf-tools /pdf/edit`));
+    assert.ok(route);
+  }
+  assert.match(workflow, /Run Lighthouse 13\.5 full budgets on PR build/);
+  assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE:\s*"0"/);
+  assert.match(workflow, /LIGHTHOUSE_BASE_URL:\s*http:\/\/127\.0\.0\.1:8787/);
 });
