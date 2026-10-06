@@ -214,3 +214,36 @@ test("Edit PDF heavy client graph starts only after the first paint boundary", (
   );
   assert.match(deferred, /return ready \? <EditPdfTool \/> : <ToolWorkspaceLoading \/>/);
 });
+
+
+test("non-visual public services do not preload Supabase before first paint", () => {
+  const analytics = readFileSync("components/analytics/AnalyticsProvider.tsx", "utf8");
+  const announcements = readFileSync("components/AnnouncementBanner.tsx", "utf8");
+
+  assert.doesNotMatch(
+    analytics,
+    /from "@\/lib\/analytics\/client"/,
+    "Analytics remote service code must not be a static dependency of every public page.",
+  );
+  assert.match(
+    analytics,
+    /import\("@\/lib\/analytics\/client"\)/,
+    "Analytics service code should load only when availability/tracking is actually needed.",
+  );
+  assert.match(
+    analytics,
+    /requestAnimationFrame\(\(\) => \{[\s\S]*requestAnimationFrame\(\(\) => \{/,
+    "Analytics availability work should start only after the first paint boundary.",
+  );
+
+  assert.doesNotMatch(
+    announcements,
+    /from "@\/lib\/supabase\/client"/,
+    "Announcement Supabase code must not be a static dependency of every public page.",
+  );
+  assert.match(
+    announcements,
+    /import\("@\/lib\/supabase\/client"\)/,
+    "Announcement data access should load on demand after first paint.",
+  );
+});
