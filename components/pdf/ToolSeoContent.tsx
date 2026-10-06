@@ -1,12 +1,15 @@
 import Link from "next/link";
 
 type Faq = { question: string; answer: string };
+type RelatedTool = { href: string; label: string };
 
 type ToolSeoEntry = {
   heading: string;
   intro: string;
   detail: string;
   capabilities: readonly string[];
+  steps?: readonly string[];
+  relatedTools?: readonly RelatedTool[];
   faqs: readonly Faq[];
 };
 
@@ -36,7 +39,7 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
     ],
   },
   "/pdf/merge": {
-    heading: "Merge PDFs without re-uploading your documents",
+    heading: "Merge and combine PDF files in your browser",
     intro:
       "Merge PDF combines multiple PDF files into one document in a browser-first workflow. Add the files, arrange their order, choose the output behavior, and create one final PDF.",
     detail:
@@ -45,6 +48,16 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
       "Reorder PDFs before combining them",
       "Preserve or normalize page sizing",
       "Create one downloadable merged PDF",
+    ],
+    steps: [
+      "Add two or more PDF files to the merge workspace.",
+      "Arrange the PDFs in the order you want them combined.",
+      "Choose the output behavior, merge the files, and download the result.",
+    ],
+    relatedTools: [
+      { href: "/pdf/split", label: "Split PDF into separate files" },
+      { href: "/pdf/organize", label: "Organize PDF pages" },
+      { href: "/pdf/compress", label: "Compress the merged PDF" },
     ],
     faqs: [
       {
@@ -60,7 +73,7 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
     ],
   },
   "/pdf/split": {
-    heading: "Split, extract, or remove PDF pages",
+    heading: "Split PDF, extract pages, or remove pages",
     intro:
       "Split PDF creates smaller documents from one PDF. You can extract selected pages, split by ranges, create separate files, or remove pages you do not need.",
     detail:
@@ -69,6 +82,16 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
       "Extract selected pages or page ranges",
       "Create multiple smaller PDF files",
       "Remove pages while preserving the original file",
+    ],
+    steps: [
+      "Add the PDF you want to split.",
+      "Choose a split method, selected pages, or page ranges.",
+      "Create and download the smaller PDF file or files.",
+    ],
+    relatedTools: [
+      { href: "/pdf/merge", label: "Merge PDF files" },
+      { href: "/pdf/organize", label: "Organize PDF pages" },
+      { href: "/pdf/crop", label: "Crop PDF pages" },
     ],
     faqs: [
       {
@@ -84,7 +107,7 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
     ],
   },
   "/pdf/compress": {
-    heading: "Reduce PDF size with clear quality controls",
+    heading: "Compress PDF and reduce file size with clear quality controls",
     intro:
       "Compress PDF helps make a document easier to email, upload, or store by reducing its file size while keeping the result reviewable before you replace the original.",
     detail:
@@ -93,6 +116,16 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
       "Choose an appropriate compression profile",
       "Compare the resulting file with the original",
       "Keep browser-first processing for supported PDFs",
+    ],
+    steps: [
+      "Add the PDF you want to make smaller.",
+      "Choose a compression profile or supported target.",
+      "Compare the result with the original, then download the version you prefer.",
+    ],
+    relatedTools: [
+      { href: "/pdf/merge", label: "Merge PDF files" },
+      { href: "/pdf/split", label: "Split PDF pages" },
+      { href: "/pdf/word-to-pdf", label: "Convert Word to PDF" },
     ],
     faqs: [
       {
@@ -108,15 +141,25 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
     ],
   },
   "/pdf/jpg-to-pdf": {
-    heading: "Turn images into an ordered PDF",
+    heading: "Convert JPG and images to PDF in your browser",
     intro:
-      "JPG to PDF combines JPG, PNG, and WebP images into one PDF document. Reorder the images, choose page settings, and generate a clean downloadable PDF.",
+      "JPG to PDF is an image-to-PDF converter for JPG, PNG, and WebP files. Combine one or multiple images into a PDF, reorder them, choose page settings, and generate a clean download.",
     detail:
       "This is useful for scanned pages, receipts, photographed documents, assignments, and other image sets that need to become a single shareable file.",
     capabilities: [
       "Mix JPG, PNG, and WebP images",
       "Reorder images before PDF creation",
       "Control page size and orientation",
+    ],
+    steps: [
+      "Add one or more JPG, PNG, or WebP images.",
+      "Reorder the images and choose the page size and orientation.",
+      "Create the PDF and download the combined document.",
+    ],
+    relatedTools: [
+      { href: "/pdf/pdf-to-jpg", label: "Convert PDF to JPG" },
+      { href: "/pdf/compress", label: "Compress PDF" },
+      { href: "/pdf/merge", label: "Merge PDF files" },
     ],
     faqs: [
       {
@@ -132,7 +175,7 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
     ],
   },
   "/pdf/pdf-to-jpg": {
-    heading: "Export PDF pages as image files",
+    heading: "Convert PDF pages to JPG or other image files",
     intro:
       "PDF to JPG renders selected PDF pages as JPG, PNG, or WebP images. Choose the pages and image settings you need, then download individual images or a grouped ZIP when appropriate.",
     detail:
@@ -141,6 +184,16 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
       "Select specific PDF pages for export",
       "Choose JPG, PNG, or WebP output",
       "Adjust image quality and rendering resolution",
+    ],
+    steps: [
+      "Add the PDF whose pages you want to convert.",
+      "Choose the pages, image format, quality, and rendering resolution.",
+      "Export the images individually or download the grouped ZIP when available.",
+    ],
+    relatedTools: [
+      { href: "/pdf/jpg-to-pdf", label: "Convert JPG to PDF" },
+      { href: "/pdf/crop", label: "Crop PDF pages" },
+      { href: "/pdf/compress", label: "Compress PDF" },
     ],
     faqs: [
       {
@@ -228,15 +281,25 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
     ],
   },
   "/pdf/edit": {
-    heading: "Edit and annotate a PDF in the browser",
+    heading: "Online PDF editor for text and annotations",
     intro:
-      "Edit PDF provides native PDF text editing where safely supported together with annotation tools such as added text, drawing, shapes, and visual whiteout.",
+      "Use Lumeo as a private online PDF editor to edit supported native PDF text and add text, drawing, shapes, and visual whiteout without sending the document to a remote editing service.",
     detail:
       "Lumeo preserves the existing PDF editing architecture and exposes editing capability only when the document content can be handled reliably. Unsupported or invisible scan text remains protected from unsafe edits.",
     capabilities: [
       "Edit supported native PDF text",
       "Add text, drawing, shapes, and whiteout",
       "Use Workspace history to undo supported changes",
+    ],
+    steps: [
+      "Add the PDF you want to edit.",
+      "Select supported native text or choose an annotation tool and make your changes.",
+      "Review the result, use undo or redo when needed, and export the updated PDF.",
+    ],
+    relatedTools: [
+      { href: "/pdf/sign", label: "Sign PDF" },
+      { href: "/pdf/watermark", label: "Watermark PDF" },
+      { href: "/pdf/organize", label: "Organize PDF pages" },
     ],
     faqs: [
       {
@@ -348,15 +411,25 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
     ],
   },
   "/pdf/word-to-pdf": {
-    heading: "Convert Word documents to PDF locally",
+    heading: "Convert Word (DOCX or DOC) to PDF locally",
     intro:
-      "Word to PDF converts supported Word documents into PDF in the browser. It is designed to preserve text, layout, tables, images, and pagination as closely as the local conversion engine allows.",
+      "Word to PDF converts supported DOCX and DOC documents into PDF in the browser. It is designed to preserve text, layout, tables, images, and pagination as closely as the local conversion engine allows.",
     detail:
       "Complex Word documents can still render differently from Microsoft Word, so review the generated PDF before relying on it for a final submission or print workflow.",
     capabilities: [
       "Convert supported DOCX or DOC documents",
       "Keep conversion local for supported files",
       "Review the PDF before downloading it",
+    ],
+    steps: [
+      "Choose the DOCX or DOC file you want to convert.",
+      "Pass the browser compatibility check and start the local conversion.",
+      "Review the generated PDF, then download it when the layout looks right.",
+    ],
+    relatedTools: [
+      { href: "/pdf/pdf-to-word", label: "Convert PDF to Word" },
+      { href: "/pdf/compress", label: "Compress the converted PDF" },
+      { href: "/pdf/merge", label: "Merge PDF files" },
     ],
     faqs: [
       {
@@ -372,7 +445,7 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
     ],
   },
   "/pdf/pdf-to-word": {
-    heading: "Convert PDF pages into an editable Word document",
+    heading: "Convert PDF to Word (DOCX) in your browser",
     intro:
       "PDF to Word reconstructs PDF content into a DOCX file so text and layout can be edited in a word processor. The quality of reconstruction depends on the structure of the source PDF.",
     detail:
@@ -381,6 +454,16 @@ const TOOL_SEO: Record<string, ToolSeoEntry> = {
       "Reconstruct editable text where reliable",
       "Preserve page layout as closely as possible",
       "Run supported conversion locally in the browser",
+    ],
+    steps: [
+      "Choose the PDF you want to convert to Word.",
+      "Run the local reconstruction so Lumeo can recover editable text and layout where reliable.",
+      "Review the DOCX result and download it for editing in a compatible word processor.",
+    ],
+    relatedTools: [
+      { href: "/pdf/word-to-pdf", label: "Convert Word to PDF" },
+      { href: "/pdf/edit", label: "Edit PDF online" },
+      { href: "/pdf/extract-text", label: "Extract text from PDF" },
     ],
     faqs: [
       {
@@ -457,6 +540,27 @@ export function ToolSeoContent({ route }: { route: keyof typeof TOOL_SEO | strin
         ))}
       </ul>
 
+      {content.steps?.length ? (
+        <div className="mt-5">
+          <h3 className="text-sm font-extrabold text-[var(--text-primary)]">
+            How to use this tool
+          </h3>
+          <ol className="mt-2 grid gap-2 text-sm leading-6 text-[var(--text-secondary)]">
+            {content.steps.map((step, index) => (
+              <li key={step} className="flex gap-3">
+                <span
+                  aria-hidden="true"
+                  className="font-extrabold tabular-nums text-[var(--text-accent)]"
+                >
+                  {index + 1}.
+                </span>
+                <span>{step}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+
       <div className="mt-5">
         <h3 className="text-sm font-extrabold text-[var(--text-primary)]">
           Common questions
@@ -477,6 +581,25 @@ export function ToolSeoContent({ route }: { route: keyof typeof TOOL_SEO | strin
           ))}
         </div>
       </div>
+
+      {content.relatedTools?.length ? (
+        <nav aria-label="Related PDF tools" className="mt-5">
+          <h3 className="text-sm font-extrabold text-[var(--text-primary)]">
+            Related tools
+          </h3>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-sm">
+            {content.relatedTools.map((tool) => (
+              <Link
+                key={tool.href}
+                className="font-bold text-[var(--text-accent)] hover:underline"
+                href={tool.href}
+              >
+                {tool.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+      ) : null}
 
       <nav
         aria-label="Related PDF help"
