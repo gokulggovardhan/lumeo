@@ -239,7 +239,7 @@ export function ToolsExplorer({ tools }: { tools: Tile[] }) {
                 onClick={() => setCategory(filter.id)}
                 className={`lumeo-focus-ring min-h-10 shrink-0 rounded-full border px-3.5 text-xs font-bold transition duration-200 ${
                   category === filter.id
-                    ? "border-[var(--border-selected)] bg-[var(--surface-selected)] text-[var(--text-primary)]"
+                    ? "border-[var(--border-selected)] bg-[var(--action-primary-active)] text-[var(--text-primary)]"
                     : "border-[var(--border-hairline)] bg-[var(--surface-base)] text-[var(--text-secondary)] hover:border-[var(--border-default)] hover:text-[var(--text-primary)]"
                 }`}
               >
