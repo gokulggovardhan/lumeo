@@ -9,7 +9,7 @@ import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/pub
 import { ToolSeoContent } from "@/components/pdf/ToolSeoContent";
 
 const EditPdfTool = dynamic(() => import("@/components/pdf/EditPdfTool"), {
-  loading: () => <ToolWorkspaceLoading minHeightClassName="min-h-[32rem]" />,
+  loading: () => <ToolWorkspaceLoading />,
 });
 
 const softwareSchema = buildSoftwareApplicationSchema({
@@ -60,7 +60,7 @@ export default async function EditPdfPage() {
       {toolState.blocked ? (
         <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
       ) : (
-        <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool"><EditPdfTool /></div>
+        <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool min-h-[calc(100dvh-12rem)] sm:min-h-0"><EditPdfTool /></div>
       )}
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
