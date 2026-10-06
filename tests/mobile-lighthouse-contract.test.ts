@@ -197,3 +197,11 @@ test("Edit PDF deferred and real empty states share identical geometry", () => {
   assert.match(empty, /<L2PrivacyNote \/>/);
   assert.match(empty, /buttonLabel=\{preparing \? "Preparing editor…" : "Select PDF"\}/);
 });
+
+
+test("homepage critical layout does not create a route-specific render-blocking stylesheet", () => {
+  const home = readFileSync("app/page.tsx", "utf8");
+  assert.doesNotMatch(home, /home\.module\.css/);
+  assert.doesNotMatch(home, /styles\.hero/);
+  assert.match(home, /min-\[900px\]:grid-cols-\[minmax\(0,1\.45fr\)_minmax\(17rem,0\.55fr\)\]/);
+});
