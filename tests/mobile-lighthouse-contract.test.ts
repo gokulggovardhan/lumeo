@@ -122,3 +122,19 @@ test("homepage LCP hero is never hidden behind entrance motion", () => {
     "The above-the-fold hero contains the LCP heading and must paint immediately.",
   );
 });
+
+
+test("LCP-critical public shells do not animate their first paint", () => {
+  const home = readFileSync("app/page.tsx", "utf8");
+  const publicChrome = readFileSync("components/PublicPdfChrome.tsx", "utf8");
+  const tools = readFileSync("app/pdf-tools/page.tsx", "utf8");
+
+  assert.equal(home.includes("lumeo-page-enter aura-home"), false);
+  assert.equal(publicChrome.includes("lumeo-page-enter aura-page-shell"), false);
+  assert.equal(
+    tools.includes('className="lumeo-fade-up mb-4 max-w-3xl sm:mb-5"'),
+    false,
+  );
+  assert.match(home, /Your PDFs stay yours\./);
+  assert.match(tools, /Find the right tool\./);
+});
