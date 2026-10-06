@@ -15,6 +15,15 @@ function routeForArea(area: WorkspaceArea): string {
   return continuationRouteForArea(area as ContinuationArea);
 }
 
+function formatBytes(value: number): string {
+  if (value < 1024 * 1024) {
+    return `${Math.max(1, Math.round(value / 1024))} KB`;
+  }
+  return `${(value / (1024 * 1024)).toFixed(
+    value >= 10 * 1024 * 1024 ? 0 : 1,
+  )} MB`;
+}
+
 export function WorkspaceHistoryControls() {
   const router = useRouter();
   const pathname = usePathname();
@@ -60,9 +69,22 @@ export function WorkspaceHistoryControls() {
         aria-label="Workspace history"
         className="aura-glass-thin flex min-h-12 flex-wrap items-center gap-2 rounded-[var(--radius-xl)] border border-[var(--border-hairline)] px-3 py-2 shadow-[var(--v2-elevation-1)]"
       >
-        <span className="mr-1 text-xs font-extrabold text-[var(--text-secondary)]">
-          Workspace changes
-        </span>
+        <div
+          data-workspace-document-status="true"
+          className="mr-1 min-w-0 basis-full sm:basis-auto sm:max-w-[24rem]"
+          aria-label={`Open document: ${document.revision.fileName}, ${document.revision.pageCount} ${document.revision.pageCount === 1 ? "page" : "pages"}, revision ${document.revision.number}, ${formatBytes(document.revision.byteLength)}`}
+        >
+          <p className="truncate text-xs font-extrabold text-[var(--text-primary)]">
+            {document.revision.fileName}
+          </p>
+          <p className="mt-0.5 text-[10.5px] font-semibold text-[var(--text-muted)] sm:text-[11px]">
+            {document.revision.pageCount} {document.revision.pageCount === 1 ? "page" : "pages"}
+            {" · "}Rev {document.revision.number}
+            {" · "}{formatBytes(document.revision.byteLength)}
+          </p>
+        </div>
+
+        <span className="sr-only">Workspace changes</span>
 
         <AuraButton
           type="button"
