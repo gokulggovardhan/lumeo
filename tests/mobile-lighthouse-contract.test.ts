@@ -158,7 +158,7 @@ test("critical public pages avoid nonessential first-paint competition", () => {
 });
 
 
-test("LCP-critical tool headers paint without entrance motion", () => {
+test("LCP-critical tool headers paint immediately and Edit keeps SEO help below the first mobile viewport", () => {
   const workspace = readFileSync("components/pdf/workspace/ToolWorkspace.tsx", "utf8");
   const editPage = readFileSync("app/pdf/edit/page.tsx", "utf8");
 
@@ -167,10 +167,10 @@ test("LCP-critical tool headers paint without entrance motion", () => {
     /l2-tool-page-header lumeo-fade-up/,
     "Shared public tool headers contain first-screen LCP text and must paint immediately.",
   );
-  assert.doesNotMatch(
+  assert.match(
     editPage,
-    /min-h-\[calc\(100dvh-12rem\)\]/,
-    "Edit PDF must not carry the discarded viewport-height workaround.",
+    /aura-live-tool min-h-\[calc\(100dvh-12rem\)\] sm:min-h-0/,
+    "Edit PDF should keep below-tool SEO/help copy outside the first mobile viewport without changing desktop layout.",
   );
 });
 
