@@ -25,8 +25,12 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(workflow, /push:/);
   assert.match(workflow, /branches:[\s\S]*main/);
   assert.match(workflow, /pull_request:/);
-  assert.match(workflow, /Mobile Lighthouse homepage budget/);
+  assert.match(workflow, /Mobile Lighthouse four-route budget/);
   assert.match(workflow, /Build Cloudflare Worker from PR branch/);
+  assert.match(workflow, /Warm all audited PR routes/);
+  for (const route of ["/", "/pdf", "/pdf-tools", "/pdf/edit"]) {
+    assert.ok(workflow.includes(`127.0.0.1:8787${route}`));
+  }
   assert.match(workflow, /Start local PR Worker/);
   assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE/);
   assert.match(workflow, /LIGHTHOUSE_BASE_URL:\s*http:\/\/127\.0\.0\.1:8787/);
@@ -69,6 +73,7 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(runner, /Discarding transient Lighthouse runtime-invalid attempt/);
   assert.match(runner, /median\(/);
   assert.match(runner, /runsPerRoute = baseConfig\.numberOfRuns/);
+  assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE:\s*"0"/);
 });
 
 
@@ -120,5 +125,28 @@ test("homepage LCP hero is never hidden behind entrance motion", () => {
     home,
     /lumeo-fade-up[^\n]*heroGrid|heroGrid[^\n]*lumeo-fade-up/,
     "The above-the-fold hero contains the LCP heading and must paint immediately.",
+  );
+});
+
+
+test("critical public pages avoid nonessential first-paint competition", () => {
+  const layout = readFileSync("app/layout.tsx", "utf8");
+  const publicChrome = readFileSync("components/PublicPdfChrome.tsx", "utf8");
+  const home = readFileSync("app/page.tsx", "utf8");
+  const tools = readFileSync("app/pdf-tools/page.tsx", "utf8");
+
+  assert.doesNotMatch(
+    layout,
+    /url:\s*"\/icon\.png"/,
+    "The oversized generic rel icon must not compete with LCP-critical resources.",
+  );
+  assert.match(layout, /icon:\s*\[\{ url: "\/favicon\.ico", sizes: "any" \}\]/);
+  assert.match(layout, /const plexMono = IBM_Plex_Mono\([\s\S]*preload:\s*false/);
+  assert.doesNotMatch(publicChrome, /lumeo-page-enter aura-page-shell/);
+  assert.doesNotMatch(home, /lumeo-page-enter aura-home/);
+  assert.doesNotMatch(
+    tools,
+    /<section className="lumeo-fade-up mb-4 max-w-3xl/,
+    "The PDF tools LCP heading must paint without entrance motion.",
   );
 });
