@@ -22,12 +22,12 @@ const breadcrumbSchema = buildBreadcrumbSchema([
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/pdf/edit", {
-    title: { absolute: "Edit PDF Online Privately - Text, Draw, Shapes & Whiteout" },
-    description: "Add text, freehand drawing, shapes, and whiteout boxes to a PDF privately in your browser. No uploads, nothing leaves your device.",
+    title: { absolute: "PDF Editor Online - Edit PDF Privately | Lumeo" },
+    description: "Edit supported PDF text and add text, drawing, shapes, and whiteout locally in your browser. Your PDF stays on your device.",
     alternates: { canonical: "/pdf/edit" },
     openGraph: {
-      title: "Edit PDF Online Privately - Lumeo PDF",
-      description: "Type, draw, and mark up a PDF in a calm browser-first workspace.",
+      title: "PDF Editor Online - Edit PDF Privately | Lumeo PDF",
+      description: "Edit supported PDF text and add text, drawing, shapes, and whiteout in a private browser-first workspace.",
       url: "https://lumeo.in/pdf/edit",
       siteName: "Lumeo PDF",
       type: "website",
@@ -35,8 +35,8 @@ export async function generateMetadata(): Promise<Metadata> {
     },
     twitter: {
       card: "summary_large_image",
-      title: "Edit PDF Online Privately - Lumeo PDF",
-      description: "Add text, drawing, shapes, and whiteout boxes to a PDF directly in your browser.",
+      title: "PDF Editor Online - Edit PDF Privately | Lumeo PDF",
+      description: "Edit supported PDF text and add text, drawing, shapes, and whiteout directly in your browser.",
       images: ["https://lumeo.in/twitter-image"],
     },
   });
