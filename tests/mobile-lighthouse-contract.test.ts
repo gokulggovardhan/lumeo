@@ -28,9 +28,11 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(workflow, /Mobile Lighthouse four-route budget/);
   assert.match(workflow, /Build Cloudflare Worker from PR branch/);
   assert.match(workflow, /Warm all audited PR routes/);
-  for (const route of ["/", "/pdf", "/pdf-tools", "/pdf/edit"]) {
-    assert.ok(workflow.includes(`127.0.0.1:8787${route}`));
-  }
+  assert.match(
+    workflow,
+    /for route in \/ \/pdf \/pdf-tools \/pdf\/edit; do/,
+    "The PR Lighthouse gate must warm all four audited routes.",
+  );
   assert.match(workflow, /Start local PR Worker/);
   assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE/);
   assert.match(workflow, /LIGHTHOUSE_BASE_URL:\s*http:\/\/127\.0\.0\.1:8787/);
