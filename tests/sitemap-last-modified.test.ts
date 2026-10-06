@@ -30,25 +30,17 @@ test("sitemap uses only explicit source-controlled last-modified dates", () => {
   }
 });
 
-test("GSC-enriched routes expose their known October 4 meaningful-change date", () => {
+test("unchanged PR #593 routes retain their October 4 meaningful-change date", () => {
   const enrichedRoutes = [
     "/heic-to-jpeg",
     "/pdf",
-    "/pdf/merge",
-    "/pdf/split",
-    "/pdf/compress",
-    "/pdf/jpg-to-pdf",
-    "/pdf/pdf-to-jpg",
     "/pdf/sign",
     "/pdf/organize",
     "/pdf/extract-text",
-    "/pdf/edit",
     "/pdf/watermark",
     "/pdf/crop",
     "/pdf/page-numbers",
     "/pdf/header-footer",
-    "/pdf/word-to-pdf",
-    "/pdf/pdf-to-word",
     "/pdf/html-to-pdf",
   ];
 
@@ -60,7 +52,32 @@ test("GSC-enriched routes expose their known October 4 meaningful-change date", 
     assert.equal(
       configuredDates.get(path),
       "2026-10-04",
-      `${path} should advertise the meaningful PR #593 update date`,
+      `${path} should retain the meaningful PR #593 update date`,
+    );
+  }
+});
+
+test("search-intent tool updates expose their October 6 meaningful-change date", () => {
+  const updatedRoutes = [
+    "/pdf/merge",
+    "/pdf/split",
+    "/pdf/compress",
+    "/pdf/jpg-to-pdf",
+    "/pdf/pdf-to-jpg",
+    "/pdf/edit",
+    "/pdf/word-to-pdf",
+    "/pdf/pdf-to-word",
+  ];
+
+  const configuredDates = new Map(
+    PUBLIC_ROUTE_CONFIG.map((route) => [route.path, route.lastModified]),
+  );
+
+  for (const path of updatedRoutes) {
+    assert.equal(
+      configuredDates.get(path),
+      "2026-10-06",
+      `${path} should advertise the meaningful search-intent update date`,
     );
   }
 });
