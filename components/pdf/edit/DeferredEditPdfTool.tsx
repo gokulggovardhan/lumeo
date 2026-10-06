@@ -2,11 +2,11 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
-import { ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
+import { EditPdfEmptyState } from "@/components/pdf/edit/EditPdfEmptyState";
 
 const EditPdfTool = dynamic(() => import("@/components/pdf/EditPdfTool"), {
   ssr: false,
-  loading: () => <ToolWorkspaceLoading />,
+  loading: () => <EditPdfEmptyState preparing />,
 });
 
 export default function DeferredEditPdfTool() {
@@ -27,7 +27,7 @@ export default function DeferredEditPdfTool() {
   }, []);
 
   if (!ready) {
-    return <ToolWorkspaceLoading />;
+    return <EditPdfEmptyState preparing />;
   }
 
   return <EditPdfTool />;
