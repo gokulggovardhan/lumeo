@@ -185,3 +185,8 @@ After the homepage, PDF Tools and Edit PDF routes converged below the unchanged 
 ### Homepage final font-swap margin
 
 The final four-route PR run left only the homepage at 4000.5 ms median LCP against the unchanged 4000 ms budget; the other three routes were already below target. Lighthouse still identified the hero heading as the LCP node. That heading used the downloadable Fraunces face, allowing a late font swap to become the final paint. The homepage hero now uses a stable Georgia/Times system-serif stack permanently, preserving the serif visual character while removing that late network-dependent LCP paint. No threshold was relaxed.
+
+
+### Root Aura dead-CSS pruning
+
+The final homepage report continued to identify the shared root stylesheet as the only render-blocking opportunity, with about 150 ms estimated savings, while the homepage median was only a few milliseconds over the unchanged 4.0 s LCP budget. Repository-wide usage checks showed that most opt-in Aura v2 utility selectors had no consumers outside their own stylesheet. The root utility sheet now retains only the glass and scrollbar helpers that production components actually use. This reduces CSS transferred before first paint without changing any rendered component or lowering any performance threshold.
