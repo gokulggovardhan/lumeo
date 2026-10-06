@@ -165,3 +165,8 @@ The pull-request Lighthouse gate now audits the same four routes (/ , /pdf, /pdf
 ### Edit PDF initial-runtime deferral
 
 After the shared-shell motion fix, three protected routes met the unchanged 4.0 s LCP budget while /pdf/edit remained around 5.17 s. Lighthouse reported roughly 0.75-1.31 s of LCP savings from JavaScript loaded before a user had selected a PDF, especially the EditPdfTool route chunk and shared client code. Edit PDF now server-renders the existing stable ToolWorkspaceLoading shell first and mounts the unchanged heavy editor component after two animation frames. The edit page header and editor wrapper also skip entrance transforms during critical paint. The native PDF editing engine, content-stream rewriting, font/resource identity, OCR, history, and export paths are unchanged.
+
+
+### Edit PDF deferred-shell layout stability
+
+The first deferred-editor run brought /pdf/edit LCP below 4.0 s (about 3.69 s) but exposed CLS 0.1136 because the generic two-panel loading skeleton was much taller than Edit PDF's actual empty upload state. The editor, the pre-mount placeholder, and the dynamic-import loading fallback now reuse one compact EditPdfEmptyState component. This keeps the upload card and privacy-note geometry stable while the heavy editor bundle loads, preventing the SEO section below from jumping upward.
