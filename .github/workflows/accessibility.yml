@@ -1,0 +1,120 @@
+name: Accessibility Automation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - "fix/**"
+      - "feature/**"
+      - "hardening/**"
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "worker/**"
+      - "scripts/run-accessibility-audit.mjs"
+      - ".github/workflows/accessibility.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: accessibility-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  axe:
+    name: axe WCAG + keyboard checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install pinned axe runtime for CI only
+        run: npm install --no-save --package-lock=false axe-core@4.10.3
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Initialize isolated Supabase catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+
+      - name: Configure public catalog environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/lumeo-accessibility-supabase.env
+          set -a
+          source /tmp/lumeo-accessibility-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Build Cloudflare Worker
+        run: npm run build:vinext
+
+      - name: Start local production Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev             --config dist/server/wrangler.json             --port 8787             --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL"             --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"             > /tmp/lumeo-accessibility-worker.log 2>&1 &
+          echo $! > /tmp/lumeo-accessibility-worker.pid
+
+          ready=false
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/pdf >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$(cat /tmp/lumeo-accessibility-worker.pid)" 2>/dev/null; then
+              cat /tmp/lumeo-accessibility-worker.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat /tmp/lumeo-accessibility-worker.log
+            exit 1
+          fi
+
+      - name: Run axe and keyboard accessibility audit
+        run: node scripts/run-accessibility-audit.mjs
+
+      - name: Upload accessibility report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: accessibility-axe-report
+          path: test-results/accessibility/axe-report.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Stop local Worker
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/lumeo-accessibility-worker.pid ]; then
+            kill "$(cat /tmp/lumeo-accessibility-worker.pid)" 2>/dev/null || true
+          fi
