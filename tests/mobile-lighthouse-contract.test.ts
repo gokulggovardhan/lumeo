@@ -240,3 +240,30 @@ test("PDF Workspace defers interactive controls until after first paint", () => 
   assert.match(firstPaint, /data-workspace-start-first-paint="true"/);
   assert.doesNotMatch(firstPaint, /components\/ui\/Aura|ToolWorkspace|useWorkspaceDocument/);
 });
+
+
+test("root Aura utility sheet keeps only production-consumed helpers", () => {
+  const utilities = readFileSync("app/aura-v2-utilities.css", "utf8");
+
+  for (const used of [
+    ".aura-glass-thin",
+    ".aura-glass-regular",
+    ".aura-glass-thick",
+    ".aura-scrollbar",
+  ]) {
+    assert.match(utilities, new RegExp(used.replace(".", "\\.")));
+  }
+
+  for (const dead of [
+    ".aura-surface-primary",
+    ".aura-elevated-1",
+    ".aura-focus-ring",
+    ".aura-divider",
+    ".aura-selection",
+    ".aura-motion-normal",
+    ".aura-density-spacious",
+    ".aura-state-disabled",
+  ]) {
+    assert.doesNotMatch(utilities, new RegExp(dead.replace(".", "\\.")));
+  }
+});
