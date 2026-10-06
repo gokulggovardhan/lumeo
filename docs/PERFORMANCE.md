@@ -161,6 +161,6 @@ The exact-production Lighthouse 13.5 run on `a60333e` produced valid samples on 
 
 
 
-### Edit PDF first-viewport LCP
+### Edit PDF LCP element correction
 
-After the shared fixes, `/`, `/pdf`, and `/pdf-tools` all passed the unchanged 4.0s PR budget. `/pdf/edit` still failed because the below-tool SEO/help paragraph at roughly y=723 became the mobile LCP while the client editor loaded. Increasing only the dynamic loading skeleton did not move that paragraph after the real editor mounted, so that experiment was removed. The actual Edit workspace wrapper now has a mobile-only minimum height of `calc(100dvh - 12rem)`, keeping the first viewport focused on the editing surface and placing SEO/help content below it. The shared loading shell and desktop Edit layout remain unchanged.
+The four-route PR run confirmed `/`, `/pdf`, and `/pdf-tools` below the unchanged 4.0s budget, while `/pdf/edit` had a 4126 ms median. The Lighthouse artifact identified the actual LCP node as the first-screen tool-header description (“Add text, drawing, shapes, and whiteout boxes to a PDF.”), not the below-tool SEO/help copy. The shared `L2ToolPageHeader` still carried `lumeo-fade-up`, so that LCP-critical entrance animation is removed for all public tool headers. The unrelated mobile minimum-height experiment is removed rather than retained as a layout workaround.
