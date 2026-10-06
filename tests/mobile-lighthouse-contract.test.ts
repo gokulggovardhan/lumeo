@@ -115,7 +115,7 @@ test("public page entrance motion never blocks first paint", () => {
 
 test("homepage LCP hero is never hidden behind entrance motion", () => {
   const home = readFileSync("app/page.tsx", "utf8");
-  assert.match(home, /className=\{styles\.heroGrid\}/);
+  assert.match(home, /grid items-stretch gap-\[0\.85rem\]/);
   assert.doesNotMatch(
     home,
     /lumeo-fade-up[^\n]*heroGrid|heroGrid[^\n]*lumeo-fade-up/,
