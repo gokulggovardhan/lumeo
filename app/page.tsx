@@ -118,7 +118,7 @@ export default async function Home() {
   return (
     <main
       id="main-content"
-      className="lumeo-page-enter aura-home relative flex min-h-dvh flex-col overflow-x-hidden text-[var(--lumeo-paper-100)]"
+      className="aura-home relative flex min-h-dvh flex-col overflow-x-hidden text-[var(--lumeo-paper-100)]"
     >
       <script
         type="application/ld+json"
