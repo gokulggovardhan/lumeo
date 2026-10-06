@@ -163,7 +163,7 @@ The exact-production Lighthouse 13.5 run on `a60333e` produced valid samples on 
 
 ### Edit PDF LCP element correction
 
-The four-route PR run confirmed `/`, `/pdf`, and `/pdf-tools` below the unchanged 4.0s budget, while `/pdf/edit` had a 4126 ms median. The Lighthouse artifact identified the actual LCP node as the first-screen tool-header description (“Add text, drawing, shapes, and whiteout boxes to a PDF.”), not the below-tool SEO/help copy. The shared `L2ToolPageHeader` still carried `lumeo-fade-up`, so that LCP-critical entrance animation is removed for all public tool headers. The unrelated mobile minimum-height experiment is removed rather than retained as a layout workaround.
+The four-route PR run confirmed `/`, `/pdf`, and `/pdf-tools` below the unchanged 4.0s budget, while `/pdf/edit` had a 4126 ms median. That run identified the first-screen tool-header description (“Add text, drawing, shapes, and whiteout boxes to a PDF.”) as LCP, so the shared `L2ToolPageHeader` entrance animation was removed. A later clean-header run exposed the next LCP candidate underneath it: the below-tool Edit PDF SEO/help paragraph at roughly y=723, with route samples 4016 ms / 4183 ms / 5680 ms. The mobile-only Edit workspace minimum height is therefore restored to keep that supporting content outside the first mobile viewport while leaving `sm+` layouts unchanged. This is now evidence-backed rather than speculative; the LCP budget remains 4000 ms.
 
 
 ### Homepage route-CSS removal
