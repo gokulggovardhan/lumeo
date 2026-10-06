@@ -35,7 +35,8 @@
     "report:edit-fidelity": "node --no-warnings --experimental-strip-types scripts/report-edit-pdf-fidelity.ts",
     "prepare:pdfjs-assets": "node scripts/prepare-pdfjs-assets.mjs",
     "prepare:ocr-assets": "node scripts/prepare-ocr-assets.mjs",
-    "prepare:brand-assets": "node scripts/prepare-brand-assets.mjs"
+    "prepare:brand-assets": "node scripts/prepare-brand-assets.mjs",
+    "verify:route-js-budget": "node scripts/check-route-js-budget.mjs"
   },
   "dependencies": {
     "@cantoo/fontkit": "2.0.12",
