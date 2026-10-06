@@ -8,7 +8,11 @@ const footerGroups = [
   {
     title: "PDF Tools",
     links: [
+      { label: "Word to PDF", href: "/pdf/word-to-pdf" },
+      { label: "PDF to Word", href: "/pdf/pdf-to-word" },
+      { label: "JPG to PDF", href: "/pdf/jpg-to-pdf" },
       { label: "Merge PDF", href: "/pdf/merge" },
+      { label: "Split PDF", href: "/pdf/split" },
       { label: "Compress PDF", href: "/pdf/compress" },
       { label: "Edit PDF", href: "/pdf/edit" },
       { label: "All PDF Tools", href: "/pdf-tools" },
