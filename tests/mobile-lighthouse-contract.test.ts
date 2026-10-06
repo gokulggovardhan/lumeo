@@ -171,11 +171,29 @@ test("Edit PDF defers its heavy runtime until after first paint", () => {
   );
 
   assert.match(deferred, /ssr:\s*false/);
-  assert.match(deferred, /ToolWorkspaceLoading/);
+  assert.match(deferred, /EditPdfEmptyState/);
   assert.match(deferred, /requestAnimationFrame/);
   assert.match(deferred, /cancelAnimationFrame/);
   assert.match(deferred, /return <EditPdfTool \/>/);
 
   assert.match(workspace, /animate = true/);
   assert.match(workspace, /animate && "lumeo-fade-up"/);
+});
+
+
+test("Edit PDF deferred and real empty states share identical geometry", () => {
+  const deferred = readFileSync("components/pdf/edit/DeferredEditPdfTool.tsx", "utf8");
+  const empty = readFileSync("components/pdf/edit/EditPdfEmptyState.tsx", "utf8");
+  const edit = readFileSync("components/pdf/EditPdfTool.tsx", "utf8");
+
+  assert.match(deferred, /loading:\s*\(\) => <EditPdfEmptyState preparing \/>/);
+  assert.match(deferred, /return <EditPdfEmptyState preparing \/>/);
+  assert.match(edit, /<EditPdfEmptyState[\s\S]*sectionRef=\{uploadClientReadyRef\}[\s\S]*onFilesSelected=/);
+  assert.doesNotMatch(edit, /if \(!pdf\)[\s\S]{0,1200}<L2UploadStage/);
+
+  assert.match(empty, /className="l2-workspace grid gap-5 pb-4 lg:pb-0"/);
+  assert.match(empty, /max-w-\[720px\]/);
+  assert.match(empty, /<L2UploadStage/);
+  assert.match(empty, /<L2PrivacyNote \/>/);
+  assert.match(empty, /buttonLabel=\{preparing \? "Preparing editor…" : "Select PDF"\}/);
 });
