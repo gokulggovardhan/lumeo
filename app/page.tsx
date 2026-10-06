@@ -14,7 +14,6 @@ import {
   LOCAL_FIRST_DISCLOSURE,
   LOCAL_FIRST_MESSAGE,
 } from "@/lib/public-site/copy";
-import styles from "./home.module.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   return withSeoOverride("/", {
@@ -137,8 +136,8 @@ export default async function Home() {
 
       <section className="relative z-10 flex-1">
         <div className="mx-auto w-full max-w-[1160px] px-5 pb-12 pt-5 sm:px-8 sm:pt-7 lg:pt-8">
-          <div className={styles.heroGrid}>
-            <header className={styles.heroCopy}>
+          <div className="grid items-stretch gap-[0.85rem] sm:gap-[1.15rem] min-[900px]:grid-cols-[minmax(0,1.45fr)_minmax(17rem,0.55fr)] min-[900px]:gap-x-6 min-[900px]:gap-y-7">
+            <header className="row-start-1 min-[900px]:col-start-1">
               <div className="max-w-[48rem]">
               <p className="aura-text-label inline-flex items-center gap-2 text-[var(--text-accent)]">
                 <span
@@ -149,7 +148,7 @@ export default async function Home() {
               </p>
 
               <h1
-                className={`${styles.heroTitle} mt-2.5 font-serif text-[clamp(2.45rem,6vw,4.6rem)] font-semibold leading-[0.98] tracking-[-0.035em] text-[var(--text-primary)]`}
+                className="mt-2.5 font-serif text-[clamp(2rem,10.5vw,2.65rem)] font-semibold leading-[0.98] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[clamp(2.25rem,4.6vw,3.75rem)] sm:leading-[0.99] sm:tracking-[-0.035em]"
               >
                 Your PDFs stay yours.
               </h1>
@@ -181,7 +180,7 @@ export default async function Home() {
               </div>
             </header>
 
-            <aside className={styles.heroTrust} aria-label="Lumeo trust principles">
+            <aside className="row-start-3 self-end rounded-2xl border border-[var(--border-hairline)] bg-[rgba(var(--paper-rgb),0.025)] px-[0.8rem] py-3 shadow-[inset_0_1px_0_rgba(var(--paper-rgb),0.035)] sm:px-4 sm:py-[0.9rem] min-[900px]:col-start-2 min-[900px]:row-start-1" aria-label="Lumeo trust principles">
               <p className="aura-text-label text-[var(--atelier-sage-300)]">
                 Designed for private document work
               </p>
@@ -198,7 +197,7 @@ export default async function Home() {
               </div>
             </aside>
 
-            <div className={styles.heroTools}>
+            <div className="row-start-2 min-w-0 min-[900px]:col-span-2 min-[900px]:row-start-2">
               <PdfToolLauncher allToolsLabel="View all tools" />
             </div>
           </div>
