@@ -30,6 +30,41 @@ test("sitemap uses only explicit source-controlled last-modified dates", () => {
   }
 });
 
+test("GSC-enriched routes expose their known October 4 meaningful-change date", () => {
+  const enrichedRoutes = [
+    "/heic-to-jpeg",
+    "/pdf",
+    "/pdf/merge",
+    "/pdf/split",
+    "/pdf/compress",
+    "/pdf/jpg-to-pdf",
+    "/pdf/pdf-to-jpg",
+    "/pdf/sign",
+    "/pdf/organize",
+    "/pdf/extract-text",
+    "/pdf/edit",
+    "/pdf/watermark",
+    "/pdf/crop",
+    "/pdf/page-numbers",
+    "/pdf/header-footer",
+    "/pdf/word-to-pdf",
+    "/pdf/pdf-to-word",
+    "/pdf/html-to-pdf",
+  ];
+
+  const configuredDates = new Map(
+    PUBLIC_ROUTE_CONFIG.map((route) => [route.path, route.lastModified]),
+  );
+
+  for (const path of enrichedRoutes) {
+    assert.equal(
+      configuredDates.get(path),
+      "2026-10-04",
+      `${path} should advertise the meaningful PR #593 update date`,
+    );
+  }
+});
+
 test("all canonical public routes remain represented without indexing transient Workspace routes", () => {
   const sitemapPaths = buildPublicSitemap().map((entry) => new URL(entry.url).pathname);
 
