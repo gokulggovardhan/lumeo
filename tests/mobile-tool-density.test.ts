@@ -7,18 +7,24 @@ function read(path: string): string {
 }
 
 test("mobile homepage prioritizes PDF tools before supporting trust content", () => {
-  const css = read("app/home.module.css");
   const page = read("app/page.tsx");
 
+  // Mobile rows remain hero -> tools -> trust even though the trust aside
+  // appears before the tools launcher in DOM order. At >=900px the original
+  // two-column hero/trust row + full-width tools row is preserved.
+  assert.match(page, /<header className="row-start-1 min-\[900px\]:col-start-1">/);
   assert.match(
-    css,
-    /grid-template-areas:\s*"hero"\s*"tools"\s*"trust"/,
+    page,
+    /<aside className="[^"]*row-start-3[^"]*min-\[900px\]:col-start-2 min-\[900px\]:row-start-1"/,
   );
   assert.match(
-    css,
-    /@media \(min-width: 900px\)[\s\S]*grid-template-areas:\s*"hero trust"\s*"tools tools"/,
+    page,
+    /<div className="row-start-2 min-w-0 min-\[900px\]:col-span-2 min-\[900px\]:row-start-2">/,
   );
-  assert.match(page, /className=\{styles\.heroTools\}/);
+  assert.match(
+    page,
+    /min-\[900px\]:grid-cols-\[minmax\(0,1\.45fr\)_minmax\(17rem,0\.55fr\)\]/,
+  );
   assert.match(page, /<PdfToolLauncher allToolsLabel="View all tools" \/>/);
   assert.match(page, /aria-label="Lumeo trust principles"/);
 });
