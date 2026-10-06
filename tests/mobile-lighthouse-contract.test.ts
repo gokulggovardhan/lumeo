@@ -194,3 +194,23 @@ test("homepage LCP-critical layout does not depend on a route CSS module", () =>
     "The desktop hero grid must preserve the prior two-column layout.",
   );
 });
+
+
+test("Edit PDF heavy client graph starts only after the first paint boundary", () => {
+  const editPage = readFileSync("app/pdf/edit/page.tsx", "utf8");
+  const deferred = readFileSync("components/pdf/edit/DeferredEditPdfTool.tsx", "utf8");
+
+  assert.doesNotMatch(
+    editPage,
+    /dynamic\(\(\) => import\("@\/components\/pdf\/EditPdfTool"\)/,
+    "The server page must not eagerly advertise the heavy Edit PDF graph.",
+  );
+  assert.match(editPage, /<DeferredEditPdfTool \/>/);
+  assert.match(deferred, /ssr:\s*false/);
+  assert.match(
+    deferred,
+    /requestAnimationFrame\(\(\) => \{[\s\S]*requestAnimationFrame\(\(\) => \{[\s\S]*setReady\(true\)/,
+    "The heavy editor should begin only after two animation frames have allowed first paint.",
+  );
+  assert.match(deferred, /return ready \? <EditPdfTool \/> : <ToolWorkspaceLoading \/>/);
+});
