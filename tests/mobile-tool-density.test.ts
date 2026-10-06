@@ -7,18 +7,11 @@ function read(path: string): string {
 }
 
 test("mobile homepage prioritizes PDF tools before supporting trust content", () => {
-  const css = read("app/home.module.css");
   const page = read("app/page.tsx");
 
-  assert.match(
-    css,
-    /grid-template-areas:\s*"hero"\s*"tools"\s*"trust"/,
-  );
-  assert.match(
-    css,
-    /@media \(min-width: 900px\)[\s\S]*grid-template-areas:\s*"hero trust"\s*"tools tools"/,
-  );
-  assert.match(page, /className=\{styles\.heroTools\}/);
+  assert.match(page, /<header className="order-1/);
+  assert.match(page, /<div className="order-2 min-w-0 min-\[900px\]:col-span-2 min-\[900px\]:row-start-2">/);
+  assert.match(page, /<aside className="order-3[\s\S]*min-\[900px\]:col-start-2 min-\[900px\]:row-start-1"/);
   assert.match(page, /<PdfToolLauncher allToolsLabel="View all tools" \/>/);
   assert.match(page, /aria-label="Lumeo trust principles"/);
 });
