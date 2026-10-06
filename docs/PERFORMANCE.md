@@ -153,3 +153,8 @@ A valid Lighthouse 13.5 trace showed the homepage requesting Edit PDF, JSZip, Sp
 ### Homepage LCP convergence
 
 Once Lighthouse 13.5 collection became reliable, the PR-local homepage budget measured a median LCP of about 4026 ms against the unchanged 4000 ms budget. The LCP node was the hero heading, "Your PDFs stay yours." The heading still lived inside the generic `lumeo-fade-up` entrance animation, whose first frame is transparent. The homepage hero no longer uses that entrance animation, so the above-the-fold LCP content is paintable immediately. Other page motion remains unchanged.
+
+
+### Final four-route LCP convergence
+
+The exact-production Lighthouse 13.5 run on `a60333e` produced valid samples on all four audited routes but missed the unchanged 4.0s LCP budget: homepage ~4.71s, `/pdf` ~4.61s, `/pdf-tools` ~4.44s and `/pdf/edit` ~4.47s. The reports showed a shared high-priority `/icon.png` request of roughly 241 KB on every page, larger than all three font files combined, plus transform-based entrance motion on the public page shell. The generic rel-icon declaration is removed in favor of the small favicon while install icons remain available through the manifest, IBM Plex Mono is no longer eagerly preloaded, public shells paint without whole-page transform motion, and the `/pdf-tools` LCP heading no longer animates. PR Lighthouse now enforces the full four-route × three-sample budget before merge so Step 4 cannot regress into another post-merge loop.
