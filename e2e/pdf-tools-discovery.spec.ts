@@ -79,7 +79,7 @@ test.describe("PDF Tools discovery", () => {
   test("supports direct discovery, combined filters, and keyboard shortcuts", async ({ page }) => {
     await page.goto("/pdf-tools");
 
-    await expect(page.getByRole("heading", { name: "Find the right tool." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "All PDF tools in one place." })).toBeVisible();
     await expect(page.getByRole("link", { name: /Open Merge PDF/ })).toHaveAttribute("href", "/pdf/merge");
 
     const search = page.getByRole("searchbox", { name: "Search tools and actions" });

@@ -20,7 +20,7 @@ export const PUBLIC_ROUTE_CONFIG: readonly PublicRouteConfig[] = [
   // Hybrid entry release, PR #573 (498ef1ff). Update per meaningful page change.
   { path: "/", changeFrequency: "weekly", priority: 1, lastModified: "2026-10-03" },
   { path: "/pdf", changeFrequency: "weekly", priority: 0.9, lastModified: "2026-10-04" },
-  { path: "/pdf-tools", changeFrequency: "weekly", priority: 0.9, lastModified: "2026-10-03" },
+  { path: "/pdf-tools", changeFrequency: "weekly", priority: 0.9, lastModified: "2026-10-06" },
   // The public tool pages below received the same meaningful PR #593 content update.
   { path: "/pdf/merge", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-04" },
   { path: "/pdf/split", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-04" },
