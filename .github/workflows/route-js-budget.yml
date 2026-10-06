@@ -1,0 +1,208 @@
+name: Route JavaScript Budget
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "worker/**"
+      - "scripts/check-route-js-budget.mjs"
+      - "tests/route-js-budget-contract.test.ts"
+      - ".github/workflows/route-js-budget.yml"
+      - "package.json"
+      - "package-lock.json"
+  push:
+    branches:
+      - main
+    paths:
+      - "app/**"
+      - "components/**"
+      - "lib/**"
+      - "public/**"
+      - "worker/**"
+      - "scripts/check-route-js-budget.mjs"
+      - ".github/workflows/route-js-budget.yml"
+      - "package.json"
+      - "package-lock.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: route-js-budget-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pr-budget:
+    if: github.event_name == 'pull_request'
+    name: Route-loaded JavaScript budget — PR Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Initialize isolated Supabase catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -f supabase/config.toml ]; then
+            npx supabase init
+          fi
+          npx supabase start
+
+      - name: Configure public catalog environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx supabase status -o env > /tmp/lumeo-route-js-supabase.env
+          set -a
+          source /tmp/lumeo-route-js-supabase.env
+          set +a
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$API_URL"
+            echo "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=$ANON_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: Build production Cloudflare Worker
+        run: npm run build:vinext
+
+      - name: Start local production Worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler dev             --config dist/server/wrangler.json             --port 8787             --var "NEXT_PUBLIC_SUPABASE_URL:$NEXT_PUBLIC_SUPABASE_URL"             --var "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"             > /tmp/lumeo-route-js-worker.log 2>&1 &
+          echo $! > /tmp/lumeo-route-js-worker.pid
+
+          ready=false
+          for attempt in {1..90}; do
+            if curl --fail --silent http://127.0.0.1:8787/pdf/edit >/dev/null; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$(cat /tmp/lumeo-route-js-worker.pid)" 2>/dev/null; then
+              cat /tmp/lumeo-route-js-worker.log
+              exit 1
+            fi
+            sleep 1
+          done
+
+          if [ "$ready" != "true" ]; then
+            cat /tmp/lumeo-route-js-worker.log
+            exit 1
+          fi
+
+      - name: Enforce route-loaded JavaScript budgets
+        env:
+          LUMEO_ROUTE_JS_BASE_URL: http://127.0.0.1:8787
+          LUMEO_ROUTE_JS_ENFORCE_TRANSFER: "0"
+        run: npm run verify:route-js-budget
+
+      - name: Upload route JavaScript report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: route-js-budget-pr
+          path: test-results/route-js-budget.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Stop local Worker
+        if: always()
+        shell: bash
+        run: |
+          if [ -f /tmp/lumeo-route-js-worker.pid ]; then
+            kill "$(cat /tmp/lumeo-route-js-worker.pid)" 2>/dev/null || true
+          fi
+
+  production-budget:
+    if: github.event_name != 'pull_request'
+    name: Route-loaded JavaScript budget — exact production
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.x"
+          cache: npm
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Wait for exact Cloudflare production revision
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          for attempt in {1..30}; do
+            body="$(curl --silent --show-error --fail --max-time 30 https://lumeo.in/api/build-info || true)"
+            deployed_commit="$(
+              BODY="$body" node -e '
+                try {
+                  const value = JSON.parse(process.env.BODY || "{}");
+                  process.stdout.write(typeof value.commit === "string" ? value.commit : "");
+                } catch {}
+              '
+            )"
+            deployed_environment="$(
+              BODY="$body" node -e '
+                try {
+                  const value = JSON.parse(process.env.BODY || "{}");
+                  process.stdout.write(typeof value.environment === "string" ? value.environment : "");
+                } catch {}
+              '
+            )"
+
+            if [ "$deployed_commit" = "$EXPECTED_SHA" ] && [ "$deployed_environment" = "production" ]; then
+              echo "PASS exact production revision $deployed_commit"
+              exit 0
+            fi
+
+            echo "Waiting for Cloudflare revision: expected $EXPECTED_SHA, observed ${deployed_commit:-none} (attempt $attempt/30)"
+            sleep 10
+          done
+
+          echo "FAIL production did not reach expected revision $EXPECTED_SHA" >&2
+          exit 1
+
+      - name: Enforce exact-production route JavaScript budgets
+        env:
+          LUMEO_ROUTE_JS_BASE_URL: https://lumeo.in
+          LUMEO_ROUTE_JS_ENFORCE_TRANSFER: "1"
+        run: npm run verify:route-js-budget
+
+      - name: Upload production route JavaScript report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: route-js-budget-production
+          path: test-results/route-js-budget.json
+          if-no-files-found: ignore
+          retention-days: 14
