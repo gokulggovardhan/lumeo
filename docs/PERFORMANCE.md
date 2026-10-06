@@ -153,3 +153,24 @@ A valid Lighthouse 13.5 trace showed the homepage requesting Edit PDF, JSZip, Sp
 ### Homepage LCP convergence
 
 Once Lighthouse 13.5 collection became reliable, the PR-local homepage budget measured a median LCP of about 4026 ms against the unchanged 4000 ms budget. The LCP node was the hero heading, "Your PDFs stay yours." The heading still lived inside the generic `lumeo-fade-up` entrance animation, whose first frame is transparent. The homepage hero no longer uses that entrance animation, so the above-the-fold LCP content is paintable immediately. Other page motion remains unchanged.
+
+
+### Final four-route LCP convergence
+
+The exact-production Lighthouse 13.5 run on `a60333e` produced valid samples on all four audited routes but missed the unchanged 4.0s LCP budget: homepage ~4.71s, `/pdf` ~4.61s, `/pdf-tools` ~4.44s and `/pdf/edit` ~4.47s. The reports showed a shared high-priority `/icon.png` request of roughly 241 KB on every page, larger than all three font files combined, plus transform-based entrance motion on the public page shell. The generic rel-icon declaration is removed in favor of the small favicon while install icons remain available through the manifest, IBM Plex Mono is no longer eagerly preloaded, public shells paint without whole-page transform motion, and the `/pdf-tools` LCP heading no longer animates. PR Lighthouse now enforces the full four-route × three-sample budget before merge so Step 4 cannot regress into another post-merge loop.
+
+
+
+### Edit PDF LCP element correction
+
+The four-route PR run confirmed `/`, `/pdf`, and `/pdf-tools` below the unchanged 4.0s budget, while `/pdf/edit` had a 4126 ms median. That run identified the first-screen tool-header description (“Add text, drawing, shapes, and whiteout boxes to a PDF.”) as LCP, so the shared `L2ToolPageHeader` entrance animation was removed. A later clean-header run exposed the next LCP candidate underneath it: the below-tool Edit PDF SEO/help paragraph at roughly y=723, with route samples 4016 ms / 4183 ms / 5680 ms. The mobile-only Edit workspace minimum height is therefore restored to keep that supporting content outside the first mobile viewport while leaving `sm+` layouts unchanged. This is now evidence-backed rather than speculative; the LCP budget remains 4000 ms.
+
+
+### Homepage route-CSS removal
+
+The post-header-fix four-route run moved `/pdf/edit` to 3708 ms and left only the homepage over budget at 4005 ms. All three homepage samples identified the same H1, “Your PDFs stay yours.”, as LCP. Lighthouse also identified the small homepage-only stylesheet as render-blocking. The former `app/home.module.css` rules are now expressed with equivalent utility classes directly in the homepage markup, preserving the mobile and >=900 px grid, title typography, and trust-card treatment while removing that separate route stylesheet request. The 4000 ms LCP budget is unchanged.
+
+
+### Edit PDF first-paint client isolation
+
+After the viewport boundary fix, the below-tool SEO paragraph stopped being LCP, but the Edit header description still measured 3698–4385 ms with a 4233 ms median. The corresponding Lighthouse network trace showed the heavy editor graph starting before first paint, including an approximately 163 KB dependency chunk, a 76 KB `EditPdfTool` chunk, and additional PDF editing dependencies. The server route no longer directly imports that graph. A minimal client boundary keeps the existing `ToolWorkspaceLoading` surface visible immediately, then enables the real Edit tool after two animation frames. This changes no PDF editing architecture or export behavior; it only prevents the full native-edit client graph from competing with the LCP-critical page header.

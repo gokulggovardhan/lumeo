@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
-import dynamic from "next/dynamic";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
-import { L2ToolPageHeader, ToolWorkspaceLoading } from "@/components/pdf/workspace/ToolWorkspace";
+import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
 import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
 import { ToolSeoContent } from "@/components/pdf/ToolSeoContent";
-
-const EditPdfTool = dynamic(() => import("@/components/pdf/EditPdfTool"), {
-  loading: () => <ToolWorkspaceLoading />,
-});
+import DeferredEditPdfTool from "@/components/pdf/edit/DeferredEditPdfTool";
 
 const softwareSchema = buildSoftwareApplicationSchema({
   name: "Lumeo Edit PDF",
@@ -60,7 +56,7 @@ export default async function EditPdfPage() {
       {toolState.blocked ? (
         <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
       ) : (
-        <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool"><EditPdfTool /></div>
+        <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool min-h-[calc(100dvh-12rem)] sm:min-h-0"><DeferredEditPdfTool /></div>
       )}
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />

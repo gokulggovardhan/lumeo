@@ -25,8 +25,14 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(workflow, /push:/);
   assert.match(workflow, /branches:[\s\S]*main/);
   assert.match(workflow, /pull_request:/);
-  assert.match(workflow, /Mobile Lighthouse homepage budget/);
+  assert.match(workflow, /Mobile Lighthouse four-route budget/);
   assert.match(workflow, /Build Cloudflare Worker from PR branch/);
+  assert.match(workflow, /Warm all audited PR routes/);
+  assert.match(
+    workflow,
+    /for route in \/ \/pdf \/pdf-tools \/pdf\/edit; do/,
+    "The PR Lighthouse gate must warm all four audited routes.",
+  );
   assert.match(workflow, /Start local PR Worker/);
   assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE/);
   assert.match(workflow, /LIGHTHOUSE_BASE_URL:\s*http:\/\/127\.0\.0\.1:8787/);
@@ -69,6 +75,7 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(runner, /Discarding transient Lighthouse runtime-invalid attempt/);
   assert.match(runner, /median\(/);
   assert.match(runner, /runsPerRoute = baseConfig\.numberOfRuns/);
+  assert.match(workflow, /LIGHTHOUSE_COLLECTOR_SMOKE:\s*"0"/);
 });
 
 
@@ -115,10 +122,95 @@ test("public page entrance motion never blocks first paint", () => {
 
 test("homepage LCP hero is never hidden behind entrance motion", () => {
   const home = readFileSync("app/page.tsx", "utf8");
-  assert.match(home, /className=\{styles\.heroGrid\}/);
+  assert.match(
+    home,
+    /<div className="grid items-stretch gap-\[0\.85rem\][^"]*">/,
+    "The above-the-fold hero grid must remain directly paintable.",
+  );
   assert.doesNotMatch(
     home,
-    /lumeo-fade-up[^\n]*heroGrid|heroGrid[^\n]*lumeo-fade-up/,
-    "The above-the-fold hero contains the LCP heading and must paint immediately.",
+    /lumeo-fade-up[^\n]*Your PDFs stay yours|Your PDFs stay yours[^\n]*lumeo-fade-up/,
+    "The measured LCP heading must not be gated by entrance motion.",
   );
+});
+
+
+test("critical public pages avoid nonessential first-paint competition", () => {
+  const layout = readFileSync("app/layout.tsx", "utf8");
+  const publicChrome = readFileSync("components/PublicPdfChrome.tsx", "utf8");
+  const home = readFileSync("app/page.tsx", "utf8");
+  const tools = readFileSync("app/pdf-tools/page.tsx", "utf8");
+
+  assert.doesNotMatch(
+    layout,
+    /url:\s*"\/icon\.png"/,
+    "The oversized generic rel icon must not compete with LCP-critical resources.",
+  );
+  assert.match(layout, /icon:\s*\[\{ url: "\/favicon\.ico", sizes: "any" \}\]/);
+  assert.match(layout, /const plexMono = IBM_Plex_Mono\([\s\S]*preload:\s*false/);
+  assert.doesNotMatch(publicChrome, /lumeo-page-enter aura-page-shell/);
+  assert.doesNotMatch(home, /lumeo-page-enter aura-home/);
+  assert.doesNotMatch(
+    tools,
+    /<section className="lumeo-fade-up mb-4 max-w-3xl/,
+    "The PDF tools LCP heading must paint without entrance motion.",
+  );
+});
+
+
+test("LCP-critical tool headers paint immediately and Edit keeps SEO help below the first mobile viewport", () => {
+  const workspace = readFileSync("components/pdf/workspace/ToolWorkspace.tsx", "utf8");
+  const editPage = readFileSync("app/pdf/edit/page.tsx", "utf8");
+
+  assert.doesNotMatch(
+    workspace,
+    /l2-tool-page-header lumeo-fade-up/,
+    "Shared public tool headers contain first-screen LCP text and must paint immediately.",
+  );
+  assert.match(
+    editPage,
+    /aura-live-tool min-h-\[calc\(100dvh-12rem\)\] sm:min-h-0/,
+    "Edit PDF should keep below-tool SEO/help copy outside the first mobile viewport without changing desktop layout.",
+  );
+});
+
+
+test("homepage LCP-critical layout does not depend on a route CSS module", () => {
+  const homepage = readFileSync("app/page.tsx", "utf8");
+
+  assert.doesNotMatch(
+    homepage,
+    /home\.module\.css/,
+    "The homepage hero must not restore the separate render-blocking CSS module.",
+  );
+  assert.match(
+    homepage,
+    /Your PDFs stay yours\./,
+    "The measured homepage LCP heading remains present.",
+  );
+  assert.match(
+    homepage,
+    /min-\[900px\]:grid-cols-\[minmax\(0,1\.45fr\)_minmax\(17rem,0\.55fr\)\]/,
+    "The desktop hero grid must preserve the prior two-column layout.",
+  );
+});
+
+
+test("Edit PDF heavy client graph starts only after the first paint boundary", () => {
+  const editPage = readFileSync("app/pdf/edit/page.tsx", "utf8");
+  const deferred = readFileSync("components/pdf/edit/DeferredEditPdfTool.tsx", "utf8");
+
+  assert.doesNotMatch(
+    editPage,
+    /dynamic\(\(\) => import\("@\/components\/pdf\/EditPdfTool"\)/,
+    "The server page must not eagerly advertise the heavy Edit PDF graph.",
+  );
+  assert.match(editPage, /<DeferredEditPdfTool \/>/);
+  assert.match(deferred, /ssr:\s*false/);
+  assert.match(
+    deferred,
+    /requestAnimationFrame\(\(\) => \{[\s\S]*requestAnimationFrame\(\(\) => \{[\s\S]*setReady\(true\)/,
+    "The heavy editor should begin only after two animation frames have allowed first paint.",
+  );
+  assert.match(deferred, /return ready \? <EditPdfTool \/> : <ToolWorkspaceLoading \/>/);
 });

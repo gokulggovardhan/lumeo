@@ -42,7 +42,7 @@ concurrency:
 jobs:
   collector-smoke:
     if: github.event_name == 'pull_request'
-    name: Mobile Lighthouse homepage budget
+    name: Mobile Lighthouse four-route budget
     runs-on: ubuntu-latest
     timeout-minutes: 35
 
@@ -117,13 +117,18 @@ jobs:
             exit 1
           fi
 
-      - name: Warm PR smoke route
-        run: curl --fail --silent --show-error --max-time 30 http://127.0.0.1:8787/ >/dev/null
+      - name: Warm all audited PR routes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for route in / /pdf /pdf-tools /pdf/edit; do
+            curl --fail --silent --show-error --max-time 30 "http://127.0.0.1:8787$route" >/dev/null
+          done
 
-      - name: Run Lighthouse 13.5 homepage budgets on PR build
+      - name: Run Lighthouse 13.5 four-route budgets on PR build
         env:
           CHROME_PATH: /usr/bin/google-chrome
-          LIGHTHOUSE_COLLECTOR_SMOKE: "1"
+          LIGHTHOUSE_COLLECTOR_SMOKE: "0"
           LIGHTHOUSE_BASE_URL: http://127.0.0.1:8787
           LIGHTHOUSE_CHROME_FLAGS: --headless=new --no-sandbox --disable-dev-shm-usage
         run: node scripts/run-mobile-lighthouse.mjs
@@ -132,7 +137,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: mobile-lighthouse-homepage-budget
+          name: mobile-lighthouse-four-route-budget
           path: .lighthouseci
           if-no-files-found: ignore
           include-hidden-files: true
