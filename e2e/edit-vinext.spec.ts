@@ -401,6 +401,17 @@ test("vinext Edit PDF recognizes a proven scanned page locally without promoting
     timeout: 90_000,
   });
 
+  // WebKit can expose the prior best-effort Find index for one task after
+  // the regenerated PDF revision is already visible. First prove that the
+  // replacement revision has been indexed, then assert the previous OCR term
+  // is absent. The final semantics remain strict: FINALSCAN must be searchable
+  // and REVIEWEDSCAN must not be.
+  await find.fill("FINALSCAN");
+  await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
+    "data-edit-search-match-count",
+    "1",
+    { timeout: 90_000 },
+  );
   await find.fill("REVIEWEDSCAN");
   await expect(page.locator("[data-edit-search-match-count]")).toHaveAttribute(
     "data-edit-search-match-count",
