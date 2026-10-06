@@ -152,3 +152,19 @@ test("critical public pages avoid nonessential first-paint competition", () => {
     "The PDF tools LCP heading must paint without entrance motion.",
   );
 });
+
+
+test("Edit loading shell keeps SEO help below the first mobile viewport", () => {
+  const workspace = readFileSync("components/pdf/workspace/ToolWorkspace.tsx", "utf8");
+  const editPage = readFileSync("app/pdf/edit/page.tsx", "utf8");
+
+  assert.match(
+    workspace,
+    /ToolWorkspaceLoading\(\{[\s\S]*minHeightClassName = "min-h-\[22rem\]"/,
+  );
+  assert.match(
+    editPage,
+    /ToolWorkspaceLoading minHeightClassName="min-h-\[32rem\]"/,
+    "Edit PDF needs a taller loading footprint so below-tool SEO copy cannot become first-viewport LCP.",
+  );
+});
