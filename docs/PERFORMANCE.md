@@ -158,3 +158,8 @@ Once Lighthouse 13.5 collection became reliable, the PR-local homepage budget me
 ### Final four-route LCP convergence
 
 The exact-production Lighthouse 13.5 run on `a60333e` produced valid samples on all four audited routes but missed the unchanged 4.0s LCP budget: homepage ~4.71s, `/pdf` ~4.61s, `/pdf-tools` ~4.44s and `/pdf/edit` ~4.47s. The reports showed a shared high-priority `/icon.png` request of roughly 241 KB on every page, larger than all three font files combined, plus transform-based entrance motion on the public page shell. The generic rel-icon declaration is removed in favor of the small favicon while install icons remain available through the manifest, IBM Plex Mono is no longer eagerly preloaded, public shells paint without whole-page transform motion, and the `/pdf-tools` LCP heading no longer animates. PR Lighthouse now enforces the full four-route × three-sample budget before merge so Step 4 cannot regress into another post-merge loop.
+
+
+### Edit PDF first-viewport LCP
+
+After the shared icon and public-shell fixes, the PR-local four-route gate passed `/` (~3.99s), `/pdf` (~3.98s), and `/pdf-tools` (~3.96s). Only `/pdf/edit` remained above budget (~5.09s). Its Lighthouse LCP node was not the editor: it was the SEO/help paragraph starting around 723px, visible at the bottom of the 844px mobile viewport while the dynamic editor was still loading. Edit PDF now uses a route-specific 32rem loading footprint (the shared default remains 22rem), matching the real editor workspace more closely and keeping below-tool help content out of the first viewport during lazy loading.
