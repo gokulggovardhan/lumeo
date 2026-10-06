@@ -148,7 +148,8 @@ export default async function Home() {
               </p>
 
               <h1
-                className="mt-2.5 font-serif text-[clamp(2rem,10.5vw,2.65rem)] font-semibold leading-[0.98] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[clamp(2.25rem,4.6vw,3.75rem)] sm:leading-[0.99] sm:tracking-[-0.035em]"
+                className="mt-2.5 text-[clamp(2rem,10.5vw,2.65rem)] font-semibold leading-[0.98] tracking-[-0.03em] text-[var(--text-primary)] sm:text-[clamp(2.25rem,4.6vw,3.75rem)] sm:leading-[0.99] sm:tracking-[-0.035em]"
+                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
               >
                 Your PDFs stay yours.
               </h1>
