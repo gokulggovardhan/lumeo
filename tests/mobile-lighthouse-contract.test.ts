@@ -38,6 +38,8 @@ test("Lighthouse certification waits for the exact deployed main revision", () =
   assert.match(workflow, /runs-on:\s*ubuntu-latest/);
   assert.match(workflow, /runs-on:\s*windows-latest/);
   assert.match(workflow, /browser-actions\/setup-chrome@v2/);
+  assert.match(workflow, /id:\s*pr-chrome/);
+  assert.match(workflow, /steps\.pr-chrome\.outputs\.chrome-path/);
   assert.match(workflow, /steps\.chrome\.outputs\.chrome-path/);
   assert.doesNotMatch(workflow, /Xvfb/);
   assert.match(workflow, /include-hidden-files:\s*true/);
