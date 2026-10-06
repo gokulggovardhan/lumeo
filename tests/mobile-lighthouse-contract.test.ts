@@ -205,3 +205,29 @@ test("homepage critical layout does not create a route-specific render-blocking 
   assert.doesNotMatch(home, /styles\.hero/);
   assert.match(home, /min-\[900px\]:grid-cols-\[minmax\(0,1\.45fr\)_minmax\(17rem,0\.55fr\)\]/);
 });
+
+
+test("PDF Workspace defers interactive controls until after first paint", () => {
+  const page = readFileSync("app/pdf/page.tsx", "utf8");
+  const deferred = readFileSync(
+    "components/pdf/workspace/DeferredWorkspaceStart.tsx",
+    "utf8",
+  );
+  const firstPaint = readFileSync(
+    "components/pdf/workspace/WorkspaceStartFirstPaint.tsx",
+    "utf8",
+  );
+
+  assert.match(page, /DeferredWorkspaceStart/);
+  assert.doesNotMatch(
+    page,
+    /import \{ WorkspaceStart \} from "@\/components\/pdf\/workspace\/WorkspaceStart"/,
+  );
+  assert.match(deferred, /ssr:\s*false/);
+  assert.match(deferred, /requestAnimationFrame/);
+  assert.match(deferred, /cancelAnimationFrame/);
+  assert.match(deferred, /WorkspaceStartFirstPaint/);
+  assert.match(firstPaint, /Keep one PDF open while you edit it, organize pages, sign/);
+  assert.match(firstPaint, /data-workspace-start-first-paint="true"/);
+  assert.doesNotMatch(firstPaint, /components\/ui\/Aura|ToolWorkspace|useWorkspaceDocument/);
+});
