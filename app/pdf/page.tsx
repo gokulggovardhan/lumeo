@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
-import { WorkspaceStart } from "@/components/pdf/workspace/WorkspaceStart";
+import DeferredWorkspaceStart from "@/components/pdf/workspace/DeferredWorkspaceStart";
 import { withSeoOverride } from "@/lib/public-site/seo";
 import { buildBreadcrumbSchema, buildSoftwareApplicationSchema } from "@/lib/public-site/schema";
 
@@ -54,7 +54,7 @@ export default function PdfWorkspacePage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-4 pb-20 pt-4 sm:px-8 sm:pb-20 sm:pt-7"
     >
-      <WorkspaceStart />
+      <DeferredWorkspaceStart />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(workspaceSchema) }}
