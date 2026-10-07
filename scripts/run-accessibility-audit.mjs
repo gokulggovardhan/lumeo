@@ -8,6 +8,7 @@ const require = createRequire(import.meta.url);
 const axePath = require.resolve("axe-core/axe.min.js");
 const baseURL = (process.env.LUMEO_ACCESSIBILITY_BASE_URL || "http://127.0.0.1:8787").replace(/\/$/, "");
 const reportPath = path.resolve("test-results/accessibility/axe-report.json");
+const stableSurfaceDelayMs = 1_250;
 
 const results = [];
 
@@ -26,7 +27,10 @@ async function createFixture() {
 
 async function waitForSurface(page) {
   await page.locator("main").first().waitFor({ state: "visible", timeout: 30_000 });
-  await page.waitForTimeout(350);
+  // Audit the settled UI, not an intermediate ScrollReveal opacity frame.
+  // The homepage launcher can delay a card by index * 60ms and then animate
+  // opacity for 500ms, so 1.25s covers the complete above-the-fold sequence.
+  await page.waitForTimeout(stableSurfaceDelayMs);
 }
 
 async function injectAxe(page) {
