@@ -50,6 +50,9 @@ const routeBudgets = {
 const maxSingleRawBytes = 430_000;
 const maxSingleGzipBytes = 195_000;
 const maxSingleTransferBytes = 195_000;
+const minimumRouteObservationMs = 1_500;
+const javascriptQuietWindowMs = 1_000;
+const maximumRouteObservationMs = 15_000;
 
 function sameOriginStaticJavaScript(url) {
   try {
@@ -95,6 +98,11 @@ async function measureRoute(browser, route) {
   const encodedTransfer = new Map();
   const scripts = new Map();
   const bodyReads = [];
+  let lastJavaScriptActivityAt = Date.now();
+
+  const noteJavaScriptActivity = () => {
+    lastJavaScriptActivityAt = Date.now();
+  };
 
   await cdp.send("Network.enable");
   await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
@@ -103,6 +111,7 @@ async function measureRoute(browser, route) {
     const url = event.response?.url;
     if (!url || !sameOriginStaticJavaScript(url)) return;
     requestUrls.set(event.requestId, url);
+    noteJavaScriptActivity();
   });
 
   cdp.on("Network.loadingFinished", (event) => {
@@ -110,12 +119,14 @@ async function measureRoute(browser, route) {
     if (!url) return;
     const current = encodedTransfer.get(url) ?? 0;
     encodedTransfer.set(url, Math.max(current, Math.round(event.encodedDataLength || 0)));
+    noteJavaScriptActivity();
   });
 
   page.on("response", (response) => {
     const url = response.url();
     if (!sameOriginStaticJavaScript(url) || scripts.has(url)) return;
 
+    noteJavaScriptActivity();
     const read = response
       .body()
       .then((body) => {
@@ -125,6 +136,7 @@ async function measureRoute(browser, route) {
           gzipBytes: gzipSync(body, { level: 9 }).byteLength,
           status: response.status(),
         });
+        noteJavaScriptActivity();
       })
       .catch((error) => {
         scripts.set(url, {
@@ -137,8 +149,38 @@ async function measureRoute(browser, route) {
 
   try {
     await page.goto(BASE_URL + route, { waitUntil: "load", timeout: 120_000 });
-    await page.waitForLoadState("networkidle", { timeout: 120_000 });
-    await page.waitForTimeout(750);
+
+    // Do not use whole-page networkidle here. Production intentionally performs
+    // post-load analytics/announcement requests that are unrelated to the JS
+    // budget and can keep the page network-active indefinitely. Instead, wait
+    // until the set of current-route JavaScript requests itself becomes quiet.
+    const observationStartedAt = Date.now();
+    while (true) {
+      await page.waitForTimeout(200);
+
+      const now = Date.now();
+      const observedFor = now - observationStartedAt;
+      const javaScriptQuietFor = now - lastJavaScriptActivityAt;
+
+      if (
+        observedFor >= minimumRouteObservationMs &&
+        javaScriptQuietFor >= javascriptQuietWindowMs
+      ) {
+        break;
+      }
+
+      if (observedFor >= maximumRouteObservationMs) {
+        throw new Error(
+          route +
+            ": route JavaScript did not stabilize within " +
+            maximumRouteObservationMs +
+            "ms (last JS activity " +
+            javaScriptQuietFor +
+            "ms ago)",
+        );
+      }
+    }
+
     await Promise.allSettled(bodyReads);
   } finally {
     await cdp.detach().catch(() => undefined);
@@ -264,7 +306,7 @@ async function main() {
     baselineSha: BASELINE_SHA,
     baselineSource: "exact-production Lighthouse 13.5 artifacts for main " + BASELINE_SHA,
     measurement:
-      "JavaScript actually requested by a cold Chromium context per route; response bodies provide raw/gzip bytes and CDP encodedDataLength provides transfer bytes.",
+      "JavaScript actually requested by a cold Chromium context per route; marked navigation prefetch is excluded and readiness is based on a bounded JavaScript-only quiet window, not whole-page network idle. Response bodies provide raw/gzip bytes and CDP encodedDataLength provides transfer bytes.",
     enforceTransfer: ENFORCE_TRANSFER,
     maxSingleRawBytes,
     maxSingleGzipBytes,
