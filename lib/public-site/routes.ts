@@ -16,7 +16,7 @@ export type PublicRouteConfig = {
  */
 export const PUBLIC_ROUTE_CONFIG: readonly PublicRouteConfig[] = [
   // GSC-backed visible tool-content enrichment, PR #593 (a5860d9f).
-  { path: "/heic-to-jpeg", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-04" },
+  { path: "/heic-to-jpeg", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-06" },
   // Hybrid entry release, PR #573 (498ef1ff). Update per meaningful page change.
   { path: "/", changeFrequency: "weekly", priority: 1, lastModified: "2026-10-03" },
   { path: "/pdf", changeFrequency: "weekly", priority: 0.9, lastModified: "2026-10-04" },
@@ -27,13 +27,13 @@ export const PUBLIC_ROUTE_CONFIG: readonly PublicRouteConfig[] = [
   { path: "/pdf/compress", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-06" },
   { path: "/pdf/jpg-to-pdf", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-06" },
   { path: "/pdf/pdf-to-jpg", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-06" },
-  { path: "/pdf/sign", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-04" },
+  { path: "/pdf/sign", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-06" },
   { path: "/pdf/organize", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-04" },
   { path: "/pdf/extract-text", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-04" },
   { path: "/pdf/edit", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-06" },
-  { path: "/pdf/watermark", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-04" },
+  { path: "/pdf/watermark", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-06" },
   { path: "/pdf/crop", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-04" },
-  { path: "/pdf/page-numbers", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-04" },
+  { path: "/pdf/page-numbers", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-06" },
   { path: "/pdf/header-footer", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-04" },
   { path: "/pdf/word-to-pdf", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-06" },
   { path: "/pdf/pdf-to-word", changeFrequency: "monthly", priority: 0.8, lastModified: "2026-10-06" },
