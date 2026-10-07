@@ -5,7 +5,11 @@ export type AnalyticsEventName =
   | "processing_succeeded"
   | "processing_failed"
   | "processing_cancelled"
-  | "download_started";
+  | "download_started"
+  | "workspace_started"
+  | "workspace_tool_switched"
+  | "workspace_finish_opened"
+  | "workspace_completed";
 
 export type AnalyticsSizeBucket =
   | "under_1mb"
