@@ -185,7 +185,7 @@ export function WorkspaceFinish() {
           </div>
 
           <div className="rounded-[var(--radius-xl)] border border-[var(--border-subtle)] bg-[rgba(var(--paper-rgb),0.025)] p-4">
-            <label className="block text-xs font-extrabold uppercase tracking-[0.12em] text-[var(--text-subtle)]">
+            <label className="block text-xs font-extrabold uppercase tracking-[0.12em] text-[var(--text-secondary)]">
               File name
               <AuraInput
                 value={name}
@@ -208,7 +208,7 @@ export function WorkspaceFinish() {
             >
               Reduce size first
             </AuraButton>
-            <p className="mt-2 text-xs leading-5 text-[var(--text-subtle)]">
+            <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
               Optional. This opens the existing Compress tool with the same PDF.
             </p>
           </div>
