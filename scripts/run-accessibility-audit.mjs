@@ -81,19 +81,26 @@ async function runAxe(page, name) {
 }
 
 async function assertKeyboardEntry(page, name) {
-  await page.keyboard.press("Tab");
-  const active = await page.evaluate(() => ({
-    tag: document.activeElement?.tagName ?? "",
-    text: document.activeElement?.textContent?.trim() ?? "",
-    href:
-      document.activeElement instanceof HTMLAnchorElement
-        ? document.activeElement.getAttribute("href")
-        : null,
-  }));
+  // WebKit can keep focus on the document for the first Tab immediately after
+  // a client-side navigation. Keep the keyboard-only requirement, but allow a
+  // short real Tab sequence to reach the first focusable control.
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    await page.keyboard.press("Tab");
+    const active = await page.evaluate(() => ({
+      tag: document.activeElement?.tagName ?? "",
+      text: document.activeElement?.textContent?.trim() ?? "",
+      href:
+        document.activeElement instanceof HTMLAnchorElement
+          ? document.activeElement.getAttribute("href")
+          : null,
+    }));
 
-  if (active.tag === "BODY" || active.tag === "HTML" || !active.tag) {
-    throw new Error(`${name}: keyboard focus did not enter the page`);
+    if (active.tag && active.tag !== "BODY" && active.tag !== "HTML") {
+      return;
+    }
   }
+
+  throw new Error(`${name}: keyboard focus did not enter the page after 5 Tab presses`);
 }
 
 async function gotoAndAudit(page, route, name) {
