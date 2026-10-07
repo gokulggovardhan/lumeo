@@ -36,7 +36,8 @@
     "prepare:pdfjs-assets": "node scripts/prepare-pdfjs-assets.mjs",
     "prepare:ocr-assets": "node scripts/prepare-ocr-assets.mjs",
     "prepare:brand-assets": "node scripts/prepare-brand-assets.mjs",
-    "verify:route-js-budget": "node scripts/check-route-js-budget.mjs"
+    "verify:route-js-budget": "node scripts/check-route-js-budget.mjs",
+    "verify:accessibility": "node scripts/run-accessibility-audit.mjs"
   },
   "dependencies": {
     "@cantoo/fontkit": "2.0.12",
