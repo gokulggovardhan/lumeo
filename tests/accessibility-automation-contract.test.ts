@@ -18,6 +18,8 @@ test("Step 6 accessibility audit covers desktop Chromium and mobile WebKit", () 
   assert.match(source, /mobile WebKit connected Workspace Edit/);
   assert.match(source, /mobile WebKit Workspace Finish/);
   assert.match(source, /keyboard focus did not enter the page/);
+  assert.match(source, /stableSurfaceDelayMs = 1_250/);
+  assert.match(source, /waitForTimeout\(stableSurfaceDelayMs\)/);
   assert.doesNotMatch(source, /networkidle/);
 });
 
