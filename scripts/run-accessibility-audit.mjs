@@ -142,13 +142,21 @@ async function auditMobileWebKit() {
     });
     await waitForSurface(page);
 
-    await page.setInputFiles("#workspace-pdf-upload", {
+    const upload = page
+      .locator('input[type="file"][data-upload-client-ready="true"]')
+      .first();
+    await upload.waitFor({ state: "attached", timeout: 30_000 });
+    await upload.setInputFiles({
       name: "accessibility-fixture.pdf",
       mimeType: "application/pdf",
       buffer: fixture,
     });
 
-    const editButton = page.getByRole("button", { name: "Edit", exact: true });
+    await page
+      .getByRole("heading", { name: "Choose your next step.", exact: true })
+      .waitFor({ state: "visible", timeout: 30_000 });
+
+    const editButton = page.getByRole("button", { name: /^Edit/ });
     await editButton.waitFor({ state: "visible", timeout: 30_000 });
     await editButton.click();
     await page.waitForURL("**/pdf/edit", { timeout: 30_000 });
