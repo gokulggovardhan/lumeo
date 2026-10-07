@@ -34,6 +34,11 @@ test("Step 6 keeps the two verified contrast fixes narrow", () => {
     command,
     /<kbd className="text-\[var\(--text-secondary\)\]">Ctrl K<\/kbd>/,
   );
+  const explorer = readFileSync("components/tools/ToolsExplorer.tsx", "utf8");
+  assert.match(
+    explorer,
+    /border-\[var\(--border-selected\)\] bg-\[var\(--action-primary-active\)\] text-\[var\(--text-primary\)\]/,
+  );
 });
 
 test("Step 6 workflow pins axe and installs Chromium plus WebKit", () => {
