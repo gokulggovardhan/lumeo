@@ -1,8 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { AuraButton, AuraInput, AuraStatus } from "@/components/ui/Aura";
+import { bucketFileSize } from "@/lib/analytics/size-bucket";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import {
   beginWorkspaceExport,
@@ -33,6 +35,8 @@ function changeSummaries(
 
 export function WorkspaceFinish() {
   const router = useRouter();
+  const { track } = useAnalytics();
+  const finishOpenedTrackedRef = useRef(false);
   const {
     document,
     fileForCurrentRevision,
@@ -45,6 +49,15 @@ export function WorkspaceFinish() {
   );
   const [error, setError] = useState("");
   const [downloaded, setDownloaded] = useState(false);
+
+  useEffect(() => {
+    if (!document || finishOpenedTrackedRef.current) return;
+    finishOpenedTrackedRef.current = true;
+    track({
+      eventName: "workspace_finish_opened",
+      inputSizeBucket: bucketFileSize(document.revision.byteLength),
+    });
+  }, [document, track]);
 
   const changes = useMemo(() => {
     if (!document) return [];
@@ -105,6 +118,8 @@ export function WorkspaceFinish() {
   function downloadPdf() {
     setError("");
     let exporting = currentDocument.session;
+    const firstCompletion =
+      currentDocument.session.state.lifecycle !== "exported";
 
     try {
       const file = fileForCurrentRevision();
@@ -112,6 +127,12 @@ export function WorkspaceFinish() {
 
       exporting = beginWorkspaceExport(currentDocument.session);
       replaceSession(exporting);
+
+      track({
+        eventName: "download_started",
+        inputSizeBucket: bucketFileSize(currentDocument.revision.byteLength),
+        outputSizeBucket: bucketFileSize(file.size),
+      });
 
       const url = URL.createObjectURL(file);
       const link = window.document.createElement("a");
@@ -123,6 +144,14 @@ export function WorkspaceFinish() {
       window.setTimeout(() => URL.revokeObjectURL(url), 0);
 
       replaceSession(completeWorkspaceExport(exporting));
+      if (firstCompletion) {
+        track({
+          eventName: "workspace_completed",
+          inputSizeBucket: bucketFileSize(currentDocument.revision.byteLength),
+          outputSizeBucket: bucketFileSize(file.size),
+          success: true,
+        });
+      }
       setDownloaded(true);
     } catch {
       try {
