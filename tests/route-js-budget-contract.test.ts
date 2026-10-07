@@ -19,7 +19,12 @@ test("Step 5 measures JavaScript actually loaded by representative routes", () =
   assert.match(source, /next-router-prefetch/);
   assert.match(source, /purpose\.includes\("prefetch"\)/);
   assert.match(source, /routeHandler\.abort\("blockedbyclient"\)/);
-  assert.match(source, /waitForLoadState\("networkidle"/);
+  assert.doesNotMatch(source, /waitForLoadState\("networkidle"/);
+  assert.match(source, /minimumRouteObservationMs\s*=\s*1_500/);
+  assert.match(source, /javascriptQuietWindowMs\s*=\s*1_000/);
+  assert.match(source, /maximumRouteObservationMs\s*=\s*15_000/);
+  assert.match(source, /javaScriptQuietFor\s*>=\s*javascriptQuietWindowMs/);
+  assert.match(source, /route JavaScript did not stabilize within/);
   assert.match(source, /maxRawBytes/);
   assert.match(source, /maxGzipBytes/);
   assert.match(source, /maxTransferBytes/);
