@@ -25,11 +25,9 @@ test("Step 6 keeps the two verified contrast fixes narrow", () => {
   const home = readFileSync("app/page.tsx", "utf8");
   const command = readFileSync("components/CommandPaletteTrigger.tsx", "utf8");
 
-  assert.match(
-    home,
-    /Start PDF Workspace[\s\S]*?bg-\[var\(--action-primary-active\)\]/,
-  );
+  assert.match(home, /bg-\[var\(--action-primary-active\)\]/);
   assert.match(home, /hover:bg-\[var\(--atelier-sage-700\)\]/);
+  assert.match(home, />\s*Start PDF Workspace\s*<\/Link>/);
   assert.match(
     command,
     /<kbd className="text-\[var\(--text-secondary\)\]">Ctrl K<\/kbd>/,
