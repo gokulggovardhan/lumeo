@@ -21,6 +21,7 @@ test("Step 5 measures JavaScript actually loaded by representative routes", () =
   assert.match(source, /routeHandler\.abort\("blockedbyclient"\)/);
   assert.match(source, /waitForRouteJavaScriptQuiescence/);
   assert.match(source, /pendingScriptRequestIds/);
+  assert.match(source, /Network\.requestWillBeSent/);
   assert.match(source, /Network\.loadingFailed/);
   assert.match(source, /ROUTE_JS_QUIET_WINDOW_MS/);
   assert.match(source, /ROUTE_JS_MAX_OBSERVATION_MS/);
