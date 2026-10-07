@@ -38,6 +38,18 @@ const EVENT_NAMES = new Set<AnalyticsEventName>([
   "processing_failed",
   "processing_cancelled",
   "download_started",
+  "workspace_started",
+  "workspace_tool_switched",
+  "workspace_finish_opened",
+  "workspace_completed",
+]);
+
+const EVENTS_WITHOUT_TOOL_SLUG = new Set<AnalyticsEventName>([
+  "page_view",
+  "download_started",
+  "workspace_started",
+  "workspace_finish_opened",
+  "workspace_completed",
 ]);
 
 const SIZE_BUCKETS = new Set<AnalyticsSizeBucket>([
@@ -163,7 +175,7 @@ function parseEventInput(value: unknown): ParsedEvent | null {
     }
     toolSlug = record.toolSlug;
   }
-  if (eventName !== "page_view" && !toolSlug) return null;
+  if (!EVENTS_WITHOUT_TOOL_SLUG.has(eventName) && !toolSlug) return null;
 
   let durationMs: number | null = null;
   if (record.durationMs !== undefined && record.durationMs !== null) {
