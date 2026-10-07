@@ -208,3 +208,10 @@ CI now records four independent measurements per route:
 The first PR measurement proved why this boundary matters: waiting through idle without suppressing marked navigation prefetch charged 70 scripts / 1.42 MB raw JS to the homepage by pulling future Merge/Compress/PDF.js/Workspace chunks, while the other three routes matched the production baseline. The audit therefore excludes only explicitly marked prefetch traffic rather than raising the byte budgets. With marked navigation prefetch suppressed, the local Cloudflare Worker measured 46 homepage scripts / 877,007 raw bytes / 255,059 gzip bytes, so the script-count regression ceiling is 52 (modest headroom over the highest current observed count) while the raw/gzip/transfer byte ceilings remain unchanged.
 
 Budgets include modest regression headroom over the measured production baseline rather than the obsolete multi-megabyte global emitted-chunk limits. Pull requests build and audit their own local Cloudflare Worker. Main-push verification waits until `/api/build-info` reports the exact deployed commit and then enforces the same route budgets against `https://lumeo.in`, including encoded transfer bytes.
+
+
+### Step 5 production readiness boundary
+
+The first main-push Step 5 production run reached the exact deployed SHA `88860eb5d489dd1789b2d8944c1dab79423e94bd`, but the verifier then timed out before measuring a route because it used Playwright's whole-page `networkidle` condition. Production intentionally performs post-load same-origin work such as analytics availability and announcements, so global network silence is not a valid readiness signal for a JavaScript-only budget.
+
+The verifier now waits for the **JavaScript request set itself** to stabilize: it observes the route for at least 1.5 seconds, requires a 1.0 second window with no new same-origin static JavaScript activity, and fails closed if that does not happen within 15 seconds. Marked navigation prefetch remains excluded, while delayed current-route imports such as the Edit PDF client graph remain included. No route byte, gzip, transfer, script-count, or largest-chunk budget was raised.
