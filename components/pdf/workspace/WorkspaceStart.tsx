@@ -179,6 +179,36 @@ export function WorkspaceStart() {
           </p>
         </div>
 
+        <ol
+          aria-label="PDF Workspace flow"
+          data-workspace-onboarding="true"
+          className="mt-4 grid grid-cols-3 gap-2 sm:mt-5 sm:gap-3"
+        >
+          {[
+            ["1", "Upload", "One PDF"],
+            ["2", "Work", "Switch tools"],
+            ["3", "Finish", "Download once"],
+          ].map(([number, label, detail]) => (
+            <li
+              key={number}
+              className="rounded-[var(--radius-lg)] border border-[var(--border-hairline)] bg-[rgba(var(--paper-rgb),0.022)] px-2.5 py-3 text-center sm:px-3"
+            >
+              <span
+                aria-hidden="true"
+                className="mx-auto grid h-6 w-6 place-items-center rounded-full bg-[var(--surface-selected)] text-[10px] font-black text-[var(--text-primary)]"
+              >
+                {number}
+              </span>
+              <span className="mt-2 block text-xs font-extrabold text-[var(--text-primary)]">
+                {label}
+              </span>
+              <span className="mt-0.5 block text-[10px] leading-4 text-[var(--text-muted)] sm:text-[11px]">
+                {detail}
+              </span>
+            </li>
+          ))}
+        </ol>
+
         {!ready ? (
           <div className="mt-5 sm:mt-6">
             <L2UploadStage
