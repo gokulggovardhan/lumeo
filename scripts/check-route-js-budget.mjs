@@ -142,11 +142,18 @@ async function measureRoute(browser, route) {
   await cdp.send("Network.enable");
   await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
 
+  cdp.on("Network.requestWillBeSent", (event) => {
+    const url = event.request?.url;
+    if (!url || !sameOriginStaticJavaScript(url)) return;
+    requestUrls.set(event.requestId, url);
+    pendingScriptRequestIds.add(event.requestId);
+    markScriptActivity();
+  });
+
   cdp.on("Network.responseReceived", (event) => {
     const url = event.response?.url;
     if (!url || !sameOriginStaticJavaScript(url)) return;
     requestUrls.set(event.requestId, url);
-    pendingScriptRequestIds.add(event.requestId);
     markScriptActivity();
   });
 
