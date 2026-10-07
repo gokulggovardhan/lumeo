@@ -12,6 +12,10 @@ const allowedEvents = new Set([
   "processing_failed",
   "processing_cancelled",
   "download_started",
+  "workspace_started",
+  "workspace_tool_switched",
+  "workspace_finish_opened",
+  "workspace_completed",
 ]);
 
 export function providerTrackDecision({
