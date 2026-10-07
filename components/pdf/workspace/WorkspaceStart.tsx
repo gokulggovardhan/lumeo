@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
 import { AuraButton, AuraStatus } from "@/components/ui/Aura";
 import {
   L2UploadStage,
@@ -11,6 +12,7 @@ import {
   continuationRouteForArea,
   type ContinuationArea,
 } from "@/lib/pdf/workspace/continuation";
+import { bucketFileSize } from "@/lib/analytics/size-bucket";
 import type { WorkspaceArea } from "@/lib/pdf/workspace/model";
 import {
   checkPdfFileSize,
@@ -69,6 +71,7 @@ function friendlyPdfError(error: unknown): string {
 
 export function WorkspaceStart() {
   const router = useRouter();
+  const { track } = useAnalytics();
   const {
     document,
     startDocument,
@@ -140,6 +143,10 @@ export function WorkspaceStart() {
         bytes: prepared.bytes,
         pageCount: prepared.pageCount,
         initialArea: area,
+      });
+      track({
+        eventName: "workspace_started",
+        inputSizeBucket: bucketFileSize(prepared.bytes.byteLength),
       });
     } else if (!document) {
       return;
