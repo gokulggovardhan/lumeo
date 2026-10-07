@@ -10,6 +10,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAnalytics } from "@/components/analytics/AnalyticsProvider";
+import { bucketFileSize } from "@/lib/analytics/size-bucket";
 import type { WorkspaceArea, WorkspaceDocument } from "@/lib/pdf/workspace/model";
 import {
   appendWorkspaceCheckpoint,
@@ -139,6 +141,23 @@ type WorkspaceDocumentContextValue = {
   clearDocument: () => void;
 };
 
+function analyticsToolSlugForArea(area: WorkspaceArea): string | null {
+  switch (area) {
+    case "edit":
+      return "edit";
+    case "pages":
+      return "organize";
+    case "sign":
+      return "sign";
+    case "enhance":
+      return "add";
+    case "optimize":
+      return "compress";
+    case "export":
+      return null;
+  }
+}
+
 function equalArrayBuffers(left: ArrayBuffer, right: ArrayBuffer): boolean {
   if (left.byteLength !== right.byteLength) return false;
   const a = new Uint8Array(left);
@@ -206,6 +225,7 @@ export function WorkspaceDocumentProvider({
 }: {
   children: ReactNode;
 }) {
+  const { track } = useAnalytics();
   const [document, setDocument] =
     useState<WorkspaceDocumentRuntime | null>(null);
   const documentRef = useRef<WorkspaceDocumentRuntime | null>(null);
@@ -522,6 +542,7 @@ export function WorkspaceDocumentProvider({
     (target: WorkspaceArea) => {
       const current = documentRef.current;
       if (!current) return null;
+      const previousArea = current.session.state.activeArea;
       const next = updateWorkspaceRuntimeSession(
         current,
         setWorkspaceArea(current.session, target),
@@ -532,9 +553,21 @@ export function WorkspaceDocumentProvider({
       }
       commit(next);
       setContinuationTargetSafely(target);
+
+      if (previousArea !== target) {
+        const toolSlug = analyticsToolSlugForArea(target);
+        if (toolSlug) {
+          track({
+            eventName: "workspace_tool_switched",
+            toolSlug,
+            inputSizeBucket: bucketFileSize(next.revision.byteLength),
+          });
+        }
+      }
+
       return next;
     },
-    [commit, setContinuationTargetSafely, syncHistory],
+    [commit, setContinuationTargetSafely, syncHistory, track],
   );
 
   const undoWorkspace = useCallback(() => {
