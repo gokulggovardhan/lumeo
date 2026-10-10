@@ -59,8 +59,8 @@ test("major search-intent pages include concise how-to guidance and contextual t
   const source = readFileSync("components/pdf/ToolSeoContent.tsx", "utf8");
   assert.match(source, /How to use this tool/);
   assert.match(source, /aria-label="Related PDF tools"/);
-  assert.ok((source.match(/steps:\s*\[/g) ?? []).length >= 8);
-  assert.ok((source.match(/relatedTools:\s*\[/g) ?? []).length >= 8);
+  assert.ok((source.match(/steps:\s*\[/g) ?? []).length >= 12);
+  assert.ok((source.match(/relatedTools:\s*\[/g) ?? []).length >= 12);
 
   for (const href of [
     "/pdf/word-to-pdf",
@@ -99,5 +99,23 @@ test("public footer links directly to the core PDF search-intent pages", () => {
   ]) {
     assert.ok(source.includes(`href: "${href}"`), `footer missing ${href}`);
   }
+});
+
+test("under-discovered tools have useful crawlable discovery content", () => {
+  const seoSource = readFileSync("components/pdf/ToolSeoContent.tsx", "utf8");
+  for (const phrase of [
+    "Add one or more HEIC or HEIF photos from your device.",
+    "Add the PDF you want to sign.",
+    "Add the PDF you want to watermark.",
+    "Add the PDF that needs page numbers.",
+  ]) {
+    assert.ok(seoSource.includes(phrase), `missing useful guidance: ${phrase}`);
+  }
+});
+
+test("HEIC metadata does not duplicate the Lumeo brand suffix", () => {
+  const source = readFileSync("app/heic-to-jpeg/page.tsx", "utf8");
+  assert.match(source, /title:\s*\{\s*absolute:\s*"HEIC to JPEG Converter Online \| Lumeo PDF"/);
+  assert.doesNotMatch(source, /HEIC to JPEG - Smart iPhone Photo Conversion \| Lumeo"/);
 });
 

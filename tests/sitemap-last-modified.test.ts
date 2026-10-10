@@ -32,14 +32,10 @@ test("sitemap uses only explicit source-controlled last-modified dates", () => {
 
 test("unchanged PR #593 routes retain their October 4 meaningful-change date", () => {
   const enrichedRoutes = [
-    "/heic-to-jpeg",
     "/pdf",
-    "/pdf/sign",
     "/pdf/organize",
     "/pdf/extract-text",
-    "/pdf/watermark",
     "/pdf/crop",
-    "/pdf/page-numbers",
     "/pdf/header-footer",
     "/pdf/html-to-pdf",
   ];
@@ -78,6 +74,27 @@ test("search-intent tool updates expose their October 6 meaningful-change date",
       configuredDates.get(path),
       "2026-10-06",
       `${path} should advertise the meaningful search-intent update date`,
+    );
+  }
+});
+
+test("indexing-discovery improvements expose their October 6 meaningful-change date", () => {
+  const updatedRoutes = [
+    "/heic-to-jpeg",
+    "/pdf/sign",
+    "/pdf/watermark",
+    "/pdf/page-numbers",
+  ];
+
+  const configuredDates = new Map(
+    PUBLIC_ROUTE_CONFIG.map((route) => [route.path, route.lastModified]),
+  );
+
+  for (const path of updatedRoutes) {
+    assert.equal(
+      configuredDates.get(path),
+      "2026-10-06",
+      `${path} should advertise the meaningful indexing-discovery update date`,
     );
   }
 });
