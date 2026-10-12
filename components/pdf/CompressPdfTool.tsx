@@ -647,7 +647,9 @@ export default function CompressPdfTool() {
       const message =
         readError instanceof Error && /password|encrypt/i.test(readError.message)
           ? "This file appears to be password-protected or encrypted."
-          : "This file could not be read. It may be damaged or password-protected.";
+          : readError instanceof Error && /toHex|toBase64|getOrInsertComputed|withResolvers/i.test(readError.message)
+            ? "This browser is missing a feature required by the PDF engine. Update your browser and try again."
+            : "This file could not be read. It may be damaged or password-protected.";
       setStatus("Ready");
       setError(message);
       setBlockingError(message);
@@ -1162,8 +1164,11 @@ export default function CompressPdfTool() {
             : sourcePdf.catalog.has(PDFName.of("Outlines")) ||
               sourcePdf.catalog.has(PDFName.of("Names")) ||
               sourcePdf.catalog.has(PDFName.of("AF")) ||
-              sourcePdf.catalog.has(PDFName.of("AcroForm"))
-            ? "This PDF has bookmarks, form fields, or attachments that need lossless preservation."
+              sourcePdf.catalog.has(PDFName.of("AcroForm")) ||
+              sourcePdf.catalog.has(PDFName.of("StructTreeRoot")) ||
+              sourcePdf.catalog.has(PDFName.of("OutputIntents")) ||
+              analysis.risks.some((risk) => risk.title === "PDF/A marker detected")
+            ? "This PDF has bookmarks, forms, tags, attachments, or archival requirements that need lossless preservation."
             : null;
 
       if (originalOnlyReason) {
