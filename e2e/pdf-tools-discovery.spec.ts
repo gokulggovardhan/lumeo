@@ -206,7 +206,7 @@ test.describe("PDF Tools discovery", () => {
       mimeType: "application/pdf",
       buffer: Buffer.from(inputBytes),
     });
-    await expect(page.getByText("DOCUMENT PROFILE")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Document profile", { exact: true })).toBeVisible({ timeout: 30_000 });
     await page.getByRole("radio", { name: "Target size" }).click();
     await page.getByRole("button", { name: "Under 200 KB" }).click();
     await page.getByRole("button", { name: "Compress PDF", exact: true }).click();
@@ -251,7 +251,7 @@ test.describe("PDF Tools discovery", () => {
       mimeType: "application/pdf",
       buffer: sourceBytes,
     });
-    await expect(page.getByText("DOCUMENT PROFILE")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Document profile", { exact: true })).toBeVisible({ timeout: 30_000 });
     await page.getByRole("button", { name: "Compress PDF", exact: true }).click();
     await expect(page.getByText("Original preserved for document safety")).toBeVisible({ timeout: 30_000 });
     const downloadPromise = page.waitForEvent("download");
