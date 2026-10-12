@@ -1,4 +1,7 @@
 import { expect, test } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { PDFDocument } from "pdf-lib";
+import * as pdfjs from "pdfjs-dist/legacy/build/pdf.mjs";
 
 test.describe("PDF Tools discovery", () => {
 
@@ -166,4 +169,70 @@ test.describe("PDF Tools discovery", () => {
       }
     }
   });
+  test("compression preserves searchable text while reaching 200 KB for a mixed image PDF", async ({ page }) => {
+    test.setTimeout(120_000);
+    await page.goto("/pdf/compress");
+
+    // Deterministic image pixels, generated locally in the browser; no
+    // confidential fixtures or network-bound sample files are required.
+    const jpgBase64 = await page.evaluate(() => {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext("2d")!;
+      const bitmap = ctx.createImageData(canvas.width, canvas.height);
+      let seed = 39843121;
+      for (let i = 0; i < bitmap.data.length; i += 4) {
+        seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+        bitmap.data[i] = seed & 255;
+        bitmap.data[i + 1] = (seed >>> 8) & 255;
+        bitmap.data[i + 2] = (seed >>> 16) & 255;
+        bitmap.data[i + 3] = 255;
+      }
+      ctx.putImageData(bitmap, 0, 0);
+      return canvas.toDataURL("image/jpeg", 0.66).split(",")[1];
+    });
+
+    const source = await PDFDocument.create();
+    const jpg = await source.embedJpg(Buffer.from(jpgBase64, "base64"));
+    const sheet = source.addPage([612, 792]);
+    sheet.drawImage(jpg, { x: 0, y: 0, width: 612, height: 792 });
+    sheet.drawText("Selectable Phase One Text", { x: 70, y: 700, size: 18 });
+    const inputBytes = await source.save();
+    expect(inputBytes.length).toBeGreaterThan(400_000);
+
+    await page.locator("#compress-pdf-upload").setInputFiles({
+      name: "phase1-mixed-content.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from(inputBytes),
+    });
+    await expect(page.getByText("DOCUMENT PROFILE")).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("radio", { name: "Target size" }).click();
+    await page.getByRole("button", { name: "Under 200 KB" }).click();
+    await page.getByRole("button", { name: "Compress PDF", exact: true }).click();
+    await expect(page.getByText("Target achieved", { exact: true })).toBeVisible({ timeout: 90_000 });
+
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download compressed PDF" }).click();
+    const downloaded = await downloadPromise;
+    const output = await readFile((await downloaded.path())!);
+    expect(output.length).toBeLessThan(inputBytes.length);
+    expect(output.length).toBeLessThanOrEqual(200 * 1024);
+
+    const parsed = await PDFDocument.load(output);
+    expect(parsed.getPageCount()).toBe(1);
+
+    // Reopen the exact downloaded bytes with an independent parser and
+    // verify text was not converted into a page-sized raster image.
+    const task = pdfjs.getDocument({ data: new Uint8Array(output) });
+    try {
+      const doc = await task.promise;
+      const pageOne = await doc.getPage(1);
+      const items = await pageOne.getTextContent();
+      expect(items.items.some((item) => "str" in item && item.str.includes("Selectable Phase One Text"))).toBe(true);
+    } finally {
+      await task.destroy();
+    }
+  });
+
 });
