@@ -51,7 +51,7 @@ import {
 import { AuraOptionCard, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
-import { loadPdfJsModule, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
+import { loadPdfJsModule, renderPageWithTimeout, withPageTimeout } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
@@ -1000,12 +1000,41 @@ export default function CompressPdfTool() {
       // Image-only pages may still contain live links and form widgets.
       // Copy those pages rather than silently flattening their annotations.
       const hasInteractiveAnnotations = Boolean(annotations && annotations.size() > 0);
+      // PDF.js text extraction alone cannot identify vector-only drawings.
+      // A scanned page with just image paint operators may be rasterized,
+      // but native paths, shadings, forms, and outlines must survive as
+      // vectors, not be silently converted to a giant JPEG.
+      let hasVectorArtwork = true; // conservative if inspection fails
+      try {
+        const operations = await withPageTimeout(
+          page.getOperatorList(),
+          pageIndex,
+          20_000,
+          "inspect page drawing operators",
+        );
+        const pdfJsOps = (await loadPdfJsModule()).OPS;
+        const nativeVectorOperators = new Set([
+          pdfJsOps.stroke,
+          pdfJsOps.closeStroke,
+          pdfJsOps.fill,
+          pdfJsOps.eoFill,
+          pdfJsOps.fillStroke,
+          pdfJsOps.eoFillStroke,
+          pdfJsOps.closeFillStroke,
+          pdfJsOps.closeEOFillStroke,
+          pdfJsOps.shadingFill,
+          pdfJsOps.paintFormXObjectBegin,
+        ]);
+        hasVectorArtwork = operations.fnArray.some((op) => nativeVectorOperators.has(op));
+      } catch {
+        hasVectorArtwork = true;
+      }
       const hasDocumentNavigation =
         sourcePdf.catalog.has(PDFName.of("Outlines")) ||
         sourcePdf.catalog.has(PDFName.of("AcroForm")) ||
         sourcePdf.catalog.has(PDFName.of("Names")) ||
         sourcePdf.catalog.has(PDFName.of("Perms"));
-      if (hasRealText || hasInteractiveAnnotations || hasDocumentNavigation) {
+      if (hasRealText || hasInteractiveAnnotations || hasVectorArtwork || hasDocumentNavigation) {
         if (hasRealText) textPagesPreserved += 1;
         const [copiedPage] = await output.copyPages(sourcePdf, [pageIndex - 1]);
         output.addPage(copiedPage);
