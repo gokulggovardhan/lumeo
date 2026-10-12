@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { PDFDict, PDFDocument, PDFName } from "pdf-lib";
-import { findEmbeddedJpegs } from "../lib/pdf/embeddedImages.ts";
+import { findEmbeddedJpegs, planEmbeddedJpegResize } from "../lib/pdf/embeddedImages.ts";
 
 // A real, minimal 1x1 red JPEG (valid SOI/EOI, DCTDecode) -- small enough to
 // inline, large enough to be a genuine embeddable image, not a fabricated
@@ -88,4 +88,25 @@ test("swapping a page's image XObject and deleting the old stream produces a val
     objectCountAfter <= objectCountBefore,
     "deleting the old stream and adding one replacement should not grow the live object count",
   );
+});
+
+test("embedded scan resizes for stricter target DPI without upscaling", () => {
+  assert.deepEqual(planEmbeddedJpegResize(3000, 4000, 612, 792, 72), {
+    width: 612,
+    height: 816,
+  });
+  assert.deepEqual(planEmbeddedJpegResize(3000, 4000, 612, 792, 150), {
+    width: 1275,
+    height: 1700,
+  });
+  assert.deepEqual(planEmbeddedJpegResize(400, 300, 612, 792, 72), {
+    width: 400,
+    height: 300,
+  });
+});
+
+test("embedded image sizing rejects corrupted and dangerous dimensions", () => {
+  assert.equal(planEmbeddedJpegResize(0, 4000, 612, 792, 72), null);
+  assert.equal(planEmbeddedJpegResize(Number.NaN, 4000, 612, 792, 72), null);
+  assert.equal(planEmbeddedJpegResize(12000, 12000, 612, 792, 72), null);
 });
