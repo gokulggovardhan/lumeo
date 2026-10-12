@@ -6835,12 +6835,23 @@ export default function EditPdfTool() {
         <L2ToolbarButton
           disabled={textSearchReplaceAllBusy}
           onClick={() => {
+            // Only focus Find when opening. A delayed frame in WebKit can
+            // otherwise steal focus from the Replace input while its text
+            // is being entered (e.g. turning "record" + "file" into
+            // an unintended "recordfile" search).
+            const opening = !textSearchOpen;
             setTextSearchOpen((open) => {
               const next = !open;
               if (!next) setTextSearchIndexBusy(false);
               return next;
             });
-            requestAnimationFrame(() => textSearchInputRef.current?.focus());
+            if (opening) {
+              requestAnimationFrame(() => {
+                if (!isTypingTarget(document.activeElement)) {
+                  textSearchInputRef.current?.focus();
+                }
+              });
+            }
           }}
         >
           Find
