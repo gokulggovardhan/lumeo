@@ -235,4 +235,32 @@ test.describe("PDF Tools discovery", () => {
     }
   });
 
+  test("compression never silently rewrites interactive forms", async ({ page }) => {
+    test.setTimeout(60_000);
+    const original = await PDFDocument.create();
+    const sheet = original.addPage([612, 792]);
+    sheet.drawText("Confidential data stays local");
+    const field = original.getForm().createTextField("customer.reference");
+    field.addToPage(sheet, { x: 60, y: 550, width: 260, height: 35 });
+    field.setText("KEEP-FORM-EDITABLE");
+    const sourceBytes = Buffer.from(await original.save());
+
+    await page.goto("/pdf/compress");
+    await page.locator("#compress-pdf-upload").setInputFiles({
+      name: "phase1-form-preservation.pdf",
+      mimeType: "application/pdf",
+      buffer: sourceBytes,
+    });
+    await expect(page.getByText("DOCUMENT PROFILE")).toBeVisible({ timeout: 30_000 });
+    await page.getByRole("button", { name: "Compress PDF", exact: true }).click();
+    await expect(page.getByText("Original preserved for document safety")).toBeVisible({ timeout: 30_000 });
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Download unchanged original PDF" }).click();
+    const download = await downloadPromise;
+    const downloaded = await readFile((await download.path())!);
+    expect(downloaded.equals(sourceBytes)).toBe(true);
+    const reopened = await PDFDocument.load(downloaded);
+    expect(reopened.getForm().getTextField("customer.reference").getText()).toBe("KEEP-FORM-EDITABLE");
+  });
+
 });
