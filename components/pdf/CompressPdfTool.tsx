@@ -1721,7 +1721,7 @@ export default function CompressPdfTool() {
               </button>
             </div>
 
-            <div className={result ? "hidden" : "no-scrollbar min-h-0 flex-1 overflow-y-auto py-3"}>
+            <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto py-3">
               {compressionMode === "quality" ? (
                 <L2AdvancedDisclosure title="Advanced options">
                   <div className="space-y-4 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/62 p-3">
