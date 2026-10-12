@@ -79,3 +79,35 @@ export function findEmbeddedJpegs(page: PDFPage): EmbeddedJpegXObject[] {
 
   return found;
 }
+
+// A whole-page JPEG can be unnecessarily large even when the page itself
+// contains real, selectable text. Target-mode compression should be able to
+// downsample that JPEG without rasterizing the surrounding PDF content.
+//
+// The source dimensions are capped before a canvas is allocated to prevent
+// a hostile/oversized image from exhausting browser memory. Never upscale.
+export function planEmbeddedJpegResize(
+  sourceWidth: number,
+  sourceHeight: number,
+  pageWidthPoints: number,
+  pageHeightPoints: number,
+  dpi: number,
+): { width: number; height: number } | null {
+  const values = [sourceWidth, sourceHeight, pageWidthPoints, pageHeightPoints, dpi];
+  if (values.some((value) => !Number.isFinite(value) || value <= 0)) return null;
+  if (sourceWidth * sourceHeight > 24_000_000) return null;
+
+  // Keep the original image aspect ratio. Fitting the larger page ratio
+  // avoids forcing a smaller number of pixels than the selected DPI budget.
+  const scale = Math.min(
+    1,
+    Math.max(
+      (pageWidthPoints * dpi) / (72 * sourceWidth),
+      (pageHeightPoints * dpi) / (72 * sourceHeight),
+    ),
+  );
+  return {
+    width: Math.max(1, Math.floor(sourceWidth * scale)),
+    height: Math.max(1, Math.floor(sourceHeight * scale)),
+  };
+}
