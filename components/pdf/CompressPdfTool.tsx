@@ -1120,11 +1120,17 @@ export default function CompressPdfTool() {
       // Keep the original for document-wide features this browser engine
       // cannot yet preserve without loss. The old code silently broke
       // bookmark destinations and could invalidate signature proofs.
+      const containsAnnotations = sourcePdf.getPages().some((page) => {
+        const annots = page.node.Annots();
+        return Boolean(annots && annots.size() > 0);
+      });
       const originalOnlyReason =
         sourcePdf.catalog.has(PDFName.of("Perms")) ||
         analysis.risks.some((risk) => risk.title === "Digital signature detected")
           ? "A digital signature may be invalidated by rewriting this PDF."
-          : sourcePdf.catalog.has(PDFName.of("Outlines")) ||
+          : containsAnnotations
+            ? "This PDF contains interactive annotations or links whose behaviour must be preserved."
+            : sourcePdf.catalog.has(PDFName.of("Outlines")) ||
               sourcePdf.catalog.has(PDFName.of("Names")) ||
               sourcePdf.catalog.has(PDFName.of("AF")) ||
               sourcePdf.catalog.has(PDFName.of("AcroForm"))
@@ -1829,7 +1835,7 @@ export default function CompressPdfTool() {
               Clear and start new
             </button>
             <button type="button" onClick={handleDownload} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto">
-              Download compressed PDF
+              {result.protectedReason ? "Download unchanged original PDF" : "Download compressed PDF"}
             </button>
           </>
         ) : (
