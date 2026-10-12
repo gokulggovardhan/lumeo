@@ -167,7 +167,7 @@ export function WorkspaceMobileNav() {
               className={
                 "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-extrabold transition " +
                 (active
-                  ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
+                  ? "bg-[var(--action-primary-active)] text-[var(--text-primary)]"
                   : "text-[var(--text-muted)] hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)]")
               }
             >
@@ -186,7 +186,7 @@ export function WorkspaceMobileNav() {
           className={
             "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-extrabold transition " +
             (isMoreArea(activeArea)
-              ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
+              ? "bg-[var(--action-primary-active)] text-[var(--text-primary)]"
               : "text-[var(--text-muted)] hover:bg-[var(--surface-raised)] hover:text-[var(--text-primary)]")
           }
         >
@@ -200,7 +200,7 @@ export function WorkspaceMobileNav() {
           className={
             "lumeo-focus-ring min-h-12 rounded-[var(--radius-lg)] px-2 text-xs font-black transition " +
             (activeArea === "export"
-              ? "bg-[var(--surface-selected)] text-[var(--text-primary)]"
+              ? "bg-[var(--action-primary-active)] text-[var(--text-primary)]"
               : "bg-[var(--surface-success)] text-[var(--text-success)] hover:bg-[var(--surface-selected)]")
           }
         >

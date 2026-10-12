@@ -50,7 +50,7 @@ export function CommandPaletteTrigger({ tiles }: { tiles: Tile[] }) {
           <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.75" />
           <path d="m20 20-3.5-3.5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.75" />
         </svg>
-        <kbd className="text-[var(--text-subtle)]">Ctrl K</kbd>
+        <kbd className="text-[var(--text-secondary)]">Ctrl K</kbd>
       </button>
       {open ? <CommandPaletteDialog tiles={tiles} onClose={() => setOpen(false)} triggerRef={buttonRef} /> : null}
     </>
