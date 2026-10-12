@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import PublicFooter from "@/components/PublicFooter";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import { ToolsExplorer } from "@/components/tools/ToolsExplorer";
@@ -38,11 +39,12 @@ const structuredData = {
   description: "A searchable directory of available Lumeo PDF tools.",
 };
 
-export default async function PdfToolsPage() {
+async function PublicToolsExplorer() {
   const catalog = await getPublicPdfCatalog();
-  const tools = resolveLumeoTools(catalog.tools);
-  const discoveryTools = buildDiscoveryTiles(tools);
+  return <ToolsExplorer tools={buildDiscoveryTiles(resolveLumeoTools(catalog.tools))} />;
+}
 
+export default function PdfToolsPage() {
   return (
     <PublicCatalogPageShell
       maxWidth="max-w-[1180px]"
@@ -66,7 +68,11 @@ export default async function PdfToolsPage() {
         </p>
       </section>
 
-      <ToolsExplorer tools={discoveryTools} />
+      <Suspense
+        fallback={<div role="status" aria-label="Loading PDF tools directory" className="min-h-[28rem] rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-base)]/30 p-5 text-sm text-[var(--text-muted)]">Loading PDF tools directory…</div>}
+      >
+        <PublicToolsExplorer />
+      </Suspense>
 
       <div className="mt-8">
         <PublicFooter />
