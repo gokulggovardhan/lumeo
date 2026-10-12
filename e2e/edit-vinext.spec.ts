@@ -842,9 +842,13 @@ test("vinext Edit PDF cancels document Replace All without publishing partial ch
   // button between a visibility assertion and the click.
   await cancel.click({ force: true });
 
-  await expect(status).toContainText(/Replace All cancelled\. Nothing was changed/i, {
-    timeout: 90_000,
-  });
+  // Cancellation can finish before or after the read-only preflight.
+  // Both messages explicitly guarantee that no PDF bytes were changed.
+  // The assertions below also prove the original text is intact.
+  await expect(status).toContainText(
+    /Replace All cancelled\.(?: Nothing was changed| \d+ safe matches had been preflighted; no PDF bytes changed)\.?/i,
+    { timeout: 90_000 },
+  );
   await expect(cancel).toHaveCount(0);
   await expect(replaceAll).toBeEnabled({ timeout: 30_000 });
 
