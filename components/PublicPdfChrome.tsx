@@ -1,7 +1,7 @@
 // components/PublicPdfChrome.tsx
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import { L2PublicHeader } from "@/components/ui/Aura";
 import { CommandPaletteTrigger } from "@/components/CommandPaletteTrigger";
 import { PublicPdfToolsMenuClient } from "@/components/public/PublicPdfToolsMenuClient";
@@ -23,6 +23,43 @@ const NAV_TOOL_SLUGS = new Set([
   "jpg-to-pdf",
   "pdf-to-jpg",
 ]);
+
+// Preserve a usable, accessible public navigation bar while public tool
+// availability is being resolved. This lets the route heading stream early
+// instead of waiting for the Supabase catalog on cold Worker instances.
+function PublicNavFallback({ maxWidth = "max-w-[1160px]" }: { maxWidth?: string }) {
+  return (
+    <L2PublicHeader className="lumeo-nav-enter aura-public-nav">
+      <nav
+        className={`mx-auto flex min-h-16 ${maxWidth} items-center justify-between gap-2 sm:gap-4`}
+        aria-label="Public navigation"
+      >
+        <Link
+          href="/"
+          prefetch={false}
+          className="flex min-w-0 items-center rounded-[var(--radius-lg)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]"
+        >
+          <BrandLockup markSize="h-9 w-9 sm:h-10 sm:w-10" />
+        </Link>
+        <Link
+          href="/pdf-tools"
+          prefetch={false}
+          className="inline-flex min-h-11 items-center rounded-[var(--radius-lg)] px-3 text-xs font-bold text-[var(--text-secondary)] hover:text-[var(--text-primary)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)]"
+        >
+          All PDF tools
+        </Link>
+      </nav>
+    </L2PublicHeader>
+  );
+}
+
+export function StreamingPublicNav({ maxWidth = "max-w-[1160px]" }: { maxWidth?: string }) {
+  return (
+    <Suspense fallback={<PublicNavFallback maxWidth={maxWidth} />}>
+      <PublicNav maxWidth={maxWidth} />
+    </Suspense>
+  );
+}
 
 export async function PublicNav({
   maxWidth = "max-w-[1160px]",
@@ -85,7 +122,7 @@ export function PublicPageShell({
       className={`aura-page-shell relative overflow-x-hidden ${mainClassName}`}
     >
       <div className="relative z-10">
-        <PublicNav maxWidth={maxWidth} />
+        <StreamingPublicNav maxWidth={maxWidth} />
         <div className={`mx-auto ${maxWidth} ${contentClassName}`}>{children}</div>
       </div>
     </main>

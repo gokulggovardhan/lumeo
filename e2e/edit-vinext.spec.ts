@@ -2288,6 +2288,10 @@ test("vinext Edit PDF replaces all safe document matches in one undo step", asyn
     name: "Replace search match with",
   });
   await replacement.fill("file");
+  // Catch delayed focus theft before requesting a destructive operation;
+  // Playwright's fill may finish before a WebKit animation-frame callback.
+  await expect(find).toHaveValue("record");
+  await expect(replacement).toHaveValue("file");
 
   const replaceAll = page.getByRole("button", { name: "Replace all safely" });
   await expect(replaceAll).toBeEnabled({ timeout: 90_000 });

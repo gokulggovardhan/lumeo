@@ -1,7 +1,9 @@
 import "server-only";
 
 import type { Metadata } from "next";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
+import { unstable_cache } from "next/cache";
+import { getSupabaseEnv } from "@/lib/supabase/env";
 import { withPublicSocialImages } from "@/lib/public-site/metadata";
 
 type SeoOverride = {
@@ -29,20 +31,36 @@ function parseSeoOverride(value: unknown): SeoOverride | null {
   };
 }
 
-// Any failure (unreachable DB, missing env, unconfigured route) falls back to
-// the caller's static defaultMetadata untouched -- SEO records are additive,
-// never a way to break a page's metadata.
+// Public SEO overrides do not require a session. Avoid creating a cookie-aware
+// SSR client for every page's metadata: the unnecessary cookies() dependency
+// forces dynamic rendering, and the network RPC delays text-first LCP on
+// public pages. Revalidate on the same cadence as the public tool catalog.
+const readPublicSeoOverride = unstable_cache(
+  async (route: string): Promise<SeoOverride | null> => {
+    try {
+      const { url, publishableKey } = getSupabaseEnv();
+      const client = createClient(url, publishableKey, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+      const { data, error } = await client.rpc("get_public_seo_setting", { p_route: route });
+      if (error) return null;
+      return parseSeoOverride(data);
+    } catch {
+      return null;
+    }
+  },
+  ["lumeo-public-seo-override"],
+  { revalidate: 300, tags: ["public-seo-setting"] },
+);
+
+// Any failed/unconfigured public lookup falls back to the existing safe
+// metadata. Never cache an authenticated or user-specific SEO response.
 export async function withSeoOverride(route: string, defaultMetadata: Metadata): Promise<Metadata> {
   const fallbackMetadata = withPublicSocialImages(defaultMetadata);
+  const override = await readPublicSeoOverride(route);
+  if (!override) return fallbackMetadata;
 
   try {
-    const supabase = await createClient();
-    const { data, error } = await supabase.rpc("get_public_seo_setting", { p_route: route });
-    if (error) return fallbackMetadata;
-
-    const override = parseSeoOverride(data);
-    if (!override) return fallbackMetadata;
-
     return {
       ...fallbackMetadata,
       title: override.title,
