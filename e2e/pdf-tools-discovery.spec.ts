@@ -86,6 +86,9 @@ test.describe("PDF Tools discovery", () => {
     await expect(page.getByRole("link", { name: /Open Merge PDF/ })).toHaveAttribute("href", "/pdf/merge");
 
     const search = page.getByRole("searchbox", { name: "Search tools and actions" });
+    // A streamed server component may paint before its client keyboard handler hydrates.
+    // Exercise the shortcut only after that real interaction listener is mounted.
+    await expect(page.locator("[data-tools-shortcuts-ready]")).toHaveAttribute("data-tools-shortcuts-ready", "true");
     await page.keyboard.press("/");
     await expect(search).toBeFocused();
     await search.fill("rotate");
