@@ -84,6 +84,16 @@ async function expectMobileNavFits(page: Page, width: number, height: number) {
   }
 }
 
+async function nativeBeforeUnloadIsBlocked(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    // Exercise the real listener without attempting to close the test tab.
+    // Actual browser dialogs are user-activation dependent by design.
+    const event = new Event("beforeunload", { cancelable: true });
+    window.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+}
+
 test("upload once can switch tools immediately and Finish exports the latest materialized revision", async ({
   page,
 }) => {
@@ -120,6 +130,8 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   await expect(identity.locator("[data-workspace-document-filename]")).toHaveAttribute("title", /\.pdf$/i);
   await expect(identity.locator("[data-workspace-document-size]")).toContainText(/(?:B|KB|MB)$/);
   await expect(identity.locator("[data-workspace-document-revision]")).toContainText(/Revision \d+/);
+  // A clean upload must never prompt when closing or refreshing.
+  await expect.poll(() => nativeBeforeUnloadIsBlocked(page)).toBe(false);
   const initialRevision = Number(await identity.getAttribute("data-workspace-revision-number"));
   expect(Number.isSafeInteger(initialRevision)).toBe(true);
   await identity.getByText("Full details").click();
@@ -142,10 +154,15 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   );
 
   await page.getByRole("button", { name: "Rotate right" }).first().click();
+  // Local edits are protected immediately, before the first Save/materialization.
+  await expect.poll(() => nativeBeforeUnloadIsBlocked(page)).toBe(true);
   await page.getByRole("button", { name: "Save organized PDF" }).click();
   await expect(page.getByText("Organized PDF ready")).toBeVisible({
     timeout: 90_000,
   });
+
+  // Changes in the shared document must activate the native protection.
+  await expect.poll(() => nativeBeforeUnloadIsBlocked(page), { timeout: 30_000 }).toBe(true);
 
   // The identity must follow the newly materialized revision in-place.
   await expect.poll(async () => Number(await identity.getAttribute("data-workspace-revision-number"))).toBeGreaterThan(initialRevision);
@@ -157,6 +174,8 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   await expect(page).toHaveURL(/\/pdf\/finish$/);
   await expect(identity).toHaveAttribute("data-workspace-revision-number", String(savedRevision));
   await expect(identity.locator("[data-workspace-document-pages]")).toHaveText("2 pages");
+  // Client-side tool navigation preserves the dirty Workspace and its guard.
+  await expect.poll(() => nativeBeforeUnloadIsBlocked(page)).toBe(true);
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PDF" }).click();
@@ -167,6 +186,8 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   const output = await PDFDocument.load(await readFile(outputPath!));
   expect(output.getPageCount()).toBe(2);
   expect(((output.getPage(0).getRotation().angle % 360) + 360) % 360).toBe(90);
+  // Finish successfully marks the existing session clean; no unload prompt.
+  await expect.poll(() => nativeBeforeUnloadIsBlocked(page)).toBe(false);
 });
 
 test("connected PDF Workspace keeps dedicated mobile navigation usable across target widths and landscape", async ({

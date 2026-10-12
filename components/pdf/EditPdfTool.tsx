@@ -6796,6 +6796,7 @@ export default function EditPdfTool() {
           bytes={originalBytes}
           pageCount={pdf.pageCount}
           document={historyState.workspaceDocument}
+          hasUnsavedChanges={workspaceProjection?.compatible ? workspaceProjection.session.state.hasUnsavedChanges : false}
         />
       ) : null}
 
