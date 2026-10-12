@@ -2,8 +2,9 @@
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import PublicFooter from "@/components/PublicFooter";
-import { PublicNav } from "@/components/PublicPdfChrome";
+import { StreamingPublicNav } from "@/components/PublicPdfChrome";
 import { PdfToolLauncher } from "@/components/pdf/PdfToolLauncher";
 import { ContinueWorking } from "@/components/ContinueWorking";
 import { withSeoOverride } from "@/lib/public-site/seo";
@@ -110,10 +111,12 @@ const trustRail = [
   "No installation",
 ];
 
-export default async function Home() {
+async function ContinueWorkingFromCatalog() {
   const catalog = await getPublicPdfCatalog();
-  const tiles = buildTiles(resolveLumeoTools(catalog.tools));
+  return <ContinueWorking tiles={buildTiles(resolveLumeoTools(catalog.tools))} />;
+}
 
+export default function Home() {
   return (
     <main
       id="main-content"
@@ -132,7 +135,7 @@ export default async function Home() {
         <div className="lumeo-ambient absolute -right-44 top-[-5rem] h-[28rem] w-[28rem] rounded-full bg-[rgba(var(--atelier-brass-rgb),0.04)] blur-[60px] md:blur-[150px] [animation-delay:-4s]" />
       </div>
 
-      <PublicNav />
+      <StreamingPublicNav />
 
       <section className="relative z-10 flex-1">
         <div className="mx-auto w-full max-w-[1160px] px-5 pb-12 pt-5 sm:px-8 sm:pt-7 lg:pt-8">
@@ -198,11 +201,21 @@ export default async function Home() {
             </aside>
 
             <div className="row-start-2 min-w-0 min-[900px]:col-span-2 min-[900px]:row-start-2">
-              <PdfToolLauncher allToolsLabel="View all tools" />
+              <Suspense
+                fallback={
+                  <div role="status" aria-label="Loading PDF tools" className="min-h-[19rem] rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-base)]/30 p-5 text-sm text-[var(--text-muted)]">
+                    Loading PDF tools…
+                  </div>
+                }
+              >
+                <PdfToolLauncher allToolsLabel="View all tools" />
+              </Suspense>
             </div>
           </div>
 
-          <ContinueWorking tiles={tiles} />
+          <Suspense fallback={null}>
+            <ContinueWorkingFromCatalog />
+          </Suspense>
 
           <section
             className="mt-10 border-y border-[var(--border-hairline)] py-6 sm:mt-11"
