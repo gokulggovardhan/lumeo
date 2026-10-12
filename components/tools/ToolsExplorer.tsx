@@ -129,7 +129,6 @@ function ToolGrid({ tools }: { tools: Tile[] }) {
 
 export function ToolsExplorer({ tools }: { tools: Tile[] }) {
   const [query, setQuery] = useState("");
-  const [keyboardReady, setKeyboardReady] = useState(false);
   const [category, setCategory] = useState<CategoryFilter>("all");
   const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -160,8 +159,15 @@ export function ToolsExplorer({ tools }: { tools: Tile[] }) {
     }
 
     window.addEventListener("keydown", handleKeyDown);
-    setKeyboardReady(true);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    // Hydration readiness is an external DOM condition, not application
+    // state. Mark it after the real keyboard handler is installed without
+    // a redundant React state update during an effect.
+    const container = inputRef.current?.closest("[data-tools-shortcuts-ready]");
+    container?.setAttribute("data-tools-shortcuts-ready", "true");
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      container?.setAttribute("data-tools-shortcuts-ready", "false");
+    };
   }, [query]);
 
   const shown = useMemo(
@@ -190,7 +196,7 @@ export function ToolsExplorer({ tools }: { tools: Tile[] }) {
   }
 
   return (
-    <div data-tools-shortcuts-ready={keyboardReady ? "true" : "false"}>
+    <div data-tools-shortcuts-ready="false">
       <section
         aria-label="Find a PDF tool"
         className="rounded-[16px] border border-[var(--border-hairline)] bg-[var(--surface-raised)] p-3.5 shadow-[var(--shadow-sm)] sm:p-4"
