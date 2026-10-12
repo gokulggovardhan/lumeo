@@ -41,7 +41,8 @@ test("identity is shared in PDF layout, follows existing provider and remains ac
   assert.match(layout, /<WorkspaceDocumentIdentity \/>/);
   assert.match(layout, /<WorkspaceHistoryControls \/>/);
   assert.match(identity, /useWorkspaceDocument\(\)/);
-  assert.match(identity, /globalHistory\.connected/);
+  assert.doesNotMatch(identity, /globalHistory\.connected/);
+  assert.match(identity, /if \(!document\) return null/);
   assert.match(identity, /document\.revision/);
   assert.match(identity, /aria-describedby=\{descriptionId\}/);
   assert.match(identity, /data-workspace-document-filename/);

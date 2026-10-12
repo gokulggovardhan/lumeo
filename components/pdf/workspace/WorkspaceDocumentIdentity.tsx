@@ -10,10 +10,11 @@ import { useWorkspaceDocument } from "./WorkspaceDocumentProvider";
 
 export function WorkspaceDocumentIdentity() {
   const descriptionId = useId();
-  const { document, globalHistory } = useWorkspaceDocument();
+  const { document } = useWorkspaceDocument();
 
-  // Standalone quick tools have no connected Workspace identity.
-  if (!document || !globalHistory.connected) return null;
+  // The first opened PDF already has an identity before any saved revision.
+  // Standalone quick tools have no shared document and render nothing.
+  if (!document) return null;
 
   // Read the existing revision directly; Undo/Redo and tool transitions
   // update this same provider. No new document ID, state or storage is added.
