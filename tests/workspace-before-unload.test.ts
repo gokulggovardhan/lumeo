@@ -1,14 +1,6 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import {
-  beginWorkspaceExport,
-  completeWorkspaceExport,
-  createDocumentSession,
-  failWorkspaceExport,
-  recordWorkspaceOperation,
-} from "../lib/pdf/workspace/session.ts";
-
 test("native unload protection follows existing Workspace state, not standalone tools or new storage", () => {
   const layout = readFileSync("app/pdf/layout.tsx", "utf8");
   const guard = readFileSync("components/pdf/workspace/WorkspaceBeforeUnloadProtection.tsx", "utf8");
