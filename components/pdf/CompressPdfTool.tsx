@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PDFDict, PDFDocument, PDFName, PDFRef, rgb, type PDFContext, type PDFPage } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
-import { findEmbeddedJpegs } from "@/lib/pdf/embeddedImages";
+import { findEmbeddedJpegs, planEmbeddedJpegResize } from "@/lib/pdf/embeddedImages";
 import {
   compressionProfiles as profiles,
   type ColourMode,
@@ -51,7 +51,7 @@ import {
 import { AuraOptionCard, AuraSegmentedControl, AuraStatus } from "@/components/ui/Aura";
 import { FileIcon } from "@/components/ui/FileIcon";
 import { shouldAttemptOnce } from "@/lib/analytics/state";
-import { loadPdfJsModule, renderPageWithTimeout } from "@/lib/pdf/pdfjs";
+import { loadPdfJsModule, renderPageWithTimeout, withPageTimeout } from "@/lib/pdf/pdfjs";
 import { formatBytes as formatFileSize } from "@/lib/pdf/formatBytes";
 import { sanitizeFileStem } from "@/lib/pdf/sanitizeFileName";
 import { copyArrayBuffer, toArrayBuffer } from "@/lib/pdf/arrayBuffer";
@@ -123,6 +123,7 @@ type CompressResult = {
   mode: CompressionMode;
   profile?: CompressProfile;
   grayscale: boolean;
+  protectedReason?: string;
   tone: ResultTone;
   target?: {
     outcome: TargetOutcome;
@@ -646,7 +647,9 @@ export default function CompressPdfTool() {
       const message =
         readError instanceof Error && /password|encrypt/i.test(readError.message)
           ? "This file appears to be password-protected or encrypted."
-          : "This file could not be read. It may be damaged or password-protected.";
+          : readError instanceof Error && /toHex|toBase64|getOrInsertComputed|withResolvers/i.test(readError.message)
+            ? "This browser is missing a feature required by the PDF engine. Update your browser and try again."
+            : "This file could not be read. It may be damaged or password-protected.";
       setStatus("Ready");
       setError(message);
       setBlockingError(message);
@@ -856,9 +859,12 @@ export default function CompressPdfTool() {
   // against shared-image pages, since each page here comes from its own
   // independent copyPages() call and therefore never shares an image
   // object with any other page already added to `output`.
-  async function recompressPageImages(page: PDFPage, output: PDFDocument, imageQuality: number): Promise<void> {
+  async function recompressPageImages(page: PDFPage, output: PDFDocument, imageQuality: number, dpi: number, colourMode: ColourMode): Promise<void> {
     const jpegs = findEmbeddedJpegs(page);
-    for (const { name, ref, bytes } of jpegs) {
+    const processedReferences = new Set<string>();
+    for (const { ref, bytes } of jpegs) {
+      if (processedReferences.has(ref.toString())) continue;
+      processedReferences.add(ref.toString());
       const blobUrl = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "image/jpeg" }));
       try {
         const img = await new Promise<HTMLImageElement>((resolve, reject) => {
@@ -868,12 +874,22 @@ export default function CompressPdfTool() {
           el.src = blobUrl;
         });
 
+        const dimensions = planEmbeddedJpegResize(
+          img.naturalWidth,
+          img.naturalHeight,
+          page.getWidth(),
+          page.getHeight(),
+          dpi,
+        );
+        if (!dimensions) continue; // keep excessively large images untouched
         const canvas = document.createElement("canvas");
-        canvas.width = img.naturalWidth;
-        canvas.height = img.naturalHeight;
+        canvas.width = dimensions.width;
+        canvas.height = dimensions.height;
         const context = canvas.getContext("2d", { alpha: false });
         if (!context) continue;
-        context.drawImage(img, 0, 0);
+        context.drawImage(img, 0, 0, dimensions.width, dimensions.height);
+        // Embedded photos on text-bearing pages must honor grayscale, too.
+        if (colourMode === "grayscale") applyGrayscale(canvas);
 
         const recompressedBlob = await new Promise<Blob | null>((resolve) =>
           canvas.toBlob(resolve, "image/jpeg", imageQuality),
@@ -883,7 +899,7 @@ export default function CompressPdfTool() {
         if (!recompressedBlob) continue;
 
         const newBytes = new Uint8Array(await recompressedBlob.arrayBuffer());
-        if (newBytes.byteLength >= bytes.byteLength) continue; // never make an embedded image bigger
+        if (newBytes.byteLength >= bytes.byteLength && colourMode !== "grayscale") continue; // never grow normal compression
 
         const newImage = await output.embedJpg(newBytes);
         const resources = page.node.Resources();
@@ -906,7 +922,14 @@ export default function CompressPdfTool() {
         const xObjectsResolved = xObjectsEntry instanceof PDFRef ? page.node.context.lookup(xObjectsEntry) : xObjectsEntry;
         if (!(xObjectsResolved instanceof PDFDict)) continue;
 
-        xObjectsResolved.set(PDFName.of(name), newImage.ref);
+        // Multiple resource aliases can refer to the same original JPEG.
+        // Repoint all of them before deleting the old stream, avoiding
+        // dangling references and corrupt output PDFs.
+        for (const [resourceName, resourceRef] of xObjectsResolved.entries()) {
+          if (resourceRef instanceof PDFRef && resourceRef.toString() === ref.toString()) {
+            xObjectsResolved.set(resourceName, newImage.ref);
+          }
+        }
         page.node.context.delete(ref);
       } catch {
         // Best-effort: an image this pass can't safely decode/recompress is
@@ -974,11 +997,50 @@ export default function CompressPdfTool() {
       const hasRealText = textContent.items.some(
         (item) => "str" in item && item.str.trim().length > 0,
       );
-      if (hasRealText) {
-        textPagesPreserved += 1;
+      const sourcePage = sourcePdf.getPage(pageIndex - 1);
+      const annotations = sourcePage.node.Annots();
+      // Image-only pages may still contain live links and form widgets.
+      // Copy those pages rather than silently flattening their annotations.
+      const hasInteractiveAnnotations = Boolean(annotations && annotations.size() > 0);
+      // PDF.js text extraction alone cannot identify vector-only drawings.
+      // A scanned page with just image paint operators may be rasterized,
+      // but native paths, shadings, forms, and outlines must survive as
+      // vectors, not be silently converted to a giant JPEG.
+      let hasVectorArtwork = true; // conservative if inspection fails
+      try {
+        const operations = await withPageTimeout(
+          page.getOperatorList(),
+          pageIndex,
+          20_000,
+          "inspect page drawing operators",
+        );
+        const pdfJsOps = (await loadPdfJsModule()).OPS;
+        const nativeVectorOperators = new Set([
+          pdfJsOps.stroke,
+          pdfJsOps.closeStroke,
+          pdfJsOps.fill,
+          pdfJsOps.eoFill,
+          pdfJsOps.fillStroke,
+          pdfJsOps.eoFillStroke,
+          pdfJsOps.closeFillStroke,
+          pdfJsOps.closeEOFillStroke,
+          pdfJsOps.shadingFill,
+          pdfJsOps.paintFormXObjectBegin,
+        ]);
+        hasVectorArtwork = operations.fnArray.some((op) => nativeVectorOperators.has(op));
+      } catch {
+        hasVectorArtwork = true;
+      }
+      const hasDocumentNavigation =
+        sourcePdf.catalog.has(PDFName.of("Outlines")) ||
+        sourcePdf.catalog.has(PDFName.of("AcroForm")) ||
+        sourcePdf.catalog.has(PDFName.of("Names")) ||
+        sourcePdf.catalog.has(PDFName.of("Perms"));
+      if (hasRealText || hasInteractiveAnnotations || hasVectorArtwork || hasDocumentNavigation) {
+        if (hasRealText) textPagesPreserved += 1;
         const [copiedPage] = await output.copyPages(sourcePdf, [pageIndex - 1]);
         output.addPage(copiedPage);
-        await recompressPageImages(copiedPage, output, imageQuality);
+        await recompressPageImages(copiedPage, output, imageQuality, dpi, colourMode);
         await new Promise((resolve) => window.setTimeout(resolve, 0));
         continue;
       }
@@ -1086,7 +1148,41 @@ export default function CompressPdfTool() {
       let outputBytes: Uint8Array;
       let targetResult: CompressResult["target"];
 
-      if (compressionMode === "target") {
+      // Keep the original for document-wide features this browser engine
+      // cannot yet preserve without loss. The old code silently broke
+      // bookmark destinations and could invalidate signature proofs.
+      const containsAnnotations = sourcePdf.getPages().some((page) => {
+        const annots = page.node.Annots();
+        return Boolean(annots && annots.size() > 0);
+      });
+      const originalOnlyReason =
+        sourcePdf.catalog.has(PDFName.of("Perms")) ||
+        analysis.risks.some((risk) => risk.title === "Digital signature detected")
+          ? "A digital signature may be invalidated by rewriting this PDF."
+          : containsAnnotations
+            ? "This PDF contains interactive annotations or links whose behaviour must be preserved."
+            : sourcePdf.catalog.has(PDFName.of("Outlines")) ||
+              sourcePdf.catalog.has(PDFName.of("Names")) ||
+              sourcePdf.catalog.has(PDFName.of("AF")) ||
+              sourcePdf.catalog.has(PDFName.of("AcroForm")) ||
+              sourcePdf.catalog.has(PDFName.of("StructTreeRoot")) ||
+              sourcePdf.catalog.has(PDFName.of("OutputIntents")) ||
+              analysis.risks.some((risk) => risk.title === "PDF/A marker detected")
+            ? "This PDF has bookmarks, forms, tags, attachments, or archival requirements that need lossless preservation."
+            : null;
+
+      if (originalOnlyReason) {
+        outputBytes = new Uint8Array(copyArrayBuffer(analysis.bytes));
+        if (compressionMode === "target") {
+          targetResult = {
+            outcome: "not-beneficial",
+            requestedBytes: targetBytes,
+            attempts: [],
+            qualityOutlook: qualityOutlookForTarget(analysis.size, targetBytes, analysis.pageCount),
+            textPagesPreserved: 0,
+          };
+        }
+      } else if (compressionMode === "target") {
         const request = createTargetCompressionRequest(
           targetBytes,
           colour === "grayscale",
@@ -1222,8 +1318,12 @@ export default function CompressPdfTool() {
       // the original, so without this check the "compressed" download could
       // be larger than what the user started with. Never ship a result
       // bigger than the original: fall back to the source bytes verbatim.
-      if (shouldFallbackToOriginal(outputBytes.byteLength, analysis.size)) {
+      const usedOriginal = shouldFallbackToOriginal(outputBytes.byteLength, analysis.size);
+      if (usedOriginal) {
         outputBytes = new Uint8Array(copyArrayBuffer(analysis.bytes));
+        if (targetResult) {
+          targetResult = { ...targetResult, outcome: "not-beneficial" };
+        }
       }
       const outputBuffer = toArrayBuffer(outputBytes);
 
@@ -1254,7 +1354,8 @@ export default function CompressPdfTool() {
         pageCount: analysis.pageCount,
         mode: compressionMode,
         profile: compressionMode === "quality" ? profile : undefined,
-        grayscale: colour === "grayscale",
+        grayscale: colour === "grayscale" && !usedOriginal,
+        protectedReason: originalOnlyReason ?? undefined,
         tone,
         target: targetResult,
       });
@@ -1620,7 +1721,7 @@ export default function CompressPdfTool() {
               </button>
             </div>
 
-            <div className={result ? "hidden" : "no-scrollbar min-h-0 flex-1 overflow-y-auto py-3"}>
+            <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto py-3">
               {compressionMode === "quality" ? (
                 <L2AdvancedDisclosure title="Advanced options">
                   <div className="space-y-4 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/62 p-3">
@@ -1700,20 +1801,25 @@ export default function CompressPdfTool() {
                   </p>
                   <p ref={resultHeadingRef} tabIndex={-1} className="text-lg font-bold text-[var(--text-primary)] outline-none">
                     {result.mode === "target"
-                      ? result.target?.outcome === "achieved"
+                      ? result.protectedReason
+                        ? "Original preserved for document safety"
+                        : result.target?.outcome === "achieved"
                         ? "Target achieved"
                         : result.target?.outcome === "closest-safe"
                           ? "Closest safe result"
                           : result.target?.outcome === "not-beneficial"
                             ? "Compression not beneficial"
                             : "Unable to process"
-                      : result.tone === "success"
+                      : result.protectedReason
+                        ? "Original preserved for document safety"
+                        : result.tone === "success"
                         ? "Compression complete"
                         : result.tone === "limited"
                           ? "Compression completed with limited reduction"
                           : "The compressed result is larger than the original"}
                   </p>
                   <div className="mt-4 grid gap-2 text-sm text-[var(--text-primary)]/58">
+                    {result.protectedReason ? <p role="status">Original file kept unchanged: {result.protectedReason} No size reduction is claimed.</p> : null}
                     {result.target ? <p>Requested: Under {formatFileSize(result.target.requestedBytes)}</p> : null}
                     <p>Original: {formatFileSize(result.originalSize)}</p>
                     <p>{result.target?.outcome === "closest-safe" ? "Safest result" : "Result"}: {formatFileSize(result.compressedSize)}</p>
@@ -1728,12 +1834,12 @@ export default function CompressPdfTool() {
                       <p>
                         {result.target.textPagesPreserved} page{result.target.textPagesPreserved === 1 ? "" : "s"} with
                         real text {result.target.textPagesPreserved === 1 ? "was" : "were"} kept as-is instead of
-                        compressed further, to keep the document searchable and selectable -- this is the reason the
-                        target was not fully reached.
+                        being rasterized. Embedded JPEGs on those pages were still eligible for compression,
+                        but the available safe passes did not reach the target.
                       </p>
                     ) : null}
-                    <p>Grayscale: {result.grayscale ? "On" : "Off"}</p>
-                    {result.target?.outcome === "closest-safe" ? <p className="text-[var(--text-primary)]/70">Reason: Reducing further would significantly affect readability.</p> : null}
+                    <p>Photo/image grayscale: {result.grayscale ? "Requested" : "Off"} · Vector content may retain colours.</p>
+                    {result.target?.outcome === "closest-safe" ? <p className="text-[var(--text-primary)]/70">Available safe browser passes did not reach this target. Image formats and document complexity can limit reduction.</p> : null}
                     {result.tone === "larger" ? <p className="font-semibold text-[var(--text-danger)]">Recommendation: keep original.</p> : null}
                   </div>
                 </div>
@@ -1763,7 +1869,7 @@ export default function CompressPdfTool() {
               Clear and start new
             </button>
             <button type="button" onClick={handleDownload} className="lumeo-primary-action inline-flex h-11 w-full items-center justify-center rounded-[var(--radius-md)] bg-[var(--emerald-600)] px-5 text-sm font-bold text-[var(--text-on-accent)] shadow-[var(--shadow-success)] transition hover:-translate-y-0.5 hover:bg-[var(--emerald-500)] active:scale-[0.98] sm:w-auto">
-              Download compressed PDF
+              {result.protectedReason ? "Download unchanged original PDF" : "Download compressed PDF"}
             </button>
           </>
         ) : (
