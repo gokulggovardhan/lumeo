@@ -113,6 +113,18 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   const nav = page.locator("[data-workspace-mobile-nav]");
   await expect(nav).toBeVisible();
 
+  // The persistent identity comes from the connected revision, not new storage.
+  const identity = page.locator("[data-workspace-document-identity]");
+  await expect(identity).toBeVisible();
+  await expect(identity.locator("[data-workspace-document-pages]")).toHaveText("2 pages");
+  await expect(identity.locator("[data-workspace-document-filename]")).toHaveAttribute("title", /\.pdf$/i);
+  await expect(identity.locator("[data-workspace-document-size]")).toContainText(/(?:B|KB|MB)$/);
+  await expect(identity.locator("[data-workspace-document-revision]")).toContainText(/Revision \d+/);
+  const initialRevision = Number(await identity.getAttribute("data-workspace-revision-number"));
+  expect(Number.isSafeInteger(initialRevision)).toBe(true);
+  await identity.getByText("Full details").click();
+  await expect(identity.locator("[data-workspace-document-full-description]")).toBeVisible();
+
   // The PDF was uploaded once on the visible /pdf hybrid Workspace entry.
   // Switching tools does not require Save/Download/Continue first.
   await clickWorkspaceNav(page, "Edit");
@@ -135,10 +147,16 @@ test("upload once can switch tools immediately and Finish exports the latest mat
     timeout: 90_000,
   });
 
+  // The identity must follow the newly materialized revision in-place.
+  await expect.poll(async () => Number(await identity.getAttribute("data-workspace-revision-number"))).toBeGreaterThan(initialRevision);
+  const savedRevision = Number(await identity.getAttribute("data-workspace-revision-number"));
+
   // Do not click a Continue-with-this-PDF action. The successful result is
   // auto-materialized, so persistent Workspace navigation must use it.
   await clickWorkspaceNav(page, "Finish");
   await expect(page).toHaveURL(/\/pdf\/finish$/);
+  await expect(identity).toHaveAttribute("data-workspace-revision-number", String(savedRevision));
+  await expect(identity.locator("[data-workspace-document-pages]")).toHaveText("2 pages");
 
   const downloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PDF" }).click();
