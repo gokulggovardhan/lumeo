@@ -51,6 +51,11 @@ const maxSingleRawBytes = 430_000;
 const maxSingleGzipBytes = 195_000;
 const maxSingleTransferBytes = 195_000;
 
+const ROUTE_JS_MIN_OBSERVATION_MS = 1_500;
+const ROUTE_JS_QUIET_WINDOW_MS = 1_000;
+const ROUTE_JS_MAX_OBSERVATION_MS = 30_000;
+const ROUTE_JS_POLL_MS = 100;
+
 function sameOriginStaticJavaScript(url) {
   try {
     const parsed = new URL(url);
@@ -70,6 +75,38 @@ function isSpeculativeNavigationPrefetch(headers) {
     .join(" ")
     .toLowerCase();
   return headers["next-router-prefetch"] === "1" || purpose.includes("prefetch");
+}
+
+async function waitForRouteJavaScriptQuiescence(
+  page,
+  pendingScriptRequestIds,
+  getLastScriptActivityAt,
+) {
+  const startedAt = Date.now();
+  const minimumObservationUntil = startedAt + ROUTE_JS_MIN_OBSERVATION_MS;
+  const deadline = startedAt + ROUTE_JS_MAX_OBSERVATION_MS;
+
+  while (Date.now() < deadline) {
+    const now = Date.now();
+    const quietFor = now - getLastScriptActivityAt();
+
+    if (
+      now >= minimumObservationUntil &&
+      pendingScriptRequestIds.size === 0 &&
+      quietFor >= ROUTE_JS_QUIET_WINDOW_MS
+    ) {
+      return;
+    }
+
+    await page.waitForTimeout(ROUTE_JS_POLL_MS);
+  }
+
+  throw new Error(
+    "Route JavaScript did not settle within " +
+      ROUTE_JS_MAX_OBSERVATION_MS +
+      "ms; pending same-origin script requests: " +
+      pendingScriptRequestIds.size,
+  );
 }
 
 async function measureRoute(browser, route) {
@@ -95,14 +132,29 @@ async function measureRoute(browser, route) {
   const encodedTransfer = new Map();
   const scripts = new Map();
   const bodyReads = [];
+  const pendingScriptRequestIds = new Set();
+  let lastScriptActivityAt = Date.now();
+
+  const markScriptActivity = () => {
+    lastScriptActivityAt = Date.now();
+  };
 
   await cdp.send("Network.enable");
   await cdp.send("Network.setCacheDisabled", { cacheDisabled: true });
+
+  cdp.on("Network.requestWillBeSent", (event) => {
+    const url = event.request?.url;
+    if (!url || !sameOriginStaticJavaScript(url)) return;
+    requestUrls.set(event.requestId, url);
+    pendingScriptRequestIds.add(event.requestId);
+    markScriptActivity();
+  });
 
   cdp.on("Network.responseReceived", (event) => {
     const url = event.response?.url;
     if (!url || !sameOriginStaticJavaScript(url)) return;
     requestUrls.set(event.requestId, url);
+    markScriptActivity();
   });
 
   cdp.on("Network.loadingFinished", (event) => {
@@ -110,11 +162,20 @@ async function measureRoute(browser, route) {
     if (!url) return;
     const current = encodedTransfer.get(url) ?? 0;
     encodedTransfer.set(url, Math.max(current, Math.round(event.encodedDataLength || 0)));
+    pendingScriptRequestIds.delete(event.requestId);
+    markScriptActivity();
+  });
+
+  cdp.on("Network.loadingFailed", (event) => {
+    if (!requestUrls.has(event.requestId)) return;
+    pendingScriptRequestIds.delete(event.requestId);
+    markScriptActivity();
   });
 
   page.on("response", (response) => {
     const url = response.url();
     if (!sameOriginStaticJavaScript(url) || scripts.has(url)) return;
+    markScriptActivity();
 
     const read = response
       .body()
@@ -137,8 +198,11 @@ async function measureRoute(browser, route) {
 
   try {
     await page.goto(BASE_URL + route, { waitUntil: "load", timeout: 120_000 });
-    await page.waitForLoadState("networkidle", { timeout: 120_000 });
-    await page.waitForTimeout(750);
+    await waitForRouteJavaScriptQuiescence(
+      page,
+      pendingScriptRequestIds,
+      () => lastScriptActivityAt,
+    );
     await Promise.allSettled(bodyReads);
   } finally {
     await cdp.detach().catch(() => undefined);

@@ -19,7 +19,13 @@ test("Step 5 measures JavaScript actually loaded by representative routes", () =
   assert.match(source, /next-router-prefetch/);
   assert.match(source, /purpose\.includes\("prefetch"\)/);
   assert.match(source, /routeHandler\.abort\("blockedbyclient"\)/);
-  assert.match(source, /waitForLoadState\("networkidle"/);
+  assert.match(source, /waitForRouteJavaScriptQuiescence/);
+  assert.match(source, /pendingScriptRequestIds/);
+  assert.match(source, /Network\.requestWillBeSent/);
+  assert.match(source, /Network\.loadingFailed/);
+  assert.match(source, /ROUTE_JS_QUIET_WINDOW_MS/);
+  assert.match(source, /ROUTE_JS_MAX_OBSERVATION_MS/);
+  assert.doesNotMatch(source, /waitForLoadState\("networkidle"/);
   assert.match(source, /maxRawBytes/);
   assert.match(source, /maxGzipBytes/);
   assert.match(source, /maxTransferBytes/);
@@ -68,3 +74,16 @@ test("package exposes the Step 5 route JavaScript verifier", () => {
     "node scripts/check-route-js-budget.mjs",
   );
 });
+
+test("Step 5 waits only for route JavaScript quiescence, not global network idle", () => {
+  const source = readFileSync("scripts/check-route-js-budget.mjs", "utf8");
+
+  assert.match(source, /pendingScriptRequestIds\.size === 0/);
+  assert.match(source, /quietFor >= ROUTE_JS_QUIET_WINDOW_MS/);
+  assert.match(source, /ROUTE_JS_MIN_OBSERVATION_MS = 1_500/);
+  assert.match(source, /ROUTE_JS_QUIET_WINDOW_MS = 1_000/);
+  assert.match(source, /ROUTE_JS_MAX_OBSERVATION_MS = 30_000/);
+  assert.match(source, /ROUTE_JS_POLL_MS = 100/);
+  assert.doesNotMatch(source, /networkidle/);
+});
+
