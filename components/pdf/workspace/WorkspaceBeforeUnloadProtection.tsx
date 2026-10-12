@@ -9,8 +9,8 @@ import { useWorkspaceDocument } from "./WorkspaceDocumentProvider";
  * Browser-native dialogs require user interaction and are browser-controlled.
  */
 export function WorkspaceBeforeUnloadProtection() {
-  const { document } = useWorkspaceDocument();
-  const hasUnsavedChanges = document?.session.state.hasUnsavedChanges ?? false;
+  const { document, draftUnsavedChanges } = useWorkspaceDocument();
+  const hasUnsavedChanges = (document?.session.state.hasUnsavedChanges ?? false) || draftUnsavedChanges;
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;

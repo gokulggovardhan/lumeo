@@ -811,7 +811,8 @@ export default function SignPdfTool() {
         bytes={pdf.bytes}
         pageCount={pdf.pageCount}
         document={pdf.workspaceDocument}
-      />
+        hasUnsavedChanges={workspaceProjection?.compatible ? workspaceProjection.session.state.hasUnsavedChanges : false}
+        />
 
       <L2WorkspaceHeader
         title="Sign PDF"

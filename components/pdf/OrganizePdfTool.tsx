@@ -644,6 +644,7 @@ export default function OrganizePdfTool() {
           bytes={document_.bytes}
           pageCount={document_.pageCount}
           document={organizerState.document}
+          hasUnsavedChanges={workspaceSession?.state.hasUnsavedChanges ?? false}
         />
       ) : null}
 

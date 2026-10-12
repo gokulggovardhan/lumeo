@@ -108,6 +108,8 @@ type WorkspaceDocumentContextValue = {
   continuationTarget: WorkspaceArea | null;
   globalHistory: WorkspaceGlobalHistoryState;
   documentHealth: WorkspaceDocumentHealthFacts;
+  draftUnsavedChanges: boolean;
+  reportDraftUnsavedChanges: (dirty: boolean) => void;
   reportDocumentHealth: (
     facts: WorkspaceDocumentHealthFacts,
     documentId?: string,
@@ -216,6 +218,10 @@ export function WorkspaceDocumentProvider({
     useState<WorkspaceGlobalHistoryState>(EMPTY_GLOBAL_HISTORY);
   const [documentHealth, setDocumentHealth] =
     useState<WorkspaceDocumentHealthFacts>({});
+  const [draftUnsavedChanges, setDraftUnsavedChanges] = useState(false);
+  const reportDraftUnsavedChanges = useCallback((dirty: boolean) => {
+    setDraftUnsavedChanges(dirty);
+  }, []);
   const documentHealthDocumentIdRef = useRef<string | null>(null);
 
   const commit = useCallback((next: WorkspaceDocumentRuntime | null) => {
@@ -263,6 +269,7 @@ export function WorkspaceDocumentProvider({
     (input: StartWorkspaceDocumentInput) => {
       const id = createId("workspace");
       syncHistory(null);
+      setDraftUnsavedChanges(false);
       documentHealthDocumentIdRef.current = null;
       setDocumentHealth({});
       setContinuationTargetSafely(null);
@@ -557,6 +564,7 @@ export function WorkspaceDocumentProvider({
   const clearDocument = useCallback(() => {
     setContinuationTargetSafely(null);
     syncHistory(null);
+    setDraftUnsavedChanges(false);
     documentHealthDocumentIdRef.current = null;
     setDocumentHealth({});
     commit(null);
@@ -568,6 +576,8 @@ export function WorkspaceDocumentProvider({
       continuationTarget,
       globalHistory,
       documentHealth,
+      draftUnsavedChanges,
+      reportDraftUnsavedChanges,
       reportDocumentHealth,
       undoWorkspace,
       redoWorkspace,
@@ -588,9 +598,11 @@ export function WorkspaceDocumentProvider({
       continueCurrent,
       document,
       documentHealth,
+      draftUnsavedChanges,
       fileForCurrentRevision,
       globalHistory,
       redoWorkspace,
+      reportDraftUnsavedChanges,
       reportDocumentHealth,
       publishRevision,
       replaceSession,

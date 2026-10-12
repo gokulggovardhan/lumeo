@@ -154,6 +154,8 @@ test("upload once can switch tools immediately and Finish exports the latest mat
   );
 
   await page.getByRole("button", { name: "Rotate right" }).first().click();
+  // Local edits are protected immediately, before the first Save/materialization.
+  await expect.poll(() => nativeBeforeUnloadIsBlocked(page)).toBe(true);
   await page.getByRole("button", { name: "Save organized PDF" }).click();
   await expect(page.getByText("Organized PDF ready")).toBeVisible({
     timeout: 90_000,

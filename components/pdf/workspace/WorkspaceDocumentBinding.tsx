@@ -13,14 +13,16 @@ export function WorkspaceDocumentBinding({
   bytes,
   pageCount,
   document,
+  hasUnsavedChanges = false,
 }: {
   area: WorkspaceArea;
   fileName: string;
   bytes: ArrayBuffer;
   pageCount: number;
   document: WorkspaceDocument;
+  hasUnsavedChanges?: boolean;
 }) {
-  const { adoptDocument } = useWorkspaceDocument();
+  const { adoptDocument, reportDraftUnsavedChanges } = useWorkspaceDocument();
 
   useEffect(() => {
     adoptDocument({
@@ -31,6 +33,11 @@ export function WorkspaceDocumentBinding({
       document,
     });
   }, [adoptDocument, area, bytes, document, fileName, pageCount]);
+
+  useEffect(() => {
+    reportDraftUnsavedChanges(hasUnsavedChanges);
+    return () => reportDraftUnsavedChanges(false);
+  }, [hasUnsavedChanges, reportDraftUnsavedChanges]);
 
   return null;
 }
