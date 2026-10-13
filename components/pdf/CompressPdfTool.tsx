@@ -715,8 +715,8 @@ export default function CompressPdfTool() {
         data: new Uint8Array(copyArrayBuffer(bytes)),
         useWorkerFetch: false,
       });
-      const document = await task.promise;
-      const page = await document.getPage(pageNumber);
+      const pdfDocument = await task.promise;
+      const page = await pdfDocument.getPage(pageNumber);
       const viewport = page.getViewport({ scale: 0.35 });
       const canvas = document.createElement("canvas");
       canvas.width = Math.max(1, Math.floor(viewport.width));
