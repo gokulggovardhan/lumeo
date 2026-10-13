@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PDFDict, PDFDocument, PDFName, PDFRef, rgb, type PDFContext, type PDFPage } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { findEmbeddedJpegs, planEmbeddedJpegResize } from "@/lib/pdf/embeddedImages";
+import { buildCompressionIntelligence, compressionSamplePageNumbers, wasCompressionPassTried, type CompressionIntelligence } from "@/lib/pdf/compressionIntelligence";
 import {
   compressionProfiles as profiles,
   type ColourMode,
@@ -105,6 +106,7 @@ type CompressAnalysis = {
   pages: PageInfo[];
   averageBytesPerPage: number;
   estimatedImageHeavyRatio: number;
+  intelligence: CompressionIntelligence;
   opportunity: Opportunity;
   recommendation: CompressProfile;
   risks: DocumentRisk[];
@@ -219,35 +221,6 @@ function detectRisks(pdfText: string, pageCount: number, size: number): Document
   return risks;
 }
 
-function estimateImageHeavyRatio(pdfText: string, pageCount: number, averageBytesPerPage: number) {
-  const imageRefs = (pdfText.match(/\/Subtype\s*\/Image\b/g) ?? []).length;
-  const imageSignal = Math.min(1, imageRefs / Math.max(1, pageCount));
-  const sizeSignal = averageBytesPerPage > 900_000 ? 1 : averageBytesPerPage > 350_000 ? 0.55 : 0.18;
-  return Math.max(imageSignal, sizeSignal);
-}
-
-function getOpportunity(ratio: number, averageBytesPerPage: number, size: number): Opportunity {
-  if (ratio >= 0.7 || averageBytesPerPage > 900_000 || size > 35 * 1024 * 1024) return "High";
-  if (ratio >= 0.35 || averageBytesPerPage > 250_000 || size > 8 * 1024 * 1024) return "Moderate";
-  return "Low";
-}
-
-function recommendProfile(opportunity: Opportunity): CompressProfile {
-  if (opportunity === "Low") return "highQuality";
-  if (opportunity === "High") return "balanced";
-  return "balanced";
-}
-
-function profileExplanation(opportunity: Opportunity) {
-  if (opportunity === "High") {
-    return "This document appears image-heavy and should compress meaningfully without requiring the strongest setting first.";
-  }
-  if (opportunity === "Moderate") {
-    return "This PDF has enough size per page to make Balanced a sensible first pass.";
-  }
-  return "This PDF already appears relatively compact. High quality is safer before trying stronger compression.";
-}
-
 function applyGrayscale(canvas: HTMLCanvasElement) {
   const context = canvas.getContext("2d");
   if (!context) return;
@@ -296,6 +269,7 @@ export default function CompressPdfTool() {
   const timersRef = useRef<number[]>([]);
   const resultHeadingRef = useRef<HTMLParagraphElement | null>(null);
   const customTargetInputRef = useRef<HTMLInputElement | null>(null);
+  const outputPreviewRequestRef = useRef(0);
 
   const [analysis, setAnalysis] = useState<CompressAnalysis | null>(null);
   const [compressionMode, setCompressionMode] =
@@ -321,6 +295,7 @@ export default function CompressPdfTool() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [result, setResult] = useState<CompressResult | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [outputPreviewUrl, setOutputPreviewUrl] = useState("");
   const [workspaceDocument, setWorkspaceDocument] =
     useState<WorkspaceDocument | null>(null);
   const [workspaceBaseSession, setWorkspaceBaseSession] =
@@ -349,16 +324,7 @@ export default function CompressPdfTool() {
     };
   }, [colour, customDpi, customQuality, expertMode, metadata, profile, quality, resolution]);
 
-  const opportunityCopy = useMemo(() => {
-    if (!analysis) return "";
-    if (analysis.opportunity === "High") {
-      return "This document contains image-heavy signals that may respond well to compression.";
-    }
-    if (analysis.opportunity === "Moderate") {
-      return "This document has a moderate size profile. Balanced compression is a good first pass.";
-    }
-    return "This PDF already appears relatively compact. Stronger compression may reduce clarity with limited savings.";
-  }, [analysis]);
+  const opportunityCopy = analysis?.intelligence.explanation ?? "";
 
   const profileLabel = profiles[profile].label;
   const outputFileName = sanitizePdfFileName(outputName);
@@ -403,6 +369,8 @@ export default function CompressPdfTool() {
   const clearResult = useCallback(
     (message = "") => {
       if (result?.url) URL.revokeObjectURL(result.url);
+      outputPreviewRequestRef.current += 1;
+      setOutputPreviewUrl("");
       setResult(null);
       setCleanupMessage(message);
     },
@@ -429,13 +397,30 @@ export default function CompressPdfTool() {
     timersRef.current = [];
   }, []);
 
+  // Each object URL has an independent lifecycle. In particular, changing
+  // the comparison preview must never revoke the downloadable PDF URL.
+  useEffect(() => {
+    const resultUrl = result?.url;
+    return () => {
+      if (resultUrl) URL.revokeObjectURL(resultUrl);
+    };
+  }, [result?.url]);
+
   useEffect(() => {
     return () => {
-      if (result?.url) URL.revokeObjectURL(result.url);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      void cleanupTasks();
     };
-  }, [cleanupTasks, previewUrl, result?.url]);
+  }, [previewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (outputPreviewUrl) URL.revokeObjectURL(outputPreviewUrl);
+    };
+  }, [outputPreviewUrl]);
+
+  useEffect(() => () => {
+    void cleanupTasks();
+  }, [cleanupTasks]);
 
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
@@ -507,7 +492,7 @@ export default function CompressPdfTool() {
       if (!context) return;
       canvas.width = Math.max(1, Math.floor(viewport.width));
       canvas.height = Math.max(1, Math.floor(viewport.height));
-      context.fillStyle = "#F8F3E4";
+      context.fillStyle = "#FFFFFF";
       context.fillRect(0, 0, canvas.width, canvas.height);
       const task = page.render({ canvas, canvasContext: context, viewport });
       renderTaskRef.current = task;
@@ -590,9 +575,6 @@ export default function CompressPdfTool() {
 
       const pdfText = new TextDecoder("latin1").decode(new Uint8Array(bytes).slice(0, Math.min(bytes.byteLength, 2_500_000)));
       const averageBytesPerPage = file.size / Math.max(1, sourcePdf.getPageCount());
-      const estimatedImageHeavyRatio = estimateImageHeavyRatio(pdfText, sourcePdf.getPageCount(), averageBytesPerPage);
-      const opportunity = getOpportunity(estimatedImageHeavyRatio, averageBytesPerPage, file.size);
-      const recommendation = recommendProfile(opportunity);
       const samplePage = Math.max(1, Math.ceil(sourcePdf.getPageCount() / 2));
 
       const pdfJs = await loadPdfJsModule();
@@ -607,6 +589,57 @@ export default function CompressPdfTool() {
       }
       pdfJsDocRef.current = pdfJsDoc;
 
+      // Inspect the actual PDF object graph. Unlike matching raw PDF
+      // bytes, this finds JPEG streams inside compressed object structures.
+      // A maximum of three pages is sampled for selectable text; both
+      // measurements stay entirely on the user's device.
+      const sourcePages = sourcePdf.getPages();
+      const uniqueJpegs = new Map<string, number>();
+      let jpegPages = 0;
+      for (const sourcePage of sourcePages) {
+        const jpegs = findEmbeddedJpegs(sourcePage);
+        if (jpegs.length > 0) jpegPages += 1;
+        for (const jpeg of jpegs) {
+          uniqueJpegs.set(jpeg.ref.toString(), jpeg.bytes.byteLength);
+        }
+      }
+      let textPages = 0;
+      let measuredSamples = 0;
+      for (const pageNumber of compressionSamplePageNumbers(sourcePages.length)) {
+        if (nextSession !== sessionRef.current) return;
+        try {
+          const sample = await pdfJsDoc.getPage(pageNumber);
+          const extracted = await withPageTimeout(
+            sample.getTextContent(), pageNumber, 15_000, "sample selectable text",
+          );
+          measuredSamples += 1;
+          if (extracted.items.some((item) => "str" in item && item.str.trim().length > 0)) {
+            textPages += 1;
+          }
+        } catch {
+          // Unavailable text samples are unknown, not evidence of a scan.
+          // An otherwise valid PDF must remain usable.
+        }
+      }
+      const protectedStructure =
+        sourcePages.some((page) => Boolean(page.node.Annots()?.size())) ||
+        ["Outlines", "AcroForm", "Names", "AF", "Perms", "StructTreeRoot", "OutputIntents"].some(
+          (key) => sourcePdf.catalog.has(PDFName.of(key)),
+        );
+      const intelligence = buildCompressionIntelligence({
+        totalBytes: file.size,
+        pageCount: sourcePages.length,
+        plainJpegPages: jpegPages,
+        plainJpegImageCount: uniqueJpegs.size,
+        uniqueJpegBytes: [...uniqueJpegs.values()].reduce((sum, bytes) => sum + bytes, 0),
+        sampledTextPages: textPages,
+        sampledPages: measuredSamples,
+        protectedStructure,
+      });
+      const estimatedImageHeavyRatio = intelligence.jpegPageShare;
+      const opportunity = intelligence.opportunity;
+      const recommendation = intelligence.recommendation;
+
       const nextAnalysis: CompressAnalysis = {
         name: file.name,
         size: file.size,
@@ -616,6 +649,7 @@ export default function CompressPdfTool() {
         pages,
         averageBytesPerPage,
         estimatedImageHeavyRatio,
+        intelligence,
         opportunity,
         recommendation,
         risks: detectRisks(pdfText, sourcePdf.getPageCount(), file.size),
@@ -680,6 +714,54 @@ export default function CompressPdfTool() {
       cancelled = true;
     };
   }, [analysis, continuationTarget, readPdfFile, takeContinuation]);
+
+  // A comparison preview is created only after a usable PDF download exists.
+  // Rendering is best effort and never blocks or invalidates compression.
+  // URLs stay local to the browser and are revoked on result changes.
+  async function renderOutputComparison(
+    bytes: ArrayBuffer,
+    pageNumber: number,
+    currentSession: number,
+    previewRequest: number,
+  ) {
+    let task: ReturnType<Awaited<ReturnType<typeof loadPdfJsModule>>["getDocument"]> | null = null;
+    try {
+      const pdfJs = await loadPdfJsModule();
+      task = pdfJs.getDocument({
+        data: new Uint8Array(copyArrayBuffer(bytes)),
+        useWorkerFetch: false,
+      });
+      const pdfDocument = await task.promise;
+      const page = await pdfDocument.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 0.35 });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) return;
+      context.fillStyle = "#FFFFFF";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      const render = page.render({ canvas, canvasContext: context, viewport });
+      await renderPageWithTimeout(render, pageNumber);
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.82),
+      );
+      canvas.width = 0;
+      canvas.height = 0;
+      if (!blob) return;
+      if (currentSession !== sessionRef.current ||
+          previewRequest !== outputPreviewRequestRef.current) return;
+      setOutputPreviewUrl(URL.createObjectURL(blob));
+    } catch {
+      // A preview is optional: the validated downloaded PDF is still usable.
+    } finally {
+      try {
+        await task?.destroy();
+      } catch {
+        // The task may already have been destroyed on navigation.
+      }
+    }
+  }
 
   function handleFiles(files: FileList | File[]) {
     const file = Array.from(files)[0];
@@ -1278,7 +1360,9 @@ export default function CompressPdfTool() {
             smallestSuccessfulStrength,
           });
           if (Math.abs(nextStrength - parameters.strength) < 0.01) break;
-          parameters = parametersForStrength(nextStrength);
+          const nextParameters = parametersForStrength(nextStrength);
+          if (wasCompressionPassTried(attempts, nextParameters.dpi, nextParameters.imageQuality)) break;
+          parameters = nextParameters;
           await new Promise((resolve) => window.setTimeout(resolve, 0));
         }
 
@@ -1359,6 +1443,10 @@ export default function CompressPdfTool() {
         tone,
         target: targetResult,
       });
+      if (!usedOriginal && !originalOnlyReason) {
+        const requestId = ++outputPreviewRequestRef.current;
+        void renderOutputComparison(outputBuffer, analysis.samplePage, currentSession, requestId);
+      }
       setStatus("Download ready");
       setProgressDetail(
         compressionMode === "target" ? "Target analysis complete." : "Compression complete.",
@@ -1507,13 +1595,16 @@ export default function CompressPdfTool() {
             <div className="mt-3 grid gap-3 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {analysis.opportunity === "High" ? "Image-heavy document" : analysis.opportunity === "Moderate" ? "Balanced document" : "Already compact document"}
+                  {analysis.intelligence.kind === "mixed" ? "Mixed text and images" : analysis.intelligence.kind === "scanned" ? "JPEG-based scanned document" : analysis.intelligence.kind === "text" ? "Primarily selectable text" : "Document content analysed"}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/48">
                   Compression opportunity: {analysis.opportunity} · Recommended: {profiles[analysis.recommendation].label}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/38">
                   {opportunityCopy}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                  {analysis.intelligence.evidence}. Other image formats may not be counted; savings are not guaranteed.
                 </p>
               </div>
               {previewUrl ? (
@@ -1524,6 +1615,44 @@ export default function CompressPdfTool() {
               ) : null}
             </div>
 
+            {result ? (
+              <section aria-label="Before and after compression comparison" className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/60 p-3">
+                <h2 className="font-serif text-base font-semibold text-[var(--text-primary)]">Before and after</h2>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                  The same representative page {analysis.samplePage} from both PDFs. Previews are rendered on this device; the downloaded PDF is the authoritative output.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <figure className="min-w-0">
+                    <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-lg border border-[var(--border-hairline)] bg-white">
+                      {previewUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={previewUrl} alt="Original PDF page preview" className="h-full w-full object-contain" />
+                      ) : <p className="p-2 text-center text-xs text-slate-600">Original preview unavailable</p>}
+                    </div>
+                    <figcaption className="mt-2 text-xs font-semibold text-[var(--text-primary)]">
+                      Original · {formatFileSize(result.originalSize)}
+                    </figcaption>
+                  </figure>
+                  <figure className="min-w-0">
+                    <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-lg border border-[var(--border-hairline)] bg-white">
+                      {outputPreviewUrl || (result.compressedSize === result.originalSize && previewUrl) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={outputPreviewUrl || previewUrl} alt="Result PDF page preview" className="h-full w-full object-contain" />
+                      ) : <p role="status" className="p-2 text-center text-xs text-slate-600">Result preview unavailable or still rendering</p>}
+                    </div>
+                    <figcaption className="mt-2 text-xs font-semibold text-[var(--text-primary)]">
+                      Result · {formatFileSize(result.compressedSize)}
+                    </figcaption>
+                  </figure>
+                </div>
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  {result.protectedReason
+                    ? "Original PDF returned unchanged to preserve document features."
+                    : "Check fine print and images at full zoom after downloading. Compression may reduce photo detail."}
+                </p>
+              </section>
+            ) : null}
+
             <div className="mt-3 hidden gap-3 md:grid md:grid-cols-3">
               <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Compression opportunity</p>
@@ -1531,14 +1660,14 @@ export default function CompressPdfTool() {
                 <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">{opportunityCopy}</p>
               </div>
               <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Estimated image-heavy pages</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Pages with safe JPEG resources</p>
                 <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{Math.round(analysis.estimatedImageHeavyRatio * 100)}%</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">Based on local document signals, not remote analysis.</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">Measured from JPEG objects in this PDF, not all image formats.</p>
               </div>
               <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Recommended for this document</p>
                 <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{profiles[analysis.recommendation].label}</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">{profileExplanation(analysis.opportunity)}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">{analysis.intelligence.explanation}</p>
               </div>
             </div>
 
@@ -1559,7 +1688,7 @@ export default function CompressPdfTool() {
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">Risk notes</p>
                 <div className="mt-3 space-y-2">
                   <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/8 p-3 text-xs leading-5 text-[var(--text-primary)]/74">
-                    This compression pass rebuilds page appearance as optimized images. Review the output before replacing files that need selectable text, forms, links, signatures, or archival conformance.
+                    Selectable text and vector content are retained where safe. Signed, interactive, or archival PDFs may be returned unchanged to protect document features.
                   </div>
                   {analysis.opportunity === "Low" ? (
                     <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/8 p-3 text-xs leading-5 text-[var(--text-primary)]/74">
@@ -1772,7 +1901,7 @@ export default function CompressPdfTool() {
                       <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Compression &amp; output summary</p>
                       <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-primary)]/50">
                         <li>Images: {selectedPlan.dpi} DPI · {Math.round(selectedPlan.quality * 100)}% quality · {selectedPlan.colour === "grayscale" ? "grayscale" : "colour preserved"}</li>
-                        <li>Text, links, forms: rebuilt as images — review output</li>
+                        <li>Selectable text and vector content are kept where safe; interactive documents may remain unchanged</li>
                         <li>Output: 1 compressed PDF · {profileLabel} profile · original page order preserved</li>
                         <li>Verified: page count and output filename checked after generation</li>
                       </ul>
@@ -1829,6 +1958,20 @@ export default function CompressPdfTool() {
                     <p>Pages: {result.pageCount}</p>
                     {result.mode === "quality" && result.profile ? <p>Profile: {profiles[result.profile].label}</p> : null}
                     {result.target ? <p>Passes: {result.target.attempts.length}</p> : null}
+                    {result.target?.attempts.length ? (
+                      <details className="rounded-lg border border-[var(--border-hairline)] p-2">
+                        <summary className="cursor-pointer text-xs font-semibold text-[var(--text-primary)]">
+                          Review individual compression passes
+                        </summary>
+                        <ol className="mt-2 space-y-1 text-xs">
+                          {result.target.attempts.map((attempt) => (
+                            <li key={attempt.pass}>
+                              Pass {attempt.pass}: {attempt.dpi} DPI · {Math.round(attempt.imageQuality * 100)}% image quality · {formatFileSize(attempt.outputBytes)}
+                            </li>
+                          ))}
+                        </ol>
+                      </details>
+                    ) : null}
                     {result.target ? <p>Quality: {result.target.qualityOutlook}</p> : null}
                     {result.target && result.target.textPagesPreserved > 0 && result.target.outcome !== "achieved" ? (
                       <p>

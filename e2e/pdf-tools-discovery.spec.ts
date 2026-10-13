@@ -210,10 +210,18 @@ test.describe("PDF Tools discovery", () => {
       buffer: Buffer.from(inputBytes),
     });
     await expect(page.getByText("Document profile", { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText("Mixed text and images", { exact: true })).toBeVisible();
+    await expect(page.getByText(/1 of 1 pages contain plain JPEG resources/)).toBeVisible();
     await page.getByRole("radio", { name: "Target size" }).click();
     await page.getByRole("button", { name: "Under 200 KB" }).click();
     await page.getByRole("button", { name: "Compress PDF", exact: true }).click();
     await expect(page.getByText("Target achieved", { exact: true })).toBeVisible({ timeout: 90_000 });
+    const comparison = page.getByRole("region", { name: "Before and after compression comparison" });
+    await expect(comparison).toBeVisible();
+    await expect(comparison.getByRole("img", { name: "Original PDF page preview" })).toBeVisible({ timeout: 20_000 });
+    await expect(comparison.getByRole("img", { name: "Result PDF page preview" })).toBeVisible({ timeout: 30_000 });
+    await page.getByText("Review individual compression passes").click();
+    await expect(page.getByText(/Pass 1: .* DPI/)).toBeVisible();
 
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: "Download compressed PDF" }).click();
