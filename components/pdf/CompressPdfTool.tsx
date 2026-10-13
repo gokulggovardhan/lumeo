@@ -397,14 +397,30 @@ export default function CompressPdfTool() {
     timersRef.current = [];
   }, []);
 
+  // Each object URL has an independent lifecycle. In particular, changing
+  // the comparison preview must never revoke the downloadable PDF URL.
+  useEffect(() => {
+    const resultUrl = result?.url;
+    return () => {
+      if (resultUrl) URL.revokeObjectURL(resultUrl);
+    };
+  }, [result?.url]);
+
   useEffect(() => {
     return () => {
-      if (result?.url) URL.revokeObjectURL(result.url);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
-      if (outputPreviewUrl) URL.revokeObjectURL(outputPreviewUrl);
-      void cleanupTasks();
     };
-  }, [cleanupTasks, previewUrl, outputPreviewUrl, result?.url]);
+  }, [previewUrl]);
+
+  useEffect(() => {
+    return () => {
+      if (outputPreviewUrl) URL.revokeObjectURL(outputPreviewUrl);
+    };
+  }, [outputPreviewUrl]);
+
+  useEffect(() => () => {
+    void cleanupTasks();
+  }, [cleanupTasks]);
 
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
