@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
 import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
@@ -42,9 +43,29 @@ export async function generateMetadata(): Promise<Metadata> {
   });
 }
 
-export default async function EditPdfPage() {
+// Keep tool gating server-side, but stream the text-first page shell without
+// waiting on availability. The editor is never interactive until the gate
+// resolves; maintenance messages retain exactly the same behaviour.
+async function EditPdfAvailabilityGate() {
   const toolState = await getToolBlockedState("edit");
+  return toolState.blocked ? (
+    <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
+  ) : (
+    <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool min-h-[calc(100dvh-12rem)] sm:min-h-0">
+      <DeferredEditPdfTool />
+    </div>
+  );
+}
 
+function EditPdfAvailabilityFallback() {
+  return (
+    <div className="l2-live-tool-workspace min-h-[calc(100dvh-12rem)] rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-base)]/30 p-4 sm:min-h-64" role="status" aria-label="Checking PDF editor availability">
+      <p className="text-sm text-[var(--text-muted)]">Preparing your private PDF editor…</p>
+    </div>
+  );
+}
+
+export default function EditPdfPage() {
   return (
     <PublicCatalogPageShell
       maxWidth="max-w-[1240px]"
@@ -53,11 +74,9 @@ export default async function EditPdfPage() {
     >
       <L2ToolPageHeader categoryLabel="EDIT" title="Edit PDF" description="Add text, drawing, shapes, and whiteout boxes to a PDF." />
 
-      {toolState.blocked ? (
-        <ToolMaintenanceNotice status={toolState.status} message={toolState.message} />
-      ) : (
-        <div className="l2-live-tool-workspace lumeo-fade-up lumeo-fade-up-delay-1 aura-live-tool min-h-[calc(100dvh-12rem)] sm:min-h-0"><DeferredEditPdfTool /></div>
-      )}
+      <Suspense fallback={<EditPdfAvailabilityFallback />}>
+        <EditPdfAvailabilityGate />
+      </Suspense>
 
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(softwareSchema) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }} />
