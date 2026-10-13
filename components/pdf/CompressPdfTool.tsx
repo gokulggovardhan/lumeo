@@ -269,6 +269,7 @@ export default function CompressPdfTool() {
   const timersRef = useRef<number[]>([]);
   const resultHeadingRef = useRef<HTMLParagraphElement | null>(null);
   const customTargetInputRef = useRef<HTMLInputElement | null>(null);
+  const outputPreviewRequestRef = useRef(0);
 
   const [analysis, setAnalysis] = useState<CompressAnalysis | null>(null);
   const [compressionMode, setCompressionMode] =
@@ -294,6 +295,7 @@ export default function CompressPdfTool() {
   const [isCompressing, setIsCompressing] = useState(false);
   const [result, setResult] = useState<CompressResult | null>(null);
   const [previewUrl, setPreviewUrl] = useState("");
+  const [outputPreviewUrl, setOutputPreviewUrl] = useState("");
   const [workspaceDocument, setWorkspaceDocument] =
     useState<WorkspaceDocument | null>(null);
   const [workspaceBaseSession, setWorkspaceBaseSession] =
@@ -367,6 +369,8 @@ export default function CompressPdfTool() {
   const clearResult = useCallback(
     (message = "") => {
       if (result?.url) URL.revokeObjectURL(result.url);
+      outputPreviewRequestRef.current += 1;
+      setOutputPreviewUrl("");
       setResult(null);
       setCleanupMessage(message);
     },
@@ -397,9 +401,10 @@ export default function CompressPdfTool() {
     return () => {
       if (result?.url) URL.revokeObjectURL(result.url);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
+      if (outputPreviewUrl) URL.revokeObjectURL(outputPreviewUrl);
       void cleanupTasks();
     };
-  }, [cleanupTasks, previewUrl, result?.url]);
+  }, [cleanupTasks, previewUrl, outputPreviewUrl, result?.url]);
 
   useEffect(() => {
     if (!shouldAttemptOnce({ availability, alreadyAccepted: openedTrackedRef.current })) return;
@@ -693,6 +698,54 @@ export default function CompressPdfTool() {
       cancelled = true;
     };
   }, [analysis, continuationTarget, readPdfFile, takeContinuation]);
+
+  // A comparison preview is created only after a usable PDF download exists.
+  // Rendering is best effort and never blocks or invalidates compression.
+  // URLs stay local to the browser and are revoked on result changes.
+  async function renderOutputComparison(
+    bytes: ArrayBuffer,
+    pageNumber: number,
+    currentSession: number,
+    previewRequest: number,
+  ) {
+    let task: ReturnType<Awaited<ReturnType<typeof loadPdfJsModule>>["getDocument"]> | null = null;
+    try {
+      const pdfJs = await loadPdfJsModule();
+      task = pdfJs.getDocument({
+        data: new Uint8Array(copyArrayBuffer(bytes)),
+        useWorkerFetch: false,
+      });
+      const document = await task.promise;
+      const page = await document.getPage(pageNumber);
+      const viewport = page.getViewport({ scale: 0.35 });
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.floor(viewport.width));
+      canvas.height = Math.max(1, Math.floor(viewport.height));
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) return;
+      context.fillStyle = "#FFFFFF";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      const render = page.render({ canvas, canvasContext: context, viewport });
+      await renderPageWithTimeout(render, pageNumber);
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.82),
+      );
+      canvas.width = 0;
+      canvas.height = 0;
+      if (!blob) return;
+      if (currentSession !== sessionRef.current ||
+          previewRequest !== outputPreviewRequestRef.current) return;
+      setOutputPreviewUrl(URL.createObjectURL(blob));
+    } catch {
+      // A preview is optional: the validated downloaded PDF is still usable.
+    } finally {
+      try {
+        await task?.destroy();
+      } catch {
+        // The task may already have been destroyed on navigation.
+      }
+    }
+  }
 
   function handleFiles(files: FileList | File[]) {
     const file = Array.from(files)[0];
@@ -1374,6 +1427,10 @@ export default function CompressPdfTool() {
         tone,
         target: targetResult,
       });
+      if (!usedOriginal && !originalOnlyReason) {
+        const requestId = ++outputPreviewRequestRef.current;
+        void renderOutputComparison(outputBuffer, analysis.samplePage, currentSession, requestId);
+      }
       setStatus("Download ready");
       setProgressDetail(
         compressionMode === "target" ? "Target analysis complete." : "Compression complete.",
