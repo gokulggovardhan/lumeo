@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PDFDict, PDFDocument, PDFName, PDFRef, rgb, type PDFContext, type PDFPage } from "pdf-lib";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import { findEmbeddedJpegs, planEmbeddedJpegResize } from "@/lib/pdf/embeddedImages";
+import { buildCompressionIntelligence, compressionSamplePageNumbers, wasCompressionPassTried, type CompressionIntelligence } from "@/lib/pdf/compressionIntelligence";
 import {
   compressionProfiles as profiles,
   type ColourMode,
@@ -105,6 +106,7 @@ type CompressAnalysis = {
   pages: PageInfo[];
   averageBytesPerPage: number;
   estimatedImageHeavyRatio: number;
+  intelligence: CompressionIntelligence;
   opportunity: Opportunity;
   recommendation: CompressProfile;
   risks: DocumentRisk[];
@@ -219,35 +221,6 @@ function detectRisks(pdfText: string, pageCount: number, size: number): Document
   return risks;
 }
 
-function estimateImageHeavyRatio(pdfText: string, pageCount: number, averageBytesPerPage: number) {
-  const imageRefs = (pdfText.match(/\/Subtype\s*\/Image\b/g) ?? []).length;
-  const imageSignal = Math.min(1, imageRefs / Math.max(1, pageCount));
-  const sizeSignal = averageBytesPerPage > 900_000 ? 1 : averageBytesPerPage > 350_000 ? 0.55 : 0.18;
-  return Math.max(imageSignal, sizeSignal);
-}
-
-function getOpportunity(ratio: number, averageBytesPerPage: number, size: number): Opportunity {
-  if (ratio >= 0.7 || averageBytesPerPage > 900_000 || size > 35 * 1024 * 1024) return "High";
-  if (ratio >= 0.35 || averageBytesPerPage > 250_000 || size > 8 * 1024 * 1024) return "Moderate";
-  return "Low";
-}
-
-function recommendProfile(opportunity: Opportunity): CompressProfile {
-  if (opportunity === "Low") return "highQuality";
-  if (opportunity === "High") return "balanced";
-  return "balanced";
-}
-
-function profileExplanation(opportunity: Opportunity) {
-  if (opportunity === "High") {
-    return "This document appears image-heavy and should compress meaningfully without requiring the strongest setting first.";
-  }
-  if (opportunity === "Moderate") {
-    return "This PDF has enough size per page to make Balanced a sensible first pass.";
-  }
-  return "This PDF already appears relatively compact. High quality is safer before trying stronger compression.";
-}
-
 function applyGrayscale(canvas: HTMLCanvasElement) {
   const context = canvas.getContext("2d");
   if (!context) return;
@@ -349,16 +322,7 @@ export default function CompressPdfTool() {
     };
   }, [colour, customDpi, customQuality, expertMode, metadata, profile, quality, resolution]);
 
-  const opportunityCopy = useMemo(() => {
-    if (!analysis) return "";
-    if (analysis.opportunity === "High") {
-      return "This document contains image-heavy signals that may respond well to compression.";
-    }
-    if (analysis.opportunity === "Moderate") {
-      return "This document has a moderate size profile. Balanced compression is a good first pass.";
-    }
-    return "This PDF already appears relatively compact. Stronger compression may reduce clarity with limited savings.";
-  }, [analysis]);
+  const opportunityCopy = analysis?.intelligence.explanation ?? "";
 
   const profileLabel = profiles[profile].label;
   const outputFileName = sanitizePdfFileName(outputName);
@@ -590,9 +554,6 @@ export default function CompressPdfTool() {
 
       const pdfText = new TextDecoder("latin1").decode(new Uint8Array(bytes).slice(0, Math.min(bytes.byteLength, 2_500_000)));
       const averageBytesPerPage = file.size / Math.max(1, sourcePdf.getPageCount());
-      const estimatedImageHeavyRatio = estimateImageHeavyRatio(pdfText, sourcePdf.getPageCount(), averageBytesPerPage);
-      const opportunity = getOpportunity(estimatedImageHeavyRatio, averageBytesPerPage, file.size);
-      const recommendation = recommendProfile(opportunity);
       const samplePage = Math.max(1, Math.ceil(sourcePdf.getPageCount() / 2));
 
       const pdfJs = await loadPdfJsModule();
@@ -616,6 +577,7 @@ export default function CompressPdfTool() {
         pages,
         averageBytesPerPage,
         estimatedImageHeavyRatio,
+        intelligence,
         opportunity,
         recommendation,
         risks: detectRisks(pdfText, sourcePdf.getPageCount(), file.size),
@@ -1278,7 +1240,9 @@ export default function CompressPdfTool() {
             smallestSuccessfulStrength,
           });
           if (Math.abs(nextStrength - parameters.strength) < 0.01) break;
-          parameters = parametersForStrength(nextStrength);
+          const nextParameters = parametersForStrength(nextStrength);
+          if (wasCompressionPassTried(attempts, nextParameters.dpi, nextParameters.imageQuality)) break;
+          parameters = nextParameters;
           await new Promise((resolve) => window.setTimeout(resolve, 0));
         }
 
@@ -1531,14 +1495,14 @@ export default function CompressPdfTool() {
                 <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">{opportunityCopy}</p>
               </div>
               <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
-                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Estimated image-heavy pages</p>
+                <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Pages with safe JPEG resources</p>
                 <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{Math.round(analysis.estimatedImageHeavyRatio * 100)}%</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">Based on local document signals, not remote analysis.</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">Measured from JPEG objects in this PDF, not all image formats.</p>
               </div>
               <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Recommended for this document</p>
                 <p className="mt-2 text-2xl font-bold text-[var(--text-primary)]">{profiles[analysis.recommendation].label}</p>
-                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">{profileExplanation(analysis.opportunity)}</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/42">{analysis.intelligence.explanation}</p>
               </div>
             </div>
 
@@ -1559,7 +1523,7 @@ export default function CompressPdfTool() {
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--lumeo-gold)]">Risk notes</p>
                 <div className="mt-3 space-y-2">
                   <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/8 p-3 text-xs leading-5 text-[var(--text-primary)]/74">
-                    This compression pass rebuilds page appearance as optimized images. Review the output before replacing files that need selectable text, forms, links, signatures, or archival conformance.
+                    Selectable text and vector content are retained where safe. Signed, interactive, or archival PDFs may be returned unchanged to protect document features.
                   </div>
                   {analysis.opportunity === "Low" ? (
                     <div className="rounded-lg border border-[var(--lumeo-gold)]/18 bg-[var(--lumeo-gold)]/8 p-3 text-xs leading-5 text-[var(--text-primary)]/74">
@@ -1772,7 +1736,7 @@ export default function CompressPdfTool() {
                       <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Compression &amp; output summary</p>
                       <ul className="mt-2 space-y-1.5 text-xs text-[var(--text-primary)]/50">
                         <li>Images: {selectedPlan.dpi} DPI · {Math.round(selectedPlan.quality * 100)}% quality · {selectedPlan.colour === "grayscale" ? "grayscale" : "colour preserved"}</li>
-                        <li>Text, links, forms: rebuilt as images — review output</li>
+                        <li>Selectable text and vector content are kept where safe; interactive documents may remain unchanged</li>
                         <li>Output: 1 compressed PDF · {profileLabel} profile · original page order preserved</li>
                         <li>Verified: page count and output filename checked after generation</li>
                       </ul>
