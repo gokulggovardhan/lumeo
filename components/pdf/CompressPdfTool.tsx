@@ -568,6 +568,57 @@ export default function CompressPdfTool() {
       }
       pdfJsDocRef.current = pdfJsDoc;
 
+      // Inspect the actual PDF object graph. Unlike matching raw PDF
+      // bytes, this finds JPEG streams inside compressed object structures.
+      // A maximum of three pages is sampled for selectable text; both
+      // measurements stay entirely on the user's device.
+      const sourcePages = sourcePdf.getPages();
+      const uniqueJpegs = new Map<string, number>();
+      let jpegPages = 0;
+      for (const sourcePage of sourcePages) {
+        const jpegs = findEmbeddedJpegs(sourcePage);
+        if (jpegs.length > 0) jpegPages += 1;
+        for (const jpeg of jpegs) {
+          uniqueJpegs.set(jpeg.ref.toString(), jpeg.bytes.byteLength);
+        }
+      }
+      let textPages = 0;
+      let measuredSamples = 0;
+      for (const pageNumber of compressionSamplePageNumbers(sourcePages.length)) {
+        if (nextSession !== sessionRef.current) return;
+        try {
+          const sample = await pdfJsDoc.getPage(pageNumber);
+          const extracted = await withPageTimeout(
+            sample.getTextContent(), pageNumber, 15_000, "sample selectable text",
+          );
+          measuredSamples += 1;
+          if (extracted.items.some((item) => "str" in item && item.str.trim().length > 0)) {
+            textPages += 1;
+          }
+        } catch {
+          // Unavailable text samples are unknown, not evidence of a scan.
+          // An otherwise valid PDF must remain usable.
+        }
+      }
+      const protectedStructure =
+        sourcePages.some((page) => Boolean(page.node.Annots()?.size())) ||
+        ["Outlines", "AcroForm", "Names", "AF", "Perms", "StructTreeRoot", "OutputIntents"].some(
+          (key) => sourcePdf.catalog.has(PDFName.of(key)),
+        );
+      const intelligence = buildCompressionIntelligence({
+        totalBytes: file.size,
+        pageCount: sourcePages.length,
+        plainJpegPages: jpegPages,
+        plainJpegImageCount: uniqueJpegs.size,
+        uniqueJpegBytes: [...uniqueJpegs.values()].reduce((sum, bytes) => sum + bytes, 0),
+        sampledTextPages: textPages,
+        sampledPages: measuredSamples,
+        protectedStructure,
+      });
+      const estimatedImageHeavyRatio = intelligence.jpegPageShare;
+      const opportunity = intelligence.opportunity;
+      const recommendation = intelligence.recommendation;
+
       const nextAnalysis: CompressAnalysis = {
         name: file.name,
         size: file.size,
@@ -1471,13 +1522,16 @@ export default function CompressPdfTool() {
             <div className="mt-3 grid gap-3 rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/60 p-3 md:grid-cols-[1fr_auto] md:items-center">
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-[var(--text-primary)]">
-                  {analysis.opportunity === "High" ? "Image-heavy document" : analysis.opportunity === "Moderate" ? "Balanced document" : "Already compact document"}
+                  {analysis.intelligence.kind === "mixed" ? "Mixed text and images" : analysis.intelligence.kind === "scanned" ? "JPEG-based scanned document" : analysis.intelligence.kind === "text" ? "Primarily selectable text" : "Document content analysed"}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/48">
                   Compression opportunity: {analysis.opportunity} · Recommended: {profiles[analysis.recommendation].label}
                 </p>
                 <p className="mt-1 text-xs leading-5 text-[var(--text-primary)]/38">
                   {opportunityCopy}
+                </p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                  {analysis.intelligence.evidence}. Other image formats may not be counted; savings are not guaranteed.
                 </p>
               </div>
               {previewUrl ? (
