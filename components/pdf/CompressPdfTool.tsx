@@ -476,7 +476,7 @@ export default function CompressPdfTool() {
       if (!context) return;
       canvas.width = Math.max(1, Math.floor(viewport.width));
       canvas.height = Math.max(1, Math.floor(viewport.height));
-      context.fillStyle = "#F8F3E4";
+      context.fillStyle = "#FFFFFF";
       context.fillRect(0, 0, canvas.width, canvas.height);
       const task = page.render({ canvas, canvasContext: context, viewport });
       renderTaskRef.current = task;
@@ -1599,6 +1599,44 @@ export default function CompressPdfTool() {
               ) : null}
             </div>
 
+            {result ? (
+              <section aria-label="Before and after compression comparison" className="mt-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--atelier-surface-2)]/60 p-3">
+                <h2 className="font-serif text-base font-semibold text-[var(--text-primary)]">Before and after</h2>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                  The same representative page {analysis.samplePage} from both PDFs. Previews are rendered on this device; the downloaded PDF is the authoritative output.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <figure className="min-w-0">
+                    <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-lg border border-[var(--border-hairline)] bg-white">
+                      {previewUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={previewUrl} alt="Original PDF page preview" className="h-full w-full object-contain" />
+                      ) : <p className="p-2 text-center text-xs text-slate-600">Original preview unavailable</p>}
+                    </div>
+                    <figcaption className="mt-2 text-xs font-semibold text-[var(--text-primary)]">
+                      Original · {formatFileSize(result.originalSize)}
+                    </figcaption>
+                  </figure>
+                  <figure className="min-w-0">
+                    <div className="flex aspect-[3/4] items-center justify-center overflow-hidden rounded-lg border border-[var(--border-hairline)] bg-white">
+                      {outputPreviewUrl || (result.compressedSize === result.originalSize && previewUrl) ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={outputPreviewUrl || previewUrl} alt="Result PDF page preview" className="h-full w-full object-contain" />
+                      ) : <p role="status" className="p-2 text-center text-xs text-slate-600">Result preview unavailable or still rendering</p>}
+                    </div>
+                    <figcaption className="mt-2 text-xs font-semibold text-[var(--text-primary)]">
+                      Result · {formatFileSize(result.compressedSize)}
+                    </figcaption>
+                  </figure>
+                </div>
+                <p className="mt-2 text-xs text-[var(--text-muted)]">
+                  {result.protectedReason
+                    ? "Original PDF returned unchanged to preserve document features."
+                    : "Check fine print and images at full zoom after downloading. Compression may reduce photo detail."}
+                </p>
+              </section>
+            ) : null}
+
             <div className="mt-3 hidden gap-3 md:grid md:grid-cols-3">
               <div className="rounded-xl border border-[var(--text-primary)]/10 bg-[var(--atelier-surface-2)]/64 p-3">
                 <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--lumeo-gold)]">Compression opportunity</p>
@@ -1904,6 +1942,20 @@ export default function CompressPdfTool() {
                     <p>Pages: {result.pageCount}</p>
                     {result.mode === "quality" && result.profile ? <p>Profile: {profiles[result.profile].label}</p> : null}
                     {result.target ? <p>Passes: {result.target.attempts.length}</p> : null}
+                    {result.target?.attempts.length ? (
+                      <details className="rounded-lg border border-[var(--border-hairline)] p-2">
+                        <summary className="cursor-pointer text-xs font-semibold text-[var(--text-primary)]">
+                          Review individual compression passes
+                        </summary>
+                        <ol className="mt-2 space-y-1 text-xs">
+                          {result.target.attempts.map((attempt) => (
+                            <li key={attempt.pass}>
+                              Pass {attempt.pass}: {attempt.dpi} DPI · {Math.round(attempt.imageQuality * 100)}% image quality · {formatFileSize(attempt.outputBytes)}
+                            </li>
+                          ))}
+                        </ol>
+                      </details>
+                    ) : null}
                     {result.target ? <p>Quality: {result.target.qualityOutlook}</p> : null}
                     {result.target && result.target.textPagesPreserved > 0 && result.target.outcome !== "achieved" ? (
                       <p>
