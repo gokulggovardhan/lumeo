@@ -125,15 +125,15 @@ jobs:
           robots="$(curl --silent --show-error --max-time 30 https://lumeo.in/robots.txt)"
           sitemap="$(curl --silent --show-error --max-time 30 https://lumeo.in/sitemap.xml)"
 
-          printf '%s' "$home" | grep -Fq 'https://lumeo.in' || { echo "FAIL: homepage canonical host missing."; exit 1; }
+          grep -Fq 'https://lumeo.in' <<< "$home" || { echo "FAIL: homepage canonical host missing."; exit 1; }
           retired_host="$(printf '%s%s' 'ver' 'cel')"
-          if printf '%s\n%s\n%s' "$home" "$robots" "$sitemap" | grep -Eqi "${retired_host}[.]app|now[.]sh"; then
+          if grep -Eqi "${retired_host}[.]app|now[.]sh" <<< "$home" || grep -Eqi "${retired_host}[.]app|now[.]sh" <<< "$robots" || grep -Eqi "${retired_host}[.]app|now[.]sh" <<< "$sitemap"; then
             echo "FAIL: public SEO output contains a retired hosting-provider hostname."
             exit 1
           fi
-          printf '%s' "$robots" | grep -Fq 'https://lumeo.in/sitemap.xml' || { echo "FAIL: robots sitemap URL wrong."; exit 1; }
+          grep -Fq 'https://lumeo.in/sitemap.xml' <<< "$robots" || { echo "FAIL: robots sitemap URL wrong."; exit 1; }
           for route in /heic-to-jpeg /pdf/edit /pdf/crop /pdf/watermark; do
-            printf '%s' "$sitemap" | grep -Fq "https://lumeo.in$route" || { echo "FAIL: sitemap missing $route"; exit 1; }
+            grep -Fq "https://lumeo.in$route" <<< "$sitemap" || { echo "FAIL: sitemap missing $route"; exit 1; }
           done
           echo "PASS: canonical metadata, robots and sitemap use lumeo.in."
 
