@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PublicCatalogPageShell } from "@/components/public/PublicCatalogPageShell";
-import { L2ToolPageHeader } from "@/components/pdf/workspace/ToolWorkspace";
+import { PublicToolPageHeader } from "@/components/pdf/workspace/PublicToolPageHeader";
 import { ToolMaintenanceNotice } from "@/components/pdf/ToolMaintenanceNotice";
 import { getToolBlockedState } from "@/lib/tools/tool-status";
 import { withSeoOverride } from "@/lib/public-site/seo";
@@ -72,7 +72,7 @@ export default function EditPdfPage() {
       mainClassName="min-h-dvh bg-[var(--surface-canvas)] text-[var(--text-primary)]"
       contentClassName="px-5 pb-12 pt-7 sm:px-8 sm:pb-14 sm:pt-9"
     >
-      <L2ToolPageHeader categoryLabel="EDIT" title="Edit PDF" description="Add text, drawing, shapes, and whiteout boxes to a PDF." />
+      <PublicToolPageHeader categoryLabel="EDIT" title="Edit PDF" description="Add text, drawing, shapes, and whiteout boxes to a PDF." />
 
       <Suspense fallback={<EditPdfAvailabilityFallback />}>
         <EditPdfAvailabilityGate />
