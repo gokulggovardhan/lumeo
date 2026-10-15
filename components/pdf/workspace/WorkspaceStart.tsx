@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { AuraButton, AuraStatus } from "@/components/ui/Aura";
 import {
@@ -67,7 +67,7 @@ function friendlyPdfError(error: unknown): string {
   return "Lumeo could not open this PDF. Choose a valid PDF file and try again.";
 }
 
-export function WorkspaceStart() {
+export function WorkspaceStart({ intro }: { intro: ReactNode }) {
   const router = useRouter();
   const {
     document,
@@ -165,19 +165,7 @@ export function WorkspaceStart() {
   return (
     <section className="grid gap-4 sm:gap-5">
       <div className="rounded-[var(--radius-2xl)] border border-[var(--border-default)] bg-[var(--surface-raised)] p-4 shadow-[var(--v2-elevation-2)] sm:p-6">
-        <div className="max-w-3xl">
-          <p className="aura-text-label text-[var(--text-accent)]">
-            UPLOAD ONCE · SWITCH TOOLS · DOWNLOAD ONCE
-          </p>
-          <h1 className="mt-2 font-serif text-[clamp(1.9rem,8vw,3.4rem)] font-semibold leading-[0.98] tracking-[-0.035em] text-[var(--text-primary)]">
-            PDF Workspace
-          </h1>
-          <p className="mt-2.5 max-w-2xl text-sm leading-6 text-[var(--text-secondary)] sm:mt-3 sm:text-base">
-            Keep one PDF open while you edit it, organize pages, sign, add
-            watermarks or page numbers, compress, and finish with one final
-            download.
-          </p>
-        </div>
+        {intro}
 
         {!ready ? (
           <div className="mt-5 sm:mt-6">
