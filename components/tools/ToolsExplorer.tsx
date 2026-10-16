@@ -92,7 +92,7 @@ function ToolCard({ tool }: { tool: Tile }) {
   );
 
   const shell =
-    "lumeo-tool-card group flex min-h-[8rem] flex-col gap-2 rounded-[14px] border p-3 shadow-[var(--shadow-sm)] sm:min-h-[10rem] sm:gap-3 sm:rounded-[15px] sm:p-4 " +
+    "lumeo-tool-card group [content-visibility:auto] [contain-intrinsic-size:auto_160px] flex min-h-[8rem] flex-col gap-2 rounded-[14px] border p-3 shadow-[var(--shadow-sm)] sm:min-h-[10rem] sm:gap-3 sm:rounded-[15px] sm:p-4 " +
     (available
       ? "border-[var(--border-hairline)] bg-[var(--surface-raised)] transition duration-200 ease-out hover:-translate-y-0.5 hover:border-[var(--border-subtle)] hover:bg-[var(--surface-elevated)] hover:shadow-[var(--shadow-md)] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[rgba(var(--champagne-rgb),0.2)] motion-reduce:transform-none"
       : "border-[var(--border-subtle)] bg-[var(--surface-raised)] opacity-80");
