@@ -218,7 +218,7 @@ export default function Home() {
           </Suspense>
 
           <section
-            className="mt-10 border-y border-[var(--border-hairline)] py-6 sm:mt-11"
+            className="mt-10 border-y border-[var(--border-hairline)] py-6 sm:mt-11 [content-visibility:auto] [contain-intrinsic-size:auto_160px]"
             aria-labelledby="privacy-heading"
           >
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
